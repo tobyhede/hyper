@@ -484,7 +484,7 @@ export async function connectHandles(
   targetHandle: Locator,
   whileConnecting?: () => Promise<void>,
 ): Promise<void> {
-  const from = (await sourceHandle.boundingBox())!;
+  const from = await boxOf(sourceHandle, 'the source handle');
   const to = await targetHandle.boundingBox();
   const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
   // The opening nudge goes *towards* the target rather than always rightwards.
@@ -500,15 +500,19 @@ export async function connectHandles(
   // single jump can be swallowed — the same reason `dragBy` moves in steps.
   await page.mouse.move(start.x + nudge, start.y, { steps: 4 });
 
-  await expect(targetHandle).toHaveCSS('opacity', '1');
+  // Eligibility arms `connectableend` for the whole drag; seeking-end *visibility*
+  // waits until the pointer is within the product proximity of the Thing
+  // (connection-handle-proximity/01). Hidden handles keep `pointer-events: none`,
+  // so Playwright `hover` cannot arm them — move by coordinates onto the target
+  // first, then the reveal turns pointer events back on.
   await expect(targetHandle).toHaveClass(/connectableend/);
+  const drop = await boxOf(targetHandle, 'the target handle');
+  await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 8 });
+  await expect(targetHandle).toHaveCSS('opacity', '1');
+  expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
 
   await whileConnecting?.();
 
-  await targetHandle.hover();
-  // `hover` moves the mouse; assert it landed, so a connection dropped on empty
-  // canvas fails here rather than as a mysteriously missing Edge later.
-  expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
   await page.mouse.up();
 }
 

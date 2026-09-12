@@ -126,7 +126,7 @@ async function dragEndpointTo(
   }
 }
 
-/** Drag one endpoint onto a Thing's authoring target handle. */
+/** Drag one endpoint onto a Thing's seeking-end authoring handle. */
 async function reconnectOnto(
   page: Page,
   edge: Locator,
@@ -139,12 +139,15 @@ async function reconnectOnto(
   await page.mouse.down();
   try {
     await page.mouse.move(from.x + 12, from.y, { steps: 3 });
-    // Target handles appear only once React Flow has really started the
-    // connection, so this gate is what stops a release that ends a drag which
-    // never began being reported as a missing Edit later.
-    await expect(targetHandle).toHaveCSS('opacity', '1');
+    // Eligibility arms `connectableend` once the reconnect drag has begun;
+    // seeking-end *visibility* waits until the pointer is within product
+    // proximity of the Thing (connection-handle-proximity/01). Hidden handles
+    // keep `pointer-events: none`, so Playwright `hover` cannot arm them —
+    // move by coordinates onto the drop handle first (same as `connectHandles`).
     await expect(targetHandle).toHaveClass(/connectableend/);
-    await targetHandle.hover();
+    const drop = await boxOf(targetHandle, 'the reconnect drop handle');
+    await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 6 });
+    await expect(targetHandle).toHaveCSS('opacity', '1');
     expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
   } finally {
     await page.mouse.up();
@@ -2222,7 +2225,6 @@ test('drawing between existing Things persists one active-Graph Edge and selects
 
   const sourceHandle = authoringHandle(source, 'source', 'right');
   const targetHandle = authoringHandle(target, 'target', 'top');
-  const targetHandles = page.locator('.rf-thing-node__authoring-handle--target');
   await expect(sourceHandle).toHaveCSS('opacity', '1');
   await expect(targetHandle).toHaveCSS('opacity', '0');
   // The Graph this Edge will join is the one conversion minted, and it is what
@@ -2234,10 +2236,28 @@ test('drawing between existing Things persists one active-Graph Edge and selects
   );
 
   await connectHandles(page, sourceHandle, targetHandle, async () => {
-    // Every Thing offers a target on every side while a connection is in flight,
-    // so the drop is never blocked by which side the author aimed at.
-    await expect(targetHandles.first()).toHaveCSS('opacity', '1');
-    await expect(targetHandles).toHaveCount(7 * AUTHORING_HANDLE_SIDES);
+    // Seeking handles show only on near, eligible Things — here the drop target
+    // under the pointer — not on every Thing in the Diagram (ADR 0090). A neighbour inside the
+    // proximity magnet may also seek; lighting *every* Thing is the regression.
+    await expect(target.locator('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'target',
+    );
+    await expect(target.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+      'opacity',
+      '1',
+    );
+    await expect(target.locator('.rf-thing-node__authoring-handle--target')).toHaveCount(
+      AUTHORING_HANDLE_SIDES,
+    );
+    await expect(source.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+      'opacity',
+      '0',
+    );
+    const thingCount = await page.locator('.rf-thing-node__inner').count();
+    expect(
+      await page.locator('.rf-thing-node__inner[data-connection-seeking="target"]').count(),
+    ).toBeLessThan(thingCount);
     const preview = page.locator('.react-flow__connection-path');
     // `toBeAttached`, not `toBeVisible`: a connection drawn between two Things
     // whose centres share a row is a horizontal `path`, and a zero-height
@@ -2396,14 +2416,28 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
   expect(await allPositions(page)).toEqual(before);
 
   // Drawn a second time, in the Diagram that now owns the Graph holding it, it is
-  // the duplicate the rule is about — refused, with nothing persisted. The
-  // assertions are negative, so they need the barrier to mean anything.
+  // the duplicate the rule is about — refused, with nothing persisted. Asserted
+  // live mid-drag: eligibility withholds seeking handles on a refused target
+  // (`edge-already-exists`), so `connectHandles` cannot gate on them here.
+  // Neighbours inside the proximity magnet may still seek; E itself must not.
   await source.hover();
-  await connectHandles(
-    page,
-    authoringHandle(source, 'source', 'right'),
-    authoringHandle(target, 'target', 'left'),
-  );
+  const duplicateFrom = authoringHandle(source, 'source', 'right');
+  const refused = authoringHandle(target, 'target', 'left');
+  const from = await boxOf(duplicateFrom, "Thing A's source handle");
+  const drop = await boxOf(refused, "Thing E's refused target handle");
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+    await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 8 });
+    await expect(target.locator('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    await expect(refused).toHaveCSS('opacity', '0');
+  } finally {
+    await page.mouse.up();
+  }
   await quiescent(page);
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
   await expect(persistence).toHaveAttribute('data-revision', '3');

@@ -22,6 +22,10 @@ import {
 import type { Thing, ThingId, Graph, GraphEdge, GraphId } from '@project/core';
 import { titleName, uuidSchema } from '@project/core';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
+import {
+  ConnectionEndEligibilityContext,
+  ConnectionTargetProximityProvider,
+} from '@project/react-flow-adapter';
 import type { ThingChoice } from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { thingChoiceOf } from './thing-choice';
@@ -225,6 +229,34 @@ export function useEdgeAuthoring({
       source.success &&
       latest.current.authoring.accepts({ kind: 'create-and-connect', from: source.data })
     );
+  }, []);
+
+  /**
+   * Whether releasing the seeking end on this Thing may be offered.
+   *
+   * Feeds `ThingNode`'s reveal and `isConnectableEnd` so a refused target stays
+   * invisible and unsnappable for the whole drag, matching `isValidConnection`
+   * rather than lighting every Thing and only failing at release.
+   */
+  const mayOfferConnectionEnd = useCallback((thingId: ThingId): boolean => {
+    const { draft } = latest.current.authoring.getState();
+    if (draft?.kind === 'pointer-connect') {
+      return latest.current.authoring.accepts({
+        kind: 'connect',
+        from: draft.from,
+        to: thingId,
+      });
+    }
+    if (draft?.kind === 'pointer-reconnect') {
+      return latest.current.authoring.accepts({
+        kind: 'reconnect',
+        graphId: draft.graphId,
+        edge: draft.edge,
+        endpoint: draft.endpoint,
+        thingId,
+      });
+    }
+    return false;
   }, []);
 
   /**
@@ -649,11 +681,20 @@ export function useEdgeAuthoring({
     ],
   );
 
+  const connectionEndEligibility = useMemo(
+    () => ({ mayOffer: mayOfferConnectionEnd }),
+    [mayOfferConnectionEnd],
+  );
+
   const provide = useCallback(
     (children: ReactNode) => (
-      <EdgeAuthoringContext.Provider value={commands}>{children}</EdgeAuthoringContext.Provider>
+      <ConnectionEndEligibilityContext.Provider value={connectionEndEligibility}>
+        <ConnectionTargetProximityProvider>
+          <EdgeAuthoringContext.Provider value={commands}>{children}</EdgeAuthoringContext.Provider>
+        </ConnectionTargetProximityProvider>
+      </ConnectionEndEligibilityContext.Provider>
     ),
-    [commands],
+    [commands, connectionEndEligibility],
   );
 
   return {

@@ -17,6 +17,9 @@ import {
 } from '@project/ui';
 import type { ThingFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
+import { useConnectionEndEligible } from './connection-end-eligibility';
+import { useConnectionTargetProximity } from './connection-target-proximity';
+import { offersConnectionEnd } from './connection-target-reveal';
 
 /**
  * React Flow custom node: a Thing front with one Edge anchor on each of its four
@@ -66,7 +69,13 @@ type SpaceFront = Mutable<Extract<CanvasThingFront, { kind: 'space' }>>;
  * it incident, before the projection catches up.
  */
 
-export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps<ThingFlowNode>) {
+export function ThingNode({
+  id,
+  data,
+  selected,
+  dragging,
+  isConnectable,
+}: NodeProps<ThingFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
    *
@@ -82,6 +91,14 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
     connection.inProgress ? (connection.fromHandle.type === 'target' ? 'source' : 'target') : null,
   );
   const connectionInProgress = seeking !== null;
+  /**
+   * Seeking-end handles show only when the pointer is near this Thing *and*
+   * Space Authoring would accept a release here. Far or refused Things stay
+   * quiet; anchors remain mounted either way (ADR 0087).
+   */
+  const near = useConnectionTargetProximity(id);
+  const eligible = useConnectionEndEligible(data.thingId);
+  const offerEnd = offersConnectionEnd({ seeking, near, eligible });
   const visuallySelected = selected || data.selectedForAuthoring;
 
   /**
@@ -176,7 +193,10 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       isConnectableStart={
         connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress
       }
-      isConnectableEnd={connectionAuthoring && isConnectable && role === seeking}
+      // Eligibility withdraws the end from snap as well as from reveal; proximity
+      // only gates the latter — within React Flow's 20px snap the Thing is already
+      // inside the 80-unit magnet, so a visible handle and a landable one agree.
+      isConnectableEnd={connectionAuthoring && isConnectable && role === seeking && eligible}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click reached the Thing underneath and opened it to read — from the one
@@ -341,7 +361,7 @@ export function ThingNode({ data, selected, dragging, isConnectable }: NodeProps
       data-active={data.active}
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
-      data-connection-seeking={seeking ?? 'none'}
+      data-connection-seeking={offerEnd ? seeking : 'none'}
       // Whether the four anchors are also affordances. They render either way —
       // an Edge attaches to an anchor and React Flow draws no Edge for a Thing
       // whose handles it cannot resolve — so this is what the reveal in

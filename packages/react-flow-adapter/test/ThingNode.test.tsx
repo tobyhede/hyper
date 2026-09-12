@@ -5,6 +5,7 @@ import { Position, type NodeProps } from '@xyflow/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
 import { ThingNode } from '../src/ThingNode';
+import { ConnectionEndEligibilityContext } from '../src/connection-end-eligibility';
 import type { ThingFlowNode, ThingNodeData, ThingTitleEditor } from '../src/projection';
 import { uuid } from './uuid';
 
@@ -30,13 +31,21 @@ interface MockConnectionState {
   fromHandle: { type: 'source' | 'target' };
 }
 
-const { updateNodeInternals, connection } = vi.hoisted(() => {
+const { updateNodeInternals, connection, proximity } = vi.hoisted(() => {
   const connection: MockConnectionState = {
     inProgress: false,
     fromHandle: { type: 'source' },
   };
-  return { updateNodeInternals: vi.fn(), connection };
+  return {
+    updateNodeInternals: vi.fn(),
+    connection,
+    proximity: { near: true },
+  };
 });
+
+vi.mock('../src/connection-target-proximity', () => ({
+  useConnectionTargetProximity: () => proximity.near,
+}));
 
 /** React Flow's `Handle` decides on its own whether a drag may start or end at
  *  it; the stand-in records the two answers it was given. */
@@ -129,6 +138,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 beforeEach(() => {
   connection.inProgress = false;
   connection.fromHandle.type = 'source';
+  proximity.near = true;
 });
 
 const graphId = uuid('00000000-0000-4000-8000-000000000010');
@@ -578,6 +588,41 @@ describe('ThingNode graph authoring', () => {
 
     expect(connectable('Connect to', 'end')).toEqual([true, true, true, true]);
     expect(connectable('Connect from', 'start')).toEqual([false, false, false, false]);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'target',
+    );
+  });
+
+  it('withholds the seeking reveal when the pointer is not near the Thing', () => {
+    connection.inProgress = true;
+    proximity.near = false;
+
+    render(<ThingNode {...props({ selected: true })} />);
+
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    // Snap may still land once the pointer enters the magnet; eligibility alone
+    // gates connectable-end, and with no provider every Thing stays eligible.
+    expect(connectable('Connect to', 'end')).toEqual([true, true, true, true]);
+  });
+
+  it('withholds seeking ends when eligibility refuses the Thing', () => {
+    connection.inProgress = true;
+
+    render(
+      <ConnectionEndEligibilityContext.Provider value={{ mayOffer: () => false }}>
+        <ThingNode {...props({ selected: true })} />
+      </ConnectionEndEligibilityContext.Provider>,
+    );
+
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
   });
 
   /**
@@ -585,15 +630,55 @@ describe('ThingNode graph authoring', () => {
    * Edge's *target*, so it is looking for a new **source**. Offering only target
    * handles left that gesture with nowhere to land — which is why the role is
    * read off the drag rather than assumed to be `target`.
+   *
+   * Near + eligible is the same reveal gate as an ordinary connect, with the
+   * seeking role inverted: source ends show, target ends stay quiet.
    */
-  it('ends a drag on a source handle while a source endpoint is being moved', () => {
+  it('offers source seeking ends when near and eligible during a source-endpoint move', () => {
     connection.inProgress = true;
     connection.fromHandle.type = 'target';
 
     render(<ThingNode {...props({ selected: true })} />);
 
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'source',
+    );
     expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
     expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
+  });
+
+  it('withholds source seeking reveal when the pointer is not near during a source-endpoint move', () => {
+    connection.inProgress = true;
+    connection.fromHandle.type = 'target';
+    proximity.near = false;
+
+    render(<ThingNode {...props({ selected: true })} />);
+
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    // Snap may still land once the pointer enters the magnet; eligibility alone
+    // gates connectable-end, and with no provider every Thing stays eligible.
+    expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
+  });
+
+  it('withholds source seeking ends when eligibility refuses during a source-endpoint move', () => {
+    connection.inProgress = true;
+    connection.fromHandle.type = 'target';
+
+    render(
+      <ConnectionEndEligibilityContext.Provider value={{ mayOffer: () => false }}>
+        <ThingNode {...props({ selected: true })} />
+      </ConnectionEndEligibilityContext.Provider>,
+    );
+
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'none',
+    );
+    expect(connectable('Connect from', 'end')).toEqual([false, false, false, false]);
   });
 
   /**
