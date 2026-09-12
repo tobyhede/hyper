@@ -18,9 +18,13 @@
  * presentation actually lands on: projectors and external displays are
  * overwhelmingly 16:9, and that is the worst case to letterbox.
  *
- * This couples the surfaces deliberately. The frame an opened or presented thing
- * is drawn in (`.thing-pane__panel`) uses the same ratio. **If one changes, change
- * the other** — a mismatch would make the graph misrepresent what an audience
+ * **There is one source for the ratio, and it is this constant.** The frame an
+ * opened or presented thing was drawn in used to restate it in a stylesheet
+ * (`.thing-pane__panel`), and that rule went with the creation panes (ADR 0089);
+ * what draws an opened or presented Thing now is `.thing--full`, which takes its
+ * box from the node React Flow sizes from this constant rather than declaring a
+ * ratio of its own. So a change here moves both surfaces together — which
+ * matters because a mismatch would make the graph misrepresent what an audience
  * sees, and would break outright if the "show full content" view of ADR 0006
  * arrives and a thing becomes a live preview of a slide.
  *

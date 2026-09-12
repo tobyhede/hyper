@@ -1483,11 +1483,15 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'created-alias') {
       // An empty title mints the same neutral `Thing N` every other created Thing
       // gets; text the author already entered is never overwritten. `??` cannot
-      // express this — the empty string is a value the picker really sends, and
-      // the whole point is that it does not count as one. Copying the Target's
-      // Title is what this replaced: it produced two Things with one name by
-      // default, and the creation flow asks for a name at this moment anyway
-      // (ADR 0070).
+      // express this — the empty string is a value a caller really sends, and
+      // the whole point is that it does not count as one.
+      //
+      // **Copying the Target's Title is now what the one caller does** (ADR 0089).
+      // This arm used to carry an argument against it, from when a pane asked for
+      // a name before the Edit ran: there is no pane, the Alias is named after
+      // its Target and renamed in place afterwards, and two Things sharing a name
+      // is not a collision because a title is not an identifier (ADR 0016). What
+      // stays this module's is the default and the normalization, not the choice.
       // Normalized the way a rename is, and for the same reason: creation and
       // renaming write one field, so the same typed bytes have to reach the
       // same stored document whichever path wrote them (ADR 0083).

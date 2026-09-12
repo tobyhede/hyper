@@ -225,7 +225,7 @@ function props({
  * an ancestor this test has to supply, since `ThingNode` never renders it. The
  * class is React Flow's own, not a fixture invention: `SpaceCanvas.tsx` reads
  * it back the same way to focus a created or renamed Thing (`editing.spec.ts`,
- * `thing-creation.test.tsx`).
+ * `thing-rail-actions.test.tsx`).
  */
 function renderInNode(node: NodeProps<ThingFlowNode>): void {
   render(

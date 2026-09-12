@@ -942,7 +942,7 @@ describe('Space Thing lifecycle', () => {
         title: 'Architecture',
         position: { x: 240, y: 80 },
       }),
-    ).resolves.toEqual({ kind: 'completed' });
+    ).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
 
     const result = await backend.loadAggregate();
     if (result.kind === 'uninitialized') throw new Error('Test backend is uninitialized');
@@ -1086,7 +1086,7 @@ describe('Space Thing lifecycle', () => {
         title: 'Second link',
         position: { x: 480, y: 80 },
       }),
-    ).resolves.toEqual({ kind: 'completed' });
+    ).resolves.toEqual({ kind: 'completed', thingId: SECOND_SPACE_THING_ID });
 
     await expect(
       lifecycle.delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID }),
@@ -1126,7 +1126,7 @@ describe('Space Thing lifecycle', () => {
         title: 'Architecture',
         position: { x: 240, y: 80 },
       }),
-    ).resolves.toEqual({ kind: 'completed' });
+    ).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
 
     const storedMeta = await backend.loadSpace(META_ID);
     expect(storedMeta?.snapshot.things).toContainEqual({
@@ -1187,7 +1187,7 @@ describe('Space Thing lifecycle', () => {
         title: 'Architecture',
         position: { x: 240, y: 80 },
       }),
-    ).resolves.toEqual({ kind: 'completed' });
+    ).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
 
     // Durable by the time the lifecycle answers, in its own commit: the target
     // carries the complete Diagram rather than a selection only the Thing
@@ -1263,7 +1263,7 @@ describe('Space Thing lifecycle', () => {
         title: 'Architecture',
         position: { x: 240, y: 80 },
       }),
-    ).resolves.toEqual({ kind: 'completed' });
+    ).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
 
     // The head of `graphs` is what an *unauthored* `activeGraph` falls back to,
     // so a target that has authored one is the case that tells the rule from

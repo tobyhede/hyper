@@ -110,7 +110,9 @@ describe('HTTP space startup composition', () => {
       productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
     );
 
-    expect(result.opened.initialization).toBe('created-diagram');
+    // The repair is read off what it wrote rather than off an announcement: the
+    // `initialization` field and the header behind it went with the disclosure
+    // they existed to trigger (`.scratch/command-dock/issues/13`).
     expect(result.opened.session.getState().acknowledgedRevision).toBe(1n);
     expect(result.opened.app.currentSpace().lookup.diagram(DIAGRAM_ID)?.diagram.positions).toEqual(
       {},

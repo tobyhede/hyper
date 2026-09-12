@@ -26,7 +26,7 @@ export interface AppShellProps {
    * the canvas rather than displacing it. Retiring this prop along with the
    * registry `Drawer` and its `DRAWER_WIDTH` is one undecided foundation
    * decision, owned by
-   * `.scratch/command-dock/issues/16-retire-the-registry-drawer-and-the-yielded-strip.md`.
+   * `.scratch/command-dock/issues/22-retire-the-registry-drawer-and-the-yielded-strip.md`.
    * Not `08`, which is resolved and ran while the drawer still had a consumer.
    */
   insetEnd?: string | undefined;

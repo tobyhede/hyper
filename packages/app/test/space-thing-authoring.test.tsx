@@ -1,4 +1,12 @@
-import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+  type RenderResult,
+} from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   newUuid,
@@ -315,6 +323,10 @@ function mount(
 
 const thingsOf = (session: SpaceSession) => session.getState().working.things;
 
+/** The canvas node one Thing is drawn as, which is how a caret is placed by id. */
+const nodeFor = (id: UUID): HTMLElement | null =>
+  document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
+
 /** The Space Things `Home` holds, in authored order. */
 const spaceThingsOf = (session: SpaceSession) =>
   thingsOf(session).flatMap((thing) =>
@@ -335,59 +347,54 @@ async function readyToAuthor(): Promise<void> {
   await waitFor(() => expect(unavailable(create)).toBe(false));
 }
 
-/** Reach Create Space Thing the way an author does: its own control in the Dock. */
-async function openSpaceThingCreation(): Promise<void> {
+/**
+ * Create a Space Thing the way an author does: one press of its own Dock
+ * control, which completes the Edit (ADR 0089).
+ *
+ * Wrapped in `act` because the lifecycle is asynchronous: the press returns
+ * before the coordination has installed anything, and the state it installs
+ * arrives on a later tick.
+ */
+async function createSpaceThing(): Promise<void> {
   await readyToAuthor();
-  createThing('Space Thing');
-  await screen.findByTestId('new-space-thing');
+  await act(async () => {
+    createThing('Space Thing');
+    // The press returns before the coordination has installed anything, so the
+    // hop is what lets that installation land inside `act`.
+    await Promise.resolve();
+  });
 }
 
 /**
- * Choose one row of the pane's target list.
+ * Open the Things list, which is where an *existing* Space is referenced from.
  *
- * The list is Base UI's own, so it is opened and committed the way that
- * primitive expects: a keyboard press on the trigger to open, then the full
- * pointer sequence on the row, because a bare `click` reaches the item before
- * the pointer handlers that select it.
+ * Idempotent, because a Space row does not take itself away: the list stays open
+ * across an add, so a second reference is one more press on a row rather than a
+ * second disclosure — and pressing the trigger again would close it.
  */
-function chooseTarget(name: string): void {
-  fireEvent.keyDown(screen.getByTestId('new-space-thing-target'), { key: 'ArrowDown' });
-  const option = screen.getByRole('option', { name });
-  fireEvent.pointerDown(option, { button: 0 });
-  fireEvent.pointerUp(option, { button: 0 });
-  fireEvent.click(option);
+async function openThingsList(): Promise<HTMLElement> {
+  const open = screen.queryByRole('dialog', { name: 'Things' });
+  if (open !== null) return open;
+  fireEvent.click(screen.getByRole('button', { name: 'Things' }));
+  return await screen.findByRole('dialog', { name: 'Things' });
 }
 
 /**
- * Open a Space Thing on the canvas and wait for its selectors.
+ * Reference a Space that already exists — the Things list's add-Space row.
  *
- * Both waits are real: the Thing reaches the canvas with the asynchronous
- * placement, and its target is a *second* Space read after the Thing is already
- * drawn — until that read lands the Open Thing draws its waiting note in place
- * of the two controls.
+ * The other half of what the retired creation pane did, and the half ADR 0089
+ * keeps as a gesture of its own: making a Space and pointing at one that exists
+ * are different acts, and this one lists real Spaces with search where the pane
+ * offered a sentinel row beside them.
  */
-async function openSpaceThing(title: string): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: `Open Thing ${title}` }));
-  await screen.findByTestId('space-thing-diagram');
-}
-
-/**
- * Choose one row of an Open Space Thing's selector.
- *
- * The shared `ChoiceMenu` the Command Dock's Diagram and Graph lists are: a menu
- * of radio rows behind the control that names what is chosen. Driven the way
- * `packages/app/test/space-thing-selection.test.tsx` drives the same control —
- * press the trigger, press the row.
- */
-function chooseSelection(testId: string, name: string): void {
-  fireEvent.click(screen.getByTestId(testId));
-  fireEvent.click(screen.getByRole('menuitemradio', { name }));
-}
-
-/** Type a title and confirm, which is the whole of the pane's completion. */
-function createNamed(title: string): void {
-  fireEvent.change(screen.getByTestId('new-space-thing-title'), { target: { value: title } });
-  fireEvent.click(screen.getByTestId('new-space-thing-create'));
+async function addExistingSpace(title: string): Promise<void> {
+  await readyToAuthor();
+  await openThingsList();
+  const row = await screen.findByRole('button', { name: `Add ${title} to Diagram` });
+  await act(async () => {
+    fireEvent.click(row);
+    await Promise.resolve();
+  });
 }
 
 beforeAll(() => {
@@ -415,40 +422,53 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-describe('Add Space Thing', () => {
-  it('is reached from its own Create control and opens its creation pane', async () => {
+describe('Create Space Thing', () => {
+  it('accepts only one Space creation before its local Edit installs', async () => {
     const { session } = mount();
-
-    await openSpaceThingCreation();
-
-    expect(screen.getByRole('dialog', { name: 'New Space Thing' })).toBeVisible();
-    expect(screen.getByTestId('new-space-thing-title')).toHaveValue('');
-    expect(screen.getByTestId('new-space-thing-target')).toHaveTextContent('A new Space');
+    await readyToAuthor();
+    await act(async () => {
+      createThing('Space Thing');
+      createThing('Space Thing');
+      await Promise.resolve();
+    });
     await settled(session);
+    expect(spaceThingsOf(session)).toHaveLength(1);
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveValue('Space 1');
+    expect(editor).toHaveFocus();
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    await createSpaceThing();
+    await settled(session);
+    expect(spaceThingsOf(session).map((thing) => thing.document.title)).toEqual([
+      'Space 1',
+      'Space 2',
+    ]);
   });
 
   /**
-   * One typed title seeds three things — the Thing, the Space it references and
-   * that Space's first Markdown Thing — and only the first two take the title.
-   * The Space's first Thing is the neutral `Thing 1` every new Space begins with,
-   * because content titled after the Space it lives in only reads as deliberate
-   * until the first rename makes the pair disagree (ADR 0068).
+   * One press mints three things — the Thing, the Space it names and that
+   * Space's first Markdown Thing — and the first two take one `Space N`.
+   *
+   * `Space N` is numbered over the containing Space's own Thing titles, which is
+   * the only source that can be read synchronously; the Space and the Thing get
+   * the same string, so they agree at creation exactly as the retired pane's
+   * typed title made them (ADR 0089). The target's first Thing is the neutral
+   * `Thing 1` every new Space begins with, because content titled after the
+   * Space it lives in only reads as deliberate until the first rename makes the
+   * pair disagree (ADR 0068).
    */
-  it('creates a Space Thing and the new Space it references from one title', async () => {
+  it('creates a Space Thing and the new Space it names from one Space N', async () => {
     const { backend, session } = mount();
-    await openSpaceThingCreation();
 
-    chooseTarget('A new Space');
-    createNamed('Architecture');
+    await createSpaceThing();
 
-    await waitFor(() => expect(screen.queryByTestId('new-space-thing')).not.toBeInTheDocument());
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
     const created = spaceThingsOf(session);
-    expect(created).toHaveLength(1);
-    expect(created[0]?.document.title).toBe('Architecture');
+    expect(created[0]?.document.title).toBe('Space 1');
 
     const targetId = created[0]!.document.spaceId;
     const target = await backend.loadSpace(targetId);
-    expect(target?.snapshot.document.title).toBe('Architecture');
+    expect(target?.snapshot.document.title).toBe('Space 1');
     expect(target?.snapshot.things.map((thing) => thing.document)).toEqual([
       { title: 'Thing 1', kind: 'markdown', body: '' },
     ]);
@@ -456,50 +476,217 @@ describe('Add Space Thing', () => {
   });
 
   /**
-   * Creating a Thing and renaming one are the same rule about what a Title is,
-   * and a `trim()` on this pane made them two rules. A whole-string trim strips
-   * the leading whitespace ADR 0083 says is the first line's own, so the same
-   * typed bytes produced one Title through the pane and another through the
-   * rename — with the rename reported as an Edit rather than as changing
-   * nothing.
+   * **The caret lands in the Thing, before the commit settles.**
+   *
+   * This is the optimistic half of ADR 0089: the coordination installs its local
+   * Edit and *then* commits two snapshots, and the press continues at the Thing
+   * as soon as that installation lands rather than waiting for the durable
+   * write. So the editor is open over a Thing whose Space is still being
+   * written — which is the point, not an implementation detail.
    */
-  it('stores the Title the schema stores, so a rename to the same bytes is no Edit', async () => {
+  it('continues in the created Thing’s own Title editor', async () => {
     const { session } = mount();
-    await openSpaceThingCreation();
 
-    chooseTarget('A new Space');
-    createNamed('  Recap');
+    await createSpaceThing();
+
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveValue('Space 1');
+    expect(editor).toHaveFocus();
+    await settled(session);
+  });
+
+  /**
+   * **The window between the press and the installed Edit belongs to the press
+   * that opened it.**
+   *
+   * The coordinated Edit lands one await after the gesture, and nothing closes
+   * the surface meanwhile — `createDisabled` answers availability, not
+   * re-entrancy — so a second creation can install inside it. `addThing` is
+   * synchronous and lands immediately, so both Things are new when the Space
+   * Thing's Edit resolves, and a creation that asked *which Things appeared*
+   * would take the earlier array position and open the caret over a Markdown
+   * Thing the author is about to type a Space's name into.
+   *
+   * The lifecycle answers the Thing it made, so the question is never asked.
+   */
+  it('continues in its own Thing when a Markdown Thing lands in the same window', async () => {
+    const { session } = mount();
+    await readyToAuthor();
+
+    await act(async () => {
+      createThing('Space Thing');
+      // Synchronous, and inside the window the coordination is still open for.
+      createThing('Markdown Thing');
+      await Promise.resolve();
+    });
 
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
-    expect(spaceThingsOf(session)[0]?.document.title).toBe('  Recap');
+    const spaceThing = spaceThingsOf(session)[0]!;
+    const markdown = thingsOf(session).filter(
+      (thing) =>
+        thing.document.kind === 'markdown' && !home.things.some(({ id }) => id === thing.id),
+    );
+    expect(markdown).toHaveLength(1);
+
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveValue('Space 1');
+    expect(nodeFor(spaceThing.id)).toContainElement(editor);
+    expect(markdown[0]?.document.title).toBe('Thing 1');
     await settled(session);
   });
 
   /**
    * The seeding is a convenience at creation and never a link afterwards: the
-   * Thing and the Space it references are separate entities from the moment they
+   * Thing and the Space it names are separate entities from the moment they
    * exist, and the Thing's Title is the containing Space's to author.
    */
   it('leaves the target Space’s title alone when the Thing is renamed', async () => {
     const { backend, session } = mount();
-    await openSpaceThingCreation();
-    chooseTarget('A new Space');
-    createNamed('Architecture');
+    await createSpaceThing();
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
     const targetId = spaceThingsOf(session)[0]!.document.spaceId;
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title Architecture' }));
     const editor = await screen.findByRole('textbox', { name: 'Thing title' });
     fireEvent.change(editor, { target: { value: 'The architecture' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
 
-    expect(spaceThingsOf(session)[0]?.document.title).toBe('The architecture');
+    await waitFor(() => expect(spaceThingsOf(session)[0]?.document.title).toBe('The architecture'));
     await waitFor(async () =>
-      expect((await backend.loadSpace(targetId))?.snapshot.document.title).toBe('Architecture'),
+      expect((await backend.loadSpace(targetId))?.snapshot.document.title).toBe('Space 1'),
     );
     await settled(session);
   });
 
+  /**
+   * A refused creation leaves nothing standing, and says what died.
+   *
+   * The lifecycle answers its refusal as it installs, so a refusal arrives with
+   * no Thing ever drawn — which is what "removed on refusal" amounts to from
+   * out here. What the author needs is the sentence, because the gesture they
+   * made looked exactly like the one that works, and the Dock's refusal channel
+   * is where a creation with no pane of its own reports (ADR 0089).
+   */
+  it('creates nothing and names the Space when the lifecycle refuses', async () => {
+    const { session } = mount(other, {
+      create: () =>
+        Promise.resolve({ kind: 'refused', refusal: { code: 'persistence-read-failed' } }),
+    });
+
+    await createSpaceThing();
+
+    expect(await screen.findByText('Space not created')).toBeVisible();
+    expect(spaceThingsOf(session)).toEqual([]);
+    expect(thingsOf(session)).toEqual(home.things);
+    expect(screen.queryByRole('textbox', { name: 'Thing title' })).toBeNull();
+    await settled(session);
+  });
+
+  it.each(['refused', 'rejected'] as const)(
+    'allows another attempt after a %s creation',
+    async (outcome) => {
+      const create = vi
+        .fn<SpaceThingAuthoring['create']>()
+        .mockImplementationOnce(() =>
+          outcome === 'refused'
+            ? Promise.resolve({ kind: 'refused', refusal: { code: 'persistence-read-failed' } })
+            : Promise.reject(new Error('coordination failed')),
+        )
+        .mockResolvedValue({ kind: 'unchanged' });
+      const { session } = mount(other, { create }, vi.fn());
+      await createSpaceThing();
+      expect(await screen.findByText('Space not created')).toBeVisible();
+      await createSpaceThing();
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('Space not created')).toBeNull();
+      await settled(session);
+    },
+  );
+
+  /**
+   * A lifecycle that changed nothing did not create a Thing.
+   *
+   * `SpaceThingCreationResult` has three arms and only `refused` says something
+   * is wrong, so an `unchanged` answered as a creation would open a Title editor
+   * over a Thing that was never made. Named the way the other arms are, so the
+   * compiler asks again the day a fourth joins the union.
+   */
+  it('creates nothing and reports nothing when the lifecycle answers unchanged', async () => {
+    const create = vi.fn<SpaceThingAuthoring['create']>(() =>
+      Promise.resolve({ kind: 'unchanged' }),
+    );
+    const { session } = mount(other, { create });
+
+    await createSpaceThing();
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(spaceThingsOf(session)).toHaveLength(0);
+    expect(screen.queryByText('Space not created')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Thing title' })).toBeNull();
+    await settled(session);
+  });
+
+  /**
+   * A rejection is not an answer.
+   *
+   * The registry throws outside its own try where a session it was coordinating
+   * has gone, and the transport rejects on a timeout or a non-OK status. The
+   * lifecycle refuses for everything it can name, so a rejection means an
+   * invariant it does not name has broken — said in the Dock's channel,
+   * untranslated, because a refusal code is a stable domain identity (ADR 0057)
+   * and nothing here answers to one.
+   */
+  it('says what broke when a create rejects', async () => {
+    // The rejection is reported too, since nothing else would say what broke.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { session } = mount(other, {
+      create: () => Promise.reject(new Error('the coordination lost a session')),
+    });
+
+    await createSpaceThing();
+
+    expect(
+      await screen.findByText('This Thing was not created: the coordination lost a session'),
+    ).toBeVisible();
+    expect(spaceThingsOf(session)).toEqual([]);
+    expect(consoleError).toHaveBeenCalled();
+    await settled(session);
+  });
+
+  /**
+   * Reported through the sink the composition was given, not a second one.
+   *
+   * A surface that answers the reporting requirement with its own
+   * `console.error` puts back exactly the invisible reporter ADR 0016 exists to
+   * prevent: a host that installed a sink of its own would never see this.
+   */
+  it('reports a rejected create through the sink the composition was given', async () => {
+    const reported = vi.fn();
+    const { session } = mount(
+      other,
+      { create: () => Promise.reject(new Error('the coordination lost a session')) },
+      reported,
+    );
+
+    await createSpaceThing();
+
+    expect(
+      await screen.findByText('This Thing was not created: the coordination lost a session'),
+    ).toBeVisible();
+    expect(reported).toHaveBeenCalled();
+    await settled(session);
+  });
+});
+
+/**
+ * Referencing a Space that already exists, which is a different act.
+ *
+ * ADR 0089 splits the retired pane's two halves: Create Space Thing always makes
+ * a Space, and pointing at one that exists is the Things list's add-Space row —
+ * a list of real Spaces with search, where the pane offered a sentinel row
+ * beside them. Everything the lifecycle's `link` arm answers is proved here,
+ * through that row.
+ */
+describe('referencing an existing Space', () => {
   /**
    * Referencing is not copying. The same Thing shape reaches an existing Space,
    * so what tells the two paths apart is the Space count either side of the
@@ -507,21 +694,20 @@ describe('Add Space Thing', () => {
    */
   it('references an existing Space instead of creating a second one', async () => {
     const { backend, session } = mount();
-    await openSpaceThingCreation();
 
-    chooseTarget('Other Space');
-    createNamed('The other one');
+    await addExistingSpace('Other Space');
 
-    await waitFor(() => expect(screen.queryByTestId('new-space-thing')).not.toBeInTheDocument());
-    expect(spaceThingsOf(session).map((thing) => thing.document)).toEqual([
-      {
-        title: 'The other one',
-        kind: 'space',
-        spaceId: OTHER_ID,
-        diagram: OTHER_DIAGRAM_ID,
-        graph: OTHER_GRAPH_ID,
-      },
-    ]);
+    await waitFor(() =>
+      expect(spaceThingsOf(session).map((thing) => thing.document)).toEqual([
+        {
+          title: 'Other Space',
+          kind: 'space',
+          spaceId: OTHER_ID,
+          diagram: OTHER_DIAGRAM_ID,
+          graph: OTHER_GRAPH_ID,
+        },
+      ]),
+    );
     expect(await backend.listSpaces()).toHaveLength(3);
     await settled(session);
   });
@@ -538,10 +724,8 @@ describe('Add Space Thing', () => {
    */
   it('takes an initialized target’s opening selection and initializes nothing', async () => {
     const { backend, session } = mount();
-    await openSpaceThingCreation();
 
-    chooseTarget('Other Space');
-    createNamed('The other one');
+    await addExistingSpace('Other Space');
 
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
     expect(spaceThingsOf(session)[0]?.document).toMatchObject({
@@ -567,16 +751,14 @@ describe('Add Space Thing', () => {
     const { backend, session } = mount(diagramlessOther, {}, undefined, {
       newId: mintingIds(MINTED_DIAGRAM_ID, MINTED_GRAPH_ID, MINTED_THING_ID),
     });
-    await openSpaceThingCreation();
 
-    chooseTarget('Other Space');
-    createNamed('The other one');
+    await addExistingSpace('Other Space');
 
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
     expect(spaceThingsOf(session)[0]).toEqual({
       id: MINTED_THING_ID,
       document: {
-        title: 'The other one',
+        title: 'Other Space',
         kind: 'space',
         spaceId: OTHER_ID,
         diagram: MINTED_DIAGRAM_ID,
@@ -602,25 +784,21 @@ describe('Add Space Thing', () => {
   });
 
   /**
-   * A target that could not be prepared makes nothing at all, and says so in
-   * the one arm that ends in advice.
+   * A target that could not be prepared makes nothing at all, and says so on
+   * the list that asked.
    *
    * Initialization is its own durable commit and it runs before the Edit
    * (ADR 0079), so a commit that fails leaves no Thing, no half-written
-   * selection and a containing Space nobody touched. The author is told on the
-   * **Target** field, because choosing another Space answers this — exactly as
-   * for the aggregate refusals beside it.
-   *
-   * The sentence is the `not-initialized` one, and asserting it whole is what
-   * separates this from a Space that has gone: a failed commit is the transient
-   * arm, so it is the only one that tells the author to try again. A target
-   * that no longer exists gets a different sentence and no such invitation.
+   * selection and a containing Space nobody touched. The sentence is the
+   * `not-initialized` one, and asserting it whole is what separates this from a
+   * Space that has gone: a failed commit is the transient arm, so it is the only
+   * one that tells the author to try again.
    */
-  it('creates nothing and names the Target when its target could not be prepared', async () => {
+  it('creates nothing and says so when its target could not be prepared', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { backend, session } = mount(diagramlessOther, {}, undefined, { control });
-    await openSpaceThingCreation();
-    chooseTarget('Other Space');
+    await readyToAuthor();
+    await openThingsList();
     const before = thingsOf(session);
 
     // Queued here rather than at mount so it is spent by the initialization
@@ -630,14 +808,15 @@ describe('Add Space Thing', () => {
       code: 'invalid-commit',
       message: 'the target could not be written',
     });
-    createNamed('The other one');
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Add Other Space to Diagram' }));
+    });
 
-    const target = await screen.findByTestId('new-space-thing-target');
-    await waitFor(() => expect(target).toHaveAttribute('aria-invalid', 'true'));
-    expect(target).toHaveAccessibleDescription(
-      'That Space could not be prepared to be shown here, so nothing was created. Try again.',
-    );
-    expect(screen.getByTestId('new-space-thing')).toBeVisible();
+    expect(
+      await screen.findByText(
+        'That Space could not be prepared to be shown here, so nothing was created. Try again.',
+      ),
+    ).toBeVisible();
     expect(spaceThingsOf(session)).toEqual([]);
     expect(thingsOf(session)).toEqual(before);
     expect((await backend.loadSpace(OTHER_ID))?.snapshot.document.diagrams).toBeUndefined();
@@ -652,21 +831,13 @@ describe('Add Space Thing', () => {
   it('lets two Space Things reference one Space', async () => {
     const { backend, session } = mount();
 
-    await openSpaceThingCreation();
-    chooseTarget('Other Space');
-    createNamed('One way in');
+    await addExistingSpace('Other Space');
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
     await settled(session);
 
-    await openSpaceThingCreation();
-    chooseTarget('Other Space');
-    createNamed('Another way in');
+    await addExistingSpace('Other Space');
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(2));
 
-    expect(spaceThingsOf(session).map((thing) => thing.document.title)).toEqual([
-      'One way in',
-      'Another way in',
-    ]);
     expect(spaceThingsOf(session).map((thing) => thing.document.spaceId)).toEqual([
       OTHER_ID,
       OTHER_ID,
@@ -693,8 +864,8 @@ describe('Add Space Thing', () => {
    * `Collection 2` was not expressible at all.
    *
    * The selection is changed through the on-canvas selector, which is the only
-   * surface that changes one: the creation pane offers no choice, because a
-   * caller holding a listing row has no Diagram of the target to offer
+   * surface that changes one: neither creation gesture offers a choice, because
+   * a caller holding a listing row has no Diagram of the target to offer
    * (ADR 0068). And it is read back off the *stored* Space as well as the
    * session, since a selection that lived only in working state would be a view
    * preference rather than authored content.
@@ -702,31 +873,34 @@ describe('Add Space Thing', () => {
   it('keeps a selection per Space Thing, and stores both', async () => {
     const { backend, session } = mount();
 
-    await openSpaceThingCreation();
-    chooseTarget('Other Space');
-    createNamed('One way in');
+    await addExistingSpace('Other Space');
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
     await settled(session);
 
-    await openSpaceThingCreation();
-    chooseTarget('Other Space');
-    createNamed('Another way in');
+    await addExistingSpace('Other Space');
     await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(2));
     await settled(session);
 
-    await openSpaceThing('One way in');
-    chooseSelection('space-thing-diagram', 'Collection 2');
+    // Both Things carry the target's own name, because a Space stays offered
+    // however many Things frame it and each row seeds its Thing from the Space
+    // it names. So the first is found **by its id** rather than by its name or
+    // by document order: two nodes answer that name, and React Flow orders its
+    // nodes by draw order rather than by authored order — `findAllByRole(…)[0]`
+    // passed against whichever it happened to draw first.
+    const [authoredFirst] = spaceThingsOf(session);
+    const node = document.querySelector(`.react-flow__node[data-id="${authoredFirst!.id}"]`);
+    if (!(node instanceof HTMLElement)) throw new Error('The first Space Thing is not on canvas');
+    fireEvent.click(within(node).getByRole('button', { name: 'Open Thing Other Space' }));
+    await within(node).findByTestId('space-thing-diagram');
+    fireEvent.click(within(node).getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
 
     await waitFor(() =>
       expect(
-        spaceThingsOf(session).map(({ document }) => [
-          document.title,
-          document.diagram,
-          document.graph,
-        ]),
+        spaceThingsOf(session).map(({ document }) => [document.diagram, document.graph]),
       ).toEqual([
-        ['One way in', OTHER_SECOND_DIAGRAM_ID, OTHER_SECOND_GRAPH_ID],
-        ['Another way in', OTHER_DIAGRAM_ID, OTHER_GRAPH_ID],
+        [OTHER_SECOND_DIAGRAM_ID, OTHER_SECOND_GRAPH_ID],
+        [OTHER_DIAGRAM_ID, OTHER_GRAPH_ID],
       ]),
     );
     await settled(session);
@@ -743,370 +917,16 @@ describe('Add Space Thing', () => {
    * A cycle is refused by the aggregate rather than filtered out of the list,
    * and the refusal is the better answer: it names the Things that formed the
    * loop, where a silently shorter list would have said nothing at all.
-   *
-   * So the pane has to survive its own refusal. The Target field is the one
-   * thing on screen that could answer it — choose a different Space — and
-   * closing the pane would take that field away with it.
    */
-  it('refuses a choice that would make a Space contain itself, and keeps the field that answers it', async () => {
+  it('refuses a choice that would make a Space contain itself', async () => {
     const { session } = mount(otherReferencingHome);
-    await openSpaceThingCreation();
 
-    chooseTarget('Other Space');
-    createNamed('Back around');
+    await addExistingSpace('Other Space');
 
-    const target = await screen.findByTestId('new-space-thing-target');
-    await waitFor(() => expect(target).toHaveAttribute('aria-invalid', 'true'));
-    expect(target).toHaveAccessibleDescription('A space thing would make a space contain itself.');
-    expect(screen.getByTestId('new-space-thing')).toBeVisible();
+    expect(
+      await screen.findByText('A space thing would make a space contain itself.'),
+    ).toBeVisible();
     expect(spaceThingsOf(session)).toEqual([]);
-    await settled(session);
-  });
-
-  /**
-   * A Space Thing always has a valid target available — a new Space — so the
-   * choice is never what is missing. The title is, which is why this pane has a
-   * Create button where Alias creation completes on the choice itself.
-   */
-  it('withholds Create until the Thing has been named', async () => {
-    const { session } = mount();
-    await openSpaceThingCreation();
-
-    expect(screen.getByTestId('new-space-thing-create')).toBeDisabled();
-
-    fireEvent.change(screen.getByTestId('new-space-thing-title'), { target: { value: '  ' } });
-    expect(screen.getByTestId('new-space-thing-create')).toBeDisabled();
-
-    fireEvent.change(screen.getByTestId('new-space-thing-title'), { target: { value: 'Named' } });
-    expect(screen.getByTestId('new-space-thing-create')).toBeEnabled();
-    await settled(session);
-  });
-
-  /**
-   * The creation state is the surface's own and nothing else (ADR 0042): no
-   * Thing, no Space, no commit until Create is pressed. Escape is Cancel's
-   * meaning on this pane rather than a second gesture (ADR 0048), so the two
-   * are one behaviour and are asserted as one.
-   */
-  it.each([
-    {
-      name: 'Cancel',
-      dismiss: () => fireEvent.click(screen.getByRole('button', { name: 'Cancel' })),
-    },
-    {
-      name: 'Escape',
-      dismiss: () =>
-        fireEvent.keyDown(screen.getByTestId('new-space-thing-title'), { key: 'Escape' }),
-    },
-  ])('creates nothing when it is dismissed with $name', async ({ dismiss }) => {
-    const { backend, session } = mount();
-    await openSpaceThingCreation();
-    fireEvent.change(screen.getByTestId('new-space-thing-title'), {
-      target: { value: 'Abandoned' },
-    });
-    chooseTarget('Other Space');
-
-    dismiss();
-
-    await waitFor(() => expect(screen.queryByTestId('new-space-thing')).not.toBeInTheDocument());
-    expect(spaceThingsOf(session)).toEqual([]);
-    expect(thingsOf(session)).toEqual(home.things);
-    expect(await backend.listSpaces()).toHaveLength(3);
-    await settled(session);
-  });
-});
-
-/**
- * The three outcomes the coordination can have that are not refusals.
- *
- * A refusal is an answer and the pane knows what to do with one. A rejection is
- * not: the registry throws outside its own try where a session it was
- * coordinating has gone, and the transport rejects on a timeout or a non-OK
- * status. None of the three is a state the author can be left holding, because
- * the running state disables both of this pane's exits.
- */
-describe('a coordination that broke rather than refused', () => {
-  /**
-   * The exits come back, and so does a sentence saying why they are needed.
-   *
-   * Both halves are one behaviour: an author who presses Create and is handed
-   * working controls back has been told the attempt is over and nothing else,
-   * and pressing Create again does the same thing again. A rejection names no
-   * field — the lifecycle refuses for everything it can name — so what threw is
-   * said in the pane's form channel, untranslated, exactly as `DeleteThingControl`
-   * says it: a refusal code is a stable domain identity (ADR 0057) and nothing
-   * here answers to one.
-   *
-   * The one app-level test of a rejection. The transitions behind it — the
-   * exits coming back, a dismissal refused while the Edit runs, a failed
-   * listing — are `thing-creation-state.test.ts`'s, driven with no React tree; this
-   * proves the pane reaches that module and draws what it answers.
-   */
-  it('says what broke when a create rejects', async () => {
-    // The rejection is reported too, since nothing else would say what broke.
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const { session } = mount(other, {
-      create: () => Promise.reject(new Error('the coordination lost a session')),
-    });
-    await openSpaceThingCreation();
-
-    createNamed('Architecture');
-
-    expect(
-      await screen.findByText('This Thing was not created: the coordination lost a session'),
-    ).toBeVisible();
-    expect(screen.getByTestId('new-space-thing')).toBeVisible();
-    expect(consoleError).toHaveBeenCalled();
-    await settled(session);
-  });
-
-  /**
-   * Reported through the sink the composition was given, not a second one.
-   *
-   * `thing-creation.ts` requires `reportBreak` with no default for the reason
-   * ADR 0016 gives, and a surface that answers that requirement with its own
-   * `console.error` puts back exactly the invisible reporter the requirement
-   * exists to prevent: a host that installed a sink of its own would never
-   * see this failure.
-   */
-  it('reports a rejected create through the sink the composition was given', async () => {
-    const reported = vi.fn();
-    const { session } = mount(
-      other,
-      { create: () => Promise.reject(new Error('the coordination lost a session')) },
-      reported,
-    );
-    await openSpaceThingCreation();
-
-    createNamed('Architecture');
-
-    expect(
-      await screen.findByText('This Thing was not created: the coordination lost a session'),
-    ).toBeVisible();
-    expect(reported).toHaveBeenCalled();
-    await settled(session);
-  });
-
-  /**
-   * A lifecycle that changed nothing did not create a Thing.
-   *
-   * `SpaceThingLifecycleResult` has three arms and only `refused` says a field
-   * is wrong, so an `unchanged` answered as a creation would close the pane and
-   * return the author to Add Thing believing a Space Thing exists that was never
-   * made. Named the way `createAlias` names its own arms, so the compiler asks
-   * again the day a fourth joins the union.
-   */
-  it('leaves the pane open when the lifecycle answers unchanged', async () => {
-    const create = vi.fn<SpaceThingAuthoring['create']>(() =>
-      Promise.resolve({ kind: 'unchanged' }),
-    );
-    const { session } = mount(other, { create });
-
-    await openSpaceThingCreation();
-    chooseTarget('A new Space');
-    createNamed('Architecture');
-
-    await waitFor(() => expect(screen.getByTestId('new-space-thing-create')).toBeEnabled());
-    // The attempt is what makes the three assertions below evidence: an open
-    // pane, live exits and no Space Thing are also exactly what a Create that
-    // never reached the lifecycle would leave behind.
-    expect(create).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('dialog', { name: 'New Space Thing' })).toBeVisible();
-    expect(spaceThingsOf(session)).toHaveLength(0);
-    await settled(session);
-  });
-
-  /**
-   * A read that rejected is reported too, and it is the one failure on this
-   * pane that was not: the seam answers an unreadable list rather than
-   * rejecting, so the shell's own reporting arm never runs and the transport
-   * error was shown to the author and then discarded.
-   */
-  it('reports a stored-Spaces read that rejected, as well as saying so', async () => {
-    const reported = vi.fn();
-    const { session } = mount(
-      other,
-      { referenceableSpaces: () => Promise.reject(new Error('the transport timed out')) },
-      reported,
-    );
-
-    await openSpaceThingCreation();
-
-    expect(
-      await screen.findByText(
-        'The stored Spaces could not be read, so this edit was not attempted.',
-      ),
-    ).toBeVisible();
-    expect(reported).toHaveBeenCalled();
-    await settled(session);
-  });
-
-  /**
-   * The pane says it is working, rather than only going quiet.
-   *
-   * A coordinated Edit spans several Spaces and answers asynchronously
-   * (ADR 0076), and while it runs both exits are withheld. Disabled controls
-   * and a dead Escape are indistinguishable from a surface that has broken, so
-   * the wait is stated on the dialog itself rather than left to be inferred
-   * from what has stopped working.
-   */
-  it('reports itself busy while a create is in flight', async () => {
-    // Never settled, which is the whole of the state under test.
-    const { session } = mount(other, { create: () => new Promise<never>(() => undefined) });
-    await openSpaceThingCreation();
-
-    createNamed('Architecture');
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
-    expect(screen.getByRole('dialog', { name: 'New Space Thing' })).toHaveAttribute(
-      'aria-busy',
-      'true',
-    );
-    await settled(session);
-  });
-
-  /**
-   * Presenting takes the pane away, and an Edit in flight is what it waits for.
-   *
-   * Presenting is reachable while the pane is open even though the pane is
-   * modal: Back onto a presenting Thing URL is a browser navigation, and the
-   * `popstate` a focus trap does not see reopens the presentation. Closing on
-   * that would be the abandonment the pane already refuses to make itself —
-   * Cancel and Escape are both withheld while a coordinated Edit is running,
-   * because the Edit completes whether or not the surface that began it is
-   * still there. So the pane stays until the Edit answers, and the answer is
-   * what takes it away.
-   */
-  it('keeps the pane over a presentation entered while a create is in flight', async () => {
-    const { session, app } = mount(other, { create: () => new Promise<never>(() => undefined) });
-    await openSpaceThingCreation();
-
-    createNamed('Architecture');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
-
-    act(() => app.navigation.openPresentation(HOME_DIAGRAM_ID, HOME_GRAPH_ID, HOME_THING_ID));
-
-    expect(screen.getByRole('dialog', { name: 'New Space Thing' })).toBeVisible();
-    await settled(session);
-  });
-
-  /**
-   * Every exit from the pane leaves focus somewhere, including the one that
-   * works.
-   *
-   * Cancel and Escape hand it back to the control the menu was opened from.
-   * Creating an Alias hands it to the editor that opens on the Alias, and taking
-   * it back would be a steal — but this pane has no naming continuation, because
-   * the title was typed on it before the Edit ran. So there is nothing to hand
-   * it to and the control it was opened from is where it belongs, exactly as
-   * after a cancellation. **That control is Create Space Thing and not a
-   * neighbour**: the kinds are peers now, so each carries its own return
-   * address (`continuation.ts`).
-   */
-  it('returns focus to Create Space Thing after creating a Space Thing', async () => {
-    const { session } = mount();
-    await openSpaceThingCreation();
-
-    createNamed('Architecture');
-
-    await waitFor(() => expect(screen.queryByTestId('new-space-thing')).not.toBeInTheDocument());
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Create Space Thing' })).toHaveFocus(),
-    );
-    await settled(session);
-  });
-
-  /**
-   * The listing failure outlives the keystroke that would withdraw a refusal.
-   *
-   * Editing a field ends the *attempt* a refusal described, which is why the
-   * pane withdraws one. An unreadable listing describes neither an attempt nor
-   * a field: it says the list beside them is short for a reason. Create is
-   * disabled until the Thing is titled, so withdrawing it on the first keystroke
-   * would put the author in front of "A new Space" alone with nothing left
-   * saying why — which is the duplicate this message exists to prevent.
-   */
-  it('keeps the unreadable-listing message while the author types a title', async () => {
-    const { session } = mount(other, {
-      referenceableSpaces: () => Promise.reject(new Error('the transport timed out')),
-    });
-    const unreadable = 'The stored Spaces could not be read, so this edit was not attempted.';
-
-    await openSpaceThingCreation();
-    expect(await screen.findByText(unreadable)).toBeVisible();
-    fireEvent.change(screen.getByTestId('new-space-thing-title'), {
-      target: { value: 'Architecture' },
-    });
-
-    expect(screen.getByText(unreadable)).toBeVisible();
-    await settled(session);
-  });
-});
-
-/**
- * Creating before the author has been shown what is already stored.
- *
- * The target list is read when the pane opens (ADR 0068), so there is a moment
- * — and, when the read fails, a state that never ends — in which the only row
- * on offer is "A new Space". The title is the pane's completion, so nothing
- * about the list stops an author typing one and pressing Create, and what they
- * get is a *second* Space named after the one they meant to reference. The two
- * states are told apart on purpose: a listing still in flight is an ordinary
- * wait and says so, and only a listing that failed is a refusal.
- *
- * "Created nothing" is asserted through Cancel rather than only through the
- * Thing count: the pane withholds Create until the listing has been read, so a
- * still-enabled Cancel is the evidence that no coordinated Edit was begun at
- * all — the pane never goes busy — where a count read straight after a click
- * would pass against one that had merely not landed yet.
- */
-describe('creating before the target list has been seen', () => {
-  /** Never settles, which is the whole of the state under test. */
-  const unread = { referenceableSpaces: () => new Promise<never>(() => undefined) };
-  const unreadable = 'The stored Spaces could not be read, so this edit was not attempted.';
-
-  it('withholds Create while the stored Spaces are still being read', async () => {
-    const { session } = mount(other, unread);
-    await openSpaceThingCreation();
-
-    fireEvent.change(screen.getByTestId('new-space-thing-title'), {
-      target: { value: 'Other Space' },
-    });
-
-    expect(await screen.findByText('Reading the stored Spaces…')).toBeVisible();
-    expect(screen.getByTestId('new-space-thing-create')).toBeDisabled();
-    // A wait is not a failure, so nothing on the pane reads as one.
-    expect(screen.queryByText(unreadable)).not.toBeInTheDocument();
-    await settled(session);
-  });
-
-  it('begins no Edit while the stored Spaces are still being read', async () => {
-    const { session } = mount(other, unread);
-    await openSpaceThingCreation();
-
-    createNamed('Other Space');
-
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
-    expect(screen.getByTestId('new-space-thing')).toBeVisible();
-    expect(spaceThingsOf(session)).toHaveLength(0);
-    await settled(session);
-  });
-
-  it('withholds Create when the stored Spaces could not be read', async () => {
-    // The read is reported as well as shown — proved by its own test above —
-    // and this test is about the pane, so the sink is only silenced here.
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const { session } = mount(other, {
-      referenceableSpaces: () => Promise.reject(new Error('the transport timed out')),
-    });
-    await openSpaceThingCreation();
-    expect(await screen.findByText(unreadable)).toBeVisible();
-
-    createNamed('Other Space');
-
-    expect(screen.getByTestId('new-space-thing-create')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
-    expect(spaceThingsOf(session)).toHaveLength(0);
     await settled(session);
   });
 });

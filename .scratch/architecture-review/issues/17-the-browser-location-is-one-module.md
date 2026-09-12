@@ -3,7 +3,7 @@
 Status: resolved
 Tags: Improvement
 Blocked by: none
-Related: `architecture-review/16` (ADR 0081, which this completes); ADR 0016
+Related: `architecture-review/22` (ADR 0081, which this completes); ADR 0016
 
 Surfaced by: the 4 September 2026 architecture review, candidate 1, then settled
 by a grilling loop. The rejected alternatives are recorded under "Decided" so

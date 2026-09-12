@@ -167,8 +167,25 @@ const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
   (color): readonly [string, string] => [GRAPH_COLOR_NAMES[color], color],
 );
 
-/** The three kinds Create offers, in the order the menu lists them. */
-const THING_KINDS = ['markdown', 'space', 'alias'] as const;
+/**
+ * The two kinds Create offers, in the order the cluster draws them.
+ *
+ * **`alias` left, and it left the Dock rather than the list.** An Alias is
+ * always created *from* the Thing it points at, which supplies the Target
+ * (ADR 0089), so the gesture is a row in that Thing's own command menu and
+ * there is nothing here for it to be a peer of.
+ */
+const THING_KINDS = ['markdown', 'space'] as const;
+
+/**
+ * A kind the Create cluster draws a control for.
+ *
+ * Named rather than written inline at the prop, because it is the type the
+ * *dispatch* is held to: `App.tsx` answers every press through a record over
+ * this, so a kind added above has to say what pressing it does before the
+ * application compiles.
+ */
+export type DockThingKind = (typeof THING_KINDS)[number];
 
 /**
  * Every disclosure opens the same way, whichever primitive draws it.
@@ -344,16 +361,6 @@ export interface DockSpace {
   readonly onRename: ((title: string) => string | null) | null;
   /** Copy this Space's own address — the one link a Space offers (`entity-actions.tsx`). */
   readonly onCopyLink: () => void;
-  /**
-   * Create a Space, which is Create Thing → Space.
-   *
-   * It sits in the Space menu against that rule, and it is the one item in the
-   * Dock that has not been reconciled: the arrangement asked for a way to make a
-   * Space from the Space you are in, and Create Thing offers the same command one
-   * cluster along. Both spend the same operation, so the duplication is a second
-   * path rather than a second behaviour.
-   */
-  readonly onNewSpace: () => void;
   /** Move to an open Space, closing nothing. The parent step and the Open Spaces menu both spend this. */
   readonly onSwitchTo: (spaceId: UUID) => void;
   /**
@@ -417,7 +424,17 @@ export interface DockCanvas {
   readonly onSelect: (diagramId: DiagramId) => void;
   /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
   readonly onRename: ((diagramId: DiagramId, title: string) => string | null) | null;
-  readonly onCreate: () => void;
+  /**
+   * Create an empty Diagram, select it, and answer whether the caret moved.
+   *
+   * **The answer is the point.** New Diagram continues in the new Diagram's name,
+   * so this cluster's menu must not take the caret back on close — but only a
+   * completion that actually requested that continuation moved it. Asserting the
+   * move on the press instead left a completion that did neither suppressing the
+   * restoration anyway, and the caret fell to `document.body`. Returning it keeps
+   * the two halves of that decision in one place rather than one per module.
+   */
+  readonly onCreate: () => boolean;
   /**
    * Whether New Diagram may run.
    *
@@ -558,10 +575,17 @@ export interface DockThingsList {
   readonly disabled: boolean;
 }
 
-/** One request to disclose the Things list, and the Thing it is about if any. */
+/** One request to disclose the Things list, and the Thing it is about. */
 export interface DockThingsDisclosure {
-  /** The Thing the request is about, for a caller that wants it marked too. */
-  readonly thingId: ThingId | null;
+  /**
+   * The Thing the request is about, which the list marks.
+   *
+   * Not nullable: every disclosure the application makes is about a Thing. The
+   * one caller that asked for the list with nothing to mark was New Diagram
+   * revealing it on an empty Diagram, and that command discloses nothing now —
+   * it continues in the new Diagram's name (ADR 0089).
+   */
+  readonly thingId: ThingId;
 }
 
 export interface DockThings {
@@ -591,7 +615,7 @@ export interface DockThings {
    * split button with a hidden default. This is *Create*, distinct from adding
    * an existing Thing, which is what the surface above is for.
    */
-  readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
+  readonly onCreate: (kind: DockThingKind) => void;
   /** Whether creating is available at all — presenting and an open pane both withdraw it. */
   readonly createDisabled: boolean;
 }
@@ -844,6 +868,12 @@ function IdentityName({
       ref={nameRef}
       className="command-dock__name"
       data-testid={testId}
+      /* The Dock's one continuation address (`continuation.ts`). Add Diagram
+         creates an empty Diagram and selects it, and the author continues in
+         its name — so the application presses this control the way a reader
+         does. Keyed on the identity rather than taken as a prop: there is one
+         addressable name, and a prop would invite a second. */
+      data-continuation-control={kind === 'Diagram' ? 'diagram-name' : undefined}
       disabled={onRename === null}
       aria-label={`Rename ${kind}: ${title}`}
       title={`Rename ${kind}`}
@@ -880,6 +910,18 @@ function DiagramControls({
   readonly side?: MenuSide;
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
+  /**
+   * Whether the command that closed this list left the caret alone.
+   *
+   * **A ref, read at close time, because the answer is what was just pressed.**
+   * New Diagram continues in the new Diagram's name: the application presses
+   * this cluster's own name control, its editor mounts and focuses itself, and
+   * Base UI's ordinary restoration would then land on the chevron a frame later
+   * — blurring an editor whose blur completes, and committing a rename nobody
+   * typed. Every other command here is over when it runs and returns the caret
+   * the way a menu should.
+   */
+  const movedCaret = useRef(false);
   return (
     <ToolbarGroup aria-label="Diagram" className="command-dock__cluster">
       <IdentityName
@@ -910,6 +952,11 @@ function DiagramControls({
         align={DISCLOSURE_ALIGN}
         sideOffset={DISCLOSURE_SIDE_OFFSET}
         className={`nokey ${DISCLOSURE_WIDTH}`}
+        restoresFocusOnClose={() => {
+          const moved = movedCaret.current;
+          movedCaret.current = false;
+          return !moved;
+        }}
         trigger={
           <ChoiceMenuTrigger
             id={triggerId}
@@ -928,7 +975,9 @@ function DiagramControls({
         <DropdownMenuItem
           className="gap-2"
           disabled={canvas.createDisabled}
-          onClick={canvas.onCreate}
+          onClick={() => {
+            movedCaret.current = canvas.onCreate();
+          }}
         >
           <PlusIcon />
           New Diagram
@@ -1162,10 +1211,12 @@ function GraphControls({
  * split button with a hidden default — the kind is chosen at creation, so none
  * of the three is the default. That reasoning is kept whole here. What is
  * dropped is the disclosure around them, which cost a press on *every*
- * creation, including the one kind that needs no second decision: `markdown`
- * completes its Edit on activation, while `alias` and `space` open a pane
- * because a Target and a target Space are still owed (`App.tsx`, `onCreate`).
- * So the menu charged the cheapest command for a choice it never makes.
+ * creation, including the one kind that then needed no second decision:
+ * `markdown` completed its Edit on activation, while `alias` and `space` opened
+ * a pane because a Target and a target Space were still owed. So the menu
+ * charged the cheapest command for a choice it never makes. ADR 0089 has since
+ * made every kind complete on activation and taken `alias` out of this cluster
+ * altogether, which makes the argument stronger rather than weaker.
  *
  * The other half of that recorded design is untouched and still load-bearing:
  * Create stays *outside* the Things surface. That list is a long scrolling one
@@ -1177,7 +1228,7 @@ function GraphControls({
  * list and Things on the canvas, where they say *what a Thing is*. Each control
  * carries `Create <kind>` as its accessible name and its tooltip, so the
  * keyboard and the pointer are unambiguous; what is accepted is that a silent
- * visual reading could take three kind glyphs in a command slot for filters
+ * visual reading could take the kind glyphs in a command slot for filters
  * over the list the trigger opens.
  *
  * They carry no chevron. In the cluster they sit where Present sits on the
@@ -1188,7 +1239,7 @@ function CreatePeers({
   onCreate,
   disabled,
 }: {
-  readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
+  readonly onCreate: (kind: DockThingKind) => void;
   readonly disabled: boolean;
 }) {
   return (
@@ -1196,9 +1247,9 @@ function CreatePeers({
        toolbar group is a plain `role="group"` div with no positional logic, so
        it nests inside the cluster without taking the roving tabindex off the
        one `Toolbar` root — and it gives `command-dock.css` one element to place
-       instead of three. Left as three siblings the vertical column's grid
-       auto-places them onto three rows and the Things cluster stands at 102px
-       beside a 44px Diagram and a 44px Graph. */
+       instead of two. Left as loose siblings the vertical column's grid
+       auto-places them onto a row each and the Things cluster grows past the
+       44px Diagram and 44px Graph beside it. */
     <ToolbarGroup aria-label="Create a Thing" className="command-dock__create">
       {THING_KINDS.map((kind) => (
         <ToolbarButton
@@ -1208,21 +1259,12 @@ function CreatePeers({
           className="nokey"
           aria-label={`Create ${thingKindName(kind)}`}
           title={`Create ${thingKindName(kind)}`}
-          // Where a cancelled creation pane puts the caret back, per kind. The
-          // pane is modal and unmounts on cancel, so there is no element to
-          // have held on to — the continuation names this control by address
-          // and one adapter resolves it (`continuation.ts`,
-          // `ChromeContinuation`). `markdown` completes on activation and is
-          // never somewhere to come back from, so it carries no address.
-          data-continuation-control={
-            kind === 'alias' ? 'create-alias' : kind === 'space' ? 'create-space-thing' : undefined
-          }
           disabled={disabled}
           onClick={() => onCreate(kind)}
         >
           {/* Decorative here and nowhere else in the Dock: this button already
               says `Create <kind>`, so a glyph announcing `<kind>` beside it is a
-              second node repeating half of it. Three of these are mounted at
+              second node repeating half of it. Both of these are mounted at
               rest, so the duplication is permanent rather than disclosed. */}
           <ThingKindIcon kind={kind} decorative />
         </ToolbarButton>
@@ -1634,14 +1676,6 @@ function SpaceMenu({
         className={`nokey ${DISCLOSURE_WIDTH}`}
       >
         <DropdownMenuGroup>
-          {/* Against the rule stated at the top of this module: creating a Space
-              is Create Thing → Space, so this is a second path to one command.
-              Drawn because the arrangement asked for it; it is the one item
-              here that has not been reconciled. */}
-          <DropdownMenuItem className="gap-2" onClick={space.onNewSpace}>
-            <PlusIcon />
-            New Space
-          </DropdownMenuItem>
           <DropdownMenuItem className="gap-2" onClick={space.onCopyLink}>
             <CopyIcon />
             Copy link

@@ -61,27 +61,26 @@ export const dock = (): HTMLElement => screen.getByRole('toolbar', { name: 'Comm
 /**
  * Create a Thing of one kind.
  *
- * The three kinds are peer controls in the Things cluster — the kind is chosen
- * at creation, so none of them is a default, and no disclosure stands in front
- * of them. One press per creation, whichever kind.
+ * The two kinds are peer controls in the Things cluster — the kind is chosen at
+ * creation, so neither is a default, and no disclosure stands in front of them.
+ * One press per creation, whichever kind, and the Edit completes on that press
+ * (ADR 0089). An Alias is not among them: it is created from the Thing it points
+ * at, through that Thing's own command menu.
  */
 export const createThing = (kind: ThingKindName): void => {
   fireEvent.click(createThingControl(kind));
 };
 
 /** The kinds the Dock offers, named as their controls announce them. */
-export type ThingKindName = 'Markdown Thing' | 'Space Thing' | 'Alias';
+export type ThingKindName = 'Markdown Thing' | 'Space Thing';
 
 /**
  * One kind's Create control, which is also what reports whether creating is
- * available at all — every peer is withdrawn by the same fact.
+ * available at all — both peers are withdrawn by the same fact.
  *
  * **The default answers the availability question and nothing else.** Asking
- * "can a Thing be created" may use any peer, because `createDisabled` withdraws
- * all three together. An assertion about *which* control — focus after a
- * cancelled pane, most of all — has to name its kind: each peer carries its own
- * continuation address, so a defaulted call there reads as passing while the
- * caret sits on a neighbour. Two tests were caught by exactly that.
+ * "can a Thing be created" may use either peer, because `createDisabled`
+ * withdraws them together; an assertion about *which* control names its kind.
  */
 export const createThingControl = (kind: ThingKindName = 'Markdown Thing'): HTMLElement =>
   within(dock()).getByRole('button', { name: `Create ${kind}` });

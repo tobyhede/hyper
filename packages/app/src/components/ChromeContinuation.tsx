@@ -50,16 +50,31 @@ export function ChromeContinuation({
     if (target.kind !== 'control') return;
     // Chrome falls through: it is drawn already, so an element this cannot find
     // is gone rather than on its way, and nothing is owed for a wait with no
-    // end. The control a cancelled pane returns to is only ever *disabled*
-    // while the pane is up, and the render that publishes this is the render
-    // that closes it.
+    // end.
     continuation.take();
-    // `then` is read rather than assumed. Every chrome continuation asks for
-    // `focus` today, and a `reveal` has no meaning off the canvas — but the
-    // module's four values are one type for both adapters, so an arm this
-    // cannot honour is spent quietly instead of silently taking the caret.
-    if (pending.then !== 'focus') return;
-    elementOf(within.current ?? document, target.name)?.focus();
+    const element = elementOf(within.current ?? document, target.name);
+    if (element === null) return;
+    // `then` is read rather than assumed: the module's four values are one type
+    // for both adapters, so an arm this cannot honour — `reveal` has no meaning
+    // off the canvas — is spent quietly instead of silently taking the caret.
+    if (pending.then === 'focus') {
+      element.focus();
+      return;
+    }
+    /*
+     * **A rename is begun by pressing the control, because that is what the
+     * control does.** The Dock's names are `button`s whose click starts the
+     * in-place editor (`IdentityName`), and the editor focuses itself on mount
+     * — so a `focus()` here would leave the caret on the button and an
+     * application-driven rename would need a second way into the same state,
+     * kept in step with the reader's. Dispatching the press instead means Add
+     * Diagram arrives exactly where a reader who clicked the name arrives.
+     *
+     * A control the application has withdrawn is a control this cannot press:
+     * Base UI suppresses activation for a disabled item, so an unavailable
+     * name simply does not open, which is the same answer the reader gets.
+     */
+    if (pending.then === 'rename') element.click();
   }, [pending, continuation, within]);
 
   return null;

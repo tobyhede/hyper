@@ -760,31 +760,7 @@ describe('Space app failure reporting', () => {
  * this evidence is the Ladle behaviour test, which runs in a real browser.
  */
 describe('Space app Things list', () => {
-  it('opens once for the client whose working load created the empty Diagram', () => {
-    const base = snapshot('Space', 'Thing', 10, 20);
-    const stored = { snapshot: base, revision: 1n, exportedRevision: null };
-    const { spaceSession: session, spaceThings } = openTestSpace(
-      new MemorySpaceBackend(SPACE_ID, [stored]),
-      stored,
-    );
-
-    mountSpace(
-      {
-        id: runtime(base).id,
-        session,
-        app: composeApp({ spaceSession: session }),
-        spaceThings,
-        initialization: 'created-diagram',
-      },
-      (app) => render(app),
-    );
-
-    expect(screen.getByRole('dialog', { name: 'Things' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
-    expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
-  });
-
-  it('opens an accessible empty drawer for an initialized zero-Thing Space', () => {
+  it('opens an accessible empty list for a zero-Thing Space, and creates in it', () => {
     const seeded = snapshot('Space', 'Thing', 10, 20);
     const empty: SpaceSnapshot = {
       ...seeded,
@@ -801,16 +777,14 @@ describe('Space app Things list', () => {
     );
 
     mountSpace(
-      {
-        id: runtime(empty).id,
-        session,
-        app: composeApp({ spaceSession: session }),
-        spaceThings,
-        initialization: 'created-diagram',
-      },
+      { id: runtime(empty).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
 
+    // Opened by the press, because nothing opens it for the reader any more:
+    // first-load initialization authors the Diagram and announces nothing
+    // (`.scratch/command-dock/issues/13`).
+    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     expect(screen.getByRole('dialog', { name: 'Things' })).toHaveTextContent(
       'This Space has no Things.',
     );
@@ -819,7 +793,16 @@ describe('Space app Things list', () => {
     expect(session.getState().working.things).toHaveLength(1);
   });
 
-  it('adds an empty selected Diagram and reveals its existing Things once', () => {
+  /**
+   * **Add Diagram opens nothing, and the author continues in the name.**
+   *
+   * The Things list used to be disclosed here, on the argument that an empty
+   * Diagram needs filling. What an author does with a brand-new Diagram is say
+   * what it is for — `Diagram 1` is a placeholder nobody wants — and a list that
+   * appears in response to a creation is furniture arriving unasked
+   * (`.scratch/command-dock/issues/13`).
+   */
+  it('adds an empty selected Diagram, opens no list, and puts the caret in its name', async () => {
     const base = snapshot('Space', 'Thing', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceThings } = openTestSpace(
@@ -831,20 +814,24 @@ describe('Space app Things list', () => {
       { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
       (app) => render(app),
     );
+    // The Edit is withdrawn until the canvas has a placement to edit against,
+    // and so is the rename the continuation lands on. Waited for on the name
+    // rather than by reopening the menu: a Base UI menu returns focus to its
+    // trigger in a microtask after it closes, so a poll that opened and
+    // dismissed this one would leave that return in flight across the press
+    // under test and steal the caret from the editor it opens.
+    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
 
     newDiagram('Diagram');
 
     expect(session.getState().working.document.diagrams).toHaveLength(2);
     expect(session.getState().working.document.diagrams?.[1]?.positions).toEqual({});
     expect(session.getState().working.document.diagrams?.[1]?.graphs).toHaveLength(1);
-    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram 1');
-    expect(screen.getByRole('dialog', { name: 'Things' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
     expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
 
-    createThing('Markdown Thing');
-    expect(screen.queryByRole('dialog', { name: 'Things' })).not.toBeInTheDocument();
+    const editor = screen.getByRole('textbox', { name: 'Diagram name' });
+    expect(editor).toHaveValue('Diagram 1');
+    expect(editor).toHaveFocus();
   });
 
   /**
@@ -887,7 +874,16 @@ describe('Space app Things list', () => {
     expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(true);
     openDiagramMenu('Diagram');
     expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
+    const create = screen.getByRole('menuitem', { name: 'New Diagram' });
+    expect(unavailable(create)).toBe(true);
+    fireEvent.click(create);
+    expect(session.getState().working.document.diagrams).toHaveLength(1);
+    expect(screen.queryByRole('textbox', { name: 'Diagram name' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
+    fireEvent.keyDown(create, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Diagram: Diagram' })).toHaveFocus(),
+    );
 
     // Left settling rather than abandoned mid-placement: the strategy resolves
     // against an unmounted tree otherwise, and the Edits it restores are the
@@ -1118,17 +1114,24 @@ describe('Space app Things list', () => {
 
     openDiagramMenu('Diagram');
     expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
+    // Dismissed and settled before the creation. A Base UI menu returns focus to
+    // its trigger in a microtask after it closes, so a close left in flight
+    // across the next press lands on the trigger *after* New Diagram has opened
+    // the new Diagram's name editor — blurring an editor whose blur completes.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
 
+    // Add Diagram continues in the new Diagram's name, so the editor is already
+    // open and there is no second gesture to begin the rename with.
     newDiagram('Diagram');
-    fireEvent.click(screen.getByRole('button', { name: 'Things' }));
-    // Renaming is the name itself, not a menu row: there is one name on the bar
-    // and clicking it is the whole command.
-    await beginRename('selected-canvas');
-    const editor = await screen.findByRole('textbox', { name: 'Diagram name' });
+    const editor = screen.getByRole('textbox', { name: 'Diagram name' });
     fireEvent.change(editor, { target: { value: 'Workshop' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');
 
+    // The rename replaced the placement, and a menu's Edits are withdrawn until
+    // the canvas has one to edit against.
+    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
     openDiagramMenu('Workshop');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
     expect(session.getState().working.document.diagrams).toHaveLength(1);

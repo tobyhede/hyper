@@ -135,42 +135,60 @@ export interface DeleteSpaceThingInput {
   readonly containingSpaceId: UUID;
   readonly thingId: UUID;
 }
-export type SpaceThingLifecycleResult =
-  | { readonly kind: 'completed' }
-  | { readonly kind: 'unchanged' }
+/** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
+export type SpaceThingRefusal =
+  | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
+  | { readonly code: 'space-thing-not-found'; readonly thingId: UUID }
   | {
-      readonly kind: 'refused';
-      readonly refusal:
-        | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
-        | { readonly code: 'space-thing-not-found'; readonly thingId: UUID }
-        | {
-            readonly code: 'persistence-recovery-required';
-            readonly spaceId: UUID;
-            readonly recovery: 'retry' | 'resolve-conflict';
-          }
-        | { readonly code: 'aggregate-refused'; readonly errors: readonly SpaceAggregateError[] }
-        | { readonly code: 'persistence-read-failed' }
-        /**
-         * The target could not be made working, so it supplies no Diagram and
-         * Graph for the Thing to select (ADR 0079).
-         *
-         * One code carrying {@link SpaceThingTargetUnavailableReason}, rather
-         * than three codes: what the Edit did is identical in all three — it did
-         * not begin — and only the advice differs, which is what a reason is
-         * for. It stays separate from `persistence-read-failed`, which is about
-         * the Spaces this Edit validates against rather than the one it was
-         * pointed at.
-         */
-        | {
-            readonly code: 'space-thing-target-unavailable';
-            readonly spaceId: UUID;
-            readonly reason: SpaceThingTargetUnavailableReason;
-          };
+      readonly code: 'persistence-recovery-required';
+      readonly spaceId: UUID;
+      readonly recovery: 'retry' | 'resolve-conflict';
+    }
+  | { readonly code: 'aggregate-refused'; readonly errors: readonly SpaceAggregateError[] }
+  | { readonly code: 'persistence-read-failed' }
+  /**
+   * The target could not be made working, so it supplies no Diagram and
+   * Graph for the Thing to select (ADR 0079).
+   *
+   * One code carrying {@link SpaceThingTargetUnavailableReason}, rather
+   * than three codes: what the Edit did is identical in all three — it did
+   * not begin — and only the advice differs, which is what a reason is
+   * for. It stays separate from `persistence-read-failed`, which is about
+   * the Spaces this Edit validates against rather than the one it was
+   * pointed at.
+   */
+  | {
+      readonly code: 'space-thing-target-unavailable';
+      readonly spaceId: UUID;
+      readonly reason: SpaceThingTargetUnavailableReason;
     };
+
+/** The Edit did not land, said the two ways every operation here can say it. */
+type SpaceThingLifecycleUnsettled =
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'refused'; readonly refusal: SpaceThingRefusal };
+
+/**
+ * What an operation that authors a Space Thing answers: the Thing it made.
+ *
+ * **Split from {@link SpaceThingDeletionResult} rather than carrying an optional
+ * id on one shared arm.** Both `create` and `link` mint the Thing's id locally,
+ * so the value exists the moment the result is built, and `delete` creates no
+ * Thing to name. An optional field on one `completed` arm would put "is it
+ * there?" at every call site — which is the cost the surface was already paying
+ * when it inferred the id from a before/after set difference instead.
+ */
+export type SpaceThingCreationResult =
+  { readonly kind: 'completed'; readonly thingId: UUID } | SpaceThingLifecycleUnsettled;
+
+/** What deletion answers: that it landed, and nothing a caller could continue at. */
+export type SpaceThingDeletionResult =
+  { readonly kind: 'completed' } | SpaceThingLifecycleUnsettled;
+
 export interface SpaceThingLifecycle {
-  readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
-  readonly link: (input: LinkSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
-  readonly delete: (input: DeleteSpaceThingInput) => Promise<SpaceThingLifecycleResult>;
+  readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingCreationResult>;
+  readonly link: (input: LinkSpaceThingInput) => Promise<SpaceThingCreationResult>;
+  readonly delete: (input: DeleteSpaceThingInput) => Promise<SpaceThingDeletionResult>;
 }
 
 /**
@@ -219,6 +237,22 @@ const selectionOfLoaded = (space: Space): TargetSelection => {
 
 const clone = <T>(value: T): T => structuredClone(value);
 const completed = { kind: 'completed' } as const;
+/** The refused arm on its own, which is the only one the three bodies build early. */
+type SpaceThingRefused = { readonly kind: 'refused'; readonly refusal: SpaceThingRefusal };
+
+/**
+ * The completion a creating operation built when it minted its Thing's id.
+ *
+ * **`undefined` here is a programming error rather than an outcome.** Both
+ * bodies mint the id on the one path that returns a change list, and every path
+ * that returns without one assigns its refusal first — which the caller has
+ * already answered by the time this is reached. So there is no third thing to
+ * say, and saying `unchanged` would name an outcome neither operation produces.
+ */
+const completedCreation = (completion: SpaceThingCreationResult | undefined) => {
+  if (completion === undefined) throw new Error('A completed Space Thing Edit named no Thing');
+  return completion;
+};
 const snapshotFromSpace = (space: Space): SpaceSnapshot => {
   const document: SpaceSnapshot['document'] = {
     version: SPACE_FILE_VERSION,
@@ -764,7 +798,7 @@ export function createSpaceSessionRegistry(
       if (session === undefined) throw new Error(`Space ${id} has no live session`);
       return session.getState().working;
     };
-    const recoveryRefusal = (spaceId: UUID): SpaceThingLifecycleResult | undefined => {
+    const recoveryRefusal = (spaceId: UUID): SpaceThingRefused | undefined => {
       const persistence = sessions.get(spaceId)?.session.getState().persistence;
       if (persistence?.kind === 'failed') {
         return {
@@ -784,8 +818,9 @@ export function createSpaceSessionRegistry(
       }
       return undefined;
     };
-    const link = async (input: LinkSpaceThingInput): Promise<SpaceThingLifecycleResult> => {
-      let refusal: SpaceThingLifecycleResult | undefined;
+    const link = async (input: LinkSpaceThingInput): Promise<SpaceThingCreationResult> => {
+      let refusal: SpaceThingRefused | undefined;
+      let completion: SpaceThingCreationResult | undefined;
       const result = await coordinateSpaceThingLifecycle(async () => {
         refusal = recoveryRefusal(input.containingSpaceId);
         if (refusal !== undefined) return undefined;
@@ -820,6 +855,7 @@ export function createSpaceSessionRegistry(
           graph: target.selection.graph,
         };
         const thingId = newId();
+        completion = { kind: 'completed', thingId };
         return [
           {
             kind: 'update',
@@ -835,11 +871,13 @@ export function createSpaceSessionRegistry(
       if (result.kind === 'aggregate-refused') {
         return { kind: 'refused', refusal: { code: 'aggregate-refused', errors: result.errors } };
       }
-      return refusal ?? completed;
+      if (refusal !== undefined) return refusal;
+      return completedCreation(completion);
     };
     return {
       create: async (input) => {
-        let refusal: SpaceThingLifecycleResult | undefined;
+        let refusal: SpaceThingRefused | undefined;
+        let completion: SpaceThingCreationResult | undefined;
         const result = await coordinateSpaceThingLifecycle(() => {
           refusal = recoveryRefusal(input.containingSpaceId);
           if (refusal !== undefined) return undefined;
@@ -864,6 +902,7 @@ export function createSpaceSessionRegistry(
           if (selection === undefined)
             throw new Error('An initialized Space supplied no Diagram to select');
           const thingId = newId();
+          completion = { kind: 'completed', thingId };
           return [
             {
               kind: 'update',
@@ -895,11 +934,12 @@ export function createSpaceSessionRegistry(
             refusal: { code: 'aggregate-refused', errors: result.errors },
           };
         }
-        return refusal ?? completed;
+        if (refusal !== undefined) return refusal;
+        return completedCreation(completion);
       },
       link,
       delete: async (input) => {
-        let refusal: SpaceThingLifecycleResult | undefined;
+        let refusal: SpaceThingRefused | undefined;
         const result = await coordinateSpaceThingLifecycle(async () => {
           refusal = recoveryRefusal(input.containingSpaceId);
           if (refusal !== undefined) return undefined;

@@ -113,6 +113,22 @@ export interface EntityAction {
    * two paths get the same red by construction.
    */
   readonly variant?: 'default' | 'destructive' | undefined;
+  /**
+   * Present and unavailable, for a command that exists on this kind of entity
+   * and can never run on *this* one.
+   *
+   * The rule above this interface is that an address which does not exist is
+   * not offered at all — so this is deliberately narrow. Create Alias is the
+   * case it was added for: ADR 0070 forbids an Alias of an Alias, and an Alias
+   * is otherwise a regular Thing, so withholding the row would make one Thing's
+   * menu shorter than every other's for a reason the reader cannot see. The
+   * greyed row is where the product says that aliasing terminates.
+   *
+   * The primitive owns what unavailable *means* — both `DropdownMenuItem` and
+   * `ContextMenuItem` are Base UI `Menu.Item`s, which suppress activation for
+   * pointer and keyboard alike and keep the item in the accessibility tree.
+   */
+  readonly disabled?: boolean | undefined;
   readonly onSelect: () => EntityActionOutcome | Promise<EntityActionOutcome>;
 }
 
@@ -303,6 +319,7 @@ function EntityActionItems({
               // nothing closes the menu the way every menu item does.
               closeOnClick={!reports(action)}
               variant={action.variant ?? 'default'}
+              disabled={action.disabled ?? false}
               // `items-start`, because an item is two lines whenever it carries
               // a destination sentence and the primitive's own `items-center`
               // would then hang the glyph between them. The column below is

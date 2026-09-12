@@ -4,7 +4,6 @@ import {
   type ObserverErrorReporter,
   type SpaceBackend,
   type SpaceThingLifecycle,
-  type SpaceThingLifecycleResult,
   type SpaceSessionRegistry,
   type SpaceSummary,
 } from '@project/persistence';
@@ -14,8 +13,10 @@ export type {
   CreateSpaceThingInput,
   DeleteSpaceThingInput,
   LinkSpaceThingInput,
+  SpaceThingCreationResult,
+  SpaceThingDeletionResult,
   SpaceThingLifecycle,
-  SpaceThingLifecycleResult,
+  SpaceThingRefusal,
   SpaceThingTargetUnavailableReason,
 } from '@project/persistence';
 
@@ -137,9 +138,9 @@ export function createSpaceThingLifecycle({
    * nothing, and a break leaves the epoch where the failed write left the
    * repository.
    */
-  const announcing = <Input>(
-    write: (input: Input) => Promise<SpaceThingLifecycleResult>,
-  ): ((input: Input) => Promise<SpaceThingLifecycleResult>) => {
+  const announcing = <Input, Result extends { readonly kind: string }>(
+    write: (input: Input) => Promise<Result>,
+  ): ((input: Input) => Promise<Result>) => {
     return async (input) => {
       const result = await write(input);
       if (result.kind === 'completed') epoch.publish(epoch.getState() + 1);

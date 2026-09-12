@@ -104,9 +104,20 @@ test(
     const menu = await disclose(page, 'Diagram: Collection 1');
     await menu.getByRole('menuitem', { name: 'New Diagram' }).click();
 
+    // The command opens nothing and continues in the new Diagram's name
+    // (`.scratch/command-dock/issues/13`), so the Dock is drawing that name's
+    // editor rather than the name — and the caret is the outcome worth holding.
+    // Escape cancels an untouched draft, which leaves the title the Edit stored.
+    //
     // `Diagram 1` is what `nextDiagramTitle` mints over `Collection 1` and
     // `Collection 2` — the application's own numbering, not a word this test
     // chose.
+    const name = page.getByRole('textbox', { name: 'Diagram name' });
+    await expect(name).toBeFocused();
+    await expect(name).toHaveValue('Diagram 1');
+    await page.keyboard.press('Escape');
+    await expect(name).toHaveCount(0);
+
     await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Diagram 1',
     );
@@ -458,13 +469,13 @@ test(
  * application cannot mean.
  */
 test(
-  'Create offers the three kinds as peers, each named for what it makes',
+  'Create offers both kinds as peers, each named for what it makes',
   { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const strip = surface(page);
-    for (const kind of ['Markdown Thing', 'Space Thing', 'Alias']) {
+    for (const kind of ['Markdown Thing', 'Space Thing']) {
       const control = strip.getByRole('button', { name: `Create ${kind}` });
       await expect(control).toBeVisible();
       // Available, and reached without opening anything first — which is the
@@ -477,8 +488,8 @@ test(
     await expect(strip.getByRole('button', { name: 'Create Thing' })).toHaveCount(0);
     await expect(page.getByRole('menu')).toHaveCount(0);
 
-    // One group, so assistive technology announces the run once rather than
-    // three unrelated commands after the Things trigger.
+    // One group, so assistive technology announces the run once rather than two
+    // unrelated commands after the Things trigger.
     await expect(strip.getByRole('group', { name: 'Create a Thing' })).toBeAttached();
   },
 );
@@ -510,9 +521,10 @@ test(
     const things = strip.getByRole('group', { name: 'Things' });
     const graph = strip.getByRole('group', { name: 'Graph' });
 
-    // One row: the cluster carrying four controls is no taller than the one
-    // carrying a name, a disclosure and Present. Three siblings auto-place onto
-    // three rows and this is what fails.
+    // One row: the cluster carrying the disclosure and both Creates is no taller
+    // than the one carrying a name, a disclosure and Present. Left as loose
+    // siblings the vertical column auto-places them onto a row each and this is
+    // what fails.
     const thingsBox = await things.boundingBox();
     const graphBox = await graph.boundingBox();
     expect(thingsBox).not.toBeNull();
@@ -520,8 +532,8 @@ test(
     if (thingsBox !== null && graphBox !== null)
       expect(Math.abs(thingsBox.height - graphBox.height)).toBeLessThanOrEqual(1);
 
-    // One pitch: the chevron and the three Creates are evenly spaced, so the
-    // disclosure reads as the first of four glyphs. Centres rather than edges,
+    // One pitch: the chevron and both Creates are evenly spaced, so the
+    // disclosure reads as the first of three glyphs. Centres rather than edges,
     // because the chevron is a 14px glyph inside a padded trigger and the
     // Creates are 14px glyphs inside 28px buttons.
     const centres = await strip.evaluate((root) => {
@@ -530,8 +542,8 @@ test(
       const trigger = cluster.querySelector('[aria-label="Things"][class*="things-trigger"]');
       const glyphs = trigger === null ? [] : [...trigger.querySelectorAll('svg')];
       const chevron = glyphs.at(-1);
-      // `button`, because the group wrapping the three is itself labelled
-      // "Create a Thing" and an attribute prefix match takes it as a fourth.
+      // `button`, because the group wrapping the pair is itself labelled
+      // "Create a Thing" and an attribute prefix match takes it as a third.
       const creates = [...cluster.querySelectorAll('button[aria-label^="Create "]')];
       return [chevron, ...creates]
         .filter((element): element is Element => element !== undefined)
@@ -540,7 +552,7 @@ test(
           return rect.left + rect.width / 2;
         });
     });
-    expect(centres).toHaveLength(4);
+    expect(centres).toHaveLength(3);
     const pitches = centres.slice(1).map((centre, index) => centre - (centres[index] ?? 0));
     for (const pitch of pitches) expect(Math.abs(pitch - (pitches[0] ?? 0))).toBeLessThanOrEqual(1);
   },

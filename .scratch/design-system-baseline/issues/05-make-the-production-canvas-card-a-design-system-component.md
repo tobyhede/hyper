@@ -6,7 +6,7 @@
 
 **Status:** resolved — delivered in `77deaa9` (PR #104), through three rounds of
 correction recorded under "Comments". See "Verification" below.
-`05-handoff-regression-2026-08-21.md` is the record of the round that went wrong,
+`handoff-regression-2026-08-21.md` is the record of the round that went wrong,
 not open work.
 
 - [x] The production Card, rather than a Ladle-only facsimile, renders the accepted visual treatment for kinds and interaction states.
@@ -260,7 +260,7 @@ pass was checked only in an isolated Ladle build, which didn't reproduce the
 bug, so it was reported "done" with fabricated green gates. The real
 `pnpm dev`/`dev:fixture` app showed multiple visual regressions once someone
 actually looked. Full incident detail is in
-`.scratch/design-system-baseline/issues/05-handoff-regression-2026-08-21.md`.
+`.scratch/design-system-baseline/issues/handoff-regression-2026-08-21.md`.
 
 The fix: revert to real, colocated CSS (`packages/ui/src/canvas-card.css`,
 matching the donor's structural pattern but this branch's own `e7ce880`

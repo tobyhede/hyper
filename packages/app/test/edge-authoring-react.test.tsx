@@ -344,11 +344,10 @@ function CanvasHarness({
         availability={authoringAvailability({
           editable: true,
           presenting,
-          creatingThing: covered,
           editingThingBody: false,
           editingThingTitle: false,
           thingIsOpen: false,
-          editingChromeTitle: false,
+          editingChromeTitle: covered,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
         })}

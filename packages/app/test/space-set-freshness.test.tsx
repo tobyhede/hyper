@@ -196,18 +196,18 @@ describe('the Spaces a Things list offers', () => {
     expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 2');
     await closeThingsList(before);
 
-    // Cross to Other and create a Space there, through the pane the reader uses.
+    // Cross to Other and create a Space there — one press, which mints the Space
+    // and the Thing that names it from one `Space N` (ADR 0089). Other holds
+    // `Thing 1` and no `Space N`, so the new pair is called `Space 1`.
     await act(async () => {
       await spaces.switchTo(OTHER_ID);
     });
     await readyToAuthor();
-    createThing('Space Thing');
-    await screen.findByTestId('new-space-thing');
-    fireEvent.change(screen.getByTestId('new-space-thing-title'), {
-      target: { value: 'Architecture' },
+    await act(async () => {
+      createThing('Space Thing');
+      await Promise.resolve();
     });
-    fireEvent.click(screen.getByTestId('new-space-thing-create'));
-    await waitFor(() => expect(screen.queryByTestId('new-space-thing')).toBeNull());
+    await screen.findByRole('textbox', { name: 'Thing title' });
 
     // Back in Home, the list has to offer the Space that now exists.
     await act(async () => {
@@ -217,6 +217,6 @@ describe('the Spaces a Things list offers', () => {
     await waitFor(() =>
       expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 3'),
     );
-    expect(screen.getByRole('button', { name: 'Add Architecture to Diagram' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Space 1 to Diagram' })).toBeInTheDocument();
   });
 });

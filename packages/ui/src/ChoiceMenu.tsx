@@ -45,6 +45,20 @@ export interface ChoiceMenuProps<Id extends string> {
   readonly sideOffset?: number;
   /** The popup's own class, which is where its width is set. */
   readonly className?: string;
+  /**
+   * Whether closing this list takes the caret back to the control it hangs off.
+   *
+   * Answered **at close time** rather than read off a render, because the thing
+   * it depends on is what the reader just pressed. A menu ordinarily returns
+   * focus to its trigger, and should: the command is over and the reader is
+   * back where they were. A command that *moves* the caret on purpose — the
+   * Dock's New Diagram, which continues in the new Diagram's name — is the
+   * exception, and without this the restoration lands a frame after the editor
+   * has focused itself, blurs it, and completes the rename nobody typed.
+   *
+   * Omitted, Base UI's own restoration stands.
+   */
+  readonly restoresFocusOnClose?: () => boolean;
 }
 
 /**
@@ -85,11 +99,18 @@ export function ChoiceMenu<Id extends string>({
   align = 'center',
   sideOffset = 6,
   className = 'w-72',
+  restoresFocusOnClose,
 }: ChoiceMenuProps<Id>) {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
       {trigger}
-      <DropdownMenuContent align={align} side={side} sideOffset={sideOffset} className={className}>
+      <DropdownMenuContent
+        align={align}
+        side={side}
+        sideOffset={sideOffset}
+        className={className}
+        finalFocus={restoresFocusOnClose}
+      >
         <DropdownMenuRadioGroup<Id | null>
           value={chosen}
           onValueChange={(next) => {

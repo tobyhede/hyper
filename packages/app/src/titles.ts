@@ -4,9 +4,9 @@ import { titleName, type Graph, type SpaceSnapshot } from '@project/core';
  * The neutral titles the app mints for structure the author did not name.
  *
  * It sits in its own module so every authoring operation shares one numbering
- * rule for Things, Diagrams and Graphs.
+ * rule for Things, Spaces, Diagrams and Graphs.
  *
- * Three named operations rather than one helper taking a prefix. What a caller
+ * Four named operations rather than one helper taking a prefix. What a caller
  * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
  * literal are this module's, so no call site can spell "Diagram" a second way or
  * number one kind of entity differently from another. This is a deterministic
@@ -46,6 +46,24 @@ function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
 export const nextThingTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
     'Thing',
+    snapshot.things.map((thing) => titleName(thing.document.title)),
+  );
+
+/**
+ * What Create Space Thing calls the Space it mints, and the Thing that names it.
+ *
+ * **Numbered over the containing Space's Thing titles, which is the only source
+ * that can be read synchronously.** The names of the Spaces already stored come
+ * from a repository read, and the creation gesture completes on activation
+ * (ADR 0089) with nothing to wait on — so a globally unique name would have to
+ * be minted inside the lifecycle and would disagree with the Thing's from the
+ * outset. One string is handed to both the Space and the Space Thing, so they
+ * agree at creation exactly as the retired pane's typed title did. Collisions
+ * across Spaces are accepted: a title is not an identifier (ADR 0016).
+ */
+export const nextSpaceTitle = (snapshot: SpaceSnapshot): string =>
+  nextNumberedTitle(
+    'Space',
     snapshot.things.map((thing) => titleName(thing.document.title)),
   );
 

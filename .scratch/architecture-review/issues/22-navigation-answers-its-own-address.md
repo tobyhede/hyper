@@ -1,5 +1,13 @@
 # Navigation answers its own address
 
+> **Renumbered from `16` by `tracker-hygiene/01`.** It shared that number with
+> `16-move-registry-coordination-tests-to-persistence.md`, and a bare
+> `architecture-review/16` could not be resolved by a reader or by an agent
+> following it. `16` stayed with the registry-tests ticket, which `14` cites
+> twice as its own deferred tail; the one citation of this one — from
+> `17-the-browser-location-is-one-module.md`, which completes the ADR 0081 work
+> this began — was followed to `22`.
+
 Status: resolved
 Tags: Improvement
 Blocked by: none

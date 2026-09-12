@@ -236,7 +236,7 @@ describe('authoring a Thing title on the graph', () => {
     const session = mount();
     // **New Diagram is the control, and Create Thing is deliberately not.** The
     // two read different terms and the difference is the claim: `createDiagram`
-    // is `addThing && !editingThingTitle`, because creating a Diagram *selects* it
+    // requires a ready chrome name, because creating a Diagram *selects* it
     // and the canvas re-derives with no nodes at all — a Thing holding a live
     // draft unmounts. Creating a Thing re-derives nothing under the editor, so
     // it stays available, which is why the assertion below is on New Diagram
@@ -566,8 +566,8 @@ describe('authoring an opened Thing', () => {
    * the author settles it first.
    *
    * This is the one control outside the canvas that needs to know an edit is
-   * running. The two modal surfaces need nothing: `ThingPane` owns its own
-   * modality, and the editor is still there when it closes.
+   * running, and since ADR 0089 retired the creation panes there is no modal
+   * surface left that could need it too.
    */
   it('cannot start presenting over a live content edit', async () => {
     const session = mount();

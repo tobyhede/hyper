@@ -162,16 +162,17 @@ function mountGraph(
         presenting={false}
         placementReady={editable}
         // The facts a mounted canvas is given, turned into answers by the one
-        // module that owns them: `titleEditing` is the creation pane `App`
-        // reports, and `editable` is a resolved placement.
+        // module that owns them: `titleEditing` is the chrome rename `App`
+        // reports — the surviving fact that withdraws canvas authoring, the
+        // creation panes having gone with ADR 0089 — and `editable` is a
+        // resolved placement.
         availability={authoringAvailability({
           editable,
           presenting: false,
-          creatingThing: !titleEditing,
           editingThingBody: false,
           editingThingTitle: false,
           thingIsOpen: false,
-          editingChromeTitle: false,
+          editingChromeTitle: !titleEditing,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
         })}

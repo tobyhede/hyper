@@ -10,8 +10,8 @@
  *
  *  - **Thing size is 260x146, not the prototype's 230x129.** The handoff says
  *    "pick one size and derive the rest", and 260x146 is the repo's own
- *    `thing.ts` constant, which placement is authored against and which
- *    `.thing-pane__panel` mirrors. Both are 16:9; taking the prototype's would
+ *    `thing.ts` constant, which placement is authored against and which every
+ *    drawn Thing takes its box from. Both are 16:9; taking the prototype's would
  *    mean changing the layout seam to match a drawing.
  *  - **Dark mode is absent.** Three candidates exist and none is chosen, so
  *    there is nothing here to render one from. See `.ladle/components.tsx`.

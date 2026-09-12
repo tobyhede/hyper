@@ -1,4 +1,11 @@
-# 16 — Retire the registry Drawer and the strip the shell yields to it
+# 22 — Retire the registry Drawer and the strip the shell yields to it
+
+> **Renumbered from `16` by `tracker-hygiene/01`.** It shared that number with
+> `16-create-thing-is-three-peers.md`, which `13` cites bare, so `16` stayed
+> there. Every citation of this ticket names its file rather than its number —
+> `AGENTS.md`, `packages/ui/src/AppShell.tsx`,
+> `packages/app/stories/design-system-inventory.ts`, `command-dock/08`,
+> `command-dock/10` and this effort's `spec.md` — and all six were followed.
 
 Status: needs-triage
 Blocked by: nothing. `10` is what left all three without a consumer.

@@ -14,7 +14,6 @@ import {
 const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editable: true,
   presenting: false,
-  creatingThing: false,
   editingThingBody: false,
   editingThingTitle: false,
   thingIsOpen: false,
@@ -51,6 +50,7 @@ describe('authoring availability', () => {
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
+        createDiagram: false,
         entityEdits: false,
         deleteThing: false,
         authorOnCanvas: false,
@@ -76,22 +76,6 @@ describe('authoring availability', () => {
         editThingBody: false,
         dragNodes: false,
         selectNodes: false,
-      },
-    ],
-    [
-      'an open creation pane',
-      { creatingThing: true },
-      {
-        ...ALL_AVAILABLE,
-        thingsView: false,
-        chromeTitleEdit: false,
-        entityEdits: false,
-        deleteThing: false,
-        addThing: false,
-        createDiagram: false,
-        authorOnCanvas: false,
-        authorInEmbeddedDiagram: false,
-        connectOnCanvas: false,
       },
     ],
     [
@@ -181,17 +165,20 @@ describe('authoring availability', () => {
       expect(availability.authorOnCanvas).toBe(false);
     });
 
-    it('withdraws the connection a modal pane covers, presented or not', () => {
+    it('withdraws the connection a live chrome rename covers, presented or not', () => {
       for (const presenting of [false, true]) {
         expect(
-          authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting, creatingThing: true })
+          authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting, editingChromeTitle: true })
             .connectOnCanvas,
         ).toBe(false);
       }
     });
 
-    it('keeps a live content editor through a modal pane that withdraws canvas authoring', () => {
-      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, creatingThing: true });
+    it('keeps a live content editor through a chrome rename that withdraws canvas authoring', () => {
+      const availability = authoringAvailability({
+        ...NOTHING_IN_PROGRESS,
+        editingChromeTitle: true,
+      });
 
       expect(availability.editThingBody).toBe(true);
       expect(availability.authorOnCanvas).toBe(false);
@@ -211,7 +198,6 @@ describe('authoring availability', () => {
       for (const inProgress of [
         { editable: false },
         { presenting: true },
-        { creatingThing: true },
         { editingChromeTitle: true },
         { spaceOnCanvas: false },
       ]) {

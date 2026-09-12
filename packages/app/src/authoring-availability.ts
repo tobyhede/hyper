@@ -25,7 +25,14 @@
  * application.
  */
 
-/** The nine facts every answer below is derived from. */
+/**
+ * The eight facts every answer below is derived from.
+ *
+ * There were nine. `creatingThing` — a creation pane is open — went with the
+ * panes themselves: every Thing creation now completes its Edit on activation
+ * (ADR 0089), so there is no modal surface for the rest of the product to stand
+ * out of the way of.
+ */
 export interface AuthoringInProgress {
   /**
    * Whether the selected Diagram's placement is ready for authoring.
@@ -37,16 +44,6 @@ export interface AuthoringInProgress {
   readonly editable: boolean;
   /** A traversal of the Active Graph is running (ADR 0024). */
   readonly presenting: boolean;
-  /**
-   * A creation pane is open, whichever kind it is creating.
-   *
-   * The condition every surface outside the pane reads. Every kind is modal — a
-   * focus trap and a backdrop over the whole graph area — so "one authoring
-   * surface at a time" is one rule, and writing it as a disjunction at each of
-   * its call sites is how a third kind would come to be withdrawn from some of
-   * them.
-   */
-  readonly creatingThing: boolean;
   /** A Thing's Markdown content edit is running on the canvas (ADR 0064). */
   readonly editingThingBody: boolean;
   /** A Thing's inline title edit is running on the canvas (ADR 0065). */
@@ -127,7 +124,6 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   const {
     editable,
     presenting,
-    creatingThing,
     editingThingBody,
     editingThingTitle,
     thingIsOpen,
@@ -141,11 +137,8 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * A fact of this module rather than an answer of it, because it is not an
    * operation: nothing offers this to an author. It says one authoring surface
-   * at a time, and **the three terms earn that for different reasons**:
+   * at a time, and **the two terms earn that for different reasons**:
    *
-   * - A creation pane is genuinely modal — a `Dialog`, with a backdrop across
-   *   the whole graph area and a focus trap — so while it is open the canvas is
-   *   covered and cannot be reached at all.
    * - A chrome title edit is *not* modal. It is an inline `InlineTitleEditor`
    *   standing in the Dock's own name control: no dialog role, no backdrop, no
    *   focus trap, and the canvas stays fully reachable behind it — the Dock
@@ -154,7 +147,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *   authoring because a second authoring surface must not be startable over a
    *   live rename, not because anything is covering the graph.
    * - A canvas that is not the one being authored — a hidden Space, or an
-   *   embedding the canvas above has withdrawn — is the third term and the one
+   *   embedding the canvas above has withdrawn — is the other term and the one
    *   that is neither: it is not covered, it is simply not the canvas. Every
    *   open Space keeps its application mounted, so without this term a Space
    *   nobody is looking at answers `F2`, `C` and Enter from the `window`
@@ -171,7 +164,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * first control it took away and read by all of them — and that name is gone
    * with the prop rather than renamed.
    */
-  const soleAuthoringSurface = spaceOnCanvas && !creatingThing && !editingChromeTitle;
+  const soleAuthoringSurface = spaceOnCanvas && !editingChromeTitle;
 
   /**
    * One condition for the Things list's `disabled` and for the Dock slot that
@@ -181,11 +174,10 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * Withdrawing the list *closes* it rather than hiding it behind a still-true
    * open state. The open state is the Dock's — `ThingsList` clears its
    * disclosure slot when this goes false — and a list that reopened itself on
-   * the way back from presenting or from a creation pane would take focus with
-   * it, landing the reader in the Things rather than on the canvas they
-   * returned to.
+   * the way back from presenting would take focus with it, landing the reader
+   * in the Things rather than on the canvas they returned to.
    */
-  const thingsView = !presenting && !creatingThing;
+  const thingsView = !presenting;
 
   /**
    * Whether a chrome rename may run at all — the one answer for all three of
@@ -195,8 +187,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * projected canvas: a rename begun there is an editor with nothing behind it,
    * and the draft is discarded on the same render it was begun.
    */
-  const chromeTitleEdit =
-    editable && !presenting && !creatingThing && !editingThingBody && !editingThingTitle;
+  const chromeTitleEdit = editable && !presenting && !editingThingBody && !editingThingTitle;
 
   /**
    * Whether a menu's Rename and Delete may be offered at all.
@@ -255,13 +246,12 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * It omits `editingThingTitle` deliberately: Add Thing *begins* a title edit
    * rather than outliving one. Add Diagram below takes the same condition and
-   * that one term more.
+   * the name readiness it needs for its continuation.
    */
-  const addThing = !presenting && !creatingThing && !editingThingBody && !editingChromeTitle;
+  const addThing = !presenting && !editingThingBody && !editingChromeTitle;
 
   /**
-   * Add Diagram is Add Thing plus `editingThingTitle`, and the extra term is this
-   * control's own.
+   * Add Diagram needs its naming continuation available as well as Add Thing.
    *
    * Creating a Diagram selects it, and the created Diagram is empty — so the
    * canvas re-derives with no nodes and a Thing mid-rename unmounts, taking the
@@ -269,9 +259,11 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * have been committed by the blur this button's own mousedown causes
    * (ADR 0065), which is precisely why a refused one is the case worth
    * withdrawing for: it is re-focused rather than settled, and nothing else
-   * stands between the click and the Thing that holds it.
+   * stands between the click and the Thing that holds it. Placement must also
+   * be ready: the new Diagram continues in its name, and an unavailable name
+   * cannot take the caret from the menu.
    */
-  const createDiagram = addThing && !editingThingTitle;
+  const createDiagram = addThing && chromeTitleEdit;
 
   /**
    * What an embedded Diagram drawn on this canvas may author — and the three

@@ -19,7 +19,6 @@ import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
-import { createThing } from './command-dock';
 
 /**
  * The two selections an Open Space Thing authors.
@@ -351,32 +350,6 @@ describe('an Open Space Thing', () => {
    * a Graph the new Diagram does not own, and the aggregate refuses exactly
    * that (ADR 0040, ADR 0068).
    */
-  /**
-   * The waiting note means one thing: the target Space has not been read yet.
-   *
-   * Authoring is withdrawn from the whole canvas while a creation pane is up —
-   * one authoring surface at a time — and the selectors go with it. What must
-   * not go with it is the *answer*: a Thing that has read its target and is
-   * drawing two controls over it cannot also be claiming it is still reading
-   * it. Unavailable and unknown are different states and the author can act on
-   * only one of them.
-   */
-  it('shows its selections unavailable rather than unread while a pane holds the canvas', async () => {
-    const session = mount();
-    const thing = await openSpaceThing();
-
-    createThing('Space Thing');
-    await screen.findByTestId('new-space-thing');
-
-    // By test id rather than by role: the pane is modal, so Base UI has marked
-    // the whole canvas behind it inert and no accessible role on it is
-    // reachable — which is the same fact the assertion is about.
-    expect(within(thing).queryByText('Reading the referenced Space…')).toBeNull();
-    expect(within(thing).getByTestId('space-thing-diagram')).toBeDisabled();
-    expect(within(thing).getByTestId('space-thing-graph')).toBeDisabled();
-    await settled(session);
-  });
-
   it('writes the chosen Diagram and re-seeds the Graph from it', async () => {
     const session = mount();
     await openSpaceThing();

@@ -1,14 +1,17 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
-import type {
-  SpaceThingLifecycleResult,
-  SpaceThingTargetUnavailableReason,
-} from './space-thing-lifecycle';
+import type { SpaceThingRefusal, SpaceThingTargetUnavailableReason } from './space-thing-lifecycle';
 import { failureMessage } from './failure-message';
 
-/** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
-export type SpaceThingRefusal = Extract<SpaceThingLifecycleResult, { kind: 'refused' }>['refusal'];
+/**
+ * Why a coordinated Space Thing lifecycle operation refused (ADR 0076).
+ *
+ * Named by the lifecycle now rather than extracted from one of its results: the
+ * three operations no longer share a result type, and a union reachable through
+ * `create` alone would be a second reading of a refusal `delete` can also make.
+ */
+export type { SpaceThingRefusal };
 
 type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
@@ -99,62 +102,6 @@ type AuthoringRefusalErrors<Field extends string> = {
   readonly fields: Partial<Readonly<Record<Field, string>>>;
   readonly form?: string;
 };
-
-const presentRefusal = <Field extends string>(
-  refusal: AuthoringRefusal,
-  placements: Readonly<Record<AuthoringRefusalCode, Field | null>>,
-): AuthoringRefusalErrors<Field> => {
-  const message = describeAuthoringRefusal(refusal);
-  const field = placements[refusal.code];
-  if (field === null) return { fields: {}, form: message };
-  const fields: Partial<Record<Field, string>> = {};
-  fields[field] = message;
-  return { fields };
-};
-
-const form = null;
-
-/** Alias creation owns Title and Target, and nothing else. */
-const titleAndTargetPlacements = {
-  'placement-pending': form,
-  'diagram-not-found': form,
-  'diagram-required': form,
-  'thing-not-found': form,
-  'thing-kind-immutable': form,
-  'alias-target-immutable': form,
-  'space-thing-target-immutable': form,
-  'space-thing-deletion-unsupported': form,
-  'thing-title-required': 'title',
-  'diagram-title-required': form,
-  'space-title-required': form,
-  'space-must-keep-diagram': form,
-  'alias-target-not-found': 'target',
-  'alias-target-must-own-content': 'target',
-  'thing-already-in-diagram': form,
-  'thing-not-in-diagram': form,
-  'thing-not-expanded': form,
-  'thing-has-aliases': form,
-  'graph-title-required': form,
-  'diagram-must-keep-graph': form,
-  'graph-not-owned': form,
-  'edge-not-found': form,
-  'edge-thing-outside-diagram': form,
-  'edge-already-exists': form,
-  'diagram-active-graph-required': form,
-} as const satisfies Readonly<Record<AuthoringRefusalCode, 'title' | 'target' | null>>;
-
-/**
- * Error placement for a creation pane, which owns Title and Target.
- *
- * One type for both kinds of creation. It is `thing-creation.ts`'s refusal
- * type, which is what lets that module hold one state machine rather than one
- * generic over two refusal unions.
- */
-export type ThingCreationRefusalErrors = AuthoringRefusalErrors<'title' | 'target'>;
-
-/** Error placement for Alias creation, which owns Title and Target. */
-export const presentNewAliasRefusal = (refusal: AuthoringRefusal): ThingCreationRefusalErrors =>
-  presentRefusal(refusal, titleAndTargetPlacements);
 
 /**
  * Whether choosing another Thing would answer this refusal.
@@ -472,78 +419,22 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
 };
 
 /**
- * Where each refusal is drawn — see {@link presentNewSpaceThingRefusal}.
- *
- * A table over every code rather than a set of the two that reach the Target
- * field, for the reason `TARGET_UNAVAILABLE_REASONS` above is one: a membership
- * test answers `false` for a code nobody placed, so a refusal added later would
- * quietly land under the pane instead of on the field that fixes it. `satisfies
- * Record<…>` makes the omission a compile error here, where the decision is.
- */
-const REFUSAL_PLACEMENT = {
-  'aggregate-refused': 'target',
-  'space-thing-target-unavailable': 'target',
-  'diagram-not-found': 'form',
-  'space-thing-not-found': 'form',
-  'persistence-recovery-required': 'form',
-  'persistence-read-failed': 'form',
-} satisfies Record<SpaceThingRefusal['code'], 'target' | 'form'>;
-
-/**
- * Error placement for Space Thing creation, which owns Title and Target.
- *
- * Two codes reach the Target field, and they are the two that have to: a cycle,
- * a target that has gone and a Diagram the target no longer holds are all
- * answered by choosing a different Space, and so is a target that could not be
- * prepared to be shown. The rest describe the containing Space or the
- * repository, which no row in that list would fix.
- */
-export const presentNewSpaceThingRefusal = (
-  refusal: SpaceThingRefusal,
-): ThingCreationRefusalErrors =>
-  REFUSAL_PLACEMENT[refusal.code] === 'target'
-    ? { fields: { target: describeSpaceThingRefusal(refusal) } }
-    : { fields: {}, form: describeSpaceThingRefusal(refusal) };
-
-/**
- * What a rejected creation says, on the channel a refusal with no field takes.
- *
- * A rejection is not a refusal: the lifecycle refuses for everything it can
- * name, so reaching here means an invariant broke and there is no field to
- * correct. The sentence is written from what threw rather than from a refusal
- * code invented to carry it, because a refusal code is a stable domain identity
- * (ADR 0057) and this is not one. It lives here rather than on the pane so that
- * `authoring-refusal.ts` remains the only place a creation's prose is written.
- *
- * The rejection is `unknown` because a `throw` can carry anything, and that is
- * the caught-error boundary the parsing rules exempt — named here rather than
- * written at the parameter, the way `ObserverErrorReporter` names its own.
- * What it says is `failureMessage`'s; what it means is written here.
- */
-export type ThingCreationBreak = (failure: unknown) => ThingCreationRefusalErrors;
-
-/** @see ThingCreationBreak */
-export const presentThingCreationBreak: ThingCreationBreak = (failure) => ({
-  fields: {},
-  form: `This Thing was not created: ${failureMessage(failure)}`,
-});
-
-/**
  * What a rejected Space Thing placement says, where a refusal would have been.
  *
  * The Things list places a Space by spending a coordinated Edit across Spaces,
  * and neither the Diagram it resolves first nor the transport under it is a
- * refusal channel: both *reject*. A rejection is not a refusal for the reason
- * `presentThingCreationBreak` gives — the lifecycle refuses for everything it
- * can name, so reaching here means an invariant broke — but the reader pressed
- * a row and is owed a sentence either way, and the list draws one string rather
- * than the pane's fielded errors.
+ * refusal channel: both *reject*. A rejection is not a refusal: the lifecycle
+ * refuses for everything it can name, so reaching here means an invariant broke
+ * and there is no field to correct. The reader pressed a row and is owed a
+ * sentence either way, and every surface that can show one now draws a single
+ * string — the panes that placed fielded errors are gone (ADR 0089).
  *
  * Here rather than on the surface, because a Space Thing's prose is written in
- * this module or nowhere. The rejection is `unknown` for `ThingCreationBreak`'s
- * reason and named the same way — at the type rather than at a parameter, which
- * is what lets a rejection arm take it without writing the annotation the
- * parsing rules reserve for an I/O boundary.
+ * this module or nowhere. The rejection is `unknown` because a `throw` can carry
+ * anything, and that is the caught-error boundary the parsing rules exempt —
+ * named at the type rather than at a parameter, which is what lets a rejection
+ * arm take it without writing the annotation those rules reserve for an I/O
+ * boundary.
  */
 export type SpaceThingBreak = (failure: unknown) => string;
 
@@ -552,13 +443,13 @@ export const describeSpaceThingBreak: SpaceThingBreak = (failure) =>
   `This Space Thing was not added: ${failureMessage(failure)}`;
 
 /**
- * What a choices read that threw says, rather than what a creation says.
+ * The same rejection, said by the command that *makes* a Space.
  *
- * A read that failed attempted no Edit, so `presentThingCreationBreak`'s
- * sentence would be false on this path. Both stay here for the reason the one
- * above gives: a creation's prose is written in this module or nowhere.
+ * Two sentences rather than one generic, because the two gestures are not the
+ * same act (ADR 0089): the Things list points a Thing at a Space that already
+ * exists, and Create Space Thing mints one. A reader who pressed the Dock's
+ * glyph and is told a Thing "was not added" has to work out what was supposed
+ * to have been added to what.
  */
-export const presentThingChoicesBreak: ThingCreationBreak = (failure) => ({
-  fields: {},
-  form: `The choices for this Thing could not be read: ${failureMessage(failure)}`,
-});
+export const describeSpaceThingCreationBreak: SpaceThingBreak = (failure) =>
+  `This Thing was not created: ${failureMessage(failure)}`;

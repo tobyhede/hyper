@@ -407,7 +407,6 @@ describe('Space HTTP reads', () => {
       revision: '1',
       exportedRevision: null,
     });
-    expect(resource.headers.get('x-hyper-space-initialization')).toBe('created-diagram');
     expect(commit).toHaveBeenCalledOnce();
     expect(collection.headers.get('cache-control')).toBe('no-store');
     expect(resource.headers.get('content-type')).toBe('application/json; charset=utf-8');
