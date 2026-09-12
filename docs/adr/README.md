@@ -73,6 +73,7 @@ under `superseded/`.
 | [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. |
 | [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate that CLI hard reset restores. |
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
+| [0088](0088-aggregate-names-the-meta-rooted-collection.md) | Aggregate names the complete Meta-rooted collection of Spaces. One Space plus its Things is a snapshot. |
 
 ## HTTP
 

@@ -108,7 +108,7 @@ const exportTo = async (repository: MemorySpaceRepository, destination: string):
   if (result.kind !== 'exported') throw new Error(`Export answered ${result.kind}`);
 };
 
-/** The Space's own directory under the aggregate root, named by its id. */
+/** The Space's own directory inside the aggregate directory, named by its id. */
 const spaceFileIn = (destination: string): string => join(destination, SPACE_ID, 'space.json');
 
 afterEach(async () => {

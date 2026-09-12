@@ -159,9 +159,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * The placement after a renderer reports its geometry, given the things a
  * completed gesture actually placed.
  *
- * With nothing authored yet the whole rendered map is adopted: an Algorithmic
- * View authors nothing, and conversion copies every thing already on screen so
- * that nothing moves at the moment it happens (ADR 0025).
+ * With nothing authored yet the whole rendered map is adopted: an automatic
+ * strategy authors nothing, and conversion copies every thing already on screen
+ * so that nothing moves at the moment it happens (ADR 0025).
  *
  * With an authored placement, the rendered geometry is a **report, not an
  * authorship claim**, and `placed` is the whole of what may be read out of it —

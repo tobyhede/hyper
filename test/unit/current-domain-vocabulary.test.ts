@@ -34,8 +34,18 @@ const TRAVERSAL = ['W', 'alk'].join('');
 // compound adjectives, and a guard that knew only the spaced form left the
 // hyphenated one as the spelling the sweep could hide in — which is exactly
 // where one survived, in a parity claim, until this line widened.
+// A hyphen, a space — or a line break with the comment's own leading `*`, which
+// is the separator a wrapped doc comment writes and the one this guard could
+// not see. `hits` reads line by line, so a two-word term the wrap split was
+// invisible to it in either half — and two really were: the second of the three
+// terms below survived a wrap in `packages/graph/src/placement.ts` and another
+// in `packages/app/test/navigation.test.ts`. The scan below uses `spanningHits`
+// for this reason, as the callback arm above already does. The terms stay
+// composed rather than spelled here, as everything retired in this file does,
+// because this comment sits inside what the scan reads.
+const RETIRED_TERM_GAP = '[ -]|\\s*\\n\\s*\\*?\\s*';
 const RETIRED_CANVAS_TERMS = new RegExp(
-  `${['Computed', 'View'].join('[ -]')}|${['Algorithmic', 'View'].join('[ -]')}|${['Space', 'View'].join('[ -]')}`,
+  `${['Computed', 'View'].join(`(?:${RETIRED_TERM_GAP})`)}|${['Algorithmic', 'View'].join(`(?:${RETIRED_TERM_GAP})`)}|${['Space', 'View'].join(`(?:${RETIRED_TERM_GAP})`)}`,
   'i',
 );
 const RETIRED_OPENING_FIELD = ['default', 'Renderer'].join('');
@@ -307,11 +317,14 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
   });
 
   it('finds no retired canvas vocabulary in live files', () => {
+    // `spanningHits` rather than `hits`: a two-word term wrapped across a line
+    // break is present in neither line on its own, and a line-by-line read
+    // reports nothing at all for it.
     const found = scannableFiles().flatMap((file) => {
       const source = readTracked(file);
       return source === null
         ? []
-        : hits(source, RETIRED_CANVAS_TERMS).map((hit) => `${file}:${hit}`);
+        : spanningHits(source, RETIRED_CANVAS_TERMS).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -333,6 +346,37 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
  * names ADR 0041 retired, and against the ones it deliberately leaves alone.
  */
 describe('the vocabulary that guard reads', () => {
+  it('reports a retired canvas term however the separator is written', () => {
+    // This arm had no fixture until two terms escaped through it, which is most
+    // of why they did: the file list said it reached every tracked file, and
+    // nothing said what it reached inside one. The composed halves are the
+    // three terms' own, so a term that leaves the regex leaves this too.
+    const first = ['Computed', 'View'];
+    const second = ['Algorithmic', 'View'];
+
+    for (const separator of [' ', '-', '\n * ', '\n   ']) {
+      const line = `a ${second.join(separator)} authors nothing`;
+      expect(spanningHits(line, RETIRED_CANVAS_TERMS), JSON.stringify(line)).not.toEqual([]);
+    }
+
+    // The wrapped form in the shape a doc comment actually writes it — which is
+    // the one `hits` cannot see at all, neither line holding the whole term.
+    const wrapped = ` * the whole rendered map is adopted: an ${first[0] ?? ''}\n * ${first[1] ?? ''} authors nothing`;
+    expect(spanningHits(wrapped, RETIRED_CANVAS_TERMS)).not.toEqual([]);
+    expect(hits(wrapped, RETIRED_CANVAS_TERMS), 'a line-by-line read is why this escaped').toEqual(
+      [],
+    );
+
+    // The compound that keeps the word: a Things View is live vocabulary
+    // (`CONTEXT.md`), and no arm names it.
+    for (const line of [
+      '<ThingsView things={absent} />',
+      'the Things View lists what the Diagram omits',
+    ]) {
+      expect(spanningHits(line, RETIRED_CANVAS_TERMS), line).toEqual([]);
+    }
+  });
+
   it('reports the retired names in every shape they were written in', () => {
     const retired = [
       `export type ${ENTITY}Id = string;`,
@@ -999,9 +1043,16 @@ describe('the retired name for the surface over the open set is gone', () => {
  *
  * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
  * bare English word is legitimate — a strategy lays things out, the Command Dock
- * takes no layout space, React Flow's docs have a layouting page — while a
- * compound is unambiguous. Nothing writes the retired id, the retired
+ * takes no layout space, React Flow's docs name a section after the gerund —
+ * while a compound is unambiguous. Nothing writes the retired id, the retired
  * collection or the retired opening field by accident.
+ *
+ * The gerund is described rather than written out, because the suffix arm below
+ * reports it and only `CITED_PATH` forgives the URL it appears in. That arm is
+ * the one this file learned late. An English suffix gives no capital, no
+ * boundary and no hyphen, so the retired spelling of `diagramless` — the
+ * adjective this codebase writes about a Space with no Diagram — passed every
+ * other arm, went green through `verify` and was caught by a human reviewer.
  *
  * **Two carve-outs are shape rather than exception**, in the `Routed*` idiom
  * this file already uses:
@@ -1079,6 +1130,15 @@ const RETIRED_DIAGRAM_NAME = new RegExp(
     // verb in the one screaming-case shape that keeps it, a CSS class group,
     // in the same idiom `(?<!use)` separates React's hook above.
     `(?<!GROUP)_${RETIRED_DIAGRAM_UPPER}\\b`,
+    // The retired word carrying a lowercase suffix that makes it a different
+    // word. Every arm above needs a capital after it, a boundary after it or a
+    // hyphen joined to it, and an English suffix offers none of the three — so
+    // the adjective this codebase actually writes, `diagramless`, went unseen
+    // in its retired spelling and reached review rather than the build. The
+    // plural is ruled out by name: `s` followed by a boundary is the compound
+    // arms' business, and claiming it here would report every `${retiredDiagramLower}s`
+    // twice.
+    `\\b${retiredDiagramLower}(?!s?\\b)[a-z]`,
   ].join('|'),
 );
 
@@ -1316,6 +1376,12 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // The screaming constant with no trailing segment, which the underscore
       // arm needs a following capital to see.
       `const DEFAULT_${RETIRED_DIAGRAM_UPPER} = null;`,
+      // The English suffix, in the retired spelling of the adjective this
+      // codebase writes about a Space that has none. No capital follows the
+      // word, no boundary lands after it and no hyphen joins it, so every arm
+      // above reads straight past it.
+      `const ${retiredDiagramLower}less = space.${retiredDiagramLower}s.length === 0;`,
+      `// first working load initializes a stored ${retiredDiagramLower}less Space`,
     ];
 
     for (const line of retired) {
@@ -1351,7 +1417,6 @@ describe('a Diagram is named once (ADR 0085)', () => {
       // The verb, in the prose ADR 0085 leaves alone.
       `// it is furniture over the canvas and takes no ${retiredDiagramLower} space`,
       `const GROUP_${RETIRED_DIAGRAM_UPPER} = 'inline-flex items-center gap-1';`,
-      `// see reactflow.dev/learn/${retiredDiagramLower}ing/sub-flows for nesting`,
       // The vocabulary this rename arrived at.
       `const selectedDiagram = space.diagrams.find((diagram) => diagram.id === id);`,
       `export type DiagramId = z.infer<typeof uuidSchema>;`,
@@ -1360,6 +1425,19 @@ describe('a Diagram is named once (ADR 0085)', () => {
     for (const line of kept) {
       expect(RETIRED_DIAGRAM_NAME.test(line), line).toBe(false);
     }
+  });
+
+  it('reads a cited foreign path as the citation it is, not as the word', () => {
+    // React Flow's own docs site spells a section with the retired word, and
+    // `docs/agents/rendering.md` sends an agent to it. The suffix arm reports
+    // it — correctly, since nothing about the shape says foreign — and
+    // `CITED_PATH` is what forgives it, which is the same masking the kebab
+    // arms above rely on. Asserted from both ends so neither half can go
+    // silently: the raw line is a hit, the masked one is not.
+    const cited = `// see reactflow.dev/learn/${retiredDiagramLower}ing/sub-flows for nesting`;
+
+    expect(RETIRED_DIAGRAM_NAME.test(cited), cited).toBe(true);
+    expect(RETIRED_DIAGRAM_NAME.test(withoutQualifiedSpellings(cited)), cited).toBe(false);
   });
 });
 
@@ -1822,6 +1900,449 @@ describe('a Thing is named once (ADR 0085)', () => {
     ]) {
       expect(RETIRED_THING_NAME.test(line), line).toBe(true);
       expect(RETIRED_THING_NAME.test(withoutForeignThingSpellings(line)), line).toBe(false);
+    }
+  });
+});
+
+/**
+ * ADR 0010 makes Space the top-level domain value, minted only by `loadSpace`,
+ * and retires the shipping-ledger word that named it before. `CONTEXT.md:9`
+ * says so in as many words — "retired from the code, not merely avoided" — and
+ * `README.md` and `docs/agents/editing-and-persistence.md` both repeat it. Until
+ * now nothing in `verify` noticed, which is the gap this block closes.
+ *
+ * **The word has a second, foreign sense, and that is what shapes the scan.**
+ * A package's `package.json` and the file that lists the packages are manifests
+ * in npm's and pnpm's vocabulary, not ours, and the tree writes that sense
+ * freely: as prose in `scripts/`, `test/` and the agent-facing documents, and
+ * as three identifiers naming a parsed `package.json`. This is the same split
+ * the loose-name block above makes for pnpm's own retired word, and it is
+ * settled the same way — **by shape, not by file**.
+ *
+ * So two scopes:
+ *
+ *  - **Every scannable file** is held to the shapes a domain name is written
+ *    in: the PascalCase compound in either direction, the camelCase one, the
+ *    screaming constant, the kebab-case refusal code or test id, and the word
+ *    capitalised as a noun. None of those has ever named a `package.json` here.
+ *  - **Implementation source** is held to the bare word as well, because inside
+ *    `src/` and a package's own source tree there is no `package.json` to read
+ *    and the only sense left is ours.
+ *
+ * That leaves bare lowercase prose about a package manifest writable in a
+ * comment, a script and a document — deliberately, and for the reason the
+ * sibling block above leaves pnpm's bare monorepo prose writable: the arm reads
+ * shapes, so the foreign sense needs no exemption to survive and cannot be
+ * mistaken for the retired entity.
+ *
+ * **Three masks, no file exemptions.** The three identifiers naming a parsed
+ * `package.json` are masked by spelling, in the `withoutForeignSpellings`
+ * idiom, so a domain compound added to one of those modules is still reported.
+ * The two retirement notices — the sentences in `README.md` and in
+ * `packages/core/src/schema.ts` that exist to say the word is retired — are
+ * masked as quotations, in the `HISTORICAL_QUOTATIONS` idiom, because a
+ * document that explains what changed has to be able to name what it changed
+ * from. Each of the five is asserted below to still be earning itself.
+ */
+const RETIRED_SPACE = ['man', 'ifest'].join('');
+const RETIRED_SPACE_CAPITAL = ['Man', 'ifest'].join('');
+const RETIRED_SPACE_UPPER = RETIRED_SPACE.toUpperCase();
+
+const RETIRED_SPACE_NAME = new RegExp(
+  [
+    // PascalCase compounds opening with it: its id, its schema, its version.
+    `${RETIRED_SPACE_CAPITAL}[A-Z]`,
+    // Compounds ending in it, singular and plural: the space one, the stored
+    // one, the parsed one. This is the arm the three foreign spellings are
+    // masked out of.
+    `[A-Za-z]${RETIRED_SPACE_CAPITAL}s?\\b`,
+    // camelCase compounds opening with it: its id, its things, its version.
+    `\\b${RETIRED_SPACE}[A-Z]`,
+    // The screaming-case constants: the bare word, its plural, its fixtures.
+    // `\\b` before it would never land in `MONOREPO_${RETIRED_SPACE_UPPER}`, an
+    // underscore being a word character — which is the point, that name reads a
+    // `package.json` and is the foreign sense.
+    `\\b${RETIRED_SPACE_UPPER}S?\\b`,
+    `${RETIRED_SPACE_UPPER}_[A-Z]`,
+    // ...and the screaming constant the retired word *ends*, which neither arm
+    // above can see: the first needs a boundary an underscore never yields, the
+    // second a segment after the word. The lookbehind is the one screaming-case
+    // name that keeps the foreign sense — pnpm's name for the file that lists
+    // the packages — in the idiom `(?<!GROUP)` uses in the Diagram block above.
+    // `\\b` would not do for the ending either, a trailing `_SEGMENT` putting no
+    // boundary after the word.
+    `(?<!MONOREPO)_${RETIRED_SPACE_UPPER}S?(?![A-Za-z])`,
+    // The kebab-case compounds: refusal codes, completion kinds, test ids and
+    // CSS blocks. A hyphen is not a word character, so every arm above reads
+    // straight past them, which is what the Diagram and Thing blocks learned.
+    `${RETIRED_SPACE}-[a-z]`,
+    `[a-z]-${RETIRED_SPACE}s?(?![a-z])`,
+    // The word capitalised as a noun, which is how a document names an entity
+    // rather than a tool's file. Nothing in the foreign sense is written this
+    // way: a compound spells it with a letter before the capital, and prose
+    // about a package manifest is lowercase.
+    `\\b${RETIRED_SPACE_CAPITAL}s?\\b`,
+  ].join('|'),
+);
+
+/**
+ * The bare word, which only implementation source is held to. A package's own
+ * source tree holds no `package.json` to read and no tooling prose about one,
+ * so the only sense the word can carry there is the retired entity.
+ */
+const RETIRED_SPACE_BARE = new RegExp(`\\b${RETIRED_SPACE}s?\\b`);
+
+/**
+ * The three identifiers naming a parsed `package.json` or the file that lists
+ * the packages. npm's and pnpm's sense, arriving with their file formats rather
+ * than ours to sweep — the same carve-out Lucide's glyph gets above, and masked
+ * by spelling for the same reason: a domain compound added to one of these
+ * modules is our vocabulary wearing a forgiven name, and stays visible.
+ *
+ * The predicate that guards the type needs no entry of its own: it contains
+ * the type's own spelling and is masked with it.
+ */
+const FOREIGN_SPACE_SPELLINGS: readonly string[] = [
+  `Typechecking${RETIRED_SPACE_CAPITAL}`,
+  `app${RETIRED_SPACE_CAPITAL}`,
+  `root${RETIRED_SPACE_CAPITAL}`,
+];
+
+/**
+ * The two sentences that exist to say the word is retired — one in `README.md`,
+ * one in the doc comment on the space-file schema. Both name the retired word
+ * because that is the whole content of the notice, and renaming either does not
+ * update a record, it deletes one.
+ *
+ * Masked rather than exempted by file, so the rest of both files stays
+ * governed, and each is asserted below to still be present: a notice that stops
+ * being written stops carrying the licence to write it.
+ */
+const RETIREMENT_NOTICES: readonly string[] = [
+  `"${RETIRED_SPACE_CAPITAL}" is retired`,
+  `"${RETIRED_SPACE}" is retired`,
+  `not a ${RETIRED_SPACE}.`,
+];
+
+const withoutForeignSpaceSpellings = (source: string): string =>
+  FOREIGN_SPACE_SPELLINGS.reduce((text, spelling) => text.split(spelling).join('foreign'), source);
+
+const withoutRetirementNotices = (source: string): string =>
+  RETIREMENT_NOTICES.reduce((text, notice) => text.split(notice).join('retired'), source);
+
+describe('a Space is named once (ADR 0010)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file this retirement governs', () => {
+    // The schema whose doc comment carries the notice, the document that
+    // repeats it, and the script that writes the foreign sense. A file list
+    // that quietly stopped resolving would report nothing forever.
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
+    expect(scanned).toContain('scripts/check-typescript-toolchain.ts');
+  });
+
+  it('finds no shape of the retired name anywhere it governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      return hits(
+        withoutRetirementNotices(withoutForeignSpaceSpellings(source)),
+        RETIRED_SPACE_NAME,
+      ).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no bare retired name in implementation source', () => {
+    const found = scanned.filter(isImplementationSource).flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(withoutRetirementNotices(source), RETIRED_SPACE_BARE).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no mask that has stopped earning itself', () => {
+    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
+
+    for (const spelling of FOREIGN_SPACE_SPELLINGS) {
+      expect(everything, `nothing tracked still writes ${spelling}`).toContain(spelling);
+    }
+
+    for (const notice of RETIREMENT_NOTICES) {
+      expect(everything, `no file still carries the notice ${notice}`).toContain(notice);
+    }
+  });
+
+  it('reports the retired name in every shape it was written in', () => {
+    // Composed rather than written out, in this file's usual idiom: spelled
+    // literally, each fixture would be a hit this scan reports against its own
+    // source.
+    const retired = [
+      `export type ${RETIRED_SPACE_CAPITAL}Id = string;`,
+      `export const ${RETIRED_SPACE}Schema = z.object({});`,
+      `const space${RETIRED_SPACE_CAPITAL} = parse(bytes);`,
+      `const stored${RETIRED_SPACE_CAPITAL}s = await readAll();`,
+      `const ${RETIRED_SPACE_UPPER}_VERSION = 1;`,
+      `const ${RETIRED_SPACE_UPPER} = 'space.json';`,
+      `const SPACE_${RETIRED_SPACE_UPPER} = 'hyper.json';`,
+      `const DEFAULT_${RETIRED_SPACE_UPPER}S_BY_ID = new Map();`,
+      `refusal: { code: '${RETIRED_SPACE}-not-found' },`,
+      `return 'space-must-keep-${RETIRED_SPACE}';`,
+      `<div data-testid="space-${RETIRED_SPACE}">`,
+      `.${RETIRED_SPACE}-header { display: flex; }`,
+      `The ${RETIRED_SPACE_CAPITAL} is the top-level value a Space is read from.`,
+      `Two ${RETIRED_SPACE_CAPITAL}s cannot describe one Space.`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_SPACE_NAME.test(line), line).toBe(true);
+    }
+  });
+
+  it('reports the bare retired name implementation source is held to', () => {
+    // Lowercase only: the capital is a shape the arm above already reports, and
+    // repeating it here would claim this one covers more than it does.
+    for (const line of [
+      ` * the ${RETIRED_SPACE} this module parses`,
+      `const ${RETIRED_SPACE}s = await readAll();`,
+      `type SpaceFile = z.infer<typeof ${RETIRED_SPACE}>;`,
+    ]) {
+      expect(RETIRED_SPACE_BARE.test(line), line).toBe(true);
+    }
+
+    // ...and the shape arm is what reports the capital, in implementation
+    // source and everywhere else.
+    expect(RETIRED_SPACE_NAME.test(`export type ${RETIRED_SPACE_CAPITAL} = Space;`)).toBe(true);
+  });
+
+  it('stays silent on the foreign sense, on its prose, and on the name that replaced it', () => {
+    const kept = [
+      // The foreign sense as prose: a comment, a document, a test name. Left
+      // writable by the shape rule rather than by an exemption, which is the
+      // whole design of this block.
+      `// A matching directory is only a package if it carries a ${RETIRED_SPACE}.`,
+      `Upgrade both consuming ${RETIRED_SPACE}s together and re-run the suite.`,
+      `const ${RETIRED_SPACE} = readFileSync(join(root, 'package.json'), 'utf8');`,
+      // pnpm's own screaming-case name for the file that lists the packages,
+      // which is the trailing-segment shape exactly — so it is the lookbehind
+      // that keeps it writable rather than the absent boundary, and this line
+      // is the whole reason that arm carries one.
+      `const MONOREPO_${RETIRED_SPACE_UPPER} = /^packages\\/[^/]+\\/package\\.json$/;`,
+      `const MONOREPO_${RETIRED_SPACE_UPPER}S = [rootPackage, appPackage];`,
+      // The vocabulary ADR 0010 arrived at.
+      `const space = loadSpace(spaceFileSchema.parse(input), thingFiles);`,
+      `export type SpaceFile = z.infer<typeof spaceFileSchema>;`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_SPACE_NAME.test(line), line).toBe(false);
+    }
+
+    // The three foreign identifiers are forgiven by their spelling, and the
+    // arm reads them exactly as it reads a domain compound — which is why they
+    // are masked rather than skipped, and why this asserts both ends.
+    for (const line of [
+      `interface Typechecking${RETIRED_SPACE_CAPITAL} { scripts: { typecheck: string } }`,
+      `import app${RETIRED_SPACE_CAPITAL} from '../../packages/app/package.json';`,
+      `const requested = root${RETIRED_SPACE_CAPITAL}.scripts['e2e:fixture'];`,
+    ]) {
+      expect(RETIRED_SPACE_NAME.test(line), line).toBe(true);
+      expect(RETIRED_SPACE_NAME.test(withoutForeignSpaceSpellings(line)), line).toBe(false);
+    }
+  });
+});
+
+/**
+ * ADR 0088 gives "aggregate" one sense — the complete Meta-rooted collection of
+ * every Space — and retires the two others: one Space plus its Things is a
+ * **snapshot**, and the stored Meta identity is a **row**.
+ *
+ * **This block is not shaped like the ones above, and the difference is the
+ * point.** Those retire a word, so they ban it. Sense 1 keeps this word — 1300
+ * occurrences across 61 identifier spellings — so there is nothing to ban, and
+ * no regex separates two senses of one spelling. What is bannable is the two
+ * **phrases** the retired senses were written in, and the import alias that
+ * existed only to dodge the collision between sense 1 and sense 2.
+ *
+ * So the guard holds three things, and is honest that it holds no more:
+ *
+ *  - The boundary phrase, in the compound, hyphenated and prose shapes. It
+ *    named one Space's own diagram and thing structure, which is the
+ *    snapshot's.
+ *  - The root phrase, likewise. It named the `RepositoryState` row, and in DDD
+ *    that phrase names an entity rather than the row that names one.
+ *  - The import alias, which was load-bearing and read as a stylistic choice
+ *    rather than as the collision-avoidance it was. Its absence is the
+ *    completion criterion for the rename: the name it dodged is free, and
+ *    `@project/graph`'s function is imported under it.
+ *
+ * **The verb phrase is untouched and is sense 1 saying what it means.** The
+ * aggregate *rooted at* the Meta Space is the rooting rule in words; the verb
+ * puts no word boundary after the noun, so no arm reaches it and none should.
+ *
+ * One mask, asserted below to still be earning itself: `CONTEXT.md`'s own
+ * `_Avoid_` line has to name the phrase it retires, in the
+ * `HISTORICAL_QUOTATIONS` idiom the Diagram block already uses.
+ */
+const KEPT_AGGREGATE = ['Agg', 'regate'].join('');
+const keptAggregate = KEPT_AGGREGATE.toLowerCase();
+const keptAggregateTail = KEPT_AGGREGATE.slice(1);
+const RETIRED_BOUNDARY = ['ound', 'ar'].join('');
+const RETIRED_ROOT = ['ro', 'ot'].join('');
+
+const RETIRED_AGGREGATE_SENSES = new RegExp(
+  [
+    // The boundary phrase: the PascalCase and camelCase compound, the
+    // hyphenated shape and the prose one. Truncated before the noun's own
+    // ending so the adjective and the plural are one arm rather than three.
+    `[Aa]${keptAggregateTail}[Bb]${RETIRED_BOUNDARY}`,
+    `\\b${keptAggregate}[- ]b${RETIRED_BOUNDARY}`,
+    // ...and the same phrase in snake_case, screaming and lower. Added for
+    // symmetry with the root arms below rather than against a site: the
+    // boundary sense named in-code structure and the root sense named a stored
+    // row, so snake_case is the likelier shape for the second — but an
+    // asymmetric guard is one a reader has to remember the asymmetry of, and
+    // the hole is the same hole. No lookahead is needed here, unlike below:
+    // this phrase has no kept verb to tell the retired noun from.
+    `${KEPT_AGGREGATE.toUpperCase()}_B${RETIRED_BOUNDARY.toUpperCase()}`,
+    `${keptAggregate}_b${RETIRED_BOUNDARY}`,
+    // The root phrase, in the same shapes. `\\b` after the noun is what keeps
+    // the verb phrase out: the participle puts no boundary there.
+    `[Aa]${keptAggregateTail}[Rr]${RETIRED_ROOT.slice(1)}s?\\b`,
+    `\\b${keptAggregate}[- ]${RETIRED_ROOT}s?\\b`,
+    // ...and the root phrase in snake_case, screaming and lower, which is the
+    // shape the stored sense would come back in: a column name and the constant
+    // that reads it. Deliberately without a leading `\\b`, and with a lookahead
+    // rather than a trailing one: `_` is a word character, so no boundary lands
+    // either side of a middle segment and both the compound arms' capital and
+    // the hyphenated arms' boundary read straight past the whole shape. The
+    // lookahead is where the verb phrase's carve-out moves to in this shape —
+    // `${keptAggregate}_${RETIRED_ROOT}_id` is the retired row name and reports,
+    // `${keptAggregate}_${RETIRED_ROOT}ed_at` is sense 1 and does not.
+    `${KEPT_AGGREGATE.toUpperCase()}_${RETIRED_ROOT.toUpperCase()}S?(?![A-Za-z])`,
+    `${keptAggregate}_${RETIRED_ROOT}s?(?![a-z])`,
+  ].join('|'),
+);
+
+/**
+ * The alias, banned outright. Unlike the two phrases it is a single identifier
+ * and needs no shapes: it was written once, as an import rename, and the whole
+ * of what this holds is that it does not come back.
+ */
+const RETIRED_AGGREGATE_ALIAS = new RegExp(`\\bvalidateSpace${KEPT_AGGREGATE}\\b`);
+
+/**
+ * The glossary's own retirement notice. `CONTEXT.md` has to be able to name the
+ * phrase it retires, and renaming that line does not update a record — it
+ * deletes one.
+ */
+const AGGREGATE_RETIREMENT_NOTICE = `${keptAggregate} ${RETIRED_ROOT} as a name for the stored Meta identity`;
+
+const withoutAggregateNotice = (source: string): string =>
+  source.split(AGGREGATE_RETIREMENT_NOTICE).join('retired');
+
+describe('aggregate names one thing (ADR 0088)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file this rename actually touched', () => {
+    // The repository that held both senses and the alias between them, the
+    // schema whose comment called one Space an aggregate, and the glossary that
+    // now has an entry for the word.
+    expect(scanned).toContain('src/persistence/postgres-space-repository.ts');
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('CONTEXT.md');
+  });
+
+  it('finds neither retired sense in any shape it was written in', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(withoutAggregateNotice(source), RETIRED_AGGREGATE_SENSES).map(
+            (hit) => `${file}:${hit}`,
+          );
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no alias standing in for the collision the rename removed', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_AGGREGATE_ALIAS).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no mask that has stopped earning itself', () => {
+    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
+
+    expect(everything, 'no document still carries the retirement notice').toContain(
+      AGGREGATE_RETIREMENT_NOTICE,
+    );
+  });
+
+  it('reports both retired senses in every shape they were written in', () => {
+    const retired = [
+      `const preserves${KEPT_AGGREGATE}B${RETIRED_BOUNDARY}y = (current, next) => true;`,
+      `// past this point the ${keptAggregate} b${RETIRED_BOUNDARY}y is settled and this commits`,
+      `const checked = ${keptAggregate}B${RETIRED_BOUNDARY}ies.length;`,
+      `const ${keptAggregate}R${RETIRED_ROOT.slice(1)} = state.singletonId;`,
+      `// clear the ${keptAggregate} ${RETIRED_ROOT} before deleting any Space rows`,
+      `const ${KEPT_AGGREGATE}R${RETIRED_ROOT.slice(1)} = RepositoryState;`,
+      `expect(entries).toContain('${keptAggregate}-${RETIRED_ROOT}');`,
+      `const ${KEPT_AGGREGATE.toUpperCase()}_${RETIRED_ROOT.toUpperCase()} = 'singleton';`,
+      `const ${KEPT_AGGREGATE.toUpperCase()}_${RETIRED_ROOT.toUpperCase()}_ID = row.id;`,
+      `select ${keptAggregate}_${RETIRED_ROOT}_id from repository_state`,
+      `const ${keptAggregate}_${RETIRED_ROOT} = await orm.repositoryState.findFirst();`,
+      `the ${keptAggregate}-b${RETIRED_BOUNDARY}y check compares two snapshots of one Space`,
+      `const ${KEPT_AGGREGATE.toUpperCase()}_B${RETIRED_BOUNDARY.toUpperCase()}Y = 'space';`,
+      `const ${keptAggregate}_b${RETIRED_BOUNDARY}y_check = preserves(current, next);`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_AGGREGATE_SENSES.test(line), line).toBe(true);
+    }
+
+    for (const line of [
+      `import { loadSpace${KEPT_AGGREGATE} as validateSpace${KEPT_AGGREGATE} } from '@project/graph';`,
+      `const intake = validateSpace${KEPT_AGGREGATE}({ metaSpaceId, spaces });`,
+    ]) {
+      expect(RETIRED_AGGREGATE_ALIAS.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the sense that keeps the word, and on the names that replaced the two it lost', () => {
+    const kept = [
+      // Sense 1, which is what the word means now. The verb phrase is the
+      // rooting rule in words, and no arm reaches it.
+      `Exported the ${keptAggregate} ${RETIRED_ROOT}ed at \${metaSpaceId} to \${destination}`,
+      `it('loads the complete ${keptAggregate} ${RETIRED_ROOT}ed at the explicit Meta Space', () => {`,
+      // The verb phrase in the snake_case shape the two underscore arms read:
+      // a lowercase letter after the noun is what tells the participle from the
+      // retired row name there, as the boundary does in every other shape.
+      `const ${keptAggregate}_${RETIRED_ROOT}ed_at = metaSpaceId;`,
+      `export interface Loaded${KEPT_AGGREGATE} { metaSpaceId: UUID; spaces: LoadedSpace[] }`,
+      `return { kind: '${keptAggregate}-refused', errors };`,
+      `await repository.replace${KEPT_AGGREGATE}(input);`,
+      `const ${keptAggregate} = loadSpace${KEPT_AGGREGATE}({ metaSpaceId, spaces });`,
+      // The names this rename arrived at.
+      `const preservesSnapshotB${RETIRED_BOUNDARY}y = (current, next) => true;`,
+      `const stored = await loadStoredSpace(orm, id);`,
+      `// clear the Meta identity row before deleting any Space rows`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_AGGREGATE_SENSES.test(line), line).toBe(false);
+      expect(RETIRED_AGGREGATE_ALIAS.test(line), line).toBe(false);
     }
   });
 });

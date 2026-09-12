@@ -76,16 +76,35 @@ reviews:
         ADR 0041 is BUILT. The live domain vocabulary is Graph, Graph
         navigation and Traversal history. The names it retired — Route and
         Walk, in any compound — survive only in the historical trees
-        `docs/adr/`, `docs/superpowers/` and `.scratch/`, and in TanStack
-        Router's own vocabulary in `packages/app/src/router.tsx`.
+        `docs/adr/`, `docs/superpowers/` and `.scratch/`. There is no router
+        library: ADR 0069 removed it, so no file speaks a routing library's
+        vocabulary and the old carve-out for one is gone.
         `test/unit/current-domain-vocabulary.test.ts` scans every tracked file
         for them, so reintroducing one fails the build rather than the review.
+        ADR 0085 is BUILT too, and the same test enforces it in thirteen shape
+        arms each: a Thing is never called a Card and a Diagram is never called
+        a Layout, in any compound, kebab-case refusal code, test id, CSS block
+        or screaming constant. `LayoutStrategy` keeps its name, which is the
+        verb rather than the entity, and React's `useLayoutEffect` and Lucide's
+        grid glyph are foreign names rather than ours. The loose word for the
+        loaded Space and the app chrome around it, and the retired name for the
+        surface over the open set, are enforced there as well — say Space, and
+        Dock or canvas for the chrome. So is the shipping-ledger word ADR 0010
+        retired for the top-level value: npm's and pnpm's sense of it stays
+        writable bare and lowercase, but capitalised, compounded, hyphenated or
+        screamed it is reported.
+        ADR 0088 is BUILT: `aggregate` names the complete Meta-rooted
+        collection of every Space and nothing else. One Space plus its Things
+        is a Space snapshot, and the stored Meta identity is the Meta identity
+        row. Do not report the word itself; the test bans the two retired
+        phrases and the import alias that dodged the collision between the
+        senses.
         Qualified senses are kept and are not findings: Hono handles a request
         route, a graph-layout engine produces routed geometry, a URL has one, and `path`
-        identifiers are filesystem paths, router URLs or React Flow's
-        `edge-path` class. Other retired vocabulary: `manifest`, `Arrangement`,
-        a shared `Draft`, a `cards` array in the space file, an `edges` array
-        beside Graphs.
+        identifiers are filesystem paths, product URL paths or React Flow's
+        `edge-path` class. Other retired vocabulary the test does not cover:
+        `Arrangement`, a shared `Draft`, a `cards` array in the space file, an
+        `edges` array beside Graphs.
 
         ADR 0040 is BUILT: `.scratch/first-public-aggregate/` landed it. A
         Diagram's `graphs` are nested owned values and its position keys are its
@@ -302,11 +321,23 @@ reviews:
         instructions: >-
           New identifiers and prose use the vocabulary in CONTEXT.md. Retired
           terms must not reappear: the names ADR 0041 retired (Route and Walk,
-          in any compound), `manifest`, `Arrangement`, a shared `Draft`, a
-          `cards` array in the space file, or an `edges` array beside Graphs.
-          `test/unit/current-domain-vocabulary.test.ts` already enforces the
-          first of those over every tracked file; this check covers the rest. A
-          new domain term, or a renamed one, needs a CONTEXT.md entry in the
+          in any compound), the two ADR 0085 retired (a Thing is not a Card, a
+          Diagram is not a Layout), the loose word for the loaded Space and its
+          chrome, the retired name for the surface over the open set, the
+          shipping-ledger word ADR 0010 retired for the top-level value,
+          `Arrangement`, a shared `Draft`, a `cards` array in the space file,
+          or an `edges` array beside Graphs.
+          `test/unit/current-domain-vocabulary.test.ts` enforces all of those
+          but the last four over every tracked file, so those are build
+          failures rather than review findings; this check covers what is left.
+          Two limits of that test are worth knowing. It reads shapes, so a
+          retired word carrying an English suffix, or bare and lowercase in a
+          sense the guard deliberately leaves writable, may reach review. And
+          ADR 0088 is a rename rather than a retirement — `aggregate` is the
+          right word for the Meta-rooted collection and the wrong one for a
+          single Space, and no regex tells those apart, so a new use of it for
+          one Space is exactly this check's business.
+          A new domain term, or a renamed one, needs a CONTEXT.md entry in the
           same pull request.
 
   tools:

@@ -44,9 +44,9 @@ const THING_C = uuid('00000000-0000-4000-8000-000000000004');
 /**
  * Two Diagrams, each owning one Graph over its own Things (ADR 0040).
  *
- * Two rather than one deliberately: it is what makes the flatten an Algorithmic
- * View draws differ from what either Diagram draws, so both of Navigation's
- * "does not show" refusals name a real state rather than an impossible one.
+ * Two rather than one deliberately: it is what makes a flattened union of both
+ * differ from what either Diagram draws, so both of Navigation's "does not
+ * show" refusals name a real state rather than an impossible one.
  */
 function fixture(): Space {
   const result = loadSpace(

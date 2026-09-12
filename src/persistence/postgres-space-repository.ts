@@ -5,7 +5,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceAggregate as validateSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
+import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
   type AggregateLoadResult,
@@ -137,14 +137,18 @@ const parseSnapshot = (input: unknown): SpaceSnapshot => {
 };
 
 /**
+ * One stored Space and its Things — a **snapshot**, not the aggregate (ADR
+ * 0088). `@project/graph`'s `loadSpaceAggregate`, imported above under its own
+ * name, is the collection one; this reads a single row and its children.
+ *
  * One statement, so one snapshot: PostgreSQL fixes it at statement start, and
- * `include` compiles the child rows into a correlated aggregate rather than a
+ * `include` compiles the child rows into a correlated subquery rather than a
  * second round trip. Other transactions still commit while this runs — they are
  * simply not in the snapshot it reads from, so the document and its things
  * cannot come from either side of one. There is no torn read to detect and no
  * revision comparison to make.
  */
-const loadSpaceAggregate = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefined> => {
+const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefined> => {
   const stored = await orm.public.Space.where({ id })
     .include('things', (things) =>
       things.select('id', 'document').orderBy((thing) => thing.id.asc()),
@@ -309,7 +313,7 @@ const replaceStoredSpace = async (
   }
 };
 
-const preservesAggregateBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
+const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
   if (current.document.defaultDiagram !== next.document.defaultDiagram) return false;
   if (
     JSON.stringify(current.document.diagrams ?? []) !== JSON.stringify(next.document.diagrams ?? [])
@@ -336,7 +340,7 @@ const commitTopologyPreservingUpdate = async (
 ): Promise<RepositoryCommitResult | undefined> => {
   const [change] = request.changes;
   if (request.changes.length !== 1 || change.kind !== 'update') return undefined;
-  const current = await loadSpaceAggregate(orm, change.spaceId);
+  const current = await loadStoredSpace(orm, change.spaceId);
   if (current?.revision !== change.expectedRevision) {
     return { kind: 'conflict', conflicts: [{ spaceId: change.spaceId, current }] };
   }
@@ -347,9 +351,9 @@ const commitTopologyPreservingUpdate = async (
       errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intake.errors }],
     };
   }
-  if (!preservesAggregateBoundary(current.snapshot, change.snapshot)) return undefined;
+  if (!preservesSnapshotBoundary(current.snapshot, change.snapshot)) return undefined;
 
-  // Past this point the aggregate boundary is settled and this path commits, so
+  // Past this point the snapshot boundary is settled and this path commits, so
   // the write below is the first one and every earlier return has written
   // nothing. The revision is re-established under the row lock rather than
   // trusted from the read above, because this path deliberately holds no
@@ -428,8 +432,8 @@ const importThings = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> =>
 };
 
 const truncateHyperContent = async (orm: Orm): Promise<void> => {
-  // Repository state restricts deletion of its Meta Space, so clear the
-  // aggregate root before deleting any Space rows.
+  // Repository state restricts deletion of its Meta Space, so clear the Meta
+  // identity row before deleting any Space rows.
   await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
   const spaces = await orm.public.Space.all();
   for (const space of spaces) {
@@ -440,7 +444,7 @@ const truncateHyperContent = async (orm: Orm): Promise<void> => {
 
 const authoritativeAggregate = async (orm: Orm, metaSpaceId: UUID): Promise<LoadedAggregate> => {
   const spaces = await loadEverySpace(orm);
-  const intake = validateSpaceAggregate({
+  const intake = loadSpaceAggregate({
     metaSpaceId,
     snapshots: spaces.map(({ snapshot }) => snapshot),
   });
@@ -490,7 +494,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
   }
 
   loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    return loadSpaceAggregate(this.#database.orm, id);
+    return loadStoredSpace(this.#database.orm, id);
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {
@@ -505,7 +509,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
   }
 
   async initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
-    const intake = validateSpaceAggregate({
+    const intake = loadSpaceAggregate({
       metaSpaceId: input.metaSpaceId,
       snapshots: input.spaces,
     });
@@ -545,7 +549,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
     input: AggregateInput,
     expectedMetaSpaceId: UUID,
   ): Promise<ReplaceAggregateResult> {
-    const intake = validateSpaceAggregate({
+    const intake = loadSpaceAggregate({
       metaSpaceId: input.metaSpaceId,
       snapshots: input.spaces,
     });
@@ -613,7 +617,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
           conflicts: [
             {
               spaceId: error.spaceId,
-              current: await loadSpaceAggregate(this.#database.orm, error.spaceId),
+              current: await loadStoredSpace(this.#database.orm, error.spaceId),
             },
           ],
         };
@@ -632,7 +636,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       const baseline =
         metaSpaceId === undefined
           ? undefined
-          : validateSpaceAggregate({
+          : loadSpaceAggregate({
               metaSpaceId,
               snapshots: stored.map(({ snapshot }) => snapshot),
             });
@@ -686,7 +690,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
        * to complete intake below and is refused. `memory.ts` draws the same
        * line, and `repository-contract.ts` holds both to it.
        */
-      const aggregate = validateSpaceAggregate({
+      const aggregate = loadSpaceAggregate({
         metaSpaceId,
         snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
       });
