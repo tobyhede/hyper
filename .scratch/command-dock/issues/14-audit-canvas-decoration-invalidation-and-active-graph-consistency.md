@@ -73,7 +73,13 @@ its list. The one input whose contents can change behind a stable identity —
 `open-spaces.ts` minting a fresh `entries` array on every session change of every
 open Space. And an embedded Diagram never receives the builder at all:
 `EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring` without
-`thingEntityActions`, and drives its canvases from the raw projection nodes.
+`thingEntityActions`, so the one arm of the decoration that reads this identity
+is the one arm its nodes do not have. It runs the rest of that memo like any
+other canvas and publishes the decorated nodes — an earlier draft of this
+section said it drives its canvases from the *raw* projection nodes, which is
+false (`EmbeddedDiagramAuthoring.tsx` publishes `authoring.nodes`, and
+`canvas-thing-authoring.ts` returns `decoratedNodes`). The argument stands on
+the first clause alone.
 
 **Measured, over the Dock's `Default` story from `render()` to a settled
 canvas:** 40 `spaceEntityActions` builds became 20, 20 decoration-memo runs
@@ -122,21 +128,64 @@ Dock's Copy link and the presenting chrome's answered different URLs; and the
 next Edit rode the stale id into the Diagram's `activeGraph` for intake to
 reject.
 
+**The recovery takes the selected Diagram the same way, and that half is
+worse.** Found in review rather than in the first pass: a restore past a
+locally *created* Diagram leaves the selection itself dangling. The Space still
+loads, so nothing refuses it — `resolveDiagram` throws `DiagramNotFoundError`
+for a Space with nothing wrong with it and `SpaceApp` draws the failure surface
+in place of the canvas. One repair answers both halves, because `selectDiagram`
+resolves the pair.
+
 **Fixed where it was caused**, not behind a new state owner or cache:
 `reconcileNavigation` in `space-authoring.ts` is the sibling of the
-`reconcilePlacement` that already ran on the same session publication, and
-re-resolves the pair with `selectDiagram` when the restored Diagram no longer
-shows the Active Graph. Both now run inside one `installTogether`, so the
-part-way state is not published. `App.tsx`'s `?? projection.visibleGraphs[0]`
-fallback is **removed** rather than kept as defence: it is what converted the
-broken state into a live command set, and without it the Dock reads exactly what
-`SpaceCanvas` reads.
+`reconcilePlacement` that already ran on the same session publication. It reads
+the selection off the Space's own index rather than through a throw, re-points a
+dangling Diagram at the Space's opening selection, and re-resolves a dangling
+Active Graph against the Diagram that survived. An absent Active Graph is
+exempt, as it is in `continueInDiagram`. Both reconciliations run inside one
+`installTogether`, **Navigation first** — `reconcilePlacement` resolves the
+selected Diagram, so a selection this repairs has to be repaired before it asks.
+
+`App.tsx`'s `?? projection.visibleGraphs[0]` fallback is **removed** rather than
+kept as defence: it is what converted the broken state into a live command set,
+and without it the Dock reads exactly what `SpaceCanvas` reads.
 
 Regression: `packages/app/test/active-graph-after-coordinated-recovery.test.ts`,
-three cases, all red before the fix and green after, driving production
-operations only (`registry.spaceThings(...).delete(...)` then
+five cases — three for the Graph half, two for the Diagram half — each red
+before its fix and green after, driving production operations only
+(`registry.spaceThings(...).delete(...)` then
 `SpaceAuthoring.acceptStoredSpace()`, which is what `PersistenceControl`'s "use
-the stored Space" spends).
+the stored Space" spends). Each composer that mints nothing is given a minter
+that throws, so an unexpected mint fails at the call rather than duplicating an
+id into another Space (ADR 0016).
+
+### Measurements
+
+Taken with temporary counters in `App.tsx` and `canvas-thing-authoring.ts`,
+driven through the Dock's `Default` story (5 placed Things, 7 in the Space),
+counted from `render()` to a settled canvas. The instrumentation is not in the
+tree; these numbers are evidence for the decision, not a benchmark to re-run.
+
+| counter | before | after |
+| --- | --- | --- |
+| App renders | 40 | 40 |
+| `spaceEntityActions` builds | 40 | 20 |
+| decoration-memo runs | 20 | 10 |
+| node objects decorated | 72 | 36 |
+| `thingRailActions` calls | 20 | 10 |
+
+Fifteen of the twenty baseline memo runs re-ran over a `nodes` array whose
+identity had not changed. Selection and drag see no benefit — 4 memo runs either
+way — because `nodes` identity moves there regardless.
+
+### Verification
+
+`pnpm verify:static` green locally. The full bar ran in CI on PR #201, all six
+jobs green: `static-checks`, `coverage`, `e2e` across all three shards, `ladle`
+and `postgres` (which carries `e2e:postgres`). The parallel test run was left to
+CI deliberately — this machine sat at load 133 on 8 cores from concurrent
+sessions, where the suite fails a different set of tests on every run and the
+*unmodified* tree fails twelve.
 
 ### Remaining tradeoff
 

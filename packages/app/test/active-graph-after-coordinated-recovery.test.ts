@@ -34,6 +34,20 @@ import { mintingIds } from './minting';
 
 const id = (value: string): UUID => uuidSchema.parse(value);
 
+/**
+ * A minter for a collaborator this test expects to mint nothing.
+ *
+ * ADR 0016 has a test name the ids it is about to assert on, and three things
+ * here take a minter while only one of them mints. Sharing the Target's would
+ * let an unexpected mint duplicate its Graph id into another Space and pass;
+ * this fails at the call instead.
+ */
+const mintsNothing =
+  (message: string): (() => UUID) =>
+  () => {
+    throw new Error(message);
+  };
+
 const META_ID = id('00000000-0000-4000-8000-000000000001');
 const META_THING_ID = id('00000000-0000-4000-8000-000000000002');
 const META_DIAGRAM_ID = id('00000000-0000-4000-8000-000000000003');
@@ -45,6 +59,8 @@ const TARGET_GRAPH_ID = id('00000000-0000-4000-8000-000000000013');
 const SPACE_THING_ID = id('00000000-0000-4000-8000-000000000014');
 const TARGET_THING_TWO = id('00000000-0000-4000-8000-000000000015');
 const ADDED_GRAPH_ID = id('00000000-0000-4000-8000-0000000000f1');
+const CREATED_DIAGRAM_ID = id('00000000-0000-4000-8000-0000000000f2');
+const CREATED_DIAGRAM_GRAPH_ID = id('00000000-0000-4000-8000-0000000000f3');
 
 const targetSnapshot: SpaceSnapshot = {
   id: TARGET_ID,
@@ -155,16 +171,101 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
     ],
   });
   await registry
-    .spaceThings(mintingIds(ADDED_GRAPH_ID))
+    .spaceThings(mintsNothing('The coordinated deletion minted an identity.'))
     .delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID });
   await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
 
   // The author answers on the containing Space, through the operation
   // `PersistenceControl`'s "use the stored Space" spends.
-  const metaApp = composeApp({ spaceSession: meta, newId: mintingIds(ADDED_GRAPH_ID) });
+  const metaApp = composeApp({
+    spaceSession: meta,
+    newId: mintsNothing('Accepting the stored Space minted an identity.'),
+  });
   expect(metaApp.authoring.acceptStoredSpace()).toBeNull();
   return target;
 };
+
+/**
+ * The same recovery, taking the *selected Diagram* rather than its Active Graph.
+ *
+ * Worse than the Graph half rather than milder: the restored Space still loads,
+ * so nothing refuses it — `resolveDiagram` throws `DiagramNotFoundError` for a
+ * Space with nothing wrong with it, and the canvas is replaced by the failure
+ * surface.
+ */
+const openRolledBackOverCreatedDiagram = async (): Promise<ReturnType<typeof composeApp>> => {
+  const control = new MemorySpaceBackendTestControl();
+  const backend = new MemorySpaceBackend(
+    META_ID,
+    [
+      { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+      { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+    ],
+    control,
+  );
+  const registry = createSpaceSessionRegistry(backend);
+  const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+  const targetSession = registry.open({
+    snapshot: targetSnapshot,
+    revision: 7n,
+    exportedRevision: null,
+  });
+
+  const target = composeApp({
+    spaceSession: targetSession,
+    newId: mintingIds(CREATED_DIAGRAM_ID, CREATED_DIAGRAM_GRAPH_ID),
+  });
+  expect(target.authoring.complete({ kind: 'created-diagram' }).kind).toBe('completed');
+  expect(target.navigation.getState().selectedDiagramId).toBe(CREATED_DIAGRAM_ID);
+  await vi.waitFor(() => expect(targetSession.getState().persistence.kind).toBe('settled'));
+
+  control.queueResult({
+    kind: 'conflict',
+    conflicts: [
+      {
+        spaceId: TARGET_ID,
+        current: { snapshot: targetSnapshot, revision: 9n, exportedRevision: null },
+      },
+    ],
+  });
+  await registry
+    .spaceThings(mintsNothing('The coordinated deletion minted an identity.'))
+    .delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID });
+  await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+  const metaApp = composeApp({
+    spaceSession: meta,
+    newId: mintsNothing('Accepting the stored Space minted an identity.'),
+  });
+  expect(metaApp.authoring.acceptStoredSpace()).toBeNull();
+  return target;
+};
+
+describe('the selected Diagram after a coordinated recovery restores a participant', () => {
+  it('names a Diagram the restored Space holds', async () => {
+    const target = await openRolledBackOverCreatedDiagram();
+
+    const space = target.currentSpace();
+    const { selectedDiagramId } = target.navigation.getState();
+
+    expect(space.diagrams.map((diagram) => diagram.id)).toContain(selectedDiagramId);
+    expect(selectedDiagramId).toBe(TARGET_DIAGRAM_ID);
+  });
+
+  it('leaves the canvas resolvable rather than the failure surface', async () => {
+    const target = await openRolledBackOverCreatedDiagram();
+
+    const space = target.currentSpace();
+    const { selectedDiagramId, activeGraphId } = target.navigation.getState();
+
+    // What `App` does every render, and what threw for a Space that loads.
+    expect(() => resolveDiagram(space, selectedDiagramId)).not.toThrow();
+    expect(
+      canvasProjection(space, resolveDiagram(space, selectedDiagramId)).visibleGraphs.map(
+        (graph) => graph.id,
+      ),
+    ).toContain(activeGraphId);
+  });
+});
 
 describe('the Active Graph after a coordinated recovery restores a participant', () => {
   it('names a Graph the restored Diagram owns', async () => {

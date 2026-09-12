@@ -979,58 +979,94 @@ export function createSpaceAuthoring({
    * write.
    *
    * The sibling of `reconcilePlacement`, and owed for the same reason. Every
-   * other replacement of the working snapshot answers the Active Graph as it
-   * installs — a completed Edit resolves the pair before `continueInDiagram`,
-   * and `acceptStoredSpace` re-opens Navigation on the Space it accepted. The
-   * coordinated Space Thing lifecycle is the exception: its recovery restores
-   * *every participant's* snapshot (`session-registry.ts`), and only the Space
-   * whose conflict the author answered had a `SpaceAuthoring` to re-open. A
-   * second open Space rolled back past a Graph it held locally went on naming
-   * that Graph as active, and nothing corrected it.
+   * other replacement of the working snapshot answers the selection as it
+   * installs — a completed Edit resolves the Diagram and its Active Graph before
+   * `continueInDiagram`, and `acceptStoredSpace` re-opens Navigation on the
+   * Space it accepted. The coordinated Space Thing lifecycle is the exception:
+   * its recovery restores *every participant's* snapshot
+   * (`session-registry.ts`), and only the Space whose conflict the author
+   * answered had a `SpaceAuthoring` to re-open. A second open Space rolled back
+   * past structure it held locally went on naming that structure, and nothing
+   * corrected it.
+   *
+   * **Both halves of the selection, because a recovery can take either.** A
+   * restore past a locally added Graph leaves the Active Graph naming a Graph
+   * the Diagram no longer owns, which made the Dock command a Graph the canvas
+   * was not drawing as active. A restore past a locally *created* Diagram leaves
+   * the selection itself dangling, and that one is worse: the Space still loads,
+   * so `resolveDiagram` throws `DiagramNotFoundError` for a Space with nothing
+   * wrong with it and `SpaceApp` draws the failure surface. One repair answers
+   * both, because `selectDiagram` resolves the pair.
    *
    * **Re-resolving here is not the repair `continueInDiagram` refuses.** That
    * call declines to invent an Active Graph because its caller states one and is
    * held to it, and because inventing one would interrupt a traversal of the
    * Graph that was active. Neither holds here: no caller stated anything — the
-   * Space was replaced out from under this one — and the Graph the traversal
-   * belonged to is the Graph that is gone. `selectDiagram` is what says so, the
-   * same operation an author spends to land on a Diagram's own Active Graph, and
-   * it drops out of presentation because there is nothing left to present.
+   * Space was replaced out from under this one — and the structure the traversal
+   * belonged to is the structure that is gone. `selectDiagram` is what says so,
+   * the same operation an author spends to land on a Diagram's own Active Graph,
+   * and it drops out of presentation because there is nothing left to present.
+   * An absent Active Graph is exempt, as it is there: it names nothing, so there
+   * is nothing about it to be stale.
    *
-   * Membership is asked of `diagramShowsGraph` rather than decided again, which
-   * is the rule that function's own comment states.
+   * Membership is asked of `diagramShowsGraph` and of the Space's own index
+   * rather than decided again, which is the rule that function's own comment
+   * states. Nothing here resolves through a throw: a dangling selection is the
+   * case being repaired, so raising and catching it to find that out would be
+   * control flow dressed as an error.
    */
   const reconcileNavigation = (): void => {
-    // A snapshot that no longer passes intake has no Diagram to reconcile
-    // against, exactly as above — and saying so is no more this function's job
-    // than it is `reconcilePlacement`'s.
-    let resolved: ResolvedDiagram;
+    /*
+     * A snapshot that no longer passes intake is `SpaceAppFailure`'s to report,
+     * exactly as it is below — and the throw this catches is intake's rather
+     * than a selection's, which is why the selection is then read off the
+     * Space's index instead of resolved.
+     */
+    let space: Space;
     try {
-      resolved = selectedResolvedDiagram();
+      space = currentSpace();
     } catch {
       return;
     }
-    const { activeGraphId, selectedDiagramId } = navigation.getState();
-    if (activeGraphId !== null && diagramShowsGraph(resolved, activeGraphId)) return;
+    const { selectedDiagramId, activeGraphId } = navigation.getState();
+    const selected = space.lookup.diagram(selectedDiagramId);
+    if (selected === undefined) {
+      // The Diagram is gone, so its Active Graph is not worth asking about. A
+      // Space whose own opening selection does not resolve either is the bug
+      // `requireDefaultDiagram` documents rather than a state to repair, so it
+      // is left for the surface to report.
+      const opening = space.defaultDiagram;
+      if (opening !== undefined && space.lookup.diagram(opening) !== undefined) {
+        navigation.selectDiagram(opening);
+      }
+      return;
+    }
+    if (activeGraphId === null || diagramShowsGraph(selected, activeGraphId)) return;
     navigation.selectDiagram(selectedDiagramId);
   };
 
   /**
-   * One publication for both reconciliations, rather than one each.
+   * One publication for both reconciliations, and Navigation first.
+   *
+   * The order is load-bearing: `reconcilePlacement` resolves the selected
+   * Diagram, so a selection this repairs has to be repaired before it asks —
+   * otherwise the placement silently keeps the geometry of a Diagram that is
+   * gone while the canvas draws another.
    *
    * `reconcilePlacement` writes through `install`, which does not publish, so
    * this used to publish itself. `reconcileNavigation` writes through Navigation,
-   * whose own notification would publish a second time — with a placement
-   * already reconciled and an Active Graph not yet, which is the part-way state
+   * whose own notification would publish a second time — with an Active Graph
+   * reconciled and a placement not yet, which is the part-way state
    * `installTogether` exists to keep nobody reading.
    */
   const unsubscribeSession = session.subscribe(() => {
     if (installing !== 0) return;
     installTogether(() => {
-      reconcilePlacement();
       reconcileNavigation();
+      reconcilePlacement();
     });
   });
+
   const unsubscribeNavigation = navigation.subscribe(() => {
     if (installing === 0) publish();
   });

@@ -936,15 +936,19 @@ export const createApp = (
      * source, `open-spaces.ts` minting a fresh `entries` array on every session
      * change of every open Space. And an embedded Diagram never receives this
      * builder at all: `EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring`
-     * without `thingEntityActions`, and its canvases are driven by the raw
-     * projection nodes rather than the decorated ones.
+     * without `thingEntityActions`, so the one arm of the decoration that reads
+     * this identity is the one arm its nodes do not have. (It runs the rest of
+     * that memo like any other canvas and publishes the decorated nodes — what
+     * it lacks is the commands, not the decoration.)
      *
-     * Measured over the Dock's `Default` story from `render()` to a settled
-     * canvas: 40 builds became 20, 20 decoration-memo runs became 10, and 72
-     * decorated node objects became 36 — half the mount-time decoration work
-     * was the churn alone, and fifteen of those twenty runs re-ran over a
-     * `nodes` array whose identity had not changed. Selection and drag see no
-     * change, because `nodes` moves there anyway.
+     * Halving is what was measured, at mount: with the identity stable, the
+     * builder runs half as often, the decoration memo runs half as often and
+     * half as many node objects are rebuilt, because most of those runs were
+     * re-running over a `nodes` array whose identity had not moved. Selection
+     * and drag are unchanged, `nodes` moving there anyway. The counts behind
+     * that are in `.scratch/command-dock/issues/14` with the instrumentation
+     * they came from, rather than frozen here where nothing can re-derive
+     * them — which is the failure this comment's predecessor is an example of.
      *
      * **The per-node cache the old note named is not this fix.** Keyed on the
      * builder it never hits while the builder churns; keyed without it, it hands
