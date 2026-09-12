@@ -1,6 +1,6 @@
 # 08 — Round-trip the complete Space aggregate
 
-Status: ready-for-human
+Status: resolved
 Tags: release/v1
 Blocked by: none
 
@@ -291,3 +291,27 @@ A handoff document written for this branch was audited against the tree before a
 **`.coderabbit.yaml` is behind the test, not ahead of it.** The handoff offers `:86` and `:305` as the content for new arms. Both regions name Route, Walk, `manifest`, `Arrangement`, a shared `Draft`, a `cards` array and an `edges` array — and neither names Card, Layout, `workspace` or `switcher`, all four of which the test already enforces. Bringing the config up to the test is its own small piece of work, in the opposite direction to the one implied.
 
 Scope for the `manifest` arm, if it is taken: the compound, kebab and key shapes run green over everything today, so the cost is entirely in the bare-word arm. Scoping that one to implementation source with `packages/core/src/schema.ts:311-312` masked as a retirement notice leaves `scripts/`, `test/` and the documents needing no exemption at all.
+
+### Closed, 12 September 2026
+
+Every criterion above is ticked and evidenced, the work is merged — PR #199 →
+`a306a1b1` on `main` — and the three review rounds are closed in `9d198232`,
+`a380e354` and `2e3afe9d`. `Status:` moves from `ready-for-human` to `resolved`;
+what was waiting on a human was the closing call, not work.
+
+Two things this ticket raised and deliberately left, both now owned elsewhere
+rather than lost:
+
+- **The `loadSpaceAggregate` name collision** is fixed.
+  `.scratch/aggregate-vocabulary/issues/01` took the decision, [ADR 0088](../../../docs/adr/0088-aggregate-names-the-meta-rooted-collection.md)
+  records it, and the alias is gone. `aggregate` now names the Meta-rooted
+  collection and nothing else.
+- **The duplicated `Promise.allSettled` fold** between `export-aggregate.ts` and
+  `read-aggregate.ts` stays as it is, judged `no_change_needed` in `a380e354`:
+  the export-reporting fix left the two returning different shapes, so only the
+  `as unknown` narrowing is shared and that is not worth a module.
+
+The two criteria no local command can observe — `pnpm e2e:postgres` and
+`pnpm test:integration:postgres` — are CI's `postgres` job, which migrates the
+database and runs the first as its last step. Cite the CI run for those; a
+worktree with no `.env` cannot.
