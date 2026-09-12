@@ -114,7 +114,7 @@ export function EmbeddedDiagramAuthoring({
       authoringAvailability({
         editable: true,
         presenting: false,
-        creatingThing: false,
+
         editingThingBody: false,
         editingThingTitle: false,
         thingIsOpen: false,

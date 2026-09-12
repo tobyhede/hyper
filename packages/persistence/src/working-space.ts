@@ -20,7 +20,7 @@ interface WorkingSpaceStore extends Pick<SpaceResourceRepository, 'loadSpace'> {
 const initializedSnapshot = (
   snapshot: SpaceSnapshot,
   newId: () => UUID,
-): { readonly snapshot: SpaceSnapshot; readonly createdDiagram: boolean } | undefined => {
+): SpaceSnapshot | undefined => {
   const diagrams = snapshot.document.diagrams ?? [];
   if (diagrams.length > 0) {
     if (snapshot.document.defaultDiagram !== undefined) return undefined;
@@ -28,34 +28,28 @@ const initializedSnapshot = (
     if (firstDiagram === undefined)
       throw new Error('A non-empty Diagram list lost its first value');
     return {
-      snapshot: {
-        ...snapshot,
-        document: { ...snapshot.document, defaultDiagram: firstDiagram.id },
-      },
-      createdDiagram: false,
+      ...snapshot,
+      document: { ...snapshot.document, defaultDiagram: firstDiagram.id },
     };
   }
   const diagramId = newId();
   const graphId = newId();
   return {
-    snapshot: {
-      ...snapshot,
-      document: {
-        ...snapshot.document,
-        diagrams: [
-          {
-            id: diagramId,
-            title: 'Diagram 1',
-            kind: 'positioned',
-            positions: {},
-            graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
-            activeGraph: graphId,
-          },
-        ],
-        defaultDiagram: diagramId,
-      },
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      diagrams: [
+        {
+          id: diagramId,
+          title: 'Diagram 1',
+          kind: 'positioned',
+          positions: {},
+          graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+          activeGraph: graphId,
+        },
+      ],
+      defaultDiagram: diagramId,
     },
-    createdDiagram: true,
   };
 };
 
@@ -70,15 +64,15 @@ async function loadWorkingSpace(
   // an already-invalid aggregate would replace them with a commit refusal.
   if (!loadSpaceSnapshot(loaded.snapshot).ok) return loaded;
   for (;;) {
-    const initialization = initializedSnapshot(loaded.snapshot, newId);
-    if (initialization === undefined) return loaded;
+    const initialized = initializedSnapshot(loaded.snapshot, newId);
+    if (initialized === undefined) return loaded;
 
     const result = await repository.commit({
       changes: [
         {
           kind: 'update',
           spaceId: id,
-          snapshot: initialization.snapshot,
+          snapshot: initialized,
           expectedRevision: loaded.revision,
         },
       ],
@@ -100,13 +94,7 @@ async function loadWorkingSpace(
     }
     const revision = result.revisions.find((candidate) => candidate.spaceId === id)?.revision;
     if (revision === undefined) throw new Error(`Space ${id} initialization returned no revision`);
-    const working = {
-      snapshot: initialization.snapshot,
-      revision,
-      exportedRevision: loaded.exportedRevision,
-    };
-    if (!initialization.createdDiagram) return working;
-    return { ...working, initialization: 'created-diagram' };
+    return { snapshot: initialized, revision, exportedRevision: loaded.exportedRevision };
   }
 }
 

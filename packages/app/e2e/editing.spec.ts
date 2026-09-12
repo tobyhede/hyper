@@ -3163,136 +3163,45 @@ test('Add Thing names the new Thing in place in the selected Diagram', async ({ 
 });
 
 /**
- * The Alias creation state is local and creates nothing (ADR 0042).
+ * Create Alias is a command on the Thing it points at (ADR 0088).
  *
- * Cancelling it must leave the Space exactly as it was — no Thing, no conversion,
- * no commit — and must leave focus somewhere an author can carry on from. The
- * revision assertion needs `quiescent`: "still 0" passes instantly against a
- * commit that has not happened yet.
- *
- * An open combobox dismisses its popup first; the pane owns the next Escape.
+ * The gesture supplies the Target, so there is no picker, no pane and nothing to
+ * cancel: one row, one press, and the Alias exists. The Title is the Target's,
+ * copied once, with the caret in it — which is the only thing on the canvas that
+ * says what the Alias points at, ADR 0083 keeping the Target's name off the
+ * Thing front.
  */
-test('cancelling the Alias Target picker creates nothing', async ({ page }) => {
+test('Create Alias on a Thing makes an Alias of it and names it after its Target', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await createThing(page, 'Alias');
-  const search = page.getByRole('combobox', { name: 'Target' });
-  await expect(search).toBeFocused();
-  await search.fill('A');
+  const menu = await thingActions(page, 'B');
+  await menu.getByRole('menuitem', { name: 'Create Alias' }).click();
 
-  await search.press('Escape');
-  await search.press('Escape');
-
-  await expect(page.getByTestId('new-alias')).toHaveCount(0);
-  await quiescent(page);
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  // **Create Alias, not whichever peer is first.** The three kinds are peers, so
-  // each carries its own return address and a cancelled Alias comes back to the
-  // control it was opened from (`continuation.ts`). Naming the kind here is what
-  // stops this passing against a caret that landed on a neighbour.
-  await expect(createThingControl(page, 'Alias')).toBeFocused();
-});
-
-/**
- * The pane's controls stay reachable when the pane cannot fit its content.
- *
- * `.thing-pane__panel` is a fixed 16/9 frame whose width is clamped by viewport
- * height. The Alias creation pane therefore has to keep its fixed controls in
- * reach when the viewport is short.
- *
- * 500px is below the ~620px where clipping begins, measured against this pane.
- */
-test('keeps the Alias pane’s controls reachable on a short viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 500 });
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
-
-  await createThing(page, 'Alias');
-  await expect(page.getByRole('button', { name: 'Cancel' })).toBeInViewport();
-});
-
-/**
- * The same one-press rule, on the field beside that picker.
- *
- * The Title holds a draft exactly as the search does, and under ADR 0048 that
- * buys it nothing: Escape discards every pending field and closes, from
- * whichever field the author happened to be standing in. The half worth pinning
- * separately is that a *typed* title does not make the pane refuse to close —
- * this is the dirty-field case, and the surface still goes on the first press.
- */
-test('Escape discards a typed Alias title and closes the pane', async ({ page }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
-  const nodes = await page.locator('.react-flow__node').count();
-
-  await createThing(page, 'Alias');
-  const title = page.getByTestId('new-alias-title');
-  await title.fill('Recap');
-
+  const title = page.getByRole('textbox', { name: 'Thing title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue('B');
   await title.press('Escape');
 
-  await expect(page.getByTestId('new-alias')).toHaveCount(0);
-  await quiescent(page);
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
-  await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+  // Two Things called B now, and the second is the Alias: the Title is copied
+  // once and the two are independent afterwards, so nothing here is a link.
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
 /**
- * Choosing a Target is the creation, and shared Title editing begins on what it made.
- */
-test(
-  'choosing a Target creates the Alias and begins shared Title editing',
-  { tag: '@parity:new-alias-completes-on-the-target-chosen' },
-  async ({ page }) => {
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await settled(page);
-    const nodes = await page.locator('.react-flow__node').count();
-
-    await createThing(page, 'Alias');
-    // No create action beside Cancel — the Target chosen is the completion, and
-    // a second activation would confirm a choice already made.
-    const pane = page.getByTestId('new-alias');
-    await expect(pane.getByRole('button', { name: 'Cancel' })).toBeVisible();
-    await expect(pane.getByRole('button', { name: /create|add|done|save/i })).toHaveCount(0);
-    await page.getByRole('combobox', { name: 'Target' }).fill('B');
-    await page.getByRole('option', { name: 'Markdown Thing B' }).click();
-
-    await expect(page.getByTestId('new-alias')).toHaveCount(0);
-    await expect(page.getByRole('textbox', { name: 'Thing title' })).toHaveValue('Thing 1');
-    await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
-    await page.getByRole('textbox', { name: 'Thing title' }).press('Escape');
-
-    // An unnamed Alias mints its own name like any other Thing, so the Target is
-    // still the only Thing called B and the Alias is the next `Thing N`.
-    await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
-    await expect(nodeByTitle(page, 'B')).toHaveCount(1);
-    await expect(nodeByTitle(page, 'Thing 1')).toHaveCount(1);
-    await expect(selectedCanvas(page)).toContainText('Collection 1');
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  },
-);
-
-/**
- * The whole gesture, and the reason the Title field had to exist.
+ * The whole gesture: the Alias is renamed by the editor its creation opens, and
+ * the Target keeps its own name.
  *
- * An unnamed Alias mints `Thing N`, so creation leaves the author standing in a
- * pane holding a name that says nothing about what they just made. Renaming has
- * to be reachable from where the author already is, has to reach the *Alias*,
- * and has to leave the Target's own title alone.
- *
- * The editor retains the pane contract: only its labelled Done action commits.
+ * The Titles agree at creation and diverge freely afterwards, which is the same
+ * rule the Space and Space Thing pair follows.
  */
 test('an Alias is renamed by the shared Title editor creation begins', async ({ page }) => {
   await page.goto('/');
@@ -3300,12 +3209,11 @@ test('an Alias is renamed by the shared Title editor creation begins', async ({ 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Alias');
-  await page.getByRole('combobox', { name: 'Target' }).fill('B');
-  await page.getByRole('option', { name: 'Markdown Thing B' }).click();
+  const menu = await thingActions(page, 'B');
+  await menu.getByRole('menuitem', { name: 'Create Alias' }).click();
 
   const title = page.getByRole('textbox', { name: 'Thing title' });
-  await expect(title).toHaveValue('Thing 1');
+  await expect(title).toHaveValue('B');
   await expect(title).toBeFocused();
   await title.fill('Recap');
   await title.press('Enter');
@@ -3316,20 +3224,20 @@ test('an Alias is renamed by the shared Title editor creation begins', async ({ 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  // And the rename outlives the pane rather than being held by it.
+  // And the rename outlives the editor rather than being held by it.
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 /**
- * And the rename is a pending field, so Escape discards it and closes — one
- * press, no field intercepting it (ADR 0048).
+ * The rename is a pending field, so Escape discards it — one press, no field
+ * intercepting it (ADR 0048).
  *
  * The Alias itself is *not* a pending field and does not go with it: it was
- * created the moment the Target was chosen, one revision earlier, and Escape on
- * this pane discards a draft rather than undoing an Edit. That is the whole
- * point of the test — the two are told apart, and only one of them is a draft.
+ * created on the press, one revision earlier, and Escape here discards a draft
+ * rather than undoing an Edit. That is the whole point of the test — the two are
+ * told apart, and only one of them is a draft.
  */
 test('Escape discards an Alias rename without undoing the Alias', async ({ page }) => {
   await page.goto('/');
@@ -3337,9 +3245,8 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Alias');
-  await page.getByRole('combobox', { name: 'Target' }).fill('B');
-  await page.getByRole('option', { name: 'Markdown Thing B' }).click();
+  const menu = await thingActions(page, 'B');
+  await menu.getByRole('menuitem', { name: 'Create Alias' }).click();
   const title = page.getByRole('textbox', { name: 'Thing title' });
   await title.fill('Recap');
 
@@ -3347,7 +3254,32 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
 
   await quiescent(page);
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(0);
-  await expect(nodeByTitle(page, 'B')).toHaveCount(1);
-  await expect(nodeByTitle(page, 'Thing 1')).toHaveCount(1);
+  await expect(nodeByTitle(page, 'B')).toHaveCount(2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
+/**
+ * **Present and unavailable on an Alias, not absent.**
+ *
+ * ADR 0070 forbids an Alias of an Alias, and an Alias is otherwise a regular
+ * Thing — so the menu stays consistent with every other Thing's, and the greyed
+ * row is where the product says that aliasing terminates.
+ */
+test('Create Alias is drawn unavailable on an Alias', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  const first = await thingActions(page, 'B');
+  await first.getByRole('menuitem', { name: 'Create Alias' }).click();
+  const title = page.getByRole('textbox', { name: 'Thing title' });
+  await title.fill('Alias of B');
+  await title.press('Enter');
+  await settled(page);
+
+  const menu = await thingActions(page, 'Alias of B');
+  const row = menu.getByRole('menuitem', { name: /^Create Alias/ });
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAttribute('aria-disabled', 'true');
 });

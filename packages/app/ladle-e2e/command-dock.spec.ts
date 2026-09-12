@@ -458,13 +458,13 @@ test(
  * application cannot mean.
  */
 test(
-  'Create offers the three kinds as peers, each named for what it makes',
+  'Create offers both kinds as peers, each named for what it makes',
   { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const strip = surface(page);
-    for (const kind of ['Markdown Thing', 'Space Thing', 'Alias']) {
+    for (const kind of ['Markdown Thing', 'Space Thing']) {
       const control = strip.getByRole('button', { name: `Create ${kind}` });
       await expect(control).toBeVisible();
       // Available, and reached without opening anything first — which is the
@@ -477,8 +477,8 @@ test(
     await expect(strip.getByRole('button', { name: 'Create Thing' })).toHaveCount(0);
     await expect(page.getByRole('menu')).toHaveCount(0);
 
-    // One group, so assistive technology announces the run once rather than
-    // three unrelated commands after the Things trigger.
+    // One group, so assistive technology announces the run once rather than two
+    // unrelated commands after the Things trigger.
     await expect(strip.getByRole('group', { name: 'Create a Thing' })).toBeAttached();
   },
 );

@@ -25,7 +25,14 @@
  * application.
  */
 
-/** The nine facts every answer below is derived from. */
+/**
+ * The eight facts every answer below is derived from.
+ *
+ * There were nine. `creatingThing` — a creation pane is open — went with the
+ * panes themselves: every Thing creation now completes its Edit on activation
+ * (ADR 0088), so there is no modal surface for the rest of the product to stand
+ * out of the way of.
+ */
 export interface AuthoringInProgress {
   /**
    * Whether the selected Diagram's placement is ready for authoring.
@@ -37,16 +44,6 @@ export interface AuthoringInProgress {
   readonly editable: boolean;
   /** A traversal of the Active Graph is running (ADR 0024). */
   readonly presenting: boolean;
-  /**
-   * A creation pane is open, whichever kind it is creating.
-   *
-   * The condition every surface outside the pane reads. Every kind is modal — a
-   * focus trap and a backdrop over the whole graph area — so "one authoring
-   * surface at a time" is one rule, and writing it as a disjunction at each of
-   * its call sites is how a third kind would come to be withdrawn from some of
-   * them.
-   */
-  readonly creatingThing: boolean;
   /** A Thing's Markdown content edit is running on the canvas (ADR 0064). */
   readonly editingThingBody: boolean;
   /** A Thing's inline title edit is running on the canvas (ADR 0065). */
@@ -127,7 +124,6 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   const {
     editable,
     presenting,
-    creatingThing,
     editingThingBody,
     editingThingTitle,
     thingIsOpen,
@@ -171,7 +167,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * first control it took away and read by all of them — and that name is gone
    * with the prop rather than renamed.
    */
-  const soleAuthoringSurface = spaceOnCanvas && !creatingThing && !editingChromeTitle;
+  const soleAuthoringSurface = spaceOnCanvas && !editingChromeTitle;
 
   /**
    * One condition for the Things list's `disabled` and for the Dock slot that
@@ -181,11 +177,10 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * Withdrawing the list *closes* it rather than hiding it behind a still-true
    * open state. The open state is the Dock's — `ThingsList` clears its
    * disclosure slot when this goes false — and a list that reopened itself on
-   * the way back from presenting or from a creation pane would take focus with
-   * it, landing the reader in the Things rather than on the canvas they
-   * returned to.
+   * the way back from presenting would take focus with it, landing the reader
+   * in the Things rather than on the canvas they returned to.
    */
-  const thingsView = !presenting && !creatingThing;
+  const thingsView = !presenting;
 
   /**
    * Whether a chrome rename may run at all — the one answer for all three of
@@ -195,8 +190,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * projected canvas: a rename begun there is an editor with nothing behind it,
    * and the draft is discarded on the same render it was begun.
    */
-  const chromeTitleEdit =
-    editable && !presenting && !creatingThing && !editingThingBody && !editingThingTitle;
+  const chromeTitleEdit = editable && !presenting && !editingThingBody && !editingThingTitle;
 
   /**
    * Whether a menu's Rename and Delete may be offered at all.
@@ -257,7 +251,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * rather than outliving one. Add Diagram below takes the same condition and
    * that one term more.
    */
-  const addThing = !presenting && !creatingThing && !editingThingBody && !editingChromeTitle;
+  const addThing = !presenting && !editingThingBody && !editingChromeTitle;
 
   /**
    * Add Diagram is Add Thing plus `editingThingTitle`, and the extra term is this

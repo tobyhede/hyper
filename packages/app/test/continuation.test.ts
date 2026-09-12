@@ -70,10 +70,10 @@ const NAME_A: PendingContinuation = {
   select: true,
   then: 'rename',
 };
-const FOCUS_ADD_THING: PendingContinuation = {
-  target: { kind: 'control', name: 'create-alias' },
+const RENAME_DIAGRAM: PendingContinuation = {
+  target: { kind: 'control', name: 'diagram-name' },
   select: false,
-  then: 'focus',
+  then: 'rename',
 };
 
 describe('the one pending continuation', () => {
@@ -97,9 +97,9 @@ describe('the one pending continuation', () => {
     const { continuation } = open();
     continuation.request(NAME_A);
 
-    continuation.request(FOCUS_ADD_THING);
+    continuation.request(RENAME_DIAGRAM);
 
-    expect(continuation.getState().pending).toEqual(FOCUS_ADD_THING);
+    expect(continuation.getState().pending).toEqual(RENAME_DIAGRAM);
   });
 
   it('yields a continuation once and leaves none behind', () => {
@@ -151,7 +151,7 @@ describe('invalidation', () => {
 
   it('discards a pending continuation when presenting begins', () => {
     const { navigation, continuation } = open();
-    continuation.request(FOCUS_ADD_THING);
+    continuation.request(RENAME_DIAGRAM);
 
     navigation.present();
 
@@ -171,12 +171,12 @@ describe('invalidation', () => {
 
   it('stops answering its collaborator once disposed', () => {
     const { navigation, continuation } = open();
-    continuation.request(FOCUS_ADD_THING);
+    continuation.request(RENAME_DIAGRAM);
 
     continuation.dispose();
     navigation.present();
 
-    expect(continuation.getState().pending).toEqual(FOCUS_ADD_THING);
+    expect(continuation.getState().pending).toEqual(RENAME_DIAGRAM);
   });
 });
 
@@ -197,7 +197,7 @@ describe('the wait policy', () => {
 
   it.each([
     ['the canvas', { kind: 'canvas' } as const],
-    ['a control', { kind: 'control', name: 'create-alias' } as const],
+    ['a control', { kind: 'control', name: 'diagram-name' } as const],
   ])('falls through on %s', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(false);
   });

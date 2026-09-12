@@ -100,15 +100,20 @@ test('Create Thing from the strip names the new Thing on the canvas', async ({ p
   await expect(dock(page)).toBeVisible();
 });
 
-/** The Alias creation state, which takes focus onto its own picker. */
-test('Create Alias from the strip opens the Target picker', async ({ page }) => {
+/** The other kind, which mints its own Space and names both from one `Space N`. */
+test('Create Space Thing from the strip names the new Thing on the canvas', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Alias');
+  await createThing(page, 'Space Thing');
 
-  await expect(page.getByRole('combobox', { name: 'Target' })).toBeFocused();
+  const title = page.getByRole('textbox', { name: 'Thing title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue(/^Space \d+$/);
+  await expect(dock(page)).toBeVisible();
+  await title.press('Escape');
+  await settled(page);
 });
 
 /**

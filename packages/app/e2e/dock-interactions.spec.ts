@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { boxOf, createThing, createThingControl, dock, nodeByTitle, settled } from './graph';
+import { boxOf, createThing, dock, nodeByTitle, settled } from './graph';
 
 for (const delay of [0, 120]) {
   test(`Dock disclosures switch on one press (${delay}ms)`, async ({ page }) => {
@@ -14,7 +14,7 @@ for (const delay of [0, 120]) {
     await expect(page.getByRole('menuitem', { name: 'New Graph', exact: true })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toHaveCount(0);
     await surface.getByRole('button', { name: /^Space: / }).click({ delay });
-    await expect(page.getByRole('menuitem', { name: 'New Space', exact: true })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'New Graph', exact: true })).toHaveCount(0);
   });
 
@@ -31,7 +31,7 @@ for (const delay of [0, 120]) {
       await dock(page)
         .getByRole('button', { name: /^Space: / })
         .click({ delay });
-      await expect(page.getByRole('menuitem', { name: 'New Space', exact: true })).toBeVisible();
+      await expect(page.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
       await dock(page)
         .getByRole('button', { name: new RegExp(`^Rename ${kind}:`) })
         .click({ delay });
@@ -252,19 +252,19 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
 });
 
 /**
- * Create Thing, as three peers, through the running application.
+ * Create Thing, as two peers, through the running application.
  *
- * The Ladle half of this claim asserts the three controls are present, named
- * and ungated; this half asserts what a press of one actually *does*, which the
+ * The Ladle half of this claim asserts the controls are present, named and
+ * ungated; this half asserts what a press of one actually *does*, which the
  * catalogue cannot: an application Edit, on the real Space, against the real
  * Authoring composition.
  *
- * **The press count is the obligation.** `markdown` completes on activation, so
- * one press puts a Thing on the canvas with its title editor open. `alias` and
- * `space` each open a pane, because a Target and a target Space are still owed
- * — so their one press reaches a pane rather than a menu that would then have
- * needed a second. That asymmetry is the reason the disclosure went: it charged
- * the kind that needs no second decision for one anyway.
+ * **The press count is the obligation, and it is now the same count for both.**
+ * ADR 0088 retired the panes that stood between a press and a creation: each
+ * kind completes its Edit on activation and continues in the Thing's own Title
+ * editor, so neither owes a second decision. The asymmetry that killed the
+ * disclosure — one kind completing on the press while two collected a value
+ * first — is gone rather than merely unmeasured.
  */
 test(
   'each Thing kind is created in one press from the Dock',
@@ -274,8 +274,8 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
-    // Nothing is disclosed on the way: the three are on the surface, so no menu
-    // is opened by any of these presses.
+    // Nothing is disclosed on the way: both are on the surface, so no menu is
+    // opened by either press.
     await expect(page.getByRole('menu')).toHaveCount(0);
 
     await createThing(page, 'Markdown Thing');
@@ -283,20 +283,16 @@ test(
     await expect(title).toBeFocused();
     await title.press('Escape');
 
-    // The two that owe a choice reach their pane in the same single press.
-    await createThing(page, 'Alias');
-    await expect(page.getByRole('combobox', { name: 'Target' })).toBeFocused();
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('new-alias')).toHaveCount(0);
-
+    // The same one press, and the same arrival: a Space Thing mints its own
+    // Space and continues in the Thing's Title editor, seeded with the `Space N`
+    // both were named from.
     await createThing(page, 'Space Thing');
-    await expect(page.getByTestId('new-space-thing')).toBeVisible();
-    await page.keyboard.press('Escape');
-
-    // **Back to the control it was opened from, not to a neighbour.** Each peer
-    // carries its own continuation address; a cancelled Space Thing landing on
-    // Create Markdown Thing would be the caret on a command never pressed.
-    await expect(createThingControl(page, 'Space Thing')).toBeFocused();
+    const spaceTitle = page.getByRole('textbox', { name: 'Thing title' });
+    await expect(spaceTitle).toBeFocused();
+    await expect(spaceTitle).toHaveValue(/^Space \d+$/);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await spaceTitle.press('Escape');
+    await settled(page);
   },
 );
 

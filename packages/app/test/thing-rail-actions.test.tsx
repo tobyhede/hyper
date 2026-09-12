@@ -18,6 +18,7 @@ import type { DestinationOpening } from '../src/destination-opening';
 import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
+import { THING_HEIGHT, THING_WIDTH } from '../src/thing';
 
 /**
  * A Thing's own commands belong to the Thing (ADR 0073, ADR 0082).
@@ -35,6 +36,7 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 /**
  * Two placed Things and no Edges.
@@ -68,14 +70,40 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
+/** The same Space with an Alias of `A` already in it, for the terminal-row case. */
+const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    diagrams: [
+      {
+        ...snapshot.document.diagrams?.[0],
+        positions: {
+          ...snapshot.document.diagrams?.[0]?.positions,
+          [ALIAS_ID]: { x: 0, y: 400, open: false },
+        },
+      },
+    ],
+  },
+  things: [
+    ...snapshot.things,
+    { id: ALIAS_ID, document: { title: 'A alias', kind: 'alias', target: THING_ID } },
+  ],
+});
+
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
   if (!loaded.ok) throw new Error(loaded.errors.map((error) => error.message).join('\n'));
   return loaded.space;
 };
 
-function mount(opening?: DestinationOpening, history?: HistoryApi): SpaceSession {
-  const stored = { snapshot, revision: 0n, exportedRevision: null };
+function mount(
+  opening?: DestinationOpening,
+  history?: HistoryApi,
+  /** The Space to mount, for the one case that needs an Alias already in it. */
+  mounted: SpaceSnapshot = snapshot,
+): SpaceSession {
+  const stored = { snapshot: mounted, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceThings } = openTestSpace(
     new MemorySpaceBackend([stored]),
     stored,
@@ -83,7 +111,7 @@ function mount(opening?: DestinationOpening, history?: HistoryApi): SpaceSession
   let view: RenderResult | undefined;
   mountSpace(
     {
-      id: runtime(snapshot).id,
+      id: runtime(mounted).id,
       session,
       app: composeApp({ spaceSession: session }),
       spaceThings,
@@ -152,6 +180,88 @@ describe('a Thing’s commands on the canvas rail', () => {
 
     expect(await screen.findByRole('button', { name: 'Actions for Thing A' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Actions for Thing B' })).toBeVisible();
+    await settled(session);
+  });
+
+  /**
+   * **Create Alias is a command about the Thing, so it lives on the Thing.**
+   *
+   * An Alias is always created *from* its Target (ADR 0088), which is what
+   * removes the Target-selection interaction entirely — the gesture is on the
+   * Thing, so the Target is the Thing it was invoked on. It inherits this
+   * menu's keyboard route rather than needing one invented, which is why it is
+   * a row here and not a rail glyph or a bare shortcut.
+   */
+  it('creates an Alias of the Thing whose menu ran the command', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+
+    await waitFor(() => expect(thingIds(session)).toHaveLength(3));
+    const created = session.getState().working.things[2];
+    expect(created?.document).toEqual({ title: 'A', kind: 'alias', target: THING_ID });
+    await settled(session);
+  });
+
+  /**
+   * The Title is the Target's, copied once and independent thereafter, and the
+   * caret is in it.
+   *
+   * ADR 0083 keeps the Target's name off the Thing front, so without the copy
+   * the author has no on-canvas indication of what the Alias points at beyond
+   * the dotted border. Copying it *once* is what keeps the two ordinary
+   * independent Titles afterwards.
+   */
+  it('continues in the new Alias’s own Title editor, seeded from its Target', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveValue('A');
+    expect(editor).toHaveFocus();
+    await settled(session);
+  });
+
+  /**
+   * Placed at a fixed offset from the source, so the Alias lands where the
+   * author is looking.
+   *
+   * A free-position search was rejected: that is a placement algorithm, and ADR
+   * 0086 put automatic arrangement behind an Edit and out of the render path
+   * deliberately. The overlap is authored and the author drags it off.
+   */
+  it('places the Alias at a fixed offset from the Thing it was made from', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+
+    await waitFor(() => expect(thingIds(session)).toHaveLength(3));
+    const alias = session.getState().working.things[2]!.id;
+    const positions = session.getState().working.document.diagrams?.[0]?.positions;
+    expect(positions?.[alias]).toMatchObject({ x: THING_WIDTH / 2, y: THING_HEIGHT / 2 });
+    await settled(session);
+  });
+
+  /**
+   * **Present and unavailable on an Alias, not absent.**
+   *
+   * ADR 0070 forbids an Alias of an Alias, and a row that can never apply would
+   * ordinarily not be one of that kind's commands. It is drawn and greyed
+   * anyway, because an Alias is otherwise a regular Thing: this row is where the
+   * product says that aliasing terminates.
+   */
+  it('offers Create Alias unavailable on an Alias, because aliasing terminates', async () => {
+    const session = mount(undefined, undefined, withAlias);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A alias' }));
+
+    const row = await screen.findByRole('menuitem', { name: /^Create Alias/ });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(thingIds(session)).toHaveLength(3);
     await settled(session);
   });
 

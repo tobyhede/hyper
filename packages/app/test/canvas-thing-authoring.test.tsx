@@ -137,17 +137,18 @@ const mountAuthoring = (
       useCanvasThingAuthoring({
         nodes: [node(expanded, thingId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
-        // into answers by the one module that owns them: a modal pane is what
-        // `enabled: false` has always meant here, and it is deliberately not
-        // the thing that ends a live content edit.
+        // into answers by the one module that owns them. A live chrome rename is
+        // what `enabled: false` means here now that ADR 0088 has retired the
+        // creation panes — it is the surviving fact that takes canvas authoring
+        // away, and it is deliberately not the thing that ends a live content
+        // edit.
         availability: authoringAvailability({
           editable: true,
           presenting,
-          creatingThing: !enabled,
           editingThingBody: false,
           editingThingTitle: false,
           thingIsOpen: false,
-          editingChromeTitle: false,
+          editingChromeTitle: !enabled,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
         }),

@@ -52,43 +52,71 @@ const exitSpace = async (page: Page): Promise<void> => {
 };
 
 /**
- * The whole creation gesture, from the menu to the Thing on the canvas.
+ * Create a Space Thing and give it a name — one press, then the inline editor.
  *
- * The title is typed on the pane rather than into an inline editor afterwards,
- * which is the visible difference from Add Thing and Add Alias: those two mint a
- * Thing and hand the caret to it, and this one cannot, because the lifecycle
- * answers a completed Edit and not the identity it created.
+ * ADR 0088 retired the pane that collected a Title before the Edit ran: the
+ * press mints the Space and the Thing that names it from one `Space N` and
+ * continues in the Thing's own Title editor, so naming it anything else is an
+ * ordinary rename afterwards. **Which means the Space keeps `Space N`** — a
+ * Thing's Title and the title of the Space it references agree only at creation
+ * (`CONTEXT.md`), and a rename here is what makes that divergence visible.
  */
-test(
-  'adding a Space Thing creates its Space and places the Thing that references it',
-  { tag: '@parity:new-space-thing-completes-on-a-labelled-create' },
-  async ({ page }) => {
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await settled(page);
-    const nodes = await page.locator('.react-flow__node').count();
+const createSpaceThingNamed = async (page: Page, title: string): Promise<void> => {
+  await createThing(page, 'Space Thing');
+  const editor = page.getByRole('textbox', { name: 'Thing title' });
+  await expect(editor).toBeFocused();
+  await editor.fill(title);
+  await editor.press('Enter');
+  await expect(nodeByTitle(page, title)).toHaveCount(1);
+};
 
-    await createThing(page, 'Space Thing');
+/**
+ * Reference a Space that already exists, from the Things list's add-Space row.
+ *
+ * The other half of what the pane did, and a different act (ADR 0088): this one
+ * points at a Space rather than making one, so the Thing it authors is named
+ * after the Space it found.
+ */
+const addExistingSpace = async (page: Page, title: string): Promise<void> => {
+  await page.getByRole('button', { name: 'Things' }).click();
+  const list = page.getByRole('dialog', { name: 'Things' });
+  await expect(list).toBeVisible();
+  await list.getByRole('button', { name: `Add ${title} to Diagram` }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+};
 
-    const pane = page.getByTestId('new-space-thing');
-    const create = pane.getByRole('button', { name: 'Create' });
-    // The completion waits on the title, because the target never needs
-    // choosing: a new Space is always available and is the default row.
-    await expect(create).toBeDisabled();
-    await expect(pane.getByRole('combobox', { name: 'Space' })).toHaveText('A new Space');
+/**
+ * The whole creation gesture, which is now one press (ADR 0088).
+ *
+ * **Optimistic, and this is where that is visible.** The Thing is placed and its
+ * Title editor takes the caret while the two-snapshot lifecycle is still
+ * committing, so the editor is asserted before `settled` rather than after it —
+ * exactly as Create Markdown Thing behaves, which is the point of the change.
+ * The `Space N` the editor is seeded with is the one string handed to both the
+ * Space and the Thing, so the two agree at creation.
+ */
+test('creating a Space Thing mints its Space and places the Thing that names it', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
 
-    await page.getByTestId('new-space-thing-title').fill('Architecture');
-    await expect(create).toBeEnabled();
-    await create.click();
+  await createThing(page, 'Space Thing');
 
-    await expect(page.getByTestId('new-space-thing')).toHaveCount(0);
-    await settled(page);
-    await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
-    await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  },
-);
+  const editor = page.getByRole('textbox', { name: 'Thing title' });
+  await expect(editor).toBeFocused();
+  await expect(editor).toHaveValue('Space 1');
+  await editor.press('Escape');
+
+  await settled(page);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
+  await expect(nodeByTitle(page, 'Space 1')).toHaveCount(1);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
 
 /**
  * The Things list offers the Meta Space's Spaces beside this Space's Things.
@@ -107,11 +135,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await createThing(page, 'Space Thing');
-    await page.getByTestId('new-space-thing-title').fill('Architecture');
-    await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByTestId('new-space-thing')).toHaveCount(0);
-    await expect(nodeByTitle(page, 'Architecture')).toBeVisible();
+    await createSpaceThingNamed(page, 'Architecture');
 
     await page.getByRole('button', { name: 'Things' }).click();
     const list = page.getByRole('dialog', { name: 'Things' });
@@ -120,13 +144,16 @@ test(
     // The Space is offered although the Thing that references it is already on
     // this Diagram — they are two different things to place, which is why the
     // filter draws them as two toggles rather than one.
-    const row = list.getByRole('button', { name: 'Add Architecture to Diagram' });
+    // `Space 1`, not `Architecture`: the rename above was the Thing's, and a
+    // Thing's Title and the title of the Space it references agree only at
+    // creation (`CONTEXT.md`). This row names the Space.
+    const row = list.getByRole('button', { name: 'Add Space 1 to Diagram' });
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-space-id', /.+/);
 
     // And pressing its toggle off takes it away, leaving this Space's Things.
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
-    await expect(list.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
+    await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
   },
 );
 
@@ -147,10 +174,7 @@ test('stops offering a Space the moment the last Space Thing referencing it is d
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  await createThing(page, 'Space Thing');
-  await page.getByTestId('new-space-thing-title').fill('Architecture');
-  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-  await expect(nodeByTitle(page, 'Architecture')).toBeVisible();
+  await createSpaceThingNamed(page, 'Architecture');
 
   const openList = async () => {
     await page.getByRole('button', { name: 'Things' }).click();
@@ -160,7 +184,7 @@ test('stops offering a Space the moment the last Space Thing referencing it is d
   };
 
   const offered = await openList();
-  await expect(offered.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(1);
+  await expect(offered.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
 
@@ -175,7 +199,7 @@ test('stops offering a Space the moment the last Space Thing referencing it is d
   // The Space went with its last reference, so the cube goes with it — and the
   // count on the toggle agrees, which is the claim the count exists to make.
   const after = await openList();
-  await expect(after.getByRole('button', { name: 'Add Architecture to Diagram' })).toHaveCount(0);
+  await expect(after.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Spaces in this Meta Space, 0' })).toBeVisible();
 });
 
@@ -193,31 +217,26 @@ test('a second Space Thing may reference the Space the first one created', async
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Space Thing');
-  await page.getByTestId('new-space-thing-title').fill('Architecture');
-  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
+  await createSpaceThingNamed(page, 'Architecture');
   await settled(page);
 
-  await createThing(page, 'Space Thing');
-  await page.getByTestId('new-space-thing-title').fill('Architecture again');
-  await page.getByRole('combobox', { name: 'Space' }).click();
-  await page.getByRole('option', { name: 'Architecture' }).click();
-  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
+  // The Space itself is still `Space 1` — the rename above was the Thing's — so
+  // that is the row the list offers, and the Thing this authors is named after
+  // the Space it found.
+  await addExistingSpace(page, 'Space 1');
 
-  await expect(page.getByTestId('new-space-thing')).toHaveCount(0);
   await settled(page);
   // The second Thing was authored against the Space the first one created — the
-  // pane offered it as a choice — so this is a second way to reach that Space
-  // rather than a second copy of it.
-  await expect(nodeByTitle(page, 'Architecture again')).toHaveCount(1);
+  // Things list offered it as a row — so this is a second way to reach that
+  // Space rather than a second copy of it.
+  await expect(nodeByTitle(page, 'Space 1')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 
   // Referencing an existing Space selects in it too (ADR 0079). The first Thing
   // stored what its target initializer minted; this one had to read the same
   // pair back off a Space that already had it, which is the other half of the
   // rule and the half a created target cannot exercise.
-  const again = nodeByTitle(page, 'Architecture again');
+  const again = nodeByTitle(page, 'Space 1');
   await again.focus();
   await again.press('Enter');
   await expect(again.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
@@ -249,10 +268,7 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
-    await createThing(page, 'Space Thing');
-    await page.getByTestId('new-space-thing-title').fill('Architecture');
-    await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-    await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
+    await createSpaceThingNamed(page, 'Architecture');
     await settled(page);
 
     // Opened from the keyboard rather than from the Thing's own control, because
@@ -323,10 +339,7 @@ test('deleting the last Space Thing deletes the Space it referenced', async ({ p
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await createThing(page, 'Space Thing');
-  await page.getByTestId('new-space-thing-title').fill('Architecture');
-  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
+  await createSpaceThingNamed(page, 'Architecture');
   await settled(page);
 
   // Deleting a Thing is the Thing's own rail (ADR 0073), reached by hovering it —
@@ -348,11 +361,13 @@ test('deleting the last Space Thing deletes the Space it referenced', async ({ p
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
 
-  // The Space went with it, so a second Space Thing is offered no existing Space
-  // to reference — which is the only way this surface can see the cascade.
-  await createThing(page, 'Space Thing');
-  await page.getByRole('combobox', { name: 'Space' }).click();
-  await expect(page.getByRole('option', { name: 'Architecture' })).toHaveCount(0);
+  // The Space went with it, so the Things list offers no Space to reference —
+  // which is the only way this surface can see the cascade.
+  await page.getByRole('button', { name: 'Things' }).click();
+  const list = page.getByRole('dialog', { name: 'Things' });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Spaces in this Meta Space, 0' })).toBeVisible();
 });
 
 /* -------------------------------------------------------------------------- */
@@ -392,10 +407,7 @@ async function openSpaceThingOnItsDiagram(page: Page): Promise<Locator> {
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Space Thing');
-  await page.getByTestId('new-space-thing-title').fill('Architecture');
-  await page.getByTestId('new-space-thing').getByRole('button', { name: 'Create' }).click();
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(1);
+  await createSpaceThingNamed(page, 'Architecture');
   await settled(page);
 
   const thing = nodeByTitle(page, 'Architecture');
@@ -477,7 +489,7 @@ test(
     await editor.fill('Written inside the Space Thing');
     await embedded.getByRole('button', { name: 'Save Thing Thing 1' }).click();
     await expect(embedded).toContainText('Written inside the Space Thing');
-    await switchToSpace(page, 'Architecture');
+    await switchToSpace(page, 'Space 1');
     await expect(
       page.locator('.react-flow__node:visible').getByRole('heading', { name: 'Thing 1' }),
     ).toBeVisible();
@@ -590,7 +602,7 @@ test(
     // Two Spaces open and neither entered, so the bar carries the Open Spaces
     // menu and no parent step: there is nothing above `Diagram fixture`.
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
-    await switchToSpace(page, 'Architecture');
+    await switchToSpace(page, 'Space 1');
 
     // Entered, so the crossing is named — and named as the Space, with the
     // parent glyph carrying the relation rather than a word.
@@ -657,9 +669,9 @@ test(
   },
   async ({ page }) => {
     await openSpaceThingOnItsDiagram(page);
-    await switchToSpace(page, 'Architecture');
+    await switchToSpace(page, 'Space 1');
     await settled(page);
-    // Only the next Edit is failed, while Architecture is the working Space.
+    // Only the next Edit is failed, while `Space 1` is the working Space.
     await page.route('**/api/spaces', async (route) => {
       if (route.request().method() === 'POST') return route.abort('failed');
       return route.continue();
@@ -672,7 +684,7 @@ test(
     const trigger = page.getByRole('button', { name: 'Spaces. 2 open, 1 needs attention.' });
     await expect(trigger.locator('[data-unwell]')).toBeVisible();
     await trigger.click({ delay: 120 });
-    const unwell = page.getByRole('menuitemradio', { name: /^Architecture/ });
+    const unwell = page.getByRole('menuitemradio', { name: /^Space 1/ });
     await expect(unwell).toContainText('Save failed');
     await expect(page.getByRole('menu').getByRole('button', { name: 'Retry' })).toHaveCount(0);
     await unwell.click();

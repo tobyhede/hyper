@@ -30,8 +30,6 @@ export interface OpenSpace {
    * able to author a Space Thing.
    */
   readonly spaceThings: SpaceThingAuthoring;
-  /** Set when this Space's first working load authored its opening Diagram. */
-  readonly initialization?: 'created-diagram';
 }
 
 export interface OpenSpacesState {
@@ -307,10 +305,6 @@ export function createOpenSpaces({
 
   const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: DiagramId): OpenSpace => {
     const spaceId = loaded.snapshot.id;
-    // A session the registry already holds keeps the snapshot it was opened on
-    // and discards this one, so anything read off `loaded` afterwards describes
-    // a read that was thrown away.
-    const reused = registry.session(spaceId) !== undefined;
     const session = registry.open(loaded);
     // Every identity and every observer failure in a composed Space comes from
     // the seams Open Spaces was given (ADR 0016). Leaving either off here lets
@@ -327,8 +321,7 @@ export function createOpenSpaces({
       if (!state.entries.some((entry) => entry.session === session)) return;
       observable.publish({ ...state, entries: [...state.entries] });
     });
-    if (reused || loaded.initialization !== 'created-diagram') return opened;
-    return { ...opened, initialization: 'created-diagram' };
+    return opened;
   };
 
   const composeValidated = async (

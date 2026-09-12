@@ -60,6 +60,16 @@ export const uncataloguedComponents = [
       'Without a consumer since `.scratch/command-dock/issues/10-decide-the-cards-surface.md` restored the Things surface decision: `ThingsDrawer` was its only one, and the Things list is a `Popover` anchored to the Dock’s own trigger — which is what the prototype’s three-surface comparison chose, on the ground that a screen-edge drawer occludes the canvas edge you are dropping onto. The registry `Drawer` and `DRAWER_WIDTH` are what is left, and `AppShell`’s `insetEnd` is left standing with them. `08-retire-the-sidebar-era-primitives.md` took the Sidebar-era primitives while this one still had a consumer, so it did not take this; retiring a registry primitive is a foundation decision rather than a surface one, and `16-retire-the-registry-drawer-and-the-yielded-strip.md` is the decision of its own that owns taking the three.',
   },
   {
+    module: 'packages/ui/src/Dialog.tsx',
+    reason:
+      'Without a consumer since ADR 0088 retired the two Thing creation panes: `ThingPane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Thing deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
+  },
+  {
+    module: 'packages/ui/src/Select.tsx',
+    reason:
+      'Without a consumer since ADR 0088 retired the Space Thing creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Thing or a Space is `ThingSearchCombobox`\'s and `ChoiceMenu`\'s everywhere that remains.',
+  },
+  {
     module: 'packages/ui/src/components/empty.tsx',
     reason:
       'Deliberately without a consumer, for the same reason as `Command.tsx` above. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',
@@ -144,10 +154,5 @@ export const handRolledStyles = [
     block: 'shell',
     reason:
       'Viewport ownership: the app owns exactly one viewport and never scrolls the page, and the canvas notice is placed over the canvas without covering its controls. `AppShell` owns the chrome; this owns where it sits against a full-bleed canvas.',
-  },
-  {
-    block: 'thing-pane',
-    reason:
-      "The modal frame a Thing is authored on: the 16:9 silhouette that matches `thing.ts`, and the scroll boundary that keeps Cancel and Done reachable. Base UI's Dialog owns modality, focus and dismissal; this owns the frame's geometry against the canvas behind it.",
   },
 ] as const;

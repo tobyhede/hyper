@@ -238,30 +238,6 @@ export const parityClaims: readonly ParityClaim[] = [
       "The canvas Thing's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
-    id: 'new-space-thing-completes-on-a-labelled-create',
-    storyFile: 'components/space-thing-panes.stories.tsx',
-    storyExport: 'NewSpaceThingPane',
-    // The clause about the target list says "a new Space or an existing one"
-    // rather than naming a Space, because the list a real repository offers is
-    // whatever is stored and the story's is fixed.
-    claim:
-      'Adding a Space Thing offers Title and a target that is either a new Space or an existing one, and completes on a labelled Create that stays disabled until the Thing is titled.',
-  },
-  {
-    id: 'new-space-thing-keeps-a-refused-attempt-on-its-target-field',
-    storyFile: 'components/space-thing-panes.stories.tsx',
-    storyExport: 'NewSpaceThingPaneRefused',
-    claim:
-      'A Space Thing creation refused for a reference cycle keeps the pane open and puts the reason on the Target field rather than closing over it.',
-    // A cycle needs a Space that already references the containing one, and the
-    // only gesture that could author it is a Space Thing created from *inside* an
-    // entered Space — which `entity-url-addressability/08` builds. Until then
-    // the refusal is unreachable in a browser, so the story is handed the
-    // structured refusal and this claim takes the documented exemption.
-    applicationEvidence:
-      'A reference cycle cannot be authored through a browser gesture yet: it needs a Space Thing created inside an entered Space, and Entering is `entity-url-addressability/08`. `packages/app/test/space-thing-authoring.test.tsx` proves the refusal through the application path meanwhile.',
-  },
-  {
     id: 'two-space-things-draw-one-target-at-their-own-selections',
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'TwoSelectionsOfOneTarget',
@@ -275,18 +251,6 @@ export const parityClaims: readonly ParityClaim[] = [
     // documented exemption meanwhile.
     applicationEvidence:
       'A second Diagram in the target is Add Diagram from inside that Space, and Entering a Space Thing is `entity-url-addressability/08`, so a browser cannot yet reach a target owning two Diagrams. `packages/app/test/space-thing-authoring.test.tsx` proves two Space Things keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',
-  },
-  {
-    id: 'new-alias-completes-on-the-target-chosen',
-    storyFile: 'components/thing-and-alias-panes.stories.tsx',
-    storyExport: 'NewAliasPane',
-    // Deliberately says nothing about the title the pane carries. The Ladle test
-    // types one and reads it back, while the application test leaves it empty
-    // and reads back the `Thing N` Authoring mints for an unnamed Alias (ADR 0083
-    // refines ADR 0046) — so a clause about a typed title would have one proof
-    // rather than the two ADR 0052 requires.
-    claim:
-      'Adding an Alias offers Title and Target with no create action, and completes on the Target chosen rather than on a second confirmation.',
   },
   {
     id: 'open-alias-shows-target-markdown-read-only',

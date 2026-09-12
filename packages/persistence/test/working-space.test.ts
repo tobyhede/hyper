@@ -86,7 +86,6 @@ describe('loadWorkingSpace', () => {
       },
       revision: 8n,
       exportedRevision: 5n,
-      initialization: 'created-diagram',
     });
   });
 
@@ -126,13 +125,12 @@ describe('loadWorkingSpace', () => {
       },
     };
 
-    const loaded = await loadWorkingSpace(store, SPACE, () => {
+    await loadWorkingSpace(store, SPACE, () => {
       throw new Error('default adoption must not mint identities');
     });
 
     expect(committed?.document.diagrams).toEqual(existing.document.diagrams);
     expect(committed?.document.defaultDiagram).toBe(DIAGRAM);
-    expect(loaded).not.toHaveProperty('initialization');
   });
 
   it('does not write a Space that already has a durable default Diagram', async () => {
@@ -256,7 +254,6 @@ describe('loadWorkingSpace', () => {
     expect(commits).toBe(2);
     expect(loaded).toMatchObject({
       revision: 9n,
-      initialization: 'created-diagram',
       snapshot: { document: { title: 'Renamed while opening' } },
     });
   });

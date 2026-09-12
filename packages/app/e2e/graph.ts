@@ -169,7 +169,7 @@ export function graphMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Active Graph: /);
 }
 
-/** The Space cluster's disclosure: New Space, Copy link and Exit Space. */
+/** The Space cluster's disclosure: Copy link and Exit Space. */
 export function spaceMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Space: /);
 }
@@ -251,18 +251,15 @@ export function presentControl(page: Page): Locator {
 }
 
 /** The kinds the Dock offers, named as their controls announce them. */
-export type ThingKindName = 'Markdown Thing' | 'Space Thing' | 'Alias';
+export type ThingKindName = 'Markdown Thing' | 'Space Thing';
 
 /**
  * One kind's Create control, which is also what reports whether creating is
- * available at all — every peer is withdrawn by the same fact.
+ * available at all — both peers are withdrawn by the same fact.
  *
  * **The default answers the availability question and nothing else.** Asking
- * "can a Thing be created" may use any peer, because `createDisabled` withdraws
- * all three together. An assertion about *which* control — focus after a
- * cancelled pane, most of all — has to name its kind: each peer carries its own
- * continuation address, so a defaulted call there reads as passing while the
- * caret sits on a neighbour. Two tests were caught by exactly that.
+ * "can a Thing be created" may use either peer, because `createDisabled`
+ * withdraws them together; an assertion about *which* control names its kind.
  */
 export function createThingControl(page: Page, kind: ThingKindName = 'Markdown Thing'): Locator {
   return dock(page).getByRole('button', { name: `Create ${kind}` });
@@ -271,8 +268,10 @@ export function createThingControl(page: Page, kind: ThingKindName = 'Markdown T
 /**
  * Create a Thing of one kind, from its own control in the Things cluster.
  *
- * The three kinds are peers with no disclosure in front of them, so this is one
- * press whichever kind is asked for.
+ * The two kinds are peers with no disclosure in front of them and each completes
+ * its Edit on the press (ADR 0088), so this is one press whichever kind is
+ * asked for. An Alias is not here: it is created from the Thing it points at,
+ * through that Thing's own command menu.
  */
 export async function createThing(page: Page, kind: ThingKindName): Promise<void> {
   await createThingControl(page, kind).click();

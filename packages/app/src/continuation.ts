@@ -46,14 +46,15 @@ export type ContinuationTarget =
  * unmounts and re-registers leaves the module holding a stale element. The
  * adapter resolves each of these against `data-continuation-control`.
  *
- * **One address per creating kind, because there is one control per kind.**
- * This was a single `add-thing`, which was right while the three kinds sat
- * behind one `+` and a cancelled pane could only be returned to that trigger.
- * The Dock now draws the kinds as peers, so a cancelled Alias has a control of
- * its own to go back to and returning it to a neighbour would be the caret
- * landing on a command the author did not use. The union is the two kinds that
- * *open* a pane (`ThingCreationKind`): a Markdown Thing completes its Edit on
- * activation and so is never somewhere to come back from.
+ * **One address, and it is a destination rather than a return.** This was the
+ * two creation panes' return addresses, `'create-alias'` and
+ * `'create-space-thing'` — where the caret went when a pane was cancelled. ADR
+ * 0088 retired both panes, so there is nothing left to come back *from*: every
+ * Thing creation completes its Edit on activation and continues at the Thing it
+ * made, which is a canvas target. What replaced them is the one chrome
+ * continuation the Dock still owes: Add Diagram creates an empty Diagram and
+ * selects it, and what an author does with a brand-new Diagram is say what it
+ * is for, so the caret lands in its name (`.scratch/command-dock/issues/13`).
  *
  * **There was a third kind here, `sidebar-row`, and it is gone with the surface
  * it named.** It existed because a Diagram or Graph rename was one draft shared
@@ -65,7 +66,7 @@ export type ContinuationTarget =
  * to address (`components/CommandDock.tsx`). Renaming it would have been a name
  * for a thing that no longer exists.
  */
-export type ContinuationControl = 'create-alias' | 'create-space-thing';
+export type ContinuationControl = 'diagram-name';
 
 export interface PendingContinuation {
   readonly target: ContinuationTarget;
