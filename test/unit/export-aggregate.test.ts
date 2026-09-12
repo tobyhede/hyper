@@ -367,6 +367,25 @@ describe('canonical export', () => {
     await expect(readFile(join(authored, 'notes.md'), 'utf8')).resolves.toBe('# Notes\n');
   });
 
+  /*
+   * Write removes exactly what read scans. A lowercase UUID name is what a
+   * previous export would have used, but without `space.json` discovery would
+   * not scan it — so it is not a Space directory, and prune must not treat the
+   * name as enough.
+   */
+  it('leaves a UUID-named directory that holds no space.json', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    await exportTo(repository, destination);
+    const authored = join(destination, 'c0000000-0000-4000-8000-0000000000aa');
+    await mkdir(authored);
+    await writeFile(join(authored, 'notes.md'), '# Notes\n');
+
+    await exportTo(repository, destination);
+
+    await expect(readFile(join(authored, 'notes.md'), 'utf8')).resolves.toBe('# Notes\n');
+  });
+
   /**
    * An uninitialized repository has no Meta Space, so there is no aggregate to
    * write and no directory whose absence would be a defect — the answer is a

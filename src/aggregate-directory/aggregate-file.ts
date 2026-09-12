@@ -286,27 +286,25 @@ const directoryExists = async (path: string): Promise<boolean> => {
 /**
  * Drop Space directories the Aggregate no longer holds.
  *
- * A directory named for a Space Id is one a previous export wrote, so a Space
- * deleted since then has to leave with it — otherwise the next import reads the
- * deletion back as a Space that still exists. Everything else the destination
- * carries is left alone: a directory this export did not name and cannot have
- * written is the author's, and re-export preserves it.
+ * Write removes exactly what read scans: a child holding `space.json`. A Space
+ * deleted since the last export has to leave with it — otherwise the next
+ * import reads the deletion back as a Space that still exists. A UUID-named
+ * directory without `space.json` is not a scan hit, so it stays.
  *
- * `spaceDirectoryId` is what "cannot have written" means, and the canonical
- * lower-case spelling it insists on is load-bearing here: removal is recursive,
- * and `z.string().uuid()` alone would accept an upper-cased name this exporter
- * never writes — an author's own directory, destroyed for looking like ours.
+ * `spaceDirectoryId` is still what "a previous export wrote this" means for a
+ * scanned directory, and the canonical lower-case spelling it insists on is
+ * load-bearing here: removal is recursive, and `z.string().uuid()` alone would
+ * accept an upper-cased name this exporter never writes — an author's own
+ * directory, destroyed for looking like ours.
  */
 export const pruneObsoleteSpaceDirectories = async (
   directory: string,
   keep: ReadonlySet<UUID>,
 ): Promise<void> => {
-  const entries = await readdir(directory, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const id = spaceDirectoryId(entry.name);
+  for (const child of await discoverSpaceDirectories(directory)) {
+    const id = spaceDirectoryId(basename(child));
     if (id === undefined || keep.has(id)) continue;
-    await rm(join(directory, entry.name), { recursive: true, force: true });
+    await rm(child, { recursive: true, force: true });
   }
 };
 
