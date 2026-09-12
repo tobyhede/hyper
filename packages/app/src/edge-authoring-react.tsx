@@ -236,7 +236,7 @@ export function useEdgeAuthoring({
    *
    * Feeds `ThingNode`'s reveal and `isConnectableEnd` so a refused target stays
    * invisible and unsnappable for the whole drag, matching `isValidConnection`
-   * rather than lighting every card and only failing at release.
+   * rather than lighting every Thing and only failing at release.
    */
   const mayOfferConnectionEnd = useCallback((thingId: ThingId): boolean => {
     const { draft } = latest.current.authoring.getState();

@@ -2215,9 +2215,8 @@ test('drawing between existing Things persists one active-Graph Edge and selects
 
   await connectHandles(page, sourceHandle, targetHandle, async () => {
     // Seeking handles show only on near, eligible Things — here the drop target
-    // under the pointer — not on every Thing in the Diagram (ADR 0033 treatment
-    // refined under connection-handle-proximity/01). A neighbour inside the
-    // proximity magnet may also seek; lighting *every* card is the regression.
+    // under the pointer — not on every Thing in the Diagram (ADR 0089). A neighbour inside the
+    // proximity magnet may also seek; lighting *every* Thing is the regression.
     await expect(target.locator('.rf-thing-node__inner')).toHaveAttribute(
       'data-connection-seeking',
       'target',

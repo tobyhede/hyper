@@ -14,8 +14,8 @@ for the gesture under `edgeEligibility`. Anchors still render on every Thing
   canvas coordinates; radius **R = 80**. Over the body the distance is 0.
 - A Thing `edgeEligibility` refuses (e.g. `edge-already-exists`) shows no seeking
   handles — same as far away. `isValidConnection` remains the release gate.
-- No new ADR: ADR 0033’s “every card” line is historical UI treatment; update
-  `rendering.md`, tests and this ticket.
+- ADR 0089 records the proximity∩eligibility reveal and refines ADR 0033 /
+  ADR 0087; `rendering.md`, tests and this ticket match it.
 
 **Out of scope:** Changing snap `connectionRadius`, Alt/Option empty-drop, or
 anchor geometry.
