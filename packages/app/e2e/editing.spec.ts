@@ -125,7 +125,7 @@ async function dragEndpointTo(
   }
 }
 
-/** Drag one endpoint onto a Thing's authoring target handle. */
+/** Drag one endpoint onto a Thing's seeking-end authoring handle. */
 async function reconnectOnto(
   page: Page,
   edge: Locator,
@@ -138,12 +138,15 @@ async function reconnectOnto(
   await page.mouse.down();
   try {
     await page.mouse.move(from.x + 12, from.y, { steps: 3 });
-    // Target handles appear only once React Flow has really started the
-    // connection, so this gate is what stops a release that ends a drag which
-    // never began being reported as a missing Edit later.
-    await expect(targetHandle).toHaveCSS('opacity', '1');
+    // Eligibility arms `connectableend` once the reconnect drag has begun;
+    // seeking-end *visibility* waits until the pointer is within product
+    // proximity of the Thing (connection-handle-proximity/01). Hidden handles
+    // keep `pointer-events: none`, so Playwright `hover` cannot arm them —
+    // move by coordinates onto the drop handle first (same as `connectHandles`).
     await expect(targetHandle).toHaveClass(/connectableend/);
-    await targetHandle.hover();
+    const drop = await boxOf(targetHandle, 'the reconnect drop handle');
+    await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 6 });
+    await expect(targetHandle).toHaveCSS('opacity', '1');
     expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
   } finally {
     await page.mouse.up();
