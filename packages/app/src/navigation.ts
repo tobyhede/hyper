@@ -164,8 +164,12 @@ function outgoingEdgesFrom(
  * Read off the Diagram rather than decided a second time. Which Graphs a Diagram
  * draws is the Diagram's own answer, and a Navigation that computed its own
  * would disagree with it the moment the two sets differ again.
+ *
+ * Exported for the same reason it is not recomputed here: Space Authoring asks
+ * it of a snapshot a coordinated recovery replaced, and a second membership test
+ * written there would be the disagreement this comment already forbids.
  */
-const diagramShowsGraph = (resolved: ResolvedDiagram, graphId: GraphId): boolean =>
+export const diagramShowsGraph = (resolved: ResolvedDiagram, graphId: GraphId): boolean =>
   resolved.diagram.graphs.some((graph) => graph.id === graphId);
 
 /**

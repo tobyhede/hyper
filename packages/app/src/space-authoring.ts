@@ -31,6 +31,7 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import { nextGraphColor } from './colors';
+import { diagramShowsGraph } from './navigation';
 import type { Navigation, NavigationState } from './navigation';
 import {
   updatePositionedDiagram,
@@ -973,10 +974,62 @@ export function createSpaceAuthoring({
     install(merged);
   };
 
+  /**
+   * Bring Navigation back in step with a working snapshot this module did not
+   * write.
+   *
+   * The sibling of `reconcilePlacement`, and owed for the same reason. Every
+   * other replacement of the working snapshot answers the Active Graph as it
+   * installs — a completed Edit resolves the pair before `continueInDiagram`,
+   * and `acceptStoredSpace` re-opens Navigation on the Space it accepted. The
+   * coordinated Space Thing lifecycle is the exception: its recovery restores
+   * *every participant's* snapshot (`session-registry.ts`), and only the Space
+   * whose conflict the author answered had a `SpaceAuthoring` to re-open. A
+   * second open Space rolled back past a Graph it held locally went on naming
+   * that Graph as active, and nothing corrected it.
+   *
+   * **Re-resolving here is not the repair `continueInDiagram` refuses.** That
+   * call declines to invent an Active Graph because its caller states one and is
+   * held to it, and because inventing one would interrupt a traversal of the
+   * Graph that was active. Neither holds here: no caller stated anything — the
+   * Space was replaced out from under this one — and the Graph the traversal
+   * belonged to is the Graph that is gone. `selectDiagram` is what says so, the
+   * same operation an author spends to land on a Diagram's own Active Graph, and
+   * it drops out of presentation because there is nothing left to present.
+   *
+   * Membership is asked of `diagramShowsGraph` rather than decided again, which
+   * is the rule that function's own comment states.
+   */
+  const reconcileNavigation = (): void => {
+    // A snapshot that no longer passes intake has no Diagram to reconcile
+    // against, exactly as above — and saying so is no more this function's job
+    // than it is `reconcilePlacement`'s.
+    let resolved: ResolvedDiagram;
+    try {
+      resolved = selectedResolvedDiagram();
+    } catch {
+      return;
+    }
+    const { activeGraphId, selectedDiagramId } = navigation.getState();
+    if (activeGraphId !== null && diagramShowsGraph(resolved, activeGraphId)) return;
+    navigation.selectDiagram(selectedDiagramId);
+  };
+
+  /**
+   * One publication for both reconciliations, rather than one each.
+   *
+   * `reconcilePlacement` writes through `install`, which does not publish, so
+   * this used to publish itself. `reconcileNavigation` writes through Navigation,
+   * whose own notification would publish a second time — with a placement
+   * already reconciled and an Active Graph not yet, which is the part-way state
+   * `installTogether` exists to keep nobody reading.
+   */
   const unsubscribeSession = session.subscribe(() => {
     if (installing !== 0) return;
-    reconcilePlacement();
-    publish();
+    installTogether(() => {
+      reconcilePlacement();
+      reconcileNavigation();
+    });
   });
   const unsubscribeNavigation = navigation.subscribe(() => {
     if (installing === 0) publish();
