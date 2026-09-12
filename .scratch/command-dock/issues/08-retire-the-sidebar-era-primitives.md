@@ -75,7 +75,7 @@ ticket states for itself: retiring a registry primitive is a foundation decision
 and taking these two is a decision of its own. Deleting `insetEnd` would take the
 `padding-inline-end` rule in `styles.css` with it.
 
-**That decision of its own is `16-retire-the-registry-drawer-and-the-yielded-strip.md`,
+**That decision of its own is `22-retire-the-registry-drawer-and-the-yielded-strip.md`,
 and not this ticket.** This section is the handoff — what fell out and why — and
 a resolved ticket cannot be scanned for as work. `10` originally wrote that this
 ticket "owns taking it"; it does not, and `10` now points at `16` too. Every

@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Tags: release/v1
 Blocked by: `command-dock/07`
-Related: `architecture-review/17` (resolved) — that ticket collapsed Card
+Related: `architecture-review/23` (resolved) — that ticket collapsed Card
 creation into one reducer, and the third pane kind this ticket was written to
 add landed with it: `packages/app/src/card-creation.ts:33` is
 `CardCreationKind = 'alias' | 'space'` (PR #157). So the structure and its first
@@ -77,7 +77,7 @@ theoretical: the delete confirmation this ticket owns is an `AlertDialog` inside
 `mobile-sidebar.spec.ts`, which `command-dock/07` rewrites. Both would be built
 and then rebuilt.
 
-**Four of six criteria were already met.** PR #157 (`architecture-review/17`)
+**Four of six criteria were already met.** PR #157 (`architecture-review/23`)
 collapsed Card creation into one reducer and the kind selection came with it, so
 the `Related:` sentence claiming this ticket "adds a third creation pane kind"
 described work that had already merged — `card-creation.ts:33` names both

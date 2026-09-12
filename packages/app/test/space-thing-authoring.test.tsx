@@ -323,6 +323,10 @@ function mount(
 
 const thingsOf = (session: SpaceSession) => session.getState().working.things;
 
+/** The canvas node one Thing is drawn as, which is how a caret is placed by id. */
+const nodeFor = (id: UUID): HTMLElement | null =>
+  document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
+
 /** The Space Things `Home` holds, in authored order. */
 const spaceThingsOf = (session: SpaceSession) =>
   thingsOf(session).flatMap((thing) =>
@@ -470,6 +474,75 @@ describe('Create Space Thing', () => {
   });
 
   /**
+   * **The window between the press and the installed Edit belongs to the press
+   * that opened it.**
+   *
+   * The coordinated Edit lands one await after the gesture, and nothing closes
+   * the surface meanwhile — `createDisabled` answers availability, not
+   * re-entrancy — so a second creation can install inside it. `addThing` is
+   * synchronous and lands immediately, so both Things are new when the Space
+   * Thing's Edit resolves, and a creation that asked *which Things appeared*
+   * would take the earlier array position and open the caret over a Markdown
+   * Thing the author is about to type a Space's name into.
+   *
+   * The lifecycle answers the Thing it made, so the question is never asked.
+   */
+  it('continues in its own Thing when a Markdown Thing lands in the same window', async () => {
+    const { session } = mount();
+    await readyToAuthor();
+
+    await act(async () => {
+      createThing('Space Thing');
+      // Synchronous, and inside the window the coordination is still open for.
+      createThing('Markdown Thing');
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(1));
+    const spaceThing = spaceThingsOf(session)[0]!;
+    const markdown = thingsOf(session).filter(
+      (thing) =>
+        thing.document.kind === 'markdown' && !home.things.some(({ id }) => id === thing.id),
+    );
+    expect(markdown).toHaveLength(1);
+
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveValue('Space 1');
+    expect(nodeFor(spaceThing.id)).toContainElement(editor);
+    expect(markdown[0]?.document.title).toBe('Thing 1');
+    await settled(session);
+  });
+
+  /**
+   * The same window, opened twice by the same command.
+   *
+   * Two presses snapshot the same Things, so a creation reading a before/after
+   * difference re-finds the Thing the *first* press made and continues there —
+   * leaving the second Thing at its minted title with nothing pointing at it.
+   * Both Things carry the same `Space 1` here, because the title is minted at
+   * the press and neither press has installed anything yet, so the id is the
+   * only thing that can tell the two apart. That is the point: it is what the
+   * lifecycle now answers with.
+   */
+  it('continues in its own Thing when a second Space Thing is pressed into the window', async () => {
+    const { session } = mount();
+    await readyToAuthor();
+
+    await act(async () => {
+      createThing('Space Thing');
+      createThing('Space Thing');
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(spaceThingsOf(session)).toHaveLength(2));
+    const second = spaceThingsOf(session)[1]!;
+
+    const editor = await screen.findByRole('textbox', { name: 'Thing title' });
+    expect(nodeFor(second.id)).toContainElement(editor);
+    await settled(session);
+  });
+
+  /**
    * The seeding is a convenience at creation and never a link afterwards: the
    * Thing and the Space it names are separate entities from the moment they
    * exist, and the Thing's Title is the containing Space's to author.
@@ -518,7 +591,7 @@ describe('Create Space Thing', () => {
   /**
    * A lifecycle that changed nothing did not create a Thing.
    *
-   * `SpaceThingLifecycleResult` has three arms and only `refused` says something
+   * `SpaceThingCreationResult` has three arms and only `refused` says something
    * is wrong, so an `unchanged` answered as a creation would open a Title editor
    * over a Thing that was never made. Named the way the other arms are, so the
    * compiler asks again the day a fourth joins the union.

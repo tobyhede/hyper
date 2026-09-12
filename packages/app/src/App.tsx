@@ -58,7 +58,12 @@ import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
 import { DeleteThingConfirmation } from './components/DeleteThingConfirmation';
-import { CommandDock, type DockChrome, type SpaceExitReport } from './components/CommandDock';
+import {
+  CommandDock,
+  type DockChrome,
+  type DockThingKind,
+  type SpaceExitReport,
+} from './components/CommandDock';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
@@ -500,7 +505,6 @@ export const createApp = (
           // `diagram-not-found` on its own account, against the Diagram the
           // coordinated Edit actually sees.
           const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
-          const before = new Set(spaceSession.getState().working.things.map(({ id }) => id));
           const result = await spaceThings.create({
             containingSpaceId: currentSpace().id,
             diagramId: resolved.diagram.id,
@@ -515,13 +519,17 @@ export const createApp = (
           // changed nothing made no Thing, and continuing at one would name an
           // id nothing draws. Not reachable from `create` today.
           if (result.kind === 'unchanged') return;
-          const created = spaceSession.getState().working.things.find(({ id }) => !before.has(id));
-          if (created === undefined) return;
+          // The id the lifecycle minted, not the Thing that appeared. Nothing
+          // closes the window between this press and the installed Edit — a
+          // second creation lands in it synchronously — so "which Thing is new"
+          // answers a different question from "which Thing did this press make",
+          // and the two disagree exactly when it matters.
+          //
           // Nothing bumps the Spaces epoch here: a created Space joins the Meta
           // Space for *every* open Space, so the lifecycle that made it is what
           // announces it (`space-thing-lifecycle.ts`).
           continuation.request({
-            target: { kind: 'thing', thingId: created.id },
+            target: { kind: 'thing', thingId: result.thingId },
             select: true,
             then: 'rename',
           });
@@ -1654,9 +1662,21 @@ export const createApp = (
               },
               // Both kinds complete their Edit on the press (ADR 0089): nothing
               // is chosen first, so there is no pane and nothing to cancel.
+              //
+              // **Each kind names its own press, rather than one arm and a
+              // fall-through.** `THING_KINDS` is the list the cluster draws its
+              // controls from, so a kind added there already has a control, a
+              // glyph and an accessible name whatever this says; an exhaustive
+              // record is what stops it inheriting the Space Thing's press in
+              // silence. ADR 0089 records that a kind which genuinely cannot
+              // complete on activation is a decision refining it — this is where
+              // that decision is asked for.
               onCreate: (kind) => {
-                if (kind === 'markdown') addThing();
-                else createSpaceThing();
+                const create = {
+                  markdown: addThing,
+                  space: createSpaceThing,
+                } satisfies Record<DockThingKind, () => void>;
+                create[kind]();
               },
               createDisabled: !availability.addThing,
             },

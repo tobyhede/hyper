@@ -54,9 +54,12 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [13](issues/13-settle-new-layout-and-new-space-command-outcomes.md) | Settle New Layout and New Space command outcomes | needs-triage |
 | [14](issues/14-audit-canvas-decoration-invalidation-and-active-graph-consistency.md) | Audit canvas decoration invalidation and Active Graph consistency | ready-for-agent |
 | [15](issues/15-settle-the-open-disclosure-treatment.md) | Settle the open-disclosure treatment, which now reaches every ghost trigger | needs-triage |
-| [16](issues/16-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the registry Drawer and the strip the shell yields to it | needs-triage |
 | [17](issues/17-decide-the-button-label-variant.md) | Decide `Button`'s `label` variant, which has no consumer | needs-triage |
 | [18](issues/18-reproduce-the-name-click-that-opens-a-thing.md) | Reproduce the Diagram/Graph name click that opens a Thing | needs-info |
+| [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the registry Drawer and the strip the shell yields to it | needs-triage |
+| [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | needs-triage |
+| [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | needs-triage |
+| [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |
 
 ## Where it stands
 

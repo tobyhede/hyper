@@ -1,5 +1,11 @@
 # Handoff: Issue 05 deepening went wrong, branch is suspect
 
+> **Unnumbered by `tracker-hygiene/01`.** It carried the `05-` prefix while
+> being a handoff *about* issue `05` rather than a second issue `05`, so a bare
+> `design-system-baseline/05` named two files. The number went back to
+> `05-make-the-production-canvas-card-a-design-system-component.md`, which is the
+> ticket; this keeps its own name and both citations of it were followed.
+
 Written by Claude (Sonnet 5) after being stopped mid-correction by the human
 (Toby) on 2026-08-21, following a report of "multiple regressions and lost
 card states, colors etc." in the running app. This document is for whoever

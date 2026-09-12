@@ -1,14 +1,17 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
-import type {
-  SpaceThingLifecycleResult,
-  SpaceThingTargetUnavailableReason,
-} from './space-thing-lifecycle';
+import type { SpaceThingRefusal, SpaceThingTargetUnavailableReason } from './space-thing-lifecycle';
 import { failureMessage } from './failure-message';
 
-/** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
-export type SpaceThingRefusal = Extract<SpaceThingLifecycleResult, { kind: 'refused' }>['refusal'];
+/**
+ * Why a coordinated Space Thing lifecycle operation refused (ADR 0076).
+ *
+ * Named by the lifecycle now rather than extracted from one of its results: the
+ * three operations no longer share a result type, and a union reachable through
+ * `create` alone would be a second reading of a refusal `delete` can also make.
+ */
+export type { SpaceThingRefusal };
 
 type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };

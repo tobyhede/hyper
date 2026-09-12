@@ -10,6 +10,7 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { spaceRepositoryContract } from '../support/repository-contract';
+import { expectPersisted } from '../support/persistence-contract';
 
 /**
  * Every Hyper row, gone. The same thing `--dangerous-truncate` does, and safe
@@ -315,7 +316,7 @@ describe('PostgresSpaceRepository', () => {
     releaseWinner.resolve(undefined);
     await winner;
 
-    await expect(initializing).resolves.toMatchObject({ kind: 'already-initialized' });
+    expectPersisted(await initializing).toMatchObject({ kind: 'already-initialized' });
   });
 
   it('conflicts when an authored commit wins after replacement reads its baseline', async () => {
@@ -353,7 +354,7 @@ describe('PostgresSpaceRepository', () => {
       kind: 'conflict',
       currentMetaSpaceId: SPACE_ID,
     });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+    expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({
       revision: 1n,
       snapshot: { document: { title: 'Authored winner' } },
     });
@@ -401,7 +402,7 @@ describe('PostgresSpaceRepository', () => {
     // Both replace, and the barrier is what makes that certain: neither could
     // take the lock while the blocking transaction held it, so both had already
     // read the identity they are authorized against by the time it released.
-    await expect(Promise.all([queuedFirst, queuedSecond])).resolves.toMatchObject([
+    expectPersisted(await Promise.all([queuedFirst, queuedSecond])).toMatchObject([
       { kind: 'replaced' },
       { kind: 'replaced' },
     ]);
@@ -448,8 +449,8 @@ describe('PostgresSpaceRepository', () => {
     // it. What this file is here to prove is unchanged — the initialization was
     // *committed* rather than derived per host, which is the revision and the
     // stored Diagram below.
-    expect(first).toMatchObject({ revision: 1n });
-    expect(first?.snapshot.document.diagrams?.[0]).toMatchObject({
+    expectPersisted(first).toMatchObject({ revision: 1n });
+    expectPersisted(first?.snapshot.document.diagrams?.[0]).toMatchObject({
       id: DIAGRAM_ID,
       positions: {},
       activeGraph: GRAPH_ID,
@@ -550,9 +551,9 @@ describe('PostgresSpaceRepository', () => {
     releaseBlocker.resolve(undefined);
     await blocker;
 
-    expect(await committing).toMatchObject({ kind: 'conflict' });
+    expectPersisted(await committing).toMatchObject({ kind: 'conflict' });
     // The writer that did commit is the one still standing.
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+    expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({
       revision: 1n,
       snapshot: { document: { title: 'Moved by the other writer' } },
     });
@@ -648,7 +649,7 @@ describe('PostgresSpaceRepository', () => {
     });
     // The whole commit rolls back, so the Space the loop had already written is
     // left at the revision the losing commit never advanced past.
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 0n });
+    expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({ revision: 0n });
   });
 
   it('commits an authoritative complete snapshot and advances its revision', async () => {
@@ -747,9 +748,9 @@ describe('PostgresSpaceRepository', () => {
 
     const writeRevisions = async () => {
       for (let revision = 1; revision <= 50; revision += 1) {
-        await expect(
-          commitSpace(atRevision(revision), BigInt(revision - 1)),
-        ).resolves.toMatchObject({
+        expectPersisted(
+          await commitSpace(atRevision(revision), BigInt(revision - 1)),
+        ).toMatchObject({
           kind: 'committed',
           revisions: [{ spaceId: SPACE_ID, revision: BigInt(revision) }],
         });
@@ -854,7 +855,7 @@ describe('PostgresSpaceRepository', () => {
       },
     };
 
-    await expect(commitSpace(invalid, 0n)).resolves.toMatchObject({
+    expectPersisted(await commitSpace(invalid, 0n)).toMatchObject({
       kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
@@ -872,7 +873,7 @@ describe('PostgresSpaceRepository', () => {
       things: [...linkedSnapshot.things, otherSnapshot.things[0]!],
     };
 
-    await expect(commitSpace(claimed, 0n)).resolves.toMatchObject({
+    expectPersisted(await commitSpace(claimed, 0n)).toMatchObject({
       kind: 'aggregate-refused',
     });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
@@ -1087,12 +1088,12 @@ describe('PostgresSpaceRepository', () => {
     // written Space by Space, and a refusal cannot leave half of it behind.
     // What still has to hold is the stored side — both seeded Spaces untouched
     // at the revision they were seeded at.
-    await expect(
-      repository.replaceAggregate(
+    expectPersisted(
+      await repository.replaceAggregate(
         { metaSpaceId: SPACE_ID, spaces: [replacement, invalid] },
         SPACE_ID,
       ),
-    ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+    ).toMatchObject({ kind: 'aggregate-refused' });
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot: linkedSnapshot,
       revision: 0n,
@@ -1211,12 +1212,12 @@ describe('PostgresSpaceRepository', () => {
 
     await seed(SPACE_ID, [first, second]);
 
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+    expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({
       snapshot: {
         document: { diagrams: [{ graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] }] },
       },
     });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
+    expectPersisted(await repository.loadSpace(OTHER_SPACE_ID)).toMatchObject({
       snapshot: {
         document: {
           diagrams: [{ graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] }],
@@ -1382,9 +1383,9 @@ describe('PostgresSpaceRepository', () => {
       },
     };
 
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [collidingGraphs] }),
-    ).resolves.toMatchObject({
+    expectPersisted(
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [collidingGraphs] }),
+    ).toMatchObject({
       kind: 'aggregate-refused',
       errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0 }],
     });

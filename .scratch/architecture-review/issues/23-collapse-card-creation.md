@@ -1,5 +1,11 @@
 # Collapse Card creation into one module
 
+> **Renumbered from `17` by `tracker-hygiene/01`.** It shared that number with
+> `17-the-browser-location-is-one-module.md`, and a bare `architecture-review/17`
+> could not be resolved. `17` stayed with the browser-location ticket because ten
+> live citations across `18` and `19` navigate by it; the two citations of this
+> one — both in `v1-release/03` — were followed to `23`.
+
 Status: resolved
 Tags: release/v1, Improvement
 Blocked by: none — `entity-url-addressability/07` delivered the second creation surface

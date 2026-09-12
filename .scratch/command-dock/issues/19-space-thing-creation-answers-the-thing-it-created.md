@@ -1,6 +1,6 @@
 # 19 — Space Thing creation answers the Thing it created
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1
 Blocked by: nothing. `13` landed the command this is about (`da24496c`, fixed up in `b8de678b`).
 
@@ -56,12 +56,48 @@ and not this ticket's: the Things list names the Thing after the Space the
 reader just picked (ADR 0083), so it has somewhere to have come from in a way a
 minted `Space N` does not. Thread the id; leave the continuation alone.
 
-- [ ] The Space Thing lifecycle's success arm carries the created Thing's id for
+- [x] The Space Thing lifecycle's success arm carries the created Thing's id for
       the operations that create one, and does not exist on the one that does not
-- [ ] `createSpaceThing` continues at the id the lifecycle answered, and the
+- [x] `createSpaceThing` continues at the id the lifecycle answered, and the
       before/after set difference is gone
-- [ ] A test fails without the change: a second creation installed while a Space
+- [x] A test fails without the change: a second creation installed while a Space
       Thing creation is in flight leaves the caret in the Space Thing, and the
       other Thing keeps its own title
-- [ ] The same holds for two Space Thing creations pressed into one window
-- [ ] `pnpm verify` and `pnpm e2e` green; `pnpm e2e:ladle` if a story changes
+- [x] The same holds for two Space Thing creations pressed into one window
+- [x] `pnpm verify` and `pnpm e2e` green; no story changed
+
+## What was built
+
+`SpaceThingLifecycleResult` is gone, split into `SpaceThingCreationResult`
+(`{ kind: 'completed'; thingId }`) and `SpaceThingDeletionResult`
+(`{ kind: 'completed' }`) over a shared `SpaceThingRefusal` and a shared
+unsettled pair. The refusal union is named once and exported, rather than
+extracted back out of whichever result a reader happened to have — `delete` can
+make the same refusals and no longer shares a result to extract them from.
+
+Both creating bodies build their completion where they mint the id, on the one
+path that returns a change list. `completedCreation` is what turns "no completion
+and no refusal" into a throw rather than a third outcome: every path that returns
+without an id assigns its refusal first, so there is nothing honest for that case
+to say, and answering `unchanged` would name an outcome neither operation
+produces.
+
+### Three questions asked while building it
+
+**Where the id comes from.** `newId()`, injected at `registry.spaceThings(newId)`
+per ADR 0016 — the same source the Diagram and Graph of a `link`'s target come
+from. Nothing new is minted; the value simply stopped being thrown away.
+
+**Whether the press is a complete round trip. It is not, and deliberately so.**
+`coordinateSpaceThingLifecycle` resolves from the `installed()` callback, which
+fires once every participant has published its coordinated commit and *before*
+`await backend.commit(...)`. So the caret lands in a Thing whose durable write is
+still in flight, and a later conflict or commit failure reaches the author through
+the persistence channel rather than through this promise. That is ADR 0089's
+optimistic half and the existing test above pins it.
+
+**The transaction boundary.** `create` is one: the candidate aggregate is validated
+whole, then a single `backend.commit` carrying the containing Space's update and
+the new Space's creation. `link` is two — the target's initialization is its own
+durable single-Space commit issued inside `derive`, which `session-registry.ts`
+records as deliberately non-atomic and idempotent on retry.

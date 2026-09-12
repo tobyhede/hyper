@@ -178,6 +178,16 @@ const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
 const THING_KINDS = ['markdown', 'space'] as const;
 
 /**
+ * A kind the Create cluster draws a control for.
+ *
+ * Named rather than written inline at the prop, because it is the type the
+ * *dispatch* is held to: `App.tsx` answers every press through a record over
+ * this, so a kind added above has to say what pressing it does before the
+ * application compiles.
+ */
+export type DockThingKind = (typeof THING_KINDS)[number];
+
+/**
  * Every disclosure opens the same way, whichever primitive draws it.
  *
  * A Popover and a Menu are two components because their *content* differs — one
@@ -605,7 +615,7 @@ export interface DockThings {
    * split button with a hidden default. This is *Create*, distinct from adding
    * an existing Thing, which is what the surface above is for.
    */
-  readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
+  readonly onCreate: (kind: DockThingKind) => void;
   /** Whether creating is available at all — presenting and an open pane both withdraw it. */
   readonly createDisabled: boolean;
 }
@@ -1229,7 +1239,7 @@ function CreatePeers({
   onCreate,
   disabled,
 }: {
-  readonly onCreate: (kind: (typeof THING_KINDS)[number]) => void;
+  readonly onCreate: (kind: DockThingKind) => void;
   readonly disabled: boolean;
 }) {
   return (
