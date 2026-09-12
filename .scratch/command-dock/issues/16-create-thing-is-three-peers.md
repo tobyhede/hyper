@@ -4,6 +4,28 @@ Status: ready-for-human
 Tags: release/v1
 Blocked by: nothing. Built on `feat/create-thing-peers` (PR #195).
 
+**Amended by ticket `13` and ADR 0088: the peers are now two, not three.** Create
+Alias left the Dock — an Alias is always created from an existing Thing, which
+supplies the Target — so the Things cluster draws `markdown` and `space` only.
+Nothing in the reasoning below is withdrawn: the kind is still chosen at
+creation, so none of the peers is a default, and the packing measurements and
+their costs stand as taken. Two things below are now false and are kept as the
+record of what was true:
+
+- **The asymmetry table is gone.** All three kinds complete their Edit on
+  activation (ADR 0088), so the completes-versus-opens-a-pane split that this
+  ticket's whole argument turns on no longer exists. Option E, rejected here as
+  "the close second" for mapping onto that asymmetry, has nothing left to map
+  onto.
+- **"One continuation address per creating kind" is reversed.** There are no
+  panes to return from, so `ContinuationTarget`'s `control` arm keeps no
+  creating-kind names at all — it carries the New Diagram rename address
+  instead.
+
+The parity claims keep their names. `command-dock-creates-each-kind-in-one-press`
+is now true of every kind in the product rather than of one, which is the
+stronger claim, and it is checked over two controls.
+
 **What was decided:** the three Thing kinds are peer controls on the Dock
 surface rather than three rows behind a `+`, and on a side edge the Things
 cluster packs onto one row instead of taking a verb track per command.
