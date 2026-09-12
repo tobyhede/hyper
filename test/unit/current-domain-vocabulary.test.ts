@@ -1920,6 +1920,14 @@ const RETIRED_SPACE_NAME = new RegExp(
     // `package.json` and is the foreign sense.
     `\\b${RETIRED_SPACE_UPPER}S?\\b`,
     `${RETIRED_SPACE_UPPER}_[A-Z]`,
+    // ...and the screaming constant the retired word *ends*, which neither arm
+    // above can see: the first needs a boundary an underscore never yields, the
+    // second a segment after the word. The lookbehind is the one screaming-case
+    // name that keeps the foreign sense — pnpm's name for the file that lists
+    // the packages — in the idiom `(?<!GROUP)` uses in the Diagram block above.
+    // `\\b` would not do for the ending either, a trailing `_SEGMENT` putting no
+    // boundary after the word.
+    `(?<!MONOREPO)_${RETIRED_SPACE_UPPER}S?(?![A-Za-z])`,
     // The kebab-case compounds: refusal codes, completion kinds, test ids and
     // CSS blocks. A hyphen is not a word character, so every arm above reads
     // straight past them, which is what the Diagram and Thing blocks learned.
@@ -2037,6 +2045,8 @@ describe('a Space is named once (ADR 0010)', () => {
       `const stored${RETIRED_SPACE_CAPITAL}s = await readAll();`,
       `const ${RETIRED_SPACE_UPPER}_VERSION = 1;`,
       `const ${RETIRED_SPACE_UPPER} = 'space.json';`,
+      `const SPACE_${RETIRED_SPACE_UPPER} = 'hyper.json';`,
+      `const DEFAULT_${RETIRED_SPACE_UPPER}S_BY_ID = new Map();`,
       `refusal: { code: '${RETIRED_SPACE}-not-found' },`,
       `return 'space-must-keep-${RETIRED_SPACE}';`,
       `<div data-testid="space-${RETIRED_SPACE}">`,
@@ -2074,9 +2084,12 @@ describe('a Space is named once (ADR 0010)', () => {
       `// A matching directory is only a package if it carries a ${RETIRED_SPACE}.`,
       `Upgrade both consuming ${RETIRED_SPACE}s together and re-run the suite.`,
       `const ${RETIRED_SPACE} = readFileSync(join(root, 'package.json'), 'utf8');`,
-      // pnpm's own screaming-case name for the file that lists the packages:
-      // an underscore is a word character, so no boundary lands before it.
+      // pnpm's own screaming-case name for the file that lists the packages,
+      // which is the trailing-segment shape exactly — so it is the lookbehind
+      // that keeps it writable rather than the absent boundary, and this line
+      // is the whole reason that arm carries one.
       `const MONOREPO_${RETIRED_SPACE_UPPER} = /^packages\\/[^/]+\\/package\\.json$/;`,
+      `const MONOREPO_${RETIRED_SPACE_UPPER}S = [rootPackage, appPackage];`,
       // The vocabulary ADR 0010 arrived at.
       `const space = loadSpace(spaceFileSchema.parse(input), thingFiles);`,
       `export type SpaceFile = z.infer<typeof spaceFileSchema>;`,
@@ -2145,10 +2158,30 @@ const RETIRED_AGGREGATE_SENSES = new RegExp(
     // ending so the adjective and the plural are one arm rather than three.
     `[Aa]${keptAggregateTail}[Bb]${RETIRED_BOUNDARY}`,
     `\\b${keptAggregate}[- ]b${RETIRED_BOUNDARY}`,
+    // ...and the same phrase in snake_case, screaming and lower. Added for
+    // symmetry with the root arms below rather than against a site: the
+    // boundary sense named in-code structure and the root sense named a stored
+    // row, so snake_case is the likelier shape for the second — but an
+    // asymmetric guard is one a reader has to remember the asymmetry of, and
+    // the hole is the same hole. No lookahead is needed here, unlike below:
+    // this phrase has no kept verb to tell the retired noun from.
+    `${KEPT_AGGREGATE.toUpperCase()}_B${RETIRED_BOUNDARY.toUpperCase()}`,
+    `${keptAggregate}_b${RETIRED_BOUNDARY}`,
     // The root phrase, in the same shapes. `\\b` after the noun is what keeps
     // the verb phrase out: the participle puts no boundary there.
     `[Aa]${keptAggregateTail}[Rr]${RETIRED_ROOT.slice(1)}s?\\b`,
     `\\b${keptAggregate}[- ]${RETIRED_ROOT}s?\\b`,
+    // ...and the root phrase in snake_case, screaming and lower, which is the
+    // shape the stored sense would come back in: a column name and the constant
+    // that reads it. Deliberately without a leading `\\b`, and with a lookahead
+    // rather than a trailing one: `_` is a word character, so no boundary lands
+    // either side of a middle segment and both the compound arms' capital and
+    // the hyphenated arms' boundary read straight past the whole shape. The
+    // lookahead is where the verb phrase's carve-out moves to in this shape —
+    // `${keptAggregate}_${RETIRED_ROOT}_id` is the retired row name and reports,
+    // `${keptAggregate}_${RETIRED_ROOT}ed_at` is sense 1 and does not.
+    `${KEPT_AGGREGATE.toUpperCase()}_${RETIRED_ROOT.toUpperCase()}S?(?![A-Za-z])`,
+    `${keptAggregate}_${RETIRED_ROOT}s?(?![a-z])`,
   ].join('|'),
 );
 
@@ -2222,7 +2255,13 @@ describe('aggregate names one thing (ADR 0088)', () => {
       `// clear the ${keptAggregate} ${RETIRED_ROOT} before deleting any Space rows`,
       `const ${KEPT_AGGREGATE}R${RETIRED_ROOT.slice(1)} = RepositoryState;`,
       `expect(entries).toContain('${keptAggregate}-${RETIRED_ROOT}');`,
+      `const ${KEPT_AGGREGATE.toUpperCase()}_${RETIRED_ROOT.toUpperCase()} = 'singleton';`,
+      `const ${KEPT_AGGREGATE.toUpperCase()}_${RETIRED_ROOT.toUpperCase()}_ID = row.id;`,
+      `select ${keptAggregate}_${RETIRED_ROOT}_id from repository_state`,
+      `const ${keptAggregate}_${RETIRED_ROOT} = await orm.repositoryState.findFirst();`,
       `the ${keptAggregate}-b${RETIRED_BOUNDARY}y check compares two snapshots of one Space`,
+      `const ${KEPT_AGGREGATE.toUpperCase()}_B${RETIRED_BOUNDARY.toUpperCase()}Y = 'space';`,
+      `const ${keptAggregate}_b${RETIRED_BOUNDARY}y_check = preserves(current, next);`,
     ];
 
     for (const line of retired) {
@@ -2243,6 +2282,10 @@ describe('aggregate names one thing (ADR 0088)', () => {
       // rooting rule in words, and no arm reaches it.
       `Exported the ${keptAggregate} ${RETIRED_ROOT}ed at \${metaSpaceId} to \${destination}`,
       `it('loads the complete ${keptAggregate} ${RETIRED_ROOT}ed at the explicit Meta Space', () => {`,
+      // The verb phrase in the snake_case shape the two underscore arms read:
+      // a lowercase letter after the noun is what tells the participle from the
+      // retired row name there, as the boundary does in every other shape.
+      `const ${keptAggregate}_${RETIRED_ROOT}ed_at = metaSpaceId;`,
       `export interface Loaded${KEPT_AGGREGATE} { metaSpaceId: UUID; spaces: LoadedSpace[] }`,
       `return { kind: '${keptAggregate}-refused', errors };`,
       `await repository.replace${KEPT_AGGREGATE}(input);`,
