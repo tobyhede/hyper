@@ -97,6 +97,20 @@ Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
 - A behaviour-preserving refactor should leave e2e green **and unchanged**. That is the guard that proves it was behaviour-preserving.
 - Prove a bug fix against the defect, not only against a test written afterwards to pass. A test you wrote to match your fix will pass whether or not the fix addresses the real problem — reproduce the broken behaviour first, then show it gone.
 
+## What a comment may assert
+
+A comment may only assert what its writer has checked. Ticket 14 shipped three that had not been, and every one was verifiable in the minute it would have taken to open the file named in it.
+
+**A negative result belongs in a ticket, never in source.** "X was tried and reverted because it broke Y" forecloses the work, reads as settled because it is in the source, and is never re-run. `App.tsx`'s `entityActions` carried one — six embedded-Diagram tests said to fail under `useMemo` — copied from a handoff bullet into a ticket into the source, and it did not reproduce. Put the finding in `.scratch/<feature>/`, dated and attributed, where a reader can see it is a report.
+
+**No measurement in source.** Commit the instrumentation or put the number in the ticket with the method that produced it. A count whose bench is gone cannot be refreshed or falsified.
+
+**A claim about another module names the test that holds it.** That family of test already exists for exactly this: `test/unit/command-surface-sharing.test.ts`, `codemirror-encapsulation.test.ts`, `graph-package-surface.test.ts`, `current-domain-vocabulary.test.ts`. "`EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring` without `thingEntityActions`" is one line of test; written as prose instead, its second clause was false. A subagent's summary is a report, not a fact — read the file before it becomes a sentence in the source.
+
+**A decision called load-bearing needs something that fails when it is reversed.** This ticket documented its reconciliation order that way; swapping the two calls broke none of the five cases, because they all read Navigation, which the repair fixes either way.
+
+None of these is lintable. They hold in review, so a review of this repo should ask of any comment in the diff whether the code supports what it says.
+
 ## Skills
 
 Vendored skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.

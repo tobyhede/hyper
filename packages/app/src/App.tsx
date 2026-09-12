@@ -910,45 +910,79 @@ export const createApp = (
     );
 
     /**
-     * **Rebuilt every render, and memoizing it is not the fix.**
+     * **Stable, and the churn it replaced was paying for nothing.**
      *
      * `thingRailActions` below hangs off this and is a dependency of the
      * node-decoration memo in `canvas-thing-authoring.ts`, so a fresh builder
-     * rebuilds every node object, re-renders every `ThingNode` and runs
-     * `spaceEntityActions` once per Thing — on renders that touch nothing on the
-     * canvas, the Things list opening among them. `SpaceCanvas`'s own note
-     * measures that and calls the widening harmless.
+     * rebuilt every node object, re-rendered every `ThingNode` and ran
+     * `spaceEntityActions` once per Thing on every render of this component.
      *
-     * Wrapping both builders in `useMemo` was tried and reverted: with the
-     * identity stable, six embedded-Diagram tests stop drawing their target at
-     * all. That memo's dependency list is therefore *incomplete*, and the churn
-     * has been standing in for a dependency nobody has named — so stabilising
-     * this quietly converts a performance cost into a correctness one. The fix
-     * the note already names is a per-node cache inside the memo, which does
-     * not depend on this identity; taking it belongs with that dependency list,
-     * not here.
+     * **What used to stand here was hearsay, and it did not reproduce.** The
+     * comment claimed that memoizing these builders makes six embedded-Diagram
+     * tests stop drawing their target at all, and that the decoration memo's
+     * dependency list is therefore incomplete. Neither half survived being
+     * checked (`.scratch/command-dock/issues/14`). The audit stabilised these
+     * three builders two ways — exhaustive dependencies, and then `[]` with the
+     * state read live, so the identities are constant for the component's whole
+     * life — and ran the app suite serially both times: 895 tests pass, the
+     * sixteen in `space-thing-embedded-diagram.test.tsx` among them. The six
+     * failures were timeouts on a machine running several suites at once, where
+     * the *unmodified* tree failed twelve.
+     *
+     * Two things make the claim structurally impossible as well as unobserved.
+     * Every identifier the decoration memo reads is in its dependency list, and
+     * the one input whose contents can change behind a stable identity —
+     * `spaceThingTargets`, which reads another Space live — is refreshed at its
+     * source, `open-spaces.ts` minting a fresh `entries` array on every session
+     * change of every open Space. And an embedded Diagram never receives this
+     * builder at all: `EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring`
+     * without `thingEntityActions`, so the one arm of the decoration that reads
+     * this identity is the one arm its nodes do not have. (It runs the rest of
+     * that memo like any other canvas and publishes the decorated nodes — what
+     * it lacks is the commands, not the decoration.)
+     *
+     * Halving is what was measured, at mount: with the identity stable, the
+     * builder runs half as often, the decoration memo runs half as often and
+     * half as many node objects are rebuilt, because most of those runs were
+     * re-running over a `nodes` array whose identity had not moved. Selection
+     * and drag are unchanged, `nodes` moving there anyway. The counts behind
+     * that are in `.scratch/command-dock/issues/14` with the instrumentation
+     * they came from, rather than frozen here where nothing can re-derive
+     * them — which is the failure this comment's predecessor is an example of.
+     *
+     * **The per-node cache the old note named is not this fix.** Keyed on the
+     * builder it never hits while the builder churns; keyed without it, it hands
+     * back a decorated node carrying a builder closed over a stale Space. The
+     * builder identity was the input, and the input is what is fixed here.
      */
-    const entityActions = spaceEntityActions({
-      spaceId: renderedSpace.id,
-      spaceTitle: renderedSpace.title,
-      onCopy: copyProductDestination,
-      // No Rename item: the Dock renames a Diagram and a Graph by clicking the
-      // name it already draws, so a menu row that opened the same editor would
-      // be the second path to one command this arrangement keeps removing. The
-      // Thing rail is this builder's other consumer and a Thing has no rename here
-      // either — its title is renamed in place on the canvas.
-      onRename: null,
-      onDeleteDiagram: availability.entityEdits
-        ? (diagramId) => {
-            const result = authoring.complete({ kind: 'deleted-diagram', diagramId });
-            setDiagramManagementRefusal(result.kind === 'refused' ? result.refusal : null);
-            // Answered rather than swallowed: the refusal set above renders in
-            // the shell's standing notice, and the answer is what tells a caller
-            // whether the Delete had a canvas result at all.
-            return result.kind === 'completed';
-          }
-        : null,
-    });
+    const entityActions = useMemo(
+      () =>
+        spaceEntityActions({
+          spaceId: renderedSpace.id,
+          spaceTitle: renderedSpace.title,
+          onCopy: copyProductDestination,
+          // No Rename item: the Dock renames a Diagram and a Graph by clicking the
+          // name it already draws, so a menu row that opened the same editor would
+          // be the second path to one command this arrangement keeps removing. The
+          // Thing rail is this builder's other consumer and a Thing has no rename here
+          // either — its title is renamed in place on the canvas.
+          onRename: null,
+          onDeleteDiagram: availability.entityEdits
+            ? (diagramId) => {
+                const result = authoring.complete({ kind: 'deleted-diagram', diagramId });
+                setDiagramManagementRefusal(result.kind === 'refused' ? result.refusal : null);
+                // Answered rather than swallowed: the refusal set above renders in
+                // the shell's standing notice, and the answer is what tells a caller
+                // whether the Delete had a canvas result at all.
+                return result.kind === 'completed';
+              }
+            : null,
+        }),
+      // `authoring` is the composition's, closed over rather than rendered, so it
+      // is not a dependency a render can move. `thingDeletion` says the same of
+      // `spaceThings`.
+      [renderedSpace.id, renderedSpace.title, copyProductDestination, availability.entityEdits],
+    );
 
     /**
      * Deleting one Thing, answering a refusal in words rather than a code.
@@ -970,26 +1004,29 @@ export const createApp = (
      * Thing's own rail runs it on the press. Which kind of Thing it is stays a
      * decision made once, here, for both.
      */
-    const thingDeletion = (thing: Thing): (() => string | null | Promise<string | null>) =>
-      thing.kind === 'space'
-        ? async () => {
-            const result = await spaceThings.delete({
-              containingSpaceId: renderedSpace.id,
-              thingId: thing.id,
-            });
-            if (result.kind === 'refused') return describeSpaceThingRefusal(result.refusal);
-            // The other Edit that changes the Meta Space's set: this deletion
-            // can destroy the target Space and every Space below it that
-            // nothing else references, so a list that was not told goes on
-            // offering a Space that is gone. Announced by the lifecycle for the
-            // same reason creation is — the Space it destroys was offered in
-            // every open Space, not only in this one.
-            return null;
-          }
-        : () => {
-            const result = authoring.complete({ kind: 'deleted-thing', thingId: thing.id });
-            return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-          };
+    const thingDeletion = useCallback(
+      (thing: Thing): (() => string | null | Promise<string | null>) =>
+        thing.kind === 'space'
+          ? async () => {
+              const result = await spaceThings.delete({
+                containingSpaceId: renderedSpace.id,
+                thingId: thing.id,
+              });
+              if (result.kind === 'refused') return describeSpaceThingRefusal(result.refusal);
+              // The other Edit that changes the Meta Space's set: this deletion
+              // can destroy the target Space and every Space below it that
+              // nothing else references, so a list that was not told goes on
+              // offering a Space that is gone. Announced by the lifecycle for the
+              // same reason creation is — the Space it destroys was offered in
+              // every open Space, not only in this one.
+              return null;
+            }
+          : () => {
+              const result = authoring.complete({ kind: 'deleted-thing', thingId: thing.id });
+              return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
+            },
+      [renderedSpace.id],
+    );
 
     /**
      * What a Thing's own rail offers (ADR 0073): the addresses every Thing has,
@@ -1007,51 +1044,60 @@ export const createApp = (
      * permanent address — so nothing here reads `diagram.positions`; which
      * addresses exist is decided from the Diagram by the builder above.
      */
-    const thingRailActions = (thingId: ThingId): readonly EntityActionGroup[] => {
-      const thing = renderedSpace.lookup.thing(thingId);
-      // A node the projection is still drawing for a Thing the working Space no
-      // longer has. No commands rather than commands that name nothing.
-      if (thing === undefined) return [];
-      const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
-      if (!availability.deleteThing) return addresses;
-      const remove = thingDeletion(thing);
-      return [
-        ...addresses,
-        [
-          {
-            id: 'delete-thing',
-            // "Delete Thing", not "Delete Thing <title>": the menu that draws
-            // this item is already named for the Thing it belongs to, and the
-            // Diagram menu's own destructive command is spelled the same way.
-            label: 'Delete Thing',
-            icon: <DeleteIcon />,
-            variant: 'destructive',
-            // **It asks, and the confirmation runs it.** Deleting a Thing is
-            // not undoable in V1, and deleting a Space Thing can take the Space
-            // it references and every Space below it that nothing else
-            // references (ADR 0074) — so the command that used to sit behind
-            // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
-            // at the App root rather than in the menu that armed it, because
-            // the menu closes on the press and would take the question with
-            // it.
-            //
-            // **And it carries no `report`.** An item that names words has
-            // its menu held open and its label swapped to the word its
-            // outcome picks — machinery for a command that *runs* on the
-            // press. This one raises a question, so `done` said "Thing deleted"
-            // beside a dialog still asking whether to, and announced it to a
-            // reader who might then press Cancel. What the deletion did is the
-            // canvas's to report; why it did not is the confirmation's, which
-            // prints it into the shell's standing notice.
-            onSelect: (): EntityActionOutcome => {
-              setThingDeletionRefusal(null);
-              setPendingThingDeletion({ thing, remove });
-              return 'done';
+    const thingRailActions = useCallback(
+      (thingId: ThingId): readonly EntityActionGroup[] => {
+        const thing = renderedSpace.lookup.thing(thingId);
+        // A node the projection is still drawing for a Thing the working Space no
+        // longer has. No commands rather than commands that name nothing.
+        if (thing === undefined) return [];
+        const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
+        if (!availability.deleteThing) return addresses;
+        const remove = thingDeletion(thing);
+        return [
+          ...addresses,
+          [
+            {
+              id: 'delete-thing',
+              // "Delete Thing", not "Delete Thing <title>": the menu that draws
+              // this item is already named for the Thing it belongs to, and the
+              // Diagram menu's own destructive command is spelled the same way.
+              label: 'Delete Thing',
+              icon: <DeleteIcon />,
+              variant: 'destructive',
+              // **It asks, and the confirmation runs it.** Deleting a Thing is
+              // not undoable in V1, and deleting a Space Thing can take the Space
+              // it references and every Space below it that nothing else
+              // references (ADR 0074) — so the command that used to sit behind
+              // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
+              // at the App root rather than in the menu that armed it, because
+              // the menu closes on the press and would take the question with
+              // it.
+              //
+              // **And it carries no `report`.** An item that names words has
+              // its menu held open and its label swapped to the word its
+              // outcome picks — machinery for a command that *runs* on the
+              // press. This one raises a question, so `done` said "Thing deleted"
+              // beside a dialog still asking whether to, and announced it to a
+              // reader who might then press Cancel. What the deletion did is the
+              // canvas's to report; why it did not is the confirmation's, which
+              // prints it into the shell's standing notice.
+              onSelect: (): EntityActionOutcome => {
+                setThingDeletionRefusal(null);
+                setPendingThingDeletion({ thing, remove });
+                return 'done';
+              },
             },
-          },
-        ],
-      ];
-    };
+          ],
+        ];
+      },
+      [
+        renderedSpace,
+        entityActions,
+        selectedDiagram.diagram,
+        availability.deleteThing,
+        thingDeletion,
+      ],
+    );
 
     /**
      * Choosing a Diagram, including the one already drawing.
@@ -1404,11 +1450,26 @@ export const createApp = (
      * does not say so, and a surface that asserted it would be asserting a
      * domain rule from the outside. `null` is drawn as no Dock at all, which is
      * the same answer the canvas gives for a Diagram it cannot resolve.
+     *
+     * **It is the Active Graph or it is nothing — there is no falling back to
+     * the first visible one.** That fallback used to sit here, and what it
+     * bought was a Dock that went on drawing while Navigation named a Graph the
+     * Diagram no longer owned. The cost was not the label: `CommandDock` passes
+     * `graph.active.id` to Delete, Rename and Recolor — the row list only
+     * activates — so Delete Graph reached a Graph `SpaceCanvas`, handed the raw
+     * `activeGraphId`, was not drawing as active, Present was enabled on the
+     * fallback's Edges and did nothing on the real one, and the Dock's Copy link
+     * answered a different URL from the presenting chrome's.
+     *
+     * So the Dock reads exactly what the canvas reads, and the two cannot come
+     * to name different Graphs. The state this used to paper over is the
+     * coordinated recovery's, and it is fixed where it was caused —
+     * `space-authoring.ts`'s `reconcileNavigation` re-resolves the pair when a
+     * snapshot is replaced under it, with a regression at the seam
+     * (`active-graph-after-coordinated-recovery.test.ts`).
      */
     const activeGraph =
-      projection.visibleGraphs.find((graph) => graph.id === activeGraphId) ??
-      projection.visibleGraphs[0] ??
-      null;
+      projection.visibleGraphs.find((graph) => graph.id === activeGraphId) ?? null;
 
     const dockChrome: DockChrome | null =
       activeGraph === null
