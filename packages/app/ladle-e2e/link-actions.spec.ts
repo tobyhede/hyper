@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+/** Canonical Thing address — not the contextual Diagram one. */
+const THING_COPY_LINK = /^Copy Link to Thing(?! in Diagram)/;
+
 /**
  * The entity-actions menu, in a real browser, because jsdom cannot fail this.
  *
@@ -84,7 +87,7 @@ test('a copy command confirms in the rail menu it was pressed in', async ({ page
 
   await page.getByRole('button', { name: 'Actions for Thing Thing 2' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
-  await menu.getByRole('menuitem', { name: 'Copy Link to Thing', exact: true }).click();
+  await menu.getByRole('menuitem', { name: THING_COPY_LINK }).click();
 
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Copied' })).toBeVisible();
@@ -113,7 +116,5 @@ test('a Thing opens the same actions menu from a right click', async ({ page }) 
   // production would supply here holds its two addresses and nothing else.
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: 'Copy Link to Thing in Diagram' })).toBeVisible();
-  await expect(
-    menu.getByRole('menuitem', { name: 'Copy Link to Thing', exact: true }),
-  ).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: THING_COPY_LINK })).toBeVisible();
 });
