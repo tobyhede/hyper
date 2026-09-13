@@ -424,17 +424,18 @@ export interface DockCanvas {
   readonly onSelect: (diagramId: DiagramId) => void;
   /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
   readonly onRename: ((diagramId: DiagramId, title: string) => string | null) | null;
+  /** Create an empty Diagram and select it. */
+  readonly onCreate: () => void;
   /**
-   * Create an empty Diagram, select it, and answer whether the caret moved.
+   * Whether New Diagram's rename continuation landed — read when the menu closes.
    *
    * **The answer is the point.** New Diagram continues in the new Diagram's name,
-   * so this cluster's menu must not take the caret back on close — but only a
-   * completion that actually requested that continuation moved it. Asserting the
-   * move on the press instead left a completion that did neither suppressing the
-   * restoration anyway, and the caret fell to `document.body`. Returning it keeps
-   * the two halves of that decision in one place rather than one per module.
+   * so this cluster's menu must not take the caret back on close — but only once
+   * the rename editor has actually opened. Asking at press time races the
+   * post-selection window where rename is withdrawn; reading here keeps the two
+   * halves of that decision in one place rather than one per module.
    */
-  readonly onCreate: () => boolean;
+  readonly didCreateMoveCaret: () => boolean;
   /**
    * Whether New Diagram may run.
    *
@@ -921,7 +922,6 @@ function DiagramControls({
    * typed. Every other command here is over when it runs and returns the caret
    * the way a menu should.
    */
-  const movedCaret = useRef(false);
   return (
     <ToolbarGroup aria-label="Diagram" className="command-dock__cluster">
       <IdentityName
@@ -952,11 +952,7 @@ function DiagramControls({
         align={DISCLOSURE_ALIGN}
         sideOffset={DISCLOSURE_SIDE_OFFSET}
         className={`nokey ${DISCLOSURE_WIDTH}`}
-        restoresFocusOnClose={() => {
-          const moved = movedCaret.current;
-          movedCaret.current = false;
-          return !moved;
-        }}
+        restoresFocusOnClose={() => !canvas.didCreateMoveCaret()}
         trigger={
           <ChoiceMenuTrigger
             id={triggerId}
@@ -976,7 +972,7 @@ function DiagramControls({
           className="gap-2"
           disabled={canvas.createDisabled}
           onClick={() => {
-            movedCaret.current = canvas.onCreate();
+            canvas.onCreate();
           }}
         >
           <PlusIcon />

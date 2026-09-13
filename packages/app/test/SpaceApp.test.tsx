@@ -1089,6 +1089,37 @@ describe('Space app Things list', () => {
   });
 
   /**
+   * **New Diagram must land its rename once the name control is activatable again.**
+   *
+   * The press is valid while the canvas is editable; selecting the new empty
+   * Diagram clears the projection and withdraws rename until placement returns.
+   * A continuation that spends on a suppressed click on the withdrawn control
+   * leaves no editor and strands the caret on `document.body` when the menu
+   * suppresses focus restoration.
+   */
+  it('opens the new Diagram name editor once rename is available after creation, without stranding focus', async () => {
+    const base = snapshot('Space', 'Thing', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceThings } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
+      (app) => render(app),
+    );
+
+    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
+    openDiagramMenu('Diagram');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Diagram' }));
+
+    const editor = await screen.findByRole('textbox', { name: 'Diagram name' });
+    await waitFor(() => expect(document.activeElement).toBe(editor));
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  /**
    * **The last Diagram cannot be deleted, and the Dock says so before the press.**
    *
    * ADR 0079 keeps a Space on at least one Diagram. The Sidebar let the command

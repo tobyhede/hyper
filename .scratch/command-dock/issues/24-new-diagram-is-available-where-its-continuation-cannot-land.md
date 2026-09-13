@@ -1,6 +1,6 @@
 # 24 — New Diagram is available where its continuation cannot land
 
-Status: ready-for-agent
+Status: in-progress
 Tags: release/v1
 Blocked by: nothing. Surfaced reviewing `19`–`21`; the code is `13`'s.
 
@@ -66,11 +66,11 @@ above, which still needs a failing test.
    `InlineTitleEditor` from `App`.
 
 - [x] The decision is recorded here
-- [ ] A test fails without the fix: New Diagram creates a Diagram but rename
+- [x] A test fails without the fix: New Diagram creates a Diagram but rename
       cannot land while the name control is withdrawn after selection
-- [ ] `Continuation` / `ChromeContinuation` expose enough for callers to know
+- [x] `Continuation` / `ChromeContinuation` expose enough for callers to know
       whether a chrome continuation landed
-- [ ] `pnpm verify` and `pnpm e2e` green
+- [ ] `pnpm verify` and `pnpm e2e` green (CI)
 
 ## Comments
 
