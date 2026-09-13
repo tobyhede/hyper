@@ -1,5 +1,9 @@
 import { useEffect, useSyncExternalStore, type RefObject } from 'react';
-import type { Continuation } from '../continuation';
+import {
+  chromeControlStaysOwed,
+  type Continuation,
+  type ContinuationControl,
+} from '../continuation';
 
 /**
  * The half of {@link Continuation} that can reach the Space chrome.
@@ -23,9 +27,15 @@ import type { Continuation } from '../continuation';
 const elementOf = (root: ParentNode, name: string): HTMLElement | null =>
   root.querySelector<HTMLElement>(`[data-continuation-control="${CSS.escape(name)}"]`);
 
+const controlActivatable = (element: HTMLElement): boolean =>
+  element.getAttribute('aria-disabled') !== 'true' &&
+  !(element instanceof HTMLButtonElement && element.disabled);
+
 export function ChromeContinuation({
   continuation,
   within,
+  chromeRenameReady,
+  onLand,
 }: {
   readonly continuation: Continuation;
   /**
@@ -41,6 +51,17 @@ export function ChromeContinuation({
    * render before this effect can run anyway.
    */
   readonly within: RefObject<HTMLElement | null>;
+  /**
+   * Whether a chrome rename may begin — the same answer {@link authoringAvailability}
+   * gives the Dock's name controls. Re-run when this flips true so a continuation
+   * requested while placement is pending can land once rename is back.
+   */
+  readonly chromeRenameReady: boolean;
+  /**
+   * Called once when a chrome continuation actually runs — after a pressable
+   * control was found and the rename or focus action was dispatched.
+   */
+  readonly onLand?: (control: ContinuationControl) => void;
 }) {
   const { pending } = useSyncExternalStore(continuation.subscribe, continuation.getState);
 
@@ -48,17 +69,24 @@ export function ChromeContinuation({
     if (pending === null) return;
     const { target } = pending;
     if (target.kind !== 'control') return;
-    // Chrome falls through: it is drawn already, so an element this cannot find
-    // is gone rather than on its way, and nothing is owed for a wait with no
-    // end.
-    continuation.take();
+
     const element = elementOf(within.current ?? document, target.name);
-    if (element === null) return;
+    const waits = chromeControlStaysOwed(pending);
+
+    if (element === null) {
+      if (!waits) continuation.take();
+      return;
+    }
+
+    if (waits && (!chromeRenameReady || !controlActivatable(element))) return;
+
+    continuation.take();
     // `then` is read rather than assumed: the module's four values are one type
     // for both adapters, so an arm this cannot honour — `reveal` has no meaning
     // off the canvas — is spent quietly instead of silently taking the caret.
     if (pending.then === 'focus') {
       element.focus();
+      onLand?.(target.name);
       return;
     }
     /*
@@ -74,8 +102,11 @@ export function ChromeContinuation({
      * Base UI suppresses activation for a disabled item, so an unavailable
      * name simply does not open, which is the same answer the reader gets.
      */
-    if (pending.then === 'rename') element.click();
-  }, [pending, continuation, within]);
+    if (pending.then === 'rename') {
+      element.click();
+      onLand?.(target.name);
+    }
+  }, [pending, continuation, within, chromeRenameReady, onLand]);
 
   return null;
 }

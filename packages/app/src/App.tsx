@@ -639,6 +639,11 @@ export const createApp = (
      * canvas's own title editing beside it (`authoring-availability.ts`).
      */
     const [editingChromeTitle, setEditingChromeTitle] = useState(false);
+    /** Set when New Diagram's chrome rename continuation actually lands. */
+    const createDiagramMovedCaret = useRef(false);
+    const onChromeContinuationLand = useCallback(() => {
+      createDiagramMovedCaret.current = true;
+    }, []);
     const thingIsOpen = Object.values(selectedDiagram.diagram.positions).some(
       (at) => at?.open === true,
     );
@@ -1557,17 +1562,15 @@ export const createApp = (
                 const result = authoring.complete({ kind: 'created-diagram' });
                 setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
                 setDiagramManagementRefusal(null);
-                // The caret moved only if a continuation was requested, which is
-                // what the Dock's menu reads to decide whether to restore focus
-                // to its trigger (`DockCanvas.onCreate`).
-                if (result.kind !== 'completed') return false;
+                createDiagramMovedCaret.current = false;
+                if (result.kind !== 'completed') return;
                 continuation.request({
                   target: { kind: 'control', name: 'diagram-name' },
                   select: false,
                   then: 'rename',
                 });
-                return true;
               },
+              didCreateMoveCaret: () => createDiagramMovedCaret.current,
               // The Dock's Delete names the Diagram its cluster is showing, which is
               // the drawing one — resolved from the id it hands back rather than
               // closed over, so the command and the name it carries cannot come apart.
@@ -1783,7 +1786,12 @@ export const createApp = (
           </>
         }
       >
-        <ChromeContinuation continuation={continuation} within={graphArea} />
+        <ChromeContinuation
+          continuation={continuation}
+          within={graphArea}
+          chromeRenameReady={availability.chromeTitleEdit}
+          onLand={onChromeContinuationLand}
+        />
         {/* **How this Space's last commit went, for a test rather than a reader.**
             The Command Dock draws nothing at all while saving is working — a
             commit settles faster than a cue can be read, so a permanent slot

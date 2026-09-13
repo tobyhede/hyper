@@ -3,7 +3,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import { staysOwed, type PendingContinuation } from '../src/continuation';
+import { chromeControlStaysOwed, staysOwed, type PendingContinuation } from '../src/continuation';
 
 /**
  * Where an Edit continues, as transitions rather than as a tree.
@@ -195,11 +195,31 @@ describe('the wait policy', () => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(true);
   });
 
-  it.each([
-    ['the canvas', { kind: 'canvas' } as const],
-    ['a control', { kind: 'control', name: 'diagram-name' } as const],
-  ])('falls through on %s', (_name, target) => {
+  it.each([['the canvas', { kind: 'canvas' } as const]])('falls through on %s', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(false);
+  });
+
+  it.each([
+    ['rename', 'rename' as const],
+    ['focus', 'focus' as const],
+  ])('keeps a chrome control owed while %s is waiting to land', (_name, then) => {
+    expect(
+      chromeControlStaysOwed({
+        target: { kind: 'control', name: 'diagram-name' },
+        select: false,
+        then,
+      }),
+    ).toBe(true);
+  });
+
+  it('falls through on a chrome control whose action needs no press', () => {
+    expect(
+      chromeControlStaysOwed({
+        target: { kind: 'control', name: 'diagram-name' },
+        select: false,
+        then: 'nothing',
+      }),
+    ).toBe(false);
   });
 
   /** A Thing waits whatever it was going to do there — Add to Diagram is a `focus`. */

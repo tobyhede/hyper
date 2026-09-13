@@ -141,6 +141,17 @@ const NONE: ContinuationState = { pending: null };
 export const staysOwed = ({ target }: PendingContinuation): boolean =>
   target.kind === 'thing' || target.kind === 'edge';
 
+/**
+ * Whether a chrome control continuation waits for activatability.
+ *
+ * A control is drawn before a continuation can reach it, but rename and focus
+ * require a pressable control — withdrawn while placement is pending is
+ * unavailable rather than gone, and spending on a suppressed click lands
+ * nowhere.
+ */
+export const chromeControlStaysOwed = ({ target, then }: PendingContinuation): boolean =>
+  target.kind === 'control' && (then === 'rename' || then === 'focus');
+
 export function createContinuation({
   authoring,
   reportObserverError = (error) => console.error('Continuation observer failed', error),
