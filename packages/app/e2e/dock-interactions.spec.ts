@@ -51,6 +51,46 @@ for (const delay of [0, 120]) {
   }
 }
 
+/**
+ * Ticket `18` could not obtain a reproduction. The Open command is not on the
+ * Dock name: a pointer Open is the Thing's own control (ADR 0036), and a
+ * keyboard Open sits on React Flow's wrapper and declines a `button` or
+ * textbox (`SpaceCanvas` `NOT_A_CANVAS_COMMAND`). These are the gestures `11`
+ * never tried — no menu, a Thing already selected, Enter completing the
+ * rename, and activating the name from the keyboard.
+ */
+test('renaming a Space, Diagram or Graph from the Dock does not Open a selected Thing', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const thing = nodeByTitle(page, 'A');
+  await expect(thing).toBeVisible();
+  await settled(page);
+  await thing.click();
+
+  for (const kind of ['Space', 'Diagram', 'Graph'] as const) {
+    await dock(page)
+      .getByRole('button', { name: new RegExp(`^Rename ${kind}:`) })
+      .click();
+    const editor = page.getByRole('textbox', { name: `${kind} name`, exact: true });
+    await expect(editor).toBeFocused();
+    await editor.press('Enter');
+    await expect(editor).toHaveCount(0);
+    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  }
+
+  for (const key of ['Enter', ' '] as const) {
+    await dock(page)
+      .getByRole('button', { name: /^Rename Diagram:/ })
+      .focus();
+    await page.keyboard.press(key);
+    const editor = page.getByRole('textbox', { name: 'Diagram name', exact: true });
+    await expect(editor).toBeFocused();
+    await editor.press('Escape');
+    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  }
+});
+
 test(
   'a side-edge Dock keeps names and opens disclosures into the canvas',
   {
