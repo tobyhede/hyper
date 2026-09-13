@@ -64,7 +64,6 @@ import {
   Toolbar,
   ToolbarButton,
   ToolbarGroup,
-  buttonVariants,
   cn,
   thingKindName,
 } from '@project/ui';
@@ -359,11 +358,9 @@ function PeerCreate({ record }: { readonly record: (line: string) => void }) {
  * **C — the peers, grouped behind one `+`.** A non-interactive `+` labels the
  * group; the three glyphs after it are the commands.
  *
- * This is the "grouped with a `+` action" reading, and the `+` is a `label`
- * variant rather than a fourth button on purpose: `Button`'s `label` variant
- * exists for exactly this — the shared box and type without button semantics or
- * hover feedback — so the mark qualifies the group without adding a target that
- * does nothing.
+ * This is the "grouped with a `+` action" reading, and the `+` is a mark
+ * rather than a fourth button on purpose: a real `<button>` here would be a
+ * target that does nothing. The mark qualifies the group without adding one.
  *
  * It answers B's objection at one control's width: the glyphs keep meaning
  * "kind" and the `+` in front of them supplies the verb once.
@@ -371,14 +368,12 @@ function PeerCreate({ record }: { readonly record: (line: string) => void }) {
 function GroupedPeerCreate({ record }: { readonly record: (line: string) => void }) {
   return (
     <span className="cdp-set-verb ml-1 inline-flex items-center gap-px rounded-[7px] border border-border/70 bg-secondary/40 p-px">
-      {/* A span through `buttonVariants`, which is what the `label` variant is
-          documented for: the shared box and type with no button semantics and no
-          hover feedback. A real `<button>` here would be a target that does
-          nothing, and `aria-hidden` on a focusable element is worse than the
-          target. */}
+      {/* A mark, not a command. A real `<button>` here would be a target that
+          does nothing, and `aria-hidden` on a focusable element is worse than
+          the target. */}
       <span
         aria-hidden="true"
-        className={cn(buttonVariants({ variant: 'label', size: 'icon' }), 'size-6')}
+        className="inline-flex size-6 cursor-default items-center justify-center text-muted-foreground"
       >
         <PlusIcon />
       </span>

@@ -1,45 +1,125 @@
 # 24 — New Diagram is available where its continuation cannot land
 
-Status: needs-triage
+Status: ready-for-agent
 Tags: release/v1
 Blocked by: nothing. Surfaced reviewing `19`–`21`; the code is `13`'s.
 
-**What to build:** New Diagram is either unavailable, or its continuation
-actually opens the name it promised. Today there is a window where it is
-available, completes, reports that the caret moved, and leaves the caret on
-`document.body`.
+**What to build:** Finish the continuation module's chrome half so New Diagram's
+rename step actually opens, and so "the caret moved" means the continuation
+**landed** rather than merely that one was **requested**.
 
 ## Why
 
-Two availabilities disagree about the same fact.
-`authoring-availability.ts`'s `createDiagram` omits `editable`;
-`chromeTitleEdit` requires it. So whenever the canvas has no live projection —
-`hasThingsOnCanvas === false`, which includes the window after `selectDiagram`
-clears `projection`, and a failed placement — New Diagram is enabled while the
-Diagram name button is rendered `disabled`.
+New Diagram completes its Edit, then continues in the new Diagram's inline name
+editor — the same rename a reader gets by clicking the Diagram name in the Dock
+(ticket `13`). That second step is a chrome continuation (`control` /
+`diagram-name`, `then: 'rename'`), not a second command.
 
-`ChromeContinuation` spends the continuation by calling `element.click()` on
-that button. Base UI's `useButton` early-returns its `onClick` for a `disabled`
-control, so no rename editor opens. `DockCanvas.onCreate` has already answered
-`true` — meaning "the caret moved" — because it *requested* a continuation
-rather than because one landed, so `finalFocus` returns `false`, Base UI skips
-returning focus to the chevron, and the caret is left nowhere.
+The failure is a **post-create** window, not a missing Availability gate at press
+time. `createDiagram` already requires `chromeTitleEdit`, which includes
+`editable`. The live race is:
+
+1. New Diagram runs while the canvas is editable.
+2. The Edit selects the new empty Diagram; `selectDiagram` clears the live
+   projection.
+3. With no projection, `chromeTitleEdit` goes false — the Diagram name control
+   is present but withdrawn (`onRename === null`, `aria-disabled`).
+4. `onCreate` returns `true` because it *requested* a continuation.
+5. `ChromeContinuation` calls `take()` and `element.click()` on the disabled
+   button; Base UI suppresses activation, so no `InlineTitleEditor` opens.
+6. The Diagram menu's `restoresFocusOnClose` skips returning focus to its
+   trigger, and the caret is left on `document.body`.
+
+`CanvasContinuation` already waits until its target is drawable (`staysOwed`).
+`ChromeContinuation` does not wait until its target is **activatable** — it
+assumes a drawn control is pressable, which is false while rename is withdrawn.
 
 **The evidence that the window is real rather than theoretical** is in
-`SpaceApp.test.tsx`: it waits for `selected-canvas` to become available before
-pressing New Diagram. That wait is stepping over this.
+`SpaceApp.test.tsx`: the happy-path test waits for `selected-canvas` to become
+available before pressing New Diagram. That wait steps over the initial
+placement-pending window; it does not cover the post-`selectDiagram` window
+above, which still needs a failing test.
 
-## The shape of the fix
+## What was decided
 
-Either is defensible and they are different decisions:
+**Complete the existing continuation abstraction — do not add a parallel one.**
 
-- Have `ChromeContinuation` report whether it landed, so `onCreate` answers what
-  happened rather than what it asked for. This is the general fix — the same
-  claim is made by every chrome continuation.
-- Gate `createDiagram` on `editable`, so the two availabilities agree and the
-  window closes. Smaller, and it withdraws a command that would otherwise work
-  for everything except its continuation.
+1. **`ChromeContinuation` reports whether the continuation landed.** Do not
+   `take()` and declare success when `click()` on a withdrawn control did
+   nothing. Mirror `CanvasContinuation`'s discipline: spend only when the action
+   actually ran, or keep the continuation owed until the control is activatable
+   again (same render cycle or a later one after projection returns).
 
-- [ ] The decision is recorded here
-- [ ] A test fails without the fix: New Diagram pressed with no live projection
+2. **`onCreate` returns what happened, not what was asked for.** The Diagram
+   menu's `restoresFocusOnClose` / `movedCaret` handshake reads "did the caret
+   move?" — that must mean the rename editor opened, for every chrome
+   continuation, not only New Diagram.
+
+3. **Reject gating alone.** Tightening `createDiagram` further does not close
+   the post-create window: the press is valid while `editable` is true; the
+   rename target becomes unavailable *because* the Edit succeeded. Withdrawing
+   New Diagram entirely would punish a command that works except for its
+   continuation.
+
+4. **Keep the simulated press.** Opening rename by pressing the name control —
+   the same path a reader takes — stays deliberate; do not fork a second way into
+   `InlineTitleEditor` from `App`.
+
+- [x] The decision is recorded here
+- [ ] A test fails without the fix: New Diagram creates a Diagram but rename
+      cannot land while the name control is withdrawn after selection
+- [ ] `Continuation` / `ChromeContinuation` expose enough for callers to know
+      whether a chrome continuation landed
 - [ ] `pnpm verify` and `pnpm e2e` green
+
+## Comments
+
+> *This was generated by AI during triage.*
+
+## Agent Brief
+
+**Category:** bug
+**Summary:** Chrome continuations must land or stay owed; New Diagram must not
+claim the caret moved when rename did not open.
+
+**Current behavior:**
+After New Diagram completes, a chrome continuation requests rename on
+`diagram-name`. `ChromeContinuation` spends immediately and simulates a click
+even when the name control is withdrawn. Base UI ignores the click. `onCreate`
+returns `true` anyway, so the Diagram menu suppresses focus restoration and the
+caret ends on `document.body`.
+
+**Desired behavior:**
+When a chrome continuation targets rename, it opens the inline Diagram name editor
+and focuses it — or stays pending until the control is activatable, then opens
+it. Callers that report "caret moved" (Diagram menu focus restoration) do so
+only when rename actually opened. If rename never opens, focus restoration
+behaves as for any other menu item that did not move the caret.
+
+**Key interfaces:**
+- `Continuation` / `ChromeContinuation` — landing vs spending; when to keep a
+  `control` target owed while the addressed button is present but not activatable
+- `DockCanvas.onCreate` return type (`boolean`) — must reflect landing, not
+  request
+- `ChoiceMenu` / `restoresFocusOnClose` — continues to read the caller's answer;
+  the caller must become honest
+- `authoringAvailability` / `chromeTitleEdit` — no further gating change required
+  for this ticket; the bug is post-create, not pre-press
+
+**Acceptance criteria:**
+- [ ] A test fails on the current tree: New Diagram pressed when rename is
+      withdrawn after diagram selection leaves no Diagram name editor and does
+      not strand focus on `document.body` once fixed
+- [ ] After the fix, New Diagram opens the Diagram name editor with the caret in
+      it (existing happy-path assertion in `SpaceApp.test.tsx` still passes)
+- [ ] `onCreate` returns `false` when rename did not open; menu focus restoration
+      returns to the trigger in that case
+- [ ] The continuation is not spent on a suppressed click on a withdrawn control
+- [ ] `pnpm verify` and `pnpm e2e` green
+
+**Out of scope:**
+- Changing `InlineTitleEditor`, `ToolbarButton`, or other `@project/ui` primitives
+- Replacing continuation with direct rename state from `App`
+- Withdrawing New Diagram at press time as the sole fix
+- Graph or Space name continuations (only `diagram-name` exists today; the
+  landing contract should generalise to future chrome controls)
