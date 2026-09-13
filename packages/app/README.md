@@ -3,107 +3,59 @@
 `fixture/` is the complete `hyper.json` aggregate `pnpm dev:fixture` loads, and
 the one Playwright drives. It is a **test bed**, not the product demo — the
 narrative demo lives in `example/` and is kept as a single Space directory.
-Tests assert *behaviour* against this shape; nothing asserts on thing prose
-beyond the few markers listed below.
 
 This file sits here rather than in `fixture/` on purpose. A space is a directory
 (ADR 0020) and every `.md` beside its space file is a thing, so a `README.md` in
 there would be scanned as one and fail to parse for want of frontmatter.
 
-The fixture is Meta-rooted. `hyper.json` names the Diagram fixture as Meta;
-ordinary Spaces live in sibling `<space-uuid>/` directories. Each Space is a
-directory: `space.json` holding structure — `version`, `id`, `title`,
-`diagrams` and `defaultDiagram` — and one markdown file per thing, either
-beside it or under `things/`. The Meta Space uses both locations (`a.md` at the
-top, the rest in `things/`) so the two-location scan is exercised by the Space
+The fixture is Meta-rooted. `hyper.json` names Meta; ordinary Spaces live in
+sibling `<space-uuid>/` directories. Each Space is a directory: `space.json`
+holding structure — `version`, `id`, `title`, `diagrams` and `defaultDiagram` —
+and one markdown file per thing, either beside it or under `things/`. The Meta
+Space uses both locations so the two-location scan is exercised by the Space
 the app actually opens.
 
-Meta still opens on Collection 1. Linked Spaces is a third Diagram of Space
-Things: Presentation walkthrough (which itself names Deep dive and Authoring
-notes) and Deep dive (also named from Meta, the converging reference). Depth
-from Meta through the walkthrough to Authoring notes is three. Cycle refusal
-is an aggregate-intake test, not an invalid fixture.
+`defaultDiagram` is the opening canvas (ADR 0079). A selected Diagram draws only
+the Graphs it owns. Cycle refusal is an aggregate-intake test, not an invalid
+fixture. Current titles, membership and counts live in the directory and in the
+tests that read it — `packages/app/test/space-files.test.ts`,
+`test/unit/tracked-fixture-aggregate.test.ts`, the e2e helpers in
+`e2e/graph.ts`. This file does not repeat them.
 
-Two **disconnected collections** on Meta, sharing no things, authored as two
-separate bands — and, because a Graph is a nested owned value of the
-Diagram that holds it (ADR 0040), **two Diagrams** for the e2e canvas, plus
-Linked Spaces:
+Meta holds three Diagrams: two disconnected collections that share no Things —
+one of them the opening canvas, with several Graphs over a shared spine and a
+member no Edge reaches — and a third Diagram of Space Things. That third
+Diagram is how ordinary Spaces hang off Meta: a converging reference, depth
+three, every ordinary Space reachable. Positions are **authored** (ADR 0014).
 
-```
-Collection 1   Long   A → B → C → D → A′
-               Mid    A → B → C → D
-               Short  A → B → C
-               T      a member no Edge reaches
-Collection 2   Echo   E → F → G → H → E′
-Linked Spaces  Catalogue   Presentation walkthrough → Deep dive
-```
+`example/` is one connected collection, so its Graphs are owned by a **single**
+Diagram. Nothing renders it, so its positions are a plain deterministic grid.
 
-Each Diagram's position keys are its Thing membership, and every Edge it owns is
-closed over that membership — which is why the split follows the collections
-rather than being drawn anywhere else. Membership is the wider of the two: `T`
-is a member of Collection 1 that no Edge reaches, which is what Add Thing leaves
-behind and what `packages/app/test/space-files.test.ts` counts rather than
-forbids. Between them the two hold every Thing once, so nothing is left over and
-nothing is in both.
+The fixture's shape exists to exercise the behaviours the e2e suite covers:
 
-Their positions are **authored**, as placement always is (ADR 0014): a plain
-hand-set grid, two rows of a Diagram apiece, so selecting a Diagram draws its Things
-where the space file put them and first paint moves nothing.
-
-`defaultDiagram` names **Collection 1**, so that is the Diagram the fixture opens
-on (ADR 0079). A selected Diagram draws only the Graphs it owns, so Collection 2
-is off the canvas until it is selected.
-
-`example/` is one connected collection of seven Things, so its three Graphs are
-owned by a **single** Diagram. Nothing renders it, so its positions are a plain
-deterministic grid.
-
-Each collection returns to its start via an **alias** (`A′` of `A`, `E′` of `E`).
-That deliberately exercises alias rendering while keeping this fixture acyclic
-and laid out as clean forward paths. Graphs themselves may contain cycles; an
-alias is useful when the author wants a separately titled and positioned Thing
-showing the same content (ADR 0009, ADR 0032).
-
-Every Graph here is a **line**: each non-terminal Thing has one Edge out. That is the
-degenerate graph, not a separate kind (ADR 0024), and it keeps the fixture's
-overlay counts easy to read. Forks and merges are legal and are covered by unit
-and property tests rather than here.
-
-Between them the shape exercises every behaviour the e2e suite covers:
-
-- **Multiple graphs over a shared spine (collection 1).** Long, Mid, Short run
-  down `A → B → C`, then Mid and Long carry on. Each has its own in/out handle on
-  every shared thing, so the three paths stay separable — the compatible-overlay
-  case.
-- **Independent collections / disconnected components.** Two bands, no edge
-  between them.
-- **Aliases on a Graph (ADR 0009).** `A′` / `E′` show `A` / `E`'s content under
-  their own titles and at distinct positions.
-- **Open shows source (ADR 0011).** `A`'s body carries `**A**`, so opening it can
-  prove the Markdown markers survive rather than rendering bold.
-- **A heading in a body is just a heading (ADR 0020).** `C`'s body opens with
-  `# Where Short ends`. Under the old split — title in the space file, body in a
-  separate markdown file — a leading heading repeated the title and rendered
-  twice, and a rule forbade it. Now that both live in one file, a title and a
+- **Multiple graphs over a shared spine.** Several Graphs share Things. Each
+  Thing declares four shared anchors, one on each side — graph-independent
+  (ADR 0087) — so overlapping Graphs stay told apart by colour.
+- **Independent collections.** Two bands, no Edge between them.
+- **Aliases on a Graph (ADR 0009).** An Alias shows its Target's content under
+  its own Title at a distinct position, keeping the fixture acyclic. Graphs
+  themselves may contain cycles.
+- **Open shows source (ADR 0011).** A body carries a Markdown marker so opening
+  it can prove the source survives rather than rendering.
+- **A heading in a body is just a heading (ADR 0020).** Title and a leading
   body heading are two different things and both are drawn once. Asserted while
   presenting, which is the one surface that draws markdown *rendered* (ADR 0011).
-- **Open off the selected Graph.** `E` is in the other collection, so selecting a
-  collection-1 Graph and opening `E` proves any thing opens regardless of the
-  selection.
-- **Scroll inside the frame (issue 05).** `D` is long enough to overflow the 16:9
-  panel at a small viewport.
-- **A Title on more than one line (ADR 0083).** `T`'s Title is three lines — one
-  of each role — so the Thing front's Title ladder is drawn by the space the app
-  and Playwright actually load, and a regression in projection or clamping shows
-  up on screen rather than only in a unit test.
-- **A Diagram member no Edge reaches.** `T` again: it is placed on Collection 1
-  and joins none of its Graphs, so it draws no graph handles and carries no
-  Edges. That is the state Add Thing and the Things list both author.
-- **Overlay counts.** Collection 1 and Collection 2 are unchanged: 11 things on
-  those two Diagrams, 13 edges (4 + 3 + 2 + 4), 6 Things on Collection 1.
-  Linked Spaces adds two Space Things and one Catalogue Edge. A *selected*
-  Diagram draws only the Graphs it owns: 9 edges for Collection 1, 4 for
-  Collection 2.
+- **Open off the selected Graph.** A Thing on the other collection still opens.
+- **Scroll inside the frame (issue 05).** One body is long enough to overflow
+  the 16:9 panel at a small viewport.
+- **A Title on more than one line (ADR 0083).** One Title is three lines so the
+  Title ladder is drawn by the Space the app and Playwright actually load.
+- **A Diagram member no Edge reaches.** Placed on the opening Diagram, on none
+  of its Graphs — the state Add Thing and the Things list both author.
+- **Linked Spaces.** Space Things on Meta, with a converging reference and
+  depth three, so Enter, switching and presentation have ordinary Spaces to
+  reach.
 
-The counts above are shape-dependent: change a Graph and the e2e counts change
-with it, deliberately.
+Graphs here are **lines**: each non-terminal Thing has one Edge out. That is the
+degenerate graph, not a separate kind (ADR 0024). Forks and merges are legal
+and are covered by unit and property tests rather than here.

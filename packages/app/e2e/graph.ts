@@ -64,9 +64,10 @@ export const FIXTURE_THING_COUNT =
  * Diagram, because a Graph is a nested owned value of the one that holds it (ADR
  * 0040) and the fixture Meta Space spreads five Graphs over three Diagrams.
  *
- * This is the count across every Diagram the fixture holds. A *selected*
- * Diagram draws only the Graphs it owns, so it is not the number to assert
- * after a conversion.
+ * This is the count across every Diagram the fixture Meta Space holds. A
+ * *selected* Diagram draws only the Graphs it owns, so it is not the number
+ * to assert after a conversion. Ordinary Spaces in the same aggregate are
+ * never opened here.
  */
 export const FIXTURE_EDGE_COUNT =
   // SAFETY: `space.json` is this repo's own tracked E2E fixture, not user

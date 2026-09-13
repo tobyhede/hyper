@@ -12,19 +12,19 @@ const spaceThingTargets = (things: readonly Thing[]): readonly UUID[] =>
 /**
  * Longest Space-Thing walk from Meta, and every ordinary Space that walk reaches.
  *
- * Depth is the number of Spaces on the longest path, Meta included — Meta → A → B
- * is depth three. A Space is reachable when some path of Space Things starting
+ * Depth is the number of Spaces on the longest chain, Meta included — Meta → A → B
+ * is depth three. A Space is reachable when some chain of Space Things starting
  * at Meta names it.
  */
-const walkFromMeta = (metaId: UUID, targetsBySpace: ReadonlyMap<UUID, readonly UUID[]>) => {
+const traverseFromMeta = (metaId: UUID, targetsBySpace: ReadonlyMap<UUID, readonly UUID[]>) => {
   const reached = new Set<UUID>([metaId]);
   let depth = 1;
-  const visit = (spaceId: UUID, pathLength: number): void => {
-    if (pathLength > depth) depth = pathLength;
+  const visit = (spaceId: UUID, chainLength: number): void => {
+    if (chainLength > depth) depth = chainLength;
     for (const target of targetsBySpace.get(spaceId) ?? []) {
       if (reached.has(target)) continue;
       reached.add(target);
-      visit(target, pathLength + 1);
+      visit(target, chainLength + 1);
     }
   };
   visit(metaId, 1);
@@ -73,11 +73,11 @@ describe('tracked fixture aggregate', () => {
       }
     }
 
-    const { depth, reached } = walkFromMeta(META_ID, targetsBySpace);
+    const { depth, reached } = traverseFromMeta(META_ID, targetsBySpace);
     const ordinary = intake.aggregate.spaces.filter((space) => space.id !== META_ID);
 
-    expect(ordinary.length).toBeGreaterThanOrEqual(3);
-    expect(depth).toBeGreaterThanOrEqual(3);
+    expect(ordinary.length).toBe(3);
+    expect(depth).toBe(3);
     expect(ordinary.every((space) => reached.has(space.id))).toBe(true);
     expect([...inbound.values()].some((count) => count >= 2)).toBe(true);
 
