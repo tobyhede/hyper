@@ -4,6 +4,7 @@ import {
   createThing,
   dragBy,
   expectThingFillsNode,
+  FIXTURE_ORDINARY_SPACE_COUNT,
   nodeByTitle,
   selectCanvas,
   settled,
@@ -198,9 +199,15 @@ test('stops offering a Space the moment the last Space Thing referencing it is d
 
   // The Space went with its last reference, so the cube goes with it — and the
   // count on the toggle agrees, which is the claim the count exists to make.
+  // The fixture already holds ordinary Spaces; deleting Architecture lands
+  // back on those, not on an empty Meta Space.
   const after = await openList();
   await expect(after.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Spaces in this Meta Space, 0' })).toBeVisible();
+  await expect(
+    page.getByRole('button', {
+      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
+    }),
+  ).toBeVisible();
 });
 
 /**
@@ -366,13 +373,18 @@ test('deleting the last Space Thing deletes the Space it referenced', async ({ p
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
 
-  // The Space went with it, so the Things list offers no Space to reference —
-  // which is the only way this surface can see the cascade.
+  // The Space went with it, so the Things list no longer offers Space 1 —
+  // which is the only way this surface can see the cascade. The fixture's
+  // ordinary Spaces remain; the count lands back where this Space started.
   await page.getByRole('button', { name: 'Things' }).click();
   const list = page.getByRole('dialog', { name: 'Things' });
   await expect(list).toBeVisible();
   await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Spaces in this Meta Space, 0' })).toBeVisible();
+  await expect(
+    page.getByRole('button', {
+      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
+    }),
+  ).toBeVisible();
 });
 
 /* -------------------------------------------------------------------------- */

@@ -857,7 +857,7 @@ test(
     // cluster outside it naming the same one (ADR 0053's surviving clause, kept
     // verbatim by ADR 0082; ADR 0079).
     const choices = await diagramChoices(page);
-    await expect(choices).toHaveCount(2);
+    await expect(choices).toHaveCount(3);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
     await page.keyboard.press('Escape');
@@ -1639,6 +1639,12 @@ test(
     await settled(page);
 
     await page.getByRole('button', { name: 'Things' }).click();
+    // Spaces stay offered after a press — placing one authors another Space
+    // Thing, it does not take the Space away — so the loop that empties the
+    // list has to stop looking at that source first. The fixture already
+    // holds ordinary Spaces; leaving them on would never reach the empty
+    // sentence this claim is about.
+    await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
     const choices = page.getByRole('button', { name: /^Add .* to Diagram$/ });
     while ((await choices.count()) > 0) {
       const before = await choices.count();
@@ -3215,7 +3221,7 @@ test('Add Thing names the new Thing in place in the selected Diagram', async ({ 
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(await diagramChoices(page)).toHaveCount(2);
+  await expect(await diagramChoices(page)).toHaveCount(3);
 });
 
 /**

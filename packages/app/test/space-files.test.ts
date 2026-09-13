@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { titleName, uuidSchema } from '@project/core';
 import { loadSpace, type ThingFile } from '@project/graph';
-import fixtureJson from '../fixture/space.json';
+import fixtureJson from '../fixture/00000000-0000-4000-8000-000000000040/space.json';
+import walkthroughJson from '../fixture/00000000-0000-4000-8000-000000000060/space.json';
+import deepDiveJson from '../fixture/00000000-0000-4000-8000-000000000070/space.json';
+import notesJson from '../fixture/00000000-0000-4000-8000-000000000080/space.json';
 import exampleJson from '../example/space.json';
 
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+const WALKTHROUGH_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
+const DEEP_DIVE_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000071');
+const NOTES_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
 
 /**
- * The two spaces on disk, loaded exactly as authored.
+ * The Spaces on disk, loaded exactly as authored.
  *
  * A space is now a directory, not a file (ADR 0020): the space file holds
  * structure, and every thing is a markdown file beside it or under `things/`. So
@@ -15,12 +21,9 @@ const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
  * test that the thing files are still authored correctly — a missing fence or an
  * unquoted title in a thing's frontmatter fails here.
  *
- * Both declare Diagrams, because both hold Graphs and a Diagram is what owns one
- * (ADR 0040). The fixture explicitly opens in Flow; the example still relies on
- * the transitional fallback. That makes the fixture's Space-subject flatten,
- * across two Diagrams, the thing the app and the e2e suite actually exercise. The fixture is separately
- * proven by the app booting; `example/` is dormant and nothing else would notice
- * it breaking.
+ * The tracked fixture is a complete aggregate: Meta is the Diagram fixture, and
+ * the ordinary Spaces hang off it. `example/` is dormant and nothing else would
+ * notice it breaking.
  */
 
 const spaceDirs = import.meta.glob<string>(['../fixture/**/*.md', '../example/**/*.md'], {
@@ -37,18 +40,48 @@ function thingFiles(dir: string): ThingFile[] {
 }
 
 describe.each([
-  // The fixture is two disconnected collections sharing no things, so it splits
-  // into two Diagrams; the example is one connected collection, so its three
-  // Graphs are owned by one.
   [
-    'fixture',
+    'fixture/00000000-0000-4000-8000-000000000040',
     fixtureJson,
     {
-      things: 11,
-      diagrams: 2,
-      graphs: 4,
-      unreached: { 'Collection 1': ['T'], 'Collection 2': [] },
+      things: 13,
+      diagrams: 3,
+      graphs: 5,
+      unreached: { 'Collection 1': ['T'], 'Collection 2': [], 'Linked Spaces': [] },
       defaultDiagram: DIAGRAM_ID,
+    },
+  ],
+  [
+    'fixture/00000000-0000-4000-8000-000000000060',
+    walkthroughJson,
+    {
+      things: 5,
+      diagrams: 1,
+      graphs: 1,
+      unreached: { Walkthrough: ['Authoring notes', 'Deep dive'] },
+      defaultDiagram: WALKTHROUGH_DIAGRAM,
+    },
+  ],
+  [
+    'fixture/00000000-0000-4000-8000-000000000070',
+    deepDiveJson,
+    {
+      things: 3,
+      diagrams: 1,
+      graphs: 1,
+      unreached: { 'Deep dive': [] },
+      defaultDiagram: DEEP_DIVE_DIAGRAM,
+    },
+  ],
+  [
+    'fixture/00000000-0000-4000-8000-000000000080',
+    notesJson,
+    {
+      things: 2,
+      diagrams: 1,
+      graphs: 1,
+      unreached: { Notes: [] },
+      defaultDiagram: NOTES_DIAGRAM,
     },
   ],
   [
@@ -86,8 +119,9 @@ describe.each([
     // and by the Diagram holding them, rather than counted: a count cannot tell a
     // Thing that became connected apart from a different Thing stranded in the
     // same fixture edit, and lets the two regressions through together. The
-    // fixture strands exactly `T`, whose three-line Title draws the ladder
-    // wherever the fixture is loaded (ADR 0083), and the example strands none.
+    // fixture Meta Space strands exactly `T`, whose three-line Title draws the
+    // ladder wherever the fixture is loaded (ADR 0083), and the walkthrough
+    // strands the two Space Things that sit off its Graph.
     const nameById = new Map<string, string>(
       result.space.things.map((thing) => [thing.id, titleName(thing.title)]),
     );

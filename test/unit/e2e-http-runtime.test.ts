@@ -5,6 +5,16 @@ import { HttpSpaceBackend } from '@project/http';
 import { createApp, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
+const WALKTHROUGH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const NOTES_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
+const EXAMPLE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+const FIXTURE_SPACES = [
+  { id: FIXTURE_ID, title: 'Diagram fixture' },
+  { id: WALKTHROUGH_ID, title: 'Presentation walkthrough' },
+  { id: DEEP_DIVE_ID, title: 'Deep dive' },
+  { id: NOTES_ID, title: 'Authoring notes' },
+] as const;
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {
   const app = await createApp(options);
   return new HttpSpaceBackend('http://hyper.test', {
@@ -17,9 +27,7 @@ describe('e2e HTTP runtime', () => {
     const first = await startRuntime({ catalog: 'fixture' });
     const second = await startRuntime({ catalog: 'fixture' });
 
-    await expect(first.listSpaces()).resolves.toEqual([
-      { id: FIXTURE_ID, title: 'Diagram fixture' },
-    ]);
+    await expect(first.listSpaces()).resolves.toEqual([...FIXTURE_SPACES]);
     const loaded = await first.loadSpace(FIXTURE_ID);
     if (loaded === undefined) throw new Error('Expected fixture space');
     expect(loaded.snapshot.id).toBe(FIXTURE_ID);
@@ -68,11 +76,11 @@ describe('e2e HTTP runtime', () => {
   });
 
   it('imports an explicit Space directory for generated catalogues', async () => {
-    const directory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
+    const directory = fileURLToPath(new URL('../../packages/app/example', import.meta.url));
     const backend = await startRuntime({ catalog: 'directory', directory });
 
     await expect(backend.listSpaces()).resolves.toEqual([
-      { id: FIXTURE_ID, title: 'Diagram fixture' },
+      { id: EXAMPLE_ID, title: 'Graph-Native Technical Presentations' },
     ]);
   });
 
