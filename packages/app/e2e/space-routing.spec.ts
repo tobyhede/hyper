@@ -30,10 +30,20 @@ const THING_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
  * turn between them. A copy on the rail confirms in place without closing its
  * menu, so this dismisses before the next one.
  */
-const copyFromMenu = async (page: Page, trigger: string, command: RegExp): Promise<void> => {
+const copyExactFromMenu = async (page: Page, trigger: string, command: string): Promise<void> => {
   // `exact`, because an Alias's rail is named for its own Title and a Thing's
   // Title is a prefix of its Alias's — `Actions for Thing A` matches
   // `Actions for Thing A′` without it.
+  await page.getByRole('button', { name: trigger, exact: true }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: command, exact: true }).click();
+  await page.keyboard.press('Escape');
+};
+
+const copyMatchingFromMenu = async (
+  page: Page,
+  trigger: string,
+  command: RegExp,
+): Promise<void> => {
   await page.getByRole('button', { name: trigger, exact: true }).click({ delay: 120 });
   await page.getByRole('menuitem', { name: command }).click();
   await page.keyboard.press('Escape');
@@ -310,7 +320,7 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
   // involved in reaching it.
   await thing.hover();
 
-  await copyFromMenu(page, 'Actions for Thing A', /^Copy permanent link/);
+  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Card');
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(
@@ -318,7 +328,7 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
     );
 
   await thing.hover();
-  await copyFromMenu(page, 'Actions for Thing A', /^Copy link/);
+  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Card in Diagram');
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(`${new URL(page.url()).origin}${diagram}/things/${encodeCompactUuid(THING_A_ID)}`);
@@ -411,14 +421,14 @@ test(
     const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
     await page.goto(diagram);
 
-    await copyFromMenu(page, 'Active Graph: Long', /^Copy permanent link/);
+    await copyMatchingFromMenu(page, 'Active Graph: Long', /^Copy permanent link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
         `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`,
       );
 
-    await copyFromMenu(page, 'Active Graph: Long', /^Copy link/);
+    await copyMatchingFromMenu(page, 'Active Graph: Long', /^Copy link/);
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);

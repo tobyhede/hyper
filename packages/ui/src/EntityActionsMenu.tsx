@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
-import { LinkActionsIcon } from './icons';
+import { EntityActionsIcon } from './icons';
 import { cn } from './lib/utils';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -379,11 +379,9 @@ export interface EntityActionsTriggerProps {
    * The glyph the trigger draws, because what reads as "the actions" depends on
    * what the trigger sits beside rather than on this component.
    *
-   * A row that stands alone passes `<EntityActionsIcon />`, the conventional
-   * "more" glyph, as the Sidebar's rows did. A Thing rail sits in a cluster where
-   * every other control names its own command, and keeps `LinkActionsIcon` —
-   * which is the default here for exactly one reason: the rail is the only
-   * caller left, so leaving the default alone is what leaves the rail alone.
+   * Defaults to `<EntityActionsIcon />`, the conventional "more" glyph, because
+   * the menu holds rename, copy, alias and delete commands — not one kind of
+   * action the trigger could name on its own.
    */
   readonly icon?: ReactNode;
   readonly className?: string;
@@ -401,7 +399,7 @@ export function EntityActionsTrigger({
   groups,
   label,
   render,
-  icon = <LinkActionsIcon />,
+  icon = <EntityActionsIcon />,
   className,
 }: EntityActionsTriggerProps) {
   const { report, fire, announcement } = useConfirmation();

@@ -210,9 +210,68 @@ describe('a Thing’s commands on the canvas rail', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
 
-    expect(await screen.findByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: /^Copy permanent link/ })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Delete Thing' })).toBeVisible();
+    expect(
+      await screen.findByRole('menuitem', { name: 'Copy Link to Card in Diagram' }),
+    ).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Copy Link to Card' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    await settled(session);
+  });
+
+  /**
+   * Remove from Diagram is the named command for the Edit Delete/Backspace already
+   * runs. It must not ask first: that question is Delete from Space's, because only
+   * a Space deletion cascades (v1-release/03).
+   */
+  it('removes the Thing from this Diagram and leaves it in the Space, without asking', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Diagram' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        session.getState().working.document.diagrams?.[0]?.positions[THING_ID],
+      ).toBeUndefined();
+    });
+    expect(thingIds(session)).toEqual([THING_ID, OTHER_THING_ID]);
+    await settled(session);
+  });
+
+  /**
+   * Delete from Space is withdrawn while a Thing is Open so Open state cannot outlive
+   * the Thing. Remove from Diagram is the canvas key's availability: it reclaims
+   * the Open room and stays offered.
+   */
+  it('still offers Remove from Diagram while the Thing is Open', async () => {
+    const opened = spaceSnapshotSchema.parse({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        diagrams: [
+          {
+            ...snapshot.document.diagrams?.[0],
+            positions: {
+              ...snapshot.document.diagrams?.[0]?.positions,
+              [THING_ID]: {
+                x: 0,
+                y: 0,
+                open: true,
+                openSize: { width: THING_WIDTH, height: THING_HEIGHT },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const session = mount(undefined, undefined, opened);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: 'Delete from Space' })).not.toBeInTheDocument();
     await settled(session);
   });
 
@@ -413,14 +472,14 @@ describe('a Thing’s commands on the canvas rail', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Thing' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
     // The press asked rather than deleted, and the question says what goes.
-    const question = await screen.findByRole('alertdialog', { name: 'Delete Thing A?' });
+    const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
     expect(question).toHaveTextContent('every Diagram that contains it');
     expect(thingIds(session)).toEqual([THING_ID, OTHER_THING_ID]);
 
-    fireEvent.click(within(question).getByRole('button', { name: 'Delete Thing' }));
+    fireEvent.click(within(question).getByRole('button', { name: 'Delete from Space' }));
 
     await waitFor(() => expect(thingIds(session)).toEqual([OTHER_THING_ID]));
     await settled(session);
@@ -440,8 +499,8 @@ describe('a Thing’s commands on the canvas rail', () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Thing' }));
-    await screen.findByRole('alertdialog', { name: 'Delete Thing A?' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
+    await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
 
     expect(screen.queryByText('Thing deleted')).not.toBeInTheDocument();
     await settled(session);
@@ -464,9 +523,9 @@ describe('a Thing’s commands on the canvas rail', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Thing' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
-    const question = await screen.findByRole('alertdialog', { name: 'Delete Thing A?' });
+    const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
     expect(question).not.toHaveTextContent('And read this next');
     fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
@@ -478,8 +537,8 @@ describe('a Thing’s commands on the canvas rail', () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Thing' }));
-    const question = await screen.findByRole('alertdialog', { name: 'Delete Thing A?' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
+    const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
     fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());

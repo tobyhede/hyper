@@ -26,6 +26,7 @@ import {
   CommitEditIcon,
   EditIcon,
   EnterSpaceIcon,
+  EntityActionsIcon,
   GraphIcon,
   DiagramIcon,
   OpenThingIcon,
@@ -379,12 +380,21 @@ export function CanvasThing(props: CanvasThingProps) {
           // The two groups are the answer to "whose command is this?". Editing
           // this Thing's Markdown is the Markdown front's business and means
           // nothing on another kind; opening and closing is every Thing's, and
-          // stays in the same place whatever kind it is drawn on.
+          // Close stays last so it keeps the position authors expect. The
+          // actions menu leads the rail — overflow commands every Thing shares.
           <ThingRailActions
             aria-label={`Thing ${name}`}
             className="canvas-thing__actions"
             data-testid="canvas-thing-actions"
           >
+            {actionableEntityActions && (
+              <EntityActionsTrigger
+                groups={entityActions}
+                label={`Actions for Thing ${name}`}
+                icon={<EntityActionsIcon />}
+                render={<ThingRailAction />}
+              />
+            )}
             <ThingRailKindActions kind={visualKind}>
               {visibleContentEdit === null ? (
                 beginContentEdit !== undefined && (
@@ -406,18 +416,6 @@ export function CanvasThing(props: CanvasThingProps) {
               )}
             </ThingRailKindActions>
             <ThingRailSharedActions>
-              {/* Ahead of Open/Close, so the control that changes what the
-                  author is looking at stays the last thing on the rail and
-                  keeps the position it has always had. Adding the new command
-                  after it would move Close under a pointer already trained on
-                  it. */}
-              {actionableEntityActions && (
-                <EntityActionsTrigger
-                  groups={entityActions}
-                  label={`Actions for Thing ${name}`}
-                  render={<ThingRailAction />}
-                />
-              )}
               {onOpenChange !== undefined && (
                 <ThingRailAction
                   aria-label={`${open ? 'Close' : 'Open'} Thing ${name}`}
