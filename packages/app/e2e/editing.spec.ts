@@ -154,6 +154,17 @@ async function reconnectOnto(
   }
 }
 
+/** Resolve a theme token the way the page paints it, not the way the recipe names it. */
+const resolveToken = (locator: Locator, token: string): Promise<string> =>
+  locator.evaluate((element, name) => {
+    const probe = document.createElement('span');
+    probe.style.color = `var(${name})`;
+    element.after(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+    return value;
+  }, token);
+
 /**
  * Click one focusable Edge, and answer the accessible name it carries.
  *
@@ -2785,6 +2796,35 @@ test(
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  },
+);
+
+test(
+  "a selected Edge's Edit trigger reads as open while its editor is",
+  { tag: '@parity:selected-edge-edit-trigger-reads-as-open' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await selectAnEdge(page);
+    const edit = page.getByRole('button', { name: 'Edit this Edge' });
+    const del = page.getByRole('button', { name: 'Delete this Edge' });
+    const restingFill = await resolveToken(edit, '--secondary');
+    await expect(edit).toHaveAttribute('aria-expanded', 'false');
+    await expect(edit).not.toHaveCSS('background-color', restingFill);
+
+    await edit.click();
+    await expect(page.getByTestId('edge-editor')).toBeVisible();
+    await expect(edit).toHaveAttribute('aria-expanded', 'true');
+    // Leave Edit before reading fill: the quiet recipe also paints hover, and
+    // click leaves the pointer over the trigger (@parity:selected-edge-edit-trigger-reads-as-open).
+    await page.mouse.move(0, 0);
+    expect(await edit.evaluate((element) => element.matches(':hover'))).toBe(false);
+    const openFill = await resolveToken(edit, '--secondary');
+    await expect(edit).toHaveCSS('background-color', openFill);
+    await expect(del).not.toHaveCSS('background-color', openFill);
   },
 );
 

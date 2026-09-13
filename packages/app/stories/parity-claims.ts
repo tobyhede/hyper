@@ -473,6 +473,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A selected Edge offers Edit and Delete, and only Edit opens the endpoint editor.',
   },
   {
+    id: 'selected-edge-edit-trigger-reads-as-open',
+    storyFile: 'components/selected-edge-controls.stories.tsx',
+    storyExport: 'EndpointEditor',
+    claim:
+      "A selected Edge's Edit trigger reads as open — the quiet secondary fill — while its editor is open.",
+  },
+  {
     id: 'selected-edge-editor-shows-both-endpoints',
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'EndpointEditor',
