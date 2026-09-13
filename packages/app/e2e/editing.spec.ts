@@ -358,12 +358,12 @@ test(
         .getByTestId('canvas-thing-actions')
         .getByRole('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
-      // The rail carries the Thing's own actions menu between Edit and Close now:
+      // The rail carries the Thing's own actions menu ahead of Edit and Close:
       // a Thing's addresses and its deletion belong to the Thing (ADR 0073), and
       // the Space's command surface does not draw them at all (ADR 0082). The
       // list is asserted whole rather than by presence, so a control appearing
       // here is a decision rather than a drift.
-    ).toEqual(['Edit Thing A', 'Actions for Thing A', 'Close Thing A']);
+    ).toEqual(['Actions for Thing A', 'Edit Thing A', 'Close Thing A']);
     await bodyTarget.click();
     const source = page.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
