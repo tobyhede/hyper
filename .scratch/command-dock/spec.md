@@ -61,8 +61,8 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [20](issues/20-the-create-dispatch-names-every-thing-kind.md) | The Create dispatch names every Thing kind | resolved |
 | [21](issues/21-the-postgres-suite-fails-at-the-compiler.md) | Removing a persistence field fails at the compiler, not only in CI | resolved |
 | [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the registry Drawer and the strip the shell yields to it | needs-triage |
-| [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | ready-for-agent |
-| [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | ready-for-agent |
+| [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | resolved |
+| [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | resolved |
 | [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |
 | [26](issues/26-identity-clusters-disclose-from-the-name.md) | Dock identity clusters disclose from the name; Rename is a menu command | ready-for-human |
 
@@ -75,18 +75,18 @@ replaced the screen-edge Things drawer with a Popover anchored to the Dock's own
 trigger, `12` gave the Thing rail the Dock's neutral surface, and `09` made the
 Space name a real Edit rather than a label with nothing behind it.
 
-**What is left is decisions on `22` and `25`, and two agent-ready tickets**
-(`23`, `24`), none of them blocking each other:
+**What is left is decisions on `22` and `25`, and `26` (`ready-for-human`)**,
+none of them blocking each other:
 
 - **10** (space-cards) and **15** merged on `main`: the fixture is a linked-space
   aggregate (PR #205), and a quiet disclosure trigger reads as open while it is
   (PR #207).
 - **13** and **14** are `done` in their files. The creation outcomes are ADR
   0089; the decoration / Active Graph audit closed without a remaining defect.
-- **23** and **24** are `ready-for-agent`. **23** withdraws Create Space Thing
-  through Availability while its coordinated Edit is in flight. **24** finishes
-  the continuation module's chrome half so New Diagram's rename lands and
-  "caret moved" means landed, not requested. Both have in-progress worktrees.
+- **23** and **24** are `resolved`. **23** withdraws Create Space Thing through
+  Availability while its coordinated Edit is in flight (PR #208). **24**
+  finishes the continuation module's chrome half so New Diagram's rename lands
+  and "caret moved" means landed, not requested (PR #209).
 - **17** resolved delete: `Button`'s unused `label` variant is gone. **22**
   is the same shape still open — the registry `Drawer`, `needs-triage`.
   **25** is also `needs-triage`.

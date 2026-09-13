@@ -1,9 +1,9 @@
 # 23 — A creation in flight does not hold the command it was pressed on
 
-Status: in-progress
+Status: resolved
 Tags: release/v1
-Blocked by: nothing. `19` threaded the created Thing's id through this same
-window and deliberately left the rest of it open.
+Blocked by: nothing. Built on PR #208 (`e09dd310`). `19` threaded the created
+Thing's id through this same window and deliberately left the rest of it open.
 
 **What to build:** While a Space Thing creation is in flight, withdraw the
 **Create Space Thing** peer through Availability — visibly disabled, not
@@ -53,7 +53,7 @@ would read the same title and anchor at press time:
 - [x] Create Space Thing is unavailable while its coordinated Edit is in flight
 - [x] Add Markdown Thing remains available in the same window
 - [x] A test fails without the change and passes with it
-- [ ] `pnpm verify` and `pnpm e2e` green (CI)
+- [x] `pnpm verify` and `pnpm e2e` green (CI — PR #208)
 
 ## Comments
 
@@ -86,14 +86,14 @@ rejected — the peer becomes available again. No silent no-op on a second press
   window; lifecycle promise boundary unchanged
 
 **Acceptance criteria:**
-- [ ] While `spaceThings.create` is unresolved, Create Space Thing is disabled
+- [x] While `spaceThings.create` is unresolved, Create Space Thing is disabled
       and Create Markdown Thing is not
-- [ ] A second press during the window does not invoke `create` again
-- [ ] After the coordination settles (success or refusal), Create Space Thing
+- [x] A second press during the window does not invoke `create` again
+- [x] After the coordination settles (success or refusal), Create Space Thing
       is available again
-- [ ] A test in `space-thing-authoring.test.tsx` (or equivalent application
+- [x] A test in `space-thing-authoring.test.tsx` (or equivalent application
       test) fails without the change
-- [ ] `pnpm verify` and `pnpm e2e` green
+- [x] `pnpm verify` and `pnpm e2e` green
 
 **Out of scope:**
 - Late title/anchor derivation (second press producing two distinguishable Things)
@@ -101,3 +101,14 @@ rejected — the peer becomes available again. No silent no-op on a second press
 - Changing which Thing a press continues at (`19` is settled)
 - E2E unless an existing peer covers Create Space Thing timing; prefer the
   application test harness already used for Space Thing authoring
+
+## Answer
+
+Availability now carries `creatingSpaceThing`. Create Space Thing is
+`addThing && !creatingSpaceThing`; Create Markdown Thing stays on `addThing`.
+The Dock spends those as two `createDisabled` answers, so only the space peer
+is `aria-disabled` for the coordinated-Edit window. The silent ref return is
+gone — a second press is withdrawn, not swallowed.
+
+Evidence is `authoring-availability.test.ts` and `space-thing-authoring.test.tsx`.
+Merged as PR #208.
