@@ -13,6 +13,7 @@ import {
   activateGraph,
   activeThing,
   activeGraph,
+  beginRename,
   allPositions,
   authoringHandle,
   boxOf,
@@ -917,10 +918,9 @@ test(
     await expect(selectedCanvas(page)).toContainText('Diagram 1');
     expect(await allPositions(page)).toEqual({});
 
-    // Rename is the name itself rather than a row menu: the Dock draws each
-    // name once, so the control the reader presses is the word they are
-    // changing.
-    await selectedCanvas(page).click();
+    // Rename is a command in the Diagram list: the name discloses, and the
+    // editor is the same in-place draft it was.
+    await beginRename(page, selectedCanvas(page));
     const title = page.getByRole('textbox', { name: 'Diagram name' });
     await title.fill('Workshop');
     await title.press('Enter');
@@ -2050,13 +2050,10 @@ test(
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    // **One name, one control, one draft.** The Sidebar shared a draft between
-    // an active row and a canvas header, begun from either and returning the
-    // caret to whichever began it — which is where `continuation.ts`'s
-    // `sidebar-row` target came from and why it is gone with the surface. The
-    // Dock draws each name once, so the editor replaces the control it began
-    // from and there is no second surface to keep in step.
-    await selectedCanvas(page).click();
+    // **One name, one disclosure, one draft.** The name opens the list; Rename
+    // in that list continues in the editor the Dock already used. Escape,
+    // Enter and a refused draft stay as they were.
+    await beginRename(page, selectedCanvas(page));
     const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
     await expect(diagramName).toBeFocused();
     await diagramName.fill('');
@@ -2069,16 +2066,16 @@ test(
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     await expect(selectedCanvas(page)).toContainText('Workshop');
 
-    // Begun again from the same control, and cancelled: Escape drops the draft
+    // Begun again from the same list, and cancelled: Escape drops the draft
     // rather than committing it.
-    await selectedCanvas(page).click();
+    await beginRename(page, selectedCanvas(page));
     const cancelled = page.getByRole('textbox', { name: 'Diagram name' });
     await cancelled.fill('Studio');
     await cancelled.press('Escape');
     await expect(selectedCanvas(page)).toContainText('Workshop');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-    await activeGraph(page).click();
+    await beginRename(page, activeGraph(page));
     const graphName = page.getByRole('textbox', { name: 'Graph name' });
     await graphName.fill('Journey');
     await graphName.press('Enter');
@@ -2090,7 +2087,7 @@ test(
     // moves with it, and ADR 0083 keeps this name off any Thing's front, so the
     // reload below is reading the stored document rather than a Thing that
     // happened to agree with it.
-    await spaceName(page).click();
+    await beginRename(page, spaceName(page));
     const spaceTitle = page.getByRole('textbox', { name: 'Space name' });
     await expect(spaceTitle).toBeFocused();
     // Whitespace rather than nothing, because that is the case the schema cannot
@@ -2110,7 +2107,7 @@ test(
     // Begun again from the same control and cancelled: Escape drops the draft,
     // and the caret goes back to the name it was begun from rather than falling
     // to the body the unmounted editor left it on.
-    await spaceName(page).click();
+    await beginRename(page, spaceName(page));
     const cancelledSpace = page.getByRole('textbox', { name: 'Space name' });
     await cancelledSpace.fill('Ledger');
     await cancelledSpace.press('Escape');

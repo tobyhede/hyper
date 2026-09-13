@@ -1,11 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-  type RenderResult,
-} from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -25,6 +18,7 @@ import {
   createThing,
   createThingControl,
   deleteDiagramItem,
+  identityRenameItem,
   newGraphItem,
   newDiagramItem,
   openDiagramMenu,
@@ -619,24 +613,13 @@ describe('authoring an opened Thing', () => {
    *
    * Renaming a Diagram is the very chrome title edit that condition withdraws.
    * Copying an address is not an edit at all — an address is a fact about the
-   * Diagram rather than a change to it — so the menu stays and only the name
-   * stops being a control.
-   *
-   * **The mechanism changed with the surface twice, and the claim did not.** The
-   * Sidebar drew Rename as a row in the Diagram's actions menu, so the withdrawal
-   * was a menu item going missing. The Dock renames a Diagram by clicking the
-   * name it already draws, so the withdrawal moved onto that name — which is the
-   * same fact, said where the reader is looking. It was read as the name ceasing
-   * to be a button until the Space's name became renameable too
-   * (`renamed-space`): the withheld name drew as a label then, and the slot is a
-   * `ToolbarButton` in both states now. So the reading is `aria-disabled`, the
-   * one every other withdrawn Dock control is read by (ADR 0073 keeps a withdrawn
-   * toolbar item focusable, so it announces itself rather than vanishing).
+   * Diagram rather than a change to it — so the menu stays and only Rename is
+   * unavailable. The name is the disclosure, so switching stays reachable.
    */
   /** The three names the Dock draws, which the one `chromeTitleEdit` answers for. */
   const CHROME_IDENTITIES = ['space-title', 'selected-canvas', 'active-graph'] as const;
 
-  it('withdraws all three chrome renames, but not the address, while a Thing title editor is open', async () => {
+  it('withdraws all three chrome renames while a Thing title editor is open', async () => {
     const session = mount();
     await settled(session);
 
@@ -647,18 +630,16 @@ describe('authoring an opened Thing', () => {
     // Thing title editor owned the caret passed every suite — which is the one
     // collision the guard exists to prevent.
     for (const identity of CHROME_IDENTITIES) {
-      expect([identity, unavailable(screen.getByTestId(identity))]).toEqual([identity, false]);
+      expect([identity, unavailable(identityRenameItem(identity))]).toEqual([identity, false]);
     }
+    fireEvent.keyDown(document.body, { key: 'Escape' });
 
     createThing('Markdown Thing');
     expect(await screen.findByRole('textbox', { name: 'Thing title' })).toBeVisible();
 
     for (const identity of CHROME_IDENTITIES) {
-      expect([identity, unavailable(screen.getByTestId(identity))]).toEqual([identity, true]);
+      expect([identity, unavailable(identityRenameItem(identity))]).toEqual([identity, true]);
     }
-    openDiagramMenu('Diagram');
-    const menu = await screen.findByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
     await settled(session);
   });
 

@@ -89,6 +89,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   DeleteIcon,
+  EditIcon,
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
   InlineTitleEditor,
@@ -685,31 +686,70 @@ function IdentityLabel({ children }: { readonly children: ReactNode }) {
   return <CommandName>{children}</CommandName>;
 }
 
+/** Which of the bar's three names a rename can be running on. */
+type DockIdentity = 'Space' | 'Diagram' | 'Graph';
+
+const identityDisclosureName = (kind: DockIdentity, title: string): string =>
+  kind === 'Graph' ? `Active Graph: ${title}` : `${kind}: ${title}`;
+
+type IdentityDisclosure = {
+  readonly trigger: ReactNode;
+  readonly renameItem: ReactNode;
+  readonly triggerId: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+};
+
 /**
- * The Space, Diagram or Graph name, renamed in place by clicking it.
+ * Whether a command that closed this identity's list left the caret alone.
  *
- * This is `InlineTitleEditor` — the component Things and the Space Sidebar
- * already rename through — in its `header` variant, which exists for named
- * chrome rather than a Thing's own title. Reusing it buys the whole edit
- * lifecycle a hand-rolled rename would otherwise fake and get wrong: select on entry,
- * Enter and blur complete, Escape cancels, focus returns to the control, and a
- * refused draft stays open and editable.
- *
- * The refusal is real rather than decorative. A rename control that cannot
- * refuse is not the control the product needs, and an empty name is the one
- * refusal every one of these entities already has.
- *
- * The name is a `ToolbarButton` at rest, so the thing you click to rename and
- * the controls beside it are one treatment. The editor replaces it rather than
- * expanding inside it, which is also what makes renaming reachable in the
- * vertical icon dock: the label collapses there, the editor does not.
+ * Held on a ref because it decides nothing that is rendered — it is a note
+ * from the press to the close that follows it. The functions that read it
+ * are JSX props on the menu, not arguments to this surface's render prop:
+ * passing a ref-backed function through a function called during render is
+ * what `react-hooks/refs` reports.
  */
-function IdentityName({
+const IdentityCaretContext = createContext<{ current: boolean } | null>(null);
+
+function useIdentityCaret() {
+  const caretMovedRef = useContext(IdentityCaretContext);
+  if (caretMovedRef === null) {
+    throw new Error('Identity caret used outside IdentitySurface');
+  }
+  return {
+    noteCaretMoved: () => {
+      caretMovedRef.current = true;
+    },
+    restoresFocusOnClose: () => {
+      const moved = caretMovedRef.current;
+      caretMovedRef.current = false;
+      return !moved;
+    },
+  };
+}
+
+/**
+ * The Space, Diagram or Graph cluster: one named disclosure, and Rename in it.
+ *
+ * The name and the chevron are the named `ChoiceMenuTrigger` an Open Space
+ * Thing already uses. Pressing either opens this identity's list. Rename is a
+ * row in that list; choosing it closes the menu and continues in
+ * `InlineTitleEditor` — the same header editor these identities already used,
+ * so Enter, Escape, blur and a refused draft stay as they were. The Edit
+ * itself does not change; only how it is begun does
+ * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+ *
+ * Switching stays reachable while a chrome title edit is withdrawn. Only the
+ * Rename row becomes unavailable — the trigger is how the list is reached.
+ */
+function IdentitySurface({
   icon,
   kind,
   title,
   testId,
+  triggerTitle,
   onRename,
+  children,
 }: {
   readonly icon: ReactNode;
   readonly kind: DockIdentity;
@@ -719,11 +759,12 @@ function IdentityName({
    *
    * The three identities are one component drawn three times, so an accessible
    * name is the only thing distinguishing them — and a test that reached for
-   * `Rename Diagram: Collection 1` would have to know the title to find the
+   * the title in the disclosure would have to know the title to find the
    * control that names it, which is the assertion inverted. The id names the
    * slot; the text in it is what is under test.
    */
   readonly testId: string;
+  readonly triggerTitle: string;
   /**
    * `null` while this name's rename is unavailable — never because the product
    * has no such Edit. All three identities have one, so every `null` here is a
@@ -731,6 +772,7 @@ function IdentityName({
    * {@link DockSpace.onRename}).
    */
   readonly onRename: ((title: string) => string | null) | null;
+  readonly children: (disclosure: IdentityDisclosure) => ReactNode;
 }) {
   /**
    * **Whether this name is the one being renamed is the bar's answer, not this
@@ -751,6 +793,7 @@ function IdentityName({
    * answered once in {@link CommandDock} instead of three times here.
    */
   const { renaming, onRenaming } = useContext(DockRenamingContext);
+  const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   const editing = renaming === kind;
 
   /**
@@ -758,15 +801,13 @@ function IdentityName({
    *
    * The editor replaces this control rather than expanding inside it, so ending
    * a rename unmounts the element holding the caret and it falls to
-   * `document.body` unless something puts it back. The Sidebar had a
-   * continuation for this because the rename could be *begun* from either of
-   * two surfaces and had to return to whichever began it; here there is one
-   * name and it is right there, so a ref is the whole of it.
+   * `document.body` unless something puts it back. The name *is* the disclosure
+   * trigger, so the ref lives on that trigger and the editor's own three exits
+   * spend it.
    *
-   * Only the editor's own three exits spend this. The endings the slot answers
-   * for the bar end a rename too, and they must not — the reader moved to
-   * another Diagram from the menu beside this name, and pulling the caret onto
-   * the name they just moved away from is taking focus, not returning it.
+   * The endings the slot answers for the bar must not — the reader moved to
+   * another Diagram from this list, and pulling the caret onto the name they
+   * just moved away from is taking focus, not returning it.
    */
   const nameRef = useRef<HTMLButtonElement>(null);
   /**
@@ -775,6 +816,14 @@ function IdentityName({
    * state would set state from inside the effect that reads it.
    */
   const returningFocus = useRef(false);
+  /**
+   * Whether the command that closed this list left the caret alone.
+   *
+   * Rename continues in the editor, and New Diagram continues in the new
+   * Diagram's name. Base UI's ordinary restoration would then land on the
+   * trigger a frame later — blurring an editor whose blur completes.
+   */
+  const caretMovedRef = useRef(false);
   // Only the identity holding the slot draws an editor, so only it can reach
   // these — clearing the slot is releasing this component's own rename rather
   // than ending someone else's.
@@ -800,94 +849,116 @@ function IdentityName({
     nameRef.current?.focus();
   }, [editing]);
 
+  /**
+   * New Diagram continues by pressing a control the visible name is not.
+   *
+   * The name is the disclosure: a click on it opens the list. The application's
+   * continuation still has to begin the editor the way a reader who chose
+   * Rename does, without flashing that list, so the press lands on this
+   * always-mounted address instead (`continuation.ts`).
+   * `waitUntilDiagramContinuationReady` and the New Diagram continuation in
+   * `SpaceApp.test.tsx` hold that the address is present and that it begins
+   * the editor without opening the list.
+   */
+  const continuation =
+    kind === 'Diagram' ? (
+      <button
+        type="button"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        data-continuation-control="diagram-name"
+        disabled={onRename === null}
+        onClick={() => onRenaming('Diagram')}
+      />
+    ) : null;
+
+  const renameItem = (
+    <DropdownMenuItem
+      className="gap-2"
+      disabled={onRename === null}
+      onClick={() => {
+        caretMovedRef.current = true;
+        onRenaming(kind);
+      }}
+    >
+      <EditIcon />
+      Rename
+    </DropdownMenuItem>
+  );
+  const identity = (trigger: ReactNode): IdentityDisclosure => ({
+    trigger,
+    renameItem,
+    triggerId,
+    open,
+    onOpenChange,
+  });
+
   if (onRename !== null && editing) {
     return (
-      <InlineTitleEditor
-        variant="header"
-        className="command-dock__name-editor"
-        title={title}
-        label={`${kind} name`}
-        onComplete={(next) => {
-          const named = next.trim();
-          if (named === '') return `A ${kind} needs a name.`;
-          // **The Edit's answer, not the press.** A rename can be refused for
-          // more than a blank name — a Diagram that has stopped drawing, a title
-          // Authoring will not take — and `InlineTitleEditor` holds a refused
-          // draft open and editable for exactly that. Closing on the press
-          // instead would drop the author's words on the floor and leave the
-          // stored title unchanged with nothing said.
-          const refusal = onRename(named);
-          if (refusal !== null) return refusal;
-          endRename();
-          return null;
-        }}
-        onCancel={endRenameReturningFocus}
-        onReturnFocus={endRenameReturningFocus}
-      />
+      <IdentityCaretContext.Provider value={caretMovedRef}>
+        <InlineTitleEditor
+          variant="header"
+          className="command-dock__name-editor"
+          title={title}
+          label={`${kind} name`}
+          onComplete={(next) => {
+            const named = next.trim();
+            if (named === '') return `A ${kind} needs a name.`;
+            // **The Edit's answer, not the press.** A rename can be refused for
+            // more than a blank name — a Diagram that has stopped drawing, a title
+            // Authoring will not take — and `InlineTitleEditor` holds a refused
+            // draft open and editable for exactly that. Closing on the press
+            // instead would drop the author's words on the floor and leave the
+            // stored title unchanged with nothing said.
+            const refusal = onRename(named);
+            if (refusal !== null) return refusal;
+            endRename();
+            return null;
+          }}
+          onCancel={endRenameReturningFocus}
+          onReturnFocus={endRenameReturningFocus}
+        />
+        {children(
+          identity(
+            <ChoiceMenuTrigger
+              id={triggerId}
+              className="nokey command-dock__disclose"
+              aria-label={identityDisclosureName(kind, title)}
+              title={triggerTitle}
+              render={<ToolbarButton variant="ghost" size="icon" />}
+            />,
+          ),
+        )}
+        {continuation}
+      </IdentityCaretContext.Provider>
     );
   }
 
-  /**
-   * **One control, unavailable rather than absent — and that is a change.**
-   *
-   * A withdrawn name used to draw as a `<span>` carrying the Button's `label`
-   * variant, on the argument that a control which is present and greyed teaches
-   * the reader that a command exists and is out of reach *now*, while the
-   * Space's name had no Edit behind it at all and so would have been
-   * advertising something nobody could ever run. `renamed-space` retired the
-   * second half of that: all three identities have a rename, so every `null`
-   * that reaches here is the application withdrawing one it will hand back — a
-   * live Thing title editor or content edit owning the caret, or no placement to
-   * edit against — which is exactly the "out of reach now" case the old comment
-   * said a disabled control was right for.
-   *
-   * So there is one element instead of two. It keeps the `testId` and
-   * `command-dock__name` either way, so the surface measures the same and a
-   * behaviour test addresses the same slot; what changes is that the slot is now
-   * always a `button`, announcing itself as unavailable through `aria-disabled`
-   * rather than vanishing from the accessibility tree as a label (ADR 0073 —
-   * `ToolbarButton` keeps a withdrawn item focusable, so `:disabled` will not
-   * match it and `aria-disabled` is what a test reads).
-   *
-   * **That last sentence is also why a stylesheet rule is owed and not optional.**
-   * With no native `disabled` attribute, every `disabled:` utility on the button
-   * misses, `cursor-pointer` stands and the ghost variant's hover fill still
-   * lands — so the visible half of "unavailable" is
-   * `.command-dock__name[aria-disabled='true']` in `command-dock.css` rather
-   * than anything here. Without it the two states are pixel-identical and a
-   * withdrawn name lights up under the pointer.
-   *
-   * **`onClick` stays stated rather than withheld.** Base UI's button
-   * suppresses activation for a disabled item — pointer and keyboard both — so a
-   * second guard written here would be this surface re-deciding what the
-   * primitive already decides (ADR 0047's second rule).
-   */
   return (
-    <ToolbarButton
-      variant="ghost"
-      size="compact"
-      ref={nameRef}
-      className="command-dock__name"
-      data-testid={testId}
-      /* The Dock's one continuation address (`continuation.ts`). Add Diagram
-         creates an empty Diagram and selects it, and the author continues in
-         its name — so the application presses this control the way a reader
-         does. Keyed on the identity rather than taken as a prop: there is one
-         addressable name, and a prop would invite a second. */
-      data-continuation-control={kind === 'Diagram' ? 'diagram-name' : undefined}
-      disabled={onRename === null}
-      aria-label={`Rename ${kind}: ${title}`}
-      title={`Rename ${kind}`}
-      onClick={() => onRenaming(kind)}
-    >
-      {icon}
-      <IdentityLabel>{title}</IdentityLabel>
-    </ToolbarButton>
+    <IdentityCaretContext.Provider value={caretMovedRef}>
+      {children(
+        identity(
+          <ChoiceMenuTrigger
+            ref={nameRef}
+            id={triggerId}
+            className="nokey command-dock__name"
+            data-testid={testId}
+            aria-label={identityDisclosureName(kind, title)}
+            title={triggerTitle}
+            icon={icon}
+            name={title}
+            render={<ToolbarButton variant="ghost" size="compact" />}
+          />,
+        ),
+      )}
+      {continuation}
+    </IdentityCaretContext.Provider>
   );
 }
 
 /**
- * Diagram: `[name][v]`. Graph: `[name][v][>]`.
+ * Diagram: `[name v]`. Graph: `[name v][>]`.
  *
  * Each is one named `ToolbarGroup` inside the Dock's single `Toolbar` — ADR
  * 0073's pair, the same one a Thing rail is built from — so the controls share a
@@ -896,12 +967,9 @@ function IdentityName({
  * says is that these are commands *on* one named entity, which is exactly what a
  * rail says about a Thing.
  *
- * Only Rename left the menu, because the name is right there and clicking a
- * name to change it needs no menu at all. Everything else stays behind the
- * chevron — including New, which is a command about the *set* rather than
- * about the named entity the cluster is showing, and so belongs with the list
- * of that set rather than beside its current member. Present is the exception
- * on the Graph side: it acts on the Active Graph the cluster is naming.
+ * Name and chevron are one disclosure. Rename sits with New, Copy link and
+ * Delete on the current identity. Present is the exception on the Graph side:
+ * it acts on the Active Graph the cluster is naming.
  */
 function DiagramControls({
   canvas,
@@ -910,96 +978,114 @@ function DiagramControls({
   readonly canvas: DockCanvas;
   readonly side?: MenuSide;
 }) {
-  const { id: triggerId, open, onOpenChange } = useDockDisclosure();
-  /**
-   * Whether the command that closed this list left the caret alone.
-   *
-   * **A ref, read at close time, because the answer is what was just pressed.**
-   * New Diagram continues in the new Diagram's name: the application presses
-   * this cluster's own name control, its editor mounts and focuses itself, and
-   * Base UI's ordinary restoration would then land on the chevron a frame later
-   * — blurring an editor whose blur completes, and committing a rename nobody
-   * typed. Every other command here is over when it runs and returns the caret
-   * the way a menu should.
-   */
   return (
     <ToolbarGroup aria-label="Diagram" className="command-dock__cluster">
-      <IdentityName
+      <IdentitySurface
         icon={<DiagramIcon />}
         kind="Diagram"
         testId="selected-canvas"
         title={canvas.selected.title}
+        triggerTitle="Switch Diagram"
         onRename={
           canvas.onRename === null
             ? null
             : (title) => canvas.onRename?.(canvas.selected.id, title) ?? null
         }
-      />
-      {/* The list, the mark on the Diagram you are in and every key that moves
-          between them are `ChoiceMenu`'s — the same component an Open Space Thing
-          chooses its Diagram through. What stays here is what the list *is* and
-          what choosing one does, which on this surface is the canvas moving.
-          The commands below it are this cluster's own. */}
-      <ChoiceMenu<DiagramId>
-        label="Diagrams"
-        choices={canvas.diagrams}
-        chosen={canvas.selected.id}
-        onChoose={canvas.onSelect}
-        open={open}
-        onOpenChange={onOpenChange}
-        triggerId={triggerId}
-        side={side}
-        align={DISCLOSURE_ALIGN}
-        sideOffset={DISCLOSURE_SIDE_OFFSET}
-        className={`nokey ${DISCLOSURE_WIDTH}`}
-        restoresFocusOnClose={() => !canvas.didCreateMoveCaret()}
-        trigger={
-          <ChoiceMenuTrigger
-            id={triggerId}
-            className="nokey command-dock__disclose"
-            aria-label={`Diagram: ${canvas.selected.title}`}
-            title="Switch Diagram"
-            render={<ToolbarButton variant="ghost" size="icon" />}
-          />
-        }
       >
-        {/* The same order the Spaces popover pins below its scroll: the set
+        {({ trigger, renameItem, triggerId, open, onOpenChange }) => (
+          <DiagramIdentityMenu
+            canvas={canvas}
+            side={side}
+            trigger={trigger}
+            renameItem={renameItem}
+            triggerId={triggerId}
+            open={open}
+            onOpenChange={onOpenChange}
+          />
+        )}
+      </IdentitySurface>
+    </ToolbarGroup>
+  );
+}
+
+/**
+ * The list, the mark on the Diagram you are in and every key that moves
+ * between them are `ChoiceMenu`'s — the same component an Open Space Thing
+ * chooses its Diagram through. What stays here is what the list *is* and
+ * what choosing one does, which on this surface is the canvas moving.
+ * The commands below it are this cluster's own.
+ */
+function DiagramIdentityMenu({
+  canvas,
+  side,
+  trigger,
+  renameItem,
+  triggerId,
+  open,
+  onOpenChange,
+}: {
+  readonly canvas: DockCanvas;
+  readonly side: MenuSide;
+  readonly trigger: ReactNode;
+  readonly renameItem: ReactNode;
+  readonly triggerId: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  const { noteCaretMoved, restoresFocusOnClose } = useIdentityCaret();
+  return (
+    <ChoiceMenu<DiagramId>
+      label="Diagrams"
+      choices={canvas.diagrams}
+      chosen={canvas.selected.id}
+      onChoose={canvas.onSelect}
+      open={open}
+      onOpenChange={onOpenChange}
+      triggerId={triggerId}
+      side={side}
+      align={DISCLOSURE_ALIGN}
+      sideOffset={DISCLOSURE_SIDE_OFFSET}
+      className={`nokey ${DISCLOSURE_WIDTH}`}
+      restoresFocusOnClose={restoresFocusOnClose}
+      trigger={trigger}
+    >
+      {/* The same order the Spaces popover pins below its scroll: the set
             first, then the commands on the one it is naming. A Diagram list is
             short enough that nothing scrolls, so the end of the list and the
             pinned position are the same place — which is why one rule covers
             both and neither has to know which case it is. */}
-        <DropdownMenuItem
-          className="gap-2"
-          disabled={canvas.createDisabled}
-          onClick={() => {
-            canvas.onCreate();
-          }}
-        >
-          <PlusIcon />
-          New Diagram
-        </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
-          <CopyIcon />
-          Copy link
-        </DropdownMenuItem>
-        {/* The last Diagram cannot be deleted (ADR 0079), so the command is
+      {renameItem}
+      <DropdownMenuItem
+        className="gap-2"
+        disabled={canvas.createDisabled}
+        onClick={() => {
+          if (canvas.onCreate()) noteCaretMoved();
+        }}
+      >
+        <PlusIcon />
+        New Diagram
+      </DropdownMenuItem>
+      <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
+        <CopyIcon />
+        Copy link
+      </DropdownMenuItem>
+      {/* The last Diagram cannot be deleted (ADR 0079), so the command is
             present and unavailable rather than absent — a control that
             disappears teaches nothing about why. */}
-        {/* Delete is destructive and sits behind its own rule, away from
+      {/* Delete is destructive and sits behind its own rule, away from
             the commands above it — the same separation the menu already
             makes between the list and the commands. */}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          className="gap-2"
-          disabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
-          onClick={() => canvas.onDelete(canvas.selected.id)}
-        >
-          <DeleteIcon />
-          Delete {canvas.selected.title}
-        </DropdownMenuItem>
-      </ChoiceMenu>
-    </ToolbarGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        variant="destructive"
+        className="gap-2"
+        disabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
+        onClick={() => canvas.onDelete(canvas.selected.id)}
+      >
+        <DeleteIcon />
+        Delete {canvas.selected.title}
+      </DropdownMenuItem>
+    </ChoiceMenu>
   );
 }
 
@@ -1019,7 +1105,6 @@ function GraphControls({
   readonly side?: MenuSide;
   readonly vertical?: boolean;
 }) {
-  const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   /**
    * **Present leads along a row and trails down a column**, and this is the one
    * thing in the Dock the edge reorders.
@@ -1071,50 +1156,84 @@ function GraphControls({
           says which *kind* of entity the colour belongs to, and it is
           `@project/ui`'s own `GraphIcon` rather than a mark this module
           invents. */}
-      <IdentityName
+      <IdentitySurface
         icon={<GraphIcon color={graph.activeColor} size={14} />}
         kind="Graph"
         testId="active-graph"
         title={graph.active.title}
+        triggerTitle="Switch Graph"
         onRename={
           graph.onRename === null
             ? null
             : (title) => graph.onRename?.(graph.active.id, title) ?? null
         }
-      />
-      {/* The same `ChoiceMenu` the Diagram cluster and an Open Space Thing draw,
-          with each row carrying the colour its Graph is drawn in — a choice's
-          own glyph is the choice's, which is why it rides on the choice rather
-          than being rendered here. */}
-      <ChoiceMenu<GraphId>
-        label={`Graphs in ${diagramTitle}`}
-        choices={graph.graphs.map((each) => ({
-          id: each.id,
-          title: each.title,
-          icon: (
-            <GraphIcon color={graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR} size={14} />
-          ),
-        }))}
-        chosen={graph.active.id}
-        onChoose={graph.onActivate}
-        open={open}
-        onOpenChange={onOpenChange}
-        triggerId={triggerId}
-        side={side}
-        align={DISCLOSURE_ALIGN}
-        sideOffset={DISCLOSURE_SIDE_OFFSET}
-        className={`nokey ${DISCLOSURE_WIDTH}`}
-        trigger={
-          <ChoiceMenuTrigger
-            id={triggerId}
-            className="nokey command-dock__disclose"
-            aria-label={`Active Graph: ${graph.active.title}`}
-            title="Switch Graph"
-            render={<ToolbarButton variant="ghost" size="icon" />}
-          />
-        }
       >
-        {/* **A submenu, not a control beside Present.** The rule this
+        {({ trigger, renameItem, triggerId, open, onOpenChange }) => (
+          <GraphIdentityMenu
+            graph={graph}
+            diagramTitle={diagramTitle}
+            side={side}
+            trigger={trigger}
+            renameItem={renameItem}
+            triggerId={triggerId}
+            open={open}
+            onOpenChange={onOpenChange}
+          />
+        )}
+      </IdentitySurface>
+      {vertical ? present : null}
+    </ToolbarGroup>
+  );
+}
+
+/**
+ * The same `ChoiceMenu` the Diagram cluster and an Open Space Thing draw,
+ * with each row carrying the colour its Graph is drawn in — a choice's
+ * own glyph is the choice's, which is why it rides on the choice rather
+ * than being rendered here.
+ */
+function GraphIdentityMenu({
+  graph,
+  diagramTitle,
+  side,
+  trigger,
+  renameItem,
+  triggerId,
+  open,
+  onOpenChange,
+}: {
+  readonly graph: DockGraph;
+  readonly diagramTitle: string;
+  readonly side: MenuSide;
+  readonly trigger: ReactNode;
+  readonly renameItem: ReactNode;
+  readonly triggerId: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  const { restoresFocusOnClose } = useIdentityCaret();
+  return (
+    <ChoiceMenu<GraphId>
+      label={`Graphs in ${diagramTitle}`}
+      choices={graph.graphs.map((each) => ({
+        id: each.id,
+        title: each.title,
+        icon: <GraphIcon color={graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR} size={14} />,
+      }))}
+      chosen={graph.active.id}
+      onChoose={graph.onActivate}
+      open={open}
+      onOpenChange={onOpenChange}
+      triggerId={triggerId}
+      side={side}
+      align={DISCLOSURE_ALIGN}
+      sideOffset={DISCLOSURE_SIDE_OFFSET}
+      className={`nokey ${DISCLOSURE_WIDTH}`}
+      restoresFocusOnClose={restoresFocusOnClose}
+      trigger={trigger}
+    >
+      {renameItem}
+      {/* **A submenu, not a control beside Present.** The rule this
                 cluster already keeps is frequency: Present earns a permanent
                 control because traversing is what a Graph is *for*, and New
                 Graph sits in the menu because Graphs are made rarely. Colour is
@@ -1131,30 +1250,30 @@ function GraphControls({
                 one colour, the palette is a closed set, and a menu's own roving
                 focus and keyboard selection come free — where a row of buttons
                 inside a menu would be a focus manager fighting the menu's. */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
-            <GraphIcon color={graph.activeColor} size={14} />
-            Colour
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="nokey">
-            <DropdownMenuRadioGroup
-              value={graph.active.color ?? ''}
-              onValueChange={(next) => graph.onRecolor(graph.active.id, next)}
-            >
-              {GRAPH_COLORS.map(([name, color]) => (
-                <DropdownMenuRadioItem key={color} value={color} closeOnClick className="gap-2">
-                  <GraphIcon color={color} size={14} />
-                  {name}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuItem className="gap-2" disabled={graph.editsDisabled} onClick={graph.onCreate}>
-          <PlusIcon />
-          New Graph
-        </DropdownMenuItem>
-        {/* **A copy reports through the application's standing notice**, not
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
+          <GraphIcon color={graph.activeColor} size={14} />
+          Colour
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="nokey">
+          <DropdownMenuRadioGroup
+            value={graph.active.color ?? ''}
+            onValueChange={(next) => graph.onRecolor(graph.active.id, next)}
+          >
+            {GRAPH_COLORS.map(([name, color]) => (
+              <DropdownMenuRadioItem key={color} value={color} closeOnClick className="gap-2">
+                <GraphIcon color={color} size={14} />
+                {name}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+      <DropdownMenuItem className="gap-2" disabled={graph.editsDisabled} onClick={graph.onCreate}>
+        <PlusIcon />
+        New Graph
+      </DropdownMenuItem>
+      {/* **A copy reports through the application's standing notice**, not
                 in the item's own label. `EntityActionsMenu` swaps a pressed
                 item's words to "Copied" or "Not copied", and it does that
                 because the Sidebar's menus were inside a Sheet drawn over the
@@ -1163,7 +1282,7 @@ function GraphControls({
                 covers nothing: "Link not copied" is pinned in the shell at every
                 width, so the in-place swap has lost the reason it existed for.
                 The Thing rail keeps it, being a menu on the canvas itself. */}
-        {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
+      {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
                 Graph always has a within-Diagram address as well as its own —
                 which is exactly what `spaceEntityActions` offers on a Graph.
 
@@ -1175,27 +1294,25 @@ function GraphControls({
                 The second form is offered only where it differs from the first,
                 which on a Graph is always — a Diagram row shows one link for the
                 same reason, having only its own. */}
-        <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
-          <CopyIcon />
-          Copy link
-        </DropdownMenuItem>
-        <DropdownMenuItem className="gap-2" onClick={graph.onCopyPermanentLink}>
-          <CopyIcon />
-          Copy permanent link
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          className="gap-2"
-          disabled={graph.editsDisabled || graph.graphs.length <= 1}
-          onClick={() => graph.onDelete(graph.active.id)}
-        >
-          <DeleteIcon />
-          Delete {graph.active.title}
-        </DropdownMenuItem>
-      </ChoiceMenu>
-      {vertical ? present : null}
-    </ToolbarGroup>
+      <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
+        <CopyIcon />
+        Copy link
+      </DropdownMenuItem>
+      <DropdownMenuItem className="gap-2" onClick={graph.onCopyPermanentLink}>
+        <CopyIcon />
+        Copy permanent link
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        variant="destructive"
+        className="gap-2"
+        disabled={graph.editsDisabled || graph.graphs.length <= 1}
+        onClick={() => graph.onDelete(graph.active.id)}
+      >
+        <DeleteIcon />
+        Delete {graph.active.title}
+      </DropdownMenuItem>
+    </ChoiceMenu>
   );
 }
 
@@ -1274,14 +1391,14 @@ function CreatePeers({
  * trigger whichever surface opens.
  *
  * It carries a chevron because it discloses a list, which is what the chevron
- * says next to it on the other three. What it does **not** carry is the name as
- * a control: Space, Diagram and Graph name one entity each, so clicking that
- * name to rename it is the whole of `IdentityName`. "Things" names a set, and a
- * set has no name to edit — so the word is a label inside the trigger rather
- * than a button of its own, and the cluster is one target instead of two.
+ * says next to it on the other three. Space, Diagram and Graph name one entity
+ * each, and that name is the same disclosure — Rename lives in the list.
+ * "Things" names a set, and a set has no name to edit — so the word is a label
+ * inside the trigger rather than a button of its own, and the cluster is one
+ * target instead of two.
  *
- * **It draws the same three parts in the same order as `IdentityName`** — an
- * icon, the title through `IdentityLabel`, then the disclosure — so the word
+ * **It draws the same three parts in the same order as an identity trigger** —
+ * an icon, the title through `IdentityLabel`, then the chevron — so the word
  * lands in the column the other three names land in, whichever edge the dock
  * is on.
  */
@@ -1335,9 +1452,6 @@ const DockDisclosureContext = createContext<DockDisclosure>({
   openId: null,
   setOpenId: () => undefined,
 });
-
-/** Which of the bar's three names a rename can be running on. */
-type DockIdentity = 'Space' | 'Diagram' | 'Graph';
 
 /**
  * Which name in the bar is being renamed, if any.
@@ -1649,29 +1763,33 @@ function ThingsControl({
 function SpaceMenu({
   space,
   side = 'bottom',
+  trigger,
+  renameItem,
+  triggerId,
+  open,
+  onOpenChange,
 }: {
   readonly space: DockSpace;
   readonly side?: MenuSide;
+  readonly trigger: ReactNode;
+  readonly renameItem: ReactNode;
+  readonly triggerId: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
 }) {
-  const { id: triggerId, open, onOpenChange } = useDockDisclosure();
+  const { restoresFocusOnClose } = useIdentityCaret();
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
-      <DropdownMenuTrigger
-        id={triggerId}
-        className="nokey command-dock__disclose"
-        aria-label={`Space: ${space.title}`}
-        title="Space commands"
-        render={<ToolbarButton variant="ghost" size="icon" />}
-      >
-        <ChevronDownIcon />
-      </DropdownMenuTrigger>
+      {trigger}
       <DropdownMenuContent
         align={DISCLOSURE_ALIGN}
         side={side}
         sideOffset={DISCLOSURE_SIDE_OFFSET}
         className={`nokey ${DISCLOSURE_WIDTH}`}
+        finalFocus={restoresFocusOnClose}
       >
         <DropdownMenuGroup>
+          {renameItem}
           <DropdownMenuItem className="gap-2" onClick={space.onCopyLink}>
             <CopyIcon />
             Copy link
@@ -2031,7 +2149,7 @@ function ParentSpace({
  * and only their position differs, and the `⌄` beside it switches among every
  * open Space (`ParentSpace` above).
  * The **cluster** is the Space you are in — a Diagram or Graph cluster in every
- * respect: a name you click to rename, and a chevron opening an ordinary menu.
+ * respect: a named disclosure, and Rename a command in that list.
  *
  * **The Spaces inside this one are not in either.** They are Space Things, so
  * they are in the Things list with every other Thing — as Things, with nothing on
@@ -2083,14 +2201,26 @@ function SpacesControl({
         <Divider orientation={vertical ? 'horizontal' : 'vertical'} />
       )}
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
-        <IdentityName
+        <IdentitySurface
           icon={<ThingKindIcon kind="space" />}
           kind="Space"
           testId="space-title"
           title={space.title}
+          triggerTitle="Space commands"
           onRename={space.onRename}
-        />
-        <SpaceMenu space={space} side={side} />
+        >
+          {({ trigger, renameItem, triggerId, open, onOpenChange }) => (
+            <SpaceMenu
+              space={space}
+              side={side}
+              trigger={trigger}
+              renameItem={renameItem}
+              triggerId={triggerId}
+              open={open}
+              onOpenChange={onOpenChange}
+            />
+          )}
+        </IdentitySurface>
       </ToolbarGroup>
       {/* Outside the menu that spends it: the menu closes on the press, and a
           dialog mounted inside its content would go with it. */}

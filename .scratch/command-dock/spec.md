@@ -64,6 +64,7 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | ready-for-agent |
 | [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | ready-for-agent |
 | [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |
+| [26](issues/26-identity-clusters-disclose-from-the-name.md) | Dock identity clusters disclose from the name; Rename is a menu command | ready-for-human |
 
 ## Where it stands
 

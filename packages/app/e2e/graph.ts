@@ -185,7 +185,7 @@ export function graphMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Active Graph: /);
 }
 
-/** The Space cluster's disclosure: Copy link and Exit Space. */
+/** The Space cluster's disclosure: Rename, Copy link and Exit Space. */
 export function spaceMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Space: /);
 }
@@ -193,12 +193,23 @@ export function spaceMenu(page: Page): Promise<Locator> {
 /**
  * The Space the Dock is in, named on the cluster beside its menu.
  *
- * The third identity, and a control like the other two: `renamed-space` made the
- * name a rename control rather than a label, so a test presses this the way it
- * presses {@link selectedCanvas}.
+ * The third identity, and a control like the other two: the name discloses
+ * the Space list; Rename in that list continues in the editor.
  */
 export function spaceName(page: Page): Locator {
   return page.getByTestId('space-title');
+}
+
+/**
+ * Begin a Dock identity rename from its list.
+ *
+ * The name discloses; Rename is the command that opens the editor
+ * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+ * `delay` is the same Base UI dismissal turn {@link disclose} waits for.
+ */
+export async function beginRename(page: Page, identity: Locator): Promise<void> {
+  await identity.click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
 }
 
 /** What the Dock says is drawing. */

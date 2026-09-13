@@ -33,8 +33,9 @@ for (const delay of [0, 120]) {
         .click({ delay });
       await expect(page.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
       await dock(page)
-        .getByRole('button', { name: new RegExp(`^Rename ${kind}:`) })
+        .getByRole('button', { name: kind === 'Diagram' ? /^Diagram: / : /^Active Graph: / })
         .click({ delay });
+      await page.getByRole('menuitem', { name: 'Rename' }).click();
       const editor = page.getByRole('textbox', { name: `${kind} name`, exact: true });
       await expect(editor).toBeFocused();
       await expect(page.getByRole('menu')).toHaveCount(0);
