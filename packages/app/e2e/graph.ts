@@ -271,6 +271,33 @@ export async function settleNewDiagramName(page: Page, title: string): Promise<v
   await expect(editor).toHaveCount(0);
 }
 
+/**
+ * Append, colour and activate one empty Graph (ADR 0040).
+ *
+ * Unlike New Diagram, the Edit completes on the press — there is no name
+ * continuation and the new Graph is already selected when this returns.
+ */
+export async function newGraph(page: Page): Promise<void> {
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: 'New Graph' }).click();
+}
+
+/** Recolour the Graph the cluster is showing, by the menu's palette name. */
+export async function recolorActiveGraph(page: Page, colorName: string): Promise<void> {
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: 'Colour' }).click();
+  const submenu = page.getByRole('menu').last();
+  await expect(submenu).toBeVisible();
+  await submenu.getByRole('menuitemradio', { name: colorName, exact: true }).click();
+}
+
+/** Delete the Graph the cluster is showing. */
+export async function deleteActiveGraph(page: Page): Promise<void> {
+  const title = (await activeGraph(page).innerText()).trim();
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: `Delete ${title}` }).click();
+}
+
 /** The Diagrams the Space offers, read from the one list that offers them. */
 export async function diagramChoices(page: Page): Promise<Locator> {
   return (await diagramMenu(page)).getByRole('menuitemradio');

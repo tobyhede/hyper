@@ -26,7 +26,11 @@ import {
   expectThingFillsNode,
   diagramChoices,
   diagramMenu,
+  deleteActiveGraph,
+  graphMenu,
   newDiagram,
+  newGraph,
+  recolorActiveGraph,
   settleNewDiagramName,
   nodeByTitle,
   openThing,
@@ -1622,6 +1626,81 @@ test('New Diagram creates an empty Diagram, continues in its name, and persists'
   await expect(selectedCanvas(page)).toContainText('Diagram 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
+
+test(
+  'New Graph creates an empty active Graph and persists through reload',
+  { tag: '@parity:command-dock-adds-graph' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const persistence = page.getByTestId('persistence-status');
+    const edgesBefore = await page.locator('.react-flow__edge').count();
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+
+    await newGraph(page);
+    await expect(activeGraph(page)).toContainText('Graph 1');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(edgesBefore);
+    await expect(persistence).toHaveAttribute('data-revision', '1');
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    await expect(activeGraph(page)).toContainText('Graph 1');
+
+    await deleteActiveGraph(page);
+    await expect(activeGraph(page)).toContainText('Long');
+
+    const graph = activeGraph(page);
+    await graph.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('menuitem', { name: 'New Graph' }).click();
+    await expect(activeGraph(page)).toContainText('Graph 1');
+  },
+);
+
+test(
+  'recolouring the active Graph persists the stored colour',
+  { tag: '@parity:command-dock-recolors-graph' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await recolorActiveGraph(page, 'Green');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+    const menu = await graphMenu(page);
+    await menu.getByRole('menuitem', { name: 'Colour' }).click();
+    const palette = page.getByRole('menu').last();
+    await expect(
+      palette.getByRole('menuitemradio', { name: 'Green', exact: true }),
+    ).toHaveAttribute('aria-checked', 'true');
+  },
+);
+
+test(
+  'Delete Graph removes the active Graph and withholds the last one',
+  { tag: '@parity:command-dock-deletes-graph' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 2');
+    await settled(page);
+
+    const lone = await graphMenu(page);
+    await expect(lone.getByRole('menuitem', { name: 'Delete Echo' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await page.keyboard.press('Escape');
+
+    await selectCanvas(page, 'Collection 1');
+    await newGraph(page);
+    await expect(activeGraph(page)).toContainText('Graph 1');
+    await deleteActiveGraph(page);
+    await expect(activeGraph(page)).toContainText('Long');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  },
+);
 
 test(
   'adding an existing Thing from the Things list authors Diagram membership',

@@ -18,6 +18,7 @@ import {
   createThing,
   createThingControl,
   deleteDiagramItem,
+  deleteGraphItem,
   identityRenameItem,
   newGraphItem,
   newDiagramItem,
@@ -110,6 +111,27 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
  * The same Space with a second Diagram, so a location can name a Diagram the
  * Space does not open on by default.
  */
+/** The default Diagram with two Graphs so Delete Graph is available. */
+const twoGraphs: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    diagrams: [
+      {
+        ...snapshot.document.diagrams![0]!,
+        graphs: [
+          {
+            id: GRAPH_ID,
+            title: 'Graph',
+            edges: [{ from: THING_ID, to: OTHER_THING_ID }],
+          },
+          { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+        ],
+      },
+    ],
+  },
+});
+
 const secondDiagram: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
@@ -327,6 +349,26 @@ describe('authoring a Thing title on the graph', () => {
 
     fireEvent.click(newGraph);
     expect(session.getState().working.document.diagrams?.[0]?.graphs).toHaveLength(1);
+    await settled(session);
+  });
+
+  it('withdraws Delete Graph while a Thing title editor holds a refused draft', async () => {
+    const session = mount(twoGraphs);
+    await screen.findByTestId('selected-canvas');
+    await waitFor(() => expect(unavailable(deleteGraphItem('Graph'))).toBe(false));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+    const input = screen.getByRole('textbox', { name: 'Thing title' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('A Thing title is required.');
+
+    const deleteGraph = deleteGraphItem('Graph');
+    expect(unavailable(deleteGraph)).toBe(true);
+
+    fireEvent.click(deleteGraph);
+    expect(session.getState().working.document.diagrams?.[0]?.graphs).toHaveLength(2);
     await settled(session);
   });
 
