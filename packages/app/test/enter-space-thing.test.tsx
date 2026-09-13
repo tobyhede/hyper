@@ -11,10 +11,10 @@ import { dock, exitSpaceItem } from './command-dock';
  * Entering a Space Thing from its rail (ADR 0068, ADR 0073).
  *
  * This file mounts `OpenSpacesApplication` and presses the Thing's Enter
- * command. It holds the canvas swap, the selection the Thing seeds, an
- * already-open Space keeping its live selection, a failed Enter reported on
- * the Space being left, Escape not exiting, and Exit then Enter seeding from
- * the Thing again.
+ * command. It holds the canvas swap, the selection the Thing seeds — including
+ * after Open has already embedded the target — an already-open Space keeping
+ * its live selection, a failed Enter reported on the Space being left, Escape
+ * not exiting, and Exit then Enter seeding from the Thing again.
  */
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -223,6 +223,20 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
     // Two Spaces open and one crossing: the bar names the Space one step up
     // rather than disclosing the set (ADR 0068, ADR 0082).
     expect(within(dock()).getByRole('button', { name: 'Go to Home' })).toBeVisible();
+  });
+
+  it('seeds from the Thing after Open, because embed is not a prior Enter', async () => {
+    const spaces = await mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Thing Architecture' }));
+    await waitFor(() => expect(spaces.entry(TARGET_ID)).toBeDefined());
+    expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
+
+    await enterArchitecture();
+
+    expect(spaces.entry(TARGET_ID)?.app.navigation.getState()).toMatchObject({
+      selectedDiagramId: SELECTED_DIAGRAM_ID,
+      activeGraphId: SELECTED_GRAPH_ID,
+    });
   });
 
   it('focuses an already-open Space and keeps the live selection', async () => {

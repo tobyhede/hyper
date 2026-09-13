@@ -1044,15 +1044,11 @@ export const createApp = (
         if (spaces === null) return;
         const thing = renderedSpace.lookup.thing(thingId);
         if (thing?.kind !== 'space') return;
-        const existing = spaces.entry(thing.spaceId);
         const title = titleName(thing.title);
         setSpaceCommandBreak(null);
         void (async () => {
           try {
-            const opened = await spaces.enter(thing.spaceId, thing.diagram);
-            if (existing === undefined) {
-              opened.app.navigation.activateGraph(thing.graph);
-            }
+            await spaces.enter(thing.spaceId, thing.diagram, thing.graph);
           } catch (failure) {
             reportBreak(failure);
             setSpaceCommandBreak(`${title} could not be entered.`);

@@ -1,4 +1,4 @@
-import type { DiagramId, UUID } from '@project/core';
+import type { DiagramId, GraphId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
@@ -90,7 +90,7 @@ export interface OpenSpaces {
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
   }>;
-  readonly enter: (spaceId: UUID, selection?: DiagramId) => Promise<OpenSpace>;
+  readonly enter: (spaceId: UUID, selection?: DiagramId, graph?: GraphId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly exit: (
     spaceId: UUID,
@@ -164,6 +164,16 @@ export function createOpenSpaces({
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
+  /**
+   * Entries that have been the canvas, not merely composed for an embed.
+   *
+   * Embed adds an Open Spaces entry without activating it (`embed` holds
+   * `activeSpaceId` on the containing Space). Enter is the first canvas
+   * showing, so it still seeds from the Thing — held by
+   * `packages/app/test/enter-space-thing.test.tsx`. A later Enter keeps the
+   * live selection, which that file's already-open case holds.
+   */
+  const shownOnCanvas = new WeakSet<OpenSpace>();
   const browserLocation = createBrowserLocation(history, report, async (pathname) => {
     await openPath(pathname);
   });
@@ -276,6 +286,7 @@ export function createOpenSpaces({
    */
   const include = (entry: OpenSpace, activeSpaceId: UUID, from: UUID | null): void => {
     const state = observable.getState();
+    if (activeSpaceId === entry.id) shownOnCanvas.add(entry);
     if (state.entries.some(({ id }) => id === entry.id)) {
       if (state.activeSpaceId === activeSpaceId) return;
       observable.publish({ ...state, activeSpaceId });
@@ -404,8 +415,19 @@ export function createOpenSpaces({
    * reader was standing in when they pressed — not whichever Space the canvas
    * happens to hold once the load settles.
    */
-  const enter = (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> =>
-    activate(spaceId, selection, observable.getState().activeSpaceId);
+  const enter = async (
+    spaceId: UUID,
+    selection?: DiagramId,
+    graph?: GraphId,
+  ): Promise<OpenSpace> => {
+    const current = observable.getState().entries.find(({ id }) => id === spaceId);
+    const seed = current === undefined || !shownOnCanvas.has(current);
+    const opened = await activate(spaceId, selection, observable.getState().activeSpaceId);
+    if (!seed) return opened;
+    if (selection !== undefined) opened.app.navigation.selectDiagram(selection);
+    if (graph !== undefined) opened.app.navigation.activateGraph(graph);
+    return opened;
+  };
 
   /**
    * Open a target for embedded editing without taking the canvas off the Space
