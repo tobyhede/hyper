@@ -263,11 +263,14 @@ export const createApp = (
       [],
     );
     /**
-     * Open one address in a new browsing context, answering whether it opened.
+     * Open one address in a new browsing context, answering whether `open` ran.
      *
      * The URL is the browser location's (ADR 0081); opening it is this
      * surface's, the same split Copy link already takes. A Space Thing spends
-     * this on the Space it shows, at that Space's own address.
+     * this on the Space it shows, at that Space's own address. With
+     * `noopener`, a tab that did open and a blocked popup both return `null`,
+     * so the boolean is not a success signal — only a missing `open` or a throw
+     * is an honest failure.
      */
     const openProductDestination = useCallback((destination: ProductDestination): boolean => {
       return openIndependently(browserLocation.href(destination));

@@ -489,9 +489,7 @@ export const OpenIndependently: Story = () => {
         entityActions={entityActions}
       />
       <p className="mt-3 text-xs text-muted-foreground" data-testid="independent-open-report">
-        {opened?.kind === 'space'
-          ? `Opened space ${opened.spaceId} independently.`
-          : 'Not opened independently.'}
+        {opened?.kind === 'space' ? `Sent space ${opened.spaceId} to a new tab.` : 'Not sent.'}
       </p>
     </div>
   );

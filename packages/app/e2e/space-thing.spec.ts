@@ -736,7 +736,7 @@ test(
       .click({ delay: 120 });
     await expect(page.getByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
 
-    const popup = page.waitForEvent('popup').catch(() => null);
+    const popup = page.waitForEvent('popup');
     await page.getByRole('menuitem', { name: /^Open in new tab/ }).click();
     const independent = await popup;
 
@@ -744,10 +744,8 @@ test(
       .poll(() => page.evaluate(() => sessionStorage.getItem('opened-independently')))
       .toMatch(new RegExp(`${targetPath}$`));
     await expect(showingSpace(page)).toContainText('Diagram fixture');
-    if (independent !== null) {
-      await expect(independent).toHaveURL(new RegExp(`${targetPath}$`));
-      await expect(showingSpace(independent)).toContainText('Presentation');
-    }
+    await expect(independent).toHaveURL(new RegExp(`${targetPath}$`));
+    await expect(showingSpace(independent)).toContainText('Presentation');
   },
 );
 

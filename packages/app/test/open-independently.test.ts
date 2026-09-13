@@ -12,7 +12,7 @@ describe('openIndependently', () => {
     expect(openIndependently('https://space.test/spaces/x')).toBe(false);
   });
 
-  it('treats a null return as opened, which noopener always answers', () => {
+  it('treats a null return as sent, which noopener always answers', () => {
     const open = vi.fn(() => null);
     vi.stubGlobal('open', open);
 
