@@ -440,7 +440,7 @@ export function createOpenSpaces({
     const firstDisplay: FirstCanvasSeed = {};
     if (selection !== undefined) firstDisplay.selection = selection;
     if (graph !== undefined) firstDisplay.graph = graph;
-    return activate(spaceId, selection, observable.getState().activeSpaceId, firstDisplay);
+    return activate(spaceId, undefined, observable.getState().activeSpaceId, firstDisplay);
   };
 
   /**

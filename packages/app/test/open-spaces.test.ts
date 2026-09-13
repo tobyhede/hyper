@@ -517,6 +517,32 @@ describe('Open Spaces', () => {
     });
   });
 
+  it('does not apply a superseded Enter’s Diagram once a later activation owns the canvas', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const meta = await openSpaces.open(META_ID);
+    meta.session.submit(edit(meta.session.getState().working));
+    await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
+
+    // Enter numbers first and parks until Meta settles. Open is the later
+    // choice, so it owns the canvas. SECOND_DIAGRAM_ID is only applied by
+    // Enter's first-display seed — compose opens the Space on DIAGRAM_ID.
+    const entering = openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID);
+    await Promise.resolve();
+    const opening = openSpaces.open(OTHER_ID);
+
+    release();
+    await entering;
+    await opening;
+
+    expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+    expect(openSpaces.entry(OTHER_ID)?.app.navigation.getState()).toMatchObject({
+      selectedDiagramId: DIAGRAM_ID,
+      activeGraphId: GRAPH_ONE,
+    });
+  });
+
   it('reloads a Space chosen while its exit was still waiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
