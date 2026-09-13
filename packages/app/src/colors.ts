@@ -3,12 +3,11 @@ import type { Space } from '@project/graph';
 /**
  * Tableau Classic 20 — twenty curated categorical colours (dark/light pairs).
  *
- * Source: Tableau's discontinued **Tableau Classic 20** palette (Preferences.tps
- * in Tableau Desktop help). The same twenty hex values; order here is for the
- * two-column swatch picker — each hue's dark and light slots share a row, and
- * successive rows follow colour-wheel adjacency (blue → cyan → green → … → grey)
- * so related hues sit near each other vertically. {@link nextGraphColor} rotates
- * through this layout order rather than Tableau's categorical assignment order.
+ * The twenty hex values are Tableau Classic 20. Order here is for the two-column
+ * swatch picker — each hue's dark and light slots share a row, and successive rows
+ * follow colour-wheel adjacency (blue → cyan → green → … → grey) so related hues
+ * sit near each other vertically. `colors.test.ts` holds the layout; {@link nextGraphColor}
+ * rotates through it rather than Tableau's categorical assignment order.
  */
 export const GRAPH_PALETTE = [
   '#1f77b4', // blue

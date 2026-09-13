@@ -3,6 +3,9 @@ import { Check } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
+/** Panel sizing shared by the popover and Dock submenu surfaces that host the grid. */
+export const paletteSwatchPanelClassName = 'nokey w-[6.75rem] p-[0.6rem]';
+
 /** One closed-palette slot the picker may offer. */
 export interface PaletteColorEntry {
   readonly color: string;
@@ -18,7 +21,14 @@ export interface PaletteColorSwatchGridProps {
   readonly className?: string;
 }
 
-/** A closed palette drawn as a swatch grid — shared by the popover and menu surfaces. */
+/**
+ * A closed palette drawn as a swatch grid — shared by the popover and menu surfaces.
+ *
+ * Deviation: hand-rolled `role="radio"` buttons rather than a registry RadioGroup —
+ * the grid mounts inside a popover or submenu panel, not a Menu radio list, and needs
+ * a two-column swatch layout. Behaviour is held by `PaletteColorPicker.test.tsx` and
+ * the Dock/application recolour parity tests.
+ */
 export function PaletteColorSwatchGrid({
   entries,
   value,
@@ -126,7 +136,7 @@ export function PaletteColorPicker({
       >
         {trigger ?? 'Choose colour'}
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className="nokey w-[6.75rem] p-[0.6rem]">
+      <PopoverContent side={side} align={align} className={paletteSwatchPanelClassName}>
         <PaletteColorSwatchGrid
           entries={entries}
           value={value}

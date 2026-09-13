@@ -345,7 +345,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Colour… in the Graph menu opens a palette-bound swatch grid listing every Tableau slot with its label; choosing one recolours the Active Graph.',
+      'Colour… in the Graph menu opens a palette-bound swatch grid offering every Tableau Classic 20 slot, each named in its accessible label; choosing one recolours the Active Graph.',
   },
   {
     id: 'palette-color-picker-chooses-a-closed-palette-colour',
@@ -354,7 +354,7 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'A closed palette opens as a swatch grid in a popover; the chosen swatch is visibly selected and choosing one invokes the caller and closes the popover.',
     applicationEvidence:
-      'The Command Dock mounts this component for Graph recolour; `command-dock-recolors-graph-through-swatch-picker` in editing.spec.ts exercises that path through the real authoring stack.',
+      'The Command Dock embeds the shared `PaletteColorSwatchGrid` for Graph recolour in a submenu; this story covers the popover wrapper. `command-dock-recolors-graph-through-swatch-picker` in editing.spec.ts exercises recolour through the real authoring stack.',
   },
   {
     id: 'command-dock-edits-identity-names',

@@ -76,6 +76,24 @@ describe('PaletteColorPicker', () => {
     expect(screen.getByRole('radio', { name: 'Blue' })).toHaveAttribute('aria-checked', 'false');
   });
 
+  it('draws one radio per palette entry', () => {
+    const fullPalette = Array.from({ length: 20 }, (_, index) => ({
+      color: `#${index.toString(16).padStart(6, '0')}`,
+      label: `Slot ${index}`,
+    }));
+
+    render(
+      <PaletteColorSwatchGrid
+        entries={fullPalette}
+        value="#000000"
+        onValueChange={() => undefined}
+        aria-label="Graph colour"
+      />,
+    );
+
+    expect(screen.getAllByRole('radio')).toHaveLength(20);
+  });
+
   it('names swatches for accessibility without drawing visible labels', () => {
     render(
       <PaletteColorSwatchGrid

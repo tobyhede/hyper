@@ -89,6 +89,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   PaletteColorSwatchGrid,
+  paletteSwatchPanelClassName,
   DeleteIcon,
   EditIcon,
   FALLBACK_GRAPH_COLOR,
@@ -1198,15 +1199,15 @@ function GraphIdentityMenu({
                 **Colour… opens a palette-bound swatch grid**, not an inline
                 radio list: twenty Tableau slots need a grid, and the closed
                 palette lives in `colors.ts` either way. The grid is the shared
-                {@link PaletteColorSwatchGrid} from `@project/ui`, mounted in a
-                submenu surface here because a menu row cannot host a popover
-                trigger beside an open list. */}
+                swatch component from `@project/ui`, mounted in a submenu here
+                because a menu row cannot host a popover trigger beside an open
+                list — `command-dock-recolors-graph-through-swatch-picker`. */}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
           <GraphIcon color={graph.activeColor} size={14} />
           Colour…
         </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="nokey w-[6.75rem] p-[0.6rem]">
+        <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
           <PaletteColorSwatchGrid
             entries={GRAPH_PALETTE_ENTRIES}
             value={graph.active.color}

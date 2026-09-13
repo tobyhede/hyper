@@ -299,7 +299,9 @@ export async function graphChoices(page: Page): Promise<Locator> {
 export async function openGraphColourPicker(page: Page): Promise<void> {
   const menu = await graphMenu(page);
   await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
-  await expect(page.getByRole('radio', { name: 'Orange', exact: true })).toBeVisible();
+  const group = page.getByRole('radiogroup', { name: 'Graph colour' });
+  await expect(group.getByRole('radio')).toHaveCount(20);
+  await expect(group.getByRole('radio', { name: 'Orange', exact: true })).toBeVisible();
 }
 
 /** Recolour the Active Graph through the swatch popover. */

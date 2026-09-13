@@ -81,7 +81,11 @@ export type {
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';
 export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
-export { PaletteColorPicker, PaletteColorSwatchGrid } from './PaletteColorPicker';
+export {
+  PaletteColorPicker,
+  PaletteColorSwatchGrid,
+  paletteSwatchPanelClassName,
+} from './PaletteColorPicker';
 export type {
   PaletteColorEntry,
   PaletteColorPickerProps,
