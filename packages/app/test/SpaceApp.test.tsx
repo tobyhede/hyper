@@ -546,8 +546,12 @@ describe('Space app failure reporting', () => {
    * nothing outside the popup.
    */
   it.each([
-    { entity: 'Actions for Thing Thing', command: /^Copy link/, reportsInPlace: true },
-    { entity: 'Actions for Thing Thing', command: /^Copy permanent link/, reportsInPlace: true },
+    {
+      entity: 'Actions for Thing Thing',
+      command: 'Copy Link to Card in Diagram',
+      reportsInPlace: true,
+    },
+    { entity: 'Actions for Thing Thing', command: 'Copy Link to Card', reportsInPlace: true },
     { entity: 'Active Graph: Graph', command: /^Copy link/, reportsInPlace: false },
     { entity: 'Active Graph: Graph', command: /^Copy permanent link/, reportsInPlace: false },
   ])(

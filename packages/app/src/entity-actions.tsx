@@ -1,5 +1,4 @@
 import {
-  titleName,
   type Thing,
   type Graph,
   type GraphId,
@@ -150,6 +149,8 @@ export interface SpaceEntityActionsOptions {
  */
 const COPY_LINK = 'Copy link';
 const COPY_PERMANENT_LINK = 'Copy permanent link';
+const THING_COPY_LINK_IN_DIAGRAM = 'Copy Link to Card in Diagram';
+const THING_COPY_LINK = 'Copy Link to Card';
 
 /**
  * What a copy command's own label says when the clipboard refused it.
@@ -165,13 +166,11 @@ const NOT_COPIED = 'Not copied';
 const copy = (
   id: string,
   label: string,
-  description: string,
   destination: ProductDestination,
   onCopy: SpaceEntityActionsOptions['onCopy'],
 ): EntityAction => ({
   id,
   label,
-  description,
   report: { done: 'Copied', failed: NOT_COPIED },
   icon: <CopyIcon />,
   // The item reports on the copy, so the copy is what is waited for. `async`
@@ -184,7 +183,7 @@ const copy = (
 
 export function spaceEntityActions({
   spaceId,
-  spaceTitle,
+  spaceTitle: _spaceTitle,
   onCopy,
   onRename,
   onDeleteDiagram,
@@ -227,34 +226,14 @@ export function spaceEntityActions({
       // means is a product decision `.scratch/link-ux` has not taken, so the
       // behaviour stands and the item's own sentence says plainly where it
       // lands rather than implying the screen.
-      return [
-        [],
-        [
-          copy(
-            COPY_LINK_ACTION_ID,
-            COPY_LINK,
-            `Opens ${spaceTitle} at the Diagram it opens on`,
-            { kind: 'space', spaceId },
-            onCopy,
-          ),
-        ],
-        [],
-      ];
+      return [[], [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'space', spaceId }, onCopy)], []];
     }
 
     if (entity.kind === 'diagram') {
       const { id: diagramId, title } = entity.diagram;
       return [
         renameAction({ kind: 'diagram', id: diagramId }, title),
-        [
-          copy(
-            COPY_LINK_ACTION_ID,
-            COPY_LINK,
-            `Opens ${title} exactly as it draws now`,
-            { kind: 'diagram', spaceId, diagramId },
-            onCopy,
-          ),
-        ],
+        [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'diagram', spaceId, diagramId }, onCopy)],
         onDeleteDiagram === null
           ? []
           : [
@@ -287,14 +266,12 @@ export function spaceEntityActions({
           copy(
             COPY_LINK_ACTION_ID,
             COPY_LINK,
-            `Opens ${graph.title} inside ${diagram.title}`,
             { kind: 'diagram-graph', spaceId, diagramId: diagram.id, graphId: graph.id },
             onCopy,
           ),
           copy(
             COPY_PERMANENT_LINK_ACTION_ID,
             COPY_PERMANENT_LINK,
-            `Always opens ${graph.title}, in whichever Diagram draws it`,
             { kind: 'graph', spaceId, graphId: graph.id },
             onCopy,
           ),
@@ -304,8 +281,6 @@ export function spaceEntityActions({
     }
 
     const { thing, diagram } = entity;
-    // A menu row names the Thing, so it says the Thing's name (ADR 0083).
-    const thingName = titleName(thing.title);
     const permanent: ProductDestination = { kind: 'thing', spaceId, thingId: thing.id };
     // A Diagram's members *are* its position keys (ADR 0040). A Thing the Things
     // drawer reveals but this Diagram does not place has no within-Diagram
@@ -321,28 +296,13 @@ export function spaceEntityActions({
         ? [
             copy(
               COPY_LINK_ACTION_ID,
-              COPY_LINK,
-              `Opens ${thingName} inside ${diagram.title}, selected the way it is now`,
+              THING_COPY_LINK_IN_DIAGRAM,
               { kind: 'diagram-thing', spaceId, diagramId: diagram.id, thingId: thing.id },
               onCopy,
             ),
-            copy(
-              COPY_PERMANENT_LINK_ACTION_ID,
-              COPY_PERMANENT_LINK,
-              `Always opens ${thingName} on its own, wherever it is placed`,
-              permanent,
-              onCopy,
-            ),
+            copy(COPY_PERMANENT_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy),
           ]
-        : [
-            copy(
-              COPY_LINK_ACTION_ID,
-              COPY_LINK,
-              `Opens ${thingName} on its own — ${diagram.title} does not place it`,
-              permanent,
-              onCopy,
-            ),
-          ],
+        : [copy(COPY_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy)],
       [],
     ];
   };

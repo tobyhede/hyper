@@ -8,6 +8,7 @@ import {
   AppShell,
   DeleteIcon,
   FALLBACK_GRAPH_COLOR,
+  RemoveFromDiagramIcon,
   ThingKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -1132,7 +1133,9 @@ export const createApp = (
                 {
                   id: 'remove-from-diagram',
                   label: 'Remove from Diagram',
+                  icon: <RemoveFromDiagramIcon />,
                   onSelect: (): EntityActionOutcome => {
+                    setThingDeletionRefusal(null);
                     const result = authoring.complete({
                       kind: 'removed-thing-from-diagram',
                       thingId: thing.id,
@@ -1149,10 +1152,11 @@ export const createApp = (
             ? [
                 {
                   id: 'delete-thing',
-                  // "Delete Thing", not "Delete Thing <title>": the menu that draws
-                  // this item is already named for the Thing it belongs to, and the
-                  // Diagram menu's own destructive command is spelled the same way.
-                  label: 'Delete Thing',
+                  // "Delete from Space", not "Delete from Space <title>": the menu
+                  // that draws this item is already named for the Thing it belongs
+                  // to, and the Diagram menu's own destructive command is spelled
+                  // the same way.
+                  label: 'Delete from Space',
                   icon: <DeleteIcon />,
                   variant: 'destructive' as const,
                   // **It asks, and the confirmation runs it.** Deleting a Thing is

@@ -26,6 +26,7 @@ import {
   CommitEditIcon,
   EditIcon,
   EnterSpaceIcon,
+  EntityActionsIcon,
   GraphIcon,
   DiagramIcon,
   OpenThingIcon,
@@ -415,6 +416,7 @@ export function CanvasThing(props: CanvasThingProps) {
                 <EntityActionsTrigger
                   groups={entityActions}
                   label={`Actions for Thing ${name}`}
+                  icon={<EntityActionsIcon />}
                   render={<ThingRailAction />}
                 />
               )}

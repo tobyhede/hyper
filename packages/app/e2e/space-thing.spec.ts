@@ -193,8 +193,8 @@ test('stops offering a Space the moment the last Space Thing referencing it is d
   await thing.click();
   await thing.hover();
   await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click({ delay: 120 });
-  await page.getByRole('menuitem', { name: 'Delete Thing' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete Thing' }).click();
+  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete from Space' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
 
   // The Space went with its last reference, so the cube goes with it — and the
@@ -361,13 +361,13 @@ test('deleting the last Space Thing deletes the Space it referenced', async ({ p
   await created
     .getByRole('button', { name: 'Actions for Thing Architecture', exact: true })
     .click({ delay: 120 });
-  await page.getByRole('menuitem', { name: 'Delete Thing' }).click();
+  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
   await expect(
     page.getByText(
       'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
     ),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Delete Thing', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete from Space', exact: true }).click();
 
   await settled(page);
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);

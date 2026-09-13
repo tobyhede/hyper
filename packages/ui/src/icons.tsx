@@ -21,6 +21,7 @@ import {
   Square,
   StickyNote,
   Trash2,
+  Unlink,
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
@@ -366,3 +367,8 @@ export const CopyIcon = (props: ThingActionIconProps) => <Copy size={14} {...pro
 
 /** Remove the entity the surrounding command names. */
 export const DeleteIcon = (props: ThingActionIconProps) => <Trash2 size={14} {...props} />;
+
+/** Remove a Thing from this Diagram while it stays in the Space. */
+export const RemoveFromDiagramIcon = (props: ThingActionIconProps) => (
+  <Unlink size={14} {...props} />
+);

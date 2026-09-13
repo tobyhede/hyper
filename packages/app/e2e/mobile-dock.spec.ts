@@ -177,15 +177,23 @@ test('Delete Thing confirms at phone width with the pointer', async ({ page }) =
 
   const thing = nodeByTitle(page, 'B');
   await thing.click();
-  await (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }).click();
+  await (
+    await thingActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
 
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete Thing B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(thing).toBeVisible();
 
-  await (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }).click();
-  await confirmation.getByRole('button', { name: 'Delete Thing' }).click();
+  await (
+    await thingActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
+  await confirmation.getByRole('button', { name: 'Delete from Space' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Things' }).click();
@@ -203,16 +211,16 @@ test('Delete Thing confirms at phone width from the keyboard', async ({ page }) 
   await thing.click();
   await thing.getByRole('button', { name: 'Actions for Thing B' }).press('Enter');
   await expect(page.getByRole('menu')).toBeVisible();
-  await page.getByRole('menuitem', { name: 'Delete Thing' }).press('Enter');
+  await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
 
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete Thing B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).press('Enter');
   await expect(thing).toBeVisible();
 
   await thing.getByRole('button', { name: 'Actions for Thing B' }).press('Enter');
-  await page.getByRole('menuitem', { name: 'Delete Thing' }).press('Enter');
-  await confirmation.getByRole('button', { name: 'Delete Thing' }).press('Enter');
+  await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
+  await confirmation.getByRole('button', { name: 'Delete from Space' }).press('Enter');
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Things' }).click();

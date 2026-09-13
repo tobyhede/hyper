@@ -173,33 +173,13 @@ describe('spaceEntityActions', () => {
       diagram: DIAGRAM,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy link', 'Copy permanent link']);
-    expect(copied(entity, 'Copy link')).toEqual({
+    expect(labels(build()(entity))).toEqual(['Copy Link to Card in Diagram', 'Copy Link to Card']);
+    expect(copied(entity, 'Copy Link to Card in Diagram')).toEqual({
       kind: 'diagram-thing',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
       thingId: PLACED_THING_ID,
     });
-  });
-
-  /**
-   * A menu row refers to a Thing, so its sentence names the Thing's **name**
-   * (ADR 0083). The description is one line of prose beneath a label, and a
-   * Title's later lines reaching it would break the sentence in half.
-   */
-  it('describes a Thing’s addresses by the Thing’s name', () => {
-    const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: thing(PLACED_THING_ID, 'Auth\nHow a session begins'),
-      diagram: DIAGRAM,
-    };
-
-    const written = commands(build()(entity))
-      .map((action) => action.description ?? '')
-      .join(' ');
-
-    expect(written).toContain('Opens Auth inside');
-    expect(written).not.toContain('How a session begins');
   });
 
   /**
@@ -214,8 +194,8 @@ describe('spaceEntityActions', () => {
       diagram: DIAGRAM,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy link']);
-    expect(copied(entity, 'Copy link')).toEqual({
+    expect(labels(build()(entity))).toEqual(['Copy Link to Card']);
+    expect(copied(entity, 'Copy Link to Card')).toEqual({
       kind: 'thing',
       spaceId: SPACE_ID,
       thingId: OUTSIDE_THING_ID,
@@ -223,7 +203,7 @@ describe('spaceEntityActions', () => {
   });
 
   /** Every address command confirms in place, which is what holds the menu open. */
-  it('confirms every copy and describes where it lands', () => {
+  it('confirms every copy with an icon and no exposition line', () => {
     const copies = commands(build()({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM })).filter(
       (action) => action.label.startsWith('Copy'),
     );
@@ -231,7 +211,7 @@ describe('spaceEntityActions', () => {
     expect(copies).toHaveLength(2);
     for (const action of copies) {
       expect(action.report?.done).toBe('Copied');
-      expect(action.description).toBeTypeOf('string');
+      expect(action.description).toBeUndefined();
       expect(action.icon).toBeDefined();
     }
   });

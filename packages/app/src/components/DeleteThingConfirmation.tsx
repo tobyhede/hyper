@@ -66,7 +66,7 @@ export function DeleteThingConfirmation({
           {/* The Thing's **name**, which is how a control names a Thing: the
               ladder below the name is drawn on the Thing front and nowhere else
               (ADR 0083). */}
-          <AlertDialogTitle>Delete Thing {titleName(thing.title)}?</AlertDialogTitle>
+          <AlertDialogTitle>Delete from Space {titleName(thing.title)}?</AlertDialogTitle>
           <AlertDialogDescription>{DELETION_DESCRIPTIONS[thing.kind]}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -106,7 +106,7 @@ export function DeleteThingConfirmation({
               })();
             }}
           >
-            Delete Thing
+            Delete from Space
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
