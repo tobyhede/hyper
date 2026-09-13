@@ -992,16 +992,8 @@ function DiagramControls({
             : (title) => canvas.onRename?.(canvas.selected.id, title) ?? null
         }
       >
-        {({ trigger, renameItem, triggerId, open, onOpenChange }) => (
-          <DiagramIdentityMenu
-            canvas={canvas}
-            side={side}
-            trigger={trigger}
-            renameItem={renameItem}
-            triggerId={triggerId}
-            open={open}
-            onOpenChange={onOpenChange}
-          />
+        {(disclosure) => (
+          <DiagramIdentityMenu canvas={canvas} side={side} disclosure={disclosure} />
         )}
       </IdentitySurface>
     </ToolbarGroup>
@@ -1018,20 +1010,13 @@ function DiagramControls({
 function DiagramIdentityMenu({
   canvas,
   side,
-  trigger,
-  renameItem,
-  triggerId,
-  open,
-  onOpenChange,
+  disclosure,
 }: {
   readonly canvas: DockCanvas;
   readonly side: MenuSide;
-  readonly trigger: ReactNode;
-  readonly renameItem: ReactNode;
-  readonly triggerId: string;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
+  readonly disclosure: IdentityDisclosure;
 }) {
+  const { trigger, renameItem, triggerId, open, onOpenChange } = disclosure;
   const { noteCaretMoved, restoresFocusOnClose } = useIdentityCaret();
   return (
     <ChoiceMenu<DiagramId>
@@ -1168,16 +1153,12 @@ function GraphControls({
             : (title) => graph.onRename?.(graph.active.id, title) ?? null
         }
       >
-        {({ trigger, renameItem, triggerId, open, onOpenChange }) => (
+        {(disclosure) => (
           <GraphIdentityMenu
             graph={graph}
             diagramTitle={diagramTitle}
             side={side}
-            trigger={trigger}
-            renameItem={renameItem}
-            triggerId={triggerId}
-            open={open}
-            onOpenChange={onOpenChange}
+            disclosure={disclosure}
           />
         )}
       </IdentitySurface>
@@ -1196,21 +1177,14 @@ function GraphIdentityMenu({
   graph,
   diagramTitle,
   side,
-  trigger,
-  renameItem,
-  triggerId,
-  open,
-  onOpenChange,
+  disclosure,
 }: {
   readonly graph: DockGraph;
   readonly diagramTitle: string;
   readonly side: MenuSide;
-  readonly trigger: ReactNode;
-  readonly renameItem: ReactNode;
-  readonly triggerId: string;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
+  readonly disclosure: IdentityDisclosure;
 }) {
+  const { trigger, renameItem, triggerId, open, onOpenChange } = disclosure;
   const { restoresFocusOnClose } = useIdentityCaret();
   return (
     <ChoiceMenu<GraphId>
@@ -1763,20 +1737,13 @@ function ThingsControl({
 function SpaceMenu({
   space,
   side = 'bottom',
-  trigger,
-  renameItem,
-  triggerId,
-  open,
-  onOpenChange,
+  disclosure,
 }: {
   readonly space: DockSpace;
   readonly side?: MenuSide;
-  readonly trigger: ReactNode;
-  readonly renameItem: ReactNode;
-  readonly triggerId: string;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
+  readonly disclosure: IdentityDisclosure;
 }) {
+  const { trigger, renameItem, triggerId, open, onOpenChange } = disclosure;
   const { restoresFocusOnClose } = useIdentityCaret();
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
@@ -2209,17 +2176,7 @@ function SpacesControl({
           triggerTitle="Space commands"
           onRename={space.onRename}
         >
-          {({ trigger, renameItem, triggerId, open, onOpenChange }) => (
-            <SpaceMenu
-              space={space}
-              side={side}
-              trigger={trigger}
-              renameItem={renameItem}
-              triggerId={triggerId}
-              open={open}
-              onOpenChange={onOpenChange}
-            />
-          )}
+          {(disclosure) => <SpaceMenu space={space} side={side} disclosure={disclosure} />}
         </IdentitySurface>
       </ToolbarGroup>
       {/* Outside the menu that spends it: the menu closes on the press, and a
