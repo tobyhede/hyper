@@ -1206,7 +1206,7 @@ function GraphIdentityMenu({
           <GraphIcon color={graph.activeColor} size={14} />
           Colour…
         </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="nokey w-[15.5rem] p-[0.6rem]">
+        <DropdownMenuSubContent className="nokey w-[6.75rem] p-[0.6rem]">
           <PaletteColorSwatchGrid
             entries={GRAPH_PALETTE_ENTRIES}
             value={graph.active.color}

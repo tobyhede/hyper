@@ -1,32 +1,36 @@
 import type { Space } from '@project/graph';
 
 /**
- * Tableau 20 — twenty curated categorical colours (dark/light pairs).
+ * Tableau Classic 20 — twenty curated categorical colours (dark/light pairs).
  *
- * Source: Tableau 10/20 qualitative palettes (Tableau Software / palettable
- * `Tableau_20`).
+ * Source: Tableau's discontinued **Tableau Classic 20** palette (Preferences.tps
+ * in Tableau Desktop help). The same twenty hex values; order here is for the
+ * two-column swatch picker — each hue's dark and light slots share a row, and
+ * successive rows follow colour-wheel adjacency (blue → cyan → green → … → grey)
+ * so related hues sit near each other vertically. {@link nextGraphColor} rotates
+ * through this layout order rather than Tableau's categorical assignment order.
  */
 export const GRAPH_PALETTE = [
   '#1f77b4', // blue
   '#aec7e8', // blue light
-  '#ff7f0e', // orange
-  '#ffbb78', // orange light
+  '#17becf', // cyan
+  '#9edae5', // cyan light
   '#2ca02c', // green
   '#98df8a', // green light
+  '#bcbd22', // olive
+  '#dbdb8d', // olive light
+  '#ff7f0e', // orange
+  '#ffbb78', // orange light
   '#d62728', // red
   '#ff9896', // red light
+  '#e377c2', // pink
+  '#f7b6d2', // pink light
   '#9467bd', // purple
   '#c5b0d5', // purple light
   '#8c564b', // brown
   '#c49c94', // brown light
-  '#e377c2', // pink
-  '#f7b6d2', // pink light
   '#7f7f7f', // grey
   '#c7c7c7', // grey light
-  '#bcbd22', // olive
-  '#dbdb8d', // olive light
-  '#17becf', // cyan
-  '#9edae5', // cyan light
 ] as const;
 
 /** Short hue names for every {@link GRAPH_PALETTE} slot — keyed by colour hex. */

@@ -15,7 +15,7 @@ export const Default: Story = () => {
     <div className="inv inv-sheet">
       <CatalogueSection
         title="Palette colour picker"
-        note="A caller-supplied closed palette opens in a popover swatch grid. The chosen swatch is visibly selected and choosing one closes the popover."
+        note="A caller-supplied closed palette opens in a popover swatch grid. Each slot is a colour swatch only — names stay in the accessible label and tooltip. The chosen swatch is visibly selected and choosing one closes the popover."
       >
         <Specimen label={color}>
           <PaletteColorPicker

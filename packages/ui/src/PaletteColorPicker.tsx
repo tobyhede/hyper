@@ -31,7 +31,7 @@ export function PaletteColorSwatchGrid({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={cn('grid grid-cols-4 gap-[0.35rem]', className)}
+      className={cn('grid grid-cols-2 gap-[0.35rem]', className)}
     >
       {entries.map(({ color, label }) => {
         const selected = value === color;
@@ -46,14 +46,14 @@ export function PaletteColorSwatchGrid({
             disabled={disabled}
             data-testid={`palette-swatch-${label.replace(/\s+/g, '-').toLowerCase()}`}
             className={cn(
-              'flex cursor-pointer flex-col items-center gap-[0.25rem] rounded-[6px] border border-transparent px-[0.25rem] py-[0.35rem] text-[11px] text-muted-foreground transition-[background-color,border-color,color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
-              selected && 'border-border bg-accent text-foreground',
+              'flex cursor-pointer items-center justify-center rounded-[6px] border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
+              selected && 'border-border bg-accent',
             )}
             onClick={() => onValueChange(color)}
           >
             <span
               aria-hidden
-              className="relative h-[1.25rem] w-[1.25rem] rounded-[4px] border border-border/60"
+              className="relative h-[1.35rem] w-[1.35rem] rounded-[4px] border border-border/60"
               style={{ backgroundColor: color }}
             >
               {selected ? (
@@ -65,7 +65,6 @@ export function PaletteColorSwatchGrid({
                 />
               ) : null}
             </span>
-            <span className="max-w-full truncate">{label}</span>
           </button>
         );
       })}
@@ -127,7 +126,7 @@ export function PaletteColorPicker({
       >
         {trigger ?? 'Choose colour'}
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className="nokey w-[15.5rem] p-[0.6rem]">
+      <PopoverContent side={side} align={align} className="nokey w-[6.75rem] p-[0.6rem]">
         <PaletteColorSwatchGrid
           entries={entries}
           value={value}

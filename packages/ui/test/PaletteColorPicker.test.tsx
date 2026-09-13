@@ -1,10 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { PaletteColorPicker, type PaletteColorEntry } from '../src/PaletteColorPicker';
+import {
+  PaletteColorPicker,
+  PaletteColorSwatchGrid,
+  type PaletteColorEntry,
+} from '../src/PaletteColorPicker';
 
 const entries: readonly PaletteColorEntry[] = [
   { color: '#1f77b4', label: 'Blue' },
   { color: '#ff7f0e', label: 'Orange' },
+];
+
+const tableauEntries: readonly PaletteColorEntry[] = [
+  { color: '#ffbb78', label: 'Orange light' },
+  { color: '#c5b0d5', label: 'Purple light' },
 ];
 
 beforeAll(() => {
@@ -65,5 +74,20 @@ describe('PaletteColorPicker', () => {
 
     expect(screen.getByRole('radio', { name: 'Orange' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Blue' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('names swatches for accessibility without drawing visible labels', () => {
+    render(
+      <PaletteColorSwatchGrid
+        entries={tableauEntries}
+        value="#ffbb78"
+        onValueChange={() => undefined}
+        aria-label="Graph colour"
+      />,
+    );
+
+    const orangeLight = screen.getByRole('radio', { name: 'Orange light' });
+    expect(orangeLight).toHaveAttribute('title', 'Orange light');
+    expect(orangeLight).toHaveTextContent('');
   });
 });

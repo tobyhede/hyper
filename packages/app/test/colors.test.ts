@@ -24,4 +24,9 @@ describe('GRAPH_PALETTE', () => {
     expect(seen.size).toBe(GRAPH_PALETTE.length);
     expect(nextGraphColor(GRAPH_PALETTE.length)).toBe(nextGraphColor(0));
   });
+
+  it('lays hue pairs out as dark then light in colour-wheel order for the swatch picker', () => {
+    expect(GRAPH_PALETTE.slice(0, 4)).toEqual(['#1f77b4', '#aec7e8', '#17becf', '#9edae5']);
+    expect(GRAPH_PALETTE.slice(-4)).toEqual(['#8c564b', '#c49c94', '#7f7f7f', '#c7c7c7']);
+  });
 });
