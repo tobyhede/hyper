@@ -42,6 +42,7 @@ import { usePlacementRendering } from './placement-rendering';
 import { THING_HEIGHT, THING_WIDTH, thingSizeVars } from './thing';
 import { canRetreat } from './navigation';
 import { copyLink } from './clipboard';
+import { openIndependently } from './open-independently';
 import {
   COPY_LINK_ACTION_ID,
   COPY_PERMANENT_LINK_ACTION_ID,
@@ -261,6 +262,16 @@ export const createApp = (
       },
       [],
     );
+    /**
+     * Open one address in a new browsing context, answering whether it opened.
+     *
+     * The URL is the browser location's (ADR 0081); opening it is this
+     * surface's, the same split Copy link already takes. A Space Thing spends
+     * this on the Space it shows, at that Space's own address.
+     */
+    const openProductDestination = useCallback((destination: ProductDestination): boolean => {
+      return openIndependently(browserLocation.href(destination));
+    }, []);
     /**
      * The outstanding request that the Dock disclose its Things list, if any.
      *
@@ -871,6 +882,7 @@ export const createApp = (
           spaceId: renderedSpace.id,
           spaceTitle: renderedSpace.title,
           onCopy: copyProductDestination,
+          onOpenIndependently: openProductDestination,
           // No Rename item: the Dock renames a Diagram and a Graph from Rename
           // in that identity's own list, so a row here would be a second path
           // to one command. The Thing rail is this builder's other consumer and
@@ -888,7 +900,16 @@ export const createApp = (
               }
             : null,
         }),
-      [renderedSpace.id, renderedSpace.title, copyProductDestination, availability.entityEdits],
+      // `authoring` is the composition's, closed over rather than rendered, so it
+      // is not a dependency a render can move. `thingDeletion` says the same of
+      // `spaceThings`.
+      [
+        renderedSpace.id,
+        renderedSpace.title,
+        copyProductDestination,
+        openProductDestination,
+        availability.entityEdits,
+      ],
     );
 
     /**

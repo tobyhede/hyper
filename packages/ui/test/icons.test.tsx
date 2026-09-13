@@ -8,6 +8,7 @@ import {
   CloseThingIcon,
   EditIcon,
   EnterSpaceIcon,
+  OpenIndependentlyIcon,
   FitViewIcon,
   GraphIcon,
   DiagramIcon,
@@ -57,6 +58,9 @@ describe('the public icon facade', () => {
         <span data-testid="enter-space">
           <EnterSpaceIcon />
         </span>
+        <span data-testid="open-independently">
+          <OpenIndependentlyIcon />
+        </span>
         <span data-testid="markdown">
           <MarkdownIcon />
         </span>
@@ -89,6 +93,7 @@ describe('the public icon facade', () => {
       'open-thing': 'maximize-2',
       'close-thing': 'minimize-2',
       'enter-space': 'log-in',
+      'open-independently': 'external-link',
       markdown: 'sticky-note',
       check: 'check',
       'zoom-in': 'plus',

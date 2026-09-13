@@ -9,7 +9,7 @@ context, or open the target independently at its canonical URL.
 which owns the Enter surface (`space-cards/01`'s Deferred section hands it
 there). `v1-release/01` was here and is now `resolved`.
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 Tags: release/v1
 
 - [x] Opening in place draws the target through the context the Card supplies and
@@ -48,13 +48,16 @@ Tags: release/v1
         `meta-space-permanent` refusal
         (`packages/app/src/open-spaces.ts:66-77`) is returned at `:552` and
         presented as "Meta cannot be closed." by `ExitSpaceControl.tsx:41-42`.
-- [ ] Opening independently uses the target Space's canonical address and
-      carries no containing navigation or presentation state. **Half-built.**
-      `packages/app/src/entity-actions.tsx:142-168` offers Copy link for a Space
-      entity, on the Space's own address and deliberately not the drawing
-      Layout's. Nothing offers it *from a Space Card*: the Card arm of the same
-      module (`:233-272`) copies the Card's own `layout-card` or `card`
-      destination, which is the containing address rather than the target's.
+- [x] Opening independently uses the target Space's canonical address and
+      carries no containing navigation or presentation state. A Space Thing's
+      menu still copies the Thing's own addresses as Copy link / Copy permanent
+      link. Beside them, Copy Space link and Open in new tab spend
+      `{ kind: 'space', spaceId: thing.spaceId }` — the target's own address,
+      not the containing Diagram's. `openIndependently` opens that URL in a new
+      browsing context (`_blank`, `noopener,noreferrer`); this tab and its Open
+      Spaces set are left alone. Held by
+      `packages/app/test/entity-actions.test.ts` and
+      `packages/app/test/thing-rail-actions.test.tsx`.
 - [x] Browser Back, Forward and reload reproduce addressable transitions without
       producing an Edit. `packages/app/src/browser-location.ts` decides
       `push | replace | none` from a pure comparison against what the current
@@ -69,8 +72,12 @@ Tags: release/v1
       UX work. The supplier is `resolved`; the presentation is
       `ExitSpaceControl`'s and stays open as UX with `space-cards/11` and
       `space-cards/12`.
-- [ ] Application and Ladle evidence prove the chosen current UX without making
-      that treatment an architectural constraint.
+- [x] Application and Ladle evidence prove the chosen current UX without making
+      that treatment an architectural constraint. Claim
+      `space-thing-opens-independently` on `OpenIndependently` in
+      `components/thing.stories.tsx`, with Ladle evidence in
+      `packages/app/ladle-e2e/thing.spec.ts` and the application press in
+      `packages/app/e2e/space-thing.spec.ts`.
 
 ## Deferred
 
@@ -103,3 +110,16 @@ The genuinely open work, so the next reader does not re-derive it:
   (`packages/graph/src/space-aggregate.ts:44` and `:203`,
   `packages/graph/src/validate.ts:281`) with a render-time guard at
   `packages/app/src/components/SpaceCanvas.tsx:331-332`.
+
+### 2026-09-13 — Independent open is a Space Thing menu, not a second Enter
+
+`space-cards/11` supplied Enter. This ticket's remaining cut is the target
+Space's own address, offered from the Space Thing:
+
+- **Copy Space link** copies `{ kind: 'space', spaceId: thing.spaceId }`.
+- **Open in new tab** opens that same URL in a new browsing context. It is a
+  link (ADR 0068): the application builds no tab of its own, records no opener,
+  and seeds no Diagram from the Thing.
+
+Write-back of a live selection onto the Thing remains `layout-only-v1/04` /
+ADR 0079 Ticket 04, not this cut-over.
