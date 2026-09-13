@@ -329,7 +329,13 @@ export function createOpenSpaces({
     const opened = {
       id: spaceId,
       session,
-      app: composeApp({ spaceSession: session, selection, newId, reportObserverError: report }),
+      app: composeApp({
+        spaceSession: session,
+        selection,
+        newId,
+        reportObserverError: report,
+        spaceThings,
+      }),
       spaceThings,
     };
     session.subscribe(() => {
@@ -569,6 +575,7 @@ export function createOpenSpaces({
     // `authoring.dispose` clearing the subscriber set the others registered in:
     // that is true today and is an ordering nothing here states or tests.
     target.app.edgeAuthoring.dispose();
+    target.app.thingDeletion.dispose();
     target.app.continuation.dispose();
     target.app.authoring.dispose();
     retired.add(target);

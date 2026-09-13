@@ -155,7 +155,7 @@ function mount(
     {
       id: runtime(mounted).id,
       session,
-      app: composeApp({ spaceSession: session }),
+      app: composeApp({ spaceSession: session, spaceThings }),
       spaceThings,
     },
     (app) => {

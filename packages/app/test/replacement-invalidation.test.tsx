@@ -150,7 +150,12 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
 
   let view: RenderResult | undefined;
   mountSpace(
-    { id: runtime(LOCAL).id, session, app: composeApp({ spaceSession: session }), spaceThings },
+    {
+      id: runtime(LOCAL).id,
+      session,
+      app: composeApp({ spaceSession: session, spaceThings }),
+      spaceThings,
+    },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
@@ -374,6 +379,25 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
       screen.queryByRole('textbox', { name: 'Space name', hidden: true }),
     ).not.toBeInTheDocument();
     expect(await screen.findByTestId('space-title')).toHaveTextContent('Remote space');
+  });
+
+  it('discards a Delete Thing confirmation when the stored Space is accepted', async () => {
+    const session = await mountedSpaceApp();
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing Local thing' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
+
+    expect(
+      await screen.findByRole('alertdialog', { name: 'Delete from Space Local thing?' }),
+    ).toBeVisible();
+
+    await raiseConflict(session);
+    acceptRemote();
+
+    await replacementLanded();
+    expect(
+      screen.queryByRole('alertdialog', { name: 'Delete from Space Local thing?' }),
+    ).not.toBeInTheDocument();
+    expect(session.getState().working.things.map(({ id }) => id)).toEqual([THING_ID]);
   });
 
   /**

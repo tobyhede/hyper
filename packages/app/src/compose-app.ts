@@ -4,6 +4,8 @@ import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
+import { createThingDeletion, type ThingDeletion } from './thing-deletion';
+import type { SpaceThingAuthoring } from './space-thing-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import { requireDefaultDiagram, resolveDiagram } from './diagram-resolution';
@@ -87,6 +89,8 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * with an option of its own, or answer a stand-in. The real one when absent.
    */
   readonly connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
+  /** Coordinated Space Thing deletion for the Delete Thing interaction. */
+  readonly spaceThings?: SpaceThingAuthoring | undefined;
 }
 
 /** The pair a connection completion is written in terms of. */
@@ -129,6 +133,8 @@ export interface ComposedApp extends AppCore {
    */
   readonly continuation: Continuation;
   readonly edgeAuthoring: EdgeAuthoring;
+  /** The Delete Thing confirmation interaction for this Space. */
+  readonly thingDeletion: ThingDeletion;
   /**
    * The sink this composition reports through, answered as well as taken.
    *
@@ -183,6 +189,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     initialPlacement,
     reportObserverError,
     connections,
+    spaceThings,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation, openingSelection } = core;
@@ -213,12 +220,19 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     reportObserverError,
   });
+  const thingDeletion = createThingDeletion({
+    authoring,
+    currentSpace,
+    spaceThings,
+    reportObserverError,
+  });
   return {
     ...core,
     authoring,
     adapter,
     continuation,
     edgeAuthoring,
+    thingDeletion,
     reportObserverError:
       reportObserverError ?? ((error) => console.error('Space composition observer failed', error)),
   };
