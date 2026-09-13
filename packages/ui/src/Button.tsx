@@ -3,8 +3,6 @@ import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from './lib/utils';
 
-const quietAppearance = 'border-transparent bg-transparent text-muted-foreground';
-
 /**
  * What a quiet button does when it is pointed at, disclosing, or unavailable.
  *
@@ -55,7 +53,7 @@ const buttonVariants = cva(
           'border-border bg-secondary text-secondary-foreground hover:border-accent disabled:opacity-50',
         destructive:
           'border-destructive bg-secondary text-destructive hover:border-accent disabled:opacity-50',
-        ghost: `${quietAppearance} ${quietFeedback}`,
+        ghost: `border-transparent bg-transparent text-muted-foreground ${quietFeedback}`,
         // A ghost at one step less ink, for a command that names somewhere the
         // reader is *not* — the Command Dock's parent crumb beside the Space
         // they are in. Every quiet control measures identically, so two of them
@@ -65,10 +63,6 @@ const buttonVariants = cva(
         // `transparent` rather than a second ink token so the step is taken
         // from whatever `--muted-foreground` is, in either theme.
         receded: `border-transparent bg-transparent text-[color-mix(in_oklab,var(--muted-foreground)_72%,transparent)] ${quietFeedback}`,
-        // For non-interactive labels beside commands: consume buttonVariants
-        // on a span, retaining the shared type and box without button semantics
-        // or hover feedback.
-        label: `${quietAppearance} cursor-default`,
         commit:
           'border-[3px] border-transparent border-b-primary bg-transparent text-foreground hover:border-primary disabled:opacity-50',
       },

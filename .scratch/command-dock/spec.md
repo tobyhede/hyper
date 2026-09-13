@@ -31,7 +31,7 @@ code is.
 **This effort predates ADR 0085.** Tickets written before it say Layout for
 Diagram and Card for Thing, and the table below quotes each file's own heading
 rather than correcting it. `13`, `14` and `15` carry a note giving the current
-names, because each is open and written throughout in the retired ones; `16`,
+names, because each is written throughout in the retired ones; `16`,
 `17` and `18` were written after the rename and need none. The resolved records
 keep Card and Layout as provenance, which is what ADR 0085 asks for.
 
@@ -51,14 +51,18 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [10](issues/10-decide-the-cards-surface.md) | Decide the Cards surface: popover or drawer | resolved |
 | [11](issues/11-restore-card-and-dock-behaviour-with-trustworthy-evidence.md) | Restore Card and Dock behaviour with trustworthy application evidence | resolved |
 | [12](issues/12-align-card-toolbars-with-the-command-dock.md) | Align Card hover toolbars with the Command Dock through shared components | resolved |
-| [13](issues/13-settle-new-layout-and-new-space-command-outcomes.md) | Settle New Layout and New Space command outcomes | needs-triage |
-| [14](issues/14-audit-canvas-decoration-invalidation-and-active-graph-consistency.md) | Audit canvas decoration invalidation and Active Graph consistency | ready-for-agent |
+| [13](issues/13-settle-new-layout-and-new-space-command-outcomes.md) | Settle New Layout and New Space command outcomes | done |
+| [14](issues/14-audit-canvas-decoration-invalidation-and-active-graph-consistency.md) | Audit canvas decoration invalidation and Active Graph consistency | done |
 | [15](issues/15-settle-the-open-disclosure-treatment.md) | Settle the open-disclosure treatment, which now reaches every ghost trigger | resolved |
-| [17](issues/17-decide-the-button-label-variant.md) | Decide `Button`'s `label` variant, which has no consumer | needs-triage |
-| [18](issues/18-reproduce-the-name-click-that-opens-a-thing.md) | Reproduce the Diagram/Graph name click that opens a Thing | needs-info |
+| [16](issues/16-create-thing-is-three-peers.md) | Create Thing is three peers, and the vertical dock packs them | resolved |
+| [17](issues/17-decide-the-button-label-variant.md) | Decide `Button`'s `label` variant, which has no consumer | resolved |
+| [18](issues/18-reproduce-the-name-click-that-opens-a-thing.md) | Reproduce the Diagram/Graph name click that opens a Thing | wontfix |
+| [19](issues/19-space-thing-creation-answers-the-thing-it-created.md) | Space Thing creation answers the Thing it created | resolved |
+| [20](issues/20-the-create-dispatch-names-every-thing-kind.md) | The Create dispatch names every Thing kind | resolved |
+| [21](issues/21-the-postgres-suite-fails-at-the-compiler.md) | Removing a persistence field fails at the compiler, not only in CI | resolved |
 | [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the registry Drawer and the strip the shell yields to it | needs-triage |
-| [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | needs-triage |
-| [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | needs-triage |
+| [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | ready-for-agent |
+| [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | ready-for-agent |
 | [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |
 
 ## Where it stands
@@ -70,31 +74,25 @@ replaced the screen-edge Things drawer with a Popover anchored to the Dock's own
 trigger, `12` gave the Thing rail the Dock's neutral surface, and `09` made the
 Space name a real Edit rather than a label with nothing behind it.
 
-**What is left is three decisions, one agent-ready ticket and one thing nobody
-can reproduce**, none of them blocking each other:
+**What is left is decisions on `22` and `25`, and two agent-ready tickets**
+(`23`, `24`), none of them blocking each other:
 
-- **13** is still `needs-triage` because the work is small either way and the
-  decision is the whole of it — what New Diagram and New Space should actually
-  do. **15** resolved Keep: a quiet disclosure trigger reads as open while it
-  is, on the shared recipe, with evidence on the Selected Edge Edit trigger.
-- **22** and **17** are the same shape and exist for the same reason: an
-  unconsumed thing whose retirement is a `@project/ui` decision, left in the
-  tail of a resolved ticket where nothing can scan for it. `22` holds the
-  registry `Drawer`, `DRAWER_WIDTH` and `AppShell`'s `insetEnd`, with five
-  sites pointing at it; `17` holds `Button`'s `label` variant, which `09` left
-  behind. They were briefly one file and are two, because `22`'s argument is
-  about a vendored component drifting from an upstream and a CVA variant
-  neither drifts nor regenerates.
-- **14** is the remaining `ready-for-agent` ticket. Two of the three findings
-  `07`'s review carried into it have since been fixed elsewhere and are
-  struck; what survives is the Active Graph fallback feeding the Dock's
-  commands and the decoration memo whose dependency list is incomplete.
-- **18** is `needs-info` and is the one thing here waiting on a person rather
-  than a decision: the reported Diagram/Graph name click that also Opens a
-  Thing. `11` could not reproduce it across the gestures it tried and ruled out
-  the standing hypothesis, so there is no work to pick up until someone
-  obtains it — but it is a file rather than a sentence, because a report in a
-  resolved ticket's prose is invisible to every scan the repo runs.
+- **10** (space-cards) and **15** merged on `main`: the fixture is a linked-space
+  aggregate (PR #205), and a quiet disclosure trigger reads as open while it is
+  (PR #207).
+- **13** and **14** are `done` in their files. The creation outcomes are ADR
+  0089; the decoration / Active Graph audit closed without a remaining defect.
+- **23** and **24** are `ready-for-agent`. **23** withdraws Create Space Thing
+  through Availability while its coordinated Edit is in flight. **24** finishes
+  the continuation module's chrome half so New Diagram's rename lands and
+  "caret moved" means landed, not requested. Both have in-progress worktrees.
+- **17** resolved delete: `Button`'s unused `label` variant is gone. **22**
+  is the same shape still open — the registry `Drawer`, `needs-triage`.
+  **25** is also `needs-triage`.
+- **18** closed as `wontfix`. Clicking a Space, Diagram or Graph name cannot
+  reach a Thing's Open — the name only begins its rename, and the canvas
+  keyboard guards decline a key that came from the Dock — and that is now a
+  claim on `dock-interactions.spec.ts`. **16** is `resolved` (built on PR #195).
 
 `11` itself resolved with its repair, which merged inside `07`.
 

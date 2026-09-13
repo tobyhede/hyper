@@ -1,6 +1,6 @@
 # 16 — Create Thing is three peers, and the vertical dock packs them
 
-Status: ready-for-human
+Status: resolved
 Tags: release/v1
 Blocked by: nothing. Built on `feat/create-thing-peers` (PR #195).
 
