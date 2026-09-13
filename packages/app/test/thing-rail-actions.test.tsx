@@ -211,9 +211,9 @@ describe('a Thing’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
 
     expect(
-      await screen.findByRole('menuitem', { name: 'Copy Link to Card in Diagram' }),
+      await screen.findByRole('menuitem', { name: 'Copy Link to Thing in Diagram' }),
     ).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Copy Link to Card' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Copy Link to Thing' })).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
     await settled(session);

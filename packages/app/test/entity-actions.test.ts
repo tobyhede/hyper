@@ -173,8 +173,11 @@ describe('spaceEntityActions', () => {
       diagram: DIAGRAM,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy Link to Card in Diagram', 'Copy Link to Card']);
-    expect(copied(entity, 'Copy Link to Card in Diagram')).toEqual({
+    expect(labels(build()(entity))).toEqual([
+      'Copy Link to Thing in Diagram',
+      'Copy Link to Thing',
+    ]);
+    expect(copied(entity, 'Copy Link to Thing in Diagram')).toEqual({
       kind: 'diagram-thing',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
@@ -194,8 +197,8 @@ describe('spaceEntityActions', () => {
       diagram: DIAGRAM,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy Link to Card']);
-    expect(copied(entity, 'Copy Link to Card')).toEqual({
+    expect(labels(build()(entity))).toEqual(['Copy Link to Thing']);
+    expect(copied(entity, 'Copy Link to Thing')).toEqual({
       kind: 'thing',
       spaceId: SPACE_ID,
       thingId: OUTSIDE_THING_ID,

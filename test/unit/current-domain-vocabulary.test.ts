@@ -1577,10 +1577,6 @@ const QUALIFIED_THING_SPELLINGS = [
   `--${retiredThingLower}\``,
   `${retiredThingLower}-authoring`,
   `${retiredThingLower}-gestures`,
-  // v1-release/03 product copy: the Thing menu names Card while the domain
-  // keeps Thing (`.scratch/v1-release/issues/03-complete-card-lifecycle-controls.md`).
-  'Copy Link to Card in Diagram',
-  'Copy Link to Card',
 ] as const;
 
 const withoutQualifiedThingSpellings = (source: string): string =>
@@ -1753,11 +1749,6 @@ describe('a Thing is named once (ADR 0085)', () => {
     // being earned and goes.
     expectEachExemptionEarned(FOREIGN_THING_FILES, FOREIGN_THING_SPELLINGS);
     expectEachExemptionEarned(FOREIGN_BARE_THING_FILES, RETIRED_THING_BARE);
-
-    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
-    for (const spelling of ['Copy Link to Card in Diagram', 'Copy Link to Card'] as const) {
-      expect(everything, `nothing tracked still writes ${spelling}`).toContain(spelling);
-    }
 
     // And the excluded tree is excluded because it still carries the record it
     // is excluded for, rather than out of habit.

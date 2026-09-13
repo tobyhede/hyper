@@ -149,8 +149,8 @@ export interface SpaceEntityActionsOptions {
  */
 const COPY_LINK = 'Copy link';
 const COPY_PERMANENT_LINK = 'Copy permanent link';
-const THING_COPY_LINK_IN_DIAGRAM = 'Copy Link to Card in Diagram';
-const THING_COPY_LINK = 'Copy Link to Card';
+const THING_COPY_LINK_IN_DIAGRAM = 'Copy Link to Thing in Diagram';
+const THING_COPY_LINK = 'Copy Link to Thing';
 
 /**
  * What a copy command's own label says when the clipboard refused it.

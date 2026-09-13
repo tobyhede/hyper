@@ -320,7 +320,7 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
   // involved in reaching it.
   await thing.hover();
 
-  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Card');
+  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Thing');
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(
@@ -328,7 +328,7 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
     );
 
   await thing.hover();
-  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Card in Diagram');
+  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Thing in Diagram');
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(`${new URL(page.url()).origin}${diagram}/things/${encodeCompactUuid(THING_A_ID)}`);

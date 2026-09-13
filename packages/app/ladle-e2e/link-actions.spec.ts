@@ -84,7 +84,7 @@ test('a copy command confirms in the rail menu it was pressed in', async ({ page
 
   await page.getByRole('button', { name: 'Actions for Thing Thing 2' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
-  await menu.getByRole('menuitem', { name: 'Copy Link to Card', exact: true }).click();
+  await menu.getByRole('menuitem', { name: 'Copy Link to Thing', exact: true }).click();
 
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Copied' })).toBeVisible();
@@ -97,7 +97,7 @@ test('a Thing rail opens its actions menu from the actions control', async ({ pa
 
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
-  await menu.getByRole('menuitem', { name: 'Copy Link to Card in Diagram' }).click();
+  await menu.getByRole('menuitem', { name: 'Copy Link to Thing in Diagram' }).click();
   await expect(
     page.getByText(/Copied → .*\/diagrams\/AAAAAAAAQACAAAAAAAAAIA\/things\//),
   ).toBeVisible();
@@ -112,8 +112,8 @@ test('a Thing opens the same actions menu from a right click', async ({ page }) 
   // No Rename: a Thing's title is renamed in place on its Front, so the menu
   // production would supply here holds its two addresses and nothing else.
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Copy Link to Card in Diagram' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Copy Link to Thing in Diagram' })).toBeVisible();
   await expect(
-    menu.getByRole('menuitem', { name: 'Copy Link to Card', exact: true }),
+    menu.getByRole('menuitem', { name: 'Copy Link to Thing', exact: true }),
   ).toBeVisible();
 });
