@@ -209,15 +209,23 @@ describe('a Thing’s commands on the canvas rail', () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    await screen.findByRole('menuitem', { name: 'Delete from Space' });
 
     expect(
-      await screen.findByRole('menuitem', { name: 'Copy Link to Thing in Diagram' }),
+      await screen.findByRole('menuitem', {
+        name: (accessibleName) => accessibleName.startsWith('Copy Link to Thing in Diagram'),
+      }),
     ).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Copy Link to Thing' })).toBeVisible();
+    expect(
+      await screen.findByRole('menuitem', {
+        name: (accessibleName) =>
+          accessibleName.startsWith('Copy Link to Thing') && !accessibleName.includes('Diagram'),
+      }),
+    ).toBeVisible();
     expect(screen.queryByRole('menuitem', { name: /^Copy Space link/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /^Open in new tab/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
     await settled(session);
   });
 
