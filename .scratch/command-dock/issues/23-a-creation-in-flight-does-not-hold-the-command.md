@@ -1,6 +1,6 @@
 # 23 — A creation in flight does not hold the command it was pressed on
 
-Status: ready-for-agent
+Status: in-progress
 Tags: release/v1
 Blocked by: nothing. `19` threaded the created Thing's id through this same
 window and deliberately left the rest of it open.
@@ -50,10 +50,10 @@ would read the same title and anchor at press time:
    exist in the tree. Add application evidence for the withdrawal behaviour.
 
 - [x] The decision is recorded here
-- [ ] Create Space Thing is unavailable while its coordinated Edit is in flight
-- [ ] Add Markdown Thing remains available in the same window
-- [ ] A test fails without the change and passes with it
-- [ ] `pnpm verify` and `pnpm e2e` green
+- [x] Create Space Thing is unavailable while its coordinated Edit is in flight
+- [x] Add Markdown Thing remains available in the same window
+- [x] A test fails without the change and passes with it
+- [ ] `pnpm verify` and `pnpm e2e` green (CI)
 
 ## Comments
 

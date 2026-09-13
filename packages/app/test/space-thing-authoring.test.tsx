@@ -27,7 +27,7 @@ import { composeApp } from '../src/compose-app';
 import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
 import type { SpaceThingAuthoring } from '../src/space-thing-lifecycle';
-import { createThing, unavailable } from './command-dock';
+import { createThing, createThingControl, unavailable } from './command-dock';
 
 /**
  * Creating a Space Thing, from the control an author actually has.
@@ -423,19 +423,12 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('Create Space Thing', () => {
-  it('accepts only one Space creation before its local Edit installs', async () => {
+  it('numbers each new Space from the Space Things already on the Diagram', async () => {
     const { session } = mount();
-    await readyToAuthor();
-    await act(async () => {
-      createThing('Space Thing');
-      createThing('Space Thing');
-      await Promise.resolve();
-    });
+    await createSpaceThing();
     await settled(session);
-    expect(spaceThingsOf(session)).toHaveLength(1);
     const editor = await screen.findByRole('textbox', { name: 'Thing title' });
     expect(editor).toHaveValue('Space 1');
-    expect(editor).toHaveFocus();
     fireEvent.keyDown(editor, { key: 'Escape' });
     await createSpaceThing();
     await settled(session);
@@ -495,19 +488,50 @@ describe('Create Space Thing', () => {
     await settled(session);
   });
 
+  it('withdraws Create Space Thing while its coordinated Edit is in flight', async () => {
+    let resolveCreate!: (value: Awaited<ReturnType<SpaceThingAuthoring['create']>>) => void;
+    const createDeferred = new Promise<Awaited<ReturnType<SpaceThingAuthoring['create']>>>(
+      (resolve) => {
+        resolveCreate = resolve;
+      },
+    );
+    const create = vi.fn(() => createDeferred);
+    const { session } = mount(other, { create }, vi.fn());
+
+    await readyToAuthor();
+    const spaceControl = createThingControl('Space Thing');
+    const markdownControl = createThingControl('Markdown Thing');
+
+    await act(async () => {
+      createThing('Space Thing');
+      await Promise.resolve();
+    });
+
+    expect(unavailable(spaceControl)).toBe(true);
+    expect(unavailable(markdownControl)).toBe(false);
+    expect(create).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireEvent.click(spaceControl);
+      await Promise.resolve();
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCreate({ kind: 'unchanged' });
+      await createDeferred;
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(unavailable(spaceControl)).toBe(false));
+    await settled(session);
+  });
+
   /**
-   * **The window between the press and the installed Edit belongs to the press
-   * that opened it.**
-   *
-   * The coordinated Edit lands one await after the gesture, and nothing closes
-   * the surface meanwhile — `createDisabled` answers availability, not
-   * re-entrancy — so a second creation can install inside it. `addThing` is
-   * synchronous and lands immediately, so both Things are new when the Space
-   * Thing's Edit resolves, and a creation that asked *which Things appeared*
-   * would take the earlier array position and open the caret over a Markdown
-   * Thing the author is about to type a Space's name into.
-   *
-   * The lifecycle answers the Thing it made, so the question is never asked.
+   * Create Space Thing is withdrawn for its own in-flight window, but Add
+   * Markdown Thing is synchronous and stays available — so a Markdown Thing can
+   * still land while the coordination is open. The lifecycle answers the Thing
+   * this press made, so the continuation still lands on the Space Thing.
    */
   it('continues in its own Thing when a Markdown Thing lands in the same window', async () => {
     const { session } = mount();
