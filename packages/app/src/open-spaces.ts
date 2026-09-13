@@ -1,4 +1,4 @@
-import type { DiagramId, UUID } from '@project/core';
+import type { DiagramId, GraphId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
@@ -90,7 +90,7 @@ export interface OpenSpaces {
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
   }>;
-  readonly enter: (spaceId: UUID, selection?: DiagramId) => Promise<OpenSpace>;
+  readonly enter: (spaceId: UUID, selection?: DiagramId, graph?: GraphId) => Promise<OpenSpace>;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly exit: (
     spaceId: UUID,
@@ -129,6 +129,11 @@ interface ValidatedLoadedSpace {
   readonly space: Space;
 }
 
+interface FirstCanvasSeed {
+  selection?: DiagramId;
+  graph?: GraphId;
+}
+
 const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
   const runtime = loadSpaceSnapshot(loaded.snapshot);
   if (!runtime.ok) {
@@ -164,6 +169,16 @@ export function createOpenSpaces({
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
+  /**
+   * Entries that have been the canvas, not merely composed for an embed.
+   *
+   * Embed adds an Open Spaces entry without activating it (`embed` holds
+   * `activeSpaceId` on the containing Space). Enter is the first canvas
+   * showing, so it still seeds from the Thing — held by
+   * `packages/app/test/enter-space-thing.test.tsx`. A later Enter keeps the
+   * live selection, which that file's already-open case holds.
+   */
+  const shownOnCanvas = new WeakSet<OpenSpace>();
   const browserLocation = createBrowserLocation(history, report, async (pathname) => {
     await openPath(pathname);
   });
@@ -276,6 +291,7 @@ export function createOpenSpaces({
    */
   const include = (entry: OpenSpace, activeSpaceId: UUID, from: UUID | null): void => {
     const state = observable.getState();
+    if (activeSpaceId === entry.id) shownOnCanvas.add(entry);
     if (state.entries.some(({ id }) => id === entry.id)) {
       if (state.activeSpaceId === activeSpaceId) return;
       observable.publish({ ...state, activeSpaceId });
@@ -356,6 +372,7 @@ export function createOpenSpaces({
     target: OpenSpace,
     request: number,
     from: UUID | null,
+    firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
     const active = observable.getState().activeSpaceId;
     if (active !== null && active !== target.id) {
@@ -371,7 +388,16 @@ export function createOpenSpaces({
       include(target, observable.getState().activeSpaceId ?? target.id, from);
       return target;
     }
+    // First canvas showing is a fact about this entry after the waits, not
+    // about whichever entry the Space Id named when the request was made —
+    // compose may have produced a new one while an exit settled.
+    const seedFrom =
+      firstDisplay !== undefined && !shownOnCanvas.has(target) ? firstDisplay : undefined;
     include(target, target.id, from);
+    if (seedFrom !== undefined) {
+      if (seedFrom.selection !== undefined) target.app.navigation.selectDiagram(seedFrom.selection);
+      if (seedFrom.graph !== undefined) target.app.navigation.activateGraph(seedFrom.graph);
+    }
     return target;
   };
 
@@ -379,13 +405,19 @@ export function createOpenSpaces({
     spaceId: UUID,
     selection: DiagramId | undefined,
     from: UUID | null,
+    firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
     // Numbered before the Space is loaded, not after: composition is itself a
     // wait, and a request made first must not be superseded by one made second
     // merely because the second Space was already in hand.
     const { request, abandon } = beginActivation();
     try {
-      return await activateAfterLeavingSettles(await compose(spaceId, selection), request, from);
+      return await activateAfterLeavingSettles(
+        await compose(spaceId, selection),
+        request,
+        from,
+        firstDisplay,
+      );
     } catch (error) {
       abandon();
       throw error;
@@ -404,8 +436,12 @@ export function createOpenSpaces({
    * reader was standing in when they pressed — not whichever Space the canvas
    * happens to hold once the load settles.
    */
-  const enter = (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> =>
-    activate(spaceId, selection, observable.getState().activeSpaceId);
+  const enter = (spaceId: UUID, selection?: DiagramId, graph?: GraphId): Promise<OpenSpace> => {
+    const firstDisplay: FirstCanvasSeed = {};
+    if (selection !== undefined) firstDisplay.selection = selection;
+    if (graph !== undefined) firstDisplay.graph = graph;
+    return activate(spaceId, undefined, observable.getState().activeSpaceId, firstDisplay);
+  };
 
   /**
    * Open a target for embedded editing without taking the canvas off the Space

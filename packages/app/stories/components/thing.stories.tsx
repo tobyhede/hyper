@@ -401,3 +401,35 @@ export const OpenAlias: Story = () => {
 };
 OpenAlias.storyName = 'Open Alias';
 OpenAlias.meta = { iframed: true };
+
+/**
+ * Enter is the Space Thing's kind command (ADR 0073, ADR 0068): it sits on the
+ * rail whether the Thing is Open or Closed, and activating it is the crossing.
+ *
+ * The production `CanvasThing` is the component; the application proof is
+ * `enter-space-thing.test.tsx` and `space-thing.spec.ts`.
+ */
+export const EnterSpace: Story = () => {
+  const [entered, setEntered] = useState(false);
+  const changeOpen = () => 'completed' as const;
+  return (
+    <div className="p-8">
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: false,
+          onOpenChange: changeOpen,
+          onEnter: () => setEntered(true),
+        }}
+        state="selected"
+        title="Architecture"
+        graphColor="#35d6c3"
+      />
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="enter-report">
+        {entered ? 'Entered Architecture.' : 'Not entered.'}
+      </p>
+    </div>
+  );
+};
+EnterSpace.storyName = 'Enter Space';
+EnterSpace.meta = { iframed: true };

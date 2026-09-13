@@ -121,6 +121,7 @@ interface HookProps {
 const mountAuthoring = (
   onBodyEditingChange?: (editing: boolean) => void,
   projectedKind: 'markdown' | 'alias' | 'space' = 'markdown',
+  onEnterSpace?: (thingId: ThingId) => void,
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -159,6 +160,7 @@ const mountAuthoring = (
         thingResize: adapter.getState().thingResize,
         onSelectThing: () => undefined,
         onBodyEditingChange,
+        onEnterSpace,
       }),
     {
       initialProps,
@@ -516,5 +518,40 @@ describe('canvas Thing authoring', () => {
       thingId: THING_ID,
     });
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
+  });
+
+  /**
+   * The decoration, not the callers: this hook attaches `data.onEnter` only
+   * when `onEnterSpace` is supplied. A canvas that omits the callback therefore
+   * offers no Enter.
+   */
+  it('omits Enter when onEnterSpace is absent', () => {
+    const { result, rerender } = mountAuthoring(undefined, 'space');
+    rerender({
+      expanded: false,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      thingId: SPACE_THING_ID,
+    });
+
+    expect(onlyNode(result.current.nodes).data.onEnter).toBeUndefined();
+  });
+
+  it('attaches Enter on a Space Thing when onEnterSpace is supplied', () => {
+    const onEnterSpace = vi.fn();
+    const { result, rerender } = mountAuthoring(undefined, 'space', onEnterSpace);
+    rerender({
+      expanded: false,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      thingId: SPACE_THING_ID,
+    });
+
+    const space = onlyNode(result.current.nodes);
+    expect(space.data.onEnter).toBeDefined();
+    act(() => space.data.onEnter?.());
+    expect(onEnterSpace).toHaveBeenCalledWith(SPACE_THING_ID);
   });
 });

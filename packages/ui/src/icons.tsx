@@ -8,6 +8,7 @@ import {
   Frame,
   LayoutGrid,
   Link,
+  LogIn,
   Maximize,
   Maximize2,
   Minus,
@@ -91,6 +92,15 @@ export const CommitEditIcon = (props: ThingActionIconProps) => <Check size={14} 
 export const AbandonEditIcon = (props: ThingActionIconProps) => (
   <X size={14} strokeWidth={3} {...props} />
 );
+
+/**
+ * Enter the Space a Space Thing references.
+ *
+ * Lucide `log-in`: an arrow going *into* a container, deliberately unlike
+ * Open's `maximize-2`. Entering the Space and expanding the Thing in place
+ * are two destinations and must not share a symbol.
+ */
+export const EnterSpaceIcon = (props: ThingActionIconProps) => <LogIn size={14} {...props} />;
 
 /** Open a Thing in place. */
 export const OpenThingIcon = (props: ThingActionIconProps) => <Maximize2 size={14} {...props} />;

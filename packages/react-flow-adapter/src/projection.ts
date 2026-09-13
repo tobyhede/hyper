@@ -170,6 +170,11 @@ export type ThingNodeData = {
    * operation on this node (ADR 0068, ADR 0074).
    */
   spaceSelection?: CanvasSpaceThingSelection;
+  /**
+   * Enter the Space this Thing references. A Space Thing kind command
+   * (ADR 0073); absent on every other kind and on a canvas that cannot enter.
+   */
+  onEnter?: () => void;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;

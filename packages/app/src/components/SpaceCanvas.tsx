@@ -269,6 +269,14 @@ export interface SpaceCanvasProps {
    * note already names.
    */
   thingEntityActions?: (thingId: ThingId) => readonly EntityActionGroup[];
+  /**
+   * Enter the Space a Space Thing on this canvas references.
+   *
+   * Passed straight through to `useCanvasThingAuthoring`. Absent leaves every
+   * Space Thing without Enter (`canvas-thing-authoring.test.tsx`,
+   * 'omits Enter when onEnterSpace is absent').
+   */
+  onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }
 
 export function SpaceCanvas({
@@ -302,6 +310,7 @@ export function SpaceCanvas({
   activeGraphThingIds,
   spaceThingTargets,
   thingEntityActions,
+  onEnterSpace,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -474,6 +483,7 @@ export function SpaceCanvas({
     onSelectThing,
     spaceThingTargets,
     thingEntityActions,
+    onEnterSpace,
   });
   const { bodyEditing, openThing: onOpenThing, beginTitleEditing } = thingAuthoring;
 

@@ -461,6 +461,88 @@ describe('Open Spaces', () => {
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
   });
 
+  it('seeds the Thing’s Graph when Enter waits out an exit of the same Space', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    other.app.navigation.activateGraph(GRAPH_TWO);
+    await openSpaces.open(META_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('pending'));
+
+    // Exit parks until Other settles, so Enter reads the still-advertised entry
+    // and would treat this as a return if first-display were decided before the
+    // wait. The entry is gone once the exit settles, and the reloaded Space is
+    // a first canvas showing — GRAPH_TWO is not that Diagram's Active Graph, so
+    // compose alone cannot look like a seed.
+    const exiting = openSpaces.exit(OTHER_ID);
+    await Promise.resolve();
+    const entering = openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_TWO);
+
+    release();
+    await expect(exiting).resolves.toEqual({ kind: 'exited' });
+    const entered = await entering;
+
+    expect(entered).not.toBe(other);
+    expect(entered.app.navigation.getState()).toMatchObject({
+      selectedDiagramId: DIAGRAM_ID,
+      activeGraphId: GRAPH_TWO,
+    });
+  });
+
+  it('does not apply a superseded Enter’s Graph once a later activation owns the canvas', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const meta = await openSpaces.open(META_ID);
+    meta.session.submit(edit(meta.session.getState().working));
+    await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
+
+    // Enter numbers first and parks until Meta settles. Open is the later
+    // choice, so it owns the canvas. GRAPH_TWO is only applied by Enter's
+    // first-display seed — compose opens the Diagram on GRAPH_ONE.
+    const entering = openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_TWO);
+    await Promise.resolve();
+    const opening = openSpaces.open(OTHER_ID);
+
+    release();
+    await entering;
+    await opening;
+
+    expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+    expect(openSpaces.entry(OTHER_ID)?.app.navigation.getState()).toMatchObject({
+      selectedDiagramId: DIAGRAM_ID,
+      activeGraphId: GRAPH_ONE,
+    });
+  });
+
+  it('does not apply a superseded Enter’s Diagram once a later activation owns the canvas', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const release = control.deferNextCommit();
+    const { openSpaces } = setup(control);
+    const meta = await openSpaces.open(META_ID);
+    meta.session.submit(edit(meta.session.getState().working));
+    await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
+
+    // Enter numbers first and parks until Meta settles. Open is the later
+    // choice, so it owns the canvas. SECOND_DIAGRAM_ID is only applied by
+    // Enter's first-display seed — compose opens the Space on DIAGRAM_ID.
+    const entering = openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID);
+    await Promise.resolve();
+    const opening = openSpaces.open(OTHER_ID);
+
+    release();
+    await entering;
+    await opening;
+
+    expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+    expect(openSpaces.entry(OTHER_ID)?.app.navigation.getState()).toMatchObject({
+      selectedDiagramId: DIAGRAM_ID,
+      activeGraphId: GRAPH_ONE,
+    });
+  });
+
   it('reloads a Space chosen while its exit was still waiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();

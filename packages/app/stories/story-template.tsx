@@ -48,11 +48,9 @@
  * `./support/ReactFlowCanvas` instead; they own `ReactFlowProvider`,
  * `Background`, the `minZoom`/`maxZoom` defaults, `proOptions`, and the
  * fit-vs-fixed-viewport union, so a new story cannot quietly drift from what
- * every other canvas story already agreed on. `stories/review/` may carry
- * pre-existing exceptions that predate this rule and aren't obligated to
- * migrate — `space-thing-canvas-prototype.stories.tsx` is the current one. The
- * `SurfacesExample` below shows the pattern; delete it if the component under
- * test needs no canvas, and see `ComponentsExample` after it instead.
+ * every other canvas story already agreed on. The `SurfacesExample` below
+ * shows the pattern; delete it if the component under test needs no canvas,
+ * and see `ComponentsExample` after it instead.
  */
 import type { Story } from '@ladle/react';
 import { StoryCanvas, StoryCanvasFrame } from './support/ReactFlowCanvas';

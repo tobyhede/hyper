@@ -550,3 +550,17 @@ test('a Title being written on more lines than fit does not push the rail out of
   expect(pastCeiling.fieldHeight).toBe(atCeiling.fieldHeight);
   expect(await field.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
 });
+
+test(
+  'a Space Thing offers Enter on its rail as a kind command',
+  { tag: '@parity:space-thing-offers-enter' },
+  async ({ page }) => {
+    await page.goto('/?story=components--thing--enter-space&mode=preview');
+
+    const enter = page.getByRole('button', { name: 'Enter Space Architecture' });
+    await expect(enter).toBeVisible();
+    await expect(page.getByTestId('enter-report')).toHaveText('Not entered.');
+    await enter.click();
+    await expect(page.getByTestId('enter-report')).toHaveText('Entered Architecture.');
+  },
+);

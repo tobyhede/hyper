@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { titleName, uuidSchema } from '@project/core';
 import { loadSpace, type ThingFile } from '@project/graph';
 import fixtureJson from '../fixture/00000000-0000-4000-8000-000000000040/space.json';
-import walkthroughJson from '../fixture/00000000-0000-4000-8000-000000000060/space.json';
+import presentationJson from '../fixture/00000000-0000-4000-8000-000000000060/space.json';
 import deepDiveJson from '../fixture/00000000-0000-4000-8000-000000000070/space.json';
 import notesJson from '../fixture/00000000-0000-4000-8000-000000000080/space.json';
 import exampleJson from '../example/space.json';
 
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
-const WALKTHROUGH_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
+const SPARE_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000068');
 const DEEP_DIVE_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000071');
 const NOTES_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
 
@@ -53,13 +53,13 @@ describe.each([
   ],
   [
     'fixture/00000000-0000-4000-8000-000000000060',
-    walkthroughJson,
+    presentationJson,
     {
       things: 5,
-      diagrams: 1,
-      graphs: 1,
-      unreached: { Walkthrough: ['Authoring notes', 'Deep dive'] },
-      defaultDiagram: WALKTHROUGH_DIAGRAM,
+      diagrams: 2,
+      graphs: 2,
+      unreached: { Overview: ['Authoring notes', 'Deep dive'], Spare: [] },
+      defaultDiagram: SPARE_DIAGRAM,
     },
   ],
   [
@@ -120,7 +120,7 @@ describe.each([
     // Thing that became connected apart from a different Thing stranded in the
     // same fixture edit, and lets the two regressions through together. The
     // fixture Meta Space strands exactly `T`, whose three-line Title draws the
-    // ladder wherever the fixture is loaded (ADR 0083), and the walkthrough
+    // ladder wherever the fixture is loaded (ADR 0083), and Presentation
     // strands the two Space Things that sit off its Graph.
     const nameById = new Map<string, string>(
       result.space.things.map((thing) => [thing.id, titleName(thing.title)]),

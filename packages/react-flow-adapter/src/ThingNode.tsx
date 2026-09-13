@@ -142,9 +142,9 @@ export function ThingNode({
   if (data.thingEditingEnabled === true && data.onEditThing !== undefined) {
     aliasFront.onOpenChange = data.onEditThing;
   }
-  // A Space Thing's own front carries nothing it authors: its Title is the
-  // Thing's, its content is the target Space's, and the only things on it that
-  // change are the two selections the composition hands down.
+  // A Space Thing's own front carries nothing it authors of the target: its
+  // Title is the Thing's, its content is the target Space's, and the
+  // composition hands down the two selections plus Enter.
   const spaceFront: SpaceFront = {
     kind: 'space',
     open: data.expanded === true,
@@ -153,6 +153,7 @@ export function ThingNode({
     spaceFront.onOpenChange = data.onEditThing;
   }
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
+  if (data.onEnter !== undefined) spaceFront.onEnter = data.onEnter;
   const front: CanvasThingFront =
     data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
 

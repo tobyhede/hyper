@@ -1030,8 +1030,8 @@ describe('CanvasThing Space front', () => {
   /**
    * Opening is the shared Thing operation, not a Space-Thing-specific one, so it
    * is the same rail control an Alias uses and it names the same two states. A
-   * Space Thing offers nothing beside it: it has no content of its own, so there
-   * is no Edit, Save or Cancel for the rail to draw.
+   * Space Thing has no Markdown of its own, so there is no Edit, Save or Cancel
+   * for the rail to draw — Enter is the kind command that sits beside them.
    */
   it('opens and closes through the shared rail control, and offers no content edit', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
@@ -1175,5 +1175,51 @@ describe('CanvasThing Space front', () => {
 
     expect(screen.queryByTestId('space-thing-diagram')).not.toBeInTheDocument();
     expect(screen.queryByTestId('space-thing-graph')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Enter is the Space Thing's kind command (ADR 0073, ADR 0068): it belongs on
+   * the rail whether the Thing is Open or Closed, and it is withheld from a
+   * read-only surface the same way every other authoring control is.
+   */
+  it('offers Enter on the rail while Closed or Open, and withholds it when read-only', () => {
+    const onEnter = vi.fn();
+    const { rerender } = render(
+      <CanvasThing
+        front={{ kind: 'space', open: false, onEnter }}
+        state="selected"
+        title="Architecture"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    const enter = screen.getByRole('button', { name: 'Enter Space Architecture' });
+    expect(enter).toBeVisible();
+    expect(enter.closest('[data-slot="thing-rail-kind-actions"]')).not.toBeNull();
+    enter.click();
+    expect(onEnter).toHaveBeenCalledOnce();
+
+    rerender(
+      <CanvasThing
+        front={{ kind: 'space', open: true, onEnter }}
+        state="selected"
+        title="Architecture"
+        graphColor="#35d6c3"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
+
+    rerender(
+      <CanvasThing
+        readOnly
+        front={{ kind: 'space', open: false, onEnter }}
+        state="selected"
+        title="Architecture"
+        graphColor="#35d6c3"
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Enter Space Architecture' }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -983,24 +983,8 @@ const RETIRED_SURFACE_NAME = new RegExp(RETIRED_SURFACE, 'i');
  *
  * `CONTEXT.md` has to name what it retires, which is the carve-out every block
  * above already makes for the document that does the retiring.
- *
- * The space-thing prototype's variant control — the retired word carrying a
- * `Variant` prefix — moves that prototype between its own story variants. It
- * switches variants rather than Spaces, so ADR 0082 and
- * `CONTEXT.md` have nothing to say about it, and the scan cannot tell the two
- * apart because they are spelled identically — the same shape of exemption
- * `FOREIGN_BARE_FILES` makes for Lucide's glyph, and a **file** exemption for
- * the same reason: there is no shape to read. It is scoped to the two files
- * that draw that control, so the name cannot spread behind it.
- *
- * Each is held below to still be earning itself, so deleting the prototype
- * deletes its exemption rather than leaving a hole.
  */
-const RETIRED_SURFACE_FILES: readonly string[] = [
-  'CONTEXT.md',
-  'packages/app/stories/review/space-thing-canvas-prototype.stories.tsx',
-  'packages/app/stories/review/space-thing-canvas-prototype.css',
-];
+const RETIRED_SURFACE_FILES: readonly string[] = ['CONTEXT.md'];
 
 describe('the retired name for the surface over the open set is gone', () => {
   it('finds it nowhere Open Spaces is what is meant', () => {
@@ -1660,7 +1644,6 @@ const FOREIGN_THING_FILES: readonly string[] = [
   'packages/ui/src/CanvasThing.tsx',
   'packages/ui/src/ThingRail.tsx',
   'packages/ui/test/design-system-baseline.test.tsx',
-  'packages/app/stories/review/space-thing-canvas-prototype.stories.tsx',
   'docs/agents/ui.md',
 ];
 

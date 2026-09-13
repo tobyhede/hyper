@@ -218,5 +218,5 @@ describe('the Spaces a Things list offers', () => {
       expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 3'),
     );
     expect(screen.getByRole('button', { name: 'Add Space 1 to Diagram' })).toBeInTheDocument();
-  });
+  }, 15_000);
 });

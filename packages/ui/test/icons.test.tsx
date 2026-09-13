@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   CloseThingIcon,
   EditIcon,
+  EnterSpaceIcon,
   FitViewIcon,
   GraphIcon,
   DiagramIcon,
@@ -53,6 +54,9 @@ describe('the public icon facade', () => {
         <span data-testid="close-thing">
           <CloseThingIcon />
         </span>
+        <span data-testid="enter-space">
+          <EnterSpaceIcon />
+        </span>
         <span data-testid="markdown">
           <MarkdownIcon />
         </span>
@@ -84,6 +88,7 @@ describe('the public icon facade', () => {
       plus: 'plus',
       'open-thing': 'maximize-2',
       'close-thing': 'minimize-2',
+      'enter-space': 'log-in',
       markdown: 'sticky-note',
       check: 'check',
       'zoom-in': 'plus',

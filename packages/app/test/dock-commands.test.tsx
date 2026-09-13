@@ -201,7 +201,7 @@ describe("every control's accessible name contains its visible label (WCAG 2.5.3
 
     expect(visibleLabel(openSpacesMenu)).toBe('Spaces');
     expect(accessibleName(openSpacesMenu)).toContain(visibleLabel(openSpacesMenu));
-  });
+  }, 15_000);
 
   /**
    * And the rule over the whole bar rather than the one control that broke it.

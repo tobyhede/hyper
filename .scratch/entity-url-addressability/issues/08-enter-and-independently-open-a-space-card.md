@@ -19,28 +19,27 @@ Tags: release/v1
       `packages/app/src/embedded-authoring.ts:42` routes the embedded surface's
       completions into `completeInLayout` against that Card-supplied Layout id,
       never against the target's navigation state.
-- [ ] Enter shows the target as the Space being worked in, with its complete
-      command surface and editing capabilities. **Open: no surface reaches it.**
-      `OpenSpaces.enter` exists (`packages/app/src/open-spaces.ts:95`, defined
-      at `:409`) and has zero production callers — every call in the tree is in
-      `packages/app/test/open-spaces.test.ts`. `space-cards/11` owns the
-      command that would call it.
-- [ ] Enter loads the target from repository state already accepted by complete
+- [x] Enter shows the target as the Space being worked in, with its complete
+      command surface and editing capabilities. Built by `space-cards/11`:
+      `App` is the production caller of `OpenSpaces.enter`, spent from the
+      Space Thing rail's `Enter Space` kind command.
+- [x] Enter loads the target from repository state already accepted by complete
       aggregate intake. Navigation performs no second cycle check and does not
-      carry an ancestor chain as an integrity mechanism. The composed `enter`
-      already holds this — it takes a Space id and an optional Layout selection
-      and nothing else — but the criterion cannot be ticked until there is an
-      Enter to exercise. `space-cards/11`'s contrary criterion was deleted on
-      this ground; its Comments record the evidence.
+      carry an ancestor chain as an integrity mechanism. Exercised by
+      `space-cards/11`: `App` calls `OpenSpaces.enter(spaceId, diagram)` from
+      the Space Thing rail; Graph is activated only when the entry is new.
 - [ ] Enter resolves the stored context `layout-only-v1/04` owns rather than
       restating it here; this ticket owns the Enter surface, not the selection
-      or its write-back rule. **Open for the same reason as above**, and doubly
-      so: `layout-only-v1/04` has not yet made the stored context durable.
-- [ ] Entering an already-open Space reuses its live context. An author can move
+      or its write-back rule. **Still open on write-back**: `layout-only-v1/04`
+      (now `entity-url-addressability/07` / ADR 0079 Ticket 04) made the
+      selection durable on the Thing; `space-cards/11` seeds a *new* entry from
+      it and leaves an already-open entry's live selection alone. Persisting
+      the live selection back onto the Thing is not this cut-over.
+- [x] Entering an already-open Space reuses its live context. An author can move
       among open Spaces without losing work, close an ordinary context
       explicitly, and never close the Meta Space.
-  - [ ] Reusing an already-open entry on Enter — unreachable while Enter has no
-        surface.
+  - [x] Reusing an already-open entry on Enter — `packages/app/test/enter-space-thing.test.tsx`
+        holds that a second Enter keeps the live Diagram rather than the Card's.
   - [x] Closing an ordinary context explicitly — `ExitSpaceControl` calls
         `spaces.exit` at
         `packages/app/src/components/ExitSpaceControl.tsx:34`, mounted at

@@ -6,4 +6,4 @@ title: Opening remarks
 # Opening remarks
 
 Presenting starts here. This Graph is a short line so Enter, Next and Prev
-have somewhere to walk without the abstract A→B spine.
+have a start and an end without the abstract A→B spine.
