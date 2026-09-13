@@ -1,6 +1,16 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { boxOf, createThing, dock, nodeByTitle, settled, beginRename, spaceName, selectedCanvas, activeGraph } from './graph';
+import {
+  boxOf,
+  createThing,
+  dock,
+  nodeByTitle,
+  settled,
+  beginRename,
+  spaceName,
+  selectedCanvas,
+  activeGraph,
+} from './graph';
 
 for (const delay of [0, 120]) {
   test(`Dock disclosures switch on one press (${delay}ms)`, async ({ page }) => {
