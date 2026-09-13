@@ -109,6 +109,7 @@ import type { Thing, ThingId, Graph, GraphId, Diagram, DiagramId, UUID } from '@
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
+import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { RejectedExitConfirmation } from '../open-spaces';
 import { GRAPH_PALETTE } from '../colors';
 import {
@@ -1017,7 +1018,7 @@ function DiagramIdentityMenu({
   readonly disclosure: IdentityDisclosure;
 }) {
   const { trigger, renameItem, triggerId, open, onOpenChange } = disclosure;
-  const { noteCaretMoved, restoresFocusOnClose } = useIdentityCaret();
+  const { restoresFocusOnClose } = useIdentityCaret();
   return (
     <ChoiceMenu<DiagramId>
       label="Diagrams"
@@ -1031,7 +1032,10 @@ function DiagramIdentityMenu({
       align={DISCLOSURE_ALIGN}
       sideOffset={DISCLOSURE_SIDE_OFFSET}
       className={`nokey ${DISCLOSURE_WIDTH}`}
-      restoresFocusOnClose={restoresFocusOnClose}
+      restoresFocusOnClose={identityMenuRestoresFocusOnClose(
+        canvas.didCreateMoveCaret,
+        restoresFocusOnClose,
+      )}
       trigger={trigger}
     >
       {/* The same order the Spaces popover pins below its scroll: the set
@@ -1044,7 +1048,7 @@ function DiagramIdentityMenu({
         className="gap-2"
         disabled={canvas.createDisabled}
         onClick={() => {
-          if (canvas.onCreate()) noteCaretMoved();
+          canvas.onCreate();
         }}
       >
         <PlusIcon />
