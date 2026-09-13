@@ -101,6 +101,7 @@ export {
   DiagramIcon,
   LinkActionsIcon,
   MarkdownIcon,
+  OpenIndependentlyIcon,
   OpenThingIcon,
   ParentIcon,
   SpaceThingIcon,

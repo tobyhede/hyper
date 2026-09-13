@@ -209,13 +209,23 @@ describe('a Thing’s commands on the canvas rail', () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    await screen.findByRole('menuitem', { name: 'Delete from Space' });
 
     expect(
-      await screen.findByRole('menuitem', { name: 'Copy Link to Thing in Diagram' }),
+      await screen.findByRole('menuitem', {
+        name: (accessibleName) => accessibleName.startsWith('Copy Link to Thing in Diagram'),
+      }),
     ).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Copy Link to Thing' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    expect(
+      await screen.findByRole('menuitem', {
+        name: (accessibleName) =>
+          accessibleName.startsWith('Copy Link to Thing') && !accessibleName.includes('Diagram'),
+      }),
+    ).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: /^Copy Space link/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /^Open in new tab/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
     await settled(session);
   });
 
@@ -428,6 +438,30 @@ describe('a Thing’s commands on the canvas rail', () => {
    * never had content to alias" are different facts, so the reason is asserted
    * and not only the unavailability.
    */
+  /**
+   * Independently opening the Space a Space Thing shows is a link to that
+   * Space's own address (ADR 0068, ADR 0069). Copy link still names the Thing;
+   * these two commands are the target, and they carry no containing Diagram.
+   */
+  it('offers a Space Thing the target Space’s address and opens it independently', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(window);
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
+    expect(await screen.findByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Open in new tab/ }));
+
+    await waitFor(() =>
+      expect(open).toHaveBeenCalledWith(
+        `https://space.test${productDestinationPath({ kind: 'space', spaceId: TARGET_SPACE_ID })}`,
+        '_blank',
+        'noopener,noreferrer',
+      ),
+    );
+    await settled(session);
+    open.mockRestore();
+  });
+
   it('offers Create Alias unavailable on a Space Thing, which owns no content', async () => {
     const session = mount(undefined, undefined, withSpaceThing);
 

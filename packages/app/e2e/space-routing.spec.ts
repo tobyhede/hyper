@@ -30,24 +30,19 @@ const THING_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
  * turn between them. A copy on the rail confirms in place without closing its
  * menu, so this dismisses before the next one.
  */
-const copyExactFromMenu = async (page: Page, trigger: string, command: string): Promise<void> => {
-  // `exact`, because an Alias's rail is named for its own Title and a Thing's
-  // Title is a prefix of its Alias's — `Actions for Thing A` matches
-  // `Actions for Thing A′` without it.
-  await page.getByRole('button', { name: trigger, exact: true }).click({ delay: 120 });
-  await page.getByRole('menuitem', { name: command, exact: true }).click();
-  await page.keyboard.press('Escape');
-};
-
 const copyMatchingFromMenu = async (
   page: Page,
   trigger: string,
-  command: RegExp,
+  command: string | RegExp,
 ): Promise<void> => {
   await page.getByRole('button', { name: trigger, exact: true }).click({ delay: 120 });
   await page.getByRole('menuitem', { name: command }).click();
   await page.keyboard.press('Escape');
 };
+
+/** Canonical Thing address — not the contextual Diagram one. */
+const THING_COPY_LINK = /^Copy Link to Thing(?! in Diagram)/;
+const THING_COPY_LINK_IN_DIAGRAM = /^Copy Link to Thing in Diagram/;
 
 const installClipboard = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
@@ -320,7 +315,7 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
   // involved in reaching it.
   await thing.hover();
 
-  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Thing');
+  await copyMatchingFromMenu(page, 'Actions for Thing A', THING_COPY_LINK);
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(
@@ -328,7 +323,7 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
     );
 
   await thing.hover();
-  await copyExactFromMenu(page, 'Actions for Thing A', 'Copy Link to Thing in Diagram');
+  await copyMatchingFromMenu(page, 'Actions for Thing A', THING_COPY_LINK_IN_DIAGRAM);
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(`${new URL(page.url()).origin}${diagram}/things/${encodeCompactUuid(THING_A_ID)}`);
