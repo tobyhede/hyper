@@ -8,7 +8,7 @@ already used for these identities. Escape, Enter and blur stay as they are.
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-human
+**Status:** resolved
 
 **Tags:** release/v1
 
@@ -43,6 +43,21 @@ clusters are the odd ones out.
 `09` made the Space name a real Edit. This ticket does not reopen that. It
 moves how the Edit is *started* onto the menu the cluster already has.
 
-`18` reported a name click that also opened a Thing. It is still `needs-info`
-and is not a blocker. Taking the name off the rename gesture removes the
-click this ticket is about; it does not claim to settle `18`.
+`18` reported a name click that also opened a Thing. It is `wontfix` and is
+not a blocker. Taking the name off the rename gesture removes the click this
+ticket is about; it does not claim to settle `18`.
+
+## Answer
+
+`IdentitySurface` in `CommandDock.tsx` is the one composition: name and
+chevron are the named `ChoiceMenuTrigger`; **Rename** is a menu row that
+closes the list and continues in the existing `InlineTitleEditor`. Things is
+unchanged. Claim `command-dock-identity-presentation` has Ladle evidence in
+`command-dock.spec.ts` and application evidence in `dock-typography.spec.ts`.
+
+## Comments
+
+### 2026-09-13 — Closed as resolved after audit
+
+The criteria were already ticked. `18` had already closed as `wontfix`; the
+Why sentence that still called it `needs-info` is corrected above.

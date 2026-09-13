@@ -64,7 +64,7 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | resolved |
 | [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | resolved |
 | [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |
-| [26](issues/26-identity-clusters-disclose-from-the-name.md) | Dock identity clusters disclose from the name; Rename is a menu command | ready-for-human |
+| [26](issues/26-identity-clusters-disclose-from-the-name.md) | Dock identity clusters disclose from the name; Rename is a menu command | resolved |
 
 ## Where it stands
 
@@ -75,7 +75,7 @@ replaced the screen-edge Things drawer with a Popover anchored to the Dock's own
 trigger, `12` gave the Thing rail the Dock's neutral surface, and `09` made the
 Space name a real Edit rather than a label with nothing behind it.
 
-**What is left is decisions on `22` and `25`, and `26` (`ready-for-human`)**,
+**What is left is decisions on `22` and `25`**,
 none of them blocking each other:
 
 - **10** (space-cards) and **15** merged on `main`: the fixture is a linked-space
@@ -83,17 +83,20 @@ none of them blocking each other:
   (PR #207).
 - **13** and **14** are `done` in their files. The creation outcomes are ADR
   0089; the decoration / Active Graph audit closed without a remaining defect.
-- **23** and **24** are `resolved`. **23** withdraws Create Space Thing through
-  Availability while its coordinated Edit is in flight (PR #208). **24**
-  finishes the continuation module's chrome half so New Diagram's rename lands
-  and "caret moved" means landed, not requested (PR #209).
+- **23**, **24** and **26** are `resolved`. **23** withdraws Create Space Thing
+  through Availability while its coordinated Edit is in flight (PR #208).
+  **24** finishes the continuation module's chrome half so New Diagram's rename
+  lands and "caret moved" means landed, not requested (PR #209). **26** makes
+  Space, Diagram and Graph one disclosure: name and chevron open the list,
+  Rename is a row in it.
 - **17** resolved delete: `Button`'s unused `label` variant is gone. **22**
   is the same shape still open — the registry `Drawer`, `needs-triage`.
   **25** is also `needs-triage`.
 - **18** closed as `wontfix`. Clicking a Space, Diagram or Graph name cannot
-  reach a Thing's Open — the name only begins its rename, and the canvas
-  keyboard guards decline a key that came from the Dock — and that is now a
-  claim on `dock-interactions.spec.ts`. **16** is `resolved` (built on PR #195).
+  reach a Thing's Open — the canvas keyboard guards decline a key that came
+  from the Dock — and that is a claim on `dock-interactions.spec.ts`. **26**
+  then moved Rename onto the menu, so the name discloses rather than beginning
+  an edit. **16** is `resolved` (built on PR #195).
 
 `11` itself resolved with its repair, which merged inside `07`.
 

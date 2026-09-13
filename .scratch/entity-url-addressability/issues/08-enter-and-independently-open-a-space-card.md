@@ -4,21 +4,19 @@
 the complete working surface, move safely among open Spaces, close an ordinary
 context, or open the target independently at its canonical URL.
 
-**Blocked by:** `space-cards/10` — Extend the fixture to linked Spaces;
-`space-cards/11` — Enter a Space Card, and Open Spaces carries the session,
-which owns the Enter surface (`space-cards/01`'s Deferred section hands it
-there). `v1-release/01` was here and is now `resolved`.
+**Blocked by:** nothing. `space-cards/10` and `space-cards/11` are `resolved`;
+`v1-release/01` already was.
 
-**Status:** ready-for-human
+**Status:** resolved
 Tags: release/v1
 
 - [x] Opening in place draws the target through the context the Card supplies and
       leaves the target Space's own active selections untouched.
-      `packages/app/src/components/SpaceCanvas.tsx:349-351` builds each embed
-      request from the Card's own `spaceId`, `layout` and `graph`, and
+      `packages/app/src/components/SpaceCanvas.tsx:334-369` builds each embed
+      request from the Thing's own `spaceId`, `diagram` and `graph`, and
       `packages/app/src/embedded-authoring.ts:42` routes the embedded surface's
-      completions into `completeInLayout` against that Card-supplied Layout id,
-      never against the target's navigation state.
+      completions into `completeInDiagram` against that Thing-supplied Diagram
+      id, never against the target's navigation state.
 - [x] Enter shows the target as the Space being worked in, with its complete
       command surface and editing capabilities. Built by `space-cards/11`:
       `App` is the production caller of `OpenSpaces.enter`, spent from the
@@ -26,8 +24,11 @@ Tags: release/v1
 - [x] Enter loads the target from repository state already accepted by complete
       aggregate intake. Navigation performs no second cycle check and does not
       carry an ancestor chain as an integrity mechanism. Exercised by
-      `space-cards/11`: `App` calls `OpenSpaces.enter(spaceId, diagram)` from
-      the Space Thing rail; Graph is activated only when the entry is new.
+      `space-cards/11`: `App` calls
+      `spaces.enter(thing.spaceId, thing.diagram, thing.graph)` from the Space
+      Thing rail. Seed applies only on first display of a new entry
+      (`open-spaces.ts` `enter`); an already-open entry keeps its live
+      selection.
 - [x] Enter resolves the stored context `layout-only-v1/04` owns rather than
       restating it here. That ticket (`Status: done`) made `diagram` and `graph`
       durable on the Thing. A *new* Open Spaces entry seeds from that pair;
@@ -42,14 +43,13 @@ Tags: release/v1
       explicitly, and never close the Meta Space.
   - [x] Reusing an already-open entry on Enter — `packages/app/test/enter-space-thing.test.tsx`
         holds that a second Enter keeps the live Diagram rather than the Card's.
-  - [x] Closing an ordinary context explicitly — `ExitSpaceControl` calls
-        `spaces.exit` at
-        `packages/app/src/components/ExitSpaceControl.tsx:34`, mounted at
-        `packages/app/src/App.tsx:920-921`.
-  - [x] Never closing the Meta Space — `ExitSpaceResult`'s
-        `meta-space-permanent` refusal
-        (`packages/app/src/open-spaces.ts:66-77`) is returned at `:552` and
-        presented as "Meta cannot be closed." by `ExitSpaceControl.tsx:41-42`.
+  - [x] Closing an ordinary context explicitly — the Dock Space menu's
+        **Exit Space** calls `spaces.exit` via `App`'s `exitSpace`
+        (`packages/app/src/App.tsx:1412`).
+  - [x] Never closing the Meta Space — `exit` returns
+        `meta-space-permanent` at `packages/app/src/open-spaces.ts:592-593`.
+        `ExitReport` / `exitReportSentence` names why it stays open
+        (`CommandDock.tsx`, `dock-model.ts`).
 - [x] Opening independently uses the target Space's canonical address and
       carries no containing navigation or presentation state. A Space Thing's
       menu still copies the Thing's own addresses as Copy link / Copy permanent
@@ -70,10 +70,9 @@ Tags: release/v1
       and restores a Back onto a resolvable Card location without earning an
       entry).
 - [x] Persistence waiting, refusal and warning behavior is supplied and proven
-      by `architecture-review/14`; its presentation and control placement remain
-      UX work. The supplier is `resolved`; the presentation is
-      `ExitSpaceControl`'s and stays open as UX with `space-cards/11` and
-      `space-cards/12`.
+      by `architecture-review/14` (`resolved`). Presentation is the Dock's
+      `ExitReport` (`CommandDock.tsx`), spent from `App`'s `exitSpace`.
+      `space-cards/12` is superseded by that same architecture ticket.
 - [x] Application and Ladle evidence prove the chosen current UX without making
       that treatment an architectural constraint. Claim
       `space-thing-opens-independently` on `OpenIndependently` in
@@ -84,7 +83,21 @@ Tags: release/v1
 ## Deferred
 
 Cross-Space Edges, cross-Space traversal and presentation-point deep links are
-outside V1.
+outside V1. `09` owns that cut.
+
+## Answer
+
+The three cuts are built. Open-in-place still uses the Thing's `spaceId` /
+`diagram` / `graph` and `completeInDiagram`. Enter is `space-cards/11`'s:
+`App` spends `spaces.enter(thing.spaceId, thing.diagram, thing.graph)`.
+Independent open is **Copy Space link** and **Open in new tab** on
+`{ kind: 'space', spaceId: thing.spaceId }`, held by `entity-actions.test.ts`,
+`thing-rail-actions.test.tsx`, and claim `space-thing-opens-independently`.
+
+Exit and Meta permanence are the Dock Space cluster and `ExitReport`, not
+`ExitSpaceControl`. The 2026-09-09 comment that "Enter has no surface" and
+"Copy link is half there" is stale — the 2026-09-13 comments and the ticked
+boxes are what hold.
 
 ## Comments
 
@@ -135,3 +148,12 @@ a stale pointer, not a remaining cut.
 Closed the write-back criterion. The next reader should not open a ticket to
 persist live Enter navigation onto the Thing unless the `space-cards/07`
 ruling is reversed.
+
+### 2026-09-13 — Closed as resolved after audit
+
+Every criterion was already ticked. Blockers `space-cards/10` and
+`space-cards/11` had finished. Citations that still named `ExitSpaceControl`,
+`completeInLayout`, `space-aggregate.ts:203` and `SpaceCanvas.tsx:331-332`
+were corrected in the boxes above. The 2026-09-09 "genuinely open work"
+paragraph is false against the merged tree; do not reopen Enter or Copy Space
+link from it. Deferred cross-Space Edges stay in `09`.
