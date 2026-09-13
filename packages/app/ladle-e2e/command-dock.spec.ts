@@ -372,8 +372,7 @@ test(
     const group = page.getByRole('radiogroup', { name: 'Graph colour' });
     await expect(group.getByRole('radio')).toHaveCount(20);
     await group.getByRole('radio', { name: 'Orange', exact: true }).click();
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('Escape');
+    await expect(group).toHaveCount(0);
     await expect(page.getByRole('menu')).toHaveCount(0);
 
     const present = surface(page).getByRole('button', { name: 'Present Long' });

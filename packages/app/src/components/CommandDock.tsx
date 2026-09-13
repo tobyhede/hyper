@@ -1211,7 +1211,10 @@ function GraphIdentityMenu({
           <PaletteColorSwatchGrid
             entries={GRAPH_PALETTE_ENTRIES}
             value={graph.active.color}
-            onValueChange={(color) => graph.onRecolor(graph.active.id, color)}
+            onValueChange={(color) => {
+              graph.onRecolor(graph.active.id, color);
+              onOpenChange(false);
+            }}
             disabled={graph.editsDisabled}
             aria-label="Graph colour"
           />
