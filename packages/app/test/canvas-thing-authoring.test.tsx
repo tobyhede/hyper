@@ -151,6 +151,7 @@ const mountAuthoring = (
           editingChromeTitle: !enabled,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
+          creatingSpaceThing: false,
         }),
         nameOnCreation,
         authoring,

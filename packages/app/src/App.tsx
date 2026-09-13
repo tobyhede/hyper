@@ -476,9 +476,7 @@ export const createApp = (
      */
     const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
 
-    // A second press must not reuse the title and anchor before the first Edit
-    // installs. A ref closes the window synchronously, including batched presses.
-    const creatingSpaceThing = useRef(false);
+    const [creatingSpaceThing, setCreatingSpaceThing] = useState(false);
 
     /**
      * Create Space Thing: one press, one Thing, one new Space (ADR 0089).
@@ -499,8 +497,7 @@ export const createApp = (
      * the Things list's add-Space row, which lists real Spaces with search.
      */
     const createSpaceThing = useCallback((): void => {
-      if (creatingSpaceThing.current) return;
-      creatingSpaceThing.current = true;
+      setCreatingSpaceThing(true);
       setSpaceThingRefusal(null);
       void (async () => {
         try {
@@ -543,7 +540,7 @@ export const createApp = (
           reportBreak(failure);
           setSpaceThingRefusal(describeSpaceThingCreationBreak(failure));
         } finally {
-          creatingSpaceThing.current = false;
+          setCreatingSpaceThing(false);
         }
       })();
     }, [centreAnchor]);
@@ -663,6 +660,7 @@ export const createApp = (
       editingChromeTitle,
       spaceOnCanvas: active,
       editingEmbeddedDiagram,
+      creatingSpaceThing,
     });
     // A withdrawn list takes its outstanding request with it. Closing is the
     // Dock's, from the same `disabled` answer that withdraws the trigger; what
@@ -1677,7 +1675,10 @@ export const createApp = (
                 } satisfies Record<DockThingKind, () => void>;
                 create[kind]();
               },
-              createDisabled: !availability.addThing,
+              createDisabled: {
+                markdown: !availability.addThing,
+                space: !availability.createSpaceThing,
+              },
             },
             persistence: {
               state: sessionState.persistence,

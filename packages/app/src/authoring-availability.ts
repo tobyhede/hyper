@@ -26,12 +26,14 @@
  */
 
 /**
- * The eight facts every answer below is derived from.
+ * The nine facts every answer below is derived from.
  *
- * There were nine. `creatingThing` — a creation pane is open — went with the
- * panes themselves: every Thing creation now completes its Edit on activation
- * (ADR 0089), so there is no modal surface for the rest of the product to stand
- * out of the way of.
+ * `creatingThing` — a creation pane is open — went with the panes themselves:
+ * every Thing creation now completes its Edit on activation (ADR 0089), so
+ * there is no modal surface for the rest of the product to stand out of the way
+ * of. `creatingSpaceThing` is the one async creation that remains: its
+ * coordinated Edit lands one await after the press, and the Space Thing peer is
+ * withdrawn for that window rather than swallowing a second press silently.
  */
 export interface AuthoringInProgress {
   /**
@@ -88,6 +90,8 @@ export interface AuthoringInProgress {
    * together, where a report through a callback prop would land an effect late.
    */
   readonly editingEmbeddedDiagram: boolean;
+  /** A Space Thing coordinated Edit is in flight (command-dock issue 23). */
+  readonly creatingSpaceThing: boolean;
 }
 
 /** What each authoring operation answers to the surfaces that offer it. */
@@ -104,6 +108,8 @@ export interface AuthoringAvailability {
   readonly present: boolean;
   /** A Thing may be created — from the toolbar, or by the canvas's own `C`. */
   readonly addThing: boolean;
+  /** The Create Space Thing peer may run — withdrawn while its Edit is in flight. */
+  readonly createSpaceThing: boolean;
   /** A Diagram may be created. */
   readonly createDiagram: boolean;
   /** The canvas's Thing controls and the whole Edge lifecycle may run. */
@@ -130,6 +136,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     editingChromeTitle,
     spaceOnCanvas,
     editingEmbeddedDiagram,
+    creatingSpaceThing,
   } = inProgress;
 
   /**
@@ -249,6 +256,17 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * the name readiness it needs for its continuation.
    */
   const addThing = !presenting && !editingThingBody && !editingChromeTitle;
+
+  /**
+   * Create Space Thing reads `addThing` and one term of its own.
+   *
+   * The coordinated Edit is optimistic — the Thing is drawn before the durable
+   * commit settles — but a second press before it installs would reuse the same
+   * title and anchor and replace the first continuation. Add Markdown Thing is
+   * synchronous and stays on `addThing`; only this peer is withdrawn for the
+   * window.
+   */
+  const createSpaceThing = addThing && !creatingSpaceThing;
 
   /**
    * Add Diagram needs its naming continuation available as well as Add Thing.
@@ -380,6 +398,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     deleteThing,
     present,
     addThing,
+    createSpaceThing,
     createDiagram,
     authorOnCanvas,
     authorInEmbeddedDiagram,

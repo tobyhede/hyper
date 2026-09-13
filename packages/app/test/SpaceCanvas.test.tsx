@@ -175,6 +175,7 @@ function mountGraph(
           editingChromeTitle: !titleEditing,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
+          creatingSpaceThing: false,
         })}
         onNodesChange={nodesChanged}
         onEdgesChange={() => undefined}

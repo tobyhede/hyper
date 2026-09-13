@@ -616,8 +616,8 @@ export interface DockThings {
    * an existing Thing, which is what the surface above is for.
    */
   readonly onCreate: (kind: DockThingKind) => void;
-  /** Whether creating is available at all — presenting and an open pane both withdraw it. */
-  readonly createDisabled: boolean;
+  /** Whether each Create peer may run — the kinds withdraw independently when in flight. */
+  readonly createDisabled: Readonly<Record<DockThingKind, boolean>>;
 }
 
 /** What went wrong, which is the only thing persistence ever says. */
@@ -1240,7 +1240,7 @@ function CreatePeers({
   disabled,
 }: {
   readonly onCreate: (kind: DockThingKind) => void;
-  readonly disabled: boolean;
+  readonly disabled: Readonly<Record<DockThingKind, boolean>>;
 }) {
   return (
     /* **A nested group, and it is what lets the vertical dock pack.** Base UI's
@@ -1259,7 +1259,7 @@ function CreatePeers({
           className="nokey"
           aria-label={`Create ${thingKindName(kind)}`}
           title={`Create ${thingKindName(kind)}`}
-          disabled={disabled}
+          disabled={disabled[kind]}
           onClick={() => onCreate(kind)}
         >
           {/* Decorative here and nowhere else in the Dock: this button already

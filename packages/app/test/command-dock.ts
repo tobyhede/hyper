@@ -75,12 +75,11 @@ export const createThing = (kind: ThingKindName): void => {
 export type ThingKindName = 'Markdown Thing' | 'Space Thing';
 
 /**
- * One kind's Create control, which is also what reports whether creating is
- * available at all — both peers are withdrawn by the same fact.
+ * One kind's Create control.
  *
- * **The default answers the availability question and nothing else.** Asking
- * "can a Thing be created" may use either peer, because `createDisabled`
- * withdraws them together; an assertion about *which* control names its kind.
+ * Each peer withdraws on its own answer — Add Markdown Thing on `addThing`,
+ * Create Space Thing also while its coordinated Edit is in flight — so name the
+ * kind when asserting availability.
  */
 export const createThingControl = (kind: ThingKindName = 'Markdown Thing'): HTMLElement =>
   within(dock()).getByRole('button', { name: `Create ${kind}` });

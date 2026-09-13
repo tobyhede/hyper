@@ -350,6 +350,7 @@ function CanvasHarness({
           editingChromeTitle: covered,
           spaceOnCanvas: true,
           editingEmbeddedDiagram: false,
+          creatingSpaceThing: false,
         })}
         onNodesChange={adapter.getState().changeNodes}
         onEdgesChange={adapter.getState().changeEdges}

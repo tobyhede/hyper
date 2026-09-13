@@ -20,6 +20,7 @@ const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editingChromeTitle: false,
   spaceOnCanvas: true,
   editingEmbeddedDiagram: false,
+  creatingSpaceThing: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
@@ -29,6 +30,7 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   deleteThing: true,
   present: true,
   addThing: true,
+  createSpaceThing: true,
   createDiagram: true,
   authorOnCanvas: true,
   authorInEmbeddedDiagram: true,
@@ -70,6 +72,7 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteThing: false,
         addThing: false,
+        createSpaceThing: false,
         createDiagram: false,
         authorOnCanvas: false,
         authorInEmbeddedDiagram: false,
@@ -88,6 +91,7 @@ describe('authoring availability', () => {
         deleteThing: false,
         present: false,
         addThing: false,
+        createSpaceThing: false,
         createDiagram: false,
       },
     ],
@@ -112,6 +116,7 @@ describe('authoring availability', () => {
         deleteThing: false,
         present: false,
         addThing: false,
+        createSpaceThing: false,
         createDiagram: false,
         authorOnCanvas: false,
         authorInEmbeddedDiagram: false,
@@ -133,6 +138,11 @@ describe('authoring availability', () => {
       { editingEmbeddedDiagram: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
     ],
+    [
+      'a Space Thing creation in flight',
+      { creatingSpaceThing: true },
+      { ...ALL_AVAILABLE, createSpaceThing: false },
+    ],
   ])('withdraws what %s takes away', (_what, inProgress, expected) => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress })).toStrictEqual(
       expected,
@@ -148,6 +158,16 @@ describe('authoring availability', () => {
 
       expect(availability.addThing).toBe(true);
       expect(availability.createDiagram).toBe(false);
+    });
+
+    it('withholds only Create Space Thing while its coordinated Edit is in flight', () => {
+      const availability = authoringAvailability({
+        ...NOTHING_IN_PROGRESS,
+        creatingSpaceThing: true,
+      });
+
+      expect(availability.createSpaceThing).toBe(false);
+      expect(availability.addThing).toBe(true);
     });
 
     it('withholds only Delete Thing while a Thing is open', () => {

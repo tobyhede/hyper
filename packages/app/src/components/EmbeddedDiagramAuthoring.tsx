@@ -120,6 +120,7 @@ export function EmbeddedDiagramAuthoring({
         thingIsOpen: false,
         editingChromeTitle: false,
         spaceOnCanvas: enabled,
+        creatingSpaceThing: false,
         // Never this embedding's own fact. A Space Thing *inside* this Diagram is
         // drawn by the containing `SpaceCanvas` too — its queue descends into
         // the nodes this one publishes — so a nested edit is reported into that

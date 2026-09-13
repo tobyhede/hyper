@@ -1,51 +1,103 @@
 # 23 — A creation in flight does not hold the command it was pressed on
 
-Status: needs-triage
+Status: in-progress
 Tags: release/v1
 Blocked by: nothing. `19` threaded the created Thing's id through this same
 window and deliberately left the rest of it open.
 
-**What to decide:** what the Create cluster does while a Space Thing creation is
-still in flight. Today it does nothing at all, and `19` closed only the half of
-that which was a wrong answer rather than a missing one.
+**What to build:** While a Space Thing creation is in flight, withdraw the
+**Create Space Thing** peer through Availability — visibly disabled, not
+silently ignored — and remove the ad-hoc ref guard once that is wired.
 
 ## The window, and what is left in it
 
-`createSpaceThing` awaits a two-snapshot coordinated Edit. Nothing raises
-`createDisabled` meanwhile — it is `!availability.addThing`, which answers
-presenting, content editing and chrome renaming, not re-entrancy — so a second
-press lands inside the window. `19` made each press continue at the Thing *it*
-made. Two things it did not touch, both reachable by pressing Create Space Thing
-twice quickly:
+`createSpaceThing` awaits a two-snapshot coordinated Edit. `createDisabled` is
+`!availability.addThing`, which answers presenting, content editing and chrome
+renaming — not re-entrancy. `19` made each press continue at the Thing *it*
+made; it did not decide what the surface does while the coordination is open.
 
-- **Both Spaces are called `Space 1`.** The title is minted at the press, from
-  the containing Space's own Thing titles (`nextSpaceTitle`), and neither press
-  has installed anything by the time the second one reads them. So the
-  repository gains two distinct Spaces with one name, and two Things with one
-  name pointing at them.
-- **Both Things are placed at the same point.** `centreAnchor()` is read at the
-  press too, so the second Thing lands exactly on the first.
-- **The caret moves out of the first Thing's Title editor.** The second press's
-  continuation replaces the first's, which is correct for "the press that opened
-  the window owns it" taken one press at a time, and is still an author typing a
-  name into a field that goes away under them.
+If a second press were allowed through with today's eager derivations, both
+would read the same title and anchor at press time:
 
-`packages/app/test/space-thing-authoring.test.tsx` already documents the first
-of these in passing — its two-press case says the titles collide and asserts by
-id for exactly that reason — so the behaviour is pinned but not decided.
+- **Both Spaces are called `Space 1`** — `nextSpaceTitle` at the press, before
+  either Edit installs.
+- **Both Things land at the same point** — `centreAnchor()` at the press.
+- **The second continuation replaces the first** — caret leaves the first
+  Thing's Title editor.
 
-**Add Thing cannot produce any of this**, its Edit being synchronous, which is
-why this is a question about the asynchronous creation rather than about Create.
+**Add Thing cannot produce any of this** — its Edit is synchronous.
 
-## What the decision is between
+## What was decided
 
-Roughly: withdraw the cluster for the duration of a creation (a fourth reason a
-Create control can be unavailable, which `createDisabled` currently has no room
-for); or let the presses through and make the *derivations* late rather than
-eager — mint the title and read the anchor inside the Edit, where the first
-creation is already installed. The second keeps the surface live and is the
-larger change, because both values are the surface's today.
+**Withdraw the Space Thing peer for the duration of an in-flight creation.**
 
-- [ ] The decision is recorded here
-- [ ] Two presses into one window produce two distinguishable Things, or one
+1. **Scope: the Space Thing peer only.** Do not disable the whole Create cluster.
+   Add Markdown Thing is synchronous and stays available.
+
+2. **Surface it through Availability, not a silent ref.** An unavailable
+   operation is not a refusal (`CONTEXT.md`); the control is present and
+   `aria-disabled`, teaching that the command exists and is out of reach *now*
+   (ADR 0082). Replace `creatingSpaceThing.current`'s early return — which
+   swallows a second press with no signal — with an explicit in-progress fact
+   wired into `authoringAvailability` and `createDisabled` for the space peer.
+
+3. **One press, one Thing.** A second press during the window must not create a
+   second Space Thing. Reject late derivations (minting title and anchor inside
+   the Edit so two presses produce `Space 1` / `Space 2` at distinct anchors).
+
+4. **Correction:** the earlier claim that `space-thing-authoring.test.tsx`
+   documents a two-press title-collision case was wrong — that test does not
+   exist in the tree. Add application evidence for the withdrawal behaviour.
+
+- [x] The decision is recorded here
+- [x] Create Space Thing is unavailable while its coordinated Edit is in flight
+- [x] Add Markdown Thing remains available in the same window
+- [x] A test fails without the change and passes with it
+- [ ] `pnpm verify` and `pnpm e2e` green (CI)
+
+## Comments
+
+> *This was generated by AI during triage.*
+
+## Agent Brief
+
+**Category:** bug
+**Summary:** Space Thing creation in flight withdraws its Create peer through
+Availability instead of silently ignoring a second press.
+
+**Current behavior:**
+`createSpaceThing` sets a ref for the duration of the async coordinated Edit.
+A second press returns immediately with no UI change. `createDisabled` does not
+reflect in-flight creation — only `addThing` availability. Title and anchor are
+still read at press time (unchanged by this ticket).
+
+**Desired behavior:**
+While a Space Thing creation is in flight, the Create Space Thing control is
+unavailable (`aria-disabled`) alongside the other Create peers that remain
+available. When the coordination settles — completed, refused, unchanged, or
+rejected — the peer becomes available again. No silent no-op on a second press.
+
+**Key interfaces:**
+- `AuthoringInProgress` / `authoringAvailability` — new fact for Space Thing
+  creation in flight, or an equivalent honest signal the Dock can read
+- `CreatePeers` / `things.createDisabled` — today one boolean for both peers;
+  the space peer needs its own unavailable answer while markdown stays available
+- `createSpaceThing` in `App` — ref guard removed once Availability owns the
+  window; lifecycle promise boundary unchanged
+
+**Acceptance criteria:**
+- [ ] While `spaceThings.create` is unresolved, Create Space Thing is disabled
+      and Create Markdown Thing is not
+- [ ] A second press during the window does not invoke `create` again
+- [ ] After the coordination settles (success or refusal), Create Space Thing
+      is available again
+- [ ] A test in `space-thing-authoring.test.tsx` (or equivalent application
+      test) fails without the change
 - [ ] `pnpm verify` and `pnpm e2e` green
+
+**Out of scope:**
+- Late title/anchor derivation (second press producing two distinguishable Things)
+- Disabling the whole Create cluster or Add Markdown Thing
+- Changing which Thing a press continues at (`19` is settled)
+- E2E unless an existing peer covers Create Space Thing timing; prefer the
+  application test harness already used for Space Thing authoring
