@@ -662,9 +662,7 @@ test(
     await settled(page);
 
     const thing = nodeByTitle(page, 'Architecture');
-    // Open first so the Thing draws over its neighbour — a Closed Thing at the
-    // visible centre sits under a fixture Thing and its rail is not reliably
-    // clickable. Enter is offered Open or Closed; the press is the claim.
+    // Open first, then Enter. Enter is offered Open or Closed; the press is the claim.
     await thing.focus();
     await thing.press('Enter');
     await expect(thing.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
@@ -675,6 +673,36 @@ test(
     await expect(page.getByRole('button', { name: 'Enter Space Architecture' })).toHaveCount(0);
   },
 );
+
+/**
+ * Entering a fixture Space Thing adds its target to Open Spaces.
+ *
+ * Presentation already sits on Linked Spaces, and its Space is not
+ * in the open set. After the rail press the Dock draws Overview, the Diagram
+ * that Thing stores — not Spare, the target's defaultDiagram. Returning without
+ * Exit leaves two Spaces open.
+ */
+test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Linked Spaces');
+  await expect(nodeByTitle(page, 'Presentation')).toBeVisible();
+  await settled(page);
+
+  const thing = nodeByTitle(page, 'Presentation');
+  await thing.hover();
+  await expect(thing.getByRole('button', { name: 'Enter Space Presentation' })).toBeVisible();
+  await thing.getByRole('button', { name: 'Enter Space Presentation' }).click();
+
+  await expect(showingSpace(page)).toContainText('Presentation');
+  await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText('Overview');
+  await expect(page.locator('[data-testid="selected-canvas"]:visible')).not.toContainText('Spare');
+  await expect(nodeByTitle(page, 'Opening remarks')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Go to Diagram fixture' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Go to Diagram fixture' }).click();
+  await expect(showingSpace(page)).toContainText('Diagram fixture');
+  await expect(page.getByRole('button', { name: /^Spaces\. 2 open\.$/ })).toBeVisible();
+});
 
 test('a Space Thing resizes to Close and remembers its Open Size', async ({ page }) => {
   const parent = await openSpaceThingOnItsDiagram(page);

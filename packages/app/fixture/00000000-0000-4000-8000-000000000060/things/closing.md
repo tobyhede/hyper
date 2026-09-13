@@ -5,5 +5,5 @@ title: Closing
 
 # Closing
 
-The walk ends here. From this Space you can still Enter the Deep dive or the
+Presenting ends here. From this Space you can still Enter the Deep dive or the
 Authoring notes — those Space Things sit on this Diagram, off the Graph.

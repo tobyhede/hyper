@@ -5,13 +5,13 @@ import { HttpSpaceBackend } from '@project/http';
 import { createApp, type E2eHttpRuntimeOptions } from '../support/e2e-http-runtime';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
-const WALKTHROUGH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const PRESENTATION_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
 const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const NOTES_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
 const EXAMPLE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const FIXTURE_SPACES = [
   { id: FIXTURE_ID, title: 'Diagram fixture' },
-  { id: WALKTHROUGH_ID, title: 'Presentation walkthrough' },
+  { id: PRESENTATION_ID, title: 'Presentation' },
   { id: DEEP_DIVE_ID, title: 'Deep dive' },
   { id: NOTES_ID, title: 'Authoring notes' },
 ] as const;

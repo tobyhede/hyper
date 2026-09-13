@@ -5,5 +5,5 @@ title: Follow-up
 
 # Follow-up
 
-The second note on the Graph. Switching back to the walkthrough or the Deep
+The second note on the Graph. Switching back to Presentation or the Deep
 dive should leave this edit where you left it; Exit is the only close.

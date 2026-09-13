@@ -272,8 +272,9 @@ export interface SpaceCanvasProps {
   /**
    * Enter the Space a Space Thing on this canvas references.
    *
-   * Absent on an isolated mount and on an embedded canvas — Enter is a
-   * crossing the session owns, and those surfaces have no session to spend.
+   * Passed straight through to `useCanvasThingAuthoring`. Absent leaves every
+   * Space Thing without Enter (`canvas-thing-authoring.test.tsx`,
+   * 'omits Enter when onEnterSpace is absent').
    */
   onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }

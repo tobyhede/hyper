@@ -244,10 +244,11 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'Two Space Things referencing one Space each draw the Diagram they store rather than the target\u2019s own opening Diagram, so their embeddings differ in membership while converging on one Space.',
     // Both Space Things can be authored in a browser, but only against a target
-    // that owns two Diagrams \u2014 and a second Diagram is Add Diagram, which acts on
-    // the Space the author is *in*. Reaching the target means Entering it, and
-    // Entering is `entity-url-addressability/08`. So the second selection cannot
-    // be authored through a browser gesture yet, and the claim takes the
+    // that owns two Diagrams \u2014 and a second Diagram is Add Diagram, which acts
+    // on the Space the author is *in*. Entering that Space is the rail command
+    // `space-cards/11` owns. The remaining gap is a target that already owns
+    // two Diagrams, not the absence of Enter \u2014 the e2e fixture does not author
+    // that second Diagram through the browser \u2014 so the claim takes the
     // documented exemption meanwhile.
     applicationEvidence:
       'A second Diagram in the target is Add Diagram from inside that Space. Entering a Space Thing is now the rail command `space-cards/11` owns, but this claim still needs a target that already owns two Diagrams — the e2e fixture does not author that second Diagram through the browser. `packages/app/test/space-thing-authoring.test.tsx` proves two Space Things keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',

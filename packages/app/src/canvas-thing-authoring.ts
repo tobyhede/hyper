@@ -117,8 +117,8 @@ export interface CanvasThingAuthoringInput {
    *
    * Asked one Thing at a time, the same way {@link thingEntityActions} is:
    * the crossing is Open Spaces' and this module only knows which Things
-   * are on the canvas. Absent leaves every Space Thing without Enter, which
-   * is what an isolated mount and an embedded canvas want.
+   * are on the canvas. Absent leaves every Space Thing without Enter
+   * (`canvas-thing-authoring.test.tsx`, 'omits Enter when onEnterSpace is absent').
    */
   readonly onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }

@@ -82,7 +82,7 @@ describe('tracked fixture aggregate', () => {
     expect([...inbound.values()].some((count) => count >= 2)).toBe(true);
 
     const titles = new Set(ordinary.map((space) => space.title));
-    expect(titles.has('Presentation walkthrough')).toBe(true);
+    expect(titles.has('Presentation')).toBe(true);
     expect(titles.has('Deep dive')).toBe(true);
     expect(titles.has('Authoring notes')).toBe(true);
 

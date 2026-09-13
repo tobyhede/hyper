@@ -10,9 +10,11 @@ import { dock, exitSpaceItem } from './command-dock';
 /**
  * Entering a Space Thing from its rail (ADR 0068, ADR 0073).
  *
- * `OpenSpaces.enter` is composed and tested; this file is the production
- * caller that ticket 11 owns — the kind command on the Thing, the canvas
- * swap, and the selection the Card seeds.
+ * This file mounts `OpenSpacesApplication` and presses the Thing's Enter
+ * command. It holds the canvas swap, the selection the Thing seeds, an
+ * already-open Space keeping its live selection, a failed Enter reported on
+ * the Space being left, Escape not exiting, and Exit then Enter seeding from
+ * the Thing again.
  */
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -153,6 +155,12 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
 
 const showingSpace = (): HTMLElement => within(dock()).getByTestId('space-title');
 
+const spaceThingDocument = (spaces: OpenSpaces) =>
+  spaces
+    .entry(HOME_ID)
+    ?.session.getState()
+    .working.things.find((thing) => thing.id === SPACE_THING_ID)?.document;
+
 async function mount(): Promise<OpenSpaces> {
   const backend = new MemorySpaceBackend(
     META_ID,
@@ -199,7 +207,7 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('entering a Space Thing', { timeout: 15_000 }, () => {
-  it('adds the target to Open Spaces, shows it, and seeds the Card’s Diagram and Graph', async () => {
+  it('adds the target to Open Spaces, shows it, and seeds the Thing’s Diagram and Graph', async () => {
     const spaces = await mount();
 
     await enterArchitecture();
@@ -227,6 +235,12 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
       selectedDiagramId: OTHER_DIAGRAM_ID,
       activeGraphId: OTHER_GRAPH_ID,
     });
+    expect(spaceThingDocument(spaces)).toMatchObject({
+      kind: 'space',
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    expect(opened?.session.getState().working.document.defaultDiagram).toBe(OTHER_DIAGRAM_ID);
 
     await spaces.switchTo(HOME_ID);
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));
@@ -241,6 +255,22 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
     });
   });
 
+  it('reports a failed Enter on the Space being left', async () => {
+    const spaces = await mount();
+    vi.spyOn(spaces, 'enter').mockRejectedValueOnce(
+      new Error(`The backend could not load space ${TARGET_ID}`),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Space Architecture' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Architecture could not be entered.');
+    });
+    expect(showingSpace()).toHaveTextContent('Home');
+    expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
+    expect(spaces.entry(TARGET_ID)).toBeUndefined();
+  });
+
   it('does not exit on Escape', async () => {
     await mount();
     await enterArchitecture();
@@ -250,7 +280,7 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
     expect(showingSpace()).toHaveTextContent('Architecture');
   });
 
-  it('seeds from the Card again after Exit, because Exit destroyed the entry', async () => {
+  it('seeds from the Thing again after Exit, because Exit destroyed the entry', async () => {
     const spaces = await mount();
     await enterArchitecture();
     spaces.entry(TARGET_ID)?.app.navigation.selectDiagram(OTHER_DIAGRAM_ID);

@@ -5,6 +5,6 @@ title: What presenting does
 
 # What presenting does
 
-Presenting walks the Active Graph. This Deep dive is a line of three, so
+Presenting traverses the Active Graph. This Deep dive is a line of three, so
 Next and Prev have a start, a middle and an end, and switching away from
-this Space leaves the walk behind.
+this Space leaves that Traversal behind.

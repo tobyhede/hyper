@@ -1,6 +1,6 @@
 ---
 id: 00000000-0000-4000-8000-000000000010
-title: Presentation walkthrough
+title: Presentation
 kind: space
 spaceId: 00000000-0000-4000-8000-000000000060
 diagram: 00000000-0000-4000-8000-000000000061
