@@ -261,6 +261,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'A Space Thing offers Enter on its rail as a kind command; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
   },
   {
+    id: 'space-thing-opens-independently',
+    storyFile: 'components/thing.stories.tsx',
+    storyExport: 'OpenIndependently',
+    claim:
+      'A Space Thing offers Copy Space link and Open in new tab for the Space it shows, at that Space’s own address and with no containing Diagram or presentation.',
+  },
+  {
     id: 'open-alias-shows-target-markdown-read-only',
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'OpenAlias',

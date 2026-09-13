@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
+import { uuidSchema, type Diagram, type Thing } from '@project/core';
+import type { ProductDestination } from '@project/http';
 import { CanvasThing, type CanvasThingFront, type CanvasThingState } from '@project/ui';
+import { spaceEntityActions } from '#src/entity-actions';
 import { thingSizeVars, snapThingSizeToClose } from '#src/thing';
 import { CanvasThingSpecimen } from '../support/CanvasThingSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
@@ -433,3 +436,65 @@ export const EnterSpace: Story = () => {
 };
 EnterSpace.storyName = 'Enter Space';
 EnterSpace.meta = { iframed: true };
+
+const ARCHITECTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const ARCHITECTURE: Thing = {
+  id: ARCHITECTURE_ID,
+  title: 'Architecture',
+  kind: 'space',
+  spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000020'),
+  diagram: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
+  graph: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
+};
+const CONTAINING_DIAGRAM: Diagram = {
+  id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
+  title: 'Collection 1',
+  kind: 'positioned',
+  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false } },
+  graphs: [
+    { id: uuidSchema.parse('00000000-0000-4000-8000-000000000004'), title: 'Overview', edges: [] },
+  ],
+};
+
+/**
+ * Independently opening the Space a Space Thing shows is a link to that
+ * Space's own address (ADR 0068). The production menu is `spaceEntityActions`;
+ * the application proof is `thing-rail-actions.test.tsx` and `space-thing.spec.ts`.
+ */
+export const OpenIndependently: Story = () => {
+  const [opened, setOpened] = useState<ProductDestination | null>(null);
+  const changeOpen = () => 'completed' as const;
+  const entityActions = spaceEntityActions({
+    spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
+    spaceTitle: 'Home',
+    onCopy: () => true,
+    onOpenIndependently: (destination) => {
+      setOpened(destination);
+      return true;
+    },
+    onRename: null,
+    onDeleteDiagram: null,
+  })({ kind: 'thing', thing: ARCHITECTURE, diagram: CONTAINING_DIAGRAM });
+  return (
+    <div className="p-8">
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: false,
+          onOpenChange: changeOpen,
+        }}
+        state="selected"
+        title="Architecture"
+        graphColor="#35d6c3"
+        entityActions={entityActions}
+      />
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="independent-open-report">
+        {opened?.kind === 'space'
+          ? `Opened space ${opened.spaceId} independently.`
+          : 'Not opened independently.'}
+      </p>
+    </div>
+  );
+};
+OpenIndependently.storyName = 'Open independently';
+OpenIndependently.meta = { iframed: true };

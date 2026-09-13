@@ -1,3 +1,4 @@
+import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
   boxOf,
@@ -682,6 +683,8 @@ test(
  * that Thing stores — not Spare, the target's defaultDiagram. Returning without
  * Exit leaves two Spaces open.
  */
+const PRESENTATION_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+
 test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Linked Spaces');
@@ -703,6 +706,50 @@ test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ p
   await expect(showingSpace(page)).toContainText('Diagram fixture');
   await expect(page.getByRole('button', { name: /^Spaces\. 2 open\.$/ })).toBeVisible();
 });
+
+/**
+ * Independently opening the Space a Space Thing shows is a link to that
+ * Space's own address (ADR 0068). It is not Enter: the containing Space stays
+ * on this tab, and the new one carries no opener.
+ */
+test(
+  'Open in new tab on a Space Thing opens the target Space at its own address',
+  { tag: '@parity:space-thing-opens-independently' },
+  async ({ page }) => {
+    const targetPath = `/spaces/${encodeCompactUuid(PRESENTATION_SPACE_ID)}`;
+    await page.addInitScript(() => {
+      const original = window.open.bind(window);
+      window.open = (url, target, features) => {
+        sessionStorage.setItem('opened-independently', String(url ?? ''));
+        return original(url, target, features);
+      };
+    });
+    await page.goto('/');
+    await selectCanvas(page, 'Linked Spaces');
+    await expect(nodeByTitle(page, 'Presentation')).toBeVisible();
+    await settled(page);
+
+    const thing = nodeByTitle(page, 'Presentation');
+    await thing.hover();
+    await thing
+      .getByRole('button', { name: 'Actions for Thing Presentation' })
+      .click({ delay: 120 });
+    await expect(page.getByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
+
+    const popup = page.waitForEvent('popup').catch(() => null);
+    await page.getByRole('menuitem', { name: /^Open in new tab/ }).click();
+    const independent = await popup;
+
+    await expect
+      .poll(() => page.evaluate(() => sessionStorage.getItem('opened-independently')))
+      .toMatch(new RegExp(`${targetPath}$`));
+    await expect(showingSpace(page)).toContainText('Diagram fixture');
+    if (independent !== null) {
+      await expect(independent).toHaveURL(new RegExp(`${targetPath}$`));
+      await expect(showingSpace(independent)).toContainText('Presentation');
+    }
+  },
+);
 
 test('a Space Thing resizes to Close and remembers its Open Size', async ({ page }) => {
   const parent = await openSpaceThingOnItsDiagram(page);

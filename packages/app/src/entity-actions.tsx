@@ -12,6 +12,7 @@ import {
   CopyIcon,
   DeleteIcon,
   EditIcon,
+  OpenIndependentlyIcon,
   type EntityAction,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -35,7 +36,7 @@ import {
  * render. Either way the decision is made once: the two surfaces cannot come to
  * disagree about what a Graph's "Copy link" means.
  *
- * Pure: it decides the whole menu from the entity and the four callbacks it was
+ * Pure: it decides the whole menu from the entity and the callbacks it was
  * composed with, and the callbacks are where every side effect lives.
  */
 
@@ -64,6 +65,8 @@ export const DELETE_DIAGRAM_ACTION_ID = 'delete-diagram';
  */
 export const COPY_LINK_ACTION_ID = 'copy-link';
 export const COPY_PERMANENT_LINK_ACTION_ID = 'copy-permanent-link';
+export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
+export const OPEN_INDEPENDENTLY_ACTION_ID = 'open-independently';
 
 /** The commands a surface may ask this list for by id. */
 export type EntityCommandId =
@@ -116,6 +119,14 @@ export interface SpaceEntityActionsOptions {
    */
   readonly onCopy: (destination: ProductDestination) => boolean | Promise<boolean>;
   /**
+   * Opens one address in a new browsing context, answering whether it opened.
+   *
+   * A Space Thing offers this for the Space it shows, on that Space's own
+   * address and nothing the containing Diagram carries (ADR 0068). `null`
+   * withholds the row — a story that only records copies has no tab to open.
+   */
+  readonly onOpenIndependently: ((destination: ProductDestination) => boolean) | null;
+  /**
    * Begins the entity's inline rename, or `null` while no rename may begin.
    *
    * `null` rather than a disabled item: Rename here is a second path to the
@@ -150,6 +161,8 @@ export interface SpaceEntityActionsOptions {
  */
 const COPY_LINK = 'Copy link';
 const COPY_PERMANENT_LINK = 'Copy permanent link';
+const COPY_SPACE_LINK = 'Copy Space link';
+const OPEN_INDEPENDENTLY = 'Open in new tab';
 
 /**
  * What a copy command's own label says when the clipboard refused it.
@@ -186,6 +199,7 @@ export function spaceEntityActions({
   spaceId,
   spaceTitle,
   onCopy,
+  onOpenIndependently,
   onRename,
   onDeleteDiagram,
 }: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityActionGroup[] {
@@ -313,36 +327,74 @@ export function spaceEntityActions({
     // left for a permanent link to differ from. Withheld, never shown and
     // refused: `diagram-thing` would 404 on the address it copied.
     const placed = diagram.positions[thing.id] !== undefined;
+    const thingAddresses: readonly EntityAction[] = placed
+      ? [
+          copy(
+            COPY_LINK_ACTION_ID,
+            COPY_LINK,
+            `Opens ${thingName} inside ${diagram.title}, selected the way it is now`,
+            { kind: 'diagram-thing', spaceId, diagramId: diagram.id, thingId: thing.id },
+            onCopy,
+          ),
+          copy(
+            COPY_PERMANENT_LINK_ACTION_ID,
+            COPY_PERMANENT_LINK,
+            `Always opens ${thingName} on its own, wherever it is placed`,
+            permanent,
+            onCopy,
+          ),
+        ]
+      : [
+          copy(
+            COPY_LINK_ACTION_ID,
+            COPY_LINK,
+            `Opens ${thingName} on its own — ${diagram.title} does not place it`,
+            permanent,
+            onCopy,
+          ),
+        ];
+    /**
+     * The Space this Thing shows, at that Space's own address.
+     *
+     * Copy link / Copy permanent link still name the Thing. Independently
+     * opening the target is a third destination: no containing Diagram, no
+     * presentation, and not this Space (ADR 0068, ADR 0069). Offered only on a
+     * Space Thing — a Markdown Thing has no target Space to address.
+     */
+    const targetSpaceAddress: readonly EntityAction[] =
+      thing.kind !== 'space'
+        ? []
+        : [
+            copy(
+              COPY_SPACE_LINK_ACTION_ID,
+              COPY_SPACE_LINK,
+              'Opens the Space on its own, at the Diagram it opens on',
+              { kind: 'space', spaceId: thing.spaceId },
+              onCopy,
+            ),
+            ...(onOpenIndependently === null
+              ? []
+              : [
+                  {
+                    id: OPEN_INDEPENDENTLY_ACTION_ID,
+                    label: OPEN_INDEPENDENTLY,
+                    description: 'Opens the Space on its own, in a new tab',
+                    report: { done: 'Opened', failed: 'Not opened' },
+                    icon: <OpenIndependentlyIcon />,
+                    // Sync on purpose: `window.open` spends the click's user
+                    // gesture, and an `await` here would yield and lose it.
+                    onSelect: (): EntityActionOutcome =>
+                      onOpenIndependently({ kind: 'space', spaceId: thing.spaceId })
+                        ? 'done'
+                        : 'failed',
+                  },
+                ]),
+          ];
     return [
       // No Rename: a Thing's title is renamed in place on the canvas, and the
       // chrome title edit takes Diagram and Graph subjects only.
       [],
-      placed
-        ? [
-            copy(
-              COPY_LINK_ACTION_ID,
-              COPY_LINK,
-              `Opens ${thingName} inside ${diagram.title}, selected the way it is now`,
-              { kind: 'diagram-thing', spaceId, diagramId: diagram.id, thingId: thing.id },
-              onCopy,
-            ),
-            copy(
-              COPY_PERMANENT_LINK_ACTION_ID,
-              COPY_PERMANENT_LINK,
-              `Always opens ${thingName} on its own, wherever it is placed`,
-              permanent,
-              onCopy,
-            ),
-          ]
-        : [
-            copy(
-              COPY_LINK_ACTION_ID,
-              COPY_LINK,
-              `Opens ${thingName} on its own — ${diagram.title} does not place it`,
-              permanent,
-              onCopy,
-            ),
-          ],
+      [...thingAddresses, ...targetSpaceAddress],
       [],
     ];
   };

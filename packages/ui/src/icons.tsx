@@ -5,6 +5,7 @@ import {
   CircleAlert,
   Copy,
   Ellipsis,
+  ExternalLink,
   Frame,
   LayoutGrid,
   Link,
@@ -101,6 +102,16 @@ export const AbandonEditIcon = (props: ThingActionIconProps) => (
  * are two destinations and must not share a symbol.
  */
 export const EnterSpaceIcon = (props: ThingActionIconProps) => <LogIn size={14} {...props} />;
+
+/**
+ * Open the Space a Space Thing shows, in a new browsing context.
+ *
+ * Lucide `external-link`: the destination leaves this tab. Enter's `log-in`
+ * stays the crossing that keeps the session; this one is a link (ADR 0068).
+ */
+export const OpenIndependentlyIcon = (props: ThingActionIconProps) => (
+  <ExternalLink size={14} {...props} />
+);
 
 /** Open a Thing in place. */
 export const OpenThingIcon = (props: ThingActionIconProps) => <Maximize2 size={14} {...props} />;

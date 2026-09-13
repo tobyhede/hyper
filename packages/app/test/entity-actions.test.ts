@@ -13,6 +13,9 @@ const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const PLACED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OUTSIDE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 const GRAPH: Graph = { id: GRAPH_ID, title: 'Long', edges: [] };
 const DIAGRAM: Diagram = {
@@ -22,11 +25,20 @@ const DIAGRAM: Diagram = {
   positions: { [PLACED_THING_ID]: { x: 0, y: 0, open: false } },
   graphs: [GRAPH],
 };
-const thing = (id: typeof PLACED_THING_ID, title: string): Thing => ({
+const thing = (id: Thing['id'], title: string): Thing => ({
   id,
   title,
   kind: 'markdown',
   body: '',
+});
+
+const spaceThing = (id: typeof PLACED_THING_ID, title: string): Thing => ({
+  id,
+  title,
+  kind: 'space',
+  spaceId: TARGET_SPACE_ID,
+  diagram: TARGET_DIAGRAM_ID,
+  graph: TARGET_GRAPH_ID,
 });
 
 const build = (
@@ -36,6 +48,7 @@ const build = (
     spaceId: SPACE_ID,
     spaceTitle: 'Fixture Space',
     onCopy: vi.fn(),
+    onOpenIndependently: vi.fn(),
     onRename: vi.fn(),
     onDeleteDiagram: vi.fn(),
     ...overrides,
@@ -81,6 +94,14 @@ describe('spaceEntityActions', () => {
     {
       name: 'a Thing',
       entity: { kind: 'thing', thing: thing(PLACED_THING_ID, 'A'), diagram: DIAGRAM } as const,
+    },
+    {
+      name: 'a Space Thing',
+      entity: {
+        kind: 'thing',
+        thing: spaceThing(PLACED_THING_ID, 'Architecture'),
+        diagram: DIAGRAM,
+      } as const,
     },
   ])('never says canonical or contextual in $name’s menu', ({ entity }) => {
     const written = commands(build()(entity))
@@ -234,6 +255,66 @@ describe('spaceEntityActions', () => {
       expect(action.description).toBeTypeOf('string');
       expect(action.icon).toBeDefined();
     }
+  });
+
+  /**
+   * A Space Thing's own addresses still name the Thing. Independently opening
+   * the Space it shows is a third destination: the target's own address, with
+   * no containing Diagram or presentation (ADR 0068, ADR 0069).
+   */
+  it('offers a Space Thing the target Space’s own address and an independent open', () => {
+    const entity: SpaceEntity = {
+      kind: 'thing',
+      thing: spaceThing(PLACED_THING_ID, 'Architecture'),
+      diagram: DIAGRAM,
+    };
+
+    expect(labels(build()(entity))).toEqual([
+      'Copy link',
+      'Copy permanent link',
+      'Copy Space link',
+      'Open in new tab',
+    ]);
+    expect(copied(entity, 'Copy link')).toEqual({
+      kind: 'diagram-thing',
+      spaceId: SPACE_ID,
+      diagramId: DIAGRAM_ID,
+      thingId: PLACED_THING_ID,
+    });
+    expect(copied(entity, 'Copy Space link')).toEqual({
+      kind: 'space',
+      spaceId: TARGET_SPACE_ID,
+    });
+  });
+
+  it('opens the target Space independently from a Space Thing, not the Thing', async () => {
+    const opened: ProductDestination[] = [];
+    const entity: SpaceEntity = {
+      kind: 'thing',
+      thing: spaceThing(PLACED_THING_ID, 'Architecture'),
+      diagram: DIAGRAM,
+    };
+    const actions = build({
+      onOpenIndependently: (destination) => {
+        opened.push(destination);
+        return true;
+      },
+    })(entity);
+    const action = commands(actions).find((candidate) => candidate.label === 'Open in new tab');
+
+    expect(action).toBeDefined();
+    expect(await action?.onSelect()).toBe('done');
+    expect(opened).toEqual([{ kind: 'space', spaceId: TARGET_SPACE_ID }]);
+  });
+
+  it('withholds the independent Space address from a Markdown Thing', () => {
+    const entity: SpaceEntity = {
+      kind: 'thing',
+      thing: thing(PLACED_THING_ID, 'A'),
+      diagram: DIAGRAM,
+    };
+
+    expect(labels(build()(entity))).toEqual(['Copy link', 'Copy permanent link']);
   });
 
   it('begins a rename against the entity the row is about', () => {

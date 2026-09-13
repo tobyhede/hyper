@@ -97,9 +97,9 @@ function PrototypeBanner({ children }: { readonly children: string }) {
  * when `ThingNode` first supplies the actions.
  *
  * There is no Rename in this menu, because production has none to offer: a Thing
- * title is renamed in place on its Front. The prototype's "Open in a new tab"
- * is gone for the same reason — the application does not implement it, and a
- * story is not the place to promise one.
+ * title is renamed in place on its Front. "Open in new tab" is a Space Thing
+ * command in production (`spaceEntityActions`); this review story still
+ * records copies only.
  */
 export const ThingRail: Story = () => {
   const { log, record } = useActivityLog();
@@ -114,6 +114,7 @@ export const ThingRail: Story = () => {
       // accepted the link.
       return true;
     },
+    onOpenIndependently: null,
     onRename: null,
     onDeleteDiagram: null,
   });

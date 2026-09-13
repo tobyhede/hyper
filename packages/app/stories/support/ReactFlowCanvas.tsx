@@ -401,6 +401,7 @@ export function CanvasThingNodeSpecimen({
       spaceId: space.id,
       spaceTitle: space.title,
       onCopy: () => true,
+      onOpenIndependently: null,
       onRename: null,
       onDeleteDiagram: null,
     })({ kind: 'thing', thing, diagram }),

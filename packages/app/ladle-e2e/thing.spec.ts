@@ -564,3 +564,21 @@ test(
     await expect(page.getByTestId('enter-report')).toHaveText('Entered Architecture.');
   },
 );
+
+test(
+  'a Space Thing offers the target Space’s own address and opens it independently',
+  { tag: '@parity:space-thing-opens-independently' },
+  async ({ page }) => {
+    await page.goto('/?story=components--thing--open-independently&mode=preview');
+
+    await page.getByRole('button', { name: 'Actions for Thing Architecture' }).click();
+    await expect(page.getByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
+    await expect(page.getByTestId('independent-open-report')).toHaveText(
+      'Not opened independently.',
+    );
+    await page.getByRole('menuitem', { name: /^Open in new tab/ }).click();
+    await expect(page.getByTestId('independent-open-report')).toHaveText(
+      'Opened space 00000000-0000-4000-8000-000000000020 independently.',
+    );
+  },
+);
