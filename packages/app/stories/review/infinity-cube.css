@@ -1,0 +1,129 @@
+/* THROWAWAY UX PROTOTYPE — see infinity-cube.stories.tsx. */
+
+html:has(.infinity-cube) {
+  color-scheme: light;
+
+  --background: #f3f3f0;
+  --foreground: #111111;
+  --card: #ffffff;
+  --muted-foreground: #6b7280;
+  --border: #e6e6e3;
+}
+
+.infinity-cube {
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.infinity-cube__lede {
+  max-width: 64ch;
+  margin: 0 0 20px;
+  color: var(--muted-foreground);
+}
+
+.infinity-cube__heading {
+  margin: 24px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.infinity-cube__panel {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.infinity-cube__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.infinity-cube__row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.infinity-cube__hero {
+  display: flex;
+  justify-content: center;
+  padding: 36px 14px;
+  color: var(--foreground);
+}
+
+.infinity-cube__mark {
+  display: block;
+  flex: none;
+  background: url('./infinity-cube-mark.png') center / contain no-repeat;
+}
+
+.infinity-cube__sizes {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex: none;
+  padding-top: 2px;
+  color: var(--foreground);
+}
+
+.infinity-cube__lockup {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: var(--foreground);
+}
+
+.infinity-cube__lockup + .infinity-cube__lockup {
+  margin-top: 28px;
+}
+
+.infinity-cube__lockup--tight {
+  gap: 16px;
+}
+
+.infinity-cube__word {
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.infinity-cube__word--small {
+  font-size: 18px;
+}
+
+.infinity-cube__cube3 {
+  font-size: 0.55em;
+  color: #2f5bff;
+}
+
+.infinity-cube__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.infinity-cube__name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.infinity-cube__note {
+  color: var(--muted-foreground);
+}
+
+.infinity-cube__rule {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex: none;
+}
