@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import type { Route } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 import {
   activateGraph,
   boxOf,
@@ -156,6 +156,71 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
  * the *only* chrome there is — so if the marker were ever dropped, this is where
  * a reader would lose a Thing to a keystroke meant for a menu.
  */
+const thingActions = async (page: Page, title: string) => {
+  const thing = nodeByTitle(page, title).first();
+  await thing.hover();
+  await thing.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  return menu;
+};
+
+/**
+ * Delete Thing's confirmation at phone width (v1-release/03). Assertions
+ * follow `editing.spec.ts` — `Delete Thing confirms before removing the Thing
+ * from the whole Space` — so Confirm is `deleted-thing`, not canvas membership.
+ */
+test('Delete Thing confirms at phone width with the pointer', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const thing = nodeByTitle(page, 'B');
+  await thing.click();
+  await (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }).click();
+
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete Thing B?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Cancel' }).click();
+  await expect(thing).toBeVisible();
+
+  await (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete Thing' }).click();
+  await confirmation.getByRole('button', { name: 'Delete Thing' }).click();
+
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Things' }).click();
+  await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(dock(page)).toBeVisible();
+});
+
+test('Delete Thing confirms at phone width from the keyboard', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const thing = nodeByTitle(page, 'B').first();
+  await thing.click();
+  await thing.getByRole('button', { name: 'Actions for Thing B' }).press('Enter');
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Delete Thing' }).press('Enter');
+
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete Thing B?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Cancel' }).press('Enter');
+  await expect(thing).toBeVisible();
+
+  await thing.getByRole('button', { name: 'Actions for Thing B' }).press('Enter');
+  await page.getByRole('menuitem', { name: 'Delete Thing' }).press('Enter');
+  await confirmation.getByRole('button', { name: 'Delete Thing' }).press('Enter');
+
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Things' }).click();
+  await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(dock(page)).toBeVisible();
+});
+
 test('Delete on a Dock control leaves the selected Thing on the canvas', async ({ page }) => {
   await page.goto('/');
   const thing = nodeByTitle(page, 'A').first();

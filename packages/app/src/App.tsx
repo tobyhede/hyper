@@ -1118,52 +1118,79 @@ export const createApp = (
               ],
             ]
           : [];
-        if (!availability.deleteThing) return [...addresses, ...alias];
-        const remove = thingDeletion(thing);
-        return [
-          ...addresses,
-          ...alias,
-          [
-            {
-              id: 'delete-thing',
-              // "Delete Thing", not "Delete Thing <title>": the menu that draws
-              // this item is already named for the Thing it belongs to, and the
-              // Diagram menu's own destructive command is spelled the same way.
-              label: 'Delete Thing',
-              icon: <DeleteIcon />,
-              variant: 'destructive',
-              // **It asks, and the confirmation runs it.** Deleting a Thing is
-              // not undoable in V1, and deleting a Space Thing can take the Space
-              // it references and every Space below it that nothing else
-              // references (ADR 0074) — so the command that used to sit behind
-              // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
-              // at the App root rather than in the menu that armed it, because
-              // the menu closes on the press and would take the question with
-              // it.
-              //
-              // **And it carries no `report`.** An item that names words has
-              // its menu held open and its label swapped to the word its
-              // outcome picks — machinery for a command that *runs* on the
-              // press. This one raises a question, so `done` said "Thing deleted"
-              // beside a dialog still asking whether to, and announced it to a
-              // reader who might then press Cancel. What the deletion did is the
-              // canvas's to report; why it did not is the confirmation's, which
-              // prints it into the shell's standing notice.
-              onSelect: (): EntityActionOutcome => {
-                setThingDeletionRefusal(null);
-                setPendingThingDeletion({ thing, remove });
-                return 'done';
-              },
-            },
-          ],
+        /**
+         * Remove from Diagram is the canvas key's availability, not Delete
+         * Thing's. Delete is withdrawn while a Thing is Open so Open state
+         * cannot outlive the Thing; Remove reclaims that room and stays
+         * offered — `thing-rail-actions.test.tsx` (`still offers Remove from
+         * Diagram while the Thing is Open`).
+         */
+        const canRemoveFromDiagram = availability.authorOnCanvas && !editingThingBody;
+        const leaving: EntityActionGroup = [
+          ...(canRemoveFromDiagram
+            ? [
+                {
+                  id: 'remove-from-diagram',
+                  label: 'Remove from Diagram',
+                  onSelect: (): EntityActionOutcome => {
+                    const result = authoring.complete({
+                      kind: 'removed-thing-from-diagram',
+                      thingId: thing.id,
+                    });
+                    if (result.kind === 'refused') {
+                      setThingDeletionRefusal(describeAuthoringRefusal(result.refusal));
+                    }
+                    return 'done';
+                  },
+                },
+              ]
+            : []),
+          ...(availability.deleteThing
+            ? [
+                {
+                  id: 'delete-thing',
+                  // "Delete Thing", not "Delete Thing <title>": the menu that draws
+                  // this item is already named for the Thing it belongs to, and the
+                  // Diagram menu's own destructive command is spelled the same way.
+                  label: 'Delete Thing',
+                  icon: <DeleteIcon />,
+                  variant: 'destructive' as const,
+                  // **It asks, and the confirmation runs it.** Deleting a Thing is
+                  // not undoable in V1, and deleting a Space Thing can take the Space
+                  // it references and every Space below it that nothing else
+                  // references (ADR 0074) — so the command that used to sit behind
+                  // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
+                  // at the App root rather than in the menu that armed it, because
+                  // the menu closes on the press and would take the question with
+                  // it.
+                  //
+                  // **And it carries no `report`.** An item that names words has
+                  // its menu held open and its label swapped to the word its
+                  // outcome picks — machinery for a command that *runs* on the
+                  // press. This one raises a question, so `done` said "Thing deleted"
+                  // beside a dialog still asking whether to, and announced it to a
+                  // reader who might then press Cancel. What the deletion did is the
+                  // canvas's to report; why it did not is the confirmation's, which
+                  // prints it into the shell's standing notice.
+                  onSelect: (): EntityActionOutcome => {
+                    setThingDeletionRefusal(null);
+                    setPendingThingDeletion({ thing, remove: thingDeletion(thing) });
+                    return 'done';
+                  },
+                },
+              ]
+            : []),
         ];
+        return [...addresses, ...alias, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
         renderedSpace,
         entityActions,
         selectedDiagram.diagram,
         availability.addThing,
+        availability.authorOnCanvas,
         availability.deleteThing,
+        editingThingBody,
         createAliasFrom,
         thingDeletion,
       ],
