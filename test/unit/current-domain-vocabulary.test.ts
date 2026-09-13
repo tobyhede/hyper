@@ -1724,7 +1724,9 @@ describe('a Thing is named once (ADR 0085)', () => {
         const source = readTracked(file);
         return source === null
           ? []
-          : hits(source, RETIRED_THING_BARE).map((hit) => `${file}:${hit}`);
+          : hits(withoutQualifiedThingSpellings(source), RETIRED_THING_BARE).map(
+              (hit) => `${file}:${hit}`,
+            );
       });
 
     expect(found).toEqual([]);

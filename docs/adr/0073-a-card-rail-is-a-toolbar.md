@@ -57,9 +57,9 @@ item. `CardRailKindActions` and `CardRailSharedActions` are those two, and a
 group that holds nothing draws nothing, so a rail never carries an empty named
 group for commands this Card does not have.
 
-**Kind commands lead and shared commands trail.** A rail is read from the
-particular to the general, and Close standing in the same place whatever kind of
-Card it is drawn on is the point of calling it shared at all.
+**The actions menu leads, kind commands follow, and Open/Close trail.** Close
+stands last so it keeps the position authors expect; the menu that carries a
+Thing's addresses and deletion sits where every Thing's overflow commands begin.
 
 Grouping does not divide the keyboard. The roving tabindex belongs to the
 toolbar root, so an arrow crosses a group boundary exactly as it crosses any

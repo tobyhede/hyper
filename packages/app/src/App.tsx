@@ -8,6 +8,7 @@ import {
   AppShell,
   DeleteIcon,
   FALLBACK_GRAPH_COLOR,
+  RemoveFromDiagramIcon,
   ThingKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -116,6 +117,7 @@ export const createApp = (
     adapter: useRenderAdapter,
     continuation,
     edgeAuthoring,
+    thingDeletion,
     reportObserverError,
   } = composition;
   /**
@@ -232,28 +234,10 @@ export const createApp = (
     /** Why the last Graph Edit did not run, or `null` — see `reportGraphEdit`. */
     const [graphRefusal, setGraphRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
-    /**
-     * Why the last Delete Thing did not run, or `null`.
-     *
-     * The Thing rail's menu reports *that* the command failed in its own label,
-     * which is all a two-word report can say; the reason has to be somewhere,
-     * and the canvas is where the author who pressed it is looking. Same shape
-     * and same place as the clipboard failure above, for the same reason: a
-     * command that did not do what its label says owes the reader words.
-     */
-    const [thingDeletionRefusal, setThingDeletionRefusal] = useState<string | null>(null);
-    /**
-     * The Thing a confirmation is standing over, and the deletion it would run.
-     *
-     * The operation travels with the Thing rather than being rebuilt when the
-     * answer comes: which Edit a deletion is depends on the kind of Thing, and
-     * deciding that twice — once to arm the question, once to answer it — is two
-     * places to get it wrong about a command with no undo behind it.
-     */
-    const [pendingThingDeletion, setPendingThingDeletion] = useState<{
-      readonly thing: Thing;
-      readonly remove: () => string | null | Promise<string | null>;
-    } | null>(null);
+    const thingDeletionState = useSyncExternalStore(
+      thingDeletion.subscribe,
+      thingDeletion.getState,
+    );
     /**
      * Copy one address, answering whether it reached the clipboard.
      *
@@ -763,7 +747,7 @@ export const createApp = (
       setCreateDiagramRefusal(null);
       setDiagramManagementRefusal(null);
       setGraphRefusal(null);
-      setThingDeletionRefusal(null);
+      thingDeletion.dismissRefusal();
     }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
@@ -904,54 +888,7 @@ export const createApp = (
               }
             : null,
         }),
-      // `authoring` is the composition's, closed over rather than rendered, so it
-      // is not a dependency a render can move. `thingDeletion` says the same of
-      // `spaceThings`.
       [renderedSpace.id, renderedSpace.title, copyProductDestination, availability.entityEdits],
-    );
-
-    /**
-     * Deleting one Thing, answering a refusal in words rather than a code.
-     *
-     * Two paths, because deleting a Space Thing is a different Edit.
-     *
-     * An ordinary Thing is removed from one Space, which is Space Authoring's. A
-     * Space Thing owns its target's lifetime together with every other reference
-     * to it, so deleting one can delete that Space and every Space below it that
-     * nothing else references — one atomic Edit over coordinated per-Space
-     * sessions, which is the Space Thing lifecycle's and not a single-Space
-     * update this seam could make (ADR 0074, ADR 0076). Space Authoring refuses
-     * it on its own account, so the choice is made here rather than discovered
-     * there.
-     *
-     * It answers the *operation* rather than performing the deletion, because
-     * the two surfaces that spend it need different things from it: the Space's
-     * command surface hands it to a confirmation that calls it later, and the
-     * Thing's own rail runs it on the press. Which kind of Thing it is stays a
-     * decision made once, here, for both.
-     */
-    const thingDeletion = useCallback(
-      (thing: Thing): (() => string | null | Promise<string | null>) =>
-        thing.kind === 'space'
-          ? async () => {
-              const result = await spaceThings.delete({
-                containingSpaceId: renderedSpace.id,
-                thingId: thing.id,
-              });
-              if (result.kind === 'refused') return describeSpaceThingRefusal(result.refusal);
-              // The other Edit that changes the Meta Space's set: this deletion
-              // can destroy the target Space and every Space below it that
-              // nothing else references, so a list that was not told goes on
-              // offering a Space that is gone. Announced by the lifecycle for the
-              // same reason creation is — the Space it destroys was offered in
-              // every open Space, not only in this one.
-              return null;
-            }
-          : () => {
-              const result = authoring.complete({ kind: 'deleted-thing', thingId: thing.id });
-              return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-            },
-      [renderedSpace.id],
     );
 
     /**
@@ -1118,54 +1055,81 @@ export const createApp = (
               ],
             ]
           : [];
-        if (!availability.deleteThing) return [...addresses, ...alias];
-        const remove = thingDeletion(thing);
-        return [
-          ...addresses,
-          ...alias,
-          [
-            {
-              id: 'delete-thing',
-              // "Delete Thing", not "Delete Thing <title>": the menu that draws
-              // this item is already named for the Thing it belongs to, and the
-              // Diagram menu's own destructive command is spelled the same way.
-              label: 'Delete Thing',
-              icon: <DeleteIcon />,
-              variant: 'destructive',
-              // **It asks, and the confirmation runs it.** Deleting a Thing is
-              // not undoable in V1, and deleting a Space Thing can take the Space
-              // it references and every Space below it that nothing else
-              // references (ADR 0074) — so the command that used to sit behind
-              // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
-              // at the App root rather than in the menu that armed it, because
-              // the menu closes on the press and would take the question with
-              // it.
-              //
-              // **And it carries no `report`.** An item that names words has
-              // its menu held open and its label swapped to the word its
-              // outcome picks — machinery for a command that *runs* on the
-              // press. This one raises a question, so `done` said "Thing deleted"
-              // beside a dialog still asking whether to, and announced it to a
-              // reader who might then press Cancel. What the deletion did is the
-              // canvas's to report; why it did not is the confirmation's, which
-              // prints it into the shell's standing notice.
-              onSelect: (): EntityActionOutcome => {
-                setThingDeletionRefusal(null);
-                setPendingThingDeletion({ thing, remove });
-                return 'done';
-              },
-            },
-          ],
+        /**
+         * Remove from Diagram is the canvas key's availability, not Delete
+         * Thing's. Delete is withdrawn while a Thing is Open so Open state
+         * cannot outlive the Thing; Remove reclaims that room and stays
+         * offered — `thing-rail-actions.test.tsx` (`still offers Remove from
+         * Diagram while the Thing is Open`).
+         */
+        const canRemoveFromDiagram = availability.authorOnCanvas && !editingThingBody;
+        const leaving: EntityActionGroup = [
+          ...(canRemoveFromDiagram
+            ? [
+                {
+                  id: 'remove-from-diagram',
+                  label: 'Remove from Diagram',
+                  icon: <RemoveFromDiagramIcon />,
+                  onSelect: (): EntityActionOutcome => {
+                    const result = authoring.complete({
+                      kind: 'removed-thing-from-diagram',
+                      thingId: thing.id,
+                    });
+                    if (result.kind === 'refused') {
+                      thingDeletion.reportRefusal(describeAuthoringRefusal(result.refusal));
+                    }
+                    return 'done';
+                  },
+                },
+              ]
+            : []),
+          ...(availability.deleteThing
+            ? [
+                {
+                  id: 'delete-thing',
+                  // "Delete from Space", not "Delete from Space <title>": the menu
+                  // that draws this item is already named for the Thing it belongs
+                  // to, and the Diagram menu's own destructive command is spelled
+                  // the same way.
+                  label: 'Delete from Space',
+                  icon: <DeleteIcon />,
+                  variant: 'destructive' as const,
+                  // **It asks, and the confirmation runs it.** Deleting a Thing is
+                  // not undoable in V1, and deleting a Space Thing can take the Space
+                  // it references and every Space below it that nothing else
+                  // references (ADR 0074) — so the command that used to sit behind
+                  // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
+                  // at the App root rather than in the menu that armed it, because
+                  // the menu closes on the press and would take the question with
+                  // it.
+                  //
+                  // **And it carries no `report`.** An item that names words has
+                  // its menu held open and its label swapped to the word its
+                  // outcome picks — machinery for a command that *runs* on the
+                  // press. This one raises a question, so `done` said "Thing deleted"
+                  // beside a dialog still asking whether to, and announced it to a
+                  // reader who might then press Cancel. What the deletion did is the
+                  // canvas's to report; why it did not is the confirmation's, which
+                  // prints it into the shell's standing notice.
+                  onSelect: (): EntityActionOutcome => {
+                    thingDeletion.arm(thing);
+                    return 'done';
+                  },
+                },
+              ]
+            : []),
         ];
+        return [...addresses, ...alias, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
         renderedSpace,
         entityActions,
         selectedDiagram.diagram,
         availability.addThing,
+        availability.authorOnCanvas,
         availability.deleteThing,
+        editingThingBody,
         createAliasFrom,
-        thingDeletion,
       ],
     );
 
@@ -1725,12 +1689,9 @@ export const createApp = (
                 {clipboardFailure}
               </ShellNotice>
             )}
-            {thingDeletionRefusal === null ? null : (
-              <ShellNotice
-                title="Thing not deleted"
-                onDismiss={() => setThingDeletionRefusal(null)}
-              >
-                {thingDeletionRefusal}
+            {thingDeletionState.refusal === null ? null : (
+              <ShellNotice title="Thing not deleted" onDismiss={thingDeletion.dismissRefusal}>
+                {thingDeletionState.refusal}
               </ShellNotice>
             )}
             {diagramRefusal === null ? null : (
@@ -1830,12 +1791,12 @@ export const createApp = (
             ? 'Persisted'
             : sessionState.persistence.kind}
         </span>
-        {pendingThingDeletion === null ? null : (
+        {thingDeletionState.pending === null ? null : (
           <DeleteThingConfirmation
-            thing={pendingThingDeletion.thing}
-            onDelete={pendingThingDeletion.remove}
-            onDismiss={() => setPendingThingDeletion(null)}
-            onRefused={setThingDeletionRefusal}
+            thing={thingDeletionState.pending}
+            deleting={thingDeletionState.deleting}
+            onConfirm={thingDeletion.confirm}
+            onDismiss={thingDeletion.cancel}
           />
         )}
         {/* One child, not a row: the Things list portals over this rather than

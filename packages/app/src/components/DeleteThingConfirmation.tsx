@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { titleName, type Thing } from '@project/core';
 import {
   AlertDialog,
@@ -10,7 +9,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@project/ui';
-import { failureMessage } from '../failure-message';
 
 /**
  * What deleting a Thing destroys, said before it happens.
@@ -40,17 +38,15 @@ const DELETION_DESCRIPTIONS = {
 
 export function DeleteThingConfirmation({
   thing,
-  onDelete,
+  deleting,
+  onConfirm,
   onDismiss,
-  onRefused,
 }: {
   readonly thing: Thing;
-  readonly onDelete: () => string | null | Promise<string | null>;
+  readonly deleting: boolean;
+  readonly onConfirm: () => void;
   readonly onDismiss: () => void;
-  readonly onRefused: (refusal: string) => void;
 }) {
-  const [deleting, setDeleting] = useState(false);
-
   return (
     <AlertDialog
       open
@@ -66,7 +62,7 @@ export function DeleteThingConfirmation({
           {/* The Thing's **name**, which is how a control names a Thing: the
               ladder below the name is drawn on the Thing front and nowhere else
               (ADR 0083). */}
-          <AlertDialogTitle>Delete Thing {titleName(thing.title)}?</AlertDialogTitle>
+          <AlertDialogTitle>Delete from Space {titleName(thing.title)}?</AlertDialogTitle>
           <AlertDialogDescription>{DELETION_DESCRIPTIONS[thing.kind]}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -81,32 +77,10 @@ export function DeleteThingConfirmation({
               // `defaultPrevented`. One Thing kind answers a promise, and the
               // primitive would close the dialog long before a refusal arrived.
               event.preventBaseUIHandler();
-              setDeleting(true);
-              // An async body runs synchronously to its first `await`, so
-              // `onDelete` is still called on this click while one `catch`
-              // covers a throw and a rejection alike. Both reach it: `complete`
-              // throws for a Space that has stopped loading, and the coordinated
-              // Edit a Space Thing runs can reject. An event handler is not
-              // something a React error boundary catches.
-              void (async () => {
-                try {
-                  const refusal = await onDelete();
-                  setDeleting(false);
-                  if (refusal !== null) onRefused(refusal);
-                } catch (failure) {
-                  // Not a refusal, and deliberately not translated into one: a
-                  // refusal code is a stable domain identity (ADR 0057) and
-                  // nothing here answers to one.
-                  setDeleting(false);
-                  onRefused(failureMessage(failure));
-                }
-                // The Thing is gone or the reason is in the standing notice;
-                // either way the question has been answered.
-                onDismiss();
-              })();
+              onConfirm();
             }}
           >
-            Delete Thing
+            Delete from Space
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

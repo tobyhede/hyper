@@ -107,6 +107,7 @@ export {
   SpaceIcon,
   SearchIcon,
   PlusIcon,
+  RemoveFromDiagramIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,

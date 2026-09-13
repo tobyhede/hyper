@@ -121,7 +121,7 @@ export const ThingRail: Story = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PrototypeBanner>
-        The link icon is one more control on the real Thing rail, ahead of Open/Close.
+        The actions menu is one more control on the real Thing rail, ahead of Open/Close.
       </PrototypeBanner>
       <div className="flex flex-1 flex-wrap items-start gap-6 p-6" style={thingSizeVars}>
         {things.map((thing, index) => {

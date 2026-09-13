@@ -176,8 +176,8 @@ describe('the rail says whose command each one is', () => {
 
     const close = screen.getByRole('button', { name: 'Close Thing A' });
     expect(sharedGroup()).toContainElement(close);
-    // Kind commands lead and shared commands trail, so Close is in the same
-    // place whatever kind of Thing the rail is drawn on.
+    // Open and Close trail the rail, so Close is in the same place whatever
+    // kind of Thing it is drawn on.
     const groups = within(railActions()).getAllByRole('group');
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
       'Markdown Thing commands',
