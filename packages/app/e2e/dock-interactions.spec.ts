@@ -1,6 +1,16 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { boxOf, createThing, dock, nodeByTitle, settled } from './graph';
+import {
+  boxOf,
+  createThing,
+  dock,
+  nodeByTitle,
+  settled,
+  beginRename,
+  spaceName,
+  selectedCanvas,
+  activeGraph,
+} from './graph';
 
 for (const delay of [0, 120]) {
   test(`Dock disclosures switch on one press (${delay}ms)`, async ({ page }) => {
@@ -33,8 +43,9 @@ for (const delay of [0, 120]) {
         .click({ delay });
       await expect(page.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
       await dock(page)
-        .getByRole('button', { name: new RegExp(`^Rename ${kind}:`) })
+        .getByRole('button', { name: kind === 'Diagram' ? /^Diagram: / : /^Active Graph: / })
         .click({ delay });
+      await page.getByRole('menuitem', { name: 'Rename' }).click();
       const editor = page.getByRole('textbox', { name: `${kind} name`, exact: true });
       await expect(editor).toBeFocused();
       await expect(page.getByRole('menu')).toHaveCount(0);
@@ -68,10 +79,14 @@ test('renaming a Space, Diagram or Graph from the Dock does not Open a selected 
   await settled(page);
   await thing.click();
 
+  const identities = {
+    Space: spaceName(page),
+    Diagram: selectedCanvas(page),
+    Graph: activeGraph(page),
+  } as const;
+
   for (const kind of ['Space', 'Diagram', 'Graph'] as const) {
-    await dock(page)
-      .getByRole('button', { name: new RegExp(`^Rename ${kind}:`) })
-      .click();
+    await beginRename(page, identities[kind]);
     const editor = page.getByRole('textbox', { name: `${kind} name`, exact: true });
     await expect(editor).toBeFocused();
     await editor.press('Enter');
@@ -80,10 +95,12 @@ test('renaming a Space, Diagram or Graph from the Dock does not Open a selected 
   }
 
   for (const key of ['Enter', ' '] as const) {
-    await dock(page)
-      .getByRole('button', { name: /^Rename Diagram:/ })
-      .focus();
+    const diagram = selectedCanvas(page);
+    await diagram.focus();
     await page.keyboard.press(key);
+    await expect(page.getByRole('menu')).toBeVisible();
+    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
     const editor = page.getByRole('textbox', { name: 'Diagram name', exact: true });
     await expect(editor).toBeFocused();
     await editor.press('Escape');

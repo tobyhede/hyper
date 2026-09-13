@@ -90,17 +90,15 @@ export function ChromeContinuation({
       return;
     }
     /*
-     * **A rename is begun by pressing the control, because that is what the
-     * control does.** The Dock's names are `button`s whose click starts the
-     * in-place editor (`IdentityName`), and the editor focuses itself on mount
-     * — so a `focus()` here would leave the caret on the button and an
-     * application-driven rename would need a second way into the same state,
-     * kept in step with the reader's. Dispatching the press instead means Add
-     * Diagram arrives exactly where a reader who clicked the name arrives.
+     * **A rename is begun by pressing this address, not the visible name.**
+     * The name discloses the list. New Diagram continues on a dedicated
+     * sibling the reader never sees, and that press starts the in-place editor
+     * the way choosing Rename does. The editor focuses itself on mount, so a
+     * `focus()` here would leave the caret on the button.
      *
-     * A control the application has withdrawn is a control this cannot press:
-     * Base UI suppresses activation for a disabled item, so an unavailable
-     * name simply does not open, which is the same answer the reader gets.
+     * A withdrawn chrome rename disables this address (`disabled` on the
+     * native button). A click then does nothing, which is the same answer the
+     * reader gets from an unavailable Rename row.
      */
     if (pending.then === 'rename') {
       element.click();

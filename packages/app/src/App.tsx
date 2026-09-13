@@ -887,11 +887,11 @@ export const createApp = (
           spaceId: renderedSpace.id,
           spaceTitle: renderedSpace.title,
           onCopy: copyProductDestination,
-          // No Rename item: the Dock renames a Diagram and a Graph by clicking the
-          // name it already draws, so a menu row that opened the same editor would
-          // be the second path to one command this arrangement keeps removing. The
-          // Thing rail is this builder's other consumer and a Thing has no rename here
-          // either — its title is renamed in place on the canvas.
+          // No Rename item: the Dock renames a Diagram and a Graph from Rename
+          // in that identity's own list, so a row here would be a second path
+          // to one command. The Thing rail is this builder's other consumer and
+          // a Thing has no rename here either — its title is renamed in place
+          // on the canvas.
           onRename: null,
           onDeleteDiagram: availability.entityEdits
             ? (diagramId) => {

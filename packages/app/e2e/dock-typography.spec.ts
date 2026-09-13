@@ -1,18 +1,17 @@
-import { createThing } from './graph';
-import { expect, test } from './fixtures';
+import { nodeByTitle } from './graph';
+import { expect, test, type Page } from './fixtures';
 
 /**
- * One treatment across the three names, and all three are controls.
+ * One treatment across the three names, and all three disclose.
  *
  * The Space used to be the exception — a `<span>` wearing the Button box, because
  * there was no `renamed-space` Edit and a greyed name would have advertised a
  * command nobody could run. There is one now, so what this holds is that the
- * three identities are one component in one state: shared typography *and* a
- * shared affordance, with the caret coming back to whichever name opened its
- * editor.
+ * three identities are one composition: shared typography *and* a shared
+ * disclosure, with Rename in each list and the caret coming back to the name.
  */
 test(
-  'Dock identities share typography and each name is its own rename control',
+  'Dock identities share typography and each name discloses its list',
   { tag: '@parity:command-dock-identity-presentation' },
   async ({ page }) => {
     await page.goto('/');
@@ -53,59 +52,100 @@ test(
       );
     expect(others).toHaveLength(2);
     for (const identity of others) expect(identity).toEqual(reference);
-    await expect(page.getByRole('button', { name: /^Rename Space:/ })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /^Rename Diagram:/ })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /^Rename Graph:/ })).toHaveCount(1);
-    await diagram.click();
+    await expect(page.getByRole('button', { name: /^Space:/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Diagram:/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Active Graph:/ })).toHaveCount(1);
+    await diagram.click({ delay: 120 });
+    await expect(page.getByRole('menu')).toBeVisible();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
     await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(diagram).toBeFocused();
     // The Space's own, because the identity that used to be a label had no way
     // to owe the caret at all.
-    await space.click();
+    await space.click({ delay: 120 });
+    await expect(page.getByRole('menu')).toBeVisible();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
     await expect(page.getByRole('textbox', { name: 'Space name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(space).toBeFocused();
+    const graph = page.getByTestId('active-graph');
+    await graph.click({ delay: 120 });
+    await expect(page.getByRole('menu')).toBeVisible();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    await expect(page.getByRole('textbox', { name: 'Graph name', exact: true })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(graph).toBeFocused();
   },
 );
 
+async function dismissOpenMenus(page: Page) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if ((await page.getByRole('menu').count()) === 0) return;
+    await page.keyboard.press('Escape');
+  }
+  await expect(page.getByRole('menu')).toHaveCount(0);
+}
+
+const identityMenu = (page: Page, testId: 'space-title' | 'selected-canvas' | 'active-graph') => {
+  const marker =
+    testId === 'space-title'
+      ? 'Copy link'
+      : testId === 'selected-canvas'
+        ? 'New Diagram'
+        : 'New Graph';
+  return page.getByRole('menu').filter({
+    has: page.getByRole('menuitem', { name: marker, exact: true }),
+  });
+};
+
+/** A refused Thing-title draft the chrome-rename guard recognises. */
+async function beginRefusedThingTitleEdit(page: Page) {
+  await dismissOpenMenus(page);
+  const thing = nodeByTitle(page, 'A').first();
+  await thing.getByRole('button', { name: 'Edit Title A' }).click();
+  const thingTitle = page.getByRole('textbox', { name: 'Thing title' });
+  await thingTitle.fill('   ');
+  await thingTitle.press('Enter');
+  await expect(page.getByRole('alert')).toHaveText('A Thing title is required.');
+  return thingTitle;
+}
+
 /**
- * A withdrawn name is visibly withdrawn, which is a stylesheet's job here and
- * nothing the component can do.
+ * Switching stays reachable while Rename is withdrawn.
  *
- * `IdentityName` draws one `ToolbarButton` in both states and hands it
- * `disabled`. ADR 0073 keeps a toolbar item focusable while it is unavailable,
- * so Base UI writes `aria-disabled="true"` and **no** native `disabled`
- * attribute — every `disabled:` utility on the button misses, the base
- * `cursor-pointer` stands, and the ghost variant's hover fill still lands.
- * Without `command-dock.css`'s `[aria-disabled='true']` rule the two states are
- * pixel-identical and a withdrawn name lights up under the pointer, so the rule
- * is load-bearing and this is what holds it there: delete it and this test is
- * the only thing in the repository that goes red.
+ * Creating a Thing opens its title editor, which takes the caret and withdraws
+ * all three chrome renames together (`authoring-availability.ts`). The name is
+ * the disclosure, so that withdrawal is the Rename row, not the trigger.
  *
- * Read in a browser rather than jsdom because it is `getComputedStyle` over a
- * cascade that jsdom does not run.
+ * Each identity is exercised with its own refused draft: opening one list and
+ * dismissing it can end the Thing title edit in a real browser, so chaining all
+ * three against one editor would read withdrawal on the first and availability
+ * on the rest (`thing-authoring.test.tsx`, ADR 0065).
  */
-test('a withdrawn Dock name is quieted and refuses the pointer', async ({ page }) => {
+test('Rename is withdrawn on every identity while a Thing title editor is open', async ({
+  page,
+}) => {
   await page.goto('/');
-  const treatment = (name: string) =>
-    page.getByTestId(name).evaluate((element) => {
-      const style = getComputedStyle(element);
-      return { color: style.color, cursor: style.cursor };
-    });
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
-  const available = await treatment('space-title');
-  expect(available.cursor).toBe('pointer');
+  await page.getByTestId('space-title').click({ delay: 120 });
+  await expect(
+    identityMenu(page, 'space-title').getByRole('menuitem', { name: 'Rename' }),
+  ).not.toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
 
-  // Creating a Thing opens its title editor, which is what takes the caret and
-  // withdraws all three chrome renames together (`authoring-availability.ts`).
-  await createThing(page, 'Markdown Thing');
-  await expect(page.getByRole('textbox', { name: 'Thing title' })).toBeVisible();
-
-  for (const name of ['space-title', 'selected-canvas', 'active-graph']) {
-    await expect(page.getByTestId(name)).toHaveAttribute('aria-disabled', 'true');
-    const withdrawn = await treatment(name);
-    expect(withdrawn.cursor).toBe('not-allowed');
-    expect(withdrawn.color).not.toBe(available.color);
+  for (const testId of ['space-title', 'selected-canvas', 'active-graph'] as const) {
+    const thingTitle = await beginRefusedThingTitleEdit(page);
+    await page.getByTestId(testId).click({ delay: 120 });
+    await expect(
+      identityMenu(page, testId).getByRole('menuitem', { name: 'Rename' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await expect(thingTitle).toBeVisible();
+    await dismissOpenMenus(page);
+    if (await thingTitle.isVisible()) {
+      await thingTitle.press('Escape');
+      await expect(thingTitle).toHaveCount(0);
+    }
   }
 });

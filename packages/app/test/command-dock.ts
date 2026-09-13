@@ -36,23 +36,74 @@ export const unavailable = (control: HTMLElement): boolean =>
  *
  * All three names are renameable now — `renamed-space` joined `renamed-diagram`
  * and `renamed-graph` — and all three are withdrawn together, by the one
- * `chromeTitleEdit` guard: a Thing title editor or a live content edit owns the
- * caret, or the canvas has no placement to edit against. So a test that presses
- * a name has to wait for it to be *available* rather than for it to be a
- * control, and the wait is the assertion: it is how "the rename is withdrawn"
- * and "the rename is back" are both read.
+ * `chromeTitleEdit` guard. The name itself is the identity's disclosure, so a
+ * test that used to press the word now opens that list and chooses Rename
+ * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
  *
- * **`aria-disabled` rather than `tagName`.** The slot is a `ToolbarButton` in
- * both states now, so the element it was reading — a `<span>` while the rename
- * was withheld — no longer exists, and a `tagName` wait would be satisfied
- * immediately by a name nothing can open. `unavailable` above is the same
- * reading every other withdrawn Dock control is read by.
+ * The wait is on the Rename row rather than the trigger: switching stays
+ * reachable while a chrome title edit is withdrawn, and only the command that
+ * would begin one is unavailable.
  */
 export const beginRename = async (
   testId: 'space-title' | 'selected-canvas' | 'active-graph',
 ): Promise<void> => {
-  await waitFor(() => expect(unavailable(screen.getByTestId(testId))).toBe(false));
-  fireEvent.click(screen.getByTestId(testId));
+  if (screen.queryByRole('textbox', { name: IDENTITY_EDITOR[testId] }) !== null) return;
+  const title = await waitFor(() => {
+    const name = screen.getByTestId(testId).textContent;
+    expect(name).toBeTruthy();
+    return name;
+  });
+  IDENTITY_MENU[testId](title);
+  const rename = await waitFor(() => {
+    const item = screen.getByRole('menuitem', { name: 'Rename' });
+    expect(unavailable(item)).toBe(false);
+    return item;
+  });
+  fireEvent.click(rename);
+};
+
+const IDENTITY_EDITOR = {
+  'space-title': 'Space name',
+  'selected-canvas': 'Diagram name',
+  'active-graph': 'Graph name',
+} as const;
+
+const IDENTITY_MENU = {
+  'space-title': (title: string) => {
+    openSpaceMenu(title);
+  },
+  'selected-canvas': (title: string) => {
+    openDiagramMenu(title);
+  },
+  'active-graph': (title: string) => {
+    openGraphMenu(title);
+  },
+} as const;
+
+/** The Rename command on one identity, after opening that identity's list. */
+export const identityRenameItem = (
+  testId: 'space-title' | 'selected-canvas' | 'active-graph',
+): HTMLElement => {
+  IDENTITY_MENU[testId](screen.getByTestId(testId).textContent);
+  return screen.getByRole('menuitem', { name: 'Rename' });
+};
+
+/**
+ * When New Diagram may continue in the new name.
+ *
+ * Waited on the continuation address rather than by opening the Diagram list:
+ * a Base UI menu returns focus to its trigger in a microtask after it closes,
+ * and a poll that opened and dismissed this one would steal the caret from
+ * the editor the continuation opens.
+ */
+export const waitUntilDiagramContinuationReady = async (): Promise<void> => {
+  await waitFor(() => {
+    const control = document.querySelector<HTMLButtonElement>(
+      '[data-continuation-control="diagram-name"]',
+    );
+    expect(control).not.toBeNull();
+    expect(control?.disabled).toBe(false);
+  });
 };
 
 /** The bar itself, named as its own toolbar. */
@@ -95,8 +146,16 @@ export const openDiagramMenu = (title: string): void => {
   // disclosure is open at a time — one open id under the whole row — so a press
   // on this trigger while another is open is an *outside* press that Base UI
   // spends on dismissing, and the menu this asked for never appears.
-  if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
+  //
+  // `hidden: true`, because a Thing title editor marks the rest of the tree
+  // inert and a role query otherwise cannot see the menu it has to dismiss.
+  dismissOpenMenu();
   fireEvent.click(within(dock()).getByRole('button', { name: `Diagram: ${title}` }));
+};
+
+const dismissOpenMenu = (): void => {
+  const open = screen.queryByRole('menu', { hidden: true });
+  if (open !== null) fireEvent.keyDown(open, { key: 'Escape' });
 };
 
 /** New Diagram, and whether it may run — its availability is its own (ADR 0065). */
@@ -175,7 +234,7 @@ export const deleteDiagramItem = (diagramTitle: string): HTMLElement => {
  * an outside press Base UI spends on dismissing.
  */
 export const openGraphMenu = (title: string): void => {
-  if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
+  dismissOpenMenu();
   fireEvent.click(within(dock()).getByRole('button', { name: `Active Graph: ${title}` }));
 };
 
@@ -191,7 +250,7 @@ export const newGraphItem = (graphTitle: string): HTMLElement => {
  * Dismissed first for the reason {@link openDiagramMenu} is.
  */
 export const openSpaceMenu = (title: string): void => {
-  if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
+  dismissOpenMenu();
   fireEvent.click(within(dock()).getByRole('button', { name: `Space: ${title}` }));
 };
 

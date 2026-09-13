@@ -42,7 +42,7 @@ async function renderDock(view: ReactElement): Promise<void> {
     return Promise.resolve();
   });
   await waitFor(() =>
-    expect(within(dock()).getByRole('button', { name: /^Rename Diagram:/ })).toBeInTheDocument(),
+    expect(within(dock()).getByRole('button', { name: /^Diagram:/ })).toBeInTheDocument(),
   );
 }
 

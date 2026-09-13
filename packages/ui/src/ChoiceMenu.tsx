@@ -160,9 +160,10 @@ export type ChoiceMenuTriggerProps = Omit<
  * name of what is chosen in front of it.
  *
  * One component for both shapes the product draws, so a chevron means "there is
- * a list behind this" everywhere it appears. The Dock's clusters take the bare
- * form, their name being a rename control of its own beside it; an Open Space
- * Thing takes the named form, having no rename and no room for two controls.
+ * a list behind this" everywhere it appears. The Dock's identity clusters and
+ * an Open Space Thing both take the named form — the name discloses, and
+ * Rename (where there is one) is a command in the list. The bare form remains
+ * for a disclosure that is only a chevron.
  *
  * `render` is what decides the box: the Dock hands it a `ToolbarButton`, since
  * a Dock cluster is inside the Dock's one toolbar, and a surface that is not a

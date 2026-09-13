@@ -41,7 +41,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Space, Diagram and Graph names share typography and are each a rename control rather than a label, and a name that opens its editor takes the caret back on Escape.',
+      'Space, Diagram and Graph names share typography and each disclose that identity’s list; Rename in the list continues in the existing editor, and Escape hands the caret back to the name.',
   },
   {
     id: 'things-popover-adds-existing-diagram-members',
@@ -338,7 +338,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'The Space, Diagram and Graph names are each their own rename control, editing in place as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
+      'The Space, Diagram and Graph names each disclose that identity’s list; Rename in the list continues in the existing in-place editor as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
   },
   {
     id: 'command-dock-marks-the-space-one-crossing-up',

@@ -22,11 +22,13 @@ import {
   exitSpaceItem,
   createThing,
   createThingControl,
+  identityRenameItem,
   newDiagram,
   openGraphMenu,
   openDiagramMenu,
   presentControl,
   unavailable,
+  waitUntilDiagramContinuationReady,
 } from './command-dock';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -820,7 +822,7 @@ describe('Space app Things list', () => {
     // trigger in a microtask after it closes, so a poll that opened and
     // dismissed this one would leave that return in flight across the press
     // under test and steal the caret from the editor it opens.
-    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
+    await waitUntilDiagramContinuationReady();
 
     newDiagram('Diagram');
 
@@ -832,6 +834,45 @@ describe('Space app Things list', () => {
     const editor = screen.getByRole('textbox', { name: 'Diagram name' });
     expect(editor).toHaveValue('Diagram 1');
     expect(editor).toHaveFocus();
+  });
+
+  /**
+   * **The name discloses; Rename is a command in the list.**
+   *
+   * Clicking a name used to open the editor. Switching is the frequent act
+   * and renaming the rare one, so the word and the chevron are now one
+   * disclosure and Rename sits with the other commands on each identity
+   * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+   */
+  it('opens each identity list from the name and begins rename from the menu', async () => {
+    const base = snapshot('Space', 'Thing', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceThings } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    mountSpace(
+      { id: runtime(base).id, session, app: composeApp({ spaceSession: session }), spaceThings },
+      (app) => render(app),
+    );
+    await waitUntilDiagramContinuationReady();
+
+    for (const { testId, editor, title } of [
+      { testId: 'space-title', editor: 'Space name', title: 'Space' },
+      { testId: 'selected-canvas', editor: 'Diagram name', title: 'Diagram' },
+      { testId: 'active-graph', editor: 'Graph name', title: 'Graph' },
+    ] as const) {
+      fireEvent.click(screen.getByTestId(testId));
+
+      expect(screen.queryByRole('textbox', { name: editor })).toBeNull();
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+
+      const field = screen.getByRole('textbox', { name: editor });
+      expect(field).toHaveValue(title);
+      expect(field).toHaveFocus();
+      fireEvent.keyDown(field, { key: 'Escape' });
+    }
   });
 
   /**
@@ -864,15 +905,11 @@ describe('Space app Things list', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
-    // The Diagram's Edits are withdrawn and its address is not. Renaming is
-    // clicking the name the Dock already draws, so the withdrawal is that name
-    // going unavailable — `aria-disabled`, not a missing control, exactly as
-    // Delete is present and unavailable beside it, because a control that
-    // disappears teaches nothing about why. It read `tagName` until the Space's
-    // name became renameable too (`renamed-space`): the withheld name used to
-    // draw as a label, and the slot is a `ToolbarButton` in both states now.
-    expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(true);
-    openDiagramMenu('Diagram');
+    // The Diagram's Edits are withdrawn and its address is not. The name is
+    // the disclosure, so switching stays reachable; Rename is the command that
+    // is unavailable — present rather than missing, exactly as Delete is,
+    // because a control that disappears teaches nothing about why.
+    expect(unavailable(identityRenameItem('selected-canvas'))).toBe(true);
     expect(unavailable(screen.getByRole('menuitem', { name: 'Delete Diagram' }))).toBe(true);
     const create = screen.getByRole('menuitem', { name: 'New Diagram' });
     expect(unavailable(create)).toBe(true);
@@ -888,7 +925,7 @@ describe('Space app Things list', () => {
     // Left settling rather than abandoned mid-placement: the strategy resolves
     // against an unmounted tree otherwise, and the Edits it restores are the
     // other half of the rule.
-    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
+    await waitUntilDiagramContinuationReady();
   });
 
   /**
@@ -916,8 +953,12 @@ describe('Space app Things list', () => {
       (app) => render(app),
     );
 
+    await waitUntilDiagramContinuationReady();
     newDiagram('Diagram');
-    const created = screen.getByTestId('selected-canvas').textContent;
+    const created = screen.getByRole('textbox', { name: 'Diagram name' }).getAttribute('value');
+    if (created === null || created === '') {
+      throw new Error('New Diagram left no name');
+    }
     await beginRename('selected-canvas');
     await screen.findByRole('textbox', { name: 'Diagram name' });
 
@@ -1162,7 +1203,7 @@ describe('Space app Things list', () => {
 
     // The rename replaced the placement, and a menu's Edits are withdrawn until
     // the canvas has one to edit against.
-    await waitFor(() => expect(unavailable(screen.getByTestId('selected-canvas'))).toBe(false));
+    await waitUntilDiagramContinuationReady();
     openDiagramMenu('Workshop');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
     expect(session.getState().working.document.diagrams).toHaveLength(1);

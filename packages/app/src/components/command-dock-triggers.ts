@@ -26,9 +26,9 @@
  * caller supplies neither.
  *
  * A set has no name to edit, so the word lives inside the trigger rather than
- * as a control beside it — which is what separates these two from the three
- * identities, where the name is a rename target and the chevron is its own
- * button.
+ * being replaced by an editor. The three identities disclose the same way
+ * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`);
+ * what still separates these two is that a set has no Rename command.
  */
 export const SET_TRIGGER = {
   className: 'nokey command-dock__name',

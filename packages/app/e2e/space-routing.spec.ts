@@ -332,24 +332,24 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
  * Sidebar row — its trailing icon and a right click". The Dock has clusters
  * rather than rows and no `onContextMenu` anywhere, so there is no second route
  * to restate; what survives is that a Diagram's commands are all in one place,
- * and that Rename is not among them because the name itself is the control.
+ * including Rename, and that the name itself is the disclosure that opens it.
  */
-test('the Diagram cluster holds every Diagram command except the rename its name is', async ({
-  page,
-}) => {
+test('the Diagram cluster holds every Diagram command including Rename', async ({ page }) => {
   await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
   await page
     .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
     .click({ delay: 120 });
   const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'New Diagram' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Delete Collection 1' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
-  await expect(page.getByRole('button', { name: 'Rename Diagram: Collection 1' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Diagram: Collection 1', exact: true }),
+  ).toBeVisible();
 });
 
 test('canonical and contextual Graph links restore navigation context without authoring', async ({
