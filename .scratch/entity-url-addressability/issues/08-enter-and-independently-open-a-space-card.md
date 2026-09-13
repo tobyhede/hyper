@@ -28,13 +28,15 @@ Tags: release/v1
       carry an ancestor chain as an integrity mechanism. Exercised by
       `space-cards/11`: `App` calls `OpenSpaces.enter(spaceId, diagram)` from
       the Space Thing rail; Graph is activated only when the entry is new.
-- [ ] Enter resolves the stored context `layout-only-v1/04` owns rather than
-      restating it here; this ticket owns the Enter surface, not the selection
-      or its write-back rule. **Still open on write-back**: `layout-only-v1/04`
-      (now `entity-url-addressability/07` / ADR 0079 Ticket 04) made the
-      selection durable on the Thing; `space-cards/11` seeds a *new* entry from
-      it and leaves an already-open entry's live selection alone. Persisting
-      the live selection back onto the Thing is not this cut-over.
+- [x] Enter resolves the stored context `layout-only-v1/04` owns rather than
+      restating it here. That ticket (`Status: done`) made `diagram` and `graph`
+      durable on the Thing. A *new* Open Spaces entry seeds from that pair;
+      an already-open entry keeps its live selection
+      (`packages/app/test/enter-space-thing.test.tsx`). Changing Diagram or
+      Graph after Enter is navigation, not an Edit: it writes neither the Thing
+      nor the target Space's own defaults. That is the `space-cards/07` ruling,
+      not a deferred write-back. A stored pair changes only by an authored Edit
+      on the Thing itself.
 - [x] Entering an already-open Space reuses its live context. An author can move
       among open Spaces without losing work, close an ordinary context
       explicitly, and never close the Meta Space.
@@ -121,5 +123,15 @@ Space's own address, offered from the Space Thing:
   link (ADR 0068): the application builds no tab of its own, records no opener,
   and seeds no Diagram from the Thing.
 
-Write-back of a live selection onto the Thing remains `layout-only-v1/04` /
-ADR 0079 Ticket 04, not this cut-over.
+Live-selection write-back is not deferred. `space-cards/07` ruled that an
+entered Space carries a live navigation context, seeded from the Thing and
+stored nowhere; changing it is not an Edit of the Thing. `layout-only-v1/04`
+is `done` and already states that navigating inside writes neither selection
+back. The unchecked box that pointed at those tickets as unfinished work was
+a stale pointer, not a remaining cut.
+
+### 2026-09-13 — Write-back is out of scope, not leftover
+
+Closed the write-back criterion. The next reader should not open a ticket to
+persist live Enter navigation onto the Thing unless the `space-cards/07`
+ruling is reversed.
