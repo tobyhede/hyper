@@ -18,7 +18,7 @@ export default { title: 'Components/Selected Edge Controls' };
 /** Selection alone: Edit and Delete, and nothing opened. */
 export const Closed: Story = () => <SelectedEdgeFixture />;
 
-/** Edit pressed: both endpoints, each showing the Thing it currently names. */
+/** Edit pressed: both endpoints, and the trigger itself reading as open. */
 export const EndpointEditor: Story = () => <SelectedEdgeFixture editorOpen />;
 
 /** A Thing the Graph already reaches: still listed, disabled, with its reason. */

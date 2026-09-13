@@ -53,7 +53,7 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [12](issues/12-align-card-toolbars-with-the-command-dock.md) | Align Card hover toolbars with the Command Dock through shared components | resolved |
 | [13](issues/13-settle-new-layout-and-new-space-command-outcomes.md) | Settle New Layout and New Space command outcomes | needs-triage |
 | [14](issues/14-audit-canvas-decoration-invalidation-and-active-graph-consistency.md) | Audit canvas decoration invalidation and Active Graph consistency | ready-for-agent |
-| [15](issues/15-settle-the-open-disclosure-treatment.md) | Settle the open-disclosure treatment, which now reaches every ghost trigger | needs-triage |
+| [15](issues/15-settle-the-open-disclosure-treatment.md) | Settle the open-disclosure treatment, which now reaches every ghost trigger | resolved |
 | [17](issues/17-decide-the-button-label-variant.md) | Decide `Button`'s `label` variant, which has no consumer | needs-triage |
 | [18](issues/18-reproduce-the-name-click-that-opens-a-thing.md) | Reproduce the Diagram/Graph name click that opens a Thing | needs-info |
 | [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the registry Drawer and the strip the shell yields to it | needs-triage |
@@ -70,13 +70,13 @@ replaced the screen-edge Things drawer with a Popover anchored to the Dock's own
 trigger, `12` gave the Thing rail the Dock's neutral surface, and `09` made the
 Space name a real Edit rather than a label with nothing behind it.
 
-**What is left is four decisions, one audit and one thing nobody can reproduce**,
-none of them blocking each other:
+**What is left is three decisions, one agent-ready ticket and one thing nobody
+can reproduce**, none of them blocking each other:
 
-- **13** and **15** are `needs-triage` because the work is small either way and
-  the decision is the whole of it — what New Diagram and New Space should
-  actually do, and whether a `ghost` disclosure trigger reading as open is an
-  application-wide rule or a Dock treatment that reached too far.
+- **13** is still `needs-triage` because the work is small either way and the
+  decision is the whole of it — what New Diagram and New Space should actually
+  do. **15** resolved Keep: a quiet disclosure trigger reads as open while it
+  is, on the shared recipe, with evidence on the Selected Edge Edit trigger.
 - **22** and **17** are the same shape and exist for the same reason: an
   unconsumed thing whose retirement is a `@project/ui` decision, left in the
   tail of a resolved ticket where nothing can scan for it. `22` holds the
@@ -85,10 +85,10 @@ none of them blocking each other:
   behind. They were briefly one file and are two, because `22`'s argument is
   about a vendored component drifting from an upstream and a CVA variant
   neither drifts nor regenerates.
-- **14** is the one `ready-for-agent` ticket. Two of the three findings `07`'s
-  review carried into it have since been fixed elsewhere and are struck; what
-  survives is the Active Graph fallback feeding the Dock's commands and the
-  decoration memo whose dependency list is incomplete.
+- **14** is the remaining `ready-for-agent` ticket. Two of the three findings
+  `07`'s review carried into it have since been fixed elsewhere and are
+  struck; what survives is the Active Graph fallback feeding the Dock's
+  commands and the decoration memo whose dependency list is incomplete.
 - **18** is `needs-info` and is the one thing here waiting on a person rather
   than a decision: the reported Diagram/Graph name click that also Opens a
   Thing. `11` could not reproduce it across the gestures it tried and ruled out
