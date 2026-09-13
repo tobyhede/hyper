@@ -129,6 +129,11 @@ interface ValidatedLoadedSpace {
   readonly space: Space;
 }
 
+interface FirstCanvasSeed {
+  selection?: DiagramId;
+  graph?: GraphId;
+}
+
 const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
   const runtime = loadSpaceSnapshot(loaded.snapshot);
   if (!runtime.ok) {
@@ -367,6 +372,7 @@ export function createOpenSpaces({
     target: OpenSpace,
     request: number,
     from: UUID | null,
+    firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
     const active = observable.getState().activeSpaceId;
     if (active !== null && active !== target.id) {
@@ -382,7 +388,16 @@ export function createOpenSpaces({
       include(target, observable.getState().activeSpaceId ?? target.id, from);
       return target;
     }
+    // First canvas showing is a fact about this entry after the waits, not
+    // about whichever entry the Space Id named when the request was made —
+    // compose may have produced a new one while an exit settled.
+    const seedFrom =
+      firstDisplay !== undefined && !shownOnCanvas.has(target) ? firstDisplay : undefined;
     include(target, target.id, from);
+    if (seedFrom !== undefined) {
+      if (seedFrom.selection !== undefined) target.app.navigation.selectDiagram(seedFrom.selection);
+      if (seedFrom.graph !== undefined) target.app.navigation.activateGraph(seedFrom.graph);
+    }
     return target;
   };
 
@@ -390,13 +405,19 @@ export function createOpenSpaces({
     spaceId: UUID,
     selection: DiagramId | undefined,
     from: UUID | null,
+    firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
     // Numbered before the Space is loaded, not after: composition is itself a
     // wait, and a request made first must not be superseded by one made second
     // merely because the second Space was already in hand.
     const { request, abandon } = beginActivation();
     try {
-      return await activateAfterLeavingSettles(await compose(spaceId, selection), request, from);
+      return await activateAfterLeavingSettles(
+        await compose(spaceId, selection),
+        request,
+        from,
+        firstDisplay,
+      );
     } catch (error) {
       abandon();
       throw error;
@@ -415,18 +436,11 @@ export function createOpenSpaces({
    * reader was standing in when they pressed — not whichever Space the canvas
    * happens to hold once the load settles.
    */
-  const enter = async (
-    spaceId: UUID,
-    selection?: DiagramId,
-    graph?: GraphId,
-  ): Promise<OpenSpace> => {
-    const current = observable.getState().entries.find(({ id }) => id === spaceId);
-    const seed = current === undefined || !shownOnCanvas.has(current);
-    const opened = await activate(spaceId, selection, observable.getState().activeSpaceId);
-    if (!seed) return opened;
-    if (selection !== undefined) opened.app.navigation.selectDiagram(selection);
-    if (graph !== undefined) opened.app.navigation.activateGraph(graph);
-    return opened;
+  const enter = (spaceId: UUID, selection?: DiagramId, graph?: GraphId): Promise<OpenSpace> => {
+    const firstDisplay: FirstCanvasSeed = {};
+    if (selection !== undefined) firstDisplay.selection = selection;
+    if (graph !== undefined) firstDisplay.graph = graph;
+    return activate(spaceId, selection, observable.getState().activeSpaceId, firstDisplay);
   };
 
   /**
