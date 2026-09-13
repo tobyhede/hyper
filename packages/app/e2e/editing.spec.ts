@@ -2812,9 +2812,11 @@ test(
     await edit.click();
     await expect(page.getByTestId('edge-editor')).toBeVisible();
     await expect(edit).toHaveAttribute('aria-expanded', 'true');
+    // Leave Edit before reading fill: the quiet recipe also paints hover, and
+    // click leaves the pointer over the trigger (@parity:selected-edge-edit-trigger-reads-as-open).
+    await page.mouse.move(0, 0);
+    expect(await edit.evaluate((element) => element.matches(':hover'))).toBe(false);
     const openFill = await resolveToken(edit, '--secondary');
-    // The fill, not only the attribute: Edit already advertises the editor with
-    // `aria-expanded`. This holds that the quiet recipe paints that open state.
     await expect(edit).toHaveCSS('background-color', openFill);
     await expect(del).not.toHaveCSS('background-color', openFill);
   },
