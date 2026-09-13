@@ -359,6 +359,30 @@ test(
  * Graph has nothing to traverse.
  */
 test(
+  'Colour… recolours the Active Graph through the swatch picker',
+  { tag: '@parity:command-dock-recolors-graph-through-swatch-picker' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const graphTitle = (
+      await page.getByTestId('active-graph').filter({ visible: true }).innerText()
+    ).trim();
+    const menu = await disclose(page, `Active Graph: ${graphTitle}`);
+    await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
+    await page.getByRole('radio', { name: 'Orange', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    const present = surface(page).getByRole('button', { name: 'Present Long' });
+    const stroke = await present
+      .locator('svg')
+      .evaluate((element) => getComputedStyle(element).stroke);
+    expect(stroke).not.toBe('none');
+  },
+);
+
+test(
   'a new Space names its initial Diagram and empty Graph and cannot present',
   { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
   async ({ page }) => {

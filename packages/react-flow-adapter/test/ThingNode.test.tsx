@@ -194,7 +194,7 @@ function props({
     selectedForAuthoring: false,
     showContent: false,
     activeGraphId: graphId,
-    activeGraphColor: '#6ea8fe',
+    activeGraphColor: '#1f77b4',
     emphasis: 'subtle',
     readOnly,
   };
@@ -569,7 +569,7 @@ describe('ThingNode graph authoring', () => {
       `Connect from ${Position.Bottom}`,
       `Connect from ${Position.Left}`,
     ]);
-    expect(handles.every((handle) => handle.style.backgroundColor === 'rgb(110, 168, 254)')).toBe(
+    expect(handles.every((handle) => handle.style.backgroundColor === 'rgb(31, 119, 180)')).toBe(
       true,
     );
   });

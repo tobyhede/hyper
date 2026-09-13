@@ -7,7 +7,10 @@ import {
   type UUID,
 } from '@project/core';
 import { loadSpace, serializeThingFile, type ThingFile, type Space } from '@project/graph';
-import { GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE } from '#src/colors';
+import {
+  GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE,
+  GRAPH_PALETTE_ENTRIES as PRODUCTION_GRAPH_PALETTE_ENTRIES,
+} from '#src/colors';
 
 /**
  * The inventory's fixture: a small, believable Space, shaped to exercise the
@@ -42,6 +45,7 @@ export const spaceId = id('a0f3e4fc-29ba-4416-9dcb-b0efc10e6b8a');
 
 /** The application palette, reused rather than translated for the catalogue. */
 export const GRAPH_PALETTE = PRODUCTION_GRAPH_PALETTE;
+export const GRAPH_PALETTE_ENTRIES = PRODUCTION_GRAPH_PALETTE_ENTRIES;
 
 export const things: readonly Thing[] = [
   {

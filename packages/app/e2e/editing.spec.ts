@@ -32,6 +32,7 @@ import {
   openThing,
   positionOf,
   presentControl,
+  recolorActiveGraph,
   selectCanvas,
   selectedCanvas,
   settled,
@@ -3390,3 +3391,28 @@ test('Create Alias is drawn unavailable on an Alias', async ({ page }) => {
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-disabled', 'true');
 });
+
+test(
+  'recolouring the Active Graph persists through the swatch picker',
+  { tag: '@parity:command-dock-recolors-graph-through-swatch-picker' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+
+    const handle = authoringHandle(nodeByTitle(page, 'A').first(), 'source', 'right');
+    const before = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
+    const revision = await page.getByTestId('persistence-status').getAttribute('data-revision');
+
+    await recolorActiveGraph(page, 'Orange');
+
+    await expect(page.getByTestId('persistence-status')).not.toHaveAttribute(
+      'data-revision',
+      revision ?? '',
+    );
+    const after = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(after).not.toBe(before);
+    await expect(presentControl(page)).toBeVisible();
+  },
+);

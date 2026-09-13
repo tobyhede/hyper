@@ -81,6 +81,12 @@ export type {
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';
 export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
+export { PaletteColorPicker, PaletteColorSwatchGrid } from './PaletteColorPicker';
+export type {
+  PaletteColorEntry,
+  PaletteColorPickerProps,
+  PaletteColorSwatchGridProps,
+} from './PaletteColorPicker';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   AbandonEditIcon,

@@ -244,6 +244,17 @@ export const newGraphItem = (graphTitle: string): HTMLElement => {
   return screen.getByRole('menuitem', { name: 'New Graph' });
 };
 
+/** Open the palette-bound Graph colour picker from the Active Graph menu. */
+export const openGraphColourPicker = (graphTitle: string): void => {
+  openGraphMenu(graphTitle);
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Colour…' }));
+};
+
+/** Choose one swatch in the open Graph colour picker. */
+export const chooseGraphColour = (label: string): void => {
+  fireEvent.click(screen.getByRole('radio', { name: label }));
+};
+
 /**
  * The Space cluster's disclosure: New Space, Copy link, the open set and Exit.
  *

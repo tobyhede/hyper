@@ -341,6 +341,22 @@ export const parityClaims: readonly ParityClaim[] = [
       "The Graph menu offers Copy link and Copy permanent link, building the current-Diagram address and the Graph's own address respectively.",
   },
   {
+    id: 'command-dock-recolors-graph-through-swatch-picker',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Colour… in the Graph menu opens a palette-bound swatch grid listing every Tableau slot with its label; choosing one recolours the Active Graph.',
+  },
+  {
+    id: 'palette-color-picker-chooses-a-closed-palette-colour',
+    storyFile: 'components/palette-color-picker.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'A closed palette opens as a swatch grid in a popover; the chosen swatch is visibly selected and choosing one invokes the caller and closes the popover.',
+    applicationEvidence:
+      'The Command Dock mounts this component for Graph recolour; `command-dock-recolors-graph-through-swatch-picker` in editing.spec.ts exercises that path through the real authoring stack.',
+  },
+  {
     id: 'command-dock-edits-identity-names',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',

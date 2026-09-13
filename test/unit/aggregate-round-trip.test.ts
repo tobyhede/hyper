@@ -94,7 +94,7 @@ const metaSpace = (): SpaceSnapshot => ({
           {
             id: META_GRAPH_ID,
             title: 'Graph 1',
-            color: '#6ea8fe',
+            color: '#1f77b4',
             edges: [{ from: MARKDOWN_THING_ID, to: FIRST_LINK_ID }],
           },
         ],

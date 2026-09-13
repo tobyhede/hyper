@@ -54,7 +54,7 @@ describe('GraphHud', () => {
     const { container } = render(
       <GraphHud
         graphs={[
-          { id: activeGraphId, title: 'Primary', color: '#6ea8fe', edges: [] },
+          { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           {
             id: uuid('00000000-0000-4000-8000-000000000011'),
             title: 'Alternate',
@@ -62,7 +62,7 @@ describe('GraphHud', () => {
             edges: [],
           },
         ]}
-        colorByGraphId={{ [activeGraphId]: '#6ea8fe' }}
+        colorByGraphId={{ [activeGraphId]: '#1f77b4' }}
         activeGraphId={activeGraphId}
         activeGraphThingIds={new Set([uuid('00000000-0000-4000-8000-000000000001')])}
       />,
@@ -75,7 +75,7 @@ describe('GraphHud', () => {
       legend.compareDocumentPosition(minimap) & globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
     expect(minimap).toHaveAttribute('data-active-fill', 'var(--secondary)');
-    expect(minimap).toHaveAttribute('data-active-stroke', '#6ea8fe');
+    expect(minimap).toHaveAttribute('data-active-stroke', '#1f77b4');
     expect(minimap).toHaveAttribute('data-other-fill', 'var(--secondary)');
     expect(minimap).toHaveAttribute('data-other-stroke', 'var(--border)');
     expect(container).toHaveTextContent('Primary');
@@ -98,7 +98,7 @@ describe('GraphHud', () => {
     render(
       <GraphHud
         graphs={[
-          { id: activeGraphId, title: 'Primary', color: '#6ea8fe', edges: [] },
+          { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           { id: otherGraphId, title: 'Alternate', color: '#f4a259', edges: [] },
         ]}
         colorByGraphId={{ [activeGraphId]: '#123456' }}
