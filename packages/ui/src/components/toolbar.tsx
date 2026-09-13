@@ -54,6 +54,12 @@ const ToolbarGroup = React.forwardRef<HTMLDivElement, ToolbarPrimitive.Group.Pro
  * as unavailable, rather than disappearing from the keyboard while remaining
  * on screen. Style it through `[aria-disabled='true']`; `:disabled` will not
  * match.
+ *
+ * The toolbar owns a 16px box for an un-sized SVG, for both its compact named
+ * controls and its icon-only controls. A glyph can still opt into another size
+ * explicitly; absent that exception, its geometry does not decide how large a
+ * command draws it. `Button.test.tsx` holds the underlying size variants and
+ * `toolbar.test.tsx` holds this toolbar override.
  */
 export type ToolbarButtonProps = ToolbarPrimitive.Button.Props &
   Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>;
@@ -64,7 +70,9 @@ const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonProps>(
       <ToolbarPrimitive.Button
         ref={ref}
         data-slot="toolbar-button"
-        render={<Button variant={variant} size={size} />}
+        render={
+          <Button variant={variant} size={size} className="[&_svg:not([class*='size-'])]:size-4" />
+        }
         {...props}
       />
     );

@@ -75,6 +75,19 @@ html:has(.infinity-cube) {
   color: var(--foreground);
 }
 
+.infinity-cube__size {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.infinity-cube__px {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
 .infinity-cube__lockup {
   display: flex;
   align-items: center;
@@ -126,4 +139,22 @@ html:has(.infinity-cube) {
   height: 18px;
   background: var(--border);
   flex: none;
+}
+
+.infinity-cube__list > .infinity-cube__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.infinity-cube__sand {
+  display: flex;
+  justify-content: flex-start;
+  padding: 18px 14px;
+  border-radius: 6px;
+  background: #e5dbc7;
+}
+
+.infinity-cube__dock .command-name {
+  margin-inline-start: 6px;
 }

@@ -74,14 +74,18 @@ export const GraphIcon = ({
  * a surface overriding a glyph's own drawing. The fill is the colour the glyph
  * was already given, so a filled triangle and an outlined one are the same
  * mark at the same value.
+ *
+ * The SVG takes the shared 16px icon box. Its mark stays optically smaller
+ * inside that box, matching the transport controls without making a Button
+ * negotiate a second icon size.
  */
 export const PresentIcon = ({ color, filled = false }: { color: string; filled?: boolean }) => (
-  <Play color={color} fill={filled ? color : 'none'} size={12} />
+  <Play className="origin-center scale-75" color={color} fill={filled ? color : 'none'} size={16} />
 );
 
 /** Stop presenting and return to the Space overview. */
 export const StopPresentingIcon = ({ color }: { color: string }) => (
-  <Square color={color} size={12} />
+  <Square className="origin-center scale-75" color={color} size={16} />
 );
 
 /** Edit the content of a Markdown Thing. */

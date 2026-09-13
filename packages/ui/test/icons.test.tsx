@@ -164,7 +164,10 @@ describe('the public icon facade', () => {
     expect(glyphs[0]).toHaveAttribute('height', '13');
     expect(glyphs[0]).toHaveAttribute('stroke', '#123456');
     expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
-    expect(glyphs[2]).toHaveAttribute('width', '12');
+    expect(glyphs[1]).toHaveAttribute('width', '16');
+    expect(glyphs[1]).toHaveClass('origin-center', 'scale-75');
+    expect(glyphs[2]).toHaveAttribute('width', '16');
+    expect(glyphs[2]).toHaveClass('origin-center', 'scale-75');
     expect(glyphs[2]).toHaveAttribute('stroke', '#abcdef');
     // The Alias sizes its own box; the base inside it always fills the 24-unit
     // viewBox, which is what keeps the badge in the same corner at every size.
