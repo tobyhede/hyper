@@ -73,20 +73,24 @@
   > .canvas-thing__body {
   padding-top: calc(38px + var(--prototype-dock-inset));
 }
-/* The production embedding's fixed top inset assumes an in-flow header.
-   This preview adds clearance without changing authored target positions. */
-.floating-dock-prototype:not([data-variant='current']) .react-flow__node[data-id^='embedded:'] {
-  translate: 0 calc(var(--prototype-dock-inset) * 2);
-}
-/* The open Space title is a drag surface; its floating menu already offers
-   Rename. Let the pointer reach the card instead of the old title button. */
-.floating-dock-prototype:not([data-variant='current'])
-  .canvas-thing[data-kind='space'][data-expanded='true']
-  .canvas-thing__title-control {
+
+/* Only the actual dock floats above embedded cards; there is no header panel. */
+.floating-dock-prototype__space-rail {
+  position: fixed;
+  z-index: 100;
+  transform-origin: top left;
   pointer-events: none;
 }
-.floating-dock-prototype:not([data-variant='current'])
-  .canvas-thing[data-kind='space'][data-expanded='true']
-  .canvas-thing__title {
-  cursor: grab;
+.floating-dock-prototype__space-rail > .thing-rail {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  pointer-events: none;
+}
+.floating-dock-prototype__space-rail .thing-rail__kind {
+  display: none;
+}
+.floating-dock-prototype__space-rail[data-visible='true'] .canvas-thing__actions {
+  opacity: 1;
+  pointer-events: auto;
 }

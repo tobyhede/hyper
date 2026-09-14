@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -19,7 +20,6 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import {
-  SPACE_THING_EMBED_INSET,
   titleName,
   uuidSchema,
   type DiagramPosition,
@@ -56,6 +56,7 @@ import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedd
 import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedDiagramAuthoring, type EmbeddedPublication } from './EmbeddedDiagramAuthoring';
 import type { Continuation } from '../continuation';
+import { EmbeddedInsetPrototype } from '../embedded-inset-prototype';
 
 const EMPTY_ENTRIES = [] as const;
 const emptySubscription = () => () => undefined;
@@ -306,6 +307,7 @@ export function SpaceCanvas({
   spaceThingTargets,
   thingEntityActions,
 }: SpaceCanvasProps) {
+  const embeddedInset = useContext(EmbeddedInsetPrototype);
   const { screenToFlowPosition } = useReactFlow();
 
   const spaces = useOpenSpaces();
@@ -364,14 +366,14 @@ export function SpaceCanvas({
       const crossed = new Set(path).add(crossing);
       const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
       const intersection = {
-        left: Math.max(absolute.x + SPACE_THING_EMBED_INSET.left, clip?.left ?? -Infinity),
-        top: Math.max(absolute.y + SPACE_THING_EMBED_INSET.top, clip?.top ?? -Infinity),
+        left: Math.max(absolute.x + embeddedInset.left, clip?.left ?? -Infinity),
+        top: Math.max(absolute.y + embeddedInset.top, clip?.top ?? -Infinity),
         right: Math.min(
-          absolute.x + (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
+          absolute.x + (parent.width ?? 0) - embeddedInset.right,
           clip?.right ?? Infinity,
         ),
         bottom: Math.min(
-          absolute.y + (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
+          absolute.y + (parent.height ?? 0) - embeddedInset.bottom,
           clip?.bottom ?? Infinity,
         ),
       };
@@ -403,7 +405,7 @@ export function SpaceCanvas({
       }
     }
     return requests;
-  }, [nodes, entries, embeddedPublications]);
+  }, [nodes, entries, embeddedPublications, embeddedInset]);
   /**
    * A read outlives its embedding only while the *target* is gone.
    *

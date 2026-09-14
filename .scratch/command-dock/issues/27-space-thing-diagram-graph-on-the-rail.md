@@ -198,3 +198,12 @@ Open/Close and editing remain the production operations. The switcher also
 compares all docks visible with normal hover/selection. These overrides are
 review-only: no production header change or final decision has been made.
 The prototype typechecks and was inspected in Chromium at 1440×1000.
+
+The Space header correction removes the old 42px embedded top boundary in the
+floating variants (only the 4px border remains). The Space dock is portalled
+above embedded cards, leaving the rest of the former header available to drag.
+The earlier title-pointer override was unrelated and has been removed. Prototype
+context seams retain the production defaults outside this story. Focused Chromium
+checks passed for dragging from the former header and returning to the top border
+in both floating variants, with the Diagram menu still operable; the current
+baseline retains its 42px inset. Root typecheck passed.

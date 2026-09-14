@@ -5,9 +5,11 @@
  */
 import { useMemo, useState } from 'react';
 import type { Story } from '@ladle/react';
-import { spaceSnapshotSchema, uuidSchema } from '@project/core';
-import { Button } from '@project/ui';
+import { SPACE_THING_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { Button, CanvasThingRailPrototype } from '@project/ui';
+import { EmbeddedInsetPrototype } from '../../src/embedded-inset-prototype';
 import { Application } from '#components/Application';
+import { FloatingSpaceRail } from './floating-space-rail-prototype';
 import { storyOpening, storySpaces } from '../support/application';
 import './floating-thing-dock.css';
 
@@ -149,6 +151,11 @@ export const Compare: Story = () => {
     },
     [scene],
   );
+  const embeddedInset = useMemo(
+    () =>
+      variant === 'current' ? SPACE_THING_EMBED_INSET : { ...SPACE_THING_EMBED_INSET, top: 4 },
+    [variant],
+  );
   const choose = (next: Variant) => {
     setVariant(next);
     const url = new URL(window.location.href);
@@ -162,7 +169,21 @@ export const Compare: Story = () => {
   return (
     <div className="floating-dock-prototype" data-variant={variant} data-show-docks={showDocks}>
       <div className="floating-dock-prototype__canvas">
-        <Application key={`${scene}:${revision}`} resolve={resolve} />
+        <EmbeddedInsetPrototype.Provider value={embeddedInset}>
+          <CanvasThingRailPrototype.Provider
+            value={(rail, openSpace) =>
+              openSpace && variant !== 'current' ? (
+                <FloatingSpaceRail inset={variant === 'inset8' ? 8 : 12} show={showDocks}>
+                  {rail}
+                </FloatingSpaceRail>
+              ) : (
+                rail
+              )
+            }
+          >
+            <Application key={`${scene}:${revision}`} resolve={resolve} />
+          </CanvasThingRailPrototype.Provider>
+        </EmbeddedInsetPrototype.Provider>
       </div>
       <aside className="floating-dock-prototype__switcher" aria-label="Prototype controls">
         <div

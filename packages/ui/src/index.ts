@@ -251,3 +251,5 @@ export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './comp
 
 export { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
 export type { DiagramMenuActionsProps, GraphMenuActionsProps } from './IdentityMenuActions';
+
+export { CanvasThingRailPrototype } from './canvas-thing-rail-prototype';

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { Edge, NodeChange } from '@xyflow/react';
-import { SPACE_THING_EMBED_INSET, type ThingId, type GraphId, type DiagramId } from '@project/core';
+import type { ThingId, GraphId, DiagramId } from '@project/core';
 import { Placement, positionedStrategy } from '@project/graph';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../authoring-availability';
@@ -17,6 +17,7 @@ import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceThingTargets } from '../space-thing-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { Continuation } from '../continuation';
+import { EmbeddedInsetPrototype } from '../embedded-inset-prototype';
 
 export interface EmbeddedPublication {
   readonly entry: OpenSpace;
@@ -58,6 +59,7 @@ export function EmbeddedDiagramAuthoring({
   readonly bounds: EmbeddedBounds;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
+  const embeddedInset = useContext(EmbeddedInsetPrototype);
   // The target's own composition names where this reports (ADR 0016); nothing
   // here holds a second sink, and a default in the module would be one.
   const [composition] = useState(() =>
@@ -152,10 +154,10 @@ export function EmbeddedDiagramAuthoring({
   });
   const offset = useMemo(
     () => ({
-      x: SPACE_THING_EMBED_INSET.left - origin.x,
-      y: SPACE_THING_EMBED_INSET.top - origin.y,
+      x: embeddedInset.left - origin.x,
+      y: embeddedInset.top - origin.y,
     }),
-    [origin],
+    [origin, embeddedInset],
   );
   const value = useMemo((): EmbeddedPublication => {
     const { nodes, edges } = embeddedDiagram({

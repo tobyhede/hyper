@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -9,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { titleLines, titleName } from '@project/core';
+import { CanvasThingRailPrototype } from './canvas-thing-rail-prototype';
 import { Button } from './Button';
 import {
   ThingRailAction,
@@ -278,6 +280,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  * own visual treatment lives in `canvas-thing.css`, colocated with this module.
  */
 export function CanvasThing(props: CanvasThingProps) {
+  const renderRail = useContext(CanvasThingRailPrototype);
   const { front, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Thing is called wherever it is *named* rather than drawn.
@@ -391,83 +394,87 @@ export function CanvasThing(props: CanvasThingProps) {
           colour is still on this Thing — `--canvas-thing-graph` below draws the
           Title's own hover and caret treatment — and still on the handles and
           Edges the adapter draws around it. */}
-      <ThingRail kind={visualKind} className="canvas-thing__rail">
-        {showActions && (
-          // ADR 0073. One tab stop for the whole rail, arrows between its
-          // controls: a canvas carries many Things and a Thing's rail carries
-          // several commands, so a control apiece would put the Things
-          // themselves out of reach behind their own actions. The keyboard
-          // contract, the shared control treatment and the canvas suppression
-          // every one of these needs are `ThingRailActions`' and
-          // `ThingRailAction`'s; what is left here is which commands this Thing
-          // has, and what each one runs.
-          //
-          // The two groups are the answer to "whose command is this?". Editing
-          // this Thing's Markdown is the Markdown front's business and means
-          // nothing on another kind; opening and closing is every Thing's.
-          // Space choices lead the rail, followed by entity actions, Open/Close
-          // with Enter in the entity menu. Content-edit commands stay beside it.
-          <ThingRailActions
-            aria-label={`Thing ${name}`}
-            className="canvas-thing__actions"
-            data-testid="canvas-thing-actions"
-          >
-            {spaceSelection !== undefined && (
-              <SpaceThingSelectors selection={spaceSelection} onReport={setContextNotice} />
-            )}
-            {actionableEntityActions && (
-              <EntityActionsTrigger
-                groups={entityActions}
-                label={`Actions for Thing ${name}`}
-                icon={<EntityActionsIcon />}
-                render={<ThingRailAction />}
-              />
-            )}
-            <ThingRailKindActions kind={visualKind}>
-              {visibleContentEdit === null ? (
-                beginContentEdit !== undefined && (
+      {renderRail(
+        <ThingRail kind={visualKind} className="canvas-thing__rail">
+          {showActions && (
+            // ADR 0073. One tab stop for the whole rail, arrows between its
+            // controls: a canvas carries many Things and a Thing's rail carries
+            // several commands, so a control apiece would put the Things
+            // themselves out of reach behind their own actions. The keyboard
+            // contract, the shared control treatment and the canvas suppression
+            // every one of these needs are `ThingRailActions`' and
+            // `ThingRailAction`'s; what is left here is which commands this Thing
+            // has, and what each one runs.
+            //
+            // The two groups are the answer to "whose command is this?". Editing
+            // this Thing's Markdown is the Markdown front's business and means
+            // nothing on another kind; opening and closing is every Thing's.
+            // Space choices lead the rail, followed by entity actions, Open/Close
+            // with Enter in the entity menu. Content-edit commands stay beside it.
+            <ThingRailActions
+              aria-label={`Thing ${name}`}
+              className="canvas-thing__actions"
+              data-testid="canvas-thing-actions"
+            >
+              {spaceSelection !== undefined && (
+                <SpaceThingSelectors selection={spaceSelection} onReport={setContextNotice} />
+              )}
+              {actionableEntityActions && (
+                <EntityActionsTrigger
+                  groups={entityActions}
+                  label={`Actions for Thing ${name}`}
+                  icon={<EntityActionsIcon />}
+                  render={<ThingRailAction />}
+                />
+              )}
+              <ThingRailKindActions kind={visualKind}>
+                {visibleContentEdit === null ? (
+                  beginContentEdit !== undefined && (
+                    <ThingRailAction
+                      ref={editControl}
+                      aria-label={`Edit Thing ${name}`}
+                      onClick={beginContentEdit}
+                    >
+                      <EditIcon data-icon="inline-start" />
+                    </ThingRailAction>
+                  )
+                ) : (
+                  <ContentEditActions name={name} edit={visibleContentEdit} />
+                )}
+              </ThingRailKindActions>
+              <ThingRailSharedActions>
+                {onOpenChange !== undefined && (
                   <ThingRailAction
-                    ref={editControl}
-                    aria-label={`Edit Thing ${name}`}
-                    onClick={beginContentEdit}
+                    aria-label={`${open ? 'Close' : 'Open'} Thing ${name}`}
+                    // Closing mid-edit would drop the Thing's box out from under a
+                    // live caret with a draft in it. The control keeps its slot and
+                    // goes unavailable rather than disappearing: the rail's row does
+                    // not reshuffle while the author writes, and what is unavailable
+                    // says so instead of vanishing.
+                    //
+                    // A toolbar item stays focusable while disabled (ADR 0073), so
+                    // that promise now holds for the keyboard too — the control keeps
+                    // its place in the arrow order and announces itself unavailable,
+                    // instead of being drawn and unreachable.
+                    disabled={visibleContentEdit !== null}
+                    onClick={() => {
+                      onOpenChange(!open);
+                    }}
                   >
-                    <EditIcon data-icon="inline-start" />
+                    {open ? (
+                      <CloseThingIcon data-icon="inline-start" />
+                    ) : (
+                      <OpenThingIcon data-icon="inline-start" />
+                    )}
                   </ThingRailAction>
-                )
-              ) : (
-                <ContentEditActions name={name} edit={visibleContentEdit} />
-              )}
-            </ThingRailKindActions>
-            <ThingRailSharedActions>
-              {onOpenChange !== undefined && (
-                <ThingRailAction
-                  aria-label={`${open ? 'Close' : 'Open'} Thing ${name}`}
-                  // Closing mid-edit would drop the Thing's box out from under a
-                  // live caret with a draft in it. The control keeps its slot and
-                  // goes unavailable rather than disappearing: the rail's row does
-                  // not reshuffle while the author writes, and what is unavailable
-                  // says so instead of vanishing.
-                  //
-                  // A toolbar item stays focusable while disabled (ADR 0073), so
-                  // that promise now holds for the keyboard too — the control keeps
-                  // its place in the arrow order and announces itself unavailable,
-                  // instead of being drawn and unreachable.
-                  disabled={visibleContentEdit !== null}
-                  onClick={() => {
-                    onOpenChange(!open);
-                  }}
-                >
-                  {open ? (
-                    <CloseThingIcon data-icon="inline-start" />
-                  ) : (
-                    <OpenThingIcon data-icon="inline-start" />
-                  )}
-                </ThingRailAction>
-              )}
-            </ThingRailSharedActions>
-          </ThingRailActions>
-        )}
-      </ThingRail>
+                )}
+              </ThingRailSharedActions>
+            </ThingRailActions>
+          )}
+        </ThingRail>,
+        open &&
+          (front.kind === 'space' || (front.kind === 'alias' && front.target.kind === 'space')),
+      )}
       <CardContent className="canvas-thing__body">
         {state === 'editing' && !readOnly ? (
           <InlineTitleEditor
