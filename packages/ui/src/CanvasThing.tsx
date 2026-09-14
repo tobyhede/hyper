@@ -30,7 +30,6 @@ import {
   CloseThingIcon,
   CommitEditIcon,
   EditIcon,
-  EnterSpaceIcon,
   EntityActionsIcon,
   GraphIcon,
   DiagramIcon,
@@ -80,8 +79,9 @@ export type CanvasThingFront =
     })
   | {
       readonly kind: 'alias';
-      /** The resolved Target Markdown this Alias displays read-only. */
-      readonly source: string;
+      /** The resolved Target content this Alias displays read-only. */
+      readonly target:
+        { readonly kind: 'markdown'; readonly source: string } | { readonly kind: 'space' };
       /** Authored Diagram state; an Alias Opens through the shared Thing operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -97,12 +97,6 @@ export type CanvasThingFront =
        * the target Space has not been read yet.
        */
       readonly selection?: CanvasSpaceThingSelection;
-      /**
-       * Enter the referenced Space, replacing the canvas. A kind command
-       * (ADR 0073): it belongs on this rail whether the Thing is Open or
-       * Closed, and it is withheld from a read-only surface.
-       */
-      readonly onEnter?: () => void;
     };
 
 /** One entity a Space Thing's selectors can be pointed at, named as an author reads it. */
@@ -298,7 +292,12 @@ export function CanvasThing(props: CanvasThingProps) {
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   /** The kinds that draw a Markdown document below their Title. */
-  const contentFront = front.kind === 'markdown' || front.kind === 'alias' ? front : undefined;
+  const contentFront =
+    front.kind === 'markdown'
+      ? front
+      : front.kind === 'alias' && front.target.kind === 'markdown'
+        ? { ...front, source: front.target.source }
+        : undefined;
   /**
    * The kinds that carry authored Open/Closed state — every kind but the
    * creation ghost, which is not a Thing yet and so has no Diagram to author it
@@ -319,7 +318,6 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentPresence = usePresence(contentFront?.open === true, contentExitDuration);
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
   const onBeginContentEdit = !readOnly && front.kind === 'markdown' ? front.onBeginEdit : undefined;
-  const onEnter = !readOnly && front.kind === 'space' ? front.onEnter : undefined;
   /**
    * The edit running inside the Markdown front this Thing owns.
    *
@@ -342,7 +340,6 @@ export function CanvasThing(props: CanvasThingProps) {
     (spaceSelection !== undefined ||
       visibleContentEdit !== null ||
       onOpenChange !== undefined ||
-      onEnter !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const style: CanvasThingStyle = { '--canvas-thing-graph': graphColor };
@@ -375,6 +372,7 @@ export function CanvasThing(props: CanvasThingProps) {
       className="canvas-thing"
       data-testid="thing"
       data-kind={visualKind}
+      data-content-kind={front.kind === 'alias' ? front.target.kind : visualKind}
       data-state={state}
       // Exposes authored state for the Thing's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's
@@ -408,7 +406,7 @@ export function CanvasThing(props: CanvasThingProps) {
           // this Thing's Markdown is the Markdown front's business and means
           // nothing on another kind; opening and closing is every Thing's.
           // Space choices lead the rail, followed by entity actions, Open/Close
-          // and Enter. Content-edit commands stay beside the entity actions.
+          // with Enter in the entity menu. Content-edit commands stay beside it.
           <ThingRailActions
             aria-label={`Thing ${name}`}
             className="canvas-thing__actions"
@@ -467,13 +465,6 @@ export function CanvasThing(props: CanvasThingProps) {
                 </ThingRailAction>
               )}
             </ThingRailSharedActions>
-            {onEnter !== undefined && (
-              <ThingRailKindActions kind="space">
-                <ThingRailAction aria-label={`Enter Space ${name}`} onClick={onEnter}>
-                  <EnterSpaceIcon data-icon="inline-start" />
-                </ThingRailAction>
-              </ThingRailKindActions>
-            )}
           </ThingRailActions>
         )}
       </ThingRail>
@@ -667,7 +658,7 @@ function SpaceThingSelectors({ selection, onReport }: SpaceThingSelectorsProps) 
         renaming={renaming === 'Graph'}
         onRenaming={(editing) => setRenaming(editing ? 'Graph' : null)}
         onReport={onReport}
-        icon={<GraphIcon />}
+        icon={<GraphIcon size={14} />}
         testId="space-thing-graph"
         choices={selection.graphs}
         chosen={selection.graphId}

@@ -9,6 +9,8 @@ import {
   DeleteIcon,
   FALLBACK_GRAPH_COLOR,
   RemoveFromDiagramIcon,
+  EnterSpaceIcon,
+  EditIcon,
   ThingKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -1029,28 +1031,7 @@ export const createApp = (
         // longer has. No commands rather than commands that name nothing.
         if (thing === undefined) return [];
         const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
-        /**
-         * **Present and unavailable wherever the single hop ends, rather than absent.**
-         *
-         * ADR 0009 requires a Target to own its Markdown content, so
-         * `aliasTargetRefusal` refuses *every* non-`markdown` kind — an Alias
-         * and a Space Thing alike (`space-authoring.ts`). Reading the rule as
-         * "not an Alias" left the row live on a Space Thing, where the press
-         * could only ever refuse.
-         *
-         * It is drawn and greyed rather than withheld because the Things it
-         * applies to are otherwise regular Things: a menu one row shorter, for a
-         * reason the reader cannot see, teaches nothing, and this row is where
-         * the product says where aliasing stops. Each kind says why in its own
-         * words, because "aliasing terminates here" and "this was never a thing
-         * with content to alias" are two different facts.
-         */
-        const terminal =
-          thing.kind === 'alias'
-            ? 'An Alias cannot be aliased.'
-            : thing.kind === 'markdown'
-              ? null
-              : 'Only a Markdown Thing can be aliased.';
+        const terminal = thing.kind === 'alias' ? 'An Alias cannot be aliased.' : null;
         const alias: readonly EntityActionGroup[] = availability.addThing
           ? [
               [
@@ -1143,6 +1124,44 @@ export const createApp = (
               ]
             : []),
         ];
+        if (thing.kind === 'space') {
+          const rename: EntityActionGroup = [
+            {
+              id: 'rename',
+              label: 'Rename',
+              icon: <EditIcon />,
+              onSelect: () => {
+                continuation.request({
+                  target: { kind: 'thing', thingId: thing.id },
+                  select: true,
+                  then: 'rename',
+                });
+                return 'done';
+              },
+            },
+          ];
+          const links = addresses.flat();
+          const enter: EntityActionGroup =
+            spaces === null
+              ? []
+              : [
+                  {
+                    id: 'enter',
+                    label: 'Enter',
+                    icon: <EnterSpaceIcon />,
+                    onSelect: () => {
+                      enterSpaceThing(thing.id);
+                      return 'done';
+                    },
+                  },
+                ];
+          return [
+            [...rename, ...alias.flat()],
+            [...enter, ...links.filter((action) => action.id === 'open-independently')],
+            links.filter((action) => action.id !== 'open-independently'),
+            leaving.filter((action) => action.id === 'remove-from-diagram'),
+          ];
+        }
         return [...addresses, ...alias, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
@@ -1154,6 +1173,8 @@ export const createApp = (
         availability.deleteThing,
         editingThingBody,
         createAliasFrom,
+        spaces,
+        enterSpaceThing,
       ],
     );
 
@@ -1905,7 +1926,6 @@ export const createApp = (
                 activeGraphThingIds={activeGraphThingIds}
                 spaceThingTargets={spaceThingTargets}
                 thingEntityActions={thingRailActions}
-                onEnterSpace={spaces === null ? undefined : enterSpaceThing}
               />
             </ReactFlowProvider>
           ) : (

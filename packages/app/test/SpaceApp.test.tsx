@@ -549,13 +549,13 @@ describe('Space app failure reporting', () => {
     {
       entity: 'Actions for Thing Thing',
       command: (accessibleName: string) =>
-        accessibleName.startsWith('Copy Link to Thing in Diagram'),
+        accessibleName.startsWith('Copy link to Thing in Diagram'),
       reportsInPlace: true,
     },
     {
       entity: 'Actions for Thing Thing',
       command: (accessibleName: string) =>
-        accessibleName.startsWith('Copy Link to Thing') && !accessibleName.includes('Diagram'),
+        accessibleName.startsWith('Copy link to Thing') && !accessibleName.includes('Diagram'),
       reportsInPlace: true,
     },
     { entity: 'Active Graph: Graph', command: /^Copy link/, reportsInPlace: false },

@@ -67,7 +67,7 @@ describe('CanvasThing kind and interaction state', () => {
   it('presents an Alias front by its kind alone', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: '', open: false }}
+        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -84,7 +84,12 @@ describe('CanvasThing kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: 'Markdown', open: false, onOpenChange }}
+        front={{
+          kind: 'alias',
+          target: { kind: 'markdown', source: 'Markdown' },
+          open: false,
+          onOpenChange,
+        }}
         state="selected"
         title="Return"
         graphColor="#ffc53d"
@@ -603,8 +608,8 @@ describe('CanvasThing Title ladder', () => {
       { kind: 'preview' },
       { kind: 'markdown', source: '', open: false },
       { kind: 'markdown', source: '', open: true },
-      { kind: 'alias', source: '', open: false },
-      { kind: 'alias', source: '', open: true },
+      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false },
+      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: true },
       { kind: 'space', open: false },
       { kind: 'space', open: true },
     ];
@@ -960,7 +965,7 @@ describe('CanvasThing open Markdown front', () => {
   it('draws no body on a closed Alias', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: '', open: false }}
+        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"
@@ -1223,49 +1228,15 @@ describe('CanvasThing Space front', () => {
     expect(screen.queryByTestId('space-thing-graph')).not.toBeInTheDocument();
   });
 
-  /**
-   * Enter is the Space Thing's kind command (ADR 0073, ADR 0068): it belongs on
-   * the rail whether the Thing is Open or Closed, and it is withheld from a
-   * read-only surface the same way every other authoring control is.
-   */
-  it('offers Enter on the rail while Closed or Open, and withholds it when read-only', () => {
-    const onEnter = vi.fn();
-    const { rerender } = render(
+  it('keeps Enter off the rail', () => {
+    render(
       <CanvasThing
-        front={{ kind: 'space', open: false, onEnter }}
+        front={{ kind: 'space', open: false }}
         state="selected"
         title="Architecture"
         graphColor="#35d6c3"
       />,
     );
-
-    const enter = screen.getByRole('button', { name: 'Enter Space Architecture' });
-    expect(enter).toBeVisible();
-    expect(enter.closest('[data-slot="thing-rail-kind-actions"]')).not.toBeNull();
-    enter.click();
-    expect(onEnter).toHaveBeenCalledOnce();
-
-    rerender(
-      <CanvasThing
-        front={{ kind: 'space', open: true, onEnter }}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
-
-    rerender(
-      <CanvasThing
-        readOnly
-        front={{ kind: 'space', open: false, onEnter }}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(
-      screen.queryByRole('button', { name: 'Enter Space Architecture' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Enter/ })).not.toBeInTheDocument();
   });
 });

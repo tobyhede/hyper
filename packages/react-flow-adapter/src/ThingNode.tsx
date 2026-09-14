@@ -136,7 +136,10 @@ export function ThingNode({
           };
   const aliasFront: AliasFront = {
     kind: 'alias',
-    source: data.body ?? '',
+    target:
+      data.spaceContent !== undefined
+        ? { kind: 'space' }
+        : { kind: 'markdown', source: data.body ?? '' },
     open: data.expanded === true,
   };
   if (data.thingEditingEnabled === true && data.onEditThing !== undefined) {
@@ -153,7 +156,6 @@ export function ThingNode({
     spaceFront.onOpenChange = data.onEditThing;
   }
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
-  if (data.onEnter !== undefined) spaceFront.onEnter = data.onEnter;
   const front: CanvasThingFront =
     data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
 

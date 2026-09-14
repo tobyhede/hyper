@@ -1,4 +1,7 @@
-import { exerciseSpaceThingContextMenus } from './space-thing-context-menu';
+import {
+  exerciseSpaceThingContextMenus,
+  exerciseSpaceThingEntityMenu,
+} from './space-thing-context-menu';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
@@ -337,8 +340,7 @@ test(
     await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
-    await page.keyboard.press('ArrowRight');
-    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toBeFocused();
+    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toHaveCount(0);
     await page.keyboard.press('Tab');
     await expect(rail.locator(':focus')).toHaveCount(0);
     await diagramControl.focus();
@@ -709,8 +711,8 @@ test(
     // Open first, then Enter. Enter is offered Open or Closed; the press is the claim.
     await thing.focus();
     await thing.press('Enter');
-    await expect(thing.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
-    await thing.getByRole('button', { name: 'Enter Space Architecture' }).click();
+    await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click();
+    await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
 
     await expect(showingSpace(page)).toContainText('Space 1');
     await expect(page.getByRole('button', { name: 'Go to Diagram fixture' })).toBeVisible();
@@ -736,8 +738,8 @@ test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ p
 
   const thing = nodeByTitle(page, 'Presentation');
   await thing.hover();
-  await expect(thing.getByRole('button', { name: 'Enter Space Presentation' })).toBeVisible();
-  await thing.getByRole('button', { name: 'Enter Space Presentation' }).click();
+  await thing.getByRole('button', { name: 'Actions for Thing Presentation' }).click();
+  await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
 
   await expect(showingSpace(page)).toContainText('Presentation');
   await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText('Overview');
@@ -756,7 +758,7 @@ test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ p
  * on this tab, and the new one carries no opener.
  */
 test(
-  'Open in new tab on a Space Thing opens the target Space at its own address',
+  'Open in New Tab on a Space Thing opens the target Space at its own address',
   { tag: '@parity:space-thing-opens-independently' },
   async ({ page }) => {
     const targetPath = `/spaces/${encodeCompactUuid(PRESENTATION_SPACE_ID)}`;
@@ -777,10 +779,10 @@ test(
     await thing
       .getByRole('button', { name: 'Actions for Thing Presentation' })
       .click({ delay: 120 });
-    await expect(page.getByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
 
     const popup = page.waitForEvent('popup');
-    await page.getByRole('menuitem', { name: /^Open in new tab/ }).click();
+    await page.getByRole('menuitem', { name: /^Open in New Tab/ }).click();
     const independent = await popup;
 
     await expect
@@ -878,5 +880,17 @@ test(
     await reopened.getByTestId('space-thing-graph').focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('menuitemradio', { name: 'Graph 1', exact: true })).toHaveCount(0);
+  },
+);
+
+test(
+  'Space Thing entity menu groups commands and creates a Space Alias',
+  { tag: '@parity:space-thing-entity-menu' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingEntityMenu(page, thing);
+    await settled(page);
+    await page.reload();
+    await expect(nodeByTitle(page, 'Space card alias')).toBeVisible();
   },
 );

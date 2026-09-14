@@ -258,7 +258,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'EnterSpace',
     claim:
-      'A Space Thing offers Enter on its rail as a kind command; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
+      'A Space Thing offers Enter in its entity menu; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
   },
   {
     id: 'space-thing-opens-independently',
@@ -580,6 +580,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'SelectedDiagram',
     claim:
       "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
+  },
+  {
+    id: 'space-thing-entity-menu',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Space Thing entity menus group Rename and Create Alias, Enter and independent opening, concise copy links, and removal; creating an Alias shows the selected target Diagram read-only.',
   },
   {
     id: 'space-thing-context-menus-share-dock-actions',

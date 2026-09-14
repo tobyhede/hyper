@@ -267,13 +267,6 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       });
       continue;
     }
-    if (target.kind !== 'markdown') {
-      errors.push({
-        kind: 'alias-target-must-own-content',
-        ref: thing.target,
-        message: `Alias "${thing.id}" targets ${target.kind} Thing "${thing.target}"; aliases show Markdown content`,
-      });
-    }
   }
 
   for (const thing of space.things) {

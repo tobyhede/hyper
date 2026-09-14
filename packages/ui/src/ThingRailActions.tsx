@@ -85,7 +85,7 @@ const GROUP_LAYOUT = 'inline-flex items-center gap-px';
  * other gap.
  *
  * A Space Thing leads with Diagram and Graph choices, then entity actions,
- * Open/Close and Enter. Content-edit commands on other kinds sit between the
+ * Open/Close, with Enter inside the entity menu. Content-edit commands on other kinds sit between the
  * entity actions and Open/Close. The mounting Thing supplies that order.
  *
  * Either group draws nothing when it holds nothing — an Alias Thing offers one

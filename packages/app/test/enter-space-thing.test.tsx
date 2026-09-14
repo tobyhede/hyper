@@ -174,12 +174,13 @@ async function mount(): Promise<OpenSpaces> {
   });
   const initial = await spaces.open(HOME_ID);
   render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-  await screen.findByRole('button', { name: 'Enter Space Architecture' });
+  await screen.findByRole('button', { name: 'Actions for Thing Architecture' });
   return spaces;
 }
 
 async function enterArchitecture(): Promise<void> {
-  fireEvent.click(screen.getByRole('button', { name: 'Enter Space Architecture' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Actions for Thing Architecture' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Enter' }));
   await waitFor(() => expect(showingSpace()).toHaveTextContent('Architecture'));
 }
 
@@ -270,7 +271,7 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
 
     await spaces.switchTo(HOME_ID);
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));
-    await screen.findByRole('button', { name: 'Enter Space Architecture' });
+    await screen.findByRole('button', { name: 'Actions for Thing Architecture' });
 
     await enterArchitecture();
 
@@ -287,7 +288,8 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
       new Error(`The backend could not load space ${TARGET_ID}`),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enter Space Architecture' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Thing Architecture' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Enter' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Architecture could not be entered.');
@@ -314,7 +316,7 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
     fireEvent.click(exitSpaceItem('Architecture'));
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));
     expect(spaces.entry(TARGET_ID)).toBeUndefined();
-    await screen.findByRole('button', { name: 'Enter Space Architecture' });
+    await screen.findByRole('button', { name: 'Actions for Thing Architecture' });
 
     await enterArchitecture();
 

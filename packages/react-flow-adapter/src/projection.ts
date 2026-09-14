@@ -170,11 +170,8 @@ export type ThingNodeData = {
    * operation on this node (ADR 0068, ADR 0074).
    */
   spaceSelection?: CanvasSpaceThingSelection;
-  /**
-   * Enter the Space this Thing references. A Space Thing kind command
-   * (ADR 0073); absent on every other kind and on a canvas that cannot enter.
-   */
-  onEnter?: () => void;
+  /** The resolved content kind, including a Space Thing reached through an Alias. */
+  spaceContent?: Extract<Thing, { kind: 'space' }>;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -306,8 +303,9 @@ export function projectThingNodes(
     // is about.
     const open = options.openThingIds?.has(thing.id) === true;
     // An alias shows its target's content under its own title (ADR 0009).
+    const content = resolveContentThing(space, thing.id);
     const body =
-      showContent || open ? (resolveContentThing(space, thing.id)?.body ?? '') : undefined;
+      showContent || open ? (content?.kind === 'markdown' ? content.body : '') : undefined;
     const node: ThingFlowNode = {
       id: thing.id,
       type: 'thing',
@@ -346,6 +344,7 @@ export function projectThingNodes(
       node.height = placedThing.height;
       node.handles = declaredHandles(placedThing);
     }
+    if (content?.kind === 'space') node.data.spaceContent = content;
     if (body !== undefined) node.data.body = body;
     if (open) {
       node.data.expanded = true;

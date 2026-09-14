@@ -271,14 +271,6 @@ export interface SpaceCanvasProps {
    * note already names.
    */
   thingEntityActions?: (thingId: ThingId) => readonly EntityActionGroup[];
-  /**
-   * Enter the Space a Space Thing on this canvas references.
-   *
-   * Passed straight through to `useCanvasThingAuthoring`. Absent leaves every
-   * Space Thing without Enter (`canvas-thing-authoring.test.tsx`,
-   * 'omits Enter when onEnterSpace is absent').
-   */
-  onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }
 
 export function SpaceCanvas({
@@ -313,7 +305,6 @@ export function SpaceCanvas({
   activeGraphThingIds,
   spaceThingTargets,
   thingEntityActions,
-  onEnterSpace,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -343,28 +334,28 @@ export function SpaceCanvas({
       entry: OpenSpace | undefined;
       absolute: DiagramPosition;
       bounds: EmbeddedBounds;
+      readOnly: boolean;
     }[] = [];
     const queue: {
       parent: ThingFlowNode;
-      session: SpaceSession;
       origin: DiagramPosition;
       clip: EmbeddedBounds | null;
       /** The Diagrams already crossed to reach this parent, newest last. */
       path: ReadonlySet<string>;
+      readOnly: boolean;
     }[] = nodes.map((parent) => ({
       parent,
-      session: spaceSession,
       origin: { x: 0, y: 0 },
       clip: null,
       path: new Set<string>(),
+      readOnly: false,
     }));
     for (const item of queue) {
-      const { parent, session, origin, clip, path } = item;
-      if (parent.data.kind !== 'space' || parent.data.expanded !== true) continue;
-      const document = session
-        .getState()
-        .working.things.find((thing) => thing.id === parent.data.thingId)?.document;
-      if (document?.kind !== 'space') continue;
+      const { parent, origin, clip, path } = item;
+      if (parent.data.expanded !== true) continue;
+      const document = parent.data.spaceContent;
+      if (document === undefined) continue;
+      const readOnly = item.readOnly || parent.data.kind === 'alias';
       // A Diagram already on this path would embed itself. Single-Space intake
       // refuses only a Thing targeting its own Space, so a mutual pair reaches
       // here validated and would otherwise nest one level deeper per commit.
@@ -386,6 +377,7 @@ export function SpaceCanvas({
       };
       requests.push({
         parent,
+        readOnly,
         spaceId: document.spaceId,
         diagramId: document.diagram,
         graphId: document.graph,
@@ -403,15 +395,15 @@ export function SpaceCanvas({
         for (const child of published.nodes)
           queue.push({
             parent: child,
-            session: published.entry.session,
             origin: absolute,
             clip: intersection,
             path: crossed,
+            readOnly,
           });
       }
     }
     return requests;
-  }, [nodes, spaceSession, entries, embeddedPublications]);
+  }, [nodes, entries, embeddedPublications]);
   /**
    * A read outlives its embedding only while the *target* is gone.
    *
@@ -487,7 +479,6 @@ export function SpaceCanvas({
     onSelectThing,
     spaceThingTargets,
     thingEntityActions,
-    onEnterSpace,
   });
   const { bodyEditing, openThing: onOpenThing, beginTitleEditing } = thingAuthoring;
 
@@ -1046,6 +1037,7 @@ export function SpaceCanvas({
             // freshness; the answers `App` holds are a frame behind them, since
             // each is reported up through an effect.
             enabled={
+              !request.readOnly &&
               availability.authorInEmbeddedDiagram &&
               (availability.authorOnCanvas || editingEmbeddingIds.has(request.parent.id)) &&
               !bodyEditing &&

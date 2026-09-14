@@ -53,12 +53,12 @@ export interface SpaceLookup {
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/** A thing that owns content rather than pointing at another thing's content. */
-export type ResolvedContentThing = Extract<Thing, { kind: 'markdown' }>;
+/** A Thing that supplies Markdown or a Space view, after resolving an Alias. */
+export type ResolvedContentThing = Extract<Thing, { kind: 'markdown' | 'space' }>;
 
 /**
- * The thing whose content `thingId` shows. A markdown thing is its own content
- * thing; an alias resolves to its target (ADR 0009). Aliasing is a single hop —
+ * The Thing whose content `thingId` shows. Markdown and Space Things resolve
+ * to themselves; an alias resolves to its target (ADR 0009). Aliasing is a single hop —
  * validation guarantees a target is never itself an alias — so this follows at
  * most one link. Returns `undefined` if the thing or its target does not resolve.
  *
@@ -71,11 +71,11 @@ export function resolveContentThing(
   thingId: ThingId,
 ): ResolvedContentThing | undefined {
   const thing = space.lookup.thing(thingId);
-  if (thing?.kind === 'markdown') return thing;
+  if (thing?.kind === 'markdown' || thing?.kind === 'space') return thing;
   if (thing?.kind !== 'alias') return undefined;
 
   const target = space.lookup.thing(thing.target);
-  return target?.kind === 'markdown' ? target : undefined;
+  return target?.kind === 'markdown' || target?.kind === 'space' ? target : undefined;
 }
 
 /**

@@ -1,4 +1,7 @@
-import { exerciseSpaceThingContextMenus } from '../e2e/space-thing-context-menu';
+import {
+  exerciseSpaceThingContextMenus,
+  exerciseSpaceThingEntityMenu,
+} from '../e2e/space-thing-context-menu';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const STORY = '/?story=surfaces--space-thing-embedded-diagram--selected-diagram&mode=preview';
@@ -96,8 +99,7 @@ test(
     await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
-    await page.keyboard.press('ArrowRight');
-    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toBeFocused();
+    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toHaveCount(0);
     await page.keyboard.press('Tab');
     await expect(rail.locator(':focus')).toHaveCount(0);
     await diagramControl.focus();
@@ -246,5 +248,14 @@ test(
   async ({ page }) => {
     await open(page);
     await exerciseSpaceThingContextMenus(page, spaceThing(page));
+  },
+);
+
+test(
+  'Space Thing entity menu groups commands and creates a Space Alias',
+  { tag: '@parity:space-thing-entity-menu' },
+  async ({ page }) => {
+    await open(page);
+    await exerciseSpaceThingEntityMenu(page, spaceThing(page));
   },
 );

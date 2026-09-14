@@ -158,3 +158,26 @@ tests, four persistence regressions, and the shared Ladle action scenario
 passed. Root and package typechecks and the UI catalogue check passed.
 The final application browser rerun was blocked by occupied test port 5300;
 no server was stopped. Full final verification is delegated to PR CI as requested.
+
+
+### Space Thing entity menu refinement
+
+User follow-up: Enter belongs inside the entity menu. The groups are now
+Rename / Create Alias; Enter / Open in New Tab; Copy link to Thing in Diagram /
+Copy link to Thing / Copy link to Space; Remove from Diagram. Copy actions carry
+no explanatory subtitles. Alias creation accepts a Space Thing and still refuses
+an Alias Target. Its Open content uses the graph resolver and the shared Diagram
+embedding, with authoring disabled throughout the Alias view.
+
+The branch was rebased onto main to incorporate the shared compact-button icon
+sizing and Dock layout corrections. A shared browser proof checks the exact menu,
+Rename, Alias creation and read-only content, and matching icon/font CSS sizes;
+the application proof also reloads the created Alias. Full verification remains
+with PR CI; local verification is limited to the affected tests and static checks.
+
+
+Validation after rebase: root typecheck, the focused application and Ladle
+entity-menu scenarios, and eight resolver/footer tests passed. The affected
+menu/action tests passed (35 tests); earlier focused Alias intake, authoring,
+Enter and CanvasThing checks passed. Review found and corrected duplicated
+Alias resolution and outdated live documentation. Final full checks run in CI.

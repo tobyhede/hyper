@@ -795,7 +795,7 @@ describe('Add Alias', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('refuses a Space Thing Target, because an Alias can only show Markdown content', () => {
+  it('creates an Alias whose Target is a Space Thing', () => {
     const withSpaceThing: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
@@ -814,13 +814,14 @@ describe('Add Alias', () => {
     };
     const { authoring, session } = open(withSpaceThing);
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
-    const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: THING_B },
+    expect(
+      authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE }).kind,
+    ).toBe('completed');
+    expect(session.getState().working.things.at(-1)?.document).toMatchObject({
+      kind: 'alias',
+      target: THING_B,
     });
-    expect(session.getState().working).toBe(before);
   });
 
   it('refuses a Target the Space no longer holds', () => {

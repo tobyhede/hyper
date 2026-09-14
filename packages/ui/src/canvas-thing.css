@@ -328,7 +328,7 @@
    normally takes: bottom-aligning the content of a body that fills the Thing
    leaves the free region above it a different size on every Thing, which is the
    one thing a projection reading a constant cannot survive. */
-.canvas-thing[data-kind='space'][data-expanded='true'] .canvas-thing__body {
+.canvas-thing[data-content-kind='space'][data-expanded='true'] .canvas-thing__body {
   height: 100px;
   flex: none;
   margin-top: auto;

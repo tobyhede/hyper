@@ -31,9 +31,10 @@ const stylesheet = readFileSync(
 
 describe('the room an Open Space Thing reserves for its Diagram', () => {
   it('gives the Thing own footer exactly the height the inset clears', () => {
-    const rule = /\.canvas-thing\[data-kind='space'\]\[data-expanded='true'\][^{]*\{([^}]*)\}/.exec(
-      stylesheet,
-    );
+    const rule =
+      /\.canvas-thing\[data-content-kind='space'\]\[data-expanded='true'\][^{]*\{([^}]*)\}/.exec(
+        stylesheet,
+      );
     expect(rule).not.toBeNull();
     const height = /height:\s*(\d+)px/.exec(rule?.[1] ?? '');
 

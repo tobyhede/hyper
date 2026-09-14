@@ -279,7 +279,7 @@ function Instance({
   };
   const front: CanvasThingFront =
     kind === 'alias'
-      ? { kind: 'alias', source: '', open: false }
+      ? { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }
       : open
         ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
         : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen };
@@ -422,9 +422,20 @@ export const EnterSpace: Story = () => {
           kind: 'space',
           open: false,
           onOpenChange: changeOpen,
-          onEnter: () => setEntered(true),
         }}
         state="selected"
+        entityActions={[
+          [
+            {
+              id: 'enter',
+              label: 'Enter',
+              onSelect: () => {
+                setEntered(true);
+                return 'done';
+              },
+            },
+          ],
+        ]}
         title="Architecture"
         graphColor="#35d6c3"
       />

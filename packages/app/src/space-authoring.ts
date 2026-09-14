@@ -725,9 +725,8 @@ const aliasTargetRefusal = (space: Space, document: ThingDocument): AuthoringRef
   if (document.kind !== 'alias') return null;
   const target = space.lookup.thing(document.target);
   if (target === undefined) return { code: 'alias-target-not-found', targetId: document.target };
-  // Single-hop by construction (ADR 0009): the Target must own Markdown
-  // content, so neither another Alias nor a Space Thing can be targeted.
-  if (target.kind !== 'markdown') {
+  // Alias resolution ends after one Thing reference, including a Space Thing.
+  if (target.kind === 'alias') {
     return { code: 'alias-target-must-own-content', targetId: document.target };
   }
   return null;
