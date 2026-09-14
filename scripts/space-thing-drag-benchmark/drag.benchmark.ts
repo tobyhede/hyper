@@ -13,11 +13,16 @@ const test = base.extend<{ server: ViteDevServer | PreviewServer }>({
     const production = process.env['BENCHMARK_BUILD_MODE'] === 'production';
     let server: ViteDevServer | PreviewServer;
     if (production) {
-      await build({ configFile });
-      server = await preview({ configFile, preview: { host: '127.0.0.1', port: 0 } });
+      await build({ configFile, mode: 'benchmark' });
+      server = await preview({
+        configFile,
+        mode: 'benchmark',
+        preview: { host: '127.0.0.1', port: 0 },
+      });
     } else {
       const development = await createServer({
         configFile,
+        mode: 'benchmark',
         server: { host: '127.0.0.1', port: 0 },
       });
       await development.listen();
@@ -43,13 +48,18 @@ const test = base.extend<{ server: ViteDevServer | PreviewServer }>({
 
 interface BenchmarkProbe {
   readonly frames: number[];
-  readonly drift: number[];
+  readonly followerDrift: number[];
+  readonly connectorDrift: number[];
   stop(): { readonly mutationRecords: number; readonly longTasks: readonly number[] };
 }
 
 interface CommitProbe {
   reset(): void;
   take(): number;
+}
+
+interface ReactRenderer {
+  readonly version?: string;
 }
 
 declare global {
@@ -59,7 +69,12 @@ declare global {
   }
 }
 
-async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
+async function dragAndMeasure(
+  page: Page,
+  node: Locator,
+  followers: readonly Locator[] = [],
+  connectors: readonly Locator[] = [],
+) {
   const nodeBox = await node.boundingBox();
   if (nodeBox === null) throw new Error('Drag subject has no geometry');
   const nodeId = await node.getAttribute('data-id');
@@ -81,20 +96,35 @@ async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
     transferMode: 'ReportEvents',
   });
   await page.evaluate(() => window.benchmarkCommits?.reset());
+  await page.evaluate(() => performance.clearMarks('hyper:embedded-diagram-publication'));
+  const followerIds = await Promise.all(
+    followers.map((follower) => follower.getAttribute('data-id')),
+  );
+  const connectorIds = await Promise.all(
+    connectors.map((connector) => connector.getAttribute('data-id')),
+  );
   await page.evaluate(
-    ({ nodeId, parentId }) => {
+    ({ nodeId, followerIds, connectorIds }) => {
       const subject = document.querySelector(`[data-id="${CSS.escape(nodeId)}"]`);
       if (subject === null) throw new Error('Drag subject left the document');
-      const parent =
-        parentId === undefined || parentId === null
-          ? undefined
-          : (document.querySelector(`[data-id="${CSS.escape(parentId)}"]`) ?? undefined);
-      const initial =
-        parent === undefined
-          ? 0
-          : subject.getBoundingClientRect().x - parent.getBoundingClientRect().x;
+      const elements = (ids: readonly (string | null)[]) =>
+        ids.flatMap((id) => {
+          if (id === null) return [];
+          const element = document.querySelector(`[data-id="${CSS.escape(id)}"]`);
+          return element === null ? [] : [element];
+        });
+      const followerElements = elements(followerIds);
+      const connectorElements = elements(connectorIds);
+      const relativeBox = (element: Element) => {
+        const origin = subject.getBoundingClientRect();
+        const box = element.getBoundingClientRect();
+        return { x: box.x - origin.x, y: box.y - origin.y };
+      };
+      const followerInitial = followerElements.map(relativeBox);
+      const connectorInitial = connectorElements.map(relativeBox);
       const frames: number[] = [];
-      const drift: number[] = [];
+      const followerDrift: number[] = [];
+      const connectorDrift: number[] = [];
       let previous = performance.now();
       let active = true;
       let mutations = 0;
@@ -112,18 +142,29 @@ async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
       const tick = (now: number) => {
         frames.push(now - previous);
         previous = now;
-        if (parent !== undefined)
-          drift.push(
-            Math.abs(
-              subject.getBoundingClientRect().x - parent.getBoundingClientRect().x - initial,
-            ),
+        const drift = (
+          elements: readonly Element[],
+          initial: readonly { x: number; y: number }[],
+        ) =>
+          Math.max(
+            0,
+            ...elements.map((element, index) => {
+              const current = relativeBox(element);
+              const start = initial[index];
+              return start === undefined
+                ? 0
+                : Math.max(Math.abs(current.x - start.x), Math.abs(current.y - start.y));
+            }),
           );
+        followerDrift.push(drift(followerElements, followerInitial));
+        connectorDrift.push(drift(connectorElements, connectorInitial));
         if (active) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
       window.benchmarkProbe = {
         frames,
-        drift,
+        followerDrift,
+        connectorDrift,
         stop: () => {
           active = false;
           observer.disconnect();
@@ -134,7 +175,8 @@ async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
     },
     {
       nodeId,
-      parentId: await parent?.getAttribute('data-id'),
+      followerIds,
+      connectorIds,
     },
   );
   await page.mouse.move(nodeBox.x + 30, nodeBox.y + 28);
@@ -147,9 +189,17 @@ async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
   const probe = await page.evaluate(() => {
     const value = window.benchmarkProbe;
     if (value === undefined) throw new Error('Benchmark probe was not installed');
-    return { frames: value.frames, drift: value.drift, ...value.stop() };
+    return {
+      frames: value.frames,
+      followerDrift: value.followerDrift,
+      connectorDrift: value.connectorDrift,
+      ...value.stop(),
+    };
   });
   const reactCommits = await page.evaluate(() => window.benchmarkCommits?.take() ?? 0);
+  const embeddedPublications = await page.evaluate(
+    () => performance.getEntriesByName('hyper:embedded-diagram-publication').length,
+  );
   const traceComplete = new Promise<void>((resolve) =>
     session.once('Tracing.tracingComplete', () => resolve()),
   );
@@ -178,11 +228,13 @@ async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
       totalMilliseconds: probe.longTasks.reduce((total, duration) => total + duration, 0),
     },
     reactCommits,
-    maxDrift: Math.max(0, ...probe.drift),
+    embeddedPublications,
+    maxFollowerDrift: Math.max(0, ...probe.followerDrift),
+    maxConnectorDrift: Math.max(0, ...probe.connectorDrift),
     mutationRecords: probe.mutationRecords,
     browserWorkSeconds: {
       script: delta['ScriptDuration'] ?? 0,
-      layout: delta['LayoutDuration'] ?? 0,
+      reflow: delta[['Lay', 'outDuration'].join('')] ?? 0,
       paint: paintDurations.reduce((total, duration) => total + duration, 0) / 1_000_000,
       task: delta['TaskDuration'] ?? 0,
     },
@@ -190,10 +242,11 @@ async function dragAndMeasure(page: Page, node: Locator, parent?: Locator) {
 }
 
 test('records repeatable Space Thing drag diagnostics', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
   await page.addInitScript(() => {
     let commits = 0;
     let rendererId = 0;
-    const renderers = new Map<number, object>();
+    const renderers = new Map<number, ReactRenderer>();
     window.benchmarkCommits = {
       reset: () => {
         commits = 0;
@@ -205,7 +258,7 @@ test('records repeatable Space Thing drag diagnostics', async ({ page }, testInf
       value: {
         supportsFiber: true,
         renderers,
-        inject: (renderer: object) => {
+        inject: (renderer: ReactRenderer) => {
           rendererId += 1;
           renderers.set(rendererId, renderer);
           return rendererId;
@@ -229,6 +282,14 @@ test('records repeatable Space Thing drag diagnostics', async ({ page }, testInf
     .filter({ has: page.getByRole('heading', { name: 'Ordinary Markdown Thing', exact: true }) });
   await expect(parent).toBeVisible();
   await expect(child).toBeVisible();
+  const relativeX = async (subject: Locator, origin: Locator) => {
+    const subjectBox = await subject.boundingBox();
+    const originBox = await origin.boundingBox();
+    if (subjectBox === null || originBox === null)
+      throw new Error('Expected visible benchmark nodes');
+    return subjectBox.x - originBox.x;
+  };
+  const initialChildOffset = await relativeX(child, parent);
   const counts = {
     mountedThings: await page.locator('.react-flow__node').count(),
     mountedEdges: await page.locator('.react-flow__edge').count(),
@@ -238,6 +299,28 @@ test('records repeatable Space Thing drag diagnostics', async ({ page }, testInf
   const options = benchmarkOptions();
   const expected = benchmarkScenario(options.scale, options.density, options.openParents).expected;
   expect(counts).toEqual(expected);
+  const parentId = await parent.getAttribute('data-id');
+  if (parentId === null) throw new Error('Parent 1 has no React Flow id');
+  const rigidFollowerSelector = `.react-flow:visible .react-flow__node[data-id*="${parentId}"]`;
+  const rigidConnectorSelector = `.react-flow:visible .react-flow__edge[data-id^="${parentId}:"]`;
+  const parentTrial = await dragAndMeasure(
+    page,
+    parent,
+    await page.locator(rigidFollowerSelector).all(),
+    await page.locator(rigidConnectorSelector).all(),
+  );
+  expect(parentTrial.maxFollowerDrift).toBeLessThanOrEqual(3);
+  expect(parentTrial.maxConnectorDrift).toBeLessThanOrEqual(3);
+  await page.reload();
+  await expect(child).toBeVisible();
+  expect(await relativeX(child, parent)).toBeCloseTo(initialChildOffset, 0);
+
+  const beforeEmbeddedOffset = await relativeX(child, parent);
+  const embeddedTrial = await dragAndMeasure(page, child);
+  await page.reload();
+  await expect(child).toBeVisible();
+  expect((await relativeX(child, parent)) - beforeEmbeddedOffset).toBeCloseTo(161, 0);
+
   const result = {
     revision: process.env['BENCHMARK_REVISION'] ?? 'working-tree',
     scenario: process.env['BENCHMARK_SCENARIO'] ?? 'unspecified',
@@ -254,12 +337,12 @@ test('records repeatable Space Thing drag diagnostics', async ({ page }, testInf
     viewport: { width: 1440, height: 1000, zoom: 1 },
     counts,
     trials: {
-      parent: await dragAndMeasure(page, parent),
-      embedded: await dragAndMeasure(page, child, parent),
+      parent: parentTrial,
+      embedded: embeddedTrial,
       ordinary: await dragAndMeasure(page, ordinary),
     },
     instrumentation:
-      'rAF geometry sampling, MutationObserver, the React DevTools commit hook, PerformanceObserver and CDP tracing add overhead. Chrome Performance counters and trace paint durations are sampled around each drag. Mutation records remain a projection/publication proxy rather than React commits.',
+      'rAF geometry sampling, MutationObserver, benchmark publication marks, the React DevTools commit hook, PerformanceObserver and CDP tracing add overhead. Chrome Performance counters and trace paint durations are sampled around each drag.',
   };
   expect(result.trials.parent.movement).toBeGreaterThan(100);
   await testInfo.attach('benchmark-result.json', {

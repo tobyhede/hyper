@@ -1,5 +1,4 @@
 import type { Edge } from '@xyflow/react';
-import { useMemo } from 'react';
 import { SPACE_THING_EMBED_INSET, type DiagramPosition } from '@project/core';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import type { CanvasNodesAndEdges } from './canvas-projection';
@@ -21,15 +20,6 @@ export interface EmbeddedParentProjection {
   readonly width?: number | undefined;
   readonly height?: number | undefined;
   readonly zIndex?: number | undefined;
-}
-
-/** Retain the parent projection while only its canvas translation changes. */
-export function useEmbeddedParentProjection(parent: ThingFlowNode): EmbeddedParentProjection {
-  const id = parent.id;
-  const width = parent.width;
-  const height = parent.height;
-  const zIndex = parent.zIndex;
-  return useMemo(() => ({ id, width, height, zIndex }), [id, width, height, zIndex]);
 }
 
 export interface EmbeddedDiagramRequest {

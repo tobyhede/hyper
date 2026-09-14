@@ -3,9 +3,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { spaceHttpPlugin } from '../vite-space-http-plugin';
-import { workspaceAliases } from '../workspace-aliases';
 
 const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
+const packageAliases = {
+  '@project/core': here('../../core/src/index.ts'),
+  '@project/graph': here('../../graph/src/index.ts'),
+  '@project/http': here('../../http/src/index.ts'),
+  '@project/persistence': here('../../persistence/src/index.ts'),
+};
 const directory = process.env['BENCHMARK_DIRECTORY'];
 if (directory === undefined) throw new Error('BENCHMARK_DIRECTORY is required');
 
@@ -15,7 +20,7 @@ export default defineConfig({
     outDir: here('../../../.scratch/space-thing-drag-performance/benchmark-dist'),
     emptyOutDir: true,
   },
-  resolve: { alias: workspaceAliases() },
+  resolve: { alias: packageAliases },
   plugins: [
     react(),
     tailwindcss(),
