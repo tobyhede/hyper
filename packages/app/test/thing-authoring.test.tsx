@@ -107,10 +107,6 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/**
- * The same Space with a second Diagram, so a location can name a Diagram the
- * Space does not open on by default.
- */
 /** The default Diagram with two Graphs so Delete Graph is available. */
 const twoGraphs: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
@@ -132,6 +128,10 @@ const twoGraphs: SpaceSnapshot = spaceSnapshotSchema.parse({
   },
 });
 
+/**
+ * The same Space with a second Diagram, so a location can name a Diagram the
+ * Space does not open on by default.
+ */
 const secondDiagram: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {

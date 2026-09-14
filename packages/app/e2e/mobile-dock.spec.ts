@@ -11,7 +11,6 @@ import {
   graphMenu,
   newDiagram,
   newGraph,
-  recolorActiveGraph,
   settleNewDiagramName,
   nodeByTitle,
   presentControl,
@@ -189,9 +188,9 @@ test('recolouring the active Graph from the Graph menu persists at phone width',
   const graph = activeGraph(page);
   await graph.focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('menuitem', { name: 'Colour' }).click();
-  const palette = page.getByRole('menu').last();
-  await expect(palette.getByRole('menuitemradio', { name: 'Green', exact: true })).toHaveAttribute(
+  await page.getByRole('menuitem', { name: 'Colour…' }).click();
+  const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
+  await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
     'aria-checked',
     'true',
   );

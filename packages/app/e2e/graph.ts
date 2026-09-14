@@ -282,15 +282,6 @@ export async function newGraph(page: Page): Promise<void> {
   await menu.getByRole('menuitem', { name: 'New Graph' }).click();
 }
 
-/** Recolour the Graph the cluster is showing, by the menu's palette name. */
-export async function recolorActiveGraph(page: Page, colorName: string): Promise<void> {
-  const menu = await graphMenu(page);
-  await menu.getByRole('menuitem', { name: 'Colour' }).click();
-  const submenu = page.getByRole('menu').last();
-  await expect(submenu).toBeVisible();
-  await submenu.getByRole('menuitemradio', { name: colorName, exact: true }).click();
-}
-
 /** Delete the Graph the cluster is showing. */
 export async function deleteActiveGraph(page: Page): Promise<void> {
   const title = (await activeGraph(page).innerText()).trim();

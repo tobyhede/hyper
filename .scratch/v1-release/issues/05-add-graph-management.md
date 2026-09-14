@@ -32,8 +32,9 @@ moved with the surface; create, recolour and delete are on the Dock beside them.
 
 ## Built
 
-The reducers were complete; this ticket wired three controls on the Dock and
-added the evidence they were missing.
+The reducers and Dock controls were complete; this ticket adds the application,
+mobile and Ladle evidence they were missing. Recolour evidence uses the current
+swatch picker and checks that the stored selection survives reload.
 
 - [x] **An author can create, recolour and delete a Graph.** `GraphIdentityMenu`
       in `CommandDock.tsx` draws New Graph, Colour and Delete; `App.tsx` spends

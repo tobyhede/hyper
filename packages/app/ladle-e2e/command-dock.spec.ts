@@ -164,16 +164,17 @@ test(
     await page.goto(story('default'));
 
     const menu = await disclose(page, 'Active Graph: Long');
-    await menu.getByRole('menuitem', { name: 'Colour' }).click();
-    const submenu = page.getByRole('menu').last();
-    await submenu.getByRole('menuitemradio', { name: 'Green', exact: true }).click();
+    await menu.getByRole('menuitem', { name: 'Colour…' }).click();
+    const submenu = page.getByRole('radiogroup', { name: 'Graph colour' });
+    await submenu.getByRole('radio', { name: 'Green', exact: true }).click();
 
     const reopened = await disclose(page, 'Active Graph: Long');
-    await reopened.getByRole('menuitem', { name: 'Colour' }).click();
-    const palette = page.getByRole('menu').last();
-    await expect(
-      palette.getByRole('menuitemradio', { name: 'Green', exact: true }),
-    ).toHaveAttribute('aria-checked', 'true');
+    await reopened.getByRole('menuitem', { name: 'Colour…' }).click();
+    const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
+    await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   },
 );
 

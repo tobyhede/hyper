@@ -30,7 +30,7 @@ import {
   graphMenu,
   newDiagram,
   newGraph,
-  recolorActiveGraph,
+  openGraphColourPicker,
   settleNewDiagramName,
   nodeByTitle,
   openThing,
@@ -1669,12 +1669,14 @@ test(
     await recolorActiveGraph(page, 'Green');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-    const menu = await graphMenu(page);
-    await menu.getByRole('menuitem', { name: 'Colour' }).click();
-    const palette = page.getByRole('menu').last();
-    await expect(
-      palette.getByRole('menuitemradio', { name: 'Green', exact: true }),
-    ).toHaveAttribute('aria-checked', 'true');
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    await openGraphColourPicker(page);
+    const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
+    await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   },
 );
 
