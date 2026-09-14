@@ -632,6 +632,9 @@ test(
     await expect(parent.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
     await expect(parent.locator('svg[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
     await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    await expect(showingSpace(page).getByRole('img')).toHaveCount(0);
+    await expect(showingSpace(page).locator('[title]')).toHaveCount(0);
+
     const ordinarySpaceUrl = page.url();
 
     await exitSpace(page);

@@ -2148,7 +2148,7 @@ function SpacesControl({
       )}
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
         <IdentitySurface
-          icon={space.isMeta ? <ParentIcon /> : <ThingKindIcon kind="space" />}
+          icon={space.isMeta ? <ParentIcon /> : <ThingKindIcon kind="space" decorative />}
           kind="Space"
           testId="space-title"
           title={space.title}

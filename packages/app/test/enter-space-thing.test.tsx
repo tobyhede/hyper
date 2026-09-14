@@ -5,7 +5,7 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
-import { dock, exitSpaceItem } from './command-dock';
+import { beginRename, dock, exitSpaceItem } from './command-dock';
 
 /**
  * Entering a Space Thing from its rail (ADR 0068, ADR 0073).
@@ -207,6 +207,18 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('entering a Space Thing', { timeout: 15_000 }, () => {
+  it('names the ordinary Space commands without a competing glyph label or tooltip', async () => {
+    await mount();
+
+    const trigger = within(dock()).getByRole('button', { name: 'Space: Home' });
+    expect(trigger).toHaveAttribute('title', 'Space commands');
+    expect(within(trigger).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(trigger).queryByTitle('Space Thing')).not.toBeInTheDocument();
+
+    await beginRename('space-title');
+    expect(screen.getByRole('textbox', { name: 'Space name' })).toHaveValue('Home');
+  });
+
   it('adds the target to Open Spaces, shows it, and seeds the Thing’s Diagram and Graph', async () => {
     const spaces = await mount();
 

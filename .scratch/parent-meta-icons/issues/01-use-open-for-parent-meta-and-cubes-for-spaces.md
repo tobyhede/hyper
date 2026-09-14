@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [x] Use the supplied OPEN artwork for Parent/Meta, preserving its original geometry and its legibility at the Dock's 16px size.
+- [x] Use the supplied OPEN artwork for Parent/Meta, preserving its original 16px geometry and its legibility at the shared Button's normal icon sizes.
 - [x] Use the regular cube for Spaces and Space Things across the Dock, creation controls, lists and canvas glyphs, including shared kind-icon consumers.
 - [x] Own the artwork and icon mapping in the shared UI package; consuming surfaces use that shared mapping.
 - [x] Preserve existing navigation, creation, selection and accessible control names while changing the glyphs.
@@ -42,3 +42,12 @@ No findings. Shared ownership, application composition, accessible names and pro
 ### Spec review
 
 No remaining findings. Three stale comments describing the former icons were corrected and re-reviewed.
+
+## Comments
+
+### Review follow-up
+
+- R1 (minor, user review): confirmed that the ordinary Space rename glyph exposed its own image label and native tooltip inside the already named rename button. Marked the glyph decorative; the application regression went red on the nested image before the fix. The Meta glyph remains decorative.
+- Removed the toolbar-specific SVG size override at the user's request. ToolbarButton now uses the shared Button sizing directly. Removed the test that imposed the override; the supplied OPEN geometry remains unchanged.
+
+Follow-up verification: the application regression in `enter-space-thing.test.tsx` failed on the nested image before the decorative prop was added, then its seven-test file passed. Static stages of `pnpm verify` passed. The final full coverage run passed 205 files / 2,559 tests; application E2E passed 194 tests; the final Ladle run passed 86 tests. Initial concurrent runs had three editor-related unit failures and nine missing-editor Ladle failures; a focused Ladle test and the full Ladle/coverage reruns passed without further code changes.

@@ -282,6 +282,10 @@ test(
       page.getByTestId('space-title').filter({ visible: true }).locator('[data-icon="space"]'),
     ).toBeVisible();
 
+    const spaceName = page.getByTestId('space-title').filter({ visible: true });
+    await expect(spaceName.getByRole('img')).toHaveCount(0);
+    await expect(spaceName.locator('[title]')).toHaveCount(0);
+
     const menu = await disclose(page, 'Spaces. 5 open.');
     for (const title of ['Meta Space', 'Platform', 'Design system', 'Rendering', 'Traversal'])
       await expect(
