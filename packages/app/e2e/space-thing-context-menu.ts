@@ -43,7 +43,7 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   expect(new URL(diagramLink).pathname).toMatch(/^\/spaces\/[^/]+\/diagrams\/[^/]+$/);
 
   await openMenu('graph');
-  await expect(page.getByRole('menuitem', { name: 'Colour', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Colour…', exact: true })).toBeVisible();
   await expect(
     page.getByRole('menuitem', { name: 'Copy permanent link', exact: true }),
   ).toBeVisible();
@@ -52,11 +52,11 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).press('Enter');
   await expect(thing.getByTestId('space-thing-graph')).toHaveText('Target path');
   await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Colour', exact: true }).click();
-  await page.getByRole('menuitemradio', { name: 'Pink', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Colour…', exact: true }).click();
+  await page.getByRole('radio', { name: 'Pink', exact: true }).click();
   await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Colour', exact: true }).click();
-  await expect(page.getByRole('menuitemradio', { name: 'Pink', exact: true })).toHaveAttribute(
+  await page.getByRole('menuitem', { name: 'Colour…', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Pink', exact: true })).toHaveAttribute(
     'aria-checked',
     'true',
   );

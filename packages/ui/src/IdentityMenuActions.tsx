@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
 import {
+  PaletteColorSwatchGrid,
+  paletteSwatchPanelClassName,
+  type PaletteColorEntry,
+} from './PaletteColorPicker';
+import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
 } from './components/dropdown-menu';
 import { CopyIcon, DeleteIcon, GraphIcon, PlusIcon } from './icons';
 
@@ -58,7 +61,7 @@ export function DiagramMenuActions({
 export interface GraphMenuActionsProps extends Omit<DiagramMenuActionsProps, 'createDisabled'> {
   readonly editsDisabled: boolean;
   readonly color: string;
-  readonly colors: readonly (readonly [string, string])[];
+  readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => void;
   readonly onCopyPermanentLink: () => void;
 }
@@ -83,17 +86,16 @@ export function GraphMenuActions({
       <DropdownMenuSub>
         <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
           <GraphIcon color={color} size={14} />
-          Colour
+          Colour…
         </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="nokey">
-          <DropdownMenuRadioGroup value={color} onValueChange={onRecolor}>
-            {colors.map(([name, value]) => (
-              <DropdownMenuRadioItem key={value} value={value} closeOnClick className="gap-2">
-                <GraphIcon color={value} size={14} />
-                {name}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
+        <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
+          <PaletteColorSwatchGrid
+            entries={colors}
+            value={color}
+            onValueChange={onRecolor}
+            disabled={editsDisabled}
+            aria-label="Graph colour"
+          />
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>

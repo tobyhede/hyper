@@ -101,33 +101,3 @@ export function graphColorMap(space: Space): Record<string, string> {
   });
   return map;
 }
-
-/**
- * The palette a Graph's colour is chosen from, named.
- *
- * `GRAPH_PALETTE` is the application's own — the same six values authoring
- * rotates through when it mints a Graph — so the menu cannot offer a colour the
- * canvas would not draw. The names belong with the palette, because a swatch with no
- * word beside it is a colour a reader cannot ask anyone else for.
- *
- * **Keyed by the colour and not by its position.** A parallel list zipped by
- * index agrees with the palette exactly as long as nobody reorders it, and
- * reordering a palette is a colour decision taken in `colors.ts` with no reason
- * to look at this menu — after which every swatch is mislabelled, the reader
- * picks Blue and gets amber, and typecheck, lint and every suite stay green
- * because nothing asserted the pairing. Keyed, a reorder cannot say anything
- * and a *new* colour is a compile error here rather than a hex code drawn as
- * its own name, which is what the `??` fallback beside the zip did.
- */
-const GRAPH_COLOR_NAMES = {
-  '#6ea8fe': 'Blue',
-  '#f59e0b': 'Amber',
-  '#34d399': 'Green',
-  '#f472b6': 'Pink',
-  '#c084fc': 'Purple',
-  '#f87171': 'Red',
-} as const satisfies Record<(typeof GRAPH_PALETTE)[number], string>;
-
-export const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
-  (color): readonly [string, string] => [GRAPH_COLOR_NAMES[color], color],
-);

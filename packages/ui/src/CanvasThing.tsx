@@ -17,6 +17,7 @@ import {
   ThingRailSharedActions,
 } from './ThingRailActions';
 import { ThingContentEditProvider, type ThingContentEdit } from './thing-content-edit';
+import type { PaletteColorEntry } from './PaletteColorPicker';
 import { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
 import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
@@ -130,7 +131,7 @@ export interface CanvasSpaceThingCommands {
 
 export interface CanvasSpaceThingGraphCommands extends CanvasSpaceThingCommands {
   readonly color: string;
-  readonly colors: readonly (readonly [string, string])[];
+  readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
   readonly onCopyPermanentLink: () => Promise<string | null>;
 }
@@ -744,6 +745,7 @@ function SpaceThingSelector({
 }: SpaceThingSelectorProps) {
   const selected = choices.find((choice) => choice.id === chosen);
   const renameScope = useId();
+  const [menuOpen, setMenuOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const movedCaret = useRef(false);
   const returningFocus = useRef(false);
@@ -836,6 +838,8 @@ function SpaceThingSelector({
         choices={choices}
         chosen={chosen}
         onChoose={onChoose}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
         className="nokey w-64"
         restoresFocusOnClose={() => !movedCaret.current}
         trigger={
@@ -864,7 +868,10 @@ function SpaceThingSelector({
               editsDisabled={disabled}
               color={commands.color}
               colors={commands.colors}
-              onRecolor={(color) => onReport(commands.onRecolor(color))}
+              onRecolor={(color) => {
+                onReport(commands.onRecolor(color));
+                setMenuOpen(false);
+              }}
               onCopyPermanentLink={() => {
                 void commands
                   .onCopyPermanentLink()

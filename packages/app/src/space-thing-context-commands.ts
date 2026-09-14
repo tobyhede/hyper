@@ -2,7 +2,7 @@ import type { ThingDocument, GraphId, UUID } from '@project/core';
 import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from '@project/ui';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
-import { GRAPH_COLORS, GRAPH_PALETTE } from './colors';
+import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
@@ -89,7 +89,7 @@ export function spaceThingContextCommands(
     graphCommands: {
       deleteDisabled: diagram.graphs.length <= 1,
       color: graph.color ?? GRAPH_PALETTE[0],
-      colors: GRAPH_COLORS,
+      colors: GRAPH_PALETTE_ENTRIES,
       onRename: (title) => refusalOf(complete({ kind: 'renamed-graph', graphId, title })),
       onRecolor: (color) => refusalOf(complete({ kind: 'recolored-graph', graphId, color })),
       onCreate: async () => {
