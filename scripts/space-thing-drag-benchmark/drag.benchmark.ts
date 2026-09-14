@@ -46,6 +46,32 @@ const test = base.extend<{ server: ViteDevServer | PreviewServer }>({
   },
 });
 
+const bufferLongTasksBeforeMeasurement = false;
+
+test('does not replay long tasks from before a drag measurement', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const finishedAt = performance.now() + 75;
+    while (performance.now() < finishedAt) {
+      // Deliberately occupy the main thread long enough to create a historical long-task entry.
+    }
+  });
+  await page.waitForTimeout(100);
+
+  const longTasks = await page.evaluate(async (buffered) => {
+    const durations: number[] = [];
+    const observer = new PerformanceObserver((entries) => {
+      durations.push(...entries.getEntries().map((entry) => entry.duration));
+    });
+    observer.observe({ type: 'longtask', buffered });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    observer.disconnect();
+    return durations;
+  }, bufferLongTasksBeforeMeasurement);
+
+  expect(longTasks).toEqual([]);
+});
+
 interface BenchmarkProbe {
   readonly frames: number[];
   readonly followerDrift: number[];
@@ -132,7 +158,10 @@ async function dragAndMeasure(
       const longTaskObserver = new PerformanceObserver((entries) => {
         longTasks.push(...entries.getEntries().map((entry) => entry.duration));
       });
-      longTaskObserver.observe({ type: 'longtask', buffered: true });
+      longTaskObserver.observe({
+        type: 'longtask',
+        buffered: bufferLongTasksBeforeMeasurement,
+      });
       const observer = new MutationObserver((records) => (mutations += records.length));
       const flow = document.querySelector(
         '.react-flow:has(.react-flow__node[data-id="' + nodeId + '"])',
