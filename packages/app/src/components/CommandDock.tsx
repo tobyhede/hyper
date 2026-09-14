@@ -308,6 +308,8 @@ export interface DockSpace {
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
   readonly currentSpaceId: UUID;
+  /** The stored Meta identity, independent of how this Space was opened. */
+  readonly isMeta: boolean;
   /** The Space this one was entered from, and the only step the bar names. Null at the root. */
   readonly parent: SpaceStep | null;
   /** Every open Space, depth-first from the root — what the Open Spaces menu lists. */
@@ -2146,7 +2148,7 @@ function SpacesControl({
       )}
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
         <IdentitySurface
-          icon={<ThingKindIcon kind="space" />}
+          icon={space.isMeta ? <ParentIcon /> : <ThingKindIcon kind="space" decorative />}
           kind="Space"
           testId="space-title"
           title={space.title}

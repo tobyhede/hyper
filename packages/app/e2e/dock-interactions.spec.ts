@@ -343,6 +343,11 @@ test(
     // The same one press, and the same arrival: a Space Thing mints its own
     // Space and continues in the Thing's Title editor, seeded with the `Space N`
     // both were named from.
+    await expect(
+      page
+        .getByRole('button', { name: 'Create Space Thing', exact: true })
+        .locator('[data-icon="space"]'),
+    ).toBeVisible();
     await createThing(page, 'Space Thing');
     const spaceTitle = page.getByRole('textbox', { name: 'Thing title' });
     await expect(spaceTitle).toBeFocused();

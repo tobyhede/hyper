@@ -78,4 +78,29 @@ describe('Button', () => {
       'focus-visible:outline-ring',
     );
   });
+
+  it('owns the size and behavior of icons drawn inside it', () => {
+    render(
+      <>
+        <Button aria-label="Icon only" size="icon">
+          <svg aria-hidden="true" />
+        </Button>
+        <Button size="compact">
+          <svg aria-hidden="true" />
+          Compact
+        </Button>
+      </>,
+    );
+
+    const iconOnly = screen.getByRole('button', { name: 'Icon only' });
+    expect(iconOnly).toHaveClass(
+      '[&_svg]:pointer-events-none',
+      '[&_svg]:shrink-0',
+      "[&_svg:not([class*='size-'])]:size-4",
+    );
+
+    const compact = screen.getByRole('button', { name: 'Compact' });
+    expect(compact).toHaveClass("[&_svg:not([class*='size-'])]:size-3.5");
+    expect(compact.className).not.toContain("[&_svg:not([class*='size-'])]:size-4");
+  });
 });
