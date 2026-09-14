@@ -610,6 +610,13 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Open Space Thing's Diagram and Graph choices are drawn on the Command Dock's own command surface and through the same shared control and list, and choosing one writes the Thing's stored context without moving the containing Space.",
   },
   {
+    id: 'open-space-thing-drag-keeps-embedded-diagram-aligned',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Dragging an Open Space Thing translates its embedded Things and Graph connectors as one aligned drawing throughout the gesture, without delayed catch-up after release.',
+  },
+  {
     id: 'embedded-diagram-things-author-target',
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',

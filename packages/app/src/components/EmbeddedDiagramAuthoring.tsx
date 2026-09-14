@@ -7,11 +7,8 @@ import { authoringAvailability } from '../authoring-availability';
 import { canvasProjection } from '../canvas-projection';
 import { useCanvasThingAuthoring } from '../canvas-thing-authoring';
 import { createEmbeddedAuthoring } from '../embedded-authoring';
-import {
-  constrainEmbeddedPosition,
-  embeddedDiagram,
-  type EmbeddedBounds,
-} from '../embedded-diagram';
+import { constrainEmbeddedPosition, type EmbeddedBounds } from '../embedded-diagram';
+import { useEmbeddedDiagram } from '../use-embedded-diagram';
 import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceThingTargets } from '../space-thing-targets';
@@ -55,6 +52,7 @@ export function EmbeddedDiagramAuthoring({
   readonly bounds: EmbeddedBounds;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
+  const parentId = parent.id;
   // The target's own composition names where this reports (ADR 0016); nothing
   // here holds a second sink, and a default in the module would be one.
   const [composition] = useState(() =>
@@ -153,14 +151,18 @@ export function EmbeddedDiagramAuthoring({
     }),
     [origin],
   );
+  const drawingProjection = useMemo(
+    () => ({ nodes: authoring.nodes, edges: state.projection?.edges ?? [] }),
+    [authoring.nodes, state.projection?.edges],
+  );
+  const { nodes, edges } = useEmbeddedDiagram({
+    parent,
+    projection: drawingProjection,
+    offset,
+    enabled,
+    bounds: { left, top, right, bottom },
+  });
   const value = useMemo((): EmbeddedPublication => {
-    const { nodes, edges } = embeddedDiagram({
-      parent,
-      projection: { nodes: authoring.nodes, edges: state.projection?.edges ?? [] },
-      offset,
-      enabled,
-      bounds: { left, top, right, bottom },
-    });
     const localIds = new Map(nodes.map((node) => [node.id, node.data.thingId]));
     return {
       entry,
@@ -207,13 +209,11 @@ export function EmbeddedDiagramAuthoring({
       },
     };
   }, [
-    authoring.nodes,
     authoring.bodyEditing,
     authoring.titleEditing,
-    state.projection,
-    parent,
+    nodes,
+    edges,
     offset,
-    enabled,
     composition,
     entry,
     diagramId,
@@ -223,7 +223,9 @@ export function EmbeddedDiagramAuthoring({
     bottom,
   ]);
   useLayoutEffect(() => {
-    publish(parent.id, value);
-  }, [parent.id, value, publish]);
+    if (import.meta.env.MODE === 'benchmark')
+      performance.mark('hyper:embedded-diagram-publication');
+    publish(parentId, value);
+  }, [parentId, value, publish]);
   return null;
 }

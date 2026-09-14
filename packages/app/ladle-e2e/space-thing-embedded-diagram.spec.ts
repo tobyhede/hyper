@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectEmbeddedThingToFollowDrag } from '../e2e/support/embedded-drag';
 
 const STORY = '/?story=surfaces--space-thing-embedded-diagram--selected-diagram&mode=preview';
 
@@ -55,6 +56,26 @@ test(
       expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
       expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
     }
+  },
+);
+
+test(
+  'an Open Space Thing keeps its embedded Diagram aligned throughout a drag',
+  { tag: '@parity:open-space-thing-drag-keeps-embedded-diagram-aligned' },
+  async ({ page }) => {
+    await open(page);
+    await expectEmbeddedThingToFollowDrag(
+      page,
+      spaceThing(page),
+      embeddedNodes(page).first(),
+      [page.locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]')],
+      {
+        connector: page.locator(
+          '.react-flow__edge:not([data-id^="00000000-0000-4000-8000-000000000005:"])',
+        ),
+        endpoint: 'target',
+      },
+    );
   },
 );
 

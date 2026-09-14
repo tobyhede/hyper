@@ -15,8 +15,15 @@ export interface EmbeddedBounds {
   readonly bottom: number;
 }
 
+export interface EmbeddedParentProjection {
+  readonly id: string;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+  readonly zIndex?: number | undefined;
+}
+
 export interface EmbeddedDiagramRequest {
-  readonly parent: ThingFlowNode;
+  readonly parent: EmbeddedParentProjection;
   readonly projection: CanvasNodesAndEdges;
   readonly offset: DiagramPosition;
   readonly enabled: boolean;

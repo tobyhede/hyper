@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SPACE_THING_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
@@ -9,6 +12,7 @@ import {
   embeddedDiagram,
   embeddedNodeId,
 } from '../src/embedded-diagram';
+import { useEmbeddedDiagram } from '../src/use-embedded-diagram';
 import { resolveDiagram } from '../src/diagram-resolution';
 
 const id = (value: number) =>
@@ -110,6 +114,83 @@ const view = (parent: {
 });
 
 describe('an embedded production projection', () => {
+  it('retains the published drawing and every node, data and Edge through parent translation', async () => {
+    const { parent: initial, projected } = await draw();
+    const request = {
+      parent: initial,
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      enabled: true,
+      bounds: view(initial),
+    };
+    const hook = renderHook(({ value }) => useEmbeddedDiagram(value), {
+      initialProps: { value: request },
+    });
+    const before = hook.result.current;
+    hook.rerender({
+      value: {
+        ...request,
+        parent: {
+          ...initial,
+          position: { x: initial.position.x + 120, y: initial.position.y + 80 },
+        },
+      },
+    });
+
+    expect(hook.result.current).toBe(before);
+    expect(hook.result.current.nodes[0]).toBe(before.nodes[0]);
+    expect(hook.result.current.nodes[0]?.data).toBe(before.nodes[0]?.data);
+    expect(hook.result.current.edges[0]).toBe(before.edges[0]);
+  });
+
+  it.each([
+    ['width', (value: ThingFlowNode) => ({ ...value, width: (value.width ?? 0) + 120 })],
+    ['height', (value: ThingFlowNode) => ({ ...value, height: (value.height ?? 0) + 120 })],
+    ['z-index', (value: ThingFlowNode) => ({ ...value, zIndex: (value.zIndex ?? 0) + 1 })],
+  ])('invalidates the published drawing when parent %s changes', async (_name, change) => {
+    const { parent: initial, projected } = await draw();
+    const request = {
+      parent: initial,
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      enabled: true,
+      bounds: view(initial),
+    };
+    const hook = renderHook(({ value }) => useEmbeddedDiagram(value), {
+      initialProps: { value: request },
+    });
+    const before = hook.result.current;
+    hook.rerender({ value: { ...request, parent: change(initial) } });
+
+    expect(hook.result.current).not.toBe(before);
+  });
+
+  it('invalidates the published drawing for target projection and ancestor bounds changes', async () => {
+    const { parent: initial, projected } = await draw();
+    const request = {
+      parent: initial,
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      enabled: true,
+      bounds: view(initial),
+    };
+    const hook = renderHook(({ value }) => useEmbeddedDiagram(value), {
+      initialProps: { value: request },
+    });
+    const before = hook.result.current;
+    hook.rerender({ value: { ...request, projection: { ...projected } } });
+    const afterProjection = hook.result.current;
+    expect(afterProjection).not.toBe(before);
+    hook.rerender({
+      value: {
+        ...request,
+        projection: { ...projected },
+        bounds: { ...request.bounds, right: 300 },
+      },
+    });
+    expect(hook.result.current).not.toBe(afterProjection);
+  });
+
   it('parents Things and translates their authored positions without moving the source', async () => {
     const { drawn, projected } = await draw();
     expect(drawn.nodes.find((node) => node.data.thingId === B)).toMatchObject({

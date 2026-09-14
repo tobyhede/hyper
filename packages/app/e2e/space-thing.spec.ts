@@ -1,5 +1,6 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
+import { expectEmbeddedThingToFollowDrag } from './support/embedded-drag';
 import {
   boxOf,
   createThing,
@@ -491,6 +492,16 @@ test(
     expect(diagram.y).toBeGreaterThan(inner.y);
     expect(graph.y).toBeGreaterThanOrEqual(diagram.y + diagram.height);
     expect(graph.y + graph.height).toBeLessThan(outer.y + outer.height);
+  },
+);
+
+test(
+  'dragging an Open Space Thing keeps its embedded Diagram aligned',
+  { tag: '@parity:open-space-thing-drag-keeps-embedded-diagram-aligned' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await expect(embeddedNodes(page)).toHaveCount(1);
+    await expectEmbeddedThingToFollowDrag(page, thing, embeddedNodes(page));
   },
 );
 

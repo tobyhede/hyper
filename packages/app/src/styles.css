@@ -140,7 +140,12 @@ body {
   height: 100%;
 }
 
-.react-flow__node[class~='dragging'].rf-thing-node {
+/* React Flow sub-flow children move with their parent but are DOM siblings of
+   it, so only disabling the directly dragged wrapper leaves embedded Things
+   interpolating toward the parent's current position. Treat the whole canvas
+   as directly manipulated while any node carries React Flow's dragging state.
+   The rule stops applying on release, restoring authored placement motion. */
+.graph-area:has(.react-flow__node[class~='dragging']) .rf-thing-node {
   transition: none;
 }
 

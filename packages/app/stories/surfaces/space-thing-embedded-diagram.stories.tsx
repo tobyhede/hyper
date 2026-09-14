@@ -107,7 +107,13 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
             openSize: { width: 640, height: 420 },
           },
         },
-        graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        graphs: [
+          {
+            id: HOME_GRAPH_ID,
+            title: 'Graph 1',
+            edges: [{ from: HOME_THING_ID, to: SPACE_THING_ID }],
+          },
+        ],
       },
     ],
     defaultDiagram: HOME_DIAGRAM_ID,
