@@ -110,6 +110,7 @@ export async function expectEmbeddedThingToFollowDrag(
   let settled = released;
   await expect
     .poll(async () => {
+      await page.evaluate(() => new Promise(requestAnimationFrame));
       settled = await geometry('The settled Space Thing', 'The retained embedded Thing');
       const stable = isStable(settled, previous);
       previous = settled;
