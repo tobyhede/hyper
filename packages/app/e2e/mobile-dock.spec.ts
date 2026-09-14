@@ -11,6 +11,7 @@ import {
   settleNewDiagramName,
   nodeByTitle,
   presentControl,
+  recolorActiveGraph,
   selectCanvas,
   selectedCanvas,
   settled,
@@ -430,4 +431,21 @@ test.describe('a short viewport', () => {
     await create.click();
     await expect(page.getByRole('textbox', { name: 'Thing title' })).toBeFocused();
   });
+});
+
+test('recolouring the Active Graph works at phone width through the swatch picker', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  const handle = nodeByTitle(page, 'A').first().locator('[data-handleid="authoring-source-right"]');
+  const before = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
+
+  await recolorActiveGraph(page, 'Orange');
+
+  const after = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(after).not.toBe(before);
 });

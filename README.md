@@ -161,7 +161,7 @@ Things, Diagrams and Graphs are parts of the Space aggregate, so they have produ
         {
           "id": "00000000-0000-4000-8000-000000000004",
           "title": "Main walkthrough",
-          "color": "#6ea8fe",
+          "color": "#1f77b4",
           "edges": [
             {
               "from": "00000000-0000-4000-8000-000000000027",

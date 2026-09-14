@@ -295,6 +295,21 @@ export async function graphChoices(page: Page): Promise<Locator> {
   return (await graphMenu(page)).getByRole('menuitemradio');
 }
 
+/** Open the palette-bound colour picker for the Active Graph. */
+export async function openGraphColourPicker(page: Page): Promise<void> {
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
+  const group = page.getByRole('radiogroup', { name: 'Graph colour' });
+  await expect(group.getByRole('radio')).toHaveCount(20);
+  await expect(group.getByRole('radio', { name: 'Orange', exact: true })).toBeVisible();
+}
+
+/** Recolour the Active Graph through the swatch popover. */
+export async function recolorActiveGraph(page: Page, label: string): Promise<void> {
+  await openGraphColourPicker(page);
+  await page.getByRole('radio', { name: label, exact: true }).click();
+}
+
 /**
  * Present, which traverses the Active Graph.
  *

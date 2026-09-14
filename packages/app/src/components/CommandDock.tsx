@@ -88,6 +88,8 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  PaletteColorSwatchGrid,
+  paletteSwatchPanelClassName,
   DeleteIcon,
   EditIcon,
   FALLBACK_GRAPH_COLOR,
@@ -111,7 +113,7 @@ import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { RejectedExitConfirmation } from '../open-spaces';
-import { GRAPH_PALETTE } from '../colors';
+import { GRAPH_PALETTE_ENTRIES } from '../colors';
 import {
   DOCK_ALONGS,
   DOCK_EDGES,
@@ -138,36 +140,6 @@ import {
 import { THINGS_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
 import { ThingsPopover, type ThingsPopoverSpace } from './ThingsPopover';
 import './command-dock.css';
-
-/**
- * The palette a Graph's colour is chosen from, named.
- *
- * `GRAPH_PALETTE` is the application's own — the same six values authoring
- * rotates through when it mints a Graph — so the menu cannot offer a colour the
- * canvas would not draw. The names are this module's, because a swatch with no
- * word beside it is a colour a reader cannot ask anyone else for.
- *
- * **Keyed by the colour and not by its position.** A parallel list zipped by
- * index agrees with the palette exactly as long as nobody reorders it, and
- * reordering a palette is a colour decision taken in `colors.ts` with no reason
- * to look at this menu — after which every swatch is mislabelled, the reader
- * picks Blue and gets amber, and typecheck, lint and every suite stay green
- * because nothing asserted the pairing. Keyed, a reorder cannot say anything
- * and a *new* colour is a compile error here rather than a hex code drawn as
- * its own name, which is what the `??` fallback beside the zip did.
- */
-const GRAPH_COLOR_NAMES = {
-  '#6ea8fe': 'Blue',
-  '#f59e0b': 'Amber',
-  '#34d399': 'Green',
-  '#f472b6': 'Pink',
-  '#c084fc': 'Purple',
-  '#f87171': 'Red',
-} as const satisfies Record<(typeof GRAPH_PALETTE)[number], string>;
-
-const GRAPH_COLORS: readonly (readonly [string, string])[] = GRAPH_PALETTE.map(
-  (color): readonly [string, string] => [GRAPH_COLOR_NAMES[color], color],
-);
 
 /**
  * The two kinds Create offers, in the order the cluster draws them.
@@ -1224,27 +1196,28 @@ function GraphIdentityMenu({
                 what this arrangement keeps removing, and a menu row that
                 duplicates a visible control is the second one nobody reviews.
 
-                Radio items rather than a strip of swatches: a Graph has exactly
-                one colour, the palette is a closed set, and a menu's own roving
-                focus and keyboard selection come free — where a row of buttons
-                inside a menu would be a focus manager fighting the menu's. */}
+                **Colour… opens a palette-bound swatch grid**, not an inline
+                radio list: twenty Tableau slots need a grid, and the closed
+                palette lives in `colors.ts` either way. The grid is the shared
+                swatch component from `@project/ui`, mounted in a submenu here
+                because a menu row cannot host a popover trigger beside an open
+                list — `command-dock-recolors-graph-through-swatch-picker`. */}
       <DropdownMenuSub>
         <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
           <GraphIcon color={graph.activeColor} size={14} />
-          Colour
+          Colour…
         </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="nokey">
-          <DropdownMenuRadioGroup
-            value={graph.active.color ?? ''}
-            onValueChange={(next) => graph.onRecolor(graph.active.id, next)}
-          >
-            {GRAPH_COLORS.map(([name, color]) => (
-              <DropdownMenuRadioItem key={color} value={color} closeOnClick className="gap-2">
-                <GraphIcon color={color} size={14} />
-                {name}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
+        <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
+          <PaletteColorSwatchGrid
+            entries={GRAPH_PALETTE_ENTRIES}
+            value={graph.activeColor}
+            onValueChange={(color) => {
+              graph.onRecolor(graph.active.id, color);
+              onOpenChange(false);
+            }}
+            disabled={graph.editsDisabled}
+            aria-label="Graph colour"
+          />
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuItem className="gap-2" disabled={graph.editsDisabled} onClick={graph.onCreate}>

@@ -752,7 +752,7 @@ function IdentityRuler({ vertical = true }: { readonly vertical?: boolean }) {
     { label: 'Overview', icon: <DiagramIcon />, verb: null },
     {
       label: 'Release path',
-      icon: <GraphIcon color="#6ea8fe" />,
+      icon: <GraphIcon color="#1f77b4" />,
       verb: <PresentIcon color="currentColor" filled />,
     },
   ];

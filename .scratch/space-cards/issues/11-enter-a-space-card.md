@@ -2,9 +2,9 @@
 
 **What to build:** The cut-over. Entering a Space Card from the canvas replaces the canvas with that Space and adds an entry to Open Spaces; the Space's own command surface survives the crossing, so the entered Space takes the canvas area rather than the viewport. Exit is an explicit command.
 
-**Blocked by:** 10 — Extend the dev fixture to a tree of linked Spaces; `layout-only-v1/04` — Make Space Cards select initialized Layouts. (09 is done and 01 is resolved.)
+**Blocked by:** nothing. `10` is `resolved`; `layout-only-v1/04` is `done`. (09 is done and 01 is resolved.)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 **Tags:** release/v1
 
@@ -15,7 +15,7 @@
 - [x] **Entering a Space that is already open focuses its existing entry** rather than adding a second. Two views of one Space at once is what a second browser tab on its address is for (ADR 0069).
 - [x] Entries are persistent. Selecting one switches and closes nothing; more than one Space is open at once; Exit is the only thing that closes one. The root Space is never closable.
 - [x] An entry names a Space and remembers nothing about how it was reached, so closing one Space never closes another. **Back is the browser's history**, not a pop, and **Escape does not exit** — it keeps the meaning ADR 0048 gives it. ADR 0068 withdrew "Back or Escape returns to the containing Space".
-- [x] **Exit lives beside the Space's own persistence controls**, so a refusal and its recovery sit together (ADR 0068). Built: `packages/app/src/components/ExitSpaceControl.tsx` presents `OpenSpaces.exit`'s refusals and its rejected-persistence confirmation, and `packages/app/src/App.tsx:920-921` mounts it in `SpaceSidebar`'s `sessionActions` slot. Proven by `packages/app/test/ExitSpaceControl.test.tsx`. The session-registry half of its refusal behaviour is still issue 12.
+- [x] **Exit lives on the Space cluster in the Command Dock**, so a refusal and its recovery sit with the Space they name (ADR 0068, ADR 0082). Built: `CommandDock`'s Space menu offers **Exit Space**; `ExitReport` presents `OpenSpaces.exit`'s refusals and its rejected-persistence confirmation (`packages/app/src/components/CommandDock.tsx`). `App`'s `exitSpace` spends `spaces.exit`. `space-cards/12` is superseded by `architecture-review/14`, which already supplies the persistence wait.
 - [x] Open Spaces draws only from two open Spaces, and carries the status mark ADR 0068 allows. Already the Dock's (`trailControls`); this ticket reaches it by Entering.
 - [x] The stable Ladle story and its parity claims land here, with the application behaviour test ADR 0052 requires beside the Ladle one — this is the ticket where the application can finally reach the surface. Claim `space-thing-offers-enter` on `components/thing.stories.tsx` `EnterSpace`; Ladle `packages/app/ladle-e2e/thing.spec.ts`; application `packages/app/test/enter-space-thing.test.tsx` and `packages/app/e2e/space-thing.spec.ts`.
 - [x] Decide what becomes of the review prototypes under `packages/app/stories/review/` for this proposal: `space-card-rail.stories.tsx`, `space-card-canvas-prototype.stories.tsx` and their CSS. They were a decision surface and the decision is ADR 0068, but both are still in the tree and deleting them is no longer free — `space-card-canvas-prototype.stories.tsx` and `.css` are named in `RETIRED_SURFACE_FILES` in `test/unit/current-domain-vocabulary.test.ts:951-955` (added by `cbcecc92`), and that list is asserted to still be earning itself, so deleting the prototype must delete its exemption in the same change. Deleted as `space-thing-rail` and `space-thing-canvas-prototype` (the rename those files took) together with the canvas prototype's `RETIRED_SURFACE_FILES` exemption.
@@ -31,6 +31,25 @@ A review of the stacked Space Sidebar prototype found three defects in it, all l
 ## Why this is one ticket and not three
 
 The three halves — a command on a Space Card, a set of open Spaces that grows, a canvas that swaps — are not separately demoable. A set that grows with nothing entering it is issue 09, which already landed; a Space Card that enters nothing is not a behaviour. This is the narrow complete path.
+
+## Answer
+
+Enter is the Space Thing rail command `Enter Space <name>`. `CanvasThing`'s
+space front takes `onEnter`; `App` spends it as
+`spaces.enter(thing.spaceId, thing.diagram, thing.graph)`. `enter` seeds
+Diagram and Graph only on first display of a new Open Spaces entry; an
+already-open Space keeps its live selection.
+
+Exit is **Exit Space** on the Dock's Space cluster. Refusals — including
+`meta-space-permanent` at `open-spaces.ts:592-593` — are `ExitReport` in
+`CommandDock.tsx`. There is no `ExitSpaceControl` and no Space Sidebar.
+
+Cycle safety stays in aggregate intake (`space-thing-reference-cycle` at
+`space-aggregate.ts:44` / `:196` and `validate.ts:282`) plus the render-time
+skip at `SpaceCanvas.tsx:368`. Enter performs no second check.
+
+Evidence: `enter-space-thing.test.tsx`, `space-thing.spec.ts`,
+`CanvasThing.test.tsx`, claim `space-thing-offers-enter`.
 
 ## Comments
 
@@ -77,3 +96,15 @@ on an untagged one: `planRelease` refuses the whole plan at `scripts/roadmap.ts:
 with *Open release blockers must carry tag release/v1*. The `release/v1` tag above
 is that consequence, not a new scope decision — the same correction `command-dock/07`
 took on the same day, for the same reason.
+
+### 2026-09-13 — Closed as resolved after audit
+
+The criteria were already ticked. Blockers `10` and `layout-only-v1/04` had
+finished. The Exit citation still named the deleted `ExitSpaceControl` in
+`SpaceSidebar`; that is the Dock Space menu and `ExitReport` now. The 2026-09-13
+Enter comment's App wiring is also stale: Graph is an argument to `enter`, not
+a follow-up `activateGraph` in `App`. Cycle comments still say
+`space-card-reference-cycle` at `space-aggregate.ts:203` and
+`SpaceCanvas.tsx:331-332`; the code is `space-thing-reference-cycle` at `:196`
+and the skip is `:368`. Review prototypes stay gone;
+`RETIRED_SURFACE_FILES` is only `CONTEXT.md`.

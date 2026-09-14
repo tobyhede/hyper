@@ -2,7 +2,8 @@
 
 **What to build:** An author can connect a containing Graph into and out of a target Graph across one Space Card, and a presentation follows those Edges with the containing Graph context needed to offer the correct exits.
 
-**Blocked by:** 07 — Author a Space Card reference; 08 — Enter and independently open a Space Card.
+**Blocked by:** nothing. `07` and `08` are `resolved`. This is the deferred
+cross-Space Edges / traversal cut `08` left in its tail.
 
 **Status:** ready-for-agent
 

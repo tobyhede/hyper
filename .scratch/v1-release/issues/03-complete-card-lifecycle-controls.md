@@ -5,7 +5,7 @@ Tags: release/v1
 Blocked by: nothing. `command-dock/07` landed; the Sidebar is gone.
 Related: `architecture-review/23` (resolved), `entity-url-addressability/07`
 (resolved), ADR 0089. Written before ADR 0085: the heading keeps Card; the
-body uses Thing and Diagram.
+body uses Thing and Diagram. Built on PR #212.
 
 **What to build:** A named **Remove from Diagram** command beside **Delete
 Thing**, and phone-width evidence that Delete Thing's confirmation opens.
@@ -101,15 +101,15 @@ the whole Space`.
 ## Answer
 
 The Thing command menu now names both ways a Thing leaves. `thingRailActions`
-in `App.tsx` offers **Remove from Diagram** beside **Delete Thing** on the
+in `App.tsx` offers **Remove from Diagram** beside **Delete from Space** on the
 same `EntityActionsMenu`. The new row completes `removed-thing-from-diagram`
 on the press and never mounts `DeleteThingConfirmation`. Availability is the
 canvas key's — `authorOnCanvas` and not body-editing — so the row stays
-offered while the Thing is Open; Delete Thing does not. Delete/Backspace is
-still that same Edit.
+offered while the Thing is Open; Delete from Space does not. Delete/Backspace
+is still that same Edit.
 
 Phone-width evidence is in `mobile-dock.spec.ts`: at 390×844, pointer and
-keyboard each open `Delete Thing B?`, Cancel leaves the Thing, Confirm
+keyboard each open `Delete from Space B?`, Cancel leaves the Thing, Confirm
 runs `deleted-thing` — the Thing is gone from the Space, not only this
 Diagram (`Add B to Diagram` absent, revision `1`).
 
@@ -128,4 +128,4 @@ Remove from Diagram row and the phone-width confirmation cases.
 
 **Implemented 2026-09-13.** Remove from Diagram is a row on `EntityActionsMenu`
 (`thingRailActions` in `App.tsx`). Phone confirmation cases are in
-`mobile-dock.spec.ts`.
+`mobile-dock.spec.ts`. Merged as PR #212.

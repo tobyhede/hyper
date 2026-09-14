@@ -1,8 +1,9 @@
 # 24 — New Diagram is available where its continuation cannot land
 
-Status: in-progress
+Status: resolved
 Tags: release/v1
-Blocked by: nothing. Surfaced reviewing `19`–`21`; the code is `13`'s.
+Blocked by: nothing. Built on PR #209 (`a05d3e0e`). Surfaced reviewing `19`–`21`;
+the code is `13`'s.
 
 **What to build:** Finish the continuation module's chrome half so New Diagram's
 rename step actually opens, and so "the caret moved" means the continuation
@@ -70,7 +71,7 @@ above, which still needs a failing test.
       cannot land while the name control is withdrawn after selection
 - [x] `Continuation` / `ChromeContinuation` expose enough for callers to know
       whether a chrome continuation landed
-- [ ] `pnpm verify` and `pnpm e2e` green (CI)
+- [x] `pnpm verify` and `pnpm e2e` green (CI — PR #209)
 
 ## Comments
 
@@ -107,15 +108,15 @@ behaves as for any other menu item that did not move the caret.
   for this ticket; the bug is post-create, not pre-press
 
 **Acceptance criteria:**
-- [ ] A test fails on the current tree: New Diagram pressed when rename is
+- [x] A test fails on the current tree: New Diagram pressed when rename is
       withdrawn after diagram selection leaves no Diagram name editor and does
       not strand focus on `document.body` once fixed
-- [ ] After the fix, New Diagram opens the Diagram name editor with the caret in
+- [x] After the fix, New Diagram opens the Diagram name editor with the caret in
       it (existing happy-path assertion in `SpaceApp.test.tsx` still passes)
-- [ ] `onCreate` returns `false` when rename did not open; menu focus restoration
+- [x] `onCreate` returns `false` when rename did not open; menu focus restoration
       returns to the trigger in that case
-- [ ] The continuation is not spent on a suppressed click on a withdrawn control
-- [ ] `pnpm verify` and `pnpm e2e` green
+- [x] The continuation is not spent on a suppressed click on a withdrawn control
+- [x] `pnpm verify` and `pnpm e2e` green
 
 **Out of scope:**
 - Changing `InlineTitleEditor`, `ToolbarButton`, or other `@project/ui` primitives
@@ -123,3 +124,14 @@ behaves as for any other menu item that did not move the caret.
 - Withdrawing New Diagram at press time as the sole fix
 - Graph or Space name continuations (only `diagram-name` exists today; the
   landing contract should generalise to future chrome controls)
+
+### Resolution — merged as PR #209
+
+`ChromeContinuation` waits until the addressed control is activatable
+(`chromeRenameReady` and not `aria-disabled`) before `take()` and the
+simulated press. `onCreate` reports that landing — `createDiagramMovedCaret`
+is set from `onLand` — so the Diagram menu restores focus unless rename
+actually opened.
+
+Evidence is `chrome-continuation.test.tsx`, `continuation.test.ts`, and the
+New Diagram case in `SpaceApp.test.tsx`.

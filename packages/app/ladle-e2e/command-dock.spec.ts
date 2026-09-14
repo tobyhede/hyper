@@ -359,6 +359,33 @@ test(
  * Graph has nothing to traverse.
  */
 test(
+  'Colour… recolours the Active Graph through the swatch picker',
+  { tag: '@parity:command-dock-recolors-graph-through-swatch-picker' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const graphTitle = (
+      await page.getByTestId('active-graph').filter({ visible: true }).innerText()
+    ).trim();
+    const present = surface(page).getByRole('button', { name: 'Present Long' });
+    const presentSvg = present.locator('svg');
+    const initialStroke = await presentSvg.evaluate((element) => getComputedStyle(element).stroke);
+
+    const menu = await disclose(page, `Active Graph: ${graphTitle}`);
+    await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
+    const group = page.getByRole('radiogroup', { name: 'Graph colour' });
+    await expect(group.getByRole('radio')).toHaveCount(20);
+    await group.getByRole('radio', { name: 'Orange', exact: true }).click();
+    await expect(group).toHaveCount(0);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    const finalStroke = await presentSvg.evaluate((element) => getComputedStyle(element).stroke);
+    expect(finalStroke).not.toBe(initialStroke);
+    expect(finalStroke).toBe('rgb(255, 127, 14)');
+  },
+);
+
+test(
   'a new Space names its initial Diagram and empty Graph and cannot present',
   { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
   async ({ page }) => {
