@@ -2,12 +2,15 @@ import { expect, test } from './fixtures';
 import type { Page, Route } from '@playwright/test';
 import {
   activateGraph,
+  activeGraph,
   boxOf,
   createThing,
   createThingControl,
   dock,
   diagramMenu,
+  graphMenu,
   newDiagram,
+  newGraph,
   settleNewDiagramName,
   nodeByTitle,
   presentControl,
@@ -146,6 +149,51 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
   const menu = await diagramMenu(page);
   await menu.getByRole('menuitem', { name: 'Delete Diagram 1' }).click();
   await expect(selectedCanvas(page)).toContainText('Collection 1');
+});
+
+/**
+ * New Graph at phone width, and the Delete that undoes it.
+ *
+ * Both are rows in the Graph menu rather than a permanent control, which is the
+ * one thing the narrower box changed about them.
+ */
+test('New Graph activates an empty Graph, and Delete returns to the one before', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  await selectCanvas(page, 'Collection 1');
+
+  await newGraph(page);
+  await expect(activeGraph(page)).toContainText('Graph 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+  await expect(activeGraph(page)).toContainText('Long');
+});
+
+test('recolouring the active Graph from the Graph menu persists at phone width', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  await selectCanvas(page, 'Collection 1');
+
+  await recolorActiveGraph(page, 'Green');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+  const graph = activeGraph(page);
+  await graph.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Colour…' }).click();
+  const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
+  await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
 });
 
 /**

@@ -334,6 +334,27 @@ export const parityClaims: readonly ParityClaim[] = [
       'New Diagram sits in the Diagram menu beside the list it adds to, and creates and selects an empty Diagram without implicitly placing Things.',
   },
   {
+    id: 'command-dock-adds-graph',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'New Graph sits in the Graph menu beside the list it adds to, and appends, colours and activates one empty Graph in one Edit.',
+  },
+  {
+    id: 'command-dock-recolors-graph',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "The Graph menu's Colour submenu offers the application's palette and stores the chosen colour on the active Graph.",
+  },
+  {
+    id: 'command-dock-deletes-graph',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Delete Graph removes the active Graph when the Diagram owns more than one, and is present but unavailable on the last Graph the Diagram keeps.',
+  },
+  {
     id: 'command-dock-copies-graph-destinations',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
