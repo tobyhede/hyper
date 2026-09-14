@@ -181,3 +181,20 @@ entity-menu scenarios, and eight resolver/footer tests passed. The affected
 menu/action tests passed (35 tests); earlier focused Alias intake, authoring,
 Enter and CanvasThing checks passed. Review found and corrected duplicated
 Alias resolution and outdated live documentation. Final full checks run in CI.
+
+
+### Floating Thing dock prototype — decision pending
+
+The user's next question is whether the Thing's dock should float inside the
+card like the canvas Dock, with more margin and no kind glyph while Open.
+The throwaway source is on branch `prototype/floating-thing-dock`, in
+`packages/app/stories/review/floating-thing-dock.stories.tsx` and its scoped CSS.
+Run `pnpm ladle`, then open
+`http://localhost:61000/?story=review--floating-thing-dock--compare&mode=preview&variant=inset12`.
+
+Compare `current`, `inset8`, and `inset12` on the same memory-backed application.
+Mixed, narrow and overlapping scenes cover Markdown, Space and Alias cards;
+Open/Close and editing remain the production operations. The switcher also
+compares all docks visible with normal hover/selection. These overrides are
+review-only: no production header change or final decision has been made.
+The prototype typechecks and was inspected in Chromium at 1440×1000.

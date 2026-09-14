@@ -1,0 +1,80 @@
+/* THROWAWAY. Every override is scoped to this review story. */
+.floating-dock-prototype {
+  height: 100vh;
+  --prototype-dock-inset: 12px;
+}
+.floating-dock-prototype[data-variant='inset8'] {
+  --prototype-dock-inset: 8px;
+}
+.floating-dock-prototype__canvas {
+  height: calc(100vh - 104px);
+}
+.floating-dock-prototype__switcher {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  z-index: 1000;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  background: var(--background);
+  box-shadow: 0 6px 24px #0003;
+}
+.floating-dock-prototype__variants {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.floating-dock-prototype__badge,
+.floating-dock-prototype__state {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  padding: 0 8px;
+}
+.floating-dock-prototype__badge {
+  letter-spacing: 0.12em;
+}
+.floating-dock-prototype[data-show-docks='true'] .canvas-thing__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.floating-dock-prototype:not([data-variant='current']) .canvas-thing > .thing-rail {
+  position: absolute;
+  inset: var(--prototype-dock-inset) var(--prototype-dock-inset) auto;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  z-index: 2;
+  pointer-events: none;
+  gap: 8px;
+}
+.floating-dock-prototype:not([data-variant='current']) .canvas-thing__actions {
+  margin-left: auto;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.floating-dock-prototype:not([data-variant='current'])
+  .canvas-thing[data-expanded='true']
+  > .thing-rail
+  > .thing-rail__kind {
+  display: none;
+}
+.floating-dock-prototype:not([data-variant='current']) .canvas-thing__content {
+  padding-top: calc(44px + var(--prototype-dock-inset) * 2);
+}
+.floating-dock-prototype:not([data-variant='current'])
+  .canvas-thing[data-expanded='false']
+  > .canvas-thing__body {
+  padding-top: calc(38px + var(--prototype-dock-inset));
+}
+/* The production embedding's fixed top inset assumes an in-flow header.
+   This preview adds clearance without changing authored target positions. */
+.floating-dock-prototype:not([data-variant='current']) .react-flow__node[data-id^='embedded:'] {
+  translate: 0 calc(var(--prototype-dock-inset) * 2);
+}
