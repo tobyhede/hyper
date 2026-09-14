@@ -328,24 +328,19 @@ test(
     await expect(
       thing.locator('.canvas-thing__body').getByRole('button', { name: /^(Diagram|Graph):/ }),
     ).toHaveCount(0);
-    const enter = rail.getByRole('button', { name: /^Enter Space/ });
-    await enter.focus();
-    await enter.press('ArrowRight');
-    await expect(rail.getByTestId('space-thing-diagram')).toBeFocused();
-    await page.keyboard.press('ArrowRight');
+    const diagramControl = rail.getByTestId('space-thing-diagram');
+    await diagramControl.focus();
+    await diagramControl.press('ArrowRight');
     await expect(rail.getByTestId('space-thing-graph')).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
-    await page.keyboard.press('ArrowLeft');
-    await page.keyboard.press('ArrowLeft');
-    await page.keyboard.press('ArrowLeft');
-    await page.keyboard.press('ArrowLeft');
     await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(enter).toBeFocused();
+    await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(rail.locator(':focus')).toHaveCount(0);
-    await enter.focus();
+    await diagramControl.focus();
 
     const treatment = (locator: Locator) =>
       locator.evaluate((element) => {

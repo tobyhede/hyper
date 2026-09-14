@@ -116,3 +116,15 @@ Verification:
   All Space Thing tests passed. A final full local run was stopped at the
   user's request to open the PR and let CI perform final full verification.
 - Final full CI verification is delegated to the PR checks.
+
+### Rail ordering correction
+
+The requested order is Diagram, Graph, entity actions (`…`), Open/Close, Enter.
+The Space choices lead and Enter trails; other Thing kinds keep their existing
+content-edit order. Application and Ladle keyboard proofs assert this sequence.
+Target-Space authoring already exists through the embedded entry's `app.authoring`;
+exposing additional Diagram and Graph menu actions would reuse that path.
+
+Ordering validation: typecheck and 47 CanvasThing tests passed; the focused
+Ladle test and both application tests passed. Standards and Spec review found
+no defects. Full final verification remains with PR CI.

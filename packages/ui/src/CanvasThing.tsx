@@ -382,14 +382,15 @@ export function CanvasThing(props: CanvasThingProps) {
           //
           // The two groups are the answer to "whose command is this?". Editing
           // this Thing's Markdown is the Markdown front's business and means
-          // nothing on another kind; opening and closing is every Thing's, and
-          // Close stays last so it keeps the position authors expect. The
-          // actions menu leads the rail — overflow commands every Thing shares.
+          // nothing on another kind; opening and closing is every Thing's.
+          // Space choices lead the rail, followed by entity actions, Open/Close
+          // and Enter. Content-edit commands stay beside the entity actions.
           <ThingRailActions
             aria-label={`Thing ${name}`}
             className="canvas-thing__actions"
             data-testid="canvas-thing-actions"
           >
+            {spaceSelection !== undefined && <SpaceThingSelectors selection={spaceSelection} />}
             {actionableEntityActions && (
               <EntityActionsTrigger
                 groups={entityActions}
@@ -412,13 +413,7 @@ export function CanvasThing(props: CanvasThingProps) {
               ) : (
                 <ContentEditActions name={name} edit={visibleContentEdit} />
               )}
-              {onEnter !== undefined && (
-                <ThingRailAction aria-label={`Enter Space ${name}`} onClick={onEnter}>
-                  <EnterSpaceIcon data-icon="inline-start" />
-                </ThingRailAction>
-              )}
             </ThingRailKindActions>
-            {spaceSelection !== undefined && <SpaceThingSelectors selection={spaceSelection} />}
             <ThingRailSharedActions>
               {onOpenChange !== undefined && (
                 <ThingRailAction
@@ -446,6 +441,13 @@ export function CanvasThing(props: CanvasThingProps) {
                 </ThingRailAction>
               )}
             </ThingRailSharedActions>
+            {onEnter !== undefined && (
+              <ThingRailKindActions kind="space">
+                <ThingRailAction aria-label={`Enter Space ${name}`} onClick={onEnter}>
+                  <EnterSpaceIcon data-icon="inline-start" />
+                </ThingRailAction>
+              </ThingRailKindActions>
+            )}
           </ThingRailActions>
         )}
       </ThingRail>

@@ -84,9 +84,9 @@ const GROUP_LAYOUT = 'inline-flex items-center gap-px';
  * tabindex is the toolbar root's and the arrows cross the boundary like any
  * other gap.
  *
- * **The actions menu leads, kind commands follow, and Open/Close trail.** Close
- * stays last so it keeps the position authors expect; the menu that carries a
- * Thing's addresses and deletion sits where every Thing's overflow commands begin.
+ * A Space Thing leads with Diagram and Graph choices, then entity actions,
+ * Open/Close and Enter. Content-edit commands on other kinds sit between the
+ * entity actions and Open/Close. The mounting Thing supplies that order.
  *
  * Either group draws nothing when it holds nothing — an Alias Thing offers one
  * kind command and no shared one — so a rail never carries an empty named
