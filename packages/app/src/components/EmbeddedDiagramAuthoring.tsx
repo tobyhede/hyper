@@ -10,6 +10,7 @@ import { createEmbeddedAuthoring } from '../embedded-authoring';
 import {
   constrainEmbeddedPosition,
   embeddedDiagram,
+  useEmbeddedParentProjection,
   type EmbeddedBounds,
 } from '../embedded-diagram';
 import type { OpenSpace } from '../open-spaces';
@@ -55,6 +56,8 @@ export function EmbeddedDiagramAuthoring({
   readonly bounds: EmbeddedBounds;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
+  const projectionParent = useEmbeddedParentProjection(parent);
+  const parentId = projectionParent.id;
   // The target's own composition names where this reports (ADR 0016); nothing
   // here holds a second sink, and a default in the module would be one.
   const [composition] = useState(() =>
@@ -155,7 +158,12 @@ export function EmbeddedDiagramAuthoring({
   );
   const value = useMemo((): EmbeddedPublication => {
     const { nodes, edges } = embeddedDiagram({
-      parent,
+      // A React Flow drag replaces the parent node on every pointer update, but
+      // embedded geometry is local to that parent. Its canvas position is
+      // therefore deliberately absent from this projection input: React Flow's
+      // subflow relationship supplies the translation without asking every
+      // descendant and Edge to be projected and published again.
+      parent: projectionParent,
       projection: { nodes: authoring.nodes, edges: state.projection?.edges ?? [] },
       offset,
       enabled,
@@ -211,7 +219,10 @@ export function EmbeddedDiagramAuthoring({
     authoring.bodyEditing,
     authoring.titleEditing,
     state.projection,
-    parent,
+    // These are the only parent fields `embeddedDiagram` reads. Parent
+    // translation must preserve the publication and every node/data/Edge
+    // identity it carries.
+    projectionParent,
     offset,
     enabled,
     composition,
@@ -223,7 +234,7 @@ export function EmbeddedDiagramAuthoring({
     bottom,
   ]);
   useLayoutEffect(() => {
-    publish(parent.id, value);
-  }, [parent.id, value, publish]);
+    publish(parentId, value);
+  }, [parentId, value, publish]);
   return null;
 }

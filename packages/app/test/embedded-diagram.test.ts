@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SPACE_THING_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
@@ -7,6 +10,7 @@ import {
   clipEmbeddedNode,
   constrainEmbeddedPosition,
   embeddedDiagram,
+  useEmbeddedParentProjection,
   embeddedNodeId,
 } from '../src/embedded-diagram';
 import { resolveDiagram } from '../src/diagram-resolution';
@@ -110,6 +114,30 @@ const view = (parent: {
 });
 
 describe('an embedded production projection', () => {
+  it('retains its parent projection through pure parent translation', async () => {
+    const { parent: initial } = await draw();
+    const hook = renderHook(({ value }) => useEmbeddedParentProjection(value), {
+      initialProps: { value: initial },
+    });
+    const before = hook.result.current;
+    hook.rerender({
+      value: { ...initial, position: { x: initial.position.x + 120, y: initial.position.y + 80 } },
+    });
+
+    expect(hook.result.current).toBe(before);
+  });
+
+  it('invalidates its parent projection when the containing bounds change', async () => {
+    const { parent: initial } = await draw();
+    const hook = renderHook(({ value }) => useEmbeddedParentProjection(value), {
+      initialProps: { value: initial },
+    });
+    const before = hook.result.current;
+    hook.rerender({ value: { ...initial, width: (initial.width ?? 0) + 120 } });
+
+    expect(hook.result.current).not.toBe(before);
+  });
+
   it('parents Things and translates their authored positions without moving the source', async () => {
     const { drawn, projected } = await draw();
     expect(drawn.nodes.find((node) => node.data.thingId === B)).toMatchObject({

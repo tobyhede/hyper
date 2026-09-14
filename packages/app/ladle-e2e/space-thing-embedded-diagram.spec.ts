@@ -17,6 +17,63 @@ const spaceThing = (page: Page): Locator =>
 const embeddedNodes = (page: Page): Locator =>
   page.locator('.react-flow__node[data-id^="embedded:"]');
 
+/**
+ * Drag a parent in two axes and observe its child before the gesture settles.
+ * A sub-flow child is a DOM sibling whose screen position React Flow derives
+ * from the parent. Its offset therefore stays constant throughout a rigid
+ * translation; a placement transition on the child makes this disagree while
+ * the pointer is down.
+ */
+const expectEmbeddedThingToFollowDrag = async (
+  page: Page,
+  parent: Locator,
+  child: Locator,
+  connector?: Locator,
+): Promise<void> => {
+  const beforeParent = await parent.boundingBox();
+  const beforeChild = await child.boundingBox();
+  if (beforeParent === null || beforeChild === null) throw new Error('The embedding was not drawn');
+  const offset = { x: beforeChild.x - beforeParent.x, y: beforeChild.y - beforeParent.y };
+  const beforeConnector = await connector?.boundingBox();
+  const connectorOffset =
+    beforeConnector === null || beforeConnector === undefined
+      ? undefined
+      : { x: beforeConnector.x - beforeParent.x, y: beforeConnector.y - beforeParent.y };
+
+  await page.mouse.move(beforeParent.x + beforeParent.width / 2, beforeParent.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(beforeParent.x + beforeParent.width / 2 + 150, beforeParent.y + 104, {
+    steps: 12,
+  });
+
+  const duringParent = await parent.boundingBox();
+  const duringChild = await child.boundingBox();
+  if (duringParent === null || duringChild === null)
+    throw new Error('The embedding left the canvas');
+  expect(duringParent.x - beforeParent.x).toBeGreaterThan(100);
+  expect(duringParent.y - beforeParent.y).toBeGreaterThan(50);
+  expect(Math.abs(duringChild.x - duringParent.x - offset.x)).toBeLessThanOrEqual(3);
+  expect(Math.abs(duringChild.y - duringParent.y - offset.y)).toBeLessThanOrEqual(3);
+  if (connector !== undefined && connectorOffset !== undefined) {
+    const duringConnector = await connector.boundingBox();
+    if (duringConnector === null) throw new Error('The embedded connector left the canvas');
+    expect(Math.abs(duringConnector.x - duringParent.x - connectorOffset.x)).toBeLessThanOrEqual(3);
+    expect(Math.abs(duringConnector.y - duringParent.y - connectorOffset.y)).toBeLessThanOrEqual(3);
+  }
+
+  await page.mouse.up();
+
+  // Releasing restores authored placement transitions, but there is no stale
+  // descendant position left to animate toward or jump from afterward.
+  await page.waitForTimeout(250);
+  const settledParent = await parent.boundingBox();
+  const settledChild = await child.boundingBox();
+  if (settledParent === null || settledChild === null)
+    throw new Error('The embedding was not retained');
+  expect(Math.abs(settledChild.x - settledParent.x - offset.x)).toBeLessThanOrEqual(3);
+  expect(Math.abs(settledChild.y - settledParent.y - offset.y)).toBeLessThanOrEqual(3);
+};
+
 const open = async (page: Page): Promise<void> => {
   await page.goto(STORY);
   // The target Space is read asynchronously — it is a different Space, stored
@@ -55,6 +112,20 @@ test(
       expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
       expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
     }
+  },
+);
+
+test(
+  'an Open Space Thing keeps its embedded Diagram aligned throughout a drag',
+  { tag: '@parity:open-space-thing-drag-keeps-embedded-diagram-aligned' },
+  async ({ page }) => {
+    await open(page);
+    await expectEmbeddedThingToFollowDrag(
+      page,
+      spaceThing(page),
+      embeddedNodes(page).first(),
+      page.locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]'),
+    );
   },
 );
 

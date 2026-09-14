@@ -414,6 +414,31 @@ test('deleting the last Space Thing deletes the Space it referenced', async ({ p
 const embeddedNodes = (page: Page): Locator =>
   page.locator('.react-flow__node[data-id^="embedded:"]');
 
+async function expectEmbeddedThingToFollowDrag(
+  page: Page,
+  parent: Locator,
+  child: Locator,
+): Promise<void> {
+  const beforeParent = await boxOf(parent, 'the Open Space Thing');
+  const beforeChild = await boxOf(child, 'the embedded Thing');
+  const offset = { x: beforeChild.x - beforeParent.x, y: beforeChild.y - beforeParent.y };
+
+  await page.mouse.move(beforeParent.x + beforeParent.width / 2, beforeParent.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(beforeParent.x + beforeParent.width / 2 + 150, beforeParent.y + 104, {
+    steps: 12,
+  });
+
+  const duringParent = await boxOf(parent, 'the dragged Space Thing');
+  const duringChild = await boxOf(child, 'the moving embedded Thing');
+  expect(duringParent.x - beforeParent.x).toBeGreaterThan(100);
+  expect(duringParent.y - beforeParent.y).toBeGreaterThan(50);
+  expect(Math.abs(duringChild.x - duringParent.x - offset.x)).toBeLessThanOrEqual(3);
+  expect(Math.abs(duringChild.y - duringParent.y - offset.y)).toBeLessThanOrEqual(3);
+
+  await page.mouse.up();
+}
+
 /**
  * Create a Space Thing and Open it on the Diagram it already selects.
  *
@@ -491,6 +516,16 @@ test(
     expect(diagram.y).toBeGreaterThan(inner.y);
     expect(graph.y).toBeGreaterThanOrEqual(diagram.y + diagram.height);
     expect(graph.y + graph.height).toBeLessThan(outer.y + outer.height);
+  },
+);
+
+test(
+  'dragging an Open Space Thing keeps its embedded Diagram aligned',
+  { tag: '@parity:open-space-thing-drag-keeps-embedded-diagram-aligned' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await expect(embeddedNodes(page)).toHaveCount(1);
+    await expectEmbeddedThingToFollowDrag(page, thing, embeddedNodes(page));
   },
 );
 

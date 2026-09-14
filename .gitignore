@@ -36,6 +36,9 @@ test-results/
 .scratch/**
 !.scratch/**/
 !.scratch/**/*.md
+# Performance fixtures are generated aggregates; their Thing files happen to be
+# Markdown, but are derived from the tracked benchmark scenario generator.
+.scratch/space-thing-drag-performance/generated/**
 # Generated dogfood Spaces are rebuilt from their release tag and issue blockers.
 .scratch/**/roadmap-space/**
 # ADR 0085's rename codemods are the exception to "runnable code here is a

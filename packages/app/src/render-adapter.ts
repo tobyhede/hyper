@@ -603,7 +603,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         }),
       );
       const nodes = withSelection(applied, selection);
-      const afterById = new Map(nodes.map((node) => [node.id, node.position]));
       const positionChanges = relevant.filter(
         (change): change is NodePositionChange => change.type === 'position',
       );
@@ -616,6 +615,9 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         return;
       }
 
+      // Only a settled drag compares its last position to the gesture origin.
+      // Intermediate pointer frames publish above without paying for this map.
+      const afterById = new Map(nodes.map((node) => [node.id, node.position]));
       const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
 
       if (movedIds.length === 0) {
