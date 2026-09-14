@@ -586,7 +586,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      "An Open Space Thing's Diagram and Graph choices are drawn on the Command Dock's own command surface and through the same shared control and list, and choosing one writes the Thing's stored context without moving the containing Space.",
+      "An Open Space Thing's Diagram and Graph choices extend its one rail toolbar with the Command Dock's shared clusters, controls and lists; arrows traverse them alongside Enter, entity actions and Close, and choosing one writes the Thing's stored context without moving the containing Space.",
   },
   {
     id: 'embedded-diagram-things-author-target',

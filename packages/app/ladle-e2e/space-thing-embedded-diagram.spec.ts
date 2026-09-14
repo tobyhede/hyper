@@ -80,6 +80,32 @@ test(
     await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 1');
     await expect(thing.getByTestId('space-thing-graph')).toHaveText('Overview');
 
+    const rail = thing.getByTestId('canvas-thing-actions');
+    await expect(thing.getByRole('toolbar')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-diagram')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-graph')).toHaveCount(1);
+    await expect(
+      thing.locator('.canvas-thing__body').getByRole('button', { name: /^(Diagram|Graph):/ }),
+    ).toHaveCount(0);
+    const enter = rail.getByRole('button', { name: /^Enter Space/ });
+    await enter.focus();
+    await enter.press('ArrowRight');
+    await expect(rail.getByTestId('space-thing-diagram')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByTestId('space-thing-graph')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(enter).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(rail.locator(':focus')).toHaveCount(0);
+    await enter.focus();
+
     const treatment = (locator: Locator) =>
       locator.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -91,7 +117,7 @@ test(
           padding: style.paddingTop,
         };
       });
-    expect(await treatment(thing.locator('[data-slot="command-surface"]'))).toEqual(
+    expect(await treatment(thing.getByTestId('canvas-thing-actions'))).toEqual(
       await treatment(page.locator('.command-dock__surface:visible')),
     );
 

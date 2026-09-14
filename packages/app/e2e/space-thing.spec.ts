@@ -321,6 +321,32 @@ test(
     // so a change to one that the other did not follow fails here; and the Thing
     // drawing its own stored context left the canvas the Thing stands on where
     // it was.
+    const rail = thing.getByTestId('canvas-thing-actions');
+    await expect(thing.getByRole('toolbar')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-diagram')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-graph')).toHaveCount(1);
+    await expect(
+      thing.locator('.canvas-thing__body').getByRole('button', { name: /^(Diagram|Graph):/ }),
+    ).toHaveCount(0);
+    const enter = rail.getByRole('button', { name: /^Enter Space/ });
+    await enter.focus();
+    await enter.press('ArrowRight');
+    await expect(rail.getByTestId('space-thing-diagram')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByTestId('space-thing-graph')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(enter).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(rail.locator(':focus')).toHaveCount(0);
+    await enter.focus();
+
     const treatment = (locator: Locator) =>
       locator.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -332,7 +358,7 @@ test(
           padding: style.paddingTop,
         };
       });
-    expect(await treatment(thing.locator('[data-slot="command-surface"]'))).toEqual(
+    expect(await treatment(thing.getByTestId('canvas-thing-actions'))).toEqual(
       await treatment(page.locator('.command-dock__surface:visible')),
     );
     // `:visible`, because creating the target Space opened it too and every open
@@ -483,14 +509,11 @@ test(
     expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
     const diagram = await boxOf(thing.getByTestId('space-thing-diagram'), 'Diagram selector');
     const graph = await boxOf(thing.getByTestId('space-thing-graph'), 'Graph selector');
-    // **Below where the embedding begins, not below every embedded box.** An
-    // embedded Thing that runs past the region is *clipped* rather than
-    // shortened (`embedded-diagram.ts`), so its layout box is the clip's input
-    // and says nothing about what is drawn — comparing against it held only at
-    // the zoom the old chrome happened to produce.
-    expect(diagram.y).toBeGreaterThan(inner.y);
-    expect(graph.y).toBeGreaterThanOrEqual(diagram.y + diagram.height);
-    expect(graph.y + graph.height).toBeLessThan(outer.y + outer.height);
+    // Both named choices share the rail above the embedded Diagram.
+    expect(diagram.y + diagram.height).toBeLessThanOrEqual(inner.y);
+    expect(graph.y).toBeCloseTo(diagram.y, 1);
+    expect(graph.x).toBeGreaterThanOrEqual(diagram.x + diagram.width);
+    expect(graph.x + graph.width).toBeLessThan(outer.x + outer.width);
   },
 );
 

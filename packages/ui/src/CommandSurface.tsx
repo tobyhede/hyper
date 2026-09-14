@@ -57,14 +57,8 @@ export type CommandSurfaceProps = ComponentProps<'div'> & {
 /**
  * The same surface, with no toolbar semantics on it.
  *
- * For a cluster of controls that is *drawn* as chrome without being a command
- * toolbar — an Open Space Thing's two choices, which sit in the Thing's own body
- * under the strip that is its toolbar. A second `Toolbar` there would be a
- * second roving container on one Thing, so the Thing would answer the Tab key
- * twice and ADR 0073's one-stop-per-rail rule would hold for neither.
- *
- * The controls inside are therefore ordinary tab stops, which is what a pair of
- * bound choices should be.
+ * For non-toolbar chrome. Thing commands, including an Open Space Thing's
+ * Diagram and Graph choices, belong in the rail's single `CommandToolbar`.
  */
 export const CommandSurface = forwardRef<HTMLDivElement, CommandSurfaceProps>(
   function CommandSurface({ className, orientation = 'horizontal', ...props }, ref) {

@@ -3,7 +3,7 @@ export const COLLAPSED_THING_SIZE = { width: 260, height: 146 } as const;
 
 /** The concrete Open Size recorded when a Thing first Opens (ADR 0066). */
 export const DEFAULT_OPEN_SIZE = { width: 560, height: 420 } as const;
-/** Room for an Open target Thing, its neighbours and the Space Thing's own selectors. */
+/** Room for an Open target Thing, its neighbours and the Space Thing's own Title. */
 export const DEFAULT_SPACE_THING_OPEN_SIZE = { width: 960, height: 720 } as const;
 
 /**
@@ -14,18 +14,18 @@ export const DEFAULT_SPACE_THING_OPEN_SIZE = { width: 960, height: 720 } as cons
  * the projection clips them and no stylesheet can lay out around them. The room they
  * get is therefore a number both sides read: the projection places a child
  * inside this inset, and `canvas-thing.css` gives the Thing's own passengers a
- * footer of exactly `bottom` so a selector can never grow into the view drawn
+ * footer of exactly `bottom` so the Title can never grow into the view drawn
  * over it. `packages/ui/test/canvas-thing-embedded-diagram.test.ts` holds the
  * stylesheet and this constant to the same number.
  *
  * Measured from the node's own box, so `left`, `right` and `bottom` each carry
  * the Thing's 4px border. `top` clears the border and the rail; `bottom` clears
- * the footer holding the Title, the Space marker and the two selectors.
+ * the footer holding the Title; selection commands live on the rail.
  */
-export const SPACE_THING_EMBED_INSET = { top: 42, right: 16, bottom: 180, left: 16 } as const;
+export const SPACE_THING_EMBED_INSET = { top: 42, right: 16, bottom: 104, left: 16 } as const;
 
 /** The height of an Open Space Thing's own footer, which `bottom` above clears. */
-export const SPACE_THING_FOOTER_HEIGHT = 176;
+export const SPACE_THING_FOOTER_HEIGHT = 100;
 
 /**
  * The floor for an ordinary Open Space Thing resize proposal (ADR 0066,
@@ -37,7 +37,7 @@ export const SPACE_THING_FOOTER_HEIGHT = 176;
  * authored, and the Thing's own passengers hold a footer of exactly
  * {@link SPACE_THING_FOOTER_HEIGHT} so the two can never overlap. Both of those
  * are fixed, so a Space Thing taken to the collapsed height would have its
- * selectors clipped by `.canvas-thing`'s own `overflow: hidden` and a view
+ * Title clipped by `.canvas-thing`'s own `overflow: hidden` and a view
  * region of negative height above them.
  *
  * Written as the inset plus one collapsed Thing rather than as a pair of

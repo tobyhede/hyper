@@ -20,7 +20,7 @@ import {
  *
  * Nothing in the type system connects a pixel in a stylesheet to a number in a
  * module, so this is what does. Drifting apart is silent and looks like a
- * rendering bug: the selectors grow under the drawn view, or the view floats
+ * rendering bug: the Title grows under the drawn view, or the view floats
  * above a gap.
  */
 
@@ -37,6 +37,7 @@ describe('the room an Open Space Thing reserves for its Diagram', () => {
     expect(rule).not.toBeNull();
     const height = /height:\s*(\d+)px/.exec(rule?.[1] ?? '');
 
+    expect(SPACE_THING_FOOTER_HEIGHT).toBe(100);
     expect(Number(height?.[1])).toBe(SPACE_THING_FOOTER_HEIGHT);
   });
 
@@ -44,7 +45,7 @@ describe('the room an Open Space Thing reserves for its Diagram', () => {
    * The inset is measured from the node's own box and the Thing carries a 4px
    * border, so `bottom` is the footer plus that border. Written as an equation
    * rather than as a second literal: a border change that moved one and not the
-   * other would put the view a few pixels into the selectors.
+   * other would put the view a few pixels into the Title.
    */
   it('clears the footer and the Thing own border below the view', () => {
     const border = /\.canvas-thing\s*\{[^}]*border:\s*(\d+)px solid/.exec(stylesheet);
@@ -73,8 +74,8 @@ describe('the room an Open Space Thing reserves for its Diagram', () => {
    * The footer does not shrink, so the floor a resize may reach has to clear it.
    *
    * `.canvas-thing` hides its own overflow, and an Open Space Thing's passengers
-   * are a fixed 176px body under a fixed-height rail inside the Thing's border.
-   * A floor shorter than their sum cuts the Graph selector off at a size the
+   * are a fixed 100px title body under a fixed-height rail inside the Thing's border.
+   * A floor shorter than their sum cuts the Title off at a size the
    * resize control offers, which is why `SPACE_THING_MIN_OPEN_SIZE` and not
    * `COLLAPSED_THING_SIZE` is what an Open Space Thing resizes against.
    */

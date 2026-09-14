@@ -16,7 +16,7 @@ import {
 } from './ThingRailActions';
 import { ThingContentEditProvider, type ThingContentEdit } from './thing-content-edit';
 import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
-import { CommandSurface } from './CommandSurface';
+import { ToolbarButton, ToolbarGroup } from './components/toolbar';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ThingRail } from './ThingRail';
 import { Card, CardContent, CardTitle } from './components/card';
@@ -281,7 +281,7 @@ export function CanvasThing(props: CanvasThingProps) {
    * creation ghost, which is not a Thing yet and so has no Diagram to author it
    * on. It is a wider set than `contentFront` because a Space Thing Opens
    * without having any Markdown of its own to reveal: what it shows when it
-   * opens is its two selectors, drawn in the body rather than above it.
+   * opens is its embedded Diagram, with selection commands on the rail.
    */
   const openableFront = front.kind === 'preview' ? undefined : front;
   const open = openableFront?.open === true;
@@ -310,10 +310,13 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions = entityActions?.some((group) => group.length > 0) === true;
+  const spaceSelection =
+    !readOnly && front.kind === 'space' && front.open ? front.selection : undefined;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (visibleContentEdit !== null ||
+    (spaceSelection !== undefined ||
+      visibleContentEdit !== null ||
       onOpenChange !== undefined ||
       onEnter !== undefined ||
       actionableEntityActions ||
@@ -415,6 +418,7 @@ export function CanvasThing(props: CanvasThingProps) {
                 </ThingRailAction>
               )}
             </ThingRailKindActions>
+            {spaceSelection !== undefined && <SpaceThingSelectors selection={spaceSelection} />}
             <ThingRailSharedActions>
               {onOpenChange !== undefined && (
                 <ThingRailAction
@@ -502,8 +506,8 @@ export function CanvasThing(props: CanvasThingProps) {
         {/* Withheld while the Thing is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Thing
             shows, not what could be changed about it. */}
-        {front.kind === 'space' && front.open && !readOnly && (
-          <SpaceThingSelectors selection={front.selection} />
+        {front.kind === 'space' && front.open && !readOnly && front.selection === undefined && (
+          <p className="canvas-thing__space-note">Reading the referenced Space…</p>
         )}
       </CardContent>
       {/* A sibling of the Title's body rather than a child of it. The body is
@@ -591,37 +595,16 @@ function TitleHeading({ title }: TitleLadderProps) {
 }
 
 interface SpaceThingSelectorsProps {
-  readonly selection: CanvasSpaceThingSelection | undefined;
+  readonly selection: CanvasSpaceThingSelection;
 }
 
 /**
- * What an Open Space Thing offers to author: which Diagram of the referenced
- * Space it shows, and which Graph of that Diagram.
- *
- * **Drawn as the Command Dock draws the same two choices**, on the shared
- * command surface and through the shared `ChoiceMenu`
- * (`.scratch/command-dock/issues/12`). A Diagram and a Graph are named and
- * chosen identically wherever the product asks for them, which is the whole
- * point of the pair being components rather than a treatment each surface
- * arrives at.
- *
- * **`CommandSurface` and not `CommandToolbar`.** The Thing already has one
- * toolbar — the strip of commands on its rail — and a second roving container
- * on the same Thing would answer the Tab key twice for one Thing (ADR 0073). A
- * bound choice is an ordinary tab stop anyway.
- *
- * The absent case is a line of prose and nothing else. A `Spinner` would be a
- * second thing to look at on a Thing whose whole content is two short controls,
- * and `StatusBusy` brings a `role="status"` with it — a live region announcing
- * every Space Thing on the canvas as it resolves, for a wait the author did not
- * ask for and cannot act on.
+ * Diagram and Graph kind commands extend the Thing's one rail toolbar.
+ * They share the Dock's clusters and choices while writing this Thing's selection.
  */
 function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
-  if (selection === undefined) {
-    return <p className="canvas-thing__space-note">Reading the referenced Space…</p>;
-  }
   return (
-    <CommandSurface orientation="vertical" className="canvas-thing__space-choices">
+    <>
       <SpaceThingSelector
         label="Diagram"
         icon={<DiagramIcon />}
@@ -640,7 +623,7 @@ function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
         disabled={selection.disabled === true}
         onChoose={selection.onGraphChange}
       />
-    </CommandSurface>
+    </>
   );
 }
 
@@ -701,29 +684,34 @@ function SpaceThingSelector({
 }: SpaceThingSelectorProps) {
   const selected = choices.find((choice) => choice.id === chosen);
   return (
-    <ChoiceMenu<string>
-      label={`${label}s`}
-      choices={choices}
-      chosen={chosen}
-      onChoose={onChoose}
-      className="nokey w-64"
-      trigger={
-        <ChoiceMenuTrigger
-          data-testid={testId}
-          className="canvas-thing__space-choice nokey nodrag nopan"
-          // The name is drawn, so the accessible name says which of the two this
-          // is as well as what it holds: the controls are one word apart and an
-          // author has to be able to tell them apart by ear. An unchosen one
-          // says `none` rather than repeating the `No Diagram` it draws, which as
-          // an accessible name read as a Diagram called "No Diagram".
-          aria-label={selected === undefined ? `${label}: none` : `${label}: ${selected.title}`}
-          title={`Choose the ${label} this Space Thing shows`}
-          disabled={disabled || choices.length === 0}
-          icon={icon}
-          name={selected?.title ?? `No ${label}`}
-        />
-      }
-    />
+    <ToolbarGroup aria-label={label} className="min-w-0">
+      <ChoiceMenu<string>
+        label={`${label}s`}
+        choices={choices}
+        chosen={chosen}
+        onChoose={onChoose}
+        className="nokey w-64"
+        trigger={
+          <ChoiceMenuTrigger
+            render={<ToolbarButton size="compact" />}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            data-testid={testId}
+            className="canvas-thing__space-choice nokey nodrag nopan"
+            // The name is drawn, so the accessible name says which of the two this
+            // is as well as what it holds: the controls are one word apart and an
+            // author has to be able to tell them apart by ear. An unchosen one
+            // says `none` rather than repeating the `No Diagram` it draws, which as
+            // an accessible name read as a Diagram called "No Diagram".
+            aria-label={selected === undefined ? `${label}: none` : `${label}: ${selected.title}`}
+            title={`Choose the ${label} this Space Thing shows`}
+            disabled={disabled || choices.length === 0}
+            icon={icon}
+            name={selected?.title ?? `No ${label}`}
+          />
+        }
+      />
+    </ToolbarGroup>
   );
 }
 

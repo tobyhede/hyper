@@ -1076,6 +1076,12 @@ describe('CanvasThing Space front', () => {
     // has to be able to tell which is which by ear.
     expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
+    const rail = screen.getByTestId('canvas-thing-actions');
+    expect(screen.getByRole('toolbar')).toBe(rail);
+    for (const id of ['space-thing-diagram', 'space-thing-graph']) {
+      expect(rail).toContainElement(screen.getByTestId(id));
+      expect(screen.getByTestId(id).closest('.canvas-thing__body')).toBeNull();
+    }
     // And each draws the title it holds, which is what a reader sees.
     expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
     expect(screen.getByTestId('space-thing-graph')).toHaveTextContent('Long');
@@ -1140,7 +1146,7 @@ describe('CanvasThing Space front', () => {
     expect(diagram).toBeEnabled();
     expect(diagram).toHaveTextContent('No Diagram');
     const graph = screen.getByTestId('space-thing-graph');
-    expect(graph).toBeDisabled();
+    expect(graph).toHaveAttribute('aria-disabled', 'true');
     expect(graph).toHaveTextContent('No Graph');
   });
 

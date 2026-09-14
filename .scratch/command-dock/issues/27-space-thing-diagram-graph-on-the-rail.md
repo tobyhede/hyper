@@ -1,6 +1,6 @@
 # 27 — Space Thing Diagram and Graph choices live on the rail, not in the body
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1
 Blocked by: nothing. Corrects incomplete execution of `12`; does not reopen
 its neutral-rail or shared-surface decisions.
@@ -38,30 +38,30 @@ comment is wrong and must be corrected with the code.
 
 ## Required shape
 
-- [ ] Move Diagram and Graph from `CardContent` into `ThingRailActions`, as
+- [x] Move Diagram and Graph from `CardContent` into `ThingRailActions`, as
       `ToolbarGroup` clusters beside the existing kind and shared groups.
-- [ ] Reuse `ChoiceMenu` and `ChoiceMenuTrigger` with `ToolbarButton` renders,
+- [x] Reuse `ChoiceMenu` and `ChoiceMenuTrigger` with `ToolbarButton` renders,
       matching the Dock's cluster treatment (named trigger: glyph, current
       title, chevron). Do **not** mount a nested `CommandSurface` or second
       `Toolbar` in the body.
-- [ ] Preserve ADR 0073's one-toolbar contract: one tab stop per Thing, arrows
+- [x] Preserve ADR 0073's one-toolbar contract: one tab stop per Thing, arrows
       traverse Enter, Diagram, Graph, entity actions and Open/Close together.
-- [ ] Withhold both clusters while the Thing is Closed, read-only, or the
+- [x] Withhold both clusters while the Thing is Closed, read-only, or the
       target Space has not been read yet — same availability rules as today.
       The unread case may keep a plain body note or equivalent non-live-region
       feedback; it must not introduce a second toolbar.
-- [ ] Operations unchanged: `onDiagramChange` / `onGraphChange` write the
+- [x] Operations unchanged: `onDiagramChange` / `onGraphChange` write the
       Thing's stored selection; they do not navigate the containing Space.
-- [ ] Shrink the Open Space Thing footer geometry now that selectors no longer
+- [x] Shrink the Open Space Thing footer geometry now that selectors no longer
       occupy the body: update `SPACE_THING_FOOTER_HEIGHT`,
       `SPACE_THING_EMBED_INSET.bottom`, `canvas-thing.css` and
       `canvas-thing-embedded-diagram.test.ts` together.
-- [ ] Update misleading comments in `CanvasThing.tsx` and `CommandSurface.tsx`.
-- [ ] Update parity claim `open-space-thing-chooses-its-context-on-the-shared-controls`
+- [x] Update misleading comments in `CanvasThing.tsx` and `CommandSurface.tsx`.
+- [x] Update parity claim `open-space-thing-chooses-its-context-on-the-shared-controls`
       if its wording still implies body placement.
-- [ ] Assert placement in unit tests: selectors live under
+- [x] Assert placement in unit tests: selectors live under
       `canvas-thing-actions` / the rail toolbar, not `.canvas-thing__body`.
-- [ ] Run `pnpm verify`, `pnpm e2e`, and `pnpm e2e:ladle`; record actual
+- [x] Run `pnpm verify`, `pnpm e2e`, and `pnpm e2e:ladle`; record actual
       outcomes.
 
 ## Out of scope
@@ -79,3 +79,40 @@ comment is wrong and must be corrected with the code.
 No ADR. `docs/agents/workflow.md` puts control placement in issues and
 behaviour tests. Ticket `12`'s decision record already states no ADR is needed
 for this class of visual treatment change.
+
+## Answer
+
+Diagram and Graph now extend `ThingRailActions` as named `ToolbarGroup`
+clusters using `ChoiceMenuTrigger` with `ToolbarButton`. Enter, the choices,
+entity actions and Close share the rail's arrow navigation and one tab stop.
+The body retains only plain unread feedback until the target resolves;
+Closed and read-only Things withhold both choices. Selection callbacks still
+write the Thing's own context.
+
+The footer is now 100px, with a 104px bottom inset including the border.
+The CSS and projection geometry test agree, and the minimum Open Size derives
+from the smaller inset. Application and Ladle parity tests assert rail
+placement, keyboard traversal and shared surface treatment.
+
+Standards and Spec reviews, including follow-up test changes, found no defects.
+
+Verification:
+
+- Focused CanvasThing and geometry tests passed after demonstrating the old
+  placement and footer failures. Embedded selection/edit tests: 22 passed.
+- `pnpm e2e:ladle`: 87 passed. The first run exposed an unsupported Home-key
+  assumption in the new test; the final test uses arrows and checks Tab exit.
+- Initial `pnpm verify` exposed old footer, native-disabled and body-panel
+  expectations, now updated, plus test timeouts under parallel load. The final
+  run limits Vitest to two workers without changing tests or thresholds.
+- Initial `pnpm e2e`: 195 passed, two failed on the earlier Home-key assertion
+  and old below-the-embedding placement expectation. Both are corrected.
+
+- Final `pnpm verify`, with `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=1
+  VITEST_MAX_FORKS=2 VITEST_MIN_FORKS=1`: passed all static checks and 2,582
+  tests across 208 files, including coverage thresholds.
+- Application E2E rerun: 195 passed, two edge tests failed while edits to test
+  files triggered Vite page reloads. Both passed in a separate one-worker rerun.
+  All Space Thing tests passed. A final full local run was stopped at the
+  user's request to open the PR and let CI perform final full verification.
+- Final full CI verification is delegated to the PR checks.
