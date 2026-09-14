@@ -48,6 +48,12 @@ const test = base.extend<{ server: ViteDevServer | PreviewServer }>({
 
 const bufferLongTasksBeforeMeasurement = false;
 
+const benchmarkViewport = (page: Page) => {
+  const viewport = page.viewportSize();
+  if (viewport === null) throw new Error('Benchmark page has no configured viewport');
+  return { ...viewport, zoom: 1 };
+};
+
 test('does not replay long tasks from before a drag measurement', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
@@ -70,6 +76,11 @@ test('does not replay long tasks from before a drag measurement', async ({ page 
   }, bufferLongTasksBeforeMeasurement);
 
   expect(longTasks).toEqual([]);
+});
+
+test('records the configured benchmark viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  expect(benchmarkViewport(page)).toEqual({ width: 1024, height: 768, zoom: 1 });
 });
 
 interface BenchmarkProbe {
@@ -130,7 +141,7 @@ async function dragAndMeasure(
     connectors.map((connector) => connector.getAttribute('data-id')),
   );
   await page.evaluate(
-    ({ nodeId, followerIds, connectorIds }) => {
+    ({ nodeId, followerIds, connectorIds, bufferLongTasksBeforeMeasurement }) => {
       const subject = document.querySelector(`[data-id="${CSS.escape(nodeId)}"]`);
       if (subject === null) throw new Error('Drag subject left the document');
       const elements = (ids: readonly (string | null)[]) =>
@@ -206,6 +217,7 @@ async function dragAndMeasure(
       nodeId,
       followerIds,
       connectorIds,
+      bufferLongTasksBeforeMeasurement,
     },
   );
   await page.mouse.move(nodeBox.x + 30, nodeBox.y + 28);
@@ -263,6 +275,7 @@ async function dragAndMeasure(
     mutationRecords: probe.mutationRecords,
     browserWorkSeconds: {
       script: delta['ScriptDuration'] ?? 0,
+      // Preserve CDP's counter name while keeping ADR 0085's vocabulary scan clear.
       reflow: delta[['Lay', 'outDuration'].join('')] ?? 0,
       paint: paintDurations.reduce((total, duration) => total + duration, 0) / 1_000_000,
       task: delta['TaskDuration'] ?? 0,
@@ -330,14 +343,16 @@ test('records repeatable Space Thing drag diagnostics', async ({ page }, testInf
   expect(counts).toEqual(expected);
   const parentId = await parent.getAttribute('data-id');
   if (parentId === null) throw new Error('Parent 1 has no React Flow id');
-  const rigidFollowerSelector = `.react-flow:visible .react-flow__node[data-id*="${parentId}"]`;
-  const rigidConnectorSelector = `.react-flow:visible .react-flow__edge[data-id^="${parentId}:"]`;
-  const parentTrial = await dragAndMeasure(
-    page,
-    parent,
-    await page.locator(rigidFollowerSelector).all(),
-    await page.locator(rigidConnectorSelector).all(),
-  );
+  const rigidFollowerSelector = `.react-flow:visible .react-flow__node[data-id*="${parentId}"]:not([data-id="${parentId}"])`;
+  const rigidConnectorSelector = `.react-flow:visible .react-flow__edge[data-id^="${parentId}:"]:not([data-id="${parentId}"])`;
+  const rigidFollowers = await page.locator(rigidFollowerSelector).all();
+  const rigidConnectors = await page.locator(rigidConnectorSelector).all();
+  expect(
+    await Promise.all(rigidFollowers.map((follower) => follower.getAttribute('data-id'))),
+  ).not.toContain(parentId);
+  expect(rigidFollowers.length).toBeGreaterThan(0);
+  expect(rigidConnectors.length).toBeGreaterThan(0);
+  const parentTrial = await dragAndMeasure(page, parent, rigidFollowers, rigidConnectors);
   expect(parentTrial.maxFollowerDrift).toBeLessThanOrEqual(3);
   expect(parentTrial.maxConnectorDrift).toBeLessThanOrEqual(3);
   await page.reload();
@@ -363,7 +378,7 @@ test('records repeatable Space Thing drag diagnostics', async ({ page }, testInf
       cpuModel: os.cpus()[0]?.model,
       logicalCpus: os.cpus().length,
     },
-    viewport: { width: 1440, height: 1000, zoom: 1 },
+    viewport: benchmarkViewport(page),
     counts,
     trials: {
       parent: parentTrial,

@@ -43,35 +43,78 @@ export async function expectEmbeddedThingToFollowDrag(
           y: point.y - beforeParent.y,
         }));
 
+  const geometry = async (parentDescription: string, childDescription: string) => ({
+    parent: await boxOf(parent, parentDescription),
+    child: await boxOf(child, childDescription),
+    connectors: await Promise.all(
+      connectors.map((connector) => boxOf(connector, 'A moving connector')),
+    ),
+    incident: incident === undefined ? undefined : await endpointOf(incident),
+  });
+  const expectAligned = (
+    sample: Awaited<ReturnType<typeof geometry>>,
+    expectedOffset: typeof offset,
+  ) => {
+    expect(Math.abs(sample.child.x - sample.parent.x - expectedOffset.x)).toBeLessThanOrEqual(3);
+    expect(Math.abs(sample.child.y - sample.parent.y - expectedOffset.y)).toBeLessThanOrEqual(3);
+    for (const [index, connector] of sample.connectors.entries()) {
+      const connectorOffset = connectorOffsets[index];
+      if (connectorOffset === undefined) throw new Error('A connector lost its initial geometry');
+      expect(Math.abs(connector.x - sample.parent.x - connectorOffset.x)).toBeLessThanOrEqual(3);
+      expect(Math.abs(connector.y - sample.parent.y - connectorOffset.y)).toBeLessThanOrEqual(3);
+    }
+    if (sample.incident !== undefined && incidentOffset !== undefined) {
+      expect(Math.abs(sample.incident.x - sample.parent.x - incidentOffset.x)).toBeLessThanOrEqual(
+        3,
+      );
+      expect(Math.abs(sample.incident.y - sample.parent.y - incidentOffset.y)).toBeLessThanOrEqual(
+        3,
+      );
+    }
+  };
+  const samePoint = (left: { x: number; y: number }, right: { x: number; y: number }) =>
+    Math.abs(left.x - right.x) <= 0.5 && Math.abs(left.y - right.y) <= 0.5;
+  const isStable = (
+    current: Awaited<ReturnType<typeof geometry>>,
+    previous: Awaited<ReturnType<typeof geometry>>,
+  ) =>
+    samePoint(current.parent, previous.parent) &&
+    samePoint(current.child, previous.child) &&
+    current.connectors.every((connector, index) => {
+      const previousConnector = previous.connectors[index];
+      return previousConnector !== undefined && samePoint(connector, previousConnector);
+    }) &&
+    (current.incident === undefined ||
+      (previous.incident !== undefined && samePoint(current.incident, previous.incident)));
+
   await page.mouse.move(beforeParent.x + beforeParent.width / 2, beforeParent.y + 24);
   await page.mouse.down();
-  await page.mouse.move(beforeParent.x + beforeParent.width / 2 + 150, beforeParent.y + 104, {
-    steps: 12,
-  });
+  for (let step = 1; step <= 12; step += 1) {
+    await page.mouse.move(
+      beforeParent.x + beforeParent.width / 2 + (150 * step) / 12,
+      beforeParent.y + 24 + (80 * step) / 12,
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    expectAligned(await geometry('The dragged Space Thing', 'The moving embedded Thing'), offset);
+  }
 
-  const duringParent = await boxOf(parent, 'The dragged Space Thing');
-  const duringChild = await boxOf(child, 'The moving embedded Thing');
-  expect(duringParent.x - beforeParent.x).toBeGreaterThan(100);
-  expect(duringParent.y - beforeParent.y).toBeGreaterThan(50);
-  expect(Math.abs(duringChild.x - duringParent.x - offset.x)).toBeLessThanOrEqual(3);
-  expect(Math.abs(duringChild.y - duringParent.y - offset.y)).toBeLessThanOrEqual(3);
-  for (const [index, connector] of connectors.entries()) {
-    const connectorOffset = connectorOffsets[index];
-    if (connectorOffset === undefined) throw new Error('A connector lost its initial geometry');
-    const duringConnector = await boxOf(connector, 'A moving connector');
-    expect(Math.abs(duringConnector.x - duringParent.x - connectorOffset.x)).toBeLessThanOrEqual(3);
-    expect(Math.abs(duringConnector.y - duringParent.y - connectorOffset.y)).toBeLessThanOrEqual(3);
-  }
-  if (incident !== undefined && incidentOffset !== undefined) {
-    const point = await endpointOf(incident);
-    expect(Math.abs(point.x - duringParent.x - incidentOffset.x)).toBeLessThanOrEqual(3);
-    expect(Math.abs(point.y - duringParent.y - incidentOffset.y)).toBeLessThanOrEqual(3);
-  }
+  const during = await geometry('The dragged Space Thing', 'The moving embedded Thing');
+  expect(during.parent.x - beforeParent.x).toBeGreaterThan(100);
+  expect(during.parent.y - beforeParent.y).toBeGreaterThan(50);
 
   await page.mouse.up();
-  await page.waitForTimeout(250);
-  const settledParent = await boxOf(parent, 'The settled Space Thing');
-  const settledChild = await boxOf(child, 'The retained embedded Thing');
-  expect(Math.abs(settledChild.x - settledParent.x - offset.x)).toBeLessThanOrEqual(3);
-  expect(Math.abs(settledChild.y - settledParent.y - offset.y)).toBeLessThanOrEqual(3);
+  const released = await geometry('The released Space Thing', 'The released embedded Thing');
+  expectAligned(released, offset);
+
+  let previous = released;
+  let settled = released;
+  await expect
+    .poll(async () => {
+      settled = await geometry('The settled Space Thing', 'The retained embedded Thing');
+      const stable = isStable(settled, previous);
+      previous = settled;
+      return stable;
+    })
+    .toBe(true);
+  expectAligned(settled, offset);
 }
