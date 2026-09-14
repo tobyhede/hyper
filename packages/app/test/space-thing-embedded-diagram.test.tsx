@@ -371,7 +371,9 @@ describe('the Diagram an Open Space Thing draws', () => {
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_THING_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Thing missing');
     expect(within(parent).queryByRole('button', { name: /Close Thing/ })).toBeNull();
-    expect(within(parent).getByTestId('space-thing-diagram').hasAttribute('disabled')).toBe(true);
+    expect(
+      within(parent).getByTestId('space-thing-diagram').getAttribute('aria-disabled') === 'true',
+    ).toBe(true);
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_THING_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Thing missing');
     expect(within(sibling).queryByRole('button', { name: /Edit Thing/ })).toBeNull();
@@ -492,9 +494,13 @@ describe('the Diagram an Open Space Thing draws', () => {
     // Every containing Thing control goes, on the Space Thing holding the edit
     // and on its sibling alike, and so does the other embedding's own.
     expect(within(editing).queryByRole('button', { name: /Close Thing/ })).toBeNull();
-    expect(within(editing).getByTestId('space-thing-diagram').hasAttribute('disabled')).toBe(true);
+    expect(
+      within(editing).getByTestId('space-thing-diagram').getAttribute('aria-disabled') === 'true',
+    ).toBe(true);
     expect(within(other).queryByRole('button', { name: /Close Thing/ })).toBeNull();
-    expect(within(other).getByTestId('space-thing-diagram').hasAttribute('disabled')).toBe(true);
+    expect(
+      within(other).getByTestId('space-thing-diagram').getAttribute('aria-disabled') === 'true',
+    ).toBe(true);
     expect(within(otherEmbedded).queryByRole('button', { name: 'Edit Title Intake' })).toBeNull();
 
     fireEvent.keyDown(within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Thing title' }), {
@@ -691,7 +697,9 @@ describe('the Diagram an Open Space Thing draws', () => {
     );
     expect(within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Close Thing/ })).toBeNull();
     expect(
-      within(embeddedNode(DRAWN_B)).getByTestId('space-thing-diagram').hasAttribute('disabled'),
+      within(embeddedNode(DRAWN_B))
+        .getByTestId('space-thing-diagram')
+        .getAttribute('aria-disabled') === 'true',
     ).toBe(true);
     const outer = document.querySelector(`.react-flow__node[data-id="${SPACE_THING_ID}"]`);
     if (!(outer instanceof HTMLElement)) throw new Error('Outer Thing missing');

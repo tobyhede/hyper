@@ -552,12 +552,13 @@ test('a Title being written on more lines than fit does not push the rail out of
 });
 
 test(
-  'a Space Thing offers Enter on its rail as a kind command',
+  'a Space Thing offers Enter in its entity menu',
   { tag: '@parity:space-thing-offers-enter' },
   async ({ page }) => {
     await page.goto('/?story=components--thing--enter-space&mode=preview');
 
-    const enter = page.getByRole('button', { name: 'Enter Space Architecture' });
+    await page.getByRole('button', { name: 'Actions for Thing Architecture' }).click();
+    const enter = page.getByRole('menuitem', { name: 'Enter', exact: true });
     await expect(enter).toBeVisible();
     await expect(page.getByTestId('enter-report')).toHaveText('Not entered.');
     await enter.click();
@@ -572,9 +573,9 @@ test(
     await page.goto('/?story=components--thing--open-independently&mode=preview');
 
     await page.getByRole('button', { name: 'Actions for Thing Architecture' }).click();
-    await expect(page.getByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
     await expect(page.getByTestId('independent-open-report')).toHaveText('Not sent.');
-    await page.getByRole('menuitem', { name: /^Open in new tab/ }).click();
+    await page.getByRole('menuitem', { name: /^Open in New Tab/ }).click();
     await expect(page.getByTestId('independent-open-report')).toHaveText(
       'Sent space 00000000-0000-4000-8000-000000000020 to a new tab.',
     );

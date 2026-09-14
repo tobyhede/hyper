@@ -144,7 +144,7 @@ function mountGraph(
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([stored]), stored);
-  const { authoring } = composeApp({ spaceSession });
+  const { authoring, continuation } = composeApp({ spaceSession });
   const testedAuthoring = {
     ...authoring,
     complete: (completion: Parameters<typeof authoring.complete>[0]) => {
@@ -155,6 +155,7 @@ function mountGraph(
   const graph = () => (
     <ReactFlowProvider>
       <SpaceCanvas
+        continuation={continuation}
         nodes={nodes}
         edges={[]}
         projectedNodes={null}

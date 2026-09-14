@@ -347,10 +347,13 @@ export interface SpaceAuthoring {
    */
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
-  /** Complete an embedded Thing gesture without moving this Space's Navigation. */
+  /**
+   * Author the explicitly addressed Diagram without switching this Space's canvas.
+   * Deleting its visible Active Graph advances that selection to a survivor.
+   */
   readonly completeInDiagram: (
     diagramId: UUID,
-    completion: EmbeddedThingCompletion,
+    completion: EmbeddedThingCompletion | EmbeddedContextCompletion,
   ) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
@@ -444,6 +447,14 @@ export type EmbeddedThingCompletion = Extract<
       | 'edited-thing'
       | 'settled-thing-movement'
       | 'removed-thing-from-diagram';
+  }
+>;
+
+/** Commands addressed to the Diagram shown by a Space Thing. */
+export type EmbeddedContextCompletion = Extract<
+  AuthoringCompletion,
+  {
+    kind: 'renamed-diagram' | 'added-graph' | 'renamed-graph' | 'recolored-graph' | 'deleted-graph';
   }
 >;
 
@@ -714,9 +725,8 @@ const aliasTargetRefusal = (space: Space, document: ThingDocument): AuthoringRef
   if (document.kind !== 'alias') return null;
   const target = space.lookup.thing(document.target);
   if (target === undefined) return { code: 'alias-target-not-found', targetId: document.target };
-  // Single-hop by construction (ADR 0009): the Target must own Markdown
-  // content, so neither another Alias nor a Space Thing can be targeted.
-  if (target.kind !== 'markdown') {
+  // Alias resolution ends after one Thing reference, including a Space Thing.
+  if (target.kind === 'alias') {
     return { code: 'alias-target-must-own-content', targetId: document.target };
   }
   return null;
@@ -1823,6 +1833,17 @@ export function createSpaceAuthoring({
         session.submit(snapshot);
         if (navigation.getState().selectedDiagramId === reported.embeddedDiagramId) {
           install(derived.edit.placement);
+          // A context menu may delete the Graph the target's own canvas shows.
+          // Keep its Diagram, but never leave Navigation naming a removed Graph.
+          if (
+            reported.completion.kind === 'deleted-graph' &&
+            navigation.getState().activeGraphId === reported.completion.graphId
+          ) {
+            navigation.continueInDiagram(
+              reported.embeddedDiagramId,
+              derived.edit.nextActiveGraphId,
+            );
+          }
         }
       });
     }

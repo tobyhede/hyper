@@ -147,8 +147,8 @@ describe('an embedded production projection', () => {
     // proposal accepted inside them is clipped rather than drawn (below).
     const drawn = view({ width: 700, height: 500 });
     expect(constrainEmbeddedPosition({ x: 600, y: 120 }, drawn)).toEqual({ x: 600, y: 120 });
-    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, drawn)).toEqual({ x: 660, y: 296 });
-    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, drawn)).toEqual({ x: 16, y: 42 });
+    expect(constrainEmbeddedPosition({ x: 900, y: 640 }, drawn)).toEqual({ x: 660, y: 372 });
+    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, drawn)).toEqual({ x: 16, y: 16 });
   });
 
   it('holds a proposal inside bounds an ancestor has narrowed', () => {
@@ -166,7 +166,7 @@ describe('an embedded production projection', () => {
     const node = embedded(drawn.nodes, B);
     const held = constrainEmbeddedPosition({ x: 900, y: 640 }, view(parent));
     // 260x146 of Thing, of which the sliver keeps 24 on each axis inside the
-    // view: right 660 + 260 - 684, bottom 296 + 146 - 320. Clamped to the
+    // view: right 660 + 260 - 684, bottom 372 + 146 - 396. Clamped to the
     // containing box instead, both clips exceeded the Thing's own extent and the
     // committed Thing vanished from the embedded view altogether.
     expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(

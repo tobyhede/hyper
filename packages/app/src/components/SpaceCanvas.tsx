@@ -55,6 +55,7 @@ import type { OpenSpace } from '../open-spaces';
 import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-diagram';
 import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedDiagramAuthoring, type EmbeddedPublication } from './EmbeddedDiagramAuthoring';
+import type { Continuation } from '../continuation';
 
 const EMPTY_ENTRIES = [] as const;
 const emptySubscription = () => () => undefined;
@@ -146,6 +147,7 @@ const focusedThing = (target: Element, nodes: readonly ThingFlowNode[]): ThingId
 };
 
 export interface SpaceCanvasProps {
+  readonly continuation: Continuation;
   nodes: ThingFlowNode[];
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
@@ -269,17 +271,10 @@ export interface SpaceCanvasProps {
    * note already names.
    */
   thingEntityActions?: (thingId: ThingId) => readonly EntityActionGroup[];
-  /**
-   * Enter the Space a Space Thing on this canvas references.
-   *
-   * Passed straight through to `useCanvasThingAuthoring`. Absent leaves every
-   * Space Thing without Enter (`canvas-thing-authoring.test.tsx`,
-   * 'omits Enter when onEnterSpace is absent').
-   */
-  onEnterSpace?: ((thingId: ThingId) => void) | undefined;
 }
 
 export function SpaceCanvas({
+  continuation,
   nodes,
   edges,
   projectedNodes,
@@ -310,7 +305,6 @@ export function SpaceCanvas({
   activeGraphThingIds,
   spaceThingTargets,
   thingEntityActions,
-  onEnterSpace,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -331,6 +325,16 @@ export function SpaceCanvas({
    * are reporting one failure, and each names itself where it is drawn.
    */
   const [embeddedFailures, setEmbeddedFailures] = useState<ReadonlyMap<ThingId, string>>(new Map());
+  const [bodyHeights, setBodyHeights] = useState<ReadonlyMap<string, number>>(new Map());
+  const reportBodyHeight = useCallback((id: string, height: number | null) => {
+    setBodyHeights((previous) => {
+      if (height === null ? !previous.has(id) : previous.get(id) === height) return previous;
+      const next = new Map(previous);
+      if (height === null) next.delete(id);
+      else next.set(id, height);
+      return next;
+    });
+  }, []);
   const embeddedRequests = useMemo(() => {
     const requests: {
       parent: ThingFlowNode;
@@ -340,28 +344,28 @@ export function SpaceCanvas({
       entry: OpenSpace | undefined;
       absolute: DiagramPosition;
       bounds: EmbeddedBounds;
+      readOnly: boolean;
     }[] = [];
     const queue: {
       parent: ThingFlowNode;
-      session: SpaceSession;
       origin: DiagramPosition;
       clip: EmbeddedBounds | null;
       /** The Diagrams already crossed to reach this parent, newest last. */
       path: ReadonlySet<string>;
+      readOnly: boolean;
     }[] = nodes.map((parent) => ({
       parent,
-      session: spaceSession,
       origin: { x: 0, y: 0 },
       clip: null,
       path: new Set<string>(),
+      readOnly: false,
     }));
     for (const item of queue) {
-      const { parent, session, origin, clip, path } = item;
-      if (parent.data.kind !== 'space' || parent.data.expanded !== true) continue;
-      const document = session
-        .getState()
-        .working.things.find((thing) => thing.id === parent.data.thingId)?.document;
-      if (document?.kind !== 'space') continue;
+      const { parent, origin, clip, path } = item;
+      if (parent.data.expanded !== true) continue;
+      const document = parent.data.spaceContent;
+      if (document === undefined) continue;
+      const readOnly = item.readOnly || parent.data.kind === 'alias';
       // A Diagram already on this path would embed itself. Single-Space intake
       // refuses only a Thing targeting its own Space, so a mutual pair reaches
       // here validated and would otherwise nest one level deeper per commit.
@@ -369,6 +373,8 @@ export function SpaceCanvas({
       if (path.has(crossing)) continue;
       const crossed = new Set(path).add(crossing);
       const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
+      const footer = bodyHeights.get(parent.id);
+      const bottomInset = footer === undefined ? SPACE_THING_EMBED_INSET.bottom : footer + 4;
       const intersection = {
         left: Math.max(absolute.x + SPACE_THING_EMBED_INSET.left, clip?.left ?? -Infinity),
         top: Math.max(absolute.y + SPACE_THING_EMBED_INSET.top, clip?.top ?? -Infinity),
@@ -376,13 +382,11 @@ export function SpaceCanvas({
           absolute.x + (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
           clip?.right ?? Infinity,
         ),
-        bottom: Math.min(
-          absolute.y + (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
-          clip?.bottom ?? Infinity,
-        ),
+        bottom: Math.min(absolute.y + (parent.height ?? 0) - bottomInset, clip?.bottom ?? Infinity),
       };
       requests.push({
         parent,
+        readOnly,
         spaceId: document.spaceId,
         diagramId: document.diagram,
         graphId: document.graph,
@@ -400,15 +404,15 @@ export function SpaceCanvas({
         for (const child of published.nodes)
           queue.push({
             parent: child,
-            session: published.entry.session,
             origin: absolute,
             clip: intersection,
             path: crossed,
+            readOnly,
           });
       }
     }
     return requests;
-  }, [nodes, spaceSession, entries, embeddedPublications]);
+  }, [nodes, entries, embeddedPublications, bodyHeights]);
   /**
    * A read outlives its embedding only while the *target* is gone.
    *
@@ -474,6 +478,7 @@ export function SpaceCanvas({
     return () => reportEmbeddedDiagramEditing(false);
   }, [embeddedEditing, reportEmbeddedDiagramEditing]);
   const thingAuthoring = useCanvasThingAuthoring({
+    continuation,
     nodes,
     availability,
     nameOnCreation,
@@ -483,7 +488,6 @@ export function SpaceCanvas({
     onSelectThing,
     spaceThingTargets,
     thingEntityActions,
-    onEnterSpace,
   });
   const { bodyEditing, openThing: onOpenThing, beginTitleEditing } = thingAuthoring;
 
@@ -724,8 +728,16 @@ export function SpaceCanvas({
    * `editableNodes` would put another Space's Thing inside each of them.
    */
   const canvasNodes = useMemo(
-    () => [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)],
-    [editableNodes, liveEmbeddings],
+    () =>
+      [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) =>
+        node.data.spaceContent === undefined
+          ? node
+          : {
+              ...node,
+              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+            },
+      ),
+    [editableNodes, liveEmbeddings, reportBodyHeight],
   );
   const canvasEdges = useMemo(
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
@@ -1023,6 +1035,7 @@ export function SpaceCanvas({
       {embeddedRequests.map((request) =>
         request.entry === undefined ? null : (
           <EmbeddedDiagramAuthoring
+            continuation={continuation}
             key={`${request.parent.id}:${request.diagramId}`}
             parent={request.parent}
             entry={request.entry}
@@ -1041,6 +1054,7 @@ export function SpaceCanvas({
             // freshness; the answers `App` holds are a frame behind them, since
             // each is reported up through an effect.
             enabled={
+              !request.readOnly &&
               availability.authorInEmbeddedDiagram &&
               (availability.authorOnCanvas || editingEmbeddingIds.has(request.parent.id)) &&
               !bodyEditing &&

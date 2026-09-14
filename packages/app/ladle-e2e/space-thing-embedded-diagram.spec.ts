@@ -1,3 +1,13 @@
+import { thingControls } from '../e2e/graph';
+import {
+  exerciseSpaceThingPadding,
+  exerciseSpaceThingFooter,
+  exerciseFloatingThingDock,
+} from '../e2e/space-thing-frame';
+import {
+  exerciseSpaceThingContextMenus,
+  exerciseSpaceThingEntityMenu,
+} from '../e2e/space-thing-context-menu';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const STORY = '/?story=surfaces--space-thing-embedded-diagram--selected-diagram&mode=preview';
@@ -77,8 +87,32 @@ test(
     const thing = spaceThing(page);
 
     // What the Thing holds: the target Space's own Diagram and Graph, named.
-    await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 1');
-    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Overview');
+    await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+      'Collection 1',
+    );
+    await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+      'Overview',
+    );
+
+    const rail = (await thingControls(page, thing)).getByTestId('canvas-thing-actions');
+    await expect((await thingControls(page, thing)).getByRole('toolbar')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-diagram')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-graph')).toHaveCount(1);
+    await expect(
+      thing.locator('.canvas-thing__body').getByRole('button', { name: /^(Diagram|Graph):/ }),
+    ).toHaveCount(0);
+    const diagramControl = rail.getByTestId('space-thing-diagram');
+    await diagramControl.focus();
+    await diagramControl.press('ArrowRight');
+    await expect(rail.getByTestId('space-thing-graph')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
+    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toHaveCount(0);
+    await page.keyboard.press('Tab');
+    await expect(rail.locator(':focus')).toHaveCount(0);
+    await diagramControl.focus();
 
     const treatment = (locator: Locator) =>
       locator.evaluate((element) => {
@@ -91,9 +125,9 @@ test(
           padding: style.paddingTop,
         };
       });
-    expect(await treatment(thing.locator('[data-slot="command-surface"]'))).toEqual(
-      await treatment(page.locator('.command-dock__surface:visible')),
-    );
+    expect(
+      await treatment((await thingControls(page, thing)).getByTestId('canvas-thing-actions')),
+    ).toEqual(await treatment(page.locator('.command-dock__surface:visible')));
 
     // The same list the Dock's own Diagram cluster discloses: radio rows, one
     // marked, reached from the control that names what is chosen.
@@ -107,7 +141,7 @@ test(
     // afterwards could only have come from the choice.
     const selectedDiagram = page.locator('[data-testid="selected-canvas"]:visible');
     const before = await selectedDiagram.innerText();
-    await thing.getByTestId('space-thing-diagram').click();
+    await (await thingControls(page, thing)).getByTestId('space-thing-diagram').click();
     const row = page.getByRole('menuitemradio', { name: 'Collection 2' });
     await expect(row).toBeVisible();
     await row.click();
@@ -115,8 +149,12 @@ test(
     // The Thing's stored context is the chosen one, Graph included: choosing a
     // Diagram seeds the Graph from that Diagram's own Active Graph
     // (`canvas-thing-authoring.ts`), so both names move together.
-    await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Collection 2');
-    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Detail');
+    await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+      'Collection 2',
+    );
+    await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+      'Detail',
+    );
 
     // And the embedding redrew to the chosen Diagram: its own Thing, and none of
     // the Diagram that was selected a moment ago.
@@ -215,5 +253,52 @@ test(
     await expect(detail.getByRole('heading', { name: 'Storage' })).toBeVisible();
     await expect(detail.getByRole('heading', { name: 'Index' })).toBeVisible();
     await expect(detail.getByRole('heading', { name: 'Intake' })).toHaveCount(0);
+  },
+);
+
+test(
+  'Space Thing context menus author the target with the Dock commands',
+  { tag: '@parity:space-thing-context-menus-share-dock-actions' },
+  async ({ page }) => {
+    await open(page);
+    await exerciseSpaceThingContextMenus(page, spaceThing(page));
+  },
+);
+
+test(
+  'Space Thing entity menu groups commands and creates a Space Alias',
+  { tag: '@parity:space-thing-entity-menu' },
+  async ({ page }) => {
+    await open(page);
+    await exerciseSpaceThingEntityMenu(page, spaceThing(page));
+  },
+);
+
+test(
+  'Space Thing canvas has equal top and side padding',
+  { tag: '@parity:space-thing-canvas-padding' },
+  async ({ page }) => {
+    await open(page);
+    await exerciseSpaceThingPadding(page, spaceThing(page), embeddedNodes(page).first());
+  },
+);
+
+test(
+  'Space Thing title footer follows its content',
+  { tag: '@parity:space-thing-content-sized-footer' },
+  async ({ page }) => {
+    await open(page);
+    const thing = spaceThing(page);
+    await exerciseSpaceThingFooter(page, thing, embeddedNodes(page).first());
+  },
+);
+
+test(
+  'Thing dock floats eight pixels inside the border above embedded content',
+  { tag: '@parity:thing-dock-floats' },
+  async ({ page }) => {
+    await open(page);
+    const thing = spaceThing(page);
+    await exerciseFloatingThingDock(page, thing);
   },
 );

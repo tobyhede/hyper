@@ -3,6 +3,7 @@ import {
   chromeControlStaysOwed,
   type Continuation,
   type ContinuationControl,
+  type ContinuationTarget,
 } from '../continuation';
 
 /**
@@ -24,8 +25,17 @@ import {
  * control it was opened from and hands focus back itself, so neither the kind
  * nor the walk survived the surface.
  */
-const elementOf = (root: ParentNode, name: string): HTMLElement | null =>
-  root.querySelector<HTMLElement>(`[data-continuation-control="${CSS.escape(name)}"]`);
+const elementOf = (
+  root: ParentNode,
+  { name, scope }: Extract<ContinuationTarget, { kind: 'control' }>,
+): HTMLElement | null =>
+  root.querySelector<HTMLElement>(
+    `[data-continuation-control="${CSS.escape(name)}"]${
+      scope === undefined
+        ? ':not([data-continuation-scope])'
+        : `[data-continuation-scope="${CSS.escape(scope.id)}"][data-continuation-subject="${CSS.escape(scope.subject)}"]`
+    }`,
+  );
 
 const controlActivatable = (element: HTMLElement): boolean =>
   element.getAttribute('aria-disabled') !== 'true' &&
@@ -70,40 +80,57 @@ export function ChromeContinuation({
     const { target } = pending;
     if (target.kind !== 'control') return;
 
-    const element = elementOf(within.current ?? document, target.name);
-    const waits = chromeControlStaysOwed(pending);
+    const root = within.current ?? document;
+    const attempt = () => {
+      if (continuation.getState().pending !== pending) return;
+      const element = elementOf(root, target);
+      const waits = chromeControlStaysOwed(pending);
 
-    if (element === null) {
-      if (!waits) continuation.take();
-      return;
-    }
+      if (element === null) {
+        if (!waits) continuation.take();
+        return;
+      }
 
-    if (waits && (!chromeRenameReady || !controlActivatable(element))) return;
+      if (waits && (!chromeRenameReady || !controlActivatable(element))) return;
 
-    continuation.take();
-    // `then` is read rather than assumed: the module's four values are one type
-    // for both adapters, so an arm this cannot honour — `reveal` has no meaning
-    // off the canvas — is spent quietly instead of silently taking the caret.
-    if (pending.then === 'focus') {
-      element.focus();
-      onLand?.(target.name);
-      return;
-    }
-    /*
-     * **A rename is begun by pressing this address, not the visible name.**
-     * The name discloses the list. New Diagram continues on a dedicated
-     * sibling the reader never sees, and that press starts the in-place editor
-     * the way choosing Rename does. The editor focuses itself on mount, so a
-     * `focus()` here would leave the caret on the button.
-     *
-     * A withdrawn chrome rename disables this address (`disabled` on the
-     * native button). A click then does nothing, which is the same answer the
-     * reader gets from an unavailable Rename row.
-     */
-    if (pending.then === 'rename') {
-      element.click();
-      onLand?.(target.name);
-    }
+      continuation.take();
+      // `then` is read rather than assumed: the module's four values are one type
+      // for both adapters, so an arm this cannot honour — `reveal` has no meaning
+      // off the canvas — is spent quietly instead of silently taking the caret.
+      if (pending.then === 'focus') {
+        element.focus();
+        if (target.scope === undefined) onLand?.(target.name);
+        return;
+      }
+      /*
+       * **A rename is begun by pressing this address, not the visible name.**
+       * The name discloses the list. New Diagram continues on a dedicated
+       * sibling the reader never sees, and that press starts the in-place editor
+       * the way choosing Rename does. The editor focuses itself on mount, so a
+       * `focus()` here would leave the caret on the button.
+       *
+       * A withdrawn chrome rename disables this address (`disabled` on the
+       * native button). A click then does nothing, which is the same answer the
+       * reader gets from an unavailable Rename row.
+       */
+      if (pending.then === 'rename') {
+        element.click();
+        if (target.scope === undefined) onLand?.(target.name);
+      }
+    };
+    attempt();
+    if (target.scope === undefined || continuation.getState().pending !== pending) return;
+    // React Flow can publish a new rail subject without re-rendering this
+    // adapter. The scoped readiness case in chrome-continuation.test.tsx
+    // holds that this waits for the created Diagram, rather than its predecessor.
+    const observer = new MutationObserver(attempt);
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-continuation-subject', 'disabled', 'aria-disabled'],
+    });
+    return () => observer.disconnect();
   }, [pending, continuation, within, chromeRenameReady, onLand]);
 
   return null;

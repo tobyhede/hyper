@@ -604,13 +604,8 @@ describe.each([
       );
     });
 
-    it('refuses an alias whose target is a Space Thing', () => {
-      const errors = refused(
-        load({ things: [spaceThing(A, ABSENT), aliasTo(B, A)], diagrams: [] }),
-      );
-      expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'alias-target-must-own-content', ref: A }),
-      );
+    it('accepts an alias whose target is a Space Thing', () => {
+      expect(load({ things: [spaceThing(A, ABSENT), aliasTo(B, A)], diagrams: [] }).ok).toBe(true);
     });
   });
 

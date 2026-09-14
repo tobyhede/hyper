@@ -1,5 +1,7 @@
 import {
   useCallback,
+  useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -15,8 +17,11 @@ import {
   ThingRailSharedActions,
 } from './ThingRailActions';
 import { ThingContentEditProvider, type ThingContentEdit } from './thing-content-edit';
+import type { PaletteColorEntry } from './PaletteColorPicker';
+import { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
+import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
-import { CommandSurface } from './CommandSurface';
+import { ToolbarButton, ToolbarGroup } from './components/toolbar';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ThingRail } from './ThingRail';
 import { Card, CardContent, CardTitle } from './components/card';
@@ -25,7 +30,6 @@ import {
   CloseThingIcon,
   CommitEditIcon,
   EditIcon,
-  EnterSpaceIcon,
   EntityActionsIcon,
   GraphIcon,
   DiagramIcon,
@@ -75,8 +79,9 @@ export type CanvasThingFront =
     })
   | {
       readonly kind: 'alias';
-      /** The resolved Target Markdown this Alias displays read-only. */
-      readonly source: string;
+      /** The resolved Target content this Alias displays read-only. */
+      readonly target:
+        { readonly kind: 'markdown'; readonly source: string } | { readonly kind: 'space' };
       /** Authored Diagram state; an Alias Opens through the shared Thing operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -92,12 +97,6 @@ export type CanvasThingFront =
        * the target Space has not been read yet.
        */
       readonly selection?: CanvasSpaceThingSelection;
-      /**
-       * Enter the referenced Space, replacing the canvas. A kind command
-       * (ADR 0073): it belongs on this rail whether the Thing is Open or
-       * Closed, and it is withheld from a read-only surface.
-       */
-      readonly onEnter?: () => void;
     };
 
 /** One entity a Space Thing's selectors can be pointed at, named as an author reads it. */
@@ -116,7 +115,25 @@ export interface CanvasSpaceThingChoice {
  * Diagram this Thing no longer shows. Which Diagrams and Graphs exist is the target
  * Space's business and neither is derived here.
  */
+export interface CanvasSpaceThingCommands {
+  readonly onRename: (title: string) => string | null;
+  readonly onCreate: (renameScope: string) => Promise<string | null>;
+  readonly onDelete: () => Promise<string | null>;
+  readonly onCopyLink: () => Promise<string | null>;
+  readonly deleteDisabled: boolean;
+}
+
+export interface CanvasSpaceThingGraphCommands extends CanvasSpaceThingCommands {
+  readonly color: string;
+  readonly colors: readonly PaletteColorEntry[];
+  readonly onRecolor: (color: string) => string | null;
+  readonly onCopyPermanentLink: () => Promise<string | null>;
+}
+
 export interface CanvasSpaceThingSelection {
+  readonly onEditingChange?: (editing: boolean) => void;
+  readonly diagramCommands?: CanvasSpaceThingCommands;
+  readonly graphCommands?: CanvasSpaceThingGraphCommands;
   readonly diagrams: readonly CanvasSpaceThingChoice[];
   readonly graphs: readonly CanvasSpaceThingChoice[];
   /** The selected Diagram, or `null` where the Thing selects none. */
@@ -147,6 +164,10 @@ export type CanvasThingState = 'rest' | 'selected' | 'dragging' | 'editing';
 
 interface CanvasThingCommonProps {
   readonly front: CanvasThingFront;
+  /** A canvas adapter may lift the rail above embedded content in its viewport. */
+  readonly renderRail?: (rail: ReactNode) => ReactNode;
+  /** Reports the content-sized title footer in unscaled layout pixels. */
+  readonly onBodyHeightChange?: (height: number | null) => void;
   readonly title: string;
   readonly graphColor: string;
   /**
@@ -261,6 +282,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  * own visual treatment lives in `canvas-thing.css`, colocated with this module.
  */
 export function CanvasThing(props: CanvasThingProps) {
+  const [hovered, setHovered] = useState(false);
   const { front, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Thing is called wherever it is *named* rather than drawn.
@@ -275,16 +297,22 @@ export function CanvasThing(props: CanvasThingProps) {
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   /** The kinds that draw a Markdown document below their Title. */
-  const contentFront = front.kind === 'markdown' || front.kind === 'alias' ? front : undefined;
+  const contentFront =
+    front.kind === 'markdown'
+      ? front
+      : front.kind === 'alias' && front.target.kind === 'markdown'
+        ? { ...front, source: front.target.source }
+        : undefined;
   /**
    * The kinds that carry authored Open/Closed state — every kind but the
    * creation ghost, which is not a Thing yet and so has no Diagram to author it
    * on. It is a wider set than `contentFront` because a Space Thing Opens
    * without having any Markdown of its own to reveal: what it shows when it
-   * opens is its two selectors, drawn in the body rather than above it.
+   * opens is its embedded Diagram, with selection commands on the rail.
    */
   const openableFront = front.kind === 'preview' ? undefined : front;
   const open = openableFront?.open === true;
+  const bodyControl = useRef<HTMLDivElement>(null);
   const contentControl = useRef<HTMLDivElement>(null);
   const contentExitDuration = useCallback(
     () => (contentControl.current === null ? 0 : opacityTransitionMs(contentControl.current)),
@@ -296,7 +324,6 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentPresence = usePresence(contentFront?.open === true, contentExitDuration);
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
   const onBeginContentEdit = !readOnly && front.kind === 'markdown' ? front.onBeginEdit : undefined;
-  const onEnter = !readOnly && front.kind === 'space' ? front.onEnter : undefined;
   /**
    * The edit running inside the Markdown front this Thing owns.
    *
@@ -310,12 +337,15 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions = entityActions?.some((group) => group.length > 0) === true;
+  const [contextNotice, setContextNotice] = useState<string | null>(null);
+  const spaceSelection =
+    !readOnly && front.kind === 'space' && front.open ? front.selection : undefined;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (visibleContentEdit !== null ||
+    (spaceSelection !== undefined ||
+      visibleContentEdit !== null ||
       onOpenChange !== undefined ||
-      onEnter !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const style: CanvasThingStyle = { '--canvas-thing-graph': graphColor };
@@ -341,13 +371,117 @@ export function CanvasThing(props: CanvasThingProps) {
     }
   }, [contentPresence.state]);
 
+  const onBodyHeightChange = props.onBodyHeightChange;
+  useLayoutEffect(() => {
+    const body = bodyControl.current;
+    if (body === null || onBodyHeightChange === undefined) return;
+    const report = () => onBodyHeightChange(body.offsetHeight);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(body);
+    return () => {
+      observer.disconnect();
+      onBodyHeightChange(null);
+    };
+  }, [onBodyHeightChange]);
+
+  const rail = (
+    <ThingRail
+      kind={visualKind}
+      hideKind={open}
+      revealed={
+        hovered || state === 'selected' || state === 'editing' || visibleContentEdit !== null
+      }
+      className="canvas-thing__rail"
+    >
+      {showActions && (
+        // ADR 0073. One tab stop for the whole rail, arrows between its
+        // controls: a canvas carries many Things and a Thing's rail carries
+        // several commands, so a control apiece would put the Things
+        // themselves out of reach behind their own actions. The keyboard
+        // contract, the shared control treatment and the canvas suppression
+        // every one of these needs are `ThingRailActions`' and
+        // `ThingRailAction`'s; what is left here is which commands this Thing
+        // has, and what each one runs.
+        //
+        // The two groups are the answer to "whose command is this?". Editing
+        // this Thing's Markdown is the Markdown front's business and means
+        // nothing on another kind; opening and closing is every Thing's.
+        // Space choices lead the rail, followed by entity actions, Open/Close
+        // with Enter in the entity menu. Content-edit commands stay beside it.
+        <ThingRailActions
+          aria-label={`Thing ${name}`}
+          className="canvas-thing__actions"
+          data-testid="canvas-thing-actions"
+        >
+          {spaceSelection !== undefined && (
+            <SpaceThingSelectors selection={spaceSelection} onReport={setContextNotice} />
+          )}
+          {actionableEntityActions && (
+            <EntityActionsTrigger
+              groups={entityActions}
+              label={`Actions for Thing ${name}`}
+              icon={<EntityActionsIcon />}
+              render={<ThingRailAction />}
+            />
+          )}
+          <ThingRailKindActions kind={visualKind}>
+            {visibleContentEdit === null ? (
+              beginContentEdit !== undefined && (
+                <ThingRailAction
+                  ref={editControl}
+                  aria-label={`Edit Thing ${name}`}
+                  onClick={beginContentEdit}
+                >
+                  <EditIcon data-icon="inline-start" />
+                </ThingRailAction>
+              )
+            ) : (
+              <ContentEditActions name={name} edit={visibleContentEdit} />
+            )}
+          </ThingRailKindActions>
+          <ThingRailSharedActions>
+            {onOpenChange !== undefined && (
+              <ThingRailAction
+                aria-label={`${open ? 'Close' : 'Open'} Thing ${name}`}
+                // Closing mid-edit would drop the Thing's box out from under a
+                // live caret with a draft in it. The control keeps its slot and
+                // goes unavailable rather than disappearing: the rail's row does
+                // not reshuffle while the author writes, and what is unavailable
+                // says so instead of vanishing.
+                //
+                // A toolbar item stays focusable while disabled (ADR 0073), so
+                // that promise now holds for the keyboard too — the control keeps
+                // its place in the arrow order and announces itself unavailable,
+                // instead of being drawn and unreachable.
+                disabled={visibleContentEdit !== null}
+                onClick={() => {
+                  onOpenChange(!open);
+                }}
+              >
+                {open ? (
+                  <CloseThingIcon data-icon="inline-start" />
+                ) : (
+                  <OpenThingIcon data-icon="inline-start" />
+                )}
+              </ThingRailAction>
+            )}
+          </ThingRailSharedActions>
+        </ThingRailActions>
+      )}
+    </ThingRail>
+  );
+
   const thing = (
     <Card
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
       role="article"
       aria-label={name}
       className="canvas-thing"
       data-testid="thing"
       data-kind={visualKind}
+      data-content-kind={front.kind === 'alias' ? front.target.kind : visualKind}
       data-state={state}
       // Exposes authored state for the Thing's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's
@@ -366,86 +500,8 @@ export function CanvasThing(props: CanvasThingProps) {
           colour is still on this Thing — `--canvas-thing-graph` below draws the
           Title's own hover and caret treatment — and still on the handles and
           Edges the adapter draws around it. */}
-      <ThingRail kind={visualKind} className="canvas-thing__rail">
-        {showActions && (
-          // ADR 0073. One tab stop for the whole rail, arrows between its
-          // controls: a canvas carries many Things and a Thing's rail carries
-          // several commands, so a control apiece would put the Things
-          // themselves out of reach behind their own actions. The keyboard
-          // contract, the shared control treatment and the canvas suppression
-          // every one of these needs are `ThingRailActions`' and
-          // `ThingRailAction`'s; what is left here is which commands this Thing
-          // has, and what each one runs.
-          //
-          // The two groups are the answer to "whose command is this?". Editing
-          // this Thing's Markdown is the Markdown front's business and means
-          // nothing on another kind; opening and closing is every Thing's, and
-          // Close stays last so it keeps the position authors expect. The
-          // actions menu leads the rail — overflow commands every Thing shares.
-          <ThingRailActions
-            aria-label={`Thing ${name}`}
-            className="canvas-thing__actions"
-            data-testid="canvas-thing-actions"
-          >
-            {actionableEntityActions && (
-              <EntityActionsTrigger
-                groups={entityActions}
-                label={`Actions for Thing ${name}`}
-                icon={<EntityActionsIcon />}
-                render={<ThingRailAction />}
-              />
-            )}
-            <ThingRailKindActions kind={visualKind}>
-              {visibleContentEdit === null ? (
-                beginContentEdit !== undefined && (
-                  <ThingRailAction
-                    ref={editControl}
-                    aria-label={`Edit Thing ${name}`}
-                    onClick={beginContentEdit}
-                  >
-                    <EditIcon data-icon="inline-start" />
-                  </ThingRailAction>
-                )
-              ) : (
-                <ContentEditActions name={name} edit={visibleContentEdit} />
-              )}
-              {onEnter !== undefined && (
-                <ThingRailAction aria-label={`Enter Space ${name}`} onClick={onEnter}>
-                  <EnterSpaceIcon data-icon="inline-start" />
-                </ThingRailAction>
-              )}
-            </ThingRailKindActions>
-            <ThingRailSharedActions>
-              {onOpenChange !== undefined && (
-                <ThingRailAction
-                  aria-label={`${open ? 'Close' : 'Open'} Thing ${name}`}
-                  // Closing mid-edit would drop the Thing's box out from under a
-                  // live caret with a draft in it. The control keeps its slot and
-                  // goes unavailable rather than disappearing: the rail's row does
-                  // not reshuffle while the author writes, and what is unavailable
-                  // says so instead of vanishing.
-                  //
-                  // A toolbar item stays focusable while disabled (ADR 0073), so
-                  // that promise now holds for the keyboard too — the control keeps
-                  // its place in the arrow order and announces itself unavailable,
-                  // instead of being drawn and unreachable.
-                  disabled={visibleContentEdit !== null}
-                  onClick={() => {
-                    onOpenChange(!open);
-                  }}
-                >
-                  {open ? (
-                    <CloseThingIcon data-icon="inline-start" />
-                  ) : (
-                    <OpenThingIcon data-icon="inline-start" />
-                  )}
-                </ThingRailAction>
-              )}
-            </ThingRailSharedActions>
-          </ThingRailActions>
-        )}
-      </ThingRail>
-      <CardContent className="canvas-thing__body">
+      {props.renderRail === undefined ? rail : props.renderRail(rail)}
+      <CardContent ref={bodyControl} className="canvas-thing__body">
         {state === 'editing' && !readOnly ? (
           <InlineTitleEditor
             title={title}
@@ -502,8 +558,13 @@ export function CanvasThing(props: CanvasThingProps) {
         {/* Withheld while the Thing is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Thing
             shows, not what could be changed about it. */}
-        {front.kind === 'space' && front.open && !readOnly && (
-          <SpaceThingSelectors selection={front.selection} />
+        {front.kind === 'space' && front.open && !readOnly && front.selection === undefined && (
+          <p className="canvas-thing__space-note">Reading the referenced Space…</p>
+        )}
+        {contextNotice !== null && (
+          <p role="status" className="canvas-thing__space-note">
+            {contextNotice}
+          </p>
         )}
       </CardContent>
       {/* A sibling of the Title's body rather than a child of it. The body is
@@ -591,60 +652,62 @@ function TitleHeading({ title }: TitleLadderProps) {
 }
 
 interface SpaceThingSelectorsProps {
-  readonly selection: CanvasSpaceThingSelection | undefined;
+  readonly onReport: (message: string | null) => void;
+  readonly selection: CanvasSpaceThingSelection;
 }
 
 /**
- * What an Open Space Thing offers to author: which Diagram of the referenced
- * Space it shows, and which Graph of that Diagram.
- *
- * **Drawn as the Command Dock draws the same two choices**, on the shared
- * command surface and through the shared `ChoiceMenu`
- * (`.scratch/command-dock/issues/12`). A Diagram and a Graph are named and
- * chosen identically wherever the product asks for them, which is the whole
- * point of the pair being components rather than a treatment each surface
- * arrives at.
- *
- * **`CommandSurface` and not `CommandToolbar`.** The Thing already has one
- * toolbar — the strip of commands on its rail — and a second roving container
- * on the same Thing would answer the Tab key twice for one Thing (ADR 0073). A
- * bound choice is an ordinary tab stop anyway.
- *
- * The absent case is a line of prose and nothing else. A `Spinner` would be a
- * second thing to look at on a Thing whose whole content is two short controls,
- * and `StatusBusy` brings a `role="status"` with it — a live region announcing
- * every Space Thing on the canvas as it resolves, for a wait the author did not
- * ask for and cannot act on.
+ * Diagram and Graph kind commands extend the Thing's one rail toolbar.
+ * They share the Dock's clusters and choices while writing this Thing's selection.
  */
-function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
-  if (selection === undefined) {
-    return <p className="canvas-thing__space-note">Reading the referenced Space…</p>;
-  }
+function SpaceThingSelectors({ selection, onReport }: SpaceThingSelectorsProps) {
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const onEditingChange = selection.onEditingChange;
+  useEffect(() => {
+    onEditingChange?.(renaming !== null || busy);
+    return () => onEditingChange?.(false);
+  }, [renaming, busy, onEditingChange]);
   return (
-    <CommandSurface orientation="vertical" className="canvas-thing__space-choices">
+    <>
       <SpaceThingSelector
         label="Diagram"
+        commands={selection.diagramCommands}
+        onBusy={setBusy}
+        renaming={renaming === 'Diagram'}
+        onRenaming={(editing) => setRenaming(editing ? 'Diagram' : null)}
+        onReport={onReport}
         icon={<DiagramIcon />}
         testId="space-thing-diagram"
         choices={selection.diagrams}
         chosen={selection.diagramId}
-        disabled={selection.disabled === true}
+        disabled={selection.disabled === true || busy}
         onChoose={selection.onDiagramChange}
       />
       <SpaceThingSelector
         label="Graph"
-        icon={<GraphIcon />}
+        commands={selection.graphCommands}
+        onBusy={setBusy}
+        renaming={renaming === 'Graph'}
+        onRenaming={(editing) => setRenaming(editing ? 'Graph' : null)}
+        onReport={onReport}
+        icon={<GraphIcon size={14} />}
         testId="space-thing-graph"
         choices={selection.graphs}
         chosen={selection.graphId}
-        disabled={selection.disabled === true}
+        disabled={selection.disabled === true || busy}
         onChoose={selection.onGraphChange}
       />
-    </CommandSurface>
+    </>
   );
 }
 
 interface SpaceThingSelectorProps {
+  readonly onBusy: (busy: boolean) => void;
+  readonly commands: CanvasSpaceThingCommands | CanvasSpaceThingGraphCommands | undefined;
+  readonly renaming: boolean;
+  readonly onRenaming: (editing: boolean) => void;
+  readonly onReport: (message: string | null) => void;
   readonly label: string;
   readonly icon: ReactNode;
   readonly testId: string;
@@ -691,6 +754,11 @@ interface SpaceThingSelectorProps {
  * trigger first has to display one.
  */
 function SpaceThingSelector({
+  onBusy,
+  commands,
+  renaming,
+  onRenaming,
+  onReport,
   label,
   icon,
   testId,
@@ -700,30 +768,145 @@ function SpaceThingSelector({
   onChoose,
 }: SpaceThingSelectorProps) {
   const selected = choices.find((choice) => choice.id === chosen);
+  const renameScope = useId();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const movedCaret = useRef(false);
+  const returningFocus = useRef(false);
+  useEffect(() => {
+    if (renaming || !returningFocus.current) return;
+    returningFocus.current = false;
+    triggerRef.current?.focus();
+  }, [renaming]);
+  const endRename = () => {
+    onRenaming(false);
+  };
+  const endRenameReturningFocus = () => {
+    returningFocus.current = true;
+    endRename();
+  };
+  const renameItem = (
+    <DropdownMenuItem
+      className="gap-2"
+      disabled={disabled || selected === undefined}
+      onClick={() => {
+        movedCaret.current = true;
+        onRenaming(true);
+      }}
+    >
+      <EditIcon />
+      Rename
+    </DropdownMenuItem>
+  );
+  const commonCommands = {
+    title: selected?.title ?? `No ${label}`,
+    renameItem,
+    deleteDisabled: disabled || commands?.deleteDisabled === true,
+    onCreate: () => {
+      if (commands === undefined) return;
+      // The application requests creation's continuation; keep the menu
+      // from restoring focus while its adapter waits for the new name.
+      movedCaret.current = label === 'Diagram';
+      onBusy(true);
+      void commands.onCreate(renameScope).then((refusal) => {
+        onReport(refusal);
+        if (refusal !== null) movedCaret.current = false;
+        onBusy(false);
+      });
+    },
+    onDelete: () => {
+      if (commands === undefined) return;
+      onBusy(true);
+      void commands.onDelete().then((refusal) => {
+        onReport(refusal);
+        onBusy(false);
+      });
+    },
+    onCopyLink: () => {
+      if (commands === undefined) return;
+      void commands.onCopyLink().then((refusal) => onReport(refusal ?? 'Link copied.'));
+    },
+  };
   return (
-    <ChoiceMenu<string>
-      label={`${label}s`}
-      choices={choices}
-      chosen={chosen}
-      onChoose={onChoose}
-      className="nokey w-64"
-      trigger={
-        <ChoiceMenuTrigger
-          data-testid={testId}
-          className="canvas-thing__space-choice nokey nodrag nopan"
-          // The name is drawn, so the accessible name says which of the two this
-          // is as well as what it holds: the controls are one word apart and an
-          // author has to be able to tell them apart by ear. An unchosen one
-          // says `none` rather than repeating the `No Diagram` it draws, which as
-          // an accessible name read as a Diagram called "No Diagram".
-          aria-label={selected === undefined ? `${label}: none` : `${label}: ${selected.title}`}
-          title={`Choose the ${label} this Space Thing shows`}
-          disabled={disabled || choices.length === 0}
-          icon={icon}
-          name={selected?.title ?? `No ${label}`}
+    <ToolbarGroup aria-label={label} className="min-w-0">
+      {label === 'Diagram' && commands !== undefined && (
+        <button
+          type="button"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          data-continuation-control="diagram-name"
+          data-continuation-scope={renameScope}
+          data-continuation-subject={chosen}
+          disabled={disabled || selected === undefined}
+          onClick={() => onRenaming(true)}
         />
-      }
-    />
+      )}
+      {renaming && commands !== undefined && selected !== undefined && (
+        <InlineTitleEditor
+          title={selected.title}
+          label={`${label} name`}
+          variant="header"
+          className="nokey nodrag nopan"
+          onComplete={(title) => {
+            const refusal = commands.onRename(title);
+            if (refusal === null) endRename();
+            return refusal;
+          }}
+          onCancel={endRename}
+          onReturnFocus={endRenameReturningFocus}
+        />
+      )}
+      <ChoiceMenu<string>
+        label={`${label}s`}
+        choices={choices}
+        chosen={chosen}
+        onChoose={onChoose}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        className="nokey w-64"
+        restoresFocusOnClose={() => !movedCaret.current}
+        trigger={
+          <ChoiceMenuTrigger
+            ref={triggerRef}
+            render={<ToolbarButton size={renaming ? 'icon' : 'compact'} />}
+            onClick={(event) => {
+              event.stopPropagation();
+              movedCaret.current = false;
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            data-testid={testId}
+            className="canvas-thing__space-choice nokey nodrag nopan"
+            aria-label={selected === undefined ? `${label}: none` : `${label}: ${selected.title}`}
+            title={`Choose the ${label} this Space Thing shows`}
+            disabled={disabled || choices.length === 0}
+            icon={icon}
+            name={renaming ? undefined : (selected?.title ?? `No ${label}`)}
+          />
+        }
+      >
+        {commands !== undefined &&
+          ('onRecolor' in commands ? (
+            <GraphMenuActions
+              {...commonCommands}
+              editsDisabled={disabled}
+              color={commands.color}
+              colors={commands.colors}
+              onRecolor={(color) => {
+                onReport(commands.onRecolor(color));
+                setMenuOpen(false);
+              }}
+              onCopyPermanentLink={() => {
+                void commands
+                  .onCopyPermanentLink()
+                  .then((refusal) => onReport(refusal ?? 'Link copied.'));
+              }}
+            />
+          ) : (
+            <DiagramMenuActions {...commonCommands} createDisabled={disabled} />
+          ))}
+      </ChoiceMenu>
+    </ToolbarGroup>
   );
 }
 

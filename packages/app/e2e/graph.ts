@@ -618,3 +618,10 @@ export async function connectToEmptyWithAlt(
     if (previewed && altDown) await page.keyboard.up('Alt');
   }
 }
+
+/** Commands belong to a placement even when its rail is lifted above embedded nodes. */
+export async function thingControls(page: Page, thing: Locator): Promise<Locator> {
+  const id = await thing.getAttribute('data-id');
+  if (id === null) throw new Error('Thing placement id missing');
+  return thing.or(page.locator(`[data-thing-rail-for="${id}"]`));
+}

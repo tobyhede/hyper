@@ -61,13 +61,13 @@ describe('CanvasThing kind and interaction state', () => {
     // Every kind draws its glyph, Markdown included — ThingKindIcon has no
     // silent-nothing case, and the rail is not the centred, icon-optional
     // diagram the pre-design-system Thing used.
-    expect(screen.getByRole('img', { name: 'Markdown Thing' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Markdown Thing' })).toBeNull();
   });
 
   it('presents an Alias front by its kind alone', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: '', open: false }}
+        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -84,7 +84,12 @@ describe('CanvasThing kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: 'Markdown', open: false, onOpenChange }}
+        front={{
+          kind: 'alias',
+          target: { kind: 'markdown', source: 'Markdown' },
+          open: false,
+          onOpenChange,
+        }}
         state="selected"
         title="Return"
         graphColor="#ffc53d"
@@ -603,8 +608,8 @@ describe('CanvasThing Title ladder', () => {
       { kind: 'preview' },
       { kind: 'markdown', source: '', open: false },
       { kind: 'markdown', source: '', open: true },
-      { kind: 'alias', source: '', open: false },
-      { kind: 'alias', source: '', open: true },
+      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false },
+      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: true },
       { kind: 'space', open: false },
       { kind: 'space', open: true },
     ];
@@ -960,7 +965,7 @@ describe('CanvasThing open Markdown front', () => {
   it('draws no body on a closed Alias', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: '', open: false }}
+        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"
@@ -1005,6 +1010,46 @@ describe('CanvasThing Space front', () => {
     onDiagramChange: vi.fn(),
     onGraphChange: vi.fn(),
     ...over,
+  });
+
+  it('keeps focus on the destination when a context rename completes on blur', async () => {
+    const onRename = vi.fn(() => null);
+    render(
+      <>
+        <CanvasThing
+          front={{
+            kind: 'space',
+            open: true,
+            selection: selection({
+              diagramCommands: {
+                onRename,
+                onCreate: () => Promise.resolve(null),
+                onDelete: () => Promise.resolve(null),
+                onCopyLink: () => Promise.resolve(null),
+                deleteDisabled: false,
+              },
+            }),
+          }}
+          state="selected"
+          title="Elsewhere"
+          graphColor="#35d6c3"
+        />
+        <button>Destination</button>
+      </>,
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+      await Promise.resolve();
+    });
+    const editor = screen.getByRole('textbox', { name: 'Diagram name' });
+    expect(editor).toHaveFocus();
+    fireEvent.change(editor, { target: { value: 'New title' } });
+    const destination = screen.getByRole('button', { name: 'Destination' });
+    act(() => destination.focus());
+    expect(onRename).toHaveBeenCalledWith('New title');
+    expect(screen.queryByRole('textbox', { name: 'Diagram name' })).not.toBeInTheDocument();
+    expect(destination).toHaveFocus();
   });
 
   /**
@@ -1076,6 +1121,12 @@ describe('CanvasThing Space front', () => {
     // has to be able to tell which is which by ear.
     expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
+    const rail = screen.getByTestId('canvas-thing-actions');
+    expect(screen.getByRole('toolbar')).toBe(rail);
+    for (const id of ['space-thing-diagram', 'space-thing-graph']) {
+      expect(rail).toContainElement(screen.getByTestId(id));
+      expect(screen.getByTestId(id).closest('.canvas-thing__body')).toBeNull();
+    }
     // And each draws the title it holds, which is what a reader sees.
     expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
     expect(screen.getByTestId('space-thing-graph')).toHaveTextContent('Long');
@@ -1140,7 +1191,7 @@ describe('CanvasThing Space front', () => {
     expect(diagram).toBeEnabled();
     expect(diagram).toHaveTextContent('No Diagram');
     const graph = screen.getByTestId('space-thing-graph');
-    expect(graph).toBeDisabled();
+    expect(graph).toHaveAttribute('aria-disabled', 'true');
     expect(graph).toHaveTextContent('No Graph');
   });
 
@@ -1177,49 +1228,15 @@ describe('CanvasThing Space front', () => {
     expect(screen.queryByTestId('space-thing-graph')).not.toBeInTheDocument();
   });
 
-  /**
-   * Enter is the Space Thing's kind command (ADR 0073, ADR 0068): it belongs on
-   * the rail whether the Thing is Open or Closed, and it is withheld from a
-   * read-only surface the same way every other authoring control is.
-   */
-  it('offers Enter on the rail while Closed or Open, and withholds it when read-only', () => {
-    const onEnter = vi.fn();
-    const { rerender } = render(
+  it('keeps Enter off the rail', () => {
+    render(
       <CanvasThing
-        front={{ kind: 'space', open: false, onEnter }}
+        front={{ kind: 'space', open: false }}
         state="selected"
         title="Architecture"
         graphColor="#35d6c3"
       />,
     );
-
-    const enter = screen.getByRole('button', { name: 'Enter Space Architecture' });
-    expect(enter).toBeVisible();
-    expect(enter.closest('[data-slot="thing-rail-kind-actions"]')).not.toBeNull();
-    enter.click();
-    expect(onEnter).toHaveBeenCalledOnce();
-
-    rerender(
-      <CanvasThing
-        front={{ kind: 'space', open: true, onEnter }}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
-
-    rerender(
-      <CanvasThing
-        readOnly
-        front={{ kind: 'space', open: false, onEnter }}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(
-      screen.queryByRole('button', { name: 'Enter Space Architecture' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Enter/ })).not.toBeInTheDocument();
   });
 });

@@ -88,6 +88,51 @@ function Harness({
 }
 
 describe('ChromeContinuation', () => {
+  it('waits for the created subject on the addressed rail without pressing the Dock', async () => {
+    const continuation = open();
+    let dockPressed = false;
+    let railPressed = 0;
+    const { getByText } = render(
+      <Harness
+        continuation={continuation}
+        chromeRenameReady
+        disabled={false}
+        onPress={() => {
+          dockPressed = true;
+        }}
+      />,
+    );
+    const dock = getByText('Diagram');
+    const rail = document.createElement('button');
+    rail.setAttribute('data-continuation-control', 'diagram-name');
+    rail.setAttribute('data-continuation-scope', 'nested-rail');
+    rail.setAttribute('data-continuation-subject', 'old-diagram');
+    rail.addEventListener('click', () => {
+      railPressed += 1;
+    });
+    dock.after(rail);
+    act(() =>
+      continuation.request({
+        target: {
+          kind: 'control',
+          name: 'diagram-name',
+          scope: { id: 'nested-rail', subject: 'created-diagram' },
+        },
+        select: false,
+        then: 'rename',
+      }),
+    );
+    expect(railPressed).toBe(0);
+    expect(dockPressed).toBe(false);
+    await act(async () => {
+      rail.setAttribute('data-continuation-subject', 'created-diagram');
+      await Promise.resolve();
+    });
+    expect(railPressed).toBe(1);
+    expect(dockPressed).toBe(false);
+    expect(continuation.getState().pending).toBeNull();
+  });
+
   it('keeps a rename continuation owed while the control is withdrawn', () => {
     const continuation = open();
     let pressed = false;

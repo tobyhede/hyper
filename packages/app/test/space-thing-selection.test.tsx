@@ -285,19 +285,11 @@ function choose(testId: string, name: string): void {
   fireEvent.click(screen.getByRole('menuitemradio', { name }));
 }
 
-/**
- * The two controls an Open Space Thing publishes its choices through, and nothing
- * else.
- *
- * Addressed through the shared command surface they sit on rather than by role
- * over the whole Thing: the Thing's rail carries a menu trigger of its own (its
- * entity actions), so a count of menu buttons on the Thing would not be a count
- * of its choices.
- */
-function choiceControls(thing: HTMLElement): HTMLElement[] {
-  const surface = thing.querySelector('[data-slot="command-surface"]');
-  if (!(surface instanceof HTMLElement)) throw new Error('the Space Thing draws no choice surface');
-  return within(surface).getAllByRole('button');
+/** The rail offers the entity menu and two context choices, with no target picker. */
+function railMenuControls(thing: HTMLElement): HTMLElement[] {
+  return within(within(thing).getByRole('toolbar'))
+    .getAllByRole('button')
+    .filter((control) => control.getAttribute('aria-haspopup') === 'menu');
 }
 
 beforeAll(() => {
@@ -446,17 +438,15 @@ describe('an Open Space Thing', () => {
   /**
    * The target is chosen once, at creation, and Space Authoring refuses a
    * changed one on its own account (ADR 0068) — so there is nothing on the Open
-   * Thing that would even ask. Two controls, and nothing beside them that would
-   * be a third.
+   * Thing that would even ask. The rail offers entity actions and the two context choices alone.
    */
   it('offers no way to change the Space it references', async () => {
     const session = mount();
 
     const thing = await openSpaceThing();
 
-    // Exactly two, named: a third would be the retarget control this Thing is
-    // not allowed to have, whatever it happened to be labelled.
-    expect(choiceControls(thing)).toHaveLength(2);
+    // Entity actions plus Diagram and Graph; no fourth menu for retargeting.
+    expect(railMenuControls(thing)).toHaveLength(3);
     expect(
       within(thing).getByRole('button', { name: 'Diagram: Collection 1' }),
     ).toBeInTheDocument();

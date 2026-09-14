@@ -441,3 +441,9 @@ body {
   border-radius: 4px;
   background: var(--secondary);
 }
+
+/* React Flow viewport coordinates keep a Space dock above its embedded nodes. */
+.thing-rail-layer {
+  position: absolute;
+  pointer-events: none;
+}

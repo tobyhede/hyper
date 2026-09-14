@@ -302,7 +302,7 @@ describe('ThingNode canvas Thing state adapter', () => {
     );
 
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'space');
-    expect(screen.getByRole('img', { name: 'Space Thing' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Space Thing' })).toBeNull();
     expect(screen.queryByText('must not render')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open Thing A' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Thing A' })).toBeNull();
