@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1042" height="854"
+     viewBox="0 0 1042 854" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">Infinity Cube logo</title>
+  <desc>Vector reconstruction of the supplied logo, with a transparent background.</desc>
+  <g fill="#111111">
+    <path id="top-chevron" d="M 268.0 163.3 L 268.0 176.6 L 361.5 229.2 L 505.3 145.1 L 650.3 229.1 L 743.0 176.0 L 743.0 161.2 L 505.7 33.4 Z"/>
+    <path id="infinity-ribbon" d="M 56.0 278.6 L 56.0 542.2 L 226.4 641.9 L 489.5 483.7 L 381.0 419.9 L 225.1 514.7 L 159.0 476.3 L 159.0 345.9 L 226.1 307.9 L 788.7 642.1 L 956.0 542.3 L 956.0 278.8 L 785.4 184.4 L 526.6 340.3 L 633.0 402.4 L 785.2 308.4 L 852.0 345.7 L 852.0 476.2 L 786.8 514.3 L 227.8 183.2 Z"/>
+    <path id="bottom-chevron" d="M 268.0 643.2 L 268.0 661.8 L 508.4 800.8 L 744.0 661.3 L 744.0 643.3 L 655.7 591.9 L 506.5 677.3 L 355.7 591.9 Z"/>
+  </g>
+</svg>

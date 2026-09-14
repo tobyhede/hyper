@@ -16,16 +16,17 @@ import {
 import { seedPositionedDiagram, type HttpLoadedSpace } from './seed';
 
 /**
- * Opening the app with nothing to open gives a new space: one thing (ADR 0018).
+ * Opening an empty catalog gives Default Content: one Open Markdown Thing
+ * showing the product logo (ADR 0077).
  *
- * This project drives its own empty HTTP repository. Server-side database
- * startup creates the one-thing Space once, and reloads reopen that durable UUID.
+ * This project drives its own empty HTTP repository. Server-side startup
+ * creates that Space once, and reloads reopen that durable UUID.
  */
 
 const seedNewSpaceDiagram = (page: Page) =>
   seedPositionedDiagram(page, 'Authored Diagram', (snapshot) => {
     const thingId = snapshot.things[0]?.id;
-    if (thingId === undefined) throw new Error('The new Space must hold Thing 1.');
+    if (thingId === undefined) throw new Error('The new Space must hold its first Thing.');
     return { [thingId]: { x: 0, y: 0, open: false } };
   });
 
@@ -74,7 +75,7 @@ test('centres its first thing without animating it in from the canvas origin', a
   });
 
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
   await settled(page);
 
   // SAFETY: `__hyperOverviewTransforms` is a debug array this same spec sets
@@ -93,18 +94,29 @@ test('centres its first thing without animating it in from the canvas origin', a
 test('shows one thing, and it is the only thing on screen', async ({ page }) => {
   await page.goto('/');
 
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   // No graphs means no edges to draw.
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
+test('opens that Thing on the product logo', async ({ page }) => {
+  await page.goto('/');
+
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
+  await expect(thing).toBeVisible();
+  await expect(thing.locator('.canvas-thing')).toHaveAttribute('data-expanded', 'true');
+  const logo = thing.getByRole('img', { name: 'Infinity Cube' });
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute('src', '/infinity-cube-logo.svg');
+});
+
 test('starts in a complete authored Diagram with its first empty Active Graph', async ({
   page,
 }) => {
   await page.goto('/');
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
   await thing.hover();
@@ -118,12 +130,12 @@ test('starts in a complete authored Diagram with its first empty Active Graph', 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('Alt toggles a transient Thing 2 preview during an empty connection drag', async ({
+test('Alt toggles a transient Thing 1 preview during an empty connection drag', async ({
   page,
 }) => {
   await page.goto('/');
   await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
   await thing.hover();
@@ -138,12 +150,12 @@ test('Alt toggles a transient Thing 2 preview during an empty connection drag', 
 
   await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 1');
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await page.keyboard.up('Alt');
   await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 1');
   await page.keyboard.up('Alt');
   await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
   await page.mouse.up();
@@ -152,12 +164,12 @@ test('Alt toggles a transient Thing 2 preview during an empty connection drag', 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('Alt empty-drop creates, connects and selects Thing 2 at the previewed position', async ({
+test('Alt empty-drop creates, connects and selects Thing 1 at the previewed position', async ({
   page,
 }) => {
   await page.goto('/');
   await createDiagram(page);
-  const sourceThing = nodeByTitle(page, 'Thing 1');
+  const sourceThing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(sourceThing).toBeVisible();
   await settled(page);
   await sourceThing.hover();
@@ -178,14 +190,14 @@ test('Alt empty-drop creates, connects and selects Thing 2 at the previewed posi
   await page.mouse.move(dropPoint.x, dropPoint.y, { steps: 4 });
   await page.keyboard.down('Alt');
   const preview = page.getByTestId('new-thing-preview');
-  await expect(preview).toContainText('Thing 2');
+  await expect(preview).toContainText('Thing 1');
   const previewBox = (await preview.boundingBox())!;
   expect(previewBox.x + previewBox.width / 2).toBeCloseTo(dropPoint.x, 0);
   expect(previewBox.y + previewBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await page.mouse.up();
   await page.keyboard.up('Alt');
 
-  const created = nodeByTitle(page, 'Thing 2');
+  const created = nodeByTitle(page, 'Thing 1');
   await expect(created).toBeVisible();
   const createdBox = (await created.boundingBox())!;
   expect(createdBox.x + createdBox.width / 2).toBeCloseTo(dropPoint.x, 0);
@@ -196,7 +208,7 @@ test('Alt empty-drop creates, connects and selects Thing 2 at the previewed posi
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  await expect(created.locator('.canvas-thing')).toHaveAttribute('data-expanded', 'false');
 
   await settled(page);
   await created.hover();
@@ -221,7 +233,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Diagram ow
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
 
-  const sourceThing = nodeByTitle(page, 'Thing 1');
+  const sourceThing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(sourceThing).toBeVisible();
   await expect(selectedCanvas(page)).toContainText('Authored Diagram');
   await expect(activeGraph(page)).toHaveText('Graph 1');
@@ -231,7 +243,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Diagram ow
 
   await connectToEmptyWithAlt(page, authoringHandle(sourceThing, 'source', 'right'));
 
-  await expect(nodeByTitle(page, 'Thing 2')).toBeVisible();
+  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
@@ -243,8 +255,8 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Diagram ow
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
   await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
-  await expect(nodeByTitle(page, 'Thing 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(selectedCanvas(page)).toContainText('Authored Diagram');
@@ -257,7 +269,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Diagram ow
 test('an Alt-drop released off the canvas creates no Thing', async ({ page }) => {
   await page.goto('/');
   await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
   await thing.hover();
@@ -270,7 +282,7 @@ test('an Alt-drop released off the canvas creates no Thing', async ({ page }) =>
     steps: 4,
   });
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 1');
 
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
@@ -284,11 +296,11 @@ test('an Alt-drop released off the canvas creates no Thing', async ({ page }) =>
   // screen over a point that would author nothing. Without this the test would
   // pass just as well if the preview correctly vanished, and the disagreement
   // the two suppliers are priced against would go unmeasured.
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 1');
   await page.mouse.up();
   await page.keyboard.up('Alt');
 
-  await expect(nodeByTitle(page, 'Thing 2')).toHaveCount(0);
+  await expect(nodeByTitle(page, 'Thing 1')).toHaveCount(0);
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
@@ -299,7 +311,7 @@ test('the first self-connection authors into the Graph the explicit Diagram owns
 }) => {
   await page.goto('/');
   await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
   const before = await positionOf(thing);
@@ -327,7 +339,7 @@ test('the Graph the explicit Diagram owns can be self-connected and presented', 
 }) => {
   await page.goto('/');
   await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
   const thingId = await thing.getAttribute('data-id');
@@ -350,7 +362,7 @@ test('the Graph the explicit Diagram owns can be self-connected and presented', 
   await expect(activeThing(page)).toHaveAttribute('data-id', thingId!);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveCount(1);
-  await expect(moves).toHaveText('Thing 1');
+  await expect(moves).toHaveText('Welcome to Infinity Cube');
 });
 
 test(
@@ -358,7 +370,7 @@ test(
   { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
   async ({ page }) => {
     await page.goto('/');
-    await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+    await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
 
     await expect(activeGraph(page)).toHaveText('Graph 1');
     await expect(selectedCanvas(page)).toContainText('Diagram 1');
@@ -373,7 +385,7 @@ test('its one centered authored Thing is draggable', async ({ page }) => {
   await page.goto('/');
   await createDiagram(page);
 
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
 
@@ -386,7 +398,7 @@ test('its one centered authored Thing is draggable', async ({ page }) => {
 
 test('renders at natural size rather than filling the screen', async ({ page }) => {
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
   await settled(page);
 
   // The overview fit caps at `maxZoom: 1`. Without the cap React Flow's default
@@ -404,7 +416,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
   await page.goto('/');
   await createDiagram(page);
 
-  const thing = nodeByTitle(page, 'Thing 1');
+  const thing = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(thing).toBeVisible();
   await settled(page);
   const before = await positionOf(thing);
@@ -416,7 +428,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
 test('a completed edit and space identity survive reload', async ({ page }) => {
   await page.goto('/');
   await createDiagram(page);
-  const first = nodeByTitle(page, 'Thing 1');
+  const first = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
   // Without this, two missing attributes compare equal after the reload and the
@@ -429,7 +441,7 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
 
   await page.reload();
 
-  const second = nodeByTitle(page, 'Thing 1');
+  const second = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(second).toBeVisible();
   await settled(page);
   expect(await second.getAttribute('data-id')).toBe(firstId);
@@ -466,7 +478,7 @@ test(
     // codebase, not third-party JSON.
     const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
     const thingId = loaded.snapshot.things[0]?.id;
-    if (thingId === undefined) throw new Error('The new Space must hold Thing 1.');
+    if (thingId === undefined) throw new Error('The new Space must hold its first Thing.');
 
     const diagramId = '00000000-0000-4000-8000-0000000000fe';
     const graphId = '00000000-0000-4000-8000-0000000000fd';
