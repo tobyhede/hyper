@@ -86,6 +86,8 @@ export interface OpenSpaces {
   readonly open: (spaceId: UUID, selection?: DiagramId) => Promise<OpenSpace>;
   /** Keep the containing canvas active while opening a target for embedded editing. */
   readonly embed: (spaceId: UUID) => Promise<OpenSpace>;
+  /** Wait for queued and in-flight writes before another Space refers to their result. */
+  readonly waitForPersistence: (spaceId: UUID) => Promise<boolean>;
   readonly openPath: (pathname: string) => Promise<{
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
@@ -614,6 +616,10 @@ export function createOpenSpaces({
     entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),
     open,
     embed,
+    waitForPersistence: async (spaceId) => {
+      await registry.waitUntilRetirable(spaceId);
+      return registry.session(spaceId)?.getState().persistence.kind === 'settled';
+    },
     openPath,
     enter,
     switchTo,

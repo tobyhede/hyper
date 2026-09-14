@@ -1,3 +1,4 @@
+import { exerciseSpaceThingContextMenus } from '../e2e/space-thing-context-menu';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const STORY = '/?story=surfaces--space-thing-embedded-diagram--selected-diagram&mode=preview';
@@ -236,5 +237,14 @@ test(
     await expect(detail.getByRole('heading', { name: 'Storage' })).toBeVisible();
     await expect(detail.getByRole('heading', { name: 'Index' })).toBeVisible();
     await expect(detail.getByRole('heading', { name: 'Intake' })).toHaveCount(0);
+  },
+);
+
+test(
+  'Space Thing context menus author the target with the Dock commands',
+  { tag: '@parity:space-thing-context-menus-share-dock-actions' },
+  async ({ page }) => {
+    await open(page);
+    await exerciseSpaceThingContextMenus(page, spaceThing(page));
   },
 );

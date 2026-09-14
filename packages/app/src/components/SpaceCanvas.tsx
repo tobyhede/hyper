@@ -55,6 +55,7 @@ import type { OpenSpace } from '../open-spaces';
 import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-diagram';
 import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedDiagramAuthoring, type EmbeddedPublication } from './EmbeddedDiagramAuthoring';
+import type { Continuation } from '../continuation';
 
 const EMPTY_ENTRIES = [] as const;
 const emptySubscription = () => () => undefined;
@@ -146,6 +147,7 @@ const focusedThing = (target: Element, nodes: readonly ThingFlowNode[]): ThingId
 };
 
 export interface SpaceCanvasProps {
+  readonly continuation: Continuation;
   nodes: ThingFlowNode[];
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
@@ -280,6 +282,7 @@ export interface SpaceCanvasProps {
 }
 
 export function SpaceCanvas({
+  continuation,
   nodes,
   edges,
   projectedNodes,
@@ -474,6 +477,7 @@ export function SpaceCanvas({
     return () => reportEmbeddedDiagramEditing(false);
   }, [embeddedEditing, reportEmbeddedDiagramEditing]);
   const thingAuthoring = useCanvasThingAuthoring({
+    continuation,
     nodes,
     availability,
     nameOnCreation,
@@ -1023,6 +1027,7 @@ export function SpaceCanvas({
       {embeddedRequests.map((request) =>
         request.entry === undefined ? null : (
           <EmbeddedDiagramAuthoring
+            continuation={continuation}
             key={`${request.parent.id}:${request.diagramId}`}
             parent={request.parent}
             entry={request.entry}

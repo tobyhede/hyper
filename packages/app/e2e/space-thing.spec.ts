@@ -1,3 +1,4 @@
+import { exerciseSpaceThingContextMenus } from './space-thing-context-menu';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
@@ -855,5 +856,27 @@ test(
     await page.unroute('**/api/spaces');
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await expect(page.getByTestId('persistence-failure')).toBeHidden();
+  },
+);
+
+test(
+  'Space Thing context menus author the target with the Dock commands',
+  { tag: '@parity:space-thing-context-menus-share-dock-actions' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingContextMenus(page, thing);
+    await page.reload();
+    const reopened = nodeByTitle(page, 'Architecture');
+    await expect(reopened.getByTestId('space-thing-diagram')).toHaveText('Target context');
+    await expect(reopened.getByTestId('space-thing-graph')).toHaveText('Target path');
+    await reopened.getByTestId('space-thing-diagram').focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('menuitemradio', { name: 'Created from rail', exact: true }),
+    ).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await reopened.getByTestId('space-thing-graph').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitemradio', { name: 'Graph 1', exact: true })).toHaveCount(0);
   },
 );

@@ -2058,3 +2058,96 @@ describe('Stale identities', () => {
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 });
+
+describe('context commands on an embedded Diagram', () => {
+  it('authors the addressed Diagram and Graph without switching the target canvas', () => {
+    const other = {
+      id: OTHER_DIAGRAM_ID,
+      title: 'Other Diagram',
+      kind: 'positioned' as const,
+      positions: { [THING_A]: { x: 500, y: 600, open: false as const } },
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+      activeGraph: OTHER_GRAPH_ID,
+    };
+    const { session, navigation, authoring } = open({
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        diagrams: [...(positionedSnapshot.document.diagrams ?? []), other],
+      },
+    });
+    const initialNavigation = navigation.getState();
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'renamed-diagram',
+        diagramId: OTHER_DIAGRAM_ID,
+        title: 'Renamed context',
+      }).kind,
+    ).toBe('completed');
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'renamed-graph',
+        graphId: OTHER_GRAPH_ID,
+        title: 'Renamed path',
+      }).kind,
+    ).toBe('completed');
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'recolored-graph',
+        graphId: OTHER_GRAPH_ID,
+        color: '#f472b6',
+      }).kind,
+    ).toBe('completed');
+    expect(authoring.completeInDiagram(OTHER_DIAGRAM_ID, { kind: 'added-graph' })).toMatchObject({
+      kind: 'completed',
+      createdGraphId: MINTED,
+    });
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, { kind: 'deleted-graph', graphId: MINTED })
+        .kind,
+    ).toBe('completed');
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'renamed-graph',
+        graphId: GRAPH_ID,
+        title: 'Wrong owner',
+      }),
+    ).toMatchObject({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
+    const working = session.getState().working;
+    expect(diagramOf(working, OTHER_DIAGRAM_ID)).toMatchObject({
+      title: 'Renamed context',
+      positions: other.positions,
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed path', color: '#f472b6' }],
+    });
+    expect(diagramOf(working, DIAGRAM_ID)).toEqual(diagramOf(positionedSnapshot, DIAGRAM_ID));
+    expect(working.document.defaultDiagram).toBe(DIAGRAM_ID);
+    expect(navigation.getState()).toEqual(initialNavigation);
+  });
+});
+
+it('repairs the target canvas when a context command deletes its active Graph', () => {
+  const { session, navigation, authoring } = open({
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      diagrams: [
+        {
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
+          kind: 'positioned',
+          positions: {
+            [THING_A]: { x: 10, y: 20, open: false },
+            [THING_B]: { x: 300, y: 40, open: false },
+          },
+          graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
+          activeGraph: GRAPH_ID,
+        },
+      ],
+    },
+  });
+  expect(
+    authoring.completeInDiagram(DIAGRAM_ID, { kind: 'deleted-graph', graphId: GRAPH_ID }).kind,
+  ).toBe('completed');
+  expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
+  expect(graphsOf(session.getState().working).map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
+});

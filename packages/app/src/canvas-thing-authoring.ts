@@ -17,6 +17,9 @@ import { THING_SIZE, snapThingSizeToClose } from './thing';
 import type { ThingResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceThingTarget, SpaceThingTargetDiagram } from './space-thing-lifecycle';
+import { useOpenSpaces } from './open-spaces-context';
+import { spaceThingContextCommands } from './space-thing-context-commands';
+import type { Continuation } from './continuation';
 import { NO_SPACE_THING_TARGETS, type SpaceThingTargets } from './space-thing-targets';
 
 type Caret =
@@ -36,7 +39,11 @@ const spaceThingSelection = (
   thingId: ThingId,
   target: SpaceThingTarget,
   document: Extract<ThingDocument, { kind: 'space' }> | undefined,
-  complete: (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId) => void,
+  complete: (
+    thingId: ThingId,
+    diagram: Pick<SpaceThingTargetDiagram, 'id'>,
+    graphId: GraphId,
+  ) => void,
   disabled: boolean,
 ): CanvasSpaceThingSelection => {
   const selectedDiagram = target.diagrams.find((diagram) => diagram.id === document?.diagram);
@@ -75,6 +82,7 @@ const spaceThingSelection = (
 };
 
 export interface CanvasThingAuthoringInput {
+  readonly continuation?: Continuation;
   readonly nodes: readonly ThingFlowNode[];
   /**
    * What may be authored right now, answered once for the whole application.
@@ -137,6 +145,7 @@ export interface CanvasThingAuthoring {
  * Thing. Space Authoring remains authoritative for every completed Edit.
  */
 export function useCanvasThingAuthoring({
+  continuation,
   nodes,
   availability,
   nameOnCreation,
@@ -150,6 +159,8 @@ export function useCanvasThingAuthoring({
   thingEntityActions,
   onEnterSpace,
 }: CanvasThingAuthoringInput): CanvasThingAuthoring {
+  const spaces = useOpenSpaces();
+  const [contextEditing, setContextEditing] = useState(false);
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleThingId = caret?.field === 'title' ? caret.thingId : null;
   const bodyCaretNamesOpenMarkdown =
@@ -177,7 +188,7 @@ export function useCanvasThingAuthoring({
     onBodyEditingChange?.(bodyEditing);
   }, [bodyEditing, onBodyEditingChange]);
   useEffect(() => {
-    onTitleEditingChange?.(editingTitleThingId !== null);
+    onTitleEditingChange?.(editingTitleThingId !== null || contextEditing);
     // Returning the Space chrome on unmount is the whole of the safety net,
     // and it is narrower than "a Diagram change remounts the canvas" would
     // suggest. Only a Diagram move that drops the projection unmounts this
@@ -190,7 +201,7 @@ export function useCanvasThingAuthoring({
     // goes away must not leave the chrome withdrawn against an editor no
     // callback will ever settle.
     return () => onTitleEditingChange?.(false);
-  }, [editingTitleThingId, onTitleEditingChange]);
+  }, [editingTitleThingId, contextEditing, onTitleEditingChange]);
 
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(
     availability.authorOnCanvas,
@@ -305,13 +316,19 @@ export function useCanvasThingAuthoring({
    * Authoring refuses a changed one on its own account.
    */
   const completeSpaceThingSelection = useCallback(
-    (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId): void => {
+    (
+      thingId: ThingId,
+      diagram: Pick<SpaceThingTargetDiagram, 'id'>,
+      graphId: GraphId,
+    ): string | null => {
       const stored = spaceSession.getState().working.things.find((thing) => thing.id === thingId);
-      if (stored?.document.kind !== 'space') return;
+      if (stored?.document.kind !== 'space')
+        return describeAuthoringRefusal({ code: 'thing-not-found' });
       const document: ThingDocument = { ...stored.document, diagram: diagram.id, graph: graphId };
       const parsed = thingDocumentSchema.safeParse(document);
-      if (!parsed.success) return;
-      authoring.complete({ kind: 'edited-thing', thingId, document: parsed.data });
+      if (!parsed.success) return 'The selection is invalid.';
+      const result = authoring.complete({ kind: 'edited-thing', thingId, document: parsed.data });
+      return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
     },
     [authoring, spaceSession],
   );
@@ -452,6 +469,28 @@ export function useCanvasThingAuthoring({
               completeSpaceThingSelection,
               !(thingBelongsToWorkingSpace && availability.authorOnCanvas),
             );
+            if (
+              spaces !== null &&
+              continuation !== undefined &&
+              stored?.document.kind === 'space'
+            ) {
+              const entry = spaces.entry(stored.document.spaceId);
+              if (entry !== undefined) {
+                data.spaceSelection = {
+                  ...data.spaceSelection,
+                  onEditingChange: setContextEditing,
+                  ...spaceThingContextCommands(
+                    entry,
+                    spaces,
+                    working.id,
+                    stored.document,
+                    (diagram, graphId) =>
+                      completeSpaceThingSelection(node.data.thingId, diagram, graphId),
+                    continuation,
+                  ),
+                };
+              }
+            }
           }
         }
         return { ...node, data };
@@ -472,6 +511,8 @@ export function useCanvasThingAuthoring({
       editableThingIds,
       working,
       spaceThingTargets,
+      spaces,
+      continuation,
       completeSpaceThingSelection,
       thingEntityActions,
       onEnterSpace,
@@ -481,7 +522,7 @@ export function useCanvasThingAuthoring({
   return {
     nodes: decoratedNodes,
     bodyEditing,
-    titleEditing: editingTitleThingId !== null,
+    titleEditing: editingTitleThingId !== null || contextEditing,
     openThing,
     beginTitleEditing,
   };

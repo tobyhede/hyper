@@ -1862,6 +1862,7 @@ export const createApp = (
                 onSelectEdge={selectEdge}
               />
               <SpaceCanvas
+                continuation={continuation}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but

@@ -1007,6 +1007,46 @@ describe('CanvasThing Space front', () => {
     ...over,
   });
 
+  it('keeps focus on the destination when a context rename completes on blur', async () => {
+    const onRename = vi.fn(() => null);
+    render(
+      <>
+        <CanvasThing
+          front={{
+            kind: 'space',
+            open: true,
+            selection: selection({
+              diagramCommands: {
+                onRename,
+                onCreate: () => Promise.resolve(null),
+                onDelete: () => Promise.resolve(null),
+                onCopyLink: () => Promise.resolve(null),
+                deleteDisabled: false,
+              },
+            }),
+          }}
+          state="selected"
+          title="Elsewhere"
+          graphColor="#35d6c3"
+        />
+        <button>Destination</button>
+      </>,
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+      await Promise.resolve();
+    });
+    const editor = screen.getByRole('textbox', { name: 'Diagram name' });
+    expect(editor).toHaveFocus();
+    fireEvent.change(editor, { target: { value: 'New title' } });
+    const destination = screen.getByRole('button', { name: 'Destination' });
+    act(() => destination.focus());
+    expect(onRename).toHaveBeenCalledWith('New title');
+    expect(screen.queryByRole('textbox', { name: 'Diagram name' })).not.toBeInTheDocument();
+    expect(destination).toHaveFocus();
+  });
+
   /**
    * A Closed Space Thing draws neither selector even when the selections are
    * available to it: those are what Opening it is for.

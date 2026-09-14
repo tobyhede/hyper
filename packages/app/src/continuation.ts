@@ -36,7 +36,12 @@ export type ContinuationTarget =
   | { readonly kind: 'thing'; readonly thingId: ThingId }
   | ({ readonly kind: 'edge' } & EdgeSubject)
   | { readonly kind: 'canvas' }
-  | { readonly kind: 'control'; readonly name: ContinuationControl };
+  | {
+      readonly kind: 'control';
+      readonly name: ContinuationControl;
+      /** A mounted control instance, supplied by an embedding that repeats the same name. */
+      readonly scope?: { readonly id: string; readonly subject: string };
+    };
 
 /**
  * A control that is not a canvas subject.

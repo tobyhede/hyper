@@ -16,6 +16,7 @@ import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceThingTargets } from '../space-thing-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
+import type { Continuation } from '../continuation';
 
 export interface EmbeddedPublication {
   readonly entry: OpenSpace;
@@ -32,6 +33,7 @@ const EMPTY_NODES: readonly ThingFlowNode[] = [];
 
 /** Reuse production projection and Thing controls over an explicitly addressed target Diagram. */
 export function EmbeddedDiagramAuthoring({
+  continuation,
   parent,
   entry,
   diagramId,
@@ -40,6 +42,7 @@ export function EmbeddedDiagramAuthoring({
   bounds: { left, top, right, bottom },
   publish,
 }: {
+  readonly continuation: Continuation;
   readonly parent: ThingFlowNode;
   readonly entry: OpenSpace;
   readonly diagramId: DiagramId;
@@ -130,6 +133,7 @@ export function EmbeddedDiagramAuthoring({
     [enabled],
   );
   const authoring = useCanvasThingAuthoring({
+    continuation,
     nodes: state.projection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation: null,

@@ -582,6 +582,13 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
   },
   {
+    id: 'space-thing-context-menus-share-dock-actions',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Space Thing Diagram and Graph menus share the Dock commands and author the target: Rename, New, Delete, Colour and canonical links, without navigating the containing Space.',
+  },
+  {
     id: 'open-space-thing-chooses-its-context-on-the-shared-controls',
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',

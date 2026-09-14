@@ -1,5 +1,7 @@
 import {
   useCallback,
+  useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -15,6 +17,8 @@ import {
   ThingRailSharedActions,
 } from './ThingRailActions';
 import { ThingContentEditProvider, type ThingContentEdit } from './thing-content-edit';
+import { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
+import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
 import { ToolbarButton, ToolbarGroup } from './components/toolbar';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
@@ -116,7 +120,25 @@ export interface CanvasSpaceThingChoice {
  * Diagram this Thing no longer shows. Which Diagrams and Graphs exist is the target
  * Space's business and neither is derived here.
  */
+export interface CanvasSpaceThingCommands {
+  readonly onRename: (title: string) => string | null;
+  readonly onCreate: (renameScope: string) => Promise<string | null>;
+  readonly onDelete: () => Promise<string | null>;
+  readonly onCopyLink: () => Promise<string | null>;
+  readonly deleteDisabled: boolean;
+}
+
+export interface CanvasSpaceThingGraphCommands extends CanvasSpaceThingCommands {
+  readonly color: string;
+  readonly colors: readonly (readonly [string, string])[];
+  readonly onRecolor: (color: string) => string | null;
+  readonly onCopyPermanentLink: () => Promise<string | null>;
+}
+
 export interface CanvasSpaceThingSelection {
+  readonly onEditingChange?: (editing: boolean) => void;
+  readonly diagramCommands?: CanvasSpaceThingCommands;
+  readonly graphCommands?: CanvasSpaceThingGraphCommands;
   readonly diagrams: readonly CanvasSpaceThingChoice[];
   readonly graphs: readonly CanvasSpaceThingChoice[];
   /** The selected Diagram, or `null` where the Thing selects none. */
@@ -310,6 +332,7 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions = entityActions?.some((group) => group.length > 0) === true;
+  const [contextNotice, setContextNotice] = useState<string | null>(null);
   const spaceSelection =
     !readOnly && front.kind === 'space' && front.open ? front.selection : undefined;
   const showActions =
@@ -390,7 +413,9 @@ export function CanvasThing(props: CanvasThingProps) {
             className="canvas-thing__actions"
             data-testid="canvas-thing-actions"
           >
-            {spaceSelection !== undefined && <SpaceThingSelectors selection={spaceSelection} />}
+            {spaceSelection !== undefined && (
+              <SpaceThingSelectors selection={spaceSelection} onReport={setContextNotice} />
+            )}
             {actionableEntityActions && (
               <EntityActionsTrigger
                 groups={entityActions}
@@ -511,6 +536,11 @@ export function CanvasThing(props: CanvasThingProps) {
         {front.kind === 'space' && front.open && !readOnly && front.selection === undefined && (
           <p className="canvas-thing__space-note">Reading the referenced Space…</p>
         )}
+        {contextNotice !== null && (
+          <p role="status" className="canvas-thing__space-note">
+            {contextNotice}
+          </p>
+        )}
       </CardContent>
       {/* A sibling of the Title's body rather than a child of it. The body is
           inset so a Title sits off the Thing's border; a writing surface brings
@@ -597,6 +627,7 @@ function TitleHeading({ title }: TitleLadderProps) {
 }
 
 interface SpaceThingSelectorsProps {
+  readonly onReport: (message: string | null) => void;
   readonly selection: CanvasSpaceThingSelection;
 }
 
@@ -604,25 +635,42 @@ interface SpaceThingSelectorsProps {
  * Diagram and Graph kind commands extend the Thing's one rail toolbar.
  * They share the Dock's clusters and choices while writing this Thing's selection.
  */
-function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
+function SpaceThingSelectors({ selection, onReport }: SpaceThingSelectorsProps) {
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const onEditingChange = selection.onEditingChange;
+  useEffect(() => {
+    onEditingChange?.(renaming !== null || busy);
+    return () => onEditingChange?.(false);
+  }, [renaming, busy, onEditingChange]);
   return (
     <>
       <SpaceThingSelector
         label="Diagram"
+        commands={selection.diagramCommands}
+        onBusy={setBusy}
+        renaming={renaming === 'Diagram'}
+        onRenaming={(editing) => setRenaming(editing ? 'Diagram' : null)}
+        onReport={onReport}
         icon={<DiagramIcon />}
         testId="space-thing-diagram"
         choices={selection.diagrams}
         chosen={selection.diagramId}
-        disabled={selection.disabled === true}
+        disabled={selection.disabled === true || busy}
         onChoose={selection.onDiagramChange}
       />
       <SpaceThingSelector
         label="Graph"
+        commands={selection.graphCommands}
+        onBusy={setBusy}
+        renaming={renaming === 'Graph'}
+        onRenaming={(editing) => setRenaming(editing ? 'Graph' : null)}
+        onReport={onReport}
         icon={<GraphIcon />}
         testId="space-thing-graph"
         choices={selection.graphs}
         chosen={selection.graphId}
-        disabled={selection.disabled === true}
+        disabled={selection.disabled === true || busy}
         onChoose={selection.onGraphChange}
       />
     </>
@@ -630,6 +678,11 @@ function SpaceThingSelectors({ selection }: SpaceThingSelectorsProps) {
 }
 
 interface SpaceThingSelectorProps {
+  readonly onBusy: (busy: boolean) => void;
+  readonly commands: CanvasSpaceThingCommands | CanvasSpaceThingGraphCommands | undefined;
+  readonly renaming: boolean;
+  readonly onRenaming: (editing: boolean) => void;
+  readonly onReport: (message: string | null) => void;
   readonly label: string;
   readonly icon: ReactNode;
   readonly testId: string;
@@ -676,6 +729,11 @@ interface SpaceThingSelectorProps {
  * trigger first has to display one.
  */
 function SpaceThingSelector({
+  onBusy,
+  commands,
+  renaming,
+  onRenaming,
+  onReport,
   label,
   icon,
   testId,
@@ -685,34 +743,138 @@ function SpaceThingSelector({
   onChoose,
 }: SpaceThingSelectorProps) {
   const selected = choices.find((choice) => choice.id === chosen);
+  const renameScope = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const movedCaret = useRef(false);
+  const returningFocus = useRef(false);
+  useEffect(() => {
+    if (renaming || !returningFocus.current) return;
+    returningFocus.current = false;
+    triggerRef.current?.focus();
+  }, [renaming]);
+  const endRename = () => {
+    onRenaming(false);
+  };
+  const endRenameReturningFocus = () => {
+    returningFocus.current = true;
+    endRename();
+  };
+  const renameItem = (
+    <DropdownMenuItem
+      className="gap-2"
+      disabled={disabled || selected === undefined}
+      onClick={() => {
+        movedCaret.current = true;
+        onRenaming(true);
+      }}
+    >
+      <EditIcon />
+      Rename
+    </DropdownMenuItem>
+  );
+  const commonCommands = {
+    title: selected?.title ?? `No ${label}`,
+    renameItem,
+    deleteDisabled: disabled || commands?.deleteDisabled === true,
+    onCreate: () => {
+      if (commands === undefined) return;
+      // The application requests creation's continuation; keep the menu
+      // from restoring focus while its adapter waits for the new name.
+      movedCaret.current = label === 'Diagram';
+      onBusy(true);
+      void commands.onCreate(renameScope).then((refusal) => {
+        onReport(refusal);
+        if (refusal !== null) movedCaret.current = false;
+        onBusy(false);
+      });
+    },
+    onDelete: () => {
+      if (commands === undefined) return;
+      onBusy(true);
+      void commands.onDelete().then((refusal) => {
+        onReport(refusal);
+        onBusy(false);
+      });
+    },
+    onCopyLink: () => {
+      if (commands === undefined) return;
+      void commands.onCopyLink().then((refusal) => onReport(refusal ?? 'Link copied.'));
+    },
+  };
   return (
     <ToolbarGroup aria-label={label} className="min-w-0">
+      {label === 'Diagram' && commands !== undefined && (
+        <button
+          type="button"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          data-continuation-control="diagram-name"
+          data-continuation-scope={renameScope}
+          data-continuation-subject={chosen}
+          disabled={disabled || selected === undefined}
+          onClick={() => onRenaming(true)}
+        />
+      )}
+      {renaming && commands !== undefined && selected !== undefined && (
+        <InlineTitleEditor
+          title={selected.title}
+          label={`${label} name`}
+          variant="header"
+          className="nokey nodrag nopan"
+          onComplete={(title) => {
+            const refusal = commands.onRename(title);
+            if (refusal === null) endRename();
+            return refusal;
+          }}
+          onCancel={endRename}
+          onReturnFocus={endRenameReturningFocus}
+        />
+      )}
       <ChoiceMenu<string>
         label={`${label}s`}
         choices={choices}
         chosen={chosen}
         onChoose={onChoose}
         className="nokey w-64"
+        restoresFocusOnClose={() => !movedCaret.current}
         trigger={
           <ChoiceMenuTrigger
-            render={<ToolbarButton size="compact" />}
-            onClick={(event) => event.stopPropagation()}
+            ref={triggerRef}
+            render={<ToolbarButton size={renaming ? 'icon' : 'compact'} />}
+            onClick={(event) => {
+              event.stopPropagation();
+              movedCaret.current = false;
+            }}
             onPointerDown={(event) => event.stopPropagation()}
             data-testid={testId}
             className="canvas-thing__space-choice nokey nodrag nopan"
-            // The name is drawn, so the accessible name says which of the two this
-            // is as well as what it holds: the controls are one word apart and an
-            // author has to be able to tell them apart by ear. An unchosen one
-            // says `none` rather than repeating the `No Diagram` it draws, which as
-            // an accessible name read as a Diagram called "No Diagram".
             aria-label={selected === undefined ? `${label}: none` : `${label}: ${selected.title}`}
             title={`Choose the ${label} this Space Thing shows`}
             disabled={disabled || choices.length === 0}
             icon={icon}
-            name={selected?.title ?? `No ${label}`}
+            {...(renaming ? {} : { name: selected?.title ?? `No ${label}` })}
           />
         }
-      />
+      >
+        {commands !== undefined &&
+          ('onRecolor' in commands ? (
+            <GraphMenuActions
+              {...commonCommands}
+              editsDisabled={disabled}
+              color={commands.color}
+              colors={commands.colors}
+              onRecolor={(color) => onReport(commands.onRecolor(color))}
+              onCopyPermanentLink={() => {
+                void commands
+                  .onCopyPermanentLink()
+                  .then((refusal) => onReport(refusal ?? 'Link copied.'));
+              }}
+            />
+          ) : (
+            <DiagramMenuActions {...commonCommands} createDisabled={disabled} />
+          ))}
+      </ChoiceMenu>
     </ToolbarGroup>
   );
 }

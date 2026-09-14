@@ -128,3 +128,33 @@ exposing additional Diagram and Graph menu actions would reuse that path.
 Ordering validation: typecheck and 47 CanvasThing tests passed; the focused
 Ladle test and both application tests passed. Standards and Spec review found
 no defects. Full final verification remains with PR CI.
+
+### Full target menus
+
+The user extended this ticket: the Space Thing's menu options must be the same
+as the Dock's. Diagram offers Rename, New Diagram, Copy link and Delete; Graph
+offers Rename, Colour, New Graph, Copy link, Copy permanent link and Delete.
+The two surfaces now draw shared `DiagramMenuActions` and `GraphMenuActions`.
+Space Thing callbacks use the existing target entry's authoring and browser
+location; Graph commands explicitly address the stored Diagram. The rail order
+remains Diagram, Graph, entity actions, Open/Close, Enter.
+
+The shared application/Ladle scenario exercises all commands, last-Graph
+protection, and the containing canvas staying selected. The application also
+checks reload persistence. Domain tests cover a context different from the
+target's own selected Diagram and repair of a target's deleted Active Graph.
+Review follow-ups:
+- Confirmed: blur completion returned focus to the old trigger. A failing unit
+  regression now passes; blur leaves focus at its destination.
+- Confirmed: New Diagram bypassed the continuation owner. It now requests the
+  containing Space's continuation, scoped to the rail and newly created Diagram;
+  a readiness regression verifies deferred projection updates.
+- Confirmed: cross-Space create/delete could persist in the wrong order. Four
+  failing memory-backend regressions now pass. Creation saves the target before
+  the Thing refers to it; deletion saves the replacement selection first.
+
+Final focused validation: 69 UI/continuation tests, 124 canvas/authoring/Edge
+tests, four persistence regressions, and the shared Ladle action scenario
+passed. Root and package typechecks and the UI catalogue check passed.
+The final application browser rerun was blocked by occupied test port 5300;
+no server was stopped. Full final verification is delegated to PR CI as requested.
