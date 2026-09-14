@@ -61,6 +61,27 @@ describe('PaletteColorPicker', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('opens when only onOpenChange is supplied', () => {
+    const onOpenChange = vi.fn();
+
+    render(
+      <PaletteColorPicker
+        entries={entries}
+        value="#1f77b4"
+        onValueChange={() => undefined}
+        onOpenChange={onOpenChange}
+        trigger="Pick colour"
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Pick colour' });
+    fireEvent.click(trigger);
+
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('radio', { name: 'Orange' })).toBeInTheDocument();
+  });
+
   it('marks the current value as selected', () => {
     render(
       <PaletteColorPicker

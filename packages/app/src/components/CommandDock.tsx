@@ -1210,7 +1210,7 @@ function GraphIdentityMenu({
         <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
           <PaletteColorSwatchGrid
             entries={GRAPH_PALETTE_ENTRIES}
-            value={graph.active.color}
+            value={graph.activeColor}
             onValueChange={(color) => {
               graph.onRecolor(graph.active.id, color);
               onOpenChange(false);

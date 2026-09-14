@@ -367,6 +367,10 @@ test(
     const graphTitle = (
       await page.getByTestId('active-graph').filter({ visible: true }).innerText()
     ).trim();
+    const present = surface(page).getByRole('button', { name: 'Present Long' });
+    const presentSvg = present.locator('svg');
+    const initialStroke = await presentSvg.evaluate((element) => getComputedStyle(element).stroke);
+
     const menu = await disclose(page, `Active Graph: ${graphTitle}`);
     await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
     const group = page.getByRole('radiogroup', { name: 'Graph colour' });
@@ -375,11 +379,9 @@ test(
     await expect(group).toHaveCount(0);
     await expect(page.getByRole('menu')).toHaveCount(0);
 
-    const present = surface(page).getByRole('button', { name: 'Present Long' });
-    const stroke = await present
-      .locator('svg')
-      .evaluate((element) => getComputedStyle(element).stroke);
-    expect(stroke).not.toBe('none');
+    const finalStroke = await presentSvg.evaluate((element) => getComputedStyle(element).stroke);
+    expect(finalStroke).not.toBe(initialStroke);
+    expect(finalStroke).toBe('rgb(255, 127, 14)');
   },
 );
 

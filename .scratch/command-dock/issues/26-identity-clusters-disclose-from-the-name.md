@@ -47,17 +47,17 @@ moves how the Edit is *started* onto the menu the cluster already has.
 not a blocker. Taking the name off the rename gesture removes the click this
 ticket is about; it does not claim to settle `18`.
 
-## Answer
-
-`IdentitySurface` in `CommandDock.tsx` is the one composition: name and
-chevron are the named `ChoiceMenuTrigger`; **Rename** is a menu row that
-closes the list and continues in the existing `InlineTitleEditor`. Things is
-unchanged. Claim `command-dock-identity-presentation` has Ladle evidence in
-`command-dock.spec.ts` and application evidence in `dock-typography.spec.ts`.
-
 ## Comments
 
 ### 2026-09-13 — Closed as resolved after audit
 
 The criteria were already ticked. `18` had already closed as `wontfix`; the
 Why sentence that still called it `needs-info` is corrected above.
+
+### Resolution
+
+`IdentitySurface` in `CommandDock.tsx` is the one composition: name and
+chevron are the named `ChoiceMenuTrigger`; **Rename** is a menu row that
+closes the list and continues in the existing `InlineTitleEditor`. Things is
+unchanged. Claim `command-dock-identity-presentation` has Ladle evidence in
+`command-dock.spec.ts` and application evidence in `dock-typography.spec.ts`.

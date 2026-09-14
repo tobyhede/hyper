@@ -125,7 +125,7 @@ behaves as for any other menu item that did not move the caret.
 - Graph or Space name continuations (only `diagram-name` exists today; the
   landing contract should generalise to future chrome controls)
 
-## Answer
+### Resolution — merged as PR #209
 
 `ChromeContinuation` waits until the addressed control is activatable
 (`chromeRenameReady` and not `aria-disabled`) before `take()` and the
@@ -134,4 +134,4 @@ is set from `onLand` — so the Diagram menu restores focus unless rename
 actually opened.
 
 Evidence is `chrome-continuation.test.tsx`, `continuation.test.ts`, and the
-New Diagram case in `SpaceApp.test.tsx`. Merged as PR #209.
+New Diagram case in `SpaceApp.test.tsx`.

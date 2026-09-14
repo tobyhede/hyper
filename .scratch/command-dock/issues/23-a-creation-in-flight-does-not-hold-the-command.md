@@ -102,7 +102,9 @@ rejected — the peer becomes available again. No silent no-op on a second press
 - E2E unless an existing peer covers Create Space Thing timing; prefer the
   application test harness already used for Space Thing authoring
 
-## Answer
+## Comments
+
+### Resolution — merged as PR #208
 
 Availability now carries `creatingSpaceThing`. Create Space Thing is
 `addThing && !creatingSpaceThing`; Create Markdown Thing stays on `addThing`.
@@ -111,4 +113,3 @@ is `aria-disabled` for the coordinated-Edit window. The silent ref return is
 gone — a second press is withdrawn, not swallowed.
 
 Evidence is `authoring-availability.test.ts` and `space-thing-authoring.test.tsx`.
-Merged as PR #208.

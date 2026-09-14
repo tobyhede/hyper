@@ -117,8 +117,14 @@ export function PaletteColorPicker({
   className,
 }: PaletteColorPickerProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const resolvedOpen = open ?? internalOpen;
-  const setResolvedOpen = onOpenChange ?? setInternalOpen;
+  const isControlled = open !== undefined;
+  const resolvedOpen = isControlled ? open : internalOpen;
+  const setResolvedOpen = (next: boolean): void => {
+    if (!isControlled) {
+      setInternalOpen(next);
+    }
+    onOpenChange?.(next);
+  };
 
   const handleSelect = (color: string): void => {
     onValueChange(color);
