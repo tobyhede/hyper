@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd" role="img" aria-label="Infinity Cube: Closed-loop">
+  <title>Infinity Cube — Closed-loop, 16px</title>
+  <path d="M4.5 2.5 8 .5 11.5 2.5 10 3.5 8 2.25 6 3.5Z"/>
+  <path d="M1 5.382V10.618L4.106 12.171 8 9.25 11.894 12.171 15 10.618V5.382L11.894 3.829 8 6.75 4.106 3.829Z M3 6.618 3.894 6.171 6.333 8 3.894 9.829 3 9.382Z M13 6.618 12.106 6.171 9.667 8 12.106 9.829 13 9.382Z"/>
+  <path d="M4.5 13.5 6 12.5 8 13.75 10 12.5 11.5 13.5 8 15.5Z"/>
+</svg>
