@@ -48,6 +48,18 @@ test(
     const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Diagram' });
     await expect(spaceRow).toHaveAttribute('data-space-id', /.+/);
 
+    await expect(spaceRow.locator('[data-icon="space"]')).toBeVisible();
+    await expect(
+      page
+        .getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ })
+        .locator('[data-icon="parent"]'),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('button', { name: /^Space Things in this Space, \d+$/ })
+        .locator('[data-icon="space"]'),
+    ).toBeVisible();
+
     await spaceRow.click();
     await expect(page.getByText('Added: Blueprint')).toBeVisible();
 

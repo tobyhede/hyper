@@ -537,6 +537,19 @@ describe('ThingsPopover', () => {
     }
   });
 
+  it('uses OPEN for the All Spaces filter and cubes for Space Things and individual Spaces', async () => {
+    render(<Fixture spaces={[{ id: id('000000000020'), title: 'Blueprint' }]} />);
+    await openList();
+
+    const allSpaces = screen.getByRole('button', { name: 'Spaces in this Meta Space, 1' });
+    expect(allSpaces.querySelector('[data-icon="parent"]')).toBeInTheDocument();
+    expect(allSpaces.querySelector('[data-icon="space"]')).not.toBeInTheDocument();
+    const spaceThings = screen.getByRole('button', { name: 'Space Things in this Space, 1' });
+    expect(spaceThings.querySelector('[data-icon="space"]')).toBeInTheDocument();
+    const space = screen.getByRole('button', { name: 'Add Blueprint to Diagram' });
+    expect(space.querySelector('[data-icon="space"]')).toBeInTheDocument();
+  });
+
   /**
    * The count's whole job, and the cost the comparison recorded against it: a
    * number beside a name that disagrees with the rows under it is worse than no

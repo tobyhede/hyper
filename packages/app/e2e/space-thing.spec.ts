@@ -153,6 +153,17 @@ test(
     await expect(row.locator('[data-icon="space"]')).toBeVisible();
     await expect(nodeByTitle(page, 'Architecture').locator('[data-icon="space"]')).toBeVisible();
 
+    await expect(
+      list
+        .getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ })
+        .locator('[data-icon="parent"]'),
+    ).toBeVisible();
+    await expect(
+      list
+        .getByRole('button', { name: /^Space Things in this Space, \d+$/ })
+        .locator('[data-icon="space"]'),
+    ).toBeVisible();
+
     // And pressing its toggle off takes it away, leaving this Space's Things.
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
     await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);

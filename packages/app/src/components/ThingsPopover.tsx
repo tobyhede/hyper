@@ -20,6 +20,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
   MarkdownIcon,
+  ParentIcon,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -42,9 +43,9 @@ type Activation = 'keyboard' | 'pointer';
  * fourth is not a kind at all: `spaces` adds a second **source** — every Space
  * in this Meta Space — and placing one of those authors the Space Thing that
  * frames it. They share a control because they answer one question for the
- * reader ("what am I looking at?"). Both use the cube glyph; the filter names
- * distinguish Space Things already authored here from Spaces available to
- * place, whether or not this Space has ever pointed at them.
+ * reader ("what am I looking at?"). The All Spaces filter uses the Parent/Meta
+ * OPEN mark for the collection; Space Things and individual Space rows keep
+ * their cube glyph.
  */
 export type ThingsFilter = Thing['kind'] | 'spaces';
 
@@ -100,7 +101,7 @@ const FILTER_GLYPHS = {
   markdown: MarkdownIcon,
   alias: AliasIcon,
   space: SpaceThingIcon,
-  spaces: SpaceIcon,
+  spaces: ParentIcon,
 } satisfies Record<ThingsFilter, ComponentType>;
 
 const FilterGlyph = ({ filter }: { readonly filter: ThingsFilter }) => {
