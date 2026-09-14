@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { newUuid, uuidSchema } from '@project/core';
+import { DEFAULT_OPEN_SIZE, newUuid, uuidSchema } from '@project/core';
 import { nextGraphColor } from '@project/graph';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
 import { runDatabaseCli } from '../../src/cli/database-entry';
@@ -95,7 +95,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
         expect.stringMatching(/^Opened space .+ at revision 0\n$/),
       );
       await expect(opened.repository.listSpaces()).resolves.toEqual([
-        expect.objectContaining({ title: 'New space' }),
+        expect.objectContaining({ title: 'Space' }),
       ]);
       const catalog = await opened.repository.listSpaces();
       const created = catalog[0];
@@ -112,13 +112,15 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
           id: created.id,
           document: {
             version: 1,
-            title: 'New space',
+            title: 'Space',
             maps: [
               {
                 id: map.id,
                 title: 'Map 1',
                 kind: 'positioned',
-                positions: { [resourceId]: { x: 0, y: 0, open: false } },
+                positions: {
+                  [resourceId]: { x: 0, y: 0, open: true, openSize: DEFAULT_OPEN_SIZE },
+                },
                 graphs: [{ id: graph.id, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
                 activeGraph: graph.id,
               },
@@ -128,7 +130,11 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
           resources: [
             {
               id: resourceId,
-              document: { title: 'Resource 1', kind: 'markdown', body: '' },
+              document: {
+                title: 'Welcome to Infinity Cube',
+                kind: 'markdown',
+                body: '![Infinity Cube](/infinity-cube-logo.svg)',
+              },
             },
           ],
         },

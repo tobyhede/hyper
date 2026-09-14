@@ -94,7 +94,7 @@ describe('SQLite HTTP runtime', () => {
         // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
         JSON.parse(await again.text()) as unknown,
       ),
-    ).toEqual([expect.objectContaining({ id: metaId, title: 'New space' })]);
+    ).toEqual([expect.objectContaining({ id: metaId, title: 'Space' })]);
 
     const loaded = await second.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
     expect(loaded.status).toBe(200);
