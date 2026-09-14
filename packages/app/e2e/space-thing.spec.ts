@@ -1,3 +1,9 @@
+import { thingControls } from './graph';
+import {
+  exerciseSpaceThingPadding,
+  exerciseSpaceThingFooter,
+  exerciseFloatingThingDock,
+} from './space-thing-frame';
 import {
   exerciseSpaceThingContextMenus,
   exerciseSpaceThingEntityMenu,
@@ -208,7 +214,11 @@ test('stops offering a Space the moment the last Space Thing referencing it is d
   const thing = nodeByTitle(page, 'Architecture').first();
   await thing.click();
   await thing.hover();
-  await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click({ delay: 120 });
+  await (
+    await thingControls(page, thing)
+  )
+    .getByRole('button', { name: 'Actions for Thing Architecture' })
+    .click({ delay: 120 });
   await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete from Space' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
@@ -267,8 +277,12 @@ test('a second Space Thing may reference the Space the first one created', async
   const again = nodeByTitle(page, 'Space 1');
   await again.focus();
   await again.press('Enter');
-  await expect(again.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
-  await expect(again.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+  await expect((await thingControls(page, again)).getByTestId('space-thing-diagram')).toHaveText(
+    'Diagram 1',
+  );
+  await expect((await thingControls(page, again)).getByTestId('space-thing-graph')).toHaveText(
+    'Graph 1',
+  );
 });
 
 /**
@@ -311,10 +325,12 @@ test(
     // Enabled rather than merely present: a selector over a target with nothing
     // to choose is disabled, so this is what says the created Space arrived
     // complete rather than blank.
-    const diagramSelector = thing.getByTestId('space-thing-diagram');
+    const diagramSelector = (await thingControls(page, thing)).getByTestId('space-thing-diagram');
     await expect(diagramSelector).toBeEnabled();
     await expect(diagramSelector).toHaveText('Diagram 1');
-    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+    await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+      'Graph 1',
+    );
     // And the Diagram it names is the one it draws, which is what says the
     // stored pair reached the canvas rather than only the two controls.
     await expect(page.locator('.react-flow__node[data-id^="embedded:"]')).toHaveCount(1);
@@ -325,8 +341,8 @@ test(
     // so a change to one that the other did not follow fails here; and the Thing
     // drawing its own stored context left the canvas the Thing stands on where
     // it was.
-    const rail = thing.getByTestId('canvas-thing-actions');
-    await expect(thing.getByRole('toolbar')).toHaveCount(1);
+    const rail = (await thingControls(page, thing)).getByTestId('canvas-thing-actions');
+    await expect((await thingControls(page, thing)).getByRole('toolbar')).toHaveCount(1);
     await expect(rail.getByTestId('space-thing-diagram')).toHaveCount(1);
     await expect(rail.getByTestId('space-thing-graph')).toHaveCount(1);
     await expect(
@@ -356,9 +372,9 @@ test(
           padding: style.paddingTop,
         };
       });
-    expect(await treatment(thing.getByTestId('canvas-thing-actions'))).toEqual(
-      await treatment(page.locator('.command-dock__surface:visible')),
-    );
+    expect(
+      await treatment((await thingControls(page, thing)).getByTestId('canvas-thing-actions')),
+    ).toEqual(await treatment(page.locator('.command-dock__surface:visible')));
     // `:visible`, because creating the target Space opened it too and every open
     // Space stays mounted with one shown (`OpenSpacesApplication`).
     await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText(
@@ -367,7 +383,9 @@ test(
 
     // The containing Thing offers Close and its own title editing. The embedded
     // target Things carry their own content-editing controls.
-    await expect(thing.getByRole('button', { name: 'Close Thing Architecture' })).toBeVisible();
+    await expect(
+      (await thingControls(page, thing)).getByRole('button', { name: 'Close Thing Architecture' }),
+    ).toBeVisible();
     await expect(thing.getByRole('button', { name: 'Edit Thing Architecture' })).toHaveCount(0);
   },
 );
@@ -467,7 +485,9 @@ async function openSpaceThingOnItsDiagram(page: Page): Promise<Locator> {
   await thing.focus();
   await thing.press('Enter');
 
-  await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+    'Diagram 1',
+  );
   await settled(page);
   return thing;
 }
@@ -505,8 +525,14 @@ test(
     expect(inner.y).toBeGreaterThanOrEqual(outer.y);
     expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
     expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
-    const diagram = await boxOf(thing.getByTestId('space-thing-diagram'), 'Diagram selector');
-    const graph = await boxOf(thing.getByTestId('space-thing-graph'), 'Graph selector');
+    const diagram = await boxOf(
+      (await thingControls(page, thing)).getByTestId('space-thing-diagram'),
+      'Diagram selector',
+    );
+    const graph = await boxOf(
+      (await thingControls(page, thing)).getByTestId('space-thing-graph'),
+      'Graph selector',
+    );
     // Both named choices share the rail above the embedded Diagram.
     expect(diagram.y + diagram.height).toBeLessThanOrEqual(inner.y);
     expect(graph.y).toBeCloseTo(diagram.y, 1);
@@ -569,7 +595,11 @@ test('closing a Space Thing removes the embedded Diagram it was drawing', async 
   await expect(embeddedNodes(page)).toHaveCount(1);
 
   await thing.hover();
-  await thing.getByRole('button', { name: 'Close Thing Architecture' }).click();
+  await (
+    await thingControls(page, thing)
+  )
+    .getByRole('button', { name: 'Close Thing Architecture' })
+    .click();
   await settled(page);
 
   await expect(embeddedNodes(page)).toHaveCount(0);
@@ -711,7 +741,11 @@ test(
     // Open first, then Enter. Enter is offered Open or Closed; the press is the claim.
     await thing.focus();
     await thing.press('Enter');
-    await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click();
+    await (
+      await thingControls(page, thing)
+    )
+      .getByRole('button', { name: 'Actions for Thing Architecture' })
+      .click();
     await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
 
     await expect(showingSpace(page)).toContainText('Space 1');
@@ -738,7 +772,11 @@ test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ p
 
   const thing = nodeByTitle(page, 'Presentation');
   await thing.hover();
-  await thing.getByRole('button', { name: 'Actions for Thing Presentation' }).click();
+  await (
+    await thingControls(page, thing)
+  )
+    .getByRole('button', { name: 'Actions for Thing Presentation' })
+    .click();
   await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
 
   await expect(showingSpace(page)).toContainText('Presentation');
@@ -816,10 +854,14 @@ test('a Space Thing resizes to Close and remembers its Open Size', async ({ page
     { steps: 20 },
   );
   await page.mouse.up();
-  await expect(parent.getByRole('button', { name: 'Open Thing Architecture' })).toBeVisible();
+  await expect(
+    (await thingControls(page, parent)).getByRole('button', { name: 'Open Thing Architecture' }),
+  ).toBeVisible();
   await parent.focus();
   await parent.press('Enter');
-  await expect(parent.getByRole('button', { name: 'Close Thing Architecture' })).toBeVisible();
+  await expect(
+    (await thingControls(page, parent)).getByRole('button', { name: 'Close Thing Architecture' }),
+  ).toBeVisible();
   await expect
     .poll(async () => (await boxOf(parent, 'reopened Space Thing')).width)
     .toBeCloseTo(open.width, 0);
@@ -869,15 +911,19 @@ test(
     await exerciseSpaceThingContextMenus(page, thing);
     await page.reload();
     const reopened = nodeByTitle(page, 'Architecture');
-    await expect(reopened.getByTestId('space-thing-diagram')).toHaveText('Target context');
-    await expect(reopened.getByTestId('space-thing-graph')).toHaveText('Target path');
-    await reopened.getByTestId('space-thing-diagram').focus();
+    await expect(
+      (await thingControls(page, reopened)).getByTestId('space-thing-diagram'),
+    ).toHaveText('Target context');
+    await expect((await thingControls(page, reopened)).getByTestId('space-thing-graph')).toHaveText(
+      'Target path',
+    );
+    await (await thingControls(page, reopened)).getByTestId('space-thing-diagram').focus();
     await page.keyboard.press('Enter');
     await expect(
       page.getByRole('menuitemradio', { name: 'Created from rail', exact: true }),
     ).toHaveCount(0);
     await page.keyboard.press('Escape');
-    await reopened.getByTestId('space-thing-graph').focus();
+    await (await thingControls(page, reopened)).getByTestId('space-thing-graph').focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('menuitemradio', { name: 'Graph 1', exact: true })).toHaveCount(0);
   },
@@ -892,5 +938,32 @@ test(
     await settled(page);
     await page.reload();
     await expect(nodeByTitle(page, 'Space card alias')).toBeVisible();
+  },
+);
+
+test(
+  'Space Thing canvas has equal top and side padding',
+  { tag: '@parity:space-thing-canvas-padding' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingPadding(page, thing, embeddedNodes(page).first());
+  },
+);
+
+test(
+  'Space Thing title footer follows its content',
+  { tag: '@parity:space-thing-content-sized-footer' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingFooter(page, thing, embeddedNodes(page).first());
+  },
+);
+
+test(
+  'Thing dock floats eight pixels inside the border above embedded content',
+  { tag: '@parity:thing-dock-floats' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseFloatingThingDock(page, thing);
   },
 );

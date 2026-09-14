@@ -1,3 +1,4 @@
+import { thingControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Exercise the same target commands through the application and its production story. */
@@ -18,7 +19,7 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
     });
   });
   const openMenu = async (kind: 'diagram' | 'graph') => {
-    const trigger = thing.getByTestId(`space-thing-${kind}`);
+    const trigger = (await thingControls(page, thing)).getByTestId(`space-thing-${kind}`);
     await trigger.focus();
     await trigger.press('Enter');
   };
@@ -29,7 +30,9 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).fill('Target context');
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).press('Enter');
-  await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Target context');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+    'Target context',
+  );
   await openMenu('diagram');
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
@@ -50,7 +53,9 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill('Target path');
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).press('Enter');
-  await expect(thing.getByTestId('space-thing-graph')).toHaveText('Target path');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+    'Target path',
+  );
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Colour…', exact: true }).click();
   await page.getByRole('radio', { name: 'Pink', exact: true }).click();
@@ -77,19 +82,27 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
     page.getByRole('menuitem', { name: 'Delete Target path', exact: true }),
   ).toBeDisabled();
   await page.getByRole('menuitem', { name: 'New Graph', exact: true }).click();
-  await expect(thing.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+    'Graph 1',
+  );
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
-  await expect(thing.getByTestId('space-thing-graph')).toHaveText('Target path');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+    'Target path',
+  );
 
   await openMenu('diagram');
   await page.getByRole('menuitem', { name: 'New Diagram', exact: true }).click();
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).fill('Created from rail');
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).press('Enter');
-  await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Created from rail');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+    'Created from rail',
+  );
   await openMenu('diagram');
   await page.getByRole('menuitem', { name: 'Delete Created from rail', exact: true }).click();
-  await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Target context');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+    'Target context',
+  );
   await expect(canvas).toHaveText(containingDiagram ?? '');
 }
 
@@ -108,14 +121,16 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
         height: getComputedStyle(icon).height,
       })),
     }));
-  expect(await typography(card.getByTestId('space-thing-diagram'))).toEqual(
-    await typography(page.locator('[data-testid="selected-canvas"]:visible')),
-  );
-  expect(await typography(card.getByTestId('space-thing-graph'))).toEqual(
-    await typography(page.locator('[data-testid="active-graph"]:visible')),
-  );
+  expect(
+    await typography((await thingControls(page, card)).getByTestId('space-thing-diagram')),
+  ).toEqual(await typography(page.locator('[data-testid="selected-canvas"]:visible')));
+  expect(
+    await typography((await thingControls(page, card)).getByTestId('space-thing-graph')),
+  ).toEqual(await typography(page.locator('[data-testid="active-graph"]:visible')));
   const menu = async () => {
-    const trigger = card.getByRole('button', { name: /^Actions for Thing/ });
+    const trigger = (await thingControls(page, card)).getByRole('button', {
+      name: /^Actions for Thing/,
+    });
     await trigger.focus();
     await trigger.press('Enter');
   };
@@ -147,17 +162,23 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
     has: page.getByRole('heading', { name: 'Space card alias', exact: true }),
   });
   await expect(alias.locator('[data-testid="thing"]')).toHaveAttribute('data-kind', 'alias');
-  const openAlias = alias.getByRole('button', { name: 'Open Thing Space card alias' });
+  const openAlias = (await thingControls(page, alias)).getByRole('button', {
+    name: 'Open Thing Space card alias',
+  });
   await openAlias.focus();
   await openAlias.press('Enter');
   const aliasId = await alias.getAttribute('data-id');
   const embedded = page.locator(`.react-flow__node[data-id^="embedded:${aliasId}:"]`);
   await expect(embedded.first()).toBeVisible();
   expect(
-    await alias.locator('.canvas-thing__body').evaluate((body) => getComputedStyle(body).height),
-  ).toBe('100px');
+    await alias
+      .locator('.canvas-thing__body')
+      .evaluate((body) => (body instanceof HTMLElement ? body.offsetHeight : 0)),
+  ).toBeLessThan(50);
   await expect(embedded.getByTestId('canvas-thing-actions')).toHaveCount(0);
-  const aliasMenu = alias.getByRole('button', { name: 'Actions for Thing Space card alias' });
+  const aliasMenu = (await thingControls(page, alias)).getByRole('button', {
+    name: 'Actions for Thing Space card alias',
+  });
   await aliasMenu.focus();
   await aliasMenu.press('Enter');
   await expect(page.getByRole('menuitem', { name: /^Create Alias/ })).toHaveAttribute(

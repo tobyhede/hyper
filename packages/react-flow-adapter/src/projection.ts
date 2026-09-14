@@ -45,6 +45,8 @@ export type ThingTitleEditor = {
 /** Data carried by each custom thing node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ThingNodeData = {
+  /** Reports rendered title geometry by placement, including embedded placements. */
+  onBodyHeightChange?: (id: string, height: number | null) => void;
   thingId: ThingId;
   title: string;
   /** Whether the Thing's reusable component must withhold authoring affordances. */

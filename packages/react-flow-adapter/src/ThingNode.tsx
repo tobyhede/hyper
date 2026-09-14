@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Handle,
+  ViewportPortal,
   NodeResizeControl,
   Position,
   useConnection,
@@ -75,6 +76,10 @@ export function ThingNode({
   selected,
   dragging,
   isConnectable,
+  positionAbsoluteX,
+  positionAbsoluteY,
+  width,
+  zIndex,
 }: NodeProps<ThingFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
@@ -109,6 +114,32 @@ export function ThingNode({
    * design-system component knowing React Flow exists.
    */
   const inner = useRef<HTMLDivElement>(null);
+  const renderRail = useCallback(
+    (rail: ReactNode) => {
+      if (data.expanded !== true || data.spaceContent === undefined) return rail;
+      return (
+        <ViewportPortal>
+          <div
+            className="thing-rail-layer"
+            data-thing-rail-for={id}
+            style={{
+              transform: `translate(${positionAbsoluteX + 4}px, ${positionAbsoluteY + 4}px)`,
+              width: (width ?? 260) - 8,
+              zIndex: 2000 + zIndex,
+            }}
+          >
+            {rail}
+          </div>
+        </ViewportPortal>
+      );
+    },
+    [id, data.expanded, data.spaceContent, positionAbsoluteX, positionAbsoluteY, width, zIndex],
+  );
+  const reportBodyHeight = data.onBodyHeightChange;
+  const onBodyHeightChange = useCallback(
+    (height: number | null) => reportBodyHeight?.(id, height),
+    [id, reportBodyHeight],
+  );
 
   const markdownOperations: MarkdownOperations = {};
   if (data.thingEditingEnabled === true && data.onEditThing !== undefined) {
@@ -424,6 +455,8 @@ export function ThingNode({
         <CanvasThing
           readOnly={data.readOnly}
           front={front}
+          renderRail={renderRail}
+          {...(reportBodyHeight === undefined ? {} : { onBodyHeightChange })}
           title={data.title}
           graphColor={data.activeGraphColor}
           state="editing"
@@ -436,6 +469,8 @@ export function ThingNode({
         <CanvasThing
           readOnly={data.readOnly}
           front={front}
+          renderRail={renderRail}
+          {...(reportBodyHeight === undefined ? {} : { onBodyHeightChange })}
           title={data.title}
           graphColor={data.activeGraphColor}
           state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}

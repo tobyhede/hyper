@@ -148,7 +148,7 @@ describe('an embedded production projection', () => {
     const drawn = view({ width: 700, height: 500 });
     expect(constrainEmbeddedPosition({ x: 600, y: 120 }, drawn)).toEqual({ x: 600, y: 120 });
     expect(constrainEmbeddedPosition({ x: 900, y: 640 }, drawn)).toEqual({ x: 660, y: 372 });
-    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, drawn)).toEqual({ x: 16, y: 42 });
+    expect(constrainEmbeddedPosition({ x: -30, y: -8 }, drawn)).toEqual({ x: 16, y: 16 });
   });
 
   it('holds a proposal inside bounds an ancestor has narrowed', () => {

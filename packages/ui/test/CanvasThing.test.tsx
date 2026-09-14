@@ -61,7 +61,7 @@ describe('CanvasThing kind and interaction state', () => {
     // Every kind draws its glyph, Markdown included — ThingKindIcon has no
     // silent-nothing case, and the rail is not the centred, icon-optional
     // diagram the pre-design-system Thing used.
-    expect(screen.getByRole('img', { name: 'Markdown Thing' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Markdown Thing' })).toBeNull();
   });
 
   it('presents an Alias front by its kind alone', () => {

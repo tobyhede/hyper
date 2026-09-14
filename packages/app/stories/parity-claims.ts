@@ -582,6 +582,26 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
   },
   {
+    id: 'thing-dock-floats',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'The Thing dock floats eight pixels inside the border, remains operable above embedded content, and replaces the open kind glyph.',
+  },
+  {
+    id: 'space-thing-content-sized-footer',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'The Space Thing title footer grows with title content and the embedded Diagram clips at its measured edge.',
+  },
+  {
+    id: 'space-thing-canvas-padding',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim: 'Embedded Things drag against equal top, left and right canvas padding.',
+  },
+  {
     id: 'space-thing-entity-menu',
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',

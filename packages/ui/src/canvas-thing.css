@@ -295,7 +295,7 @@
 }
 
 /* Plain feedback while the referenced Space is unread. Its selection commands
-   join the rail once the read completes; the footer keeps its fixed height. */
+   join the rail once the read completes; feedback contributes to footer height. */
 .canvas-thing__space-note {
   margin: 8px 0 0;
   color: var(--canvas-thing-muted);
@@ -316,20 +316,10 @@
   flex: 1 1 auto;
 }
 
-/* An Open Space Thing draws the Diagram it selects (ADR 0068), and that view
-   is React Flow sub-flow nodes painted *over* this Thing rather than DOM inside
-   it — so nothing here can lay out around them, and the room they get has to be
-   a number both sides agree on. The Thing's own passengers take a footer of
-   exactly `SPACE_THING_FOOTER_HEIGHT`, leaving the region above it for the view.
-   `packages/ui/test/canvas-thing-embedded-diagram.test.ts` holds this rule and that
-   constant to the same number.
-
-   `flex: none` with `margin-top: auto` rather than the `flex: 1` the body
-   normally takes: bottom-aligning the content of a body that fills the Thing
-   leaves the free region above it a different size on every Thing, which is the
-   one thing a projection reading a constant cannot survive. */
+/* The title footer takes only its content. CanvasThing reports its measured
+   height so embedded nodes and Edges clip at the same boundary. */
 .canvas-thing[data-content-kind='space'][data-expanded='true'] .canvas-thing__body {
-  height: 100px;
+  height: auto;
   flex: none;
   margin-top: auto;
 }
@@ -456,4 +446,31 @@
   .canvas-thing {
     --thing-placement-duration: 1ms;
   }
+}
+
+/* A Thing's command surface floats eight pixels inside its paper border. */
+.canvas-thing__rail {
+  position: absolute;
+  inset: 8px 8px auto;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  z-index: 2;
+  pointer-events: none;
+  gap: 8px;
+}
+.canvas-thing__rail .canvas-thing__actions {
+  margin-left: auto;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.canvas-thing__rail[data-revealed='true'] .canvas-thing__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.canvas-thing__content {
+  padding-top: 54px;
+}
+.canvas-thing[data-expanded='false'] > .canvas-thing__body {
+  padding-top: 46px;
 }

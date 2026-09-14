@@ -325,6 +325,16 @@ export function SpaceCanvas({
    * are reporting one failure, and each names itself where it is drawn.
    */
   const [embeddedFailures, setEmbeddedFailures] = useState<ReadonlyMap<ThingId, string>>(new Map());
+  const [bodyHeights, setBodyHeights] = useState<ReadonlyMap<string, number>>(new Map());
+  const reportBodyHeight = useCallback((id: string, height: number | null) => {
+    setBodyHeights((previous) => {
+      if (height === null ? !previous.has(id) : previous.get(id) === height) return previous;
+      const next = new Map(previous);
+      if (height === null) next.delete(id);
+      else next.set(id, height);
+      return next;
+    });
+  }, []);
   const embeddedRequests = useMemo(() => {
     const requests: {
       parent: ThingFlowNode;
@@ -363,6 +373,8 @@ export function SpaceCanvas({
       if (path.has(crossing)) continue;
       const crossed = new Set(path).add(crossing);
       const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
+      const footer = bodyHeights.get(parent.id);
+      const bottomInset = footer === undefined ? SPACE_THING_EMBED_INSET.bottom : footer + 4;
       const intersection = {
         left: Math.max(absolute.x + SPACE_THING_EMBED_INSET.left, clip?.left ?? -Infinity),
         top: Math.max(absolute.y + SPACE_THING_EMBED_INSET.top, clip?.top ?? -Infinity),
@@ -370,10 +382,7 @@ export function SpaceCanvas({
           absolute.x + (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
           clip?.right ?? Infinity,
         ),
-        bottom: Math.min(
-          absolute.y + (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
-          clip?.bottom ?? Infinity,
-        ),
+        bottom: Math.min(absolute.y + (parent.height ?? 0) - bottomInset, clip?.bottom ?? Infinity),
       };
       requests.push({
         parent,
@@ -403,7 +412,7 @@ export function SpaceCanvas({
       }
     }
     return requests;
-  }, [nodes, entries, embeddedPublications]);
+  }, [nodes, entries, embeddedPublications, bodyHeights]);
   /**
    * A read outlives its embedding only while the *target* is gone.
    *
@@ -719,8 +728,16 @@ export function SpaceCanvas({
    * `editableNodes` would put another Space's Thing inside each of them.
    */
   const canvasNodes = useMemo(
-    () => [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)],
-    [editableNodes, liveEmbeddings],
+    () =>
+      [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) =>
+        node.data.spaceContent === undefined
+          ? node
+          : {
+              ...node,
+              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+            },
+      ),
+    [editableNodes, liveEmbeddings, reportBodyHeight],
   );
   const canvasEdges = useMemo(
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],

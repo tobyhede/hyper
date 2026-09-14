@@ -181,3 +181,23 @@ entity-menu scenarios, and eight resolver/footer tests passed. The affected
 menu/action tests passed (35 tests); earlier focused Alias intake, authoring,
 Enter and CanvasThing checks passed. Review found and corrected duplicated
 Alias resolution and outdated live documentation. Final full checks run in CI.
+
+
+### Floating Thing dock — accepted
+
+The selected prototype is `Floating · 8px`, captured on
+`prototype/floating-thing-dock`. Production uses the shared Thing rail and
+CommandToolbar with an 8px gap inside the border. Open Things omit the kind
+glyph. Space docks use React Flow's ViewportPortal so embedded Things pass
+under the controls without a header panel blocking the canvas.
+
+The embedded canvas has the same 16px inset from the outer box at the top,
+left and right (4px border plus 12px paper). The title footer is content-sized;
+its measured height sets the clipping and drag boundary for embedded Things
+and Edges, including Aliases that display Space content. The 100px fixed-footer
+source assertions were replaced by browser evidence against actual content.
+
+The agreed TDD boundary is browser interaction through both the production
+application and its Ladle host: equal padding and drag limits, title-dependent
+footer height, and floating dock interaction. Each new behavior was observed
+red before its implementation passed. Full final verification runs on PR CI.
