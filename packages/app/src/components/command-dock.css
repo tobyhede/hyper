@@ -478,17 +478,9 @@
    than by saying anything stronger. They are the `receded` variant and
    `quietFeedback`'s `aria-expanded` state in `@project/ui` now.
 
-   What the ink says is unchanged and worth keeping: the parent is the Space you
-   are in drawn as the thing it sits inside, and **three things separate it from
-   the Space you are in**, no one of which was enough. The mark is a cube rather
-   than the Space glyph — not the Space glyph decorated, but the same object at a
-   different depth, so the two rows differ in silhouette, which is what a reader
-   matches on (`ParentIcon`, chosen in `.scratch/command-dock/issues/06-...`). It
-   recedes a step below the bar's own tone, which is also why the cube carries a
-   quarter-unit more stroke than the bar's other glyphs — the tone step is weight
-   it has to be given back. And a `Divider` stands between them, as at every
-   cluster boundary in the Dock, so this is the rule rather than a patch on this
-   pair. */
+   The parent step uses the OPEN Parent/Meta mark, recedes below the current
+   Space's tone, and keeps the Divider at the cluster boundary. The regular
+   Space uses a cube; geometry belongs to the shared icons, not this sheet. */
 .command-dock__crumb {
   display: inline-flex;
   min-width: 0;

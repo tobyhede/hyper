@@ -123,11 +123,9 @@ test('creating a Space Thing mints its Space and places the Thing that names it'
 /**
  * The Things list offers the Meta Space's Spaces beside this Space's Things.
  *
- * The distinction the filter's two Space glyphs exist to draw (ADR 0074): the
- * frame is a Space **Thing**, one authored view placed in a Diagram, and the cube
- * is the Space itself, offered whether or not this Space has ever pointed at
- * it. Creating a Space Thing brings its Space into the Meta Space, so the same
- * Edit that puts a frame on the canvas is what puts a cube in the list.
+ * A Space Thing and its target Space share the cube glyph. The two filters
+ * name the different sets: Things authored here and Spaces available to place.
+ * Creating a Space Thing makes both its canvas glyph and its target's list row.
  */
 test(
   'the Things list offers a newly created Space as a Space of the Meta Space',
@@ -152,6 +150,8 @@ test(
     const row = list.getByRole('button', { name: 'Add Space 1 to Diagram' });
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-space-id', /.+/);
+    await expect(row.locator('[data-icon="space"]')).toBeVisible();
+    await expect(nodeByTitle(page, 'Architecture').locator('[data-icon="space"]')).toBeVisible();
 
     // And pressing its toggle off takes it away, leaving this Space's Things.
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
@@ -606,10 +606,8 @@ test('an embedded Thing can move, open with the keyboard and resize in its targe
  * **The bar names one step up rather than a whole path**, which is the
  * arrangement's answer to width rather than an omission: the step a reader
  * reaches for is the one above them, and everything further up is behind the
- * Open Spaces disclosure. `ParentIcon` is the mark that says the named Space is
- * *above* this one rather than beside it — the cube ticket `06` moved into
- * `@project/ui` so the decision would live somewhere other than a story sheet,
- * and this is the consumer that gives it a check.
+ * Open Spaces disclosure. The shared OPEN mark identifies Parent/Meta and the
+ * cube identifies an ordinary Space, including when opened directly.
  */
 test(
   'entering a Space names the Space it was entered from, and Exit returns',
@@ -626,23 +624,35 @@ test(
     // parent glyph carrying the relation rather than a word.
     const parent = page.getByRole('button', { name: 'Go to Diagram fixture' });
     await expect(parent).toBeVisible();
-    // The mark contributes nothing to the name: the cube is `aria-hidden`, so
+    // The mark contributes nothing to the name: the OPEN mark is `aria-hidden`, so
     // the control is named for the Space alone and the glyph carries the
     // relation to it.
     await expect(parent).toHaveAccessibleName('Go to Diagram fixture');
     await expect(parent).toContainText('Diagram fixture');
     await expect(parent.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
+    await expect(parent.locator('svg[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
+    await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    const ordinarySpaceUrl = page.url();
 
     await exitSpace(page);
 
     await expect(showingSpace(page)).toContainText('Diagram fixture');
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+    await expect(showingSpace(page).locator('[data-icon="parent"]')).toHaveAttribute(
+      'viewBox',
+      '0 0 16 16',
+    );
+
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
     await expect(embedded.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
     await embedded.click();
     await embedded.hover();
     await expect(embedded.getByRole('button', { name: 'Edit Thing Thing 1' })).toBeVisible();
+
+    await page.goto(ordinarySpaceUrl);
+    await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
   },
 );
 

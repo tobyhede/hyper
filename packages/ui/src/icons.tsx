@@ -6,7 +6,6 @@ import {
   Copy,
   Ellipsis,
   ExternalLink,
-  Frame,
   LayoutGrid,
   Link,
   LogIn,
@@ -147,20 +146,8 @@ export const MarkdownIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <StickyNote size={size} />
 );
 
-/** The Thing kind that shows one selected view of another Space (ADR 0068). */
-export const SpaceThingIcon = ({ size = 14 }: { size?: number | undefined }) => (
-  <Frame size={size} />
-);
-
 /**
- * The isometric cube both Space marks are drawn from, and the optical
- * correction that sizes it.
- *
- * Shared rather than duplicated because the two marks that draw it —
- * {@link ParentIcon} and {@link SpaceIcon} — are the same object seen in two
- * positions, and a cube that drifted in weight between them would read as two
- * different things. What each *means* is on each of them; what is here is the
- * geometry, and `mark` is the only thing that varies.
+ * The isometric cube shared by Spaces and Space Things.
  *
  * **The scale is an optical correction, not a size.** Lucide's `box` has a
  * geometry box 20 units tall — `3..21` across by `2..22` down, read off
@@ -181,13 +168,8 @@ export const SpaceThingIcon = ({ size = 14 }: { size?: number | undefined }) => 
  * apart, and the stroke is divided back out by the scale so the correction
  * changes the silhouette and not the weight.
  *
- * **What the cube costs, wherever it is drawn.** It gives one domain kind two
- * glyphs, so {@link SpaceThingIcon} stops answering "what does a Space look
- * like" on its own — the frame is a Space *Thing* and the volume is the Space.
- * That pair is the distinction both consumers turn on, and a reader has to
- * learn it once.
  */
-const CubeGlyph = ({ size, mark }: { size: number; mark: string }) => {
+const CubeGlyph = ({ size }: { size: number }) => {
   const view = 24;
   const stroke = 2.25;
   const scale = (view - stroke) / 20;
@@ -199,13 +181,7 @@ const CubeGlyph = ({ size, mark }: { size: number; mark: string }) => {
       viewBox={`0 0 ${view} ${view}`}
       fill="none"
       aria-hidden="true"
-      /* **The one thing a test can hold this glyph to.** The mark is
-         `aria-hidden`, so nothing about it reaches the accessible name and a
-         behaviour test can only ask "is there an icon here" — which is true of
-         every icon and so checks nothing. `ui:catalog:check` cannot see this
-         module either. Named rather than styled, so swapping the cube for a
-         chevron fails the check that says the parent mark says *containing*. */
-      data-icon={mark}
+      data-icon="space"
     >
       <g transform={`translate(12 12) scale(${scale}) translate(-12 -12)`}>
         <Box size={view} strokeWidth={stroke / scale} />
@@ -215,45 +191,34 @@ const CubeGlyph = ({ size, mark }: { size: number; mark: string }) => {
 };
 
 /**
- * The Space you came from, drawn as the volume the one you are in sits inside.
- *
- * **Two Spaces named side by side cannot both take the Space glyph.** The
- * Command Dock draws the Space you are in beside the Space you entered it from,
- * and giving both {@link SpaceThingIcon} drew two identical clusters at the same
- * size and the same `--muted-foreground` — the glyph is what a reader matches
- * on, so repeating it made the pair harder to tell apart rather than easier.
- *
- * A kind glyph cannot separate them, because both rows really are Spaces. What
- * differs is position, so the mark says position: the Space you are on is a
- * frame, because a frame is the surface you are working on, and the Space you
- * came from is the volume that surface is inside. The rows then differ in
- * silhouette at no width and with no cut base, and the cube is the same object
- * at a different depth rather than a foreign glyph. Chosen over a direction
- * mark and over a badged composite; the alternatives are in
- * `.scratch/command-dock/issues/06-...`.
- *
- * **What it costs here.** It says *containing*, not *above* and not *back*, so
- * the reader learns the relationship but nothing in the mark says which way to
- * travel — and pressing it is still a move. A cube in isometric has an up-face,
- * and filling it would add the direction back; that is not taken here.
+ * Parent/Meta uses the OPEN infinity-cube artwork selected in the design review.
+ * This product mark is the approved custom exception to the Lucide vocabulary;
+ * icons.test.tsx holds its geometry to the supplied 16px SVG.
  */
-export const ParentIcon = ({ size = 14 }: { size?: number | undefined }) => (
-  <CubeGlyph size={size} mark="parent" />
+export const ParentIcon = ({ size = 16 }: { size?: number | undefined }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    fill="currentColor"
+    fillRule="evenodd"
+    aria-hidden="true"
+    data-icon="parent"
+  >
+    <path d="M4.5 2.5 8 .5 11.5 2.5 10 3.5 8 2.25 6 3.5Z" />
+    <path d="M1 5.382 4.106 3.829 12.106 9.829 13 9.382V6.618L12.106 6.171 10.5 7.375 8.833 6.125 11.894 3.829 15 5.382V10.618L11.894 12.171 3.894 6.171 3 6.618V9.382L3.894 9.829 5.5 8.625 7.167 9.875 4.106 12.171 1 10.618Z" />
+    <path d="M4.5 13.5 6 12.5 8 13.75 10 12.5 11.5 13.5 8 15.5Z" />
+  </svg>
 );
 
-/**
- * A Space itself, as against a Space **Thing** that frames one view of it.
- *
- * The same cube {@link ParentIcon} draws, and deliberately: the containing
- * Space is a Space, so one mark means one thing. What separates this from
- * {@link SpaceThingIcon}'s frame is the distinction the Things list turns on — a
- * frame is one authored view placed in a Diagram, and the volume is the Space
- * every such view is a view of. A reader who learns the pair in the filter
- * reads it again on the rows and in the Dock's parent step.
- */
+/** A regular Space, drawn as a cube. */
 export const SpaceIcon = ({ size = 14 }: { size?: number | undefined }) => (
-  <CubeGlyph size={size} mark="space" />
+  <CubeGlyph size={size} />
 );
+
+/** Space Things share the Space cube, including when used as an Alias base. */
+export const SpaceThingIcon = SpaceIcon;
 
 /**
  * The Thing kinds that own what they draw, and so have a glyph of their own.

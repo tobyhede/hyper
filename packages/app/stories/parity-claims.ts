@@ -368,7 +368,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'A Space entered from another names that one Space as a step back, marked with the parent glyph, and holds every other open Space behind the Open Spaces disclosure beside it.',
+      'A Space entered from another names that one Space as a step back, marked with OPEN, and holds every other open Space behind the Open Spaces disclosure beside it. The current Meta Space also draws OPEN, while an ordinary Space draws a cube.',
   },
   {
     id: 'command-dock-keeps-its-names-on-a-side-edge',

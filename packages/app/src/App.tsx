@@ -1505,6 +1505,7 @@ export const createApp = (
             space: {
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,
+              isMeta: renderedSpace.id === spaces?.metaSpaceId,
               parent: parentSpace,
               openSpaces: openSpaceRows,
               // Behind `chromeTitleEdit` exactly as the Diagram and Graph names

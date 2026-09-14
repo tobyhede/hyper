@@ -42,10 +42,9 @@ type Activation = 'keyboard' | 'pointer';
  * fourth is not a kind at all: `spaces` adds a second **source** — every Space
  * in this Meta Space — and placing one of those authors the Space Thing that
  * frames it. They share a control because they answer one question for the
- * reader ("what am I looking at?") and because the pair that would otherwise
- * confuse them is drawn side by side here: the frame is a Space Thing already in
- * this Space, and the cube is a Space, whether or not this Space has ever
- * pointed at it.
+ * reader ("what am I looking at?"). Both use the cube glyph; the filter names
+ * distinguish Space Things already authored here from Spaces available to
+ * place, whether or not this Space has ever pointed at them.
  */
 export type ThingsFilter = Thing['kind'] | 'spaces';
 

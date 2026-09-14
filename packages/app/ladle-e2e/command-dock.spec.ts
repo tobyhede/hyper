@@ -258,10 +258,8 @@ test(
  *
  * The bar names **one** step up rather than the full Traversal history — that
  * is the Dock's answer to width, and the Open Spaces menu is what makes it an
- * answer rather than an omission. The parent step carries `ParentIcon`, the cube
- * `06` moved into `@project/ui` to lock the decision somewhere other than a
- * throwaway sheet; this is the consumer that gives it a check rather than a doc
- * comment.
+ * answer rather than an omission. Parent/Meta carries the approved OPEN mark;
+ * ordinary Spaces carry cubes.
  */
 test(
   'the bar names one Space back and discloses the rest of the open set',
@@ -274,15 +272,15 @@ test(
     );
     const parent = surface(page).getByRole('button', { name: 'Go to Design system' });
     await expect(parent).toBeVisible();
-    // The mark contributes nothing to the name: the cube is `aria-hidden`, so
+    // The mark contributes nothing to the name: the OPEN mark is `aria-hidden`, so
     // the control is named for the Space alone and the glyph carries the
     // relation to it.
     await expect(parent).toHaveAccessibleName('Go to Design system');
     await expect(parent).toContainText('Design system');
-    // The cube specifically, not "an icon": `ParentIcon` says *containing*
-    // where a chevron would say *above* and an arrow *back* (`icons.tsx`), and
-    // `svg[aria-hidden]` is satisfied by any of the three.
-    await expect(parent.locator('[data-icon="parent"]')).toBeVisible();
+    await expect(parent.locator('[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
+    await expect(
+      page.getByTestId('space-title').filter({ visible: true }).locator('[data-icon="space"]'),
+    ).toBeVisible();
 
     const menu = await disclose(page, 'Spaces. 5 open.');
     for (const title of ['Meta Space', 'Platform', 'Design system', 'Rendering', 'Traversal'])
@@ -294,6 +292,11 @@ test(
     await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Traversal',
     );
+    const openSpaces = await disclose(page, 'Spaces. 5 open.');
+    await openSpaces.getByRole('menuitemradio', { name: /^Meta Space/ }).click();
+    const metaTitle = page.getByTestId('space-title').filter({ visible: true });
+    await expect(metaTitle).toContainText('Meta Space');
+    await expect(metaTitle.locator('[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
   },
 );
 
@@ -523,6 +526,19 @@ test(
     // One group, so assistive technology announces the run once rather than two
     // unrelated commands after the Things trigger.
     await expect(strip.getByRole('group', { name: 'Create a Thing' })).toBeAttached();
+    const createSpace = strip.getByRole('button', { name: 'Create Space Thing', exact: true });
+    await expect(createSpace.locator('[data-icon="space"]')).toBeVisible();
+    await createSpace.click();
+    const title = page.getByRole('textbox', { name: 'Thing title' });
+    await expect(title).toBeFocused();
+    await title.press('Enter');
+    await expect(
+      page
+        .locator('.react-flow__node:visible')
+        .getByRole('img', { name: 'Space Thing', exact: true })
+        .locator('[data-icon="space"]')
+        .last(),
+    ).toBeVisible();
   },
 );
 

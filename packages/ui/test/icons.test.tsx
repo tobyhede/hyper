@@ -2,6 +2,9 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   AliasIcon,
+  ParentIcon,
+  SpaceIcon,
+  SpaceThingIcon,
   ThingKindIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -22,6 +25,47 @@ import {
 } from '../src/index';
 
 describe('the public icon facade', () => {
+  it('draws Parent/Meta with the supplied OPEN artwork at 16px', () => {
+    const { container } = render(<ParentIcon />);
+    const glyph = container.querySelector('svg');
+    expect(glyph).toHaveAttribute('viewBox', '0 0 16 16');
+    expect(glyph).toHaveAttribute('width', '16');
+    expect(glyph).toHaveAttribute('height', '16');
+    expect(glyph).toHaveAttribute('fill', 'currentColor');
+    expect(glyph).toHaveAttribute('fill-rule', 'evenodd');
+    expect(glyph).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      Array.from(container.querySelectorAll('path'), (path) => path.getAttribute('d')),
+    ).toEqual([
+      'M4.5 2.5 8 .5 11.5 2.5 10 3.5 8 2.25 6 3.5Z',
+      'M1 5.382 4.106 3.829 12.106 9.829 13 9.382V6.618L12.106 6.171 10.5 7.375 8.833 6.125 11.894 3.829 15 5.382V10.618L11.894 12.171 3.894 6.171 3 6.618V9.382L3.894 9.829 5.5 8.625 7.167 9.875 4.106 12.171 1 10.618Z',
+      'M4.5 13.5 6 12.5 8 13.75 10 12.5 11.5 13.5 8 15.5Z',
+    ]);
+  });
+
+  it('uses the same cube for Spaces, Space Things and their kind glyphs', () => {
+    render(
+      <>
+        <span data-testid="space">
+          <SpaceIcon size={16} />
+        </span>
+        <span data-testid="space-thing">
+          <SpaceThingIcon size={16} />
+        </span>
+        <ThingKindIcon kind="space" size={16} />
+      </>,
+    );
+    for (const glyph of [
+      screen.getByTestId('space'),
+      screen.getByTestId('space-thing'),
+      screen.getByRole('img', { name: 'Space Thing' }),
+    ]) {
+      expect(glyph.querySelector('.lucide-box')).toBeInTheDocument();
+      expect(glyph.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(glyph.querySelector('svg')).toHaveAttribute('width', '16');
+    }
+  });
+
   it('uses Lucide for every general-purpose interface glyph', () => {
     render(
       <div>
@@ -124,12 +168,12 @@ describe('the public icon facade', () => {
     // composition, which is why it is ours and why the badge can sit over it.
     for (const [testId, lucideName] of [
       ['alias-default', 'sticky-note'],
-      ['alias-of-space', 'frame'],
+      ['alias-of-space', 'box'],
     ] as const) {
       const composed = screen.getByTestId(testId).querySelector('svg');
       expect(composed).toHaveAttribute('aria-hidden', 'true');
       expect(composed).not.toHaveClass('lucide');
-      expect(composed?.querySelector('svg')).toHaveClass('lucide', `lucide-${lucideName}`);
+      expect(composed?.querySelector('.lucide')).toHaveClass('lucide', `lucide-${lucideName}`);
     }
 
     // The hole is cut rather than painted, so the badge is legible on any
@@ -259,6 +303,6 @@ describe('the public icon facade', () => {
     expect(ofMarkdown).toHaveAttribute('data-alias-of', 'markdown');
     expect(ofSpace).toHaveAttribute('data-alias-of', 'space');
     expect(ofMarkdown.querySelector('svg svg')).toHaveClass('lucide-sticky-note');
-    expect(ofSpace.querySelector('svg svg')).toHaveClass('lucide-frame');
+    expect(ofSpace.querySelector('.lucide')).toHaveClass('lucide-box');
   });
 });
