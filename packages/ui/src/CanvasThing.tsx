@@ -853,7 +853,7 @@ function SpaceThingSelector({
             title={`Choose the ${label} this Space Thing shows`}
             disabled={disabled || choices.length === 0}
             icon={icon}
-            {...(renaming ? {} : { name: selected?.title ?? `No ${label}` })}
+            name={renaming ? undefined : (selected?.title ?? `No ${label}`)}
           />
         }
       >

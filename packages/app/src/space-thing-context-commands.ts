@@ -11,6 +11,11 @@ import type { SpaceThingTargetDiagram } from './space-thing-lifecycle';
 const refusalOf = (result: AuthoringResult): string | null =>
   result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 
+interface SpaceThingContextCommands {
+  readonly diagramCommands: CanvasSpaceThingCommands;
+  readonly graphCommands?: CanvasSpaceThingGraphCommands;
+}
+
 /** The Dock commands, addressed to the target and the context this Thing stores. */
 export function spaceThingContextCommands(
   entry: OpenSpace,
@@ -19,7 +24,7 @@ export function spaceThingContextCommands(
   document: Extract<ThingDocument, { kind: 'space' }>,
   select: (diagram: Pick<SpaceThingTargetDiagram, 'id'>, graphId: GraphId) => string | null,
   continuation: Continuation,
-): { diagramCommands: CanvasSpaceThingCommands; graphCommands?: CanvasSpaceThingGraphCommands } {
+): SpaceThingContextCommands {
   const location = spaces.browserLocation;
   const persistenceError = 'The change could not be saved. Check the Space persistence status.';
   const settled = async () =>
