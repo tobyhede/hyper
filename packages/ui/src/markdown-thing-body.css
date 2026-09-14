@@ -104,6 +104,12 @@
   background: color-mix(in srgb, currentcolor 8%, transparent);
 }
 
+.markdown-thing-body__rendered img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* Pointer activation for the rendered body, with no second visible affordance.
    Keyboard authors use the rail's Edit Button; this sibling only preserves the
    established click-to-edit gesture without drawing another pencil or button. */

@@ -49,3 +49,12 @@ Tags: release/v1
       no-reseed reload, confirmed/forced reset, cancellation and atomic failure;
       browser evidence proves the expected Default Content opens and behaves as
       ordinary editable Cards.
+
+## Comments
+
+First slice (2026-09-14): only the Open Markdown Thing. Default Content on
+first init; `newSpace` unchanged. Meta Space name `Space`. Thing title
+`Welcome to Infinity Cube`, body a Markdown image of a tracked
+`/infinity-cube-logo.svg`, open at `DEFAULT_OPEN_SIZE`. Identities still come
+from `newId`. Closed Markdown, Alias, Space Thing, example Space, frozen
+identities and CLI reset stay on this ticket for later slices.

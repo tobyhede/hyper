@@ -1,4 +1,6 @@
-import { uuidSchema, type UUID } from '@project/core';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { DEFAULT_OPEN_SIZE, uuidSchema, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
   type AggregateLoadResult,
@@ -73,23 +75,43 @@ describe('defaultContentAggregate', () => {
           id: SPACE_ID,
           document: {
             version: 1,
-            title: 'New space',
+            title: 'Space',
             defaultDiagram: DIAGRAM_ID,
             diagrams: [
               {
                 id: DIAGRAM_ID,
                 title: 'Diagram 1',
                 kind: 'positioned',
-                positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+                positions: {
+                  [THING_ID]: { x: 0, y: 0, open: true, openSize: DEFAULT_OPEN_SIZE },
+                },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
           },
-          things: [{ id: THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
+          things: [
+            {
+              id: THING_ID,
+              document: {
+                title: 'Welcome to Infinity Cube',
+                kind: 'markdown',
+                body: '![Infinity Cube](/infinity-cube-logo.svg)',
+              },
+            },
+          ],
         },
       ],
     });
+  });
+
+  it('names a tracked public logo the Markdown body can render', () => {
+    const svg = readFileSync(
+      fileURLToPath(new URL('../../packages/app/public/infinity-cube-logo.svg', import.meta.url)),
+      'utf8',
+    );
+
+    expect(svg).toContain('Infinity Cube logo');
   });
 });
 
@@ -401,20 +423,31 @@ describe('resolveDatabaseStartup', () => {
           id: SPACE_ID,
           document: {
             version: 1,
-            title: 'New space',
+            title: 'Space',
             defaultDiagram: DIAGRAM_ID,
             diagrams: [
               {
                 id: DIAGRAM_ID,
                 title: 'Diagram 1',
                 kind: 'positioned',
-                positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+                positions: {
+                  [THING_ID]: { x: 0, y: 0, open: true, openSize: DEFAULT_OPEN_SIZE },
+                },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
           },
-          things: [{ id: THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
+          things: [
+            {
+              id: THING_ID,
+              document: {
+                title: 'Welcome to Infinity Cube',
+                kind: 'markdown',
+                body: '![Infinity Cube](/infinity-cube-logo.svg)',
+              },
+            },
+          ],
         },
         revision: 0n,
         exportedRevision: null,
