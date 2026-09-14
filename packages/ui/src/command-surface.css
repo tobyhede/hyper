@@ -17,6 +17,8 @@
    Dock's own sheet still owns its twelve slots and its cap, and the Thing's owns
    when its strip is revealed. Nothing here positions anything. */
 .command-surface {
+  /* Canvas nodes and application chrome inherit different line heights. */
+  line-height: 1.5;
   display: flex;
   align-items: center;
   gap: 2px;

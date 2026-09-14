@@ -101,6 +101,8 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
   const typography = (control: Locator) =>
     control.evaluate((element) => ({
       font: getComputedStyle(element).fontSize,
+      lineHeight: getComputedStyle(element).lineHeight,
+      height: getComputedStyle(element).height,
       icons: [...element.querySelectorAll('svg')].map((icon) => ({
         width: getComputedStyle(icon).width,
         height: getComputedStyle(icon).height,
