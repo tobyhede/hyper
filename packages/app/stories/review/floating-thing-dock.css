@@ -78,3 +78,15 @@
 .floating-dock-prototype:not([data-variant='current']) .react-flow__node[data-id^='embedded:'] {
   translate: 0 calc(var(--prototype-dock-inset) * 2);
 }
+/* The open Space title is a drag surface; its floating menu already offers
+   Rename. Let the pointer reach the card instead of the old title button. */
+.floating-dock-prototype:not([data-variant='current'])
+  .canvas-thing[data-kind='space'][data-expanded='true']
+  .canvas-thing__title-control {
+  pointer-events: none;
+}
+.floating-dock-prototype:not([data-variant='current'])
+  .canvas-thing[data-kind='space'][data-expanded='true']
+  .canvas-thing__title {
+  cursor: grab;
+}
