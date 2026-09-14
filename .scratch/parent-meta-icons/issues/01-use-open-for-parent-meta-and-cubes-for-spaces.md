@@ -24,7 +24,7 @@ The prototype's Inline, Stacked and Vertical dock layouts remain design studies.
 
 Implemented the approved icon pair in the shared UI facade. Parent/Meta renders the supplied OPEN artwork with its original 16px geometry; Spaces and Space Things share the existing corrected cube, including Space-based Alias glyphs. The current Meta Space is identified through the stored Meta UUID, so an ordinary Space opened directly keeps the cube.
 
-The production Dock layout and commands are retained. Stable story claims, application and Ladle proofs, and current icon guidance now describe the selected pair. The prototype is captured at `4473e0f4` on `review/infinity-cube-mark`; its other layouts remain design studies.
+The production Dock layout and commands are retained. Stable story claims, application and Ladle proofs, and current icon guidance now describe the selected pair. The prototype is captured at `4473e0f4` on `review/infinity-cube-mark`; the review story and its three SVG assets have now been removed from the live catalogue. The historical commit preserves the design studies and supplied artwork.
 
 ### Verification
 
