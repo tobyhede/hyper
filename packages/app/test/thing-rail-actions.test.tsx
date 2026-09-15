@@ -445,6 +445,21 @@ describe('a Thing’s commands on the canvas rail', () => {
     await settled(session);
   });
 
+  /**
+   * Delete from Space is a leaving action on every Thing, including a Space
+   * Thing. Filtering the rail down to Remove from Diagram alone would withdraw
+   * a command that is still available (`availability.deleteThing`).
+   */
+  it('offers Delete from Space on a Space Thing when deletion is available', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    await settled(session);
+  });
+
   it('offers a Space Thing the target Space’s address and opens it independently', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(window);
     const session = mount(undefined, undefined, withSpaceThing);

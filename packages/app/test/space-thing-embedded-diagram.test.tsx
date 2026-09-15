@@ -1274,9 +1274,9 @@ describe('the Diagram an Open Space Thing draws', () => {
     // control that could author another Space from this canvas (ADR 0040).
     const drawn = embeddedNode(DRAWN_A);
     expect(within(drawn).getByRole('button', { name: /Open Thing/ })).toBeTruthy();
-    // Edit publishes the same hover handles the host canvas does. Read withholds
-    // the affordance (`connectionAuthoringEnabled: false`) so a pointer cannot
-    // start an Edge; the four sides still render as anchors (ADR 0087).
+    // Portal Edit publishes the same connection authoring the host canvas does:
+    // `connectionAuthoringEnabled: true` and the eight labelled handles
+    // (ADR 0087).
     expect(drawn.querySelector('.rf-thing-node__inner')).toHaveAttribute(
       'data-connection-authoring',
       'true',

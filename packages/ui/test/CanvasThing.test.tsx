@@ -1001,7 +1001,7 @@ describe('CanvasThing Space front', () => {
   const spaceRail = (
     <>
       <button type="button" data-testid="space-thing-diagram">
-        Collection 1
+        Diagram 1
       </button>
       <button type="button" data-testid="space-thing-graph">
         Long

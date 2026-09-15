@@ -1179,7 +1179,9 @@ export const createApp = (
             [...rename, ...alias.flat()],
             [...enter, ...links.filter((action) => action.id === 'open-independently')],
             links.filter((action) => action.id !== 'open-independently'),
-            leaving.filter((action) => action.id === 'remove-from-diagram'),
+            leaving.filter(
+              (action) => action.id === 'remove-from-diagram' || action.id === 'delete-thing',
+            ),
           ];
         }
         return [...addresses, ...alias, ...(leaving.length > 0 ? [leaving] : [])];
@@ -1672,6 +1674,7 @@ export const createApp = (
               },
               onDelete: (graphId) => {
                 void (async () => {
+                  setGraphDeleteMessage(null);
                   const result = await coordinatedGraphDelete(spaceThings.deleteGraph, {
                     targetSpaceId: renderedSpace.id,
                     diagramId: selectedDiagram.diagram.id,

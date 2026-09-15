@@ -346,7 +346,11 @@ export function useCanvasThingAuthoring({
         spaceSession,
         thingId,
         (document) => {
-          const next: ThingDocument = { ...document, diagram: diagram.id, graph: graphId };
+          const next: Extract<ThingDocument, { kind: 'space' }> = {
+            ...document,
+            diagram: diagram.id,
+            graph: graphId,
+          };
           if (document.diagram !== diagram.id) delete next.framing;
           return next;
         },
