@@ -102,6 +102,11 @@ export const aliasThingFrontmatterSchema = z.object({
  * which made one Thing's selection follow another Space's opening choice.
  * Requiring the field is what stops that: two Space Things on one target differ
  * by what they store and by nothing else.
+ *
+ * Framing is the Diagram-coordinate centre and scale saved for this particular
+ * window onto the target. It is absent until the view has been framed, in which
+ * case the renderer fits the selected Diagram. It belongs here rather than on
+ * the Diagram because two Space Things may show the same Diagram differently.
  */
 export const spaceThingFrontmatterSchema = z.object({
   id: idSchema,
@@ -110,6 +115,13 @@ export const spaceThingFrontmatterSchema = z.object({
   spaceId: idSchema,
   diagram: uuidSchema,
   graph: idSchema,
+  framing: z
+    .object({
+      centreX: z.number().finite(),
+      centreY: z.number().finite(),
+      zoom: z.number().positive().finite(),
+    })
+    .optional(),
 });
 
 const defaultMarkdownKind = (value: unknown): unknown =>

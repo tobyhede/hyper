@@ -87,13 +87,15 @@ export async function expectEmbeddedThingToFollowDrag(
     (current.incident === undefined ||
       (previous.incident !== undefined && samePoint(current.incident, previous.incident)));
 
-  await page.mouse.move(beforeParent.x + beforeParent.width / 2, beforeParent.y + 24);
+  // Left inset, below the floating rail. The rail is a full-width strip with
+  // `pointer-events: auto` on its actions when revealed, and Diagram + Graph
+  // clusters make those actions wide enough to cover the horizontal centre
+  // (`canvas-thing.css`, `ThingRailActions`).
+  const grab = { x: beforeParent.x + 8, y: beforeParent.y + 80 };
+  await page.mouse.move(grab.x, grab.y);
   await page.mouse.down();
   for (let step = 1; step <= 12; step += 1) {
-    await page.mouse.move(
-      beforeParent.x + beforeParent.width / 2 + (150 * step) / 12,
-      beforeParent.y + 24 + (80 * step) / 12,
-    );
+    await page.mouse.move(grab.x + (150 * step) / 12, grab.y + (80 * step) / 12);
     await page.evaluate(() => new Promise(requestAnimationFrame));
     expectAligned(await geometry('The dragged Space Thing', 'The moving embedded Thing'), offset);
   }

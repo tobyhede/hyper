@@ -75,8 +75,8 @@ export interface ChoiceMenuProps<Id extends string> {
  * — and that is what lives here rather than at each surface.
  *
  * The commands a surface carries alongside the set go in `children`, below a
- * rule: New, Copy link and Delete on the Dock's clusters, and nothing at all on
- * a Space Thing, which selects a context and authors no Diagrams.
+ * rule. The Dock and Space Thing share their Diagram and Graph command rows;
+ * the caller supplies which Space those commands author.
  *
  * **The generic binds the group and its items together.** Base UI types both
  * `value`s as `any`, so a group and an item written separately can disagree

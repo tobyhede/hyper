@@ -283,9 +283,9 @@ body {
    Every rule below is conditioned on `data-connection-authoring`, because the
    four sides are **anchors** before they are affordances and they render on
    every Thing: an Edge attaches to one, and React Flow draws no Edge at all for
-   a Thing whose handles it cannot resolve (ADR 0087). A Thing inside a Space
-   Thing's embedded Diagram draws its Edges and offers no gesture, so the reveal
-   is what withholds the affordance the anchors would otherwise expose. */
+   a Thing whose handles it cannot resolve (ADR 0087). A Read embedding keeps
+   the anchors and withholds the gesture; Edit publishes the same affordance
+   the host canvas does. */
 .react-flow__node:hover
   .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
@@ -445,4 +445,10 @@ body {
   padding: 2cqw;
   border-radius: 4px;
   background: var(--secondary);
+}
+
+/* React Flow viewport coordinates keep a Space dock above its embedded nodes. */
+.thing-rail-layer {
+  position: absolute;
+  pointer-events: none;
 }

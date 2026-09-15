@@ -48,7 +48,7 @@ describe('resolveContentThing', () => {
   it('resolves an alias to the thing whose content it shows', () => {
     const resolved = resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000044'));
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
-    expect(resolved?.body).toBe('The model body.\n');
+    expect(resolved?.kind === 'markdown' ? resolved.body : undefined).toBe('The model body.\n');
   });
 
   it('resolves a markdown thing to itself', () => {

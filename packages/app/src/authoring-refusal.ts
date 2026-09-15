@@ -70,7 +70,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
     case 'alias-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'alias-target-must-own-content':
-      return 'An Alias must target a Thing that owns its content.';
+      return 'An Alias cannot target another Alias.';
     case 'thing-already-in-diagram':
       return 'This Thing is already in this Diagram.';
     case 'thing-not-in-diagram':

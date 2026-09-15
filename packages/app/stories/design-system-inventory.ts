@@ -101,6 +101,11 @@ export const handRolledStyles = [
       "React Flow's own classes, restyled where the library's defaults do not suit the canvas. Integration styling by definition — no module here emits these names.",
   },
   {
+    block: 'thing-rail-layer',
+    reason:
+      'React Flow viewport placement and pointer routing for the shared Thing rail above embedded nodes.',
+  },
+  {
     block: 'rf-thing-node',
     reason:
       "The adapter's node wrapper: thing sizing from `--thing-width`/`--thing-height` and the Expanded Thing's fill of the box the Diagram authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Thing's palette, and the one rule naming the actively presented Thing. React Flow measures against this box, so it cannot move into the component it wraps.",

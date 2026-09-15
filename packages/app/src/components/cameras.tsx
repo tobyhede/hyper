@@ -6,18 +6,16 @@ import {
   PRESENTING_DURATION,
   PRESENTING_PADDING,
 } from '../camera';
+import { viewportFromFraming, type SpaceThingFraming } from '../space-thing-framing';
 
 /**
- * The camera seam (ADR 0027): the two components that move React Flow's viewport
+ * The camera seam (ADR 0027): the components that move React Flow's viewport
  * and the whole of what this app asks of it.
  *
- * Both are one `fitView` call (ADR 0044). Framing a set of nodes is what React
- * Flow's own presentation tutorial navigates with, and what the docs point to
- * when they call `getViewportForBounds` "quite a low-level utility". The
- * arithmetic that used to sit here — half a thing's width, a letterbox divisor, a
- * zoom computed from the viewport — is all inside `fitView`, and unlike our
- * version it clamps into `[minZoom, maxZoom]` so the camera cannot leave the
- * extent the canvas declares.
+ * Overview and presenting are one `fitView` call (ADR 0044). Enter from a Space
+ * Thing is not: the stored framing is a Diagram-coordinate camera, and
+ * `viewportFromFraming` places it on the *entered* canvas's own size so the
+ * source Thing's rectangle never becomes the destination viewport.
  *
  * **A camera command is issued, never awaited (ADR 0043).** Read against
  * `@xyflow/react@12.11.2` and `@xyflow/system@0.0.79`, a camera Promise has three
@@ -116,6 +114,29 @@ export function PresentingCamera({ activeThingId }: { activeThingId: string | nu
       duration: PRESENTING_DURATION,
     });
   }, [activeThingId, viewportWidth, viewportHeight, getNode, fitView]);
+
+  return null;
+}
+
+/**
+ * Places the entered canvas at a Space Thing's stored camera.
+ *
+ * Uses the mounted canvas's own width and height, never the source Thing's
+ * rectangle. Issued, never awaited (ADR 0043), matching the two `fitView`
+ * cameras above. Absent framing leaves React Flow's `fitView` prop to run.
+ */
+export function OpeningFramingCamera({ framing }: { framing: SpaceThingFraming | undefined }) {
+  const { setViewport } = useReactFlow();
+  const viewportWidth = useStore((s) => s.width);
+  const viewportHeight = useStore((s) => s.height);
+  const applied = useRef(false);
+
+  useEffect(() => {
+    if (framing === undefined || applied.current || viewportWidth === 0 || viewportHeight === 0)
+      return;
+    applied.current = true;
+    void setViewport(viewportFromFraming(framing, viewportWidth, viewportHeight), { duration: 0 });
+  }, [framing, viewportWidth, viewportHeight, setViewport]);
 
   return null;
 }

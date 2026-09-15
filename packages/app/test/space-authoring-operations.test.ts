@@ -795,7 +795,7 @@ describe('Add Alias', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('refuses a Space Thing Target, because an Alias can only show Markdown content', () => {
+  it('creates an Alias whose Target is a Space Thing', () => {
     const withSpaceThing: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
@@ -814,13 +814,14 @@ describe('Add Alias', () => {
     };
     const { authoring, session } = open(withSpaceThing);
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
-    const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: THING_B },
+    expect(
+      authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE }).kind,
+    ).toBe('completed');
+    expect(session.getState().working.things.at(-1)?.document).toMatchObject({
+      kind: 'alias',
+      target: THING_B,
     });
-    expect(session.getState().working).toBe(before);
   });
 
   it('refuses a Target the Space no longer holds', () => {
@@ -2057,4 +2058,195 @@ describe('Stale identities', () => {
       authoring.complete({ kind: 'renamed-graph', graphId: UNKNOWN_GRAPH, title: 'Renamed' }),
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
+});
+
+describe('connecting Things on an embedded Diagram', () => {
+  const SHOWN_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+  const other = {
+    id: OTHER_DIAGRAM_ID,
+    title: 'Other Diagram',
+    kind: 'positioned' as const,
+    positions: {
+      [THING_A]: { x: 500, y: 600, open: false as const },
+      [THING_C]: { x: 800, y: 600, open: false as const },
+    },
+    graphs: [
+      { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+      { id: SHOWN_GRAPH_ID, title: 'Shown Graph', edges: [] },
+    ],
+    activeGraph: OTHER_GRAPH_ID,
+  };
+  const withOther = {
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      diagrams: [...(positionedSnapshot.document.diagrams ?? []), other],
+    },
+    things: [
+      ...positionedSnapshot.things,
+      { id: THING_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
+    ],
+  };
+  const rendered = Placement.fromEntries([
+    [THING_A, { x: 500, y: 600, open: false }],
+    [THING_C, { x: 800, y: 600, open: false }],
+  ]);
+
+  it('writes the Edge into the Graph the Space Thing is showing, not the canvas Active Graph', () => {
+    const { session, navigation, authoring } = open(withOther);
+    place(authoring, {
+      [THING_A]: [10, 20],
+      [THING_B]: [300, 40],
+    });
+    const initialNavigation = navigation.getState();
+
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'connected-things',
+        from: THING_A,
+        to: THING_C,
+        rendered,
+        graphId: SHOWN_GRAPH_ID,
+      }).kind,
+    ).toBe('completed');
+
+    expect(navigation.getState()).toEqual(initialNavigation);
+    expect(diagramOf(session.getState().working, OTHER_DIAGRAM_ID)?.graphs).toEqual([
+      { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+      { id: SHOWN_GRAPH_ID, title: 'Shown Graph', edges: [{ from: THING_A, to: THING_C }] },
+    ]);
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)).toEqual(
+      diagramOf(positionedSnapshot, DIAGRAM_ID),
+    );
+  });
+
+  it('refuses a duplicate on the Graph being shown', () => {
+    const { authoring } = open({
+      ...withOther,
+      document: {
+        ...withOther.document,
+        diagrams: [
+          ...(positionedSnapshot.document.diagrams ?? []),
+          {
+            ...other,
+            graphs: [
+              { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+              {
+                id: SHOWN_GRAPH_ID,
+                title: 'Shown Graph',
+                edges: [{ from: THING_A, to: THING_C }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    place(authoring, {
+      [THING_A]: [10, 20],
+      [THING_B]: [300, 40],
+    });
+
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'connected-things',
+        from: THING_A,
+        to: THING_C,
+        rendered,
+        graphId: SHOWN_GRAPH_ID,
+      }),
+    ).toMatchObject({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
+  });
+});
+
+describe('context commands on an embedded Diagram', () => {
+  it('authors the addressed Diagram and Graph without switching the target canvas', () => {
+    const other = {
+      id: OTHER_DIAGRAM_ID,
+      title: 'Other Diagram',
+      kind: 'positioned' as const,
+      positions: { [THING_A]: { x: 500, y: 600, open: false as const } },
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+      activeGraph: OTHER_GRAPH_ID,
+    };
+    const { session, navigation, authoring } = open({
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        diagrams: [...(positionedSnapshot.document.diagrams ?? []), other],
+      },
+    });
+    const initialNavigation = navigation.getState();
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'renamed-diagram',
+        diagramId: OTHER_DIAGRAM_ID,
+        title: 'Renamed context',
+      }).kind,
+    ).toBe('completed');
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'renamed-graph',
+        graphId: OTHER_GRAPH_ID,
+        title: 'Renamed Graph',
+      }).kind,
+    ).toBe('completed');
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'recolored-graph',
+        graphId: OTHER_GRAPH_ID,
+        color: '#f472b6',
+      }).kind,
+    ).toBe('completed');
+    expect(authoring.completeInDiagram(OTHER_DIAGRAM_ID, { kind: 'added-graph' })).toMatchObject({
+      kind: 'completed',
+      createdGraphId: MINTED,
+    });
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, { kind: 'deleted-graph', graphId: MINTED })
+        .kind,
+    ).toBe('completed');
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'renamed-graph',
+        graphId: GRAPH_ID,
+        title: 'Wrong owner',
+      }),
+    ).toMatchObject({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
+    const working = session.getState().working;
+    expect(diagramOf(working, OTHER_DIAGRAM_ID)).toMatchObject({
+      title: 'Renamed context',
+      positions: other.positions,
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }],
+    });
+    expect(diagramOf(working, DIAGRAM_ID)).toEqual(diagramOf(positionedSnapshot, DIAGRAM_ID));
+    expect(working.document.defaultDiagram).toBe(DIAGRAM_ID);
+    expect(navigation.getState()).toEqual(initialNavigation);
+  });
+});
+
+it('repairs the target canvas when a context command deletes its active Graph', () => {
+  const { session, navigation, authoring } = open({
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      diagrams: [
+        {
+          id: DIAGRAM_ID,
+          title: 'Diagram 1',
+          kind: 'positioned',
+          positions: {
+            [THING_A]: { x: 10, y: 20, open: false },
+            [THING_B]: { x: 300, y: 40, open: false },
+          },
+          graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
+          activeGraph: GRAPH_ID,
+        },
+      ],
+    },
+  });
+  expect(
+    authoring.completeInDiagram(DIAGRAM_ID, { kind: 'deleted-graph', graphId: GRAPH_ID }).kind,
+  ).toBe('completed');
+  expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
+  expect(graphsOf(session.getState().working).map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
 });

@@ -45,6 +45,9 @@ _Avoid_: Card (retired by ADR 0085), node, slide, page, tile, subgraph. For the 
 A Thing of kind **space**: a reference to another Space, shown through the target's selected Diagram and Graph. The Space reference is immutable but the selections are authored on the Thing; many Space Things may show the same Space differently. The Space Things referencing a Space own its lifetime together: deleting one leaves the target alive while another reference remains, and deleting the last one deletes the target and every Space below it that nothing else references (ADR 0074). Space Thing references may converge but may not form a cycle.
 _Avoid_: subspace, portal, link, nested space (as a second name for the same entity — it is a Space, full stop).
 
+**Space Thing Framing**:
+The authored view of a target Diagram owned by a Space Thing, alongside its Diagram and Graph selections. Framing determines which part of that Diagram is visible and at what scale; it does not change the target Things' authored positions.
+
 **Alias**:
 A Thing that shows another Thing's **content** read-only: the same content appearing again elsewhere in the space, with a single source of truth, so editing the Target changes every place it appears. An Alias carries its own Title and chooses its immutable Target when created; it may target any non-Alias Thing kind, including a Markdown Thing or a Space Thing, but never itself or another Alias.
 

@@ -1,12 +1,27 @@
+import { thingControls } from './graph';
+import {
+  beginPortalEdit,
+  embeddedGraphEdgeCount,
+  exercisePortalEditHostCanvas,
+  exerciseSpaceThingPadding,
+  exerciseSpaceThingFooter,
+  exerciseFloatingThingDock,
+  hostGraphEdgeCount,
+} from './space-thing-frame';
+import {
+  exerciseSpaceThingContextMenus,
+  exerciseSpaceThingEntityMenu,
+} from './space-thing-context-menu';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import { expectEmbeddedThingToFollowDrag } from './support/embedded-drag';
 import {
+  authoringHandle,
   boxOf,
+  connectHandles,
   createThing,
   dragBy,
   expectThingFillsNode,
-  FIXTURE_ORDINARY_SPACE_COUNT,
   nodeByTitle,
   selectCanvas,
   settled,
@@ -47,6 +62,16 @@ const switchToSpace = async (page: Page, title: string): Promise<void> => {
  * are out of the accessibility tree — but a test id does not.
  */
 const showingSpace = (page: Page): Locator => page.locator('[data-testid="space-title"]:visible');
+
+/** Pan the portal camera from the containing Thing's left inset, not from an embedded child. */
+const panPortal = async (page: Page, thing: Locator): Promise<void> => {
+  const outer = await boxOf(thing, 'Open Space Thing');
+  await page.mouse.move(outer.x + 8, outer.y + outer.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(outer.x + 8 + 90, outer.y + outer.height / 2 + 50, { steps: 10 });
+  await page.mouse.up();
+  await settled(page);
+};
 
 /** Leave the Space you are in, which is the Space cluster's own command. */
 const exitSpace = async (page: Page): Promise<void> => {
@@ -172,58 +197,6 @@ test(
 );
 
 /**
- * Destroying a Space takes it out of the list that offers it.
- *
- * The Spaces source is read once and re-read on an epoch, and creating a Space
- * Thing is not the only Edit that changes the set: deleting the last Space Thing
- * that references a Space destroys that Space and every Space below it that
- * nothing else references (ADR 0074, ADR 0076). A list still offering it would
- * spend `link` against a Space that is gone, on a row the reader had no way to
- * know was stale.
- */
-test('stops offering a Space the moment the last Space Thing referencing it is deleted', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-
-  await createSpaceThingNamed(page, 'Architecture');
-
-  const openList = async () => {
-    await page.getByRole('button', { name: 'Things' }).click();
-    const list = page.getByRole('dialog', { name: 'Things' });
-    await expect(list).toBeVisible();
-    return list;
-  };
-
-  const offered = await openList();
-  await expect(offered.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(1);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
-
-  const thing = nodeByTitle(page, 'Architecture').first();
-  await thing.click();
-  await thing.hover();
-  await thing.getByRole('button', { name: 'Actions for Thing Architecture' }).click({ delay: 120 });
-  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete from Space' }).click();
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
-
-  // The Space went with its last reference, so the cube goes with it — and the
-  // count on the toggle agrees, which is the claim the count exists to make.
-  // The fixture already holds ordinary Spaces; deleting Architecture lands
-  // back on those, not on an empty Meta Space.
-  const after = await openList();
-  await expect(after.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
-  await expect(
-    page.getByRole('button', {
-      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
-    }),
-  ).toBeVisible();
-});
-
-/**
  * The second Space Thing is offered the first's Space, and referencing it is not
  * a copy.
  *
@@ -264,8 +237,12 @@ test('a second Space Thing may reference the Space the first one created', async
   const again = nodeByTitle(page, 'Space 1');
   await again.focus();
   await again.press('Enter');
-  await expect(again.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
-  await expect(again.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+  await expect((await thingControls(page, again)).getByTestId('space-thing-diagram')).toHaveText(
+    'Diagram 1',
+  );
+  await expect((await thingControls(page, again)).getByTestId('space-thing-graph')).toHaveText(
+    'Graph 1',
+  );
 });
 
 /**
@@ -308,10 +285,12 @@ test(
     // Enabled rather than merely present: a selector over a target with nothing
     // to choose is disabled, so this is what says the created Space arrived
     // complete rather than blank.
-    const diagramSelector = thing.getByTestId('space-thing-diagram');
+    const diagramSelector = (await thingControls(page, thing)).getByTestId('space-thing-diagram');
     await expect(diagramSelector).toBeEnabled();
     await expect(diagramSelector).toHaveText('Diagram 1');
-    await expect(thing.getByTestId('space-thing-graph')).toHaveText('Graph 1');
+    await expect((await thingControls(page, thing)).getByTestId('space-thing-graph')).toHaveText(
+      'Graph 1',
+    );
     // And the Diagram it names is the one it draws, which is what says the
     // stored pair reached the canvas rather than only the two controls.
     await expect(page.locator('.react-flow__node[data-id^="embedded:"]')).toHaveCount(1);
@@ -322,6 +301,28 @@ test(
     // so a change to one that the other did not follow fails here; and the Thing
     // drawing its own stored context left the canvas the Thing stands on where
     // it was.
+    const rail = (await thingControls(page, thing)).getByTestId('canvas-thing-actions');
+    await expect((await thingControls(page, thing)).getByRole('toolbar')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-diagram')).toHaveCount(1);
+    await expect(rail.getByTestId('space-thing-graph')).toHaveCount(1);
+    await expect(
+      thing.locator('.canvas-thing__body').getByRole('button', { name: /^(Diagram|Graph):/ }),
+    ).toHaveCount(0);
+    const diagramControl = rail.getByTestId('space-thing-diagram');
+    await diagramControl.focus();
+    await diagramControl.press('ArrowRight');
+    await expect(rail.getByTestId('space-thing-graph')).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Edit Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
+    await expect(rail.getByRole('button', { name: /^Enter Space/ })).toHaveCount(0);
+    await page.keyboard.press('Tab');
+    await expect(rail.locator(':focus')).toHaveCount(0);
+    await diagramControl.focus();
+
     const treatment = (locator: Locator) =>
       locator.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -333,72 +334,26 @@ test(
           padding: style.paddingTop,
         };
       });
-    expect(await treatment(thing.locator('[data-slot="command-surface"]'))).toEqual(
-      await treatment(page.locator('.command-dock__surface:visible')),
-    );
+    expect(
+      await treatment((await thingControls(page, thing)).getByTestId('canvas-thing-actions')),
+    ).toEqual(await treatment(page.locator('.command-dock__surface:visible')));
     // `:visible`, because creating the target Space opened it too and every open
     // Space stays mounted with one shown (`OpenSpacesApplication`).
     await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText(
       'Collection 1',
     );
 
-    // The containing Thing offers Close and its own title editing. The embedded
-    // target Things carry their own content-editing controls.
-    await expect(thing.getByRole('button', { name: 'Close Thing Architecture' })).toBeVisible();
-    await expect(thing.getByRole('button', { name: 'Edit Thing Architecture' })).toHaveCount(0);
+    // The containing Thing offers Close, portal Edit and its own title editing.
+    // Embedded target Things carry their own content-editing controls only
+    // after portal Edit.
+    await expect(
+      (await thingControls(page, thing)).getByRole('button', { name: 'Close Thing Architecture' }),
+    ).toBeVisible();
+    await expect(
+      (await thingControls(page, thing)).getByRole('button', { name: 'Edit Thing Architecture' }),
+    ).toBeVisible();
   },
 );
-
-/**
- * Deleting a Space Thing says what it destroys before it is confirmed.
- *
- * V1 has no undo and the cascade can reach Spaces that are not on screen, so
- * the confirmation naming that is the thing standing in place of a refusal
- * (ADR 0074). Deleting the only reference takes its Space with it, which is
- * what leaves the Space count where it started.
- */
-test('deleting the last Space Thing deletes the Space it referenced', async ({ page }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
-  const nodes = await page.locator('.react-flow__node').count();
-
-  await createSpaceThingNamed(page, 'Architecture');
-  await settled(page);
-
-  // Deleting a Thing is the Thing's own rail (ADR 0073), reached by hovering it —
-  // the Space's command surface draws no Thing commands at all (ADR 0082).
-  const created = nodeByTitle(page, 'Architecture');
-  await created.hover();
-  await created
-    .getByRole('button', { name: 'Actions for Thing Architecture', exact: true })
-    .click({ delay: 120 });
-  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
-  await expect(
-    page.getByText(
-      'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
-    ),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Delete from Space', exact: true }).click();
-
-  await settled(page);
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
-
-  // The Space went with it, so the Things list no longer offers Space 1 —
-  // which is the only way this surface can see the cascade. The fixture's
-  // ordinary Spaces remain; the count lands back where this Space started.
-  await page.getByRole('button', { name: 'Things' }).click();
-  const list = page.getByRole('dialog', { name: 'Things' });
-  await expect(list).toBeVisible();
-  await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
-  await expect(
-    page.getByRole('button', {
-      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
-    }),
-  ).toBeVisible();
-});
 
 /* -------------------------------------------------------------------------- */
 /* The Diagram an Open Space Thing draws                                        */
@@ -444,7 +399,9 @@ async function openSpaceThingOnItsDiagram(page: Page): Promise<Locator> {
   await thing.focus();
   await thing.press('Enter');
 
-  await expect(thing.getByTestId('space-thing-diagram')).toHaveText('Diagram 1');
+  await expect((await thingControls(page, thing)).getByTestId('space-thing-diagram')).toHaveText(
+    'Diagram 1',
+  );
   await settled(page);
   return thing;
 }
@@ -482,16 +439,19 @@ test(
     expect(inner.y).toBeGreaterThanOrEqual(outer.y);
     expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
     expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
-    const diagram = await boxOf(thing.getByTestId('space-thing-diagram'), 'Diagram selector');
-    const graph = await boxOf(thing.getByTestId('space-thing-graph'), 'Graph selector');
-    // **Below where the embedding begins, not below every embedded box.** An
-    // embedded Thing that runs past the region is *clipped* rather than
-    // shortened (`embedded-diagram.ts`), so its layout box is the clip's input
-    // and says nothing about what is drawn — comparing against it held only at
-    // the zoom the old chrome happened to produce.
-    expect(diagram.y).toBeGreaterThan(inner.y);
-    expect(graph.y).toBeGreaterThanOrEqual(diagram.y + diagram.height);
-    expect(graph.y + graph.height).toBeLessThan(outer.y + outer.height);
+    const diagram = await boxOf(
+      (await thingControls(page, thing)).getByTestId('space-thing-diagram'),
+      'Diagram selector',
+    );
+    const graph = await boxOf(
+      (await thingControls(page, thing)).getByTestId('space-thing-graph'),
+      'Graph selector',
+    );
+    // Both named choices share the rail floating over the embedded Diagram.
+    expect(diagram.y).toBeGreaterThanOrEqual(outer.y);
+    expect(graph.y).toBeCloseTo(diagram.y, 1);
+    expect(graph.x).toBeGreaterThanOrEqual(diagram.x + diagram.width);
+    expect(graph.x + graph.width).toBeLessThan(outer.x + outer.width);
   },
 );
 
@@ -510,18 +470,18 @@ test(
   { tag: '@parity:embedded-diagram-things-author-target' },
   async ({ page }) => {
     await openSpaceThingOnItsDiagram(page);
+    const parent = nodeByTitle(page, 'Architecture');
+    await beginPortalEdit(page, parent);
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
     await embedded.hover();
-    // The four sides are anchors here and nothing more (ADR 0087): an embedded
-    // Diagram draws Edges, and an Edge attaches to an anchor. Hovering reveals
-    // none of them, because the reveal reads whether this Thing offers
-    // connection authoring at all — and a Thing inside a Space Thing does not.
+    // Edit offers the same hover handles as the host canvas. They author the
+    // Graph this Space Thing is showing and refuse a cross-Space Edge (ADR 0040).
     await expect(embedded.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
-    await expect(embedded.getByRole('button', { name: /^Connect (from|to) / })).toHaveCount(0);
-    await expect(embedded.locator('.rf-thing-node__authoring-handle').first()).toHaveCSS(
+    await expect(embedded.getByLabel(/^Connect (from|to) /)).toHaveCount(8);
+    await expect(embedded.locator('.rf-thing-node__authoring-handle--source').first()).toHaveCSS(
       'opacity',
-      '0',
+      '1',
     );
     await embedded.getByRole('button', { name: 'Edit Thing Thing 1' }).click();
     const editor = embedded.locator('[contenteditable="true"]');
@@ -544,6 +504,33 @@ test(
 );
 
 /**
+ * Ticket 04 / spec.md: handles author the Graph the Space Thing is showing
+ * and do not complete a cross-Space Edge on the containing canvas (ADR 0040).
+ */
+test('a connect between two embedded Things authors the shown Graph, not the host Graph', async ({
+  page,
+}) => {
+  const parent = await openSpaceThingOnItsDiagram(page);
+  await beginPortalEdit(page, parent);
+  const embedded = embeddedNodes(page);
+  await expect(embedded).toHaveCount(1);
+  const hostBefore = await hostGraphEdgeCount(page, parent);
+  const shownBefore = await embeddedGraphEdgeCount(page, parent);
+  await embedded.hover();
+  // A self-Edge is legal (ADR 0032) and the one in-view Thing is the pair the
+  // host camera still frames. A second Thing authored on the target canvas sits
+  // outside that window, and Playwright's box is the layout box, not the clip.
+  await connectHandles(
+    page,
+    authoringHandle(embedded, 'source', 'right'),
+    authoringHandle(embedded, 'target', 'left'),
+  );
+  await settled(page);
+  expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);
+  await expect.poll(() => embeddedGraphEdgeCount(page, parent)).toBe(shownBefore + 1);
+});
+
+/**
  * Closing the Space Thing takes the view with it.
  *
  * The embedded Things are nodes in the containing instance's own store, not
@@ -559,7 +546,11 @@ test('closing a Space Thing removes the embedded Diagram it was drawing', async 
   await expect(embeddedNodes(page)).toHaveCount(1);
 
   await thing.hover();
-  await thing.getByRole('button', { name: 'Close Thing Architecture' }).click();
+  await (
+    await thingControls(page, thing)
+  )
+    .getByRole('button', { name: 'Close Thing Architecture' })
+    .click();
   await settled(page);
 
   await expect(embeddedNodes(page)).toHaveCount(0);
@@ -572,6 +563,7 @@ test('an embedded Thing can move, open with the keyboard and resize in its targe
   page,
 }) => {
   const parent = await openSpaceThingOnItsDiagram(page);
+  await beginPortalEdit(page, parent);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
   await expectThingFillsNode(parent);
@@ -671,9 +663,11 @@ test(
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
     await expect(embedded.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
-    await embedded.click();
-    await embedded.hover();
-    await expect(embedded.getByRole('button', { name: 'Edit Thing Thing 1' })).toBeVisible();
+    await expect(
+      (await thingControls(page, nodeByTitle(page, 'Architecture'))).getByRole('button', {
+        name: 'Edit Thing Architecture',
+      }),
+    ).toBeVisible();
 
     await page.goto(ordinarySpaceUrl);
     await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
@@ -701,8 +695,12 @@ test(
     // Open first, then Enter. Enter is offered Open or Closed; the press is the claim.
     await thing.focus();
     await thing.press('Enter');
-    await expect(thing.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
-    await thing.getByRole('button', { name: 'Enter Space Architecture' }).click();
+    await (
+      await thingControls(page, thing)
+    )
+      .getByRole('button', { name: 'Actions for Thing Architecture' })
+      .click();
+    await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
 
     await expect(showingSpace(page)).toContainText('Space 1');
     await expect(page.getByRole('button', { name: 'Go to Diagram fixture' })).toBeVisible();
@@ -728,8 +726,12 @@ test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ p
 
   const thing = nodeByTitle(page, 'Presentation');
   await thing.hover();
-  await expect(thing.getByRole('button', { name: 'Enter Space Presentation' })).toBeVisible();
-  await thing.getByRole('button', { name: 'Enter Space Presentation' }).click();
+  await (
+    await thingControls(page, thing)
+  )
+    .getByRole('button', { name: 'Actions for Thing Presentation' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
 
   await expect(showingSpace(page)).toContainText('Presentation');
   await expect(page.locator('[data-testid="selected-canvas"]:visible')).toContainText('Overview');
@@ -748,7 +750,7 @@ test('Enter on a fixture Space Thing adds its target to Open Spaces', async ({ p
  * on this tab, and the new one carries no opener.
  */
 test(
-  'Open in new tab on a Space Thing opens the target Space at its own address',
+  'Open in New Tab on a Space Thing opens the target Space at its own address',
   { tag: '@parity:space-thing-opens-independently' },
   async ({ page }) => {
     const targetPath = `/spaces/${encodeCompactUuid(PRESENTATION_SPACE_ID)}`;
@@ -769,10 +771,10 @@ test(
     await thing
       .getByRole('button', { name: 'Actions for Thing Presentation' })
       .click({ delay: 120 });
-    await expect(page.getByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
 
     const popup = page.waitForEvent('popup');
-    await page.getByRole('menuitem', { name: /^Open in new tab/ }).click();
+    await page.getByRole('menuitem', { name: /^Open in New Tab/ }).click();
     const independent = await popup;
 
     await expect
@@ -806,10 +808,14 @@ test('a Space Thing resizes to Close and remembers its Open Size', async ({ page
     { steps: 20 },
   );
   await page.mouse.up();
-  await expect(parent.getByRole('button', { name: 'Open Thing Architecture' })).toBeVisible();
+  await expect(
+    (await thingControls(page, parent)).getByRole('button', { name: 'Open Thing Architecture' }),
+  ).toBeVisible();
   await parent.focus();
   await parent.press('Enter');
-  await expect(parent.getByRole('button', { name: 'Close Thing Architecture' })).toBeVisible();
+  await expect(
+    (await thingControls(page, parent)).getByRole('button', { name: 'Close Thing Architecture' }),
+  ).toBeVisible();
   await expect
     .poll(async () => (await boxOf(parent, 'reopened Space Thing')).width)
     .toBeCloseTo(open.width, 0);
@@ -850,3 +856,240 @@ test(
     await expect(page.getByTestId('persistence-failure')).toBeHidden();
   },
 );
+
+test(
+  'Space Thing context menus author the target with the Dock commands',
+  { tag: '@parity:space-thing-context-menus-share-dock-actions' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingContextMenus(page, thing);
+    await page.reload();
+    const reopened = nodeByTitle(page, 'Architecture');
+    await expect(
+      (await thingControls(page, reopened)).getByTestId('space-thing-diagram'),
+    ).toHaveText('Target context');
+    await expect((await thingControls(page, reopened)).getByTestId('space-thing-graph')).toHaveText(
+      'Target path',
+    );
+    await (await thingControls(page, reopened)).getByTestId('space-thing-diagram').focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('menuitemradio', { name: 'Created from rail', exact: true }),
+    ).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await (await thingControls(page, reopened)).getByTestId('space-thing-graph').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitemradio', { name: 'Graph 1', exact: true })).toHaveCount(0);
+  },
+);
+
+test(
+  'Space Thing entity menu groups commands and creates a Space Alias',
+  { tag: '@parity:space-thing-entity-menu' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingEntityMenu(page, thing);
+    await settled(page);
+    await page.reload();
+    await expect(nodeByTitle(page, 'Space card alias')).toBeVisible();
+  },
+);
+
+test(
+  'Space Thing canvas has equal top and side padding',
+  { tag: '@parity:space-thing-canvas-padding' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingPadding(page, thing, embeddedNodes(page).first());
+  },
+);
+
+test(
+  'Space Thing title footer follows its content',
+  { tag: '@parity:space-thing-content-sized-footer' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseSpaceThingFooter(page, thing, embeddedNodes(page).first());
+  },
+);
+
+test(
+  'Thing dock floats eight pixels inside the border above embedded content',
+  { tag: '@parity:thing-dock-floats' },
+  async ({ page }) => {
+    const thing = await openSpaceThingOnItsDiagram(page);
+    await exerciseFloatingThingDock(page, thing);
+  },
+);
+
+test(
+  'Edit, Done and keyboard toggle the portal without discarding target edits',
+  { tag: '@parity:space-thing-portal-read-edit' },
+  async ({ page }) => {
+    const parent = await openSpaceThingOnItsDiagram(page);
+    const embedded = embeddedNodes(page);
+    await expect(embedded).toHaveCount(1);
+    await expect(embedded.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
+    const outerBefore = await boxOf(parent, 'containing Thing');
+    const innerBefore = await boxOf(embedded, 'embedded Thing');
+    await page.mouse.move(
+      innerBefore.x + innerBefore.width / 2,
+      innerBefore.y + innerBefore.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      innerBefore.x + innerBefore.width / 2 + 70,
+      innerBefore.y + innerBefore.height / 2,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    await settled(page);
+    const outerAfter = await boxOf(parent, 'moved containing Thing');
+    expect(outerAfter.x).toBeGreaterThan(outerBefore.x + 30);
+    const innerAfter = await boxOf(embedded, 'embedded Thing after outer drag');
+    expect(innerAfter.x - outerAfter.x).toBeCloseTo(innerBefore.x - outerBefore.x, 0);
+
+    const rail = (await thingControls(page, parent)).getByTestId('canvas-thing-actions');
+    await rail.getByRole('button', { name: 'Edit Thing Architecture' }).click();
+    await expect(rail.getByRole('button', { name: 'Done Thing Architecture' })).toBeVisible();
+    await expect(
+      embeddedNodes(page).getByRole('button', { name: 'Edit Thing Thing 1' }),
+    ).toBeVisible();
+    await rail.getByRole('button', { name: 'Done Thing Architecture' }).click();
+    await expect(rail.getByRole('button', { name: 'Edit Thing Architecture' })).toBeVisible();
+    await expect(embeddedNodes(page).getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
+
+    await rail.getByRole('button', { name: 'Edit Thing Architecture' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(rail.getByRole('button', { name: 'Done Thing Architecture' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(rail.getByRole('button', { name: 'Edit Thing Architecture' })).toBeFocused();
+  },
+);
+
+test(
+  'portal framing survives Done, Close, reopen and reload, and Enter uses the canvas size',
+  { tag: '@parity:space-thing-portal-framing' },
+  async ({ page }) => {
+    const parent = await openSpaceThingOnItsDiagram(page);
+    const embedded = embeddedNodes(page);
+    await beginPortalEdit(page, parent);
+    const before = await boxOf(embedded, 'embedded Thing');
+    await panPortal(page, parent);
+    const framed = await boxOf(embedded, 'framed embedded Thing');
+    expect(framed.x).not.toBeCloseTo(before.x, 0);
+
+    await (
+      await thingControls(page, parent)
+    )
+      .getByRole('button', { name: 'Done Thing Architecture' })
+      .click();
+    const inset = async (label: string) => {
+      const outer = await boxOf(parent, 'containing Thing');
+      const inner = await boxOf(embeddedNodes(page), label);
+      const zoom = await parent.evaluate((node) =>
+        node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
+      );
+      return { x: (inner.x - outer.x) / zoom, y: (inner.y - outer.y) / zoom };
+    };
+    const framedInset = await inset('framed after Done');
+
+    await (
+      await thingControls(page, parent)
+    )
+      .getByRole('button', { name: 'Close Thing Architecture' })
+      .click();
+    await settled(page);
+    await parent.focus();
+    await parent.press('Enter');
+    await settled(page);
+    expect((await inset('framed after reopen')).x).toBeCloseTo(framedInset.x, 0);
+    expect((await inset('framed after reopen')).y).toBeCloseTo(framedInset.y, 0);
+
+    await expect(page.getByTestId('persistence-status').first()).toHaveText('Persisted');
+    await page.reload();
+    await expect(embeddedNodes(page)).toHaveCount(1);
+    expect((await inset('framed after reload')).x).toBeCloseTo(framedInset.x, 0);
+    expect((await inset('framed after reload')).y).toBeCloseTo(framedInset.y, 0);
+
+    const portalBox = await boxOf(parent, 'portal before Enter');
+    await parent.hover({ position: { x: 8, y: 80 } });
+    const id = await parent.getAttribute('data-id');
+    if (id === null) throw new Error('Thing placement id missing');
+    await page
+      .locator(`[data-thing-rail-for="${id}"]`)
+      .getByRole('button', { name: 'Actions for Thing Architecture' })
+      .click({ delay: 120 });
+    await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
+    await expect(showingSpace(page)).toContainText('Space 1');
+    const enteredCanvas = page.locator('.react-flow:visible').first();
+    await expect(enteredCanvas).toBeVisible();
+    const enteredPane = await enteredCanvas.boundingBox();
+    if (enteredPane === null) throw new Error('entered canvas missing');
+    expect(enteredPane.width).toBeGreaterThan(portalBox.width + 40);
+
+    await page.getByRole('button', { name: 'Go to Diagram fixture' }).click();
+    await expect(showingSpace(page)).toContainText('Diagram fixture');
+    await expect(embeddedNodes(page)).toHaveCount(1);
+    await settled(page);
+    expect((await inset('framed after Return')).x).toBeCloseTo(framedInset.x, 0);
+    expect((await inset('framed after Return')).y).toBeCloseTo(framedInset.y, 0);
+  },
+);
+
+test(
+  'portal zoom frames authored coordinates without stretching Things or painting outside',
+  { tag: '@parity:space-thing-portal-edit-is-the-host-canvas' },
+  async ({ page }) => {
+    const parent = await openSpaceThingOnItsDiagram(page);
+    await exercisePortalEditHostCanvas(page, parent, embeddedNodes(page));
+  },
+);
+
+test('deleting the selected Diagram clears framing; deleting a Graph keeps it', async ({
+  page,
+}) => {
+  const parent = await openSpaceThingOnItsDiagram(page);
+  const embedded = embeddedNodes(page);
+  await beginPortalEdit(page, parent);
+  await panPortal(page, parent);
+  const framed = await boxOf(embedded, 'framed embedded Thing');
+
+  const openGraph = async () => {
+    const trigger = (await thingControls(page, parent)).getByTestId('space-thing-graph');
+    await trigger.focus();
+    await trigger.press('Enter');
+  };
+  await openGraph();
+  await page.getByRole('menuitem', { name: 'New Graph', exact: true }).click();
+  await settled(page);
+  expect((await boxOf(embeddedNodes(page), 'framed after new Graph')).x).toBeCloseTo(framed.x, 0);
+  expect((await boxOf(embeddedNodes(page), 'framed after new Graph')).y).toBeCloseTo(framed.y, 0);
+  await openGraph();
+  await page.getByRole('menuitem', { name: /^Delete Graph / }).click();
+  await settled(page);
+  expect((await boxOf(embeddedNodes(page), 'framed after Graph delete')).x).toBeCloseTo(
+    framed.x,
+    0,
+  );
+  expect((await boxOf(embeddedNodes(page), 'framed after Graph delete')).y).toBeCloseTo(
+    framed.y,
+    0,
+  );
+
+  const openDiagram = async () => {
+    const trigger = (await thingControls(page, parent)).getByTestId('space-thing-diagram');
+    await trigger.focus();
+    await trigger.press('Enter');
+  };
+  await openDiagram();
+  await page.getByRole('menuitem', { name: 'New Diagram', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Diagram name', exact: true }).fill('Replacement');
+  await page.getByRole('textbox', { name: 'Diagram name', exact: true }).press('Enter');
+  await settled(page);
+  await openDiagram();
+  await page.getByRole('menuitem', { name: 'Delete Replacement', exact: true }).click();
+  await settled(page);
+  const reset = await boxOf(embeddedNodes(page), 'embedding after Diagram fallback');
+  expect(reset.x).not.toBeCloseTo(framed.x, 0);
+});

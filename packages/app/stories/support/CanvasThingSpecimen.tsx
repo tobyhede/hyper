@@ -26,7 +26,7 @@ export function CanvasThingSpecimen({
     kind === 'preview'
       ? { kind: 'preview' }
       : kind === 'alias'
-        ? { kind: 'alias', source: '', open: false }
+        ? { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }
         : kind === 'space'
           ? { kind: 'space', open: false }
           : { kind: 'markdown', source: '', open: false };

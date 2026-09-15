@@ -11,6 +11,8 @@ export interface ThingRailProps {
   /** The Thing's commands, drawn at the trailing edge. */
   readonly children?: ReactNode;
   readonly className?: string;
+  readonly hideKind?: boolean;
+  readonly revealed?: boolean;
 }
 
 /**
@@ -29,12 +31,20 @@ export interface ThingRailProps {
  * reveals its own commands is written in that Thing's stylesheet, because that is
  * the Thing's state rather than the rail's.
  */
-export function ThingRail({ kind, children, className }: ThingRailProps) {
+export function ThingRail({
+  kind,
+  children,
+  className,
+  hideKind = false,
+  revealed,
+}: ThingRailProps) {
   return (
-    <CardHeader className={cn('thing-rail', className)}>
-      <span className="thing-rail__kind">
-        <ThingKindIcon kind={kind} />
-      </span>
+    <CardHeader data-revealed={revealed} className={cn('thing-rail', className)}>
+      {!hideKind && (
+        <span className="thing-rail__kind">
+          <ThingKindIcon kind={kind} />
+        </span>
+      )}
       {children}
     </CardHeader>
   );

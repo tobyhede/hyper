@@ -14,6 +14,7 @@ export type {
   DeleteSpaceThingInput,
   LinkSpaceThingInput,
   SpaceThingCreationResult,
+  SpaceThingContextDeletionResult,
   SpaceThingDeletionResult,
   SpaceThingLifecycle,
   SpaceThingRefusal,
@@ -37,8 +38,9 @@ export interface SpaceThingTarget {
 /**
  * Everything authoring a Space Thing needs, over the coordinated lifecycle.
  *
- * The three writes are ADR 0076's, unchanged and still the module's public
- * interface. The two reads are here rather than beside them on a backend
+ * The lifecycle writes remain the module's public interface: the three topology
+ * operations from ADR 0076, plus Diagram and Graph deletion now that either may
+ * update Space Things in several containing Spaces. The two reads are here rather than beside them on a backend
  * because they answer the same question the writes do — *which Space, and which
  * of its Diagrams and Graphs* — and a surface that had to reach a backend for
  * them would be composing its own answer to a question this module already
@@ -128,7 +130,7 @@ export function createSpaceThingLifecycle({
   /**
    * Announce an Edit of this shape once it has landed.
    *
-   * All three writes, because this is the one place that knows such an Edit
+   * Every coordinated write, because this is the one place that knows such an Edit
    * completed. A `link` changes no Space set and is announced anyway — one
    * announcement costs the drawn Space one repository read and no other Space
    * anything, which is less than a rule two surfaces would have to agree on.
@@ -152,6 +154,8 @@ export function createSpaceThingLifecycle({
     create: announcing(lifecycle.create),
     link: announcing(lifecycle.link),
     delete: announcing(lifecycle.delete),
+    deleteDiagram: announcing(lifecycle.deleteDiagram),
+    deleteGraph: announcing(lifecycle.deleteGraph),
     spaceSet: { getState: epoch.getState, subscribe: epoch.subscribe },
     referenceableSpaces: async (containingSpaceId) => {
       const spaces = await backend.listSpaces();
