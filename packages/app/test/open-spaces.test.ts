@@ -230,6 +230,55 @@ describe('Open Spaces', () => {
     });
   });
 
+  it('keeps the Enter framing seed across reads of the same entry', async () => {
+    const { openSpaces } = setup();
+    await openSpaces.open(META_ID);
+    const framing = { centreX: 100, centreY: 50, zoom: 2 };
+    const entered = await openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_ONE, framing);
+
+    expect(openSpaces.openingFraming(entered)).toEqual(framing);
+    expect(openSpaces.openingFraming(entered)).toEqual(framing);
+
+    await openSpaces.switchTo(META_ID);
+    const again = await openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID, GRAPH_TWO, {
+      centreX: 1,
+      centreY: 1,
+      zoom: 1,
+    });
+
+    expect(again).toBe(entered);
+    expect(openSpaces.openingFraming(again)).toEqual(framing);
+  });
+
+  /**
+   * Embed mounts the target without activating it. Enter is then the first
+   * canvas showing, and SpaceCanvas seeds from `openingFraming` on the
+   * activation notify — so that notify must already carry the seed.
+   */
+  it('makes the Enter framing seed readable on the activation that first shows an embedded Space', async () => {
+    const { openSpaces } = setup();
+    await openSpaces.open(META_ID);
+    const embedded = await openSpaces.embed(OTHER_ID);
+    expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+    expect(openSpaces.openingFraming(embedded)).toBeUndefined();
+
+    const framing = { centreX: 100, centreY: 50, zoom: 2 };
+    let capturedActivation = false;
+    let framingAtActivation: typeof framing | undefined;
+    const unsubscribe = openSpaces.subscribe(() => {
+      if (capturedActivation || openSpaces.getState().activeSpaceId !== OTHER_ID) return;
+      capturedActivation = true;
+      const entry = openSpaces.entry(OTHER_ID);
+      framingAtActivation = entry === undefined ? undefined : openSpaces.openingFraming(entry);
+    });
+
+    await openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_ONE, framing);
+    unsubscribe();
+
+    expect(capturedActivation).toBe(true);
+    expect(framingAtActivation).toEqual(framing);
+  });
+
   it('waits for the Space being left to finish its in-flight commit', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();

@@ -128,6 +128,11 @@ export interface EdgeAuthoringInput {
    */
   readonly enabled: boolean;
   readonly onSelectEdge: (subject: EdgeSubject) => void;
+  /**
+   * Extra seeking-end eligibility, for a connect that is not this canvas's
+   * Active Graph — a Space Thing in Edit writing the Graph it is showing.
+   */
+  readonly mayOfferAlso?: (thingId: ThingId) => boolean;
 }
 
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
@@ -184,6 +189,7 @@ export function useEdgeAuthoring({
   newThingTitle,
   enabled,
   onSelectEdge,
+  mayOfferAlso,
 }: EdgeAuthoringInput): EdgeAuthoringSurface {
   const state = useSyncExternalStore(authoring.subscribe, authoring.getState);
   const { screenToFlowPosition } = useReactFlow();
@@ -203,9 +209,9 @@ export function useEdgeAuthoring({
   // every reader is a browser event: a pointer release or a key press arrives
   // from the event loop, always after the render that produced the value it
   // needs.
-  const latest = useRef({ projectedNodes, authoring });
+  const latest = useRef({ projectedNodes, authoring, mayOfferAlso });
   useEffect(() => {
-    latest.current = { projectedNodes, authoring };
+    latest.current = { projectedNodes, authoring, mayOfferAlso };
   });
 
   useEffect(() => {
@@ -239,6 +245,7 @@ export function useEdgeAuthoring({
    * rather than lighting every Thing and only failing at release.
    */
   const mayOfferConnectionEnd = useCallback((thingId: ThingId): boolean => {
+    if (latest.current.mayOfferAlso?.(thingId) === true) return true;
     const { draft } = latest.current.authoring.getState();
     if (draft?.kind === 'pointer-connect') {
       return latest.current.authoring.accepts({

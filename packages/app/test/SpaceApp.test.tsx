@@ -549,13 +549,13 @@ describe('Space app failure reporting', () => {
     {
       entity: 'Actions for Thing Thing',
       command: (accessibleName: string) =>
-        accessibleName.startsWith('Copy Link to Thing in Diagram'),
+        accessibleName.startsWith('Copy link to Thing in Diagram'),
       reportsInPlace: true,
     },
     {
       entity: 'Actions for Thing Thing',
       command: (accessibleName: string) =>
-        accessibleName.startsWith('Copy Link to Thing') && !accessibleName.includes('Diagram'),
+        accessibleName.startsWith('Copy link to Thing') && !accessibleName.includes('Diagram'),
       reportsInPlace: true,
     },
     { entity: 'Active Graph: Graph', command: /^Copy link/, reportsInPlace: false },
@@ -924,7 +924,7 @@ describe('Space app Things list', () => {
     const create = screen.getByRole('menuitem', { name: 'New Diagram' });
     expect(unavailable(create)).toBe(true);
     fireEvent.click(create);
-    expect(session.getState().working.document.diagrams).toHaveLength(1);
+    await waitFor(() => expect(session.getState().working.document.diagrams).toHaveLength(1));
     expect(screen.queryByRole('textbox', { name: 'Diagram name' })).toBeNull();
     expect(screen.getByRole('menuitem', { name: /^Copy link/ })).toBeInTheDocument();
     fireEvent.keyDown(create, { key: 'Escape' });
@@ -1216,7 +1216,7 @@ describe('Space app Things list', () => {
     await waitUntilDiagramContinuationReady();
     openDiagramMenu('Workshop');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
-    expect(session.getState().working.document.diagrams).toHaveLength(1);
+    await waitFor(() => expect(session.getState().working.document.diagrams).toHaveLength(1));
     expect(session.getState().working.things).toEqual(base.things);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Diagram');
   });

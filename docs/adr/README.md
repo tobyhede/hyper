@@ -93,6 +93,7 @@ under `superseded/`.
 | [0044](0044-the-presenting-move-is-one-fitview-call.md) | The presenting move is one `fitView` call. |
 | [0033](0033-route-authoring-uses-spatial-route-coloured-handles.md) | Graph authoring uses spatial handles coloured as the active Graph. |
 | [0090](0090-seeking-handles-reveal-by-proximity-and-eligibility.md) | Seeking-end authoring handles reveal only on Things near the pointer that `edgeEligibility` would accept. |
+| [0091](0091-context-deletion-relocates-every-space-thing.md) | Deleting a Diagram or Graph atomically relocates every Space Thing that selected it. |
 
 ## UI foundation
 

@@ -1,12 +1,69 @@
 import type { Edge } from '@xyflow/react';
-import { SPACE_THING_EMBED_INSET, type DiagramPosition } from '@project/core';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import {
+  SPACE_THING_EMBED_INSET,
+  uuidSchema,
+  type DiagramPosition,
+  type ThingId,
+} from '@project/core';
+import { AUTHORING_HANDLE_DIAMETER, type ThingFlowNode } from '@project/react-flow-adapter';
 import type { CanvasNodesAndEdges } from './canvas-projection';
 
 /** A placement identity: the same target Thing can appear through several Space Things. */
 export const embeddedNodeId = (parentId: string, thingId: string): string =>
   `embedded:${parentId}:${thingId}`;
 export const embeddedClipId = (parentId: string): string => `embedded-clip-${parentId}`;
+
+const EMBEDDED_PREFIX = 'embedded:';
+
+/**
+ * Inverse of {@link embeddedNodeId}: the containing placement and the Thing it
+ * draws. The Thing is the last UUID; the parent may itself be a placement id.
+ */
+export function parseEmbeddedNodeId(
+  id: string,
+): { readonly parentId: string; readonly thingId: ThingId } | undefined {
+  if (!id.startsWith(EMBEDDED_PREFIX)) return undefined;
+  const rest = id.slice(EMBEDDED_PREFIX.length);
+  const separator = rest.lastIndexOf(':');
+  if (separator <= 0) return undefined;
+  const thingId = uuidSchema.safeParse(rest.slice(separator + 1));
+  if (!thingId.success) return undefined;
+  return { parentId: rest.slice(0, separator), thingId: thingId.data };
+}
+
+export type CanvasNodeConnection =
+  | { readonly kind: 'host'; readonly from: ThingId; readonly to: ThingId }
+  | {
+      readonly kind: 'embedded';
+      readonly parentId: string;
+      readonly from: ThingId;
+      readonly to: ThingId;
+    }
+  | { readonly kind: 'invalid' };
+
+/**
+ * Which Space a pair of React Flow node ids may author an Edge in.
+ *
+ * Host Things keep UUID ids. Embedded Things share a parent. A mixed pair, or
+ * two embeddings of different Space Things, is a cross-Space Edge (ADR 0040).
+ */
+export function canvasNodeConnection(source: string, target: string): CanvasNodeConnection {
+  const fromHost = uuidSchema.safeParse(source);
+  const toHost = uuidSchema.safeParse(target);
+  if (fromHost.success && toHost.success) {
+    return { kind: 'host', from: fromHost.data, to: toHost.data };
+  }
+  const fromEmbedded = parseEmbeddedNodeId(source);
+  const toEmbedded = parseEmbeddedNodeId(target);
+  if (fromEmbedded === undefined || toEmbedded === undefined) return { kind: 'invalid' };
+  if (fromEmbedded.parentId !== toEmbedded.parentId) return { kind: 'invalid' };
+  return {
+    kind: 'embedded',
+    parentId: fromEmbedded.parentId,
+    from: fromEmbedded.thingId,
+    to: toEmbedded.thingId,
+  };
+}
 
 export interface EmbeddedBounds {
   readonly left: number;
@@ -26,6 +83,7 @@ export interface EmbeddedDiagramRequest {
   readonly parent: EmbeddedParentProjection;
   readonly projection: CanvasNodesAndEdges;
   readonly offset: DiagramPosition;
+  readonly zoom?: number;
   readonly enabled: boolean;
   readonly bounds?: EmbeddedBounds;
 }
@@ -72,11 +130,23 @@ export function constrainEmbeddedPosition(
 }
 
 /** Reclip a retained read as its containing Thing changes size, without opening a session. */
+/**
+ * How far a handle's centre sits outside the Thing box.
+ *
+ * `inset(0)` clips that centre — React Flow parks each handle on the rim — so a
+ * side that does not overflow the window keeps this outset. A side that does
+ * overflow keeps the overflow: the handle there is already outside the window.
+ * `embedded-diagram.test.ts` holds the inset.
+ */
+const EMBEDDED_HANDLE_OUTSET = AUTHORING_HANDLE_DIAMETER / 2;
+
+const clipSide = (overflow: number): number => (overflow > 0 ? overflow : -EMBEDDED_HANDLE_OUTSET);
+
 export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): ThingFlowNode {
-  const top = Math.max(0, bounds.top - node.position.y);
-  const left = Math.max(0, bounds.left - node.position.x);
-  const right = Math.max(0, node.position.x + (node.width ?? 0) - bounds.right);
-  const bottom = Math.max(0, node.position.y + (node.height ?? 0) - bounds.bottom);
+  const top = clipSide(Math.max(0, bounds.top - node.position.y));
+  const left = clipSide(Math.max(0, bounds.left - node.position.x));
+  const right = clipSide(Math.max(0, node.position.x + (node.width ?? 0) - bounds.right));
+  const bottom = clipSide(Math.max(0, node.position.y + (node.height ?? 0) - bounds.bottom));
   return {
     ...node,
     style: { ...node.style, clipPath: `inset(${top}px ${right}px ${bottom}px ${left}px)` },
@@ -88,25 +158,28 @@ export function embeddedDiagram({
   parent,
   projection,
   offset,
+  zoom = 1,
   enabled,
   bounds,
 }: EmbeddedDiagramRequest): CanvasNodesAndEdges {
   const nodes = projection.nodes.map((node): ThingFlowNode => {
-    const position = { x: node.position.x + offset.x, y: node.position.y + offset.y };
-    return clipEmbeddedNode(
-      {
-        ...node,
-        id: embeddedNodeId(parent.id, node.id),
-        parentId: parent.id,
-        position,
-        connectable: false,
-        data: { ...node.data, connectionAuthoringEnabled: false },
-        draggable: enabled,
-        selectable: enabled,
-        focusable: enabled,
-        deletable: false,
-        zIndex: (parent.zIndex ?? 10) + (node.data.expanded === true ? 2 : 1),
-      },
+    const position = { x: node.position.x * zoom + offset.x, y: node.position.y * zoom + offset.y };
+    const next: ThingFlowNode = {
+      ...node,
+      id: embeddedNodeId(parent.id, node.id),
+      parentId: parent.id,
+      position,
+      connectable: enabled,
+      data: { ...node.data, connectionAuthoringEnabled: enabled },
+      draggable: enabled,
+      selectable: enabled,
+      focusable: enabled,
+      deletable: false,
+      zIndex: (parent.zIndex ?? 10) + (node.data.expanded === true ? 2 : 1),
+    };
+    if (!enabled) next.className = 'nopan nowheel nodrag';
+    const clipped = clipEmbeddedNode(
+      next,
       bounds ?? {
         top: SPACE_THING_EMBED_INSET.top,
         left: SPACE_THING_EMBED_INSET.left,
@@ -114,6 +187,16 @@ export function embeddedDiagram({
         bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
       },
     );
+    const style = {
+      ...clipped.style,
+      transition: 'none',
+    };
+    return enabled
+      ? { ...clipped, style }
+      : {
+          ...clipped,
+          style: { ...style, pointerEvents: 'none' },
+        };
   });
   const ids = new Map(
     projection.nodes.map((node) => [node.id, embeddedNodeId(parent.id, node.id)]),

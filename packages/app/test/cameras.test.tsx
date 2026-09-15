@@ -25,6 +25,10 @@ const flow = vi.hoisted(() => ({
       maxZoom?: number;
     }) => new Promise<boolean>(() => undefined),
   ),
+  setViewport: vi.fn(
+    (_viewport: { x: number; y: number; zoom: number }, _options?: { duration?: number }) =>
+      new Promise<boolean>(() => undefined),
+  ),
   getNode: vi.fn(),
   viewport: { width: 1000, height: 800 },
 }));
@@ -35,7 +39,8 @@ vi.mock('@xyflow/react', () => ({
     selector(flow.viewport),
 }));
 
-const { OverviewCamera, PresentingCamera } = await import('../src/components/cameras');
+const { OverviewCamera, PresentingCamera, OpeningFramingCamera } =
+  await import('../src/components/cameras');
 
 const THING = { id: 'a', position: { x: 0, y: 0 }, width: 200, height: 100 };
 const OTHER_THING = { id: 'b', position: { x: 600, y: 0 }, width: 200, height: 100 };
@@ -44,6 +49,7 @@ const fits = () => flow.fitView.mock.calls;
 
 beforeEach(() => {
   flow.fitView.mockClear();
+  flow.setViewport.mockClear();
   flow.viewport = { width: 1000, height: 800 };
   flow.getNode.mockImplementation((id: string) =>
     id === THING.id ? THING : id === OTHER_THING.id ? OTHER_THING : undefined,
@@ -128,5 +134,22 @@ describe('the overview camera', () => {
     render(<OverviewCamera presenting={true} />);
 
     expect(fits()).toHaveLength(0);
+  });
+});
+
+describe('the opening framing camera', () => {
+  it('places the entered canvas from stored framing and the canvas size, not fitView', () => {
+    render(<OpeningFramingCamera framing={{ centreX: 100, centreY: 50, zoom: 2 }} />);
+
+    expect(fits()).toHaveLength(0);
+    expect(flow.setViewport).toHaveBeenCalledTimes(1);
+    expect(flow.setViewport.mock.calls[0]?.[0]).toEqual({ x: 300, y: 300, zoom: 2 });
+    expect(flow.setViewport.mock.calls[0]?.[1]).toEqual({ duration: 0 });
+  });
+
+  it('does nothing when Enter carried no framing', () => {
+    render(<OpeningFramingCamera framing={undefined} />);
+
+    expect(flow.setViewport).not.toHaveBeenCalled();
   });
 });

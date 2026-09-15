@@ -6,8 +6,23 @@
  * `fitView` prop in `SpaceCanvas` as well as by the camera that has to agree
  * with it, and a component module that exports an object costs Fast Refresh.
  * The behaviour these feed — and the policy governing it — is in
- * `components/cameras.tsx` (ADR 0027, ADR 0043, ADR 0044).
+ * `components/cameras.tsx` (ADR 0027, ADR 0043, ADR 0044). Embedded Diagram
+ * offset and zoom are `spaceThingEmbedCamera` here for the same Fast Refresh
+ * reason — the seam component imports it rather than calling `embedCamera`
+ * directly.
  */
+import type { DiagramPosition } from '@project/core';
+import type { EmbeddedBounds } from './embedded-diagram';
+import { embedCamera, type SpaceThingFraming } from './space-thing-framing';
+
+/** Places an embedded Diagram at a Space Thing's stored camera offset. */
+export function spaceThingEmbedCamera(
+  bounds: EmbeddedBounds,
+  origin: DiagramPosition,
+  framing: SpaceThingFraming | undefined,
+) {
+  return embedCamera(bounds, origin, framing);
+}
 
 /**
  * How much room the presented thing leaves around itself.

@@ -18,8 +18,6 @@ export type {
   CanvasThingFront,
   CanvasThingProps,
   CanvasThingState,
-  CanvasSpaceThingChoice,
-  CanvasSpaceThingSelection,
 } from './CanvasThing';
 export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';
@@ -246,3 +244,6 @@ export { ToggleGroup, ToggleGroupItem } from './components/toggle-group';
 export { Toolbar, ToolbarButton, ToolbarGroup } from './components/toolbar';
 export type { ToolbarButtonProps } from './components/toolbar';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';
+
+export { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
+export type { DiagramMenuActionsProps, GraphMenuActionsProps } from './IdentityMenuActions';

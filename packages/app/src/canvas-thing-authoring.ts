@@ -3,78 +3,87 @@ import {
   THING_TITLE_REQUIRED,
   thingDocumentSchema,
   uuidSchema,
-  SPACE_THING_MIN_OPEN_SIZE,
   type ThingDocument,
   type ThingId,
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
-import type { CanvasSpaceThingSelection, EntityActionGroup } from '@project/ui';
+import type { EntityActionGroup } from '@project/ui';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import { THING_SIZE, snapThingSizeToClose } from './thing';
 import type { ThingResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
-import type { SpaceThingTarget, SpaceThingTargetDiagram } from './space-thing-lifecycle';
+import type { SpaceThingTargetDiagram } from './space-thing-lifecycle';
+import { useOpenSpaces } from './open-spaces-context';
+import { completeEmbeddedAuthoring } from './embedded-authoring';
+import type { Continuation } from './continuation';
 import { NO_SPACE_THING_TARGETS, type SpaceThingTargets } from './space-thing-targets';
+import type { SpaceThingFraming } from './space-thing-framing';
+import {
+  applyThingDataPatch,
+  decorateMarkdownThingNode,
+  decorateSharedThingNode,
+  decorateSpaceThingNode,
+} from './canvas-thing-decoration';
 
 type Caret =
   | { readonly thingId: string; readonly field: 'title' }
   | { readonly thingId: string; readonly field: 'body'; readonly openObserved: boolean }
   | null;
 
+const spaceDocumentIdentity = (document: Extract<ThingDocument, { kind: 'space' }>): string => {
+  const framing = document.framing;
+  const framingKey =
+    framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
+  return `${document.spaceId}:${document.diagram}:${document.graph}:${document.title}:${framingKey}`;
+};
+
+const spaceDocumentsOf = (
+  things: readonly { readonly id: ThingId; readonly document: ThingDocument }[],
+): Map<ThingId, Extract<ThingDocument, { kind: 'space' }>> => {
+  const next = new Map<ThingId, Extract<ThingDocument, { kind: 'space' }>>();
+  for (const thing of things) {
+    if (thing.document.kind === 'space') next.set(thing.id, thing.document);
+  }
+  return next;
+};
+
+const spaceDocumentsKeyOf = (
+  things: readonly { readonly id: ThingId; readonly document: ThingDocument }[],
+): string =>
+  things
+    .flatMap((thing) =>
+      thing.document.kind === 'space'
+        ? [`${thing.id}:${spaceDocumentIdentity(thing.document)}`]
+        : [],
+    )
+    .join();
+
 /**
- * The two lists an Open Space Thing chooses from, and what a choice writes.
+ * Load a Space Thing, parse the next document, persist it as `edited-thing`.
  *
- * Built here rather than in the component because the *pairing* is a domain
- * rule and not a presentation one: the Graphs offered are the selected Diagram's
- * alone, so a Thing whose stored Diagram has since been deleted offers no
- * Graphs rather than the previous Diagram's (ADR 0040, ADR 0068).
+ * Selection and framing both write that one Edit; they differ only in which
+ * fields they patch and the sentence a failed parse returns.
  */
-const spaceThingSelection = (
+const completeEditedSpaceThing = (
+  authoring: Pick<SpaceAuthoring, 'complete'>,
+  spaceSession: SpaceSession,
   thingId: ThingId,
-  target: SpaceThingTarget,
-  document: Extract<ThingDocument, { kind: 'space' }> | undefined,
-  complete: (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId) => void,
-  disabled: boolean,
-): CanvasSpaceThingSelection => {
-  const selectedDiagram = target.diagrams.find((diagram) => diagram.id === document?.diagram);
-  const diagramOf = (id: string): SpaceThingTargetDiagram | undefined =>
-    target.diagrams.find((diagram) => diagram.id === id);
-  return {
-    disabled,
-    diagrams: target.diagrams.map(({ id, title }) => ({ id, title })),
-    graphs: (selectedDiagram?.graphs ?? []).map(({ id, title }) => ({ id, title })),
-    diagramId: selectedDiagram?.id ?? null,
-    graphId: selectedDiagram?.graphs.some((graph) => graph.id === document?.graph)
-      ? (document?.graph ?? null)
-      : null,
-    onDiagramChange: (id) => {
-      const diagram = diagramOf(id);
-      // The Diagram's own Active Graph, and the head of its list only where it
-      // has authored none — which is what an absent `activeGraph` means
-      // (ADR 0026). Resolved against the Diagram's Graphs rather than trusted:
-      // the seed has to be a Graph this Diagram owns or the aggregate refuses
-      // the Thing that names it.
-      if (diagram === undefined) return;
-      const seed =
-        diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
-      // A Diagram owns at least one Graph, so this is the type-level boundary
-      // between a validated Space and the ids read out of it, not a Diagram an
-      // author can choose and leave half-selected.
-      if (seed === undefined) return;
-      complete(thingId, diagram, seed.id);
-    },
-    onGraphChange: (id) => {
-      if (selectedDiagram === undefined) return;
-      const graph = selectedDiagram.graphs.find((candidate) => candidate.id === id);
-      if (graph !== undefined) complete(thingId, selectedDiagram, graph.id);
-    },
-  };
+  nextDocument: (document: Extract<ThingDocument, { kind: 'space' }>) => ThingDocument,
+  invalidMessage: string,
+): string | null => {
+  const stored = spaceSession.getState().working.things.find((thing) => thing.id === thingId);
+  if (stored?.document.kind !== 'space')
+    return describeAuthoringRefusal({ code: 'thing-not-found' });
+  const parsed = thingDocumentSchema.safeParse(nextDocument(stored.document));
+  if (!parsed.success) return invalidMessage;
+  const result = authoring.complete({ kind: 'edited-thing', thingId, document: parsed.data });
+  return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 };
 
 export interface CanvasThingAuthoringInput {
+  readonly continuation?: Continuation;
   readonly nodes: readonly ThingFlowNode[];
   /**
    * What may be authored right now, answered once for the whole application.
@@ -95,8 +104,7 @@ export interface CanvasThingAuthoringInput {
    * What each referenced Space offers a Space Thing to select, keyed by target.
    *
    * Absent, or missing an entry, means the target has not been read yet — the
-   * Thing still draws, without the context and the selectors an Open one carries
-   * (ADR 0068).
+   * Thing still draws, without the rail an Open one carries (ADR 0068).
    */
   readonly spaceThingTargets?: SpaceThingTargets | undefined;
   /**
@@ -113,14 +121,14 @@ export interface CanvasThingAuthoringInput {
    */
   readonly thingEntityActions?: ((thingId: ThingId) => readonly EntityActionGroup[]) | undefined;
   /**
-   * Enter the Space a Space Thing on this canvas references.
+   * Which Open Space Things currently have their embedded canvas in Edit.
    *
-   * Asked one Thing at a time, the same way {@link thingEntityActions} is:
-   * the crossing is Open Spaces' and this module only knows which Things
-   * are on the canvas. Absent leaves every Space Thing without Enter
-   * (`canvas-thing-authoring.test.tsx`, 'omits Enter when onEnterSpace is absent').
+   * Absent leaves every Space Thing in Read: the embedding stays inert and the
+   * dock offers no Edit/Done. The containing canvas owns the set because the
+   * embedding is sibling nodes, not markup inside the Thing.
    */
-  readonly onEnterSpace?: ((thingId: ThingId) => void) | undefined;
+  readonly portalEditing?: ReadonlySet<ThingId>;
+  readonly onPortalEditingChange?: ((thingId: ThingId, editing: boolean) => void) | undefined;
 }
 
 export interface CanvasThingAuthoring {
@@ -129,6 +137,10 @@ export interface CanvasThingAuthoring {
   readonly titleEditing: boolean;
   readonly openThing: (thingId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (thingId: string) => void;
+  readonly completeSpaceThingFraming: (
+    thingId: ThingId,
+    framing: SpaceThingFraming,
+  ) => string | null;
 }
 
 /**
@@ -137,6 +149,7 @@ export interface CanvasThingAuthoring {
  * Thing. Space Authoring remains authoritative for every completed Edit.
  */
 export function useCanvasThingAuthoring({
+  continuation,
   nodes,
   availability,
   nameOnCreation,
@@ -148,8 +161,14 @@ export function useCanvasThingAuthoring({
   onTitleEditingChange,
   spaceThingTargets = NO_SPACE_THING_TARGETS,
   thingEntityActions,
-  onEnterSpace,
+  portalEditing,
+  onPortalEditingChange,
 }: CanvasThingAuthoringInput): CanvasThingAuthoring {
+  const spaces = useOpenSpaces();
+  const [contextEditingIds, setContextEditingIds] = useState<ReadonlySet<ThingId>>(() => new Set());
+  const [contextNotices, setContextNotices] = useState<ReadonlyMap<ThingId, string>>(
+    () => new Map(),
+  );
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleThingId = caret?.field === 'title' ? caret.thingId : null;
   const bodyCaretNamesOpenMarkdown =
@@ -177,7 +196,7 @@ export function useCanvasThingAuthoring({
     onBodyEditingChange?.(bodyEditing);
   }, [bodyEditing, onBodyEditingChange]);
   useEffect(() => {
-    onTitleEditingChange?.(editingTitleThingId !== null);
+    onTitleEditingChange?.(editingTitleThingId !== null || contextEditingIds.size > 0);
     // Returning the Space chrome on unmount is the whole of the safety net,
     // and it is narrower than "a Diagram change remounts the canvas" would
     // suggest. Only a Diagram move that drops the projection unmounts this
@@ -190,7 +209,7 @@ export function useCanvasThingAuthoring({
     // goes away must not leave the chrome withdrawn against an editor no
     // callback will ever settle.
     return () => onTitleEditingChange?.(false);
-  }, [editingTitleThingId, onTitleEditingChange]);
+  }, [editingTitleThingId, contextEditingIds, onTitleEditingChange]);
 
   const [canvasAuthoringWasEnabled, setCanvasAuthoringWasEnabled] = useState(
     availability.authorOnCanvas,
@@ -232,10 +251,23 @@ export function useCanvasThingAuthoring({
 
   const closeThing = useCallback(
     (thingId: ThingId): 'completed' | 'retained' => {
+      onPortalEditingChange?.(thingId, false);
+      setContextNotices((previous) => {
+        if (!previous.has(thingId)) return previous;
+        const next = new Map(previous);
+        next.delete(thingId);
+        return next;
+      });
+      setContextEditingIds((previous) => {
+        if (!previous.has(thingId)) return previous;
+        const next = new Set(previous);
+        next.delete(thingId);
+        return next;
+      });
       const result = authoring.complete({ kind: 'closed-thing', thingId });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
-    [authoring],
+    [authoring, onPortalEditingChange],
   );
 
   const completeThingBody = useCallback(
@@ -297,22 +329,41 @@ export function useCanvasThingAuthoring({
    * one — `spaceFileSchema` says so — and a Space Thing stores a Graph as well
    * as a Diagram (ADR 0079), so writing the pair half-made is not a state this
    * surface may reach. `graphId` is required here for that reason, and the
-   * schema parse below is what still stands between a resolved pair and a
-   * stored one.
+   * schema parse is what still stands between a resolved pair and a stored one.
    *
    * The target Space reference is untouched here and cannot be reached from the
    * surface at all: it is chosen once, at creation (ADR 0068), and Space
    * Authoring refuses a changed one on its own account.
    */
   const completeSpaceThingSelection = useCallback(
-    (thingId: ThingId, diagram: SpaceThingTargetDiagram, graphId: GraphId): void => {
-      const stored = spaceSession.getState().working.things.find((thing) => thing.id === thingId);
-      if (stored?.document.kind !== 'space') return;
-      const document: ThingDocument = { ...stored.document, diagram: diagram.id, graph: graphId };
-      const parsed = thingDocumentSchema.safeParse(document);
-      if (!parsed.success) return;
-      authoring.complete({ kind: 'edited-thing', thingId, document: parsed.data });
-    },
+    (
+      thingId: ThingId,
+      diagram: Pick<SpaceThingTargetDiagram, 'id'>,
+      graphId: GraphId,
+    ): string | null =>
+      completeEditedSpaceThing(
+        authoring,
+        spaceSession,
+        thingId,
+        (document) => {
+          const next: ThingDocument = { ...document, diagram: diagram.id, graph: graphId };
+          if (document.diagram !== diagram.id) delete next.framing;
+          return next;
+        },
+        'The selection is invalid.',
+      ),
+    [authoring, spaceSession],
+  );
+
+  const completeSpaceThingFraming = useCallback(
+    (thingId: ThingId, framing: SpaceThingFraming): string | null =>
+      completeEditedSpaceThing(
+        authoring,
+        spaceSession,
+        thingId,
+        (document) => ({ ...document, framing }),
+        'The framing is invalid.',
+      ),
     [authoring, spaceSession],
   );
 
@@ -321,168 +372,170 @@ export function useCanvasThingAuthoring({
   }, []);
   const getWorking = useCallback(() => spaceSession.getState().working, [spaceSession]);
   const working = useSyncExternalStore(spaceSession.subscribe, getWorking);
+  const editableThingIdsKey = working.things.map((thing) => thing.id).join();
+  /* eslint-disable react-hooks/exhaustive-deps -- membership key, not snapshot identity */
   const editableThingIds = useMemo(
     () => new Set(working.things.map((thing) => thing.id)),
-    [working],
+    [editableThingIdsKey],
   );
+  const spaceDocumentsKey = spaceDocumentsKeyOf(working.things);
+  const spaceDocuments = useMemo(() => spaceDocumentsOf(working.things), [spaceDocumentsKey]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+  const clearCaret = useCallback(() => {
+    setCaret(null);
+  }, []);
+  const beginBodyEditing = useCallback((node: ThingFlowNode) => {
+    setCaret({
+      thingId: node.id,
+      field: 'body',
+      openObserved: node.data.expanded === true,
+    });
+  }, []);
+  const onContextEditingChange = useCallback((thingId: ThingId, editing: boolean) => {
+    setContextEditingIds((prev) => {
+      const has = prev.has(thingId);
+      if (editing === has) return prev;
+      const next = new Set(prev);
+      if (editing) next.add(thingId);
+      else next.delete(thingId);
+      return next;
+    });
+  }, []);
+  const onContextReport = useCallback((thingId: ThingId, message: string | null) => {
+    setContextNotices((prev) => {
+      const current = prev.get(thingId) ?? null;
+      if (current === message) return prev;
+      const next = new Map(prev);
+      if (message === null) next.delete(thingId);
+      else next.set(thingId, message);
+      return next;
+    });
+  }, []);
 
-  const decoratedNodes = useMemo(
-    () =>
-      nodes.map((node) => {
-        const thingBelongsToWorkingSpace = editableThingIds.has(node.data.thingId);
-        const data: ThingFlowNode['data'] = {
-          ...node.data,
-          titleEditingEnabled:
-            thingBelongsToWorkingSpace && availability.authorOnCanvas && !bodyEditing,
-        };
-        if (thingBelongsToWorkingSpace && availability.authorOnCanvas) {
-          data.thingEditingEnabled = true;
-          data.onEditThing = (open) => (open ? openThing(node.id) : closeThing(node.data.thingId));
-        }
-        if (thingBelongsToWorkingSpace && availability.authorOnCanvas && !bodyEditing) {
-          data.onBeginTitleEditing = () => beginTitleEditing(node.id);
-        }
-        if (
-          thingBelongsToWorkingSpace &&
-          availability.authorOnCanvas &&
-          !bodyEditing &&
-          node.data.kind === 'markdown'
-        ) {
-          data.onBeginBodyEditing = () =>
-            setCaret({
-              thingId: node.id,
-              field: 'body',
-              openObserved: node.data.expanded === true,
-            });
-        }
-        if (
-          thingBelongsToWorkingSpace &&
-          node.data.expanded === true &&
-          availability.authorOnCanvas
-        ) {
-          // Ordinary Open proposals preserve the Space footer. The gesture
-          // itself still reaches Closed Size so ADR 0066's magnet can Close it.
-          const floor = node.data.kind === 'space' ? SPACE_THING_MIN_OPEN_SIZE : THING_SIZE;
-          data.resize = {
-            minWidth: THING_SIZE.width,
-            minHeight: THING_SIZE.height,
-            onResizeStart: () => {
-              onSelectThing(node.data.thingId);
-              thingResize.beginResize(node.data.thingId);
-            },
-            onResize: (size) => {
-              const proposed = snapThingSizeToClose(size);
-              thingResize.previewResize(
-                node.data.thingId,
-                proposed === THING_SIZE
-                  ? proposed
-                  : {
-                      width: Math.max(floor.width, size.width),
-                      height: Math.max(floor.height, size.height),
-                    },
-              );
-            },
-            onResizeEnd: () => thingResize.finishResize(node.data.thingId),
-            onResizeCancel: () => thingResize.cancelResize(node.data.thingId),
-          };
-        }
-        if (
-          thingBelongsToWorkingSpace &&
-          node.data.kind === 'markdown' &&
-          bodyEditorThingId === node.id
-        ) {
-          data.bodyEditor = {
-            onComplete: (body) => completeThingBody(node.data.thingId, body),
-            onEnd: () => setCaret(null),
-          };
-        }
-        if (
-          thingBelongsToWorkingSpace &&
-          availability.authorOnCanvas &&
-          node.id === editingTitleThingId
-        ) {
-          data.titleEditor = {
-            onComplete: (title) => {
-              const error = completeThingTitle(node.id, title);
-              if (error === null) setCaret(null);
-              return error;
-            },
-            onCancel: () => setCaret(null),
-          };
-        }
-        // The same gate every other control on the rail takes, and for the same
-        // reason rather than by analogy: these commands are drawn *in* that
-        // rail, so a canvas that has withdrawn authoring — presenting, a
-        // creation pane, a live chrome rename — would otherwise reinstate the
-        // one cluster that survived it, on a Thing whose every other control has
-        // gone.
-        if (
-          thingEntityActions !== undefined &&
-          thingBelongsToWorkingSpace &&
-          availability.authorOnCanvas
-        ) {
-          data.entityActions = thingEntityActions(node.data.thingId);
-        }
-        if (
-          onEnterSpace !== undefined &&
-          thingBelongsToWorkingSpace &&
-          availability.authorOnCanvas &&
-          node.data.kind === 'space'
-        ) {
-          data.onEnter = () => onEnterSpace(node.data.thingId);
-        }
-        if (node.data.kind === 'space') {
-          const stored = working.things.find((thing) => thing.id === node.data.thingId);
-          const target =
-            stored?.document.kind === 'space'
-              ? spaceThingTargets.get(stored.document.spaceId)
-              : undefined;
-          if (target !== undefined) {
-            // Supplied whenever the target has been read, and *disabled* rather
-            // than withheld where it cannot be authored. An absent selection is
-            // how the Thing says the target Space has not been read yet, so a
-            // canvas that had merely withdrawn authoring — a creation pane is
-            // up, the Space is presenting, a chrome title is being edited —
-            // would put every Open Space Thing on it back to reporting a wait
-            // that had already ended.
-            data.spaceSelection = spaceThingSelection(
-              node.data.thingId,
-              target,
-              stored?.document.kind === 'space' ? stored.document : undefined,
-              completeSpaceThingSelection,
-              !(thingBelongsToWorkingSpace && availability.authorOnCanvas),
-            );
-          }
-        }
-        return { ...node, data };
-      }),
-    [
-      nodes,
-      availability.authorOnCanvas,
+  const sharedContext = useMemo(
+    () => ({
+      authorOnCanvas: availability.authorOnCanvas,
       bodyEditing,
+      editableThingIds,
       openThing,
       closeThing,
       beginTitleEditing,
       onSelectThing,
       thingResize,
-      bodyEditorThingId,
-      completeThingBody,
       editingTitleThingId,
       completeThingTitle,
-      editableThingIds,
-      working,
-      spaceThingTargets,
-      completeSpaceThingSelection,
+      clearCaret,
       thingEntityActions,
-      onEnterSpace,
+    }),
+    [
+      availability.authorOnCanvas,
+      bodyEditing,
+      editableThingIds,
+      openThing,
+      closeThing,
+      beginTitleEditing,
+      onSelectThing,
+      thingResize,
+      editingTitleThingId,
+      completeThingTitle,
+      clearCaret,
+      thingEntityActions,
     ],
+  );
+  const markdownContext = useMemo(
+    () => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      bodyEditing,
+      editableThingIds,
+      beginBodyEditing,
+      bodyEditorThingId,
+      completeThingBody,
+      clearCaret,
+    }),
+    [
+      availability.authorOnCanvas,
+      bodyEditing,
+      editableThingIds,
+      beginBodyEditing,
+      bodyEditorThingId,
+      completeThingBody,
+      clearCaret,
+    ],
+  );
+  const spaceContext = useMemo(
+    () => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      editableThingIds,
+      containingSpaceId: working.id,
+      spaceDocuments,
+      spaceThingTargets,
+      spaces,
+      continuation,
+      completeSpaceThingSelection,
+      completeEmbedded: completeEmbeddedAuthoring,
+      portalEditing,
+      onPortalEditingChange,
+      contextNotices,
+      onContextEditingChange,
+      onContextReport,
+    }),
+    [
+      availability.authorOnCanvas,
+      editableThingIds,
+      working.id,
+      spaceDocuments,
+      spaceThingTargets,
+      spaces,
+      continuation,
+      completeSpaceThingSelection,
+      portalEditing,
+      onPortalEditingChange,
+      contextNotices,
+      onContextEditingChange,
+      onContextReport,
+    ],
+  );
+
+  const withShared = useMemo(
+    () =>
+      nodes.map((node) => applyThingDataPatch(node, decorateSharedThingNode(node, sharedContext))),
+    [nodes, sharedContext],
+  );
+  const markdownDecorated = useMemo(() => {
+    const next = new Map<string, ThingFlowNode>();
+    for (const node of withShared) {
+      if (node.data.kind === 'markdown') {
+        next.set(
+          node.id,
+          applyThingDataPatch(node, decorateMarkdownThingNode(node, markdownContext)),
+        );
+      }
+    }
+    return next;
+  }, [withShared, markdownContext]);
+  const spaceDecorated = useMemo(() => {
+    const next = new Map<string, ThingFlowNode>();
+    for (const node of withShared) {
+      if (node.data.kind === 'space') {
+        next.set(node.id, applyThingDataPatch(node, decorateSpaceThingNode(node, spaceContext)));
+      }
+    }
+    return next;
+  }, [withShared, spaceContext]);
+  const decoratedNodes = useMemo(
+    () =>
+      withShared.map(
+        (node) => markdownDecorated.get(node.id) ?? spaceDecorated.get(node.id) ?? node,
+      ),
+    [withShared, markdownDecorated, spaceDecorated],
   );
 
   return {
     nodes: decoratedNodes,
     bodyEditing,
-    titleEditing: editingTitleThingId !== null,
+    titleEditing: editingTitleThingId !== null || contextEditingIds.size > 0,
     openThing,
     beginTitleEditing,
+    completeSpaceThingFraming,
   };
 }

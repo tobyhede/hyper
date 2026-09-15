@@ -18,7 +18,13 @@ import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { newUuid } from '@project/core';
-import { anyPresentControl, openSpaceRow, openSpacesMenu, unavailable } from './command-dock';
+import {
+  anyPresentControl,
+  openSpaceMenu,
+  openSpaceRow,
+  openSpacesMenu,
+  unavailable,
+} from './command-dock';
 
 /**
  * What an Open Space Thing *shows* (ADR 0068).
@@ -231,6 +237,22 @@ const containingNode = (thingId: ThingId): HTMLElement => {
   return node;
 };
 
+/** Open Space Thing rails are lifted into the viewport so embedded Things can pass beneath them. */
+const controlsOf = (node: HTMLElement): HTMLElement => {
+  const id = node.dataset['id'];
+  if (id === undefined) return node;
+  const rail = document.querySelector(`[data-thing-rail-for="${id}"]`);
+  if (!(rail instanceof HTMLElement)) {
+    throw new Error(`no lifted rail is drawn for ${id}`);
+  }
+  return rail;
+};
+
+/** Put the Space Thing into portal Edit so its embedded Diagram can be authored. */
+const beginPortalEdit = (parent: HTMLElement): void => {
+  fireEvent.click(within(controlsOf(parent)).getByRole('button', { name: /^Edit Thing/ }));
+};
+
 /** An embedded Thing drawn by a named Space Thing rather than by `SPACE_THING_ID`. */
 const embeddedNodeOf = (parentId: ThingId, thingId: ThingId): HTMLElement => {
   const node = document.querySelector(
@@ -294,6 +316,7 @@ describe('the Diagram an Open Space Thing draws', () => {
       const initial = await spaces.open(HOME_ID);
       render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
       await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+      beginPortalEdit(containingNode(SPACE_THING_ID));
       const remote = { ...target, document: { ...target.document, title: 'Remote Architecture' } };
       control.queueResult(
         kind === 'failed'
@@ -341,6 +364,245 @@ describe('the Diagram an Open Space Thing draws', () => {
     },
   );
 
+  it('keeps the embedded Diagram inert until Edit, and Done returns it to Read', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    expect(within(embeddedNode(DRAWN_A)).queryByRole('button', { name: /Edit Thing/ })).toBeNull();
+    const parent = containingNode(SPACE_THING_ID);
+    expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Thing/ })).toBeTruthy();
+    beginPortalEdit(parent);
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy(),
+    );
+    expect(within(controlsOf(parent)).getByRole('button', { name: /Done Thing/ })).toBeTruthy();
+    fireEvent.click(within(controlsOf(parent)).getByRole('button', { name: /Done Thing/ }));
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).queryByRole('button', { name: /Edit Thing/ }),
+      ).toBeNull(),
+    );
+    expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Thing/ })).toBeTruthy();
+  });
+
+  /**
+   * Ticket 04 captures wheel on the canvas root to author framing. ADR 0064
+   * forbids `nowheel` on an Open Thing, so the editing Space Thing must not
+   * take that class — the capture listener is the wheel, not a hole in the
+   * host viewport.
+   */
+  it('does not put nowheel on an Open Space Thing in portal Edit, and wheel still authors its framing', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const session = await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy(),
+    );
+    const parent = containingNode(SPACE_THING_ID);
+    expect(parent.className.split(/\s+/)).not.toContain('nowheel');
+    fireEvent.wheel(parent, { deltaY: -120, bubbles: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+    const thing = session
+      .getState()
+      .working.things.find((candidate) => candidate.id === SPACE_THING_ID);
+    if (thing?.document.kind !== 'space') throw new Error('Space Thing missing');
+    expect(thing.document.framing?.zoom).toBe(1.1);
+  });
+
+  /**
+   * Portal Edit keeps `editingPortals` populated after Present or a chrome
+   * rename withdraws canvas authoring. Wheel must not keep writing framing.
+   */
+  it('does not author portal framing from wheel while presenting', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const session = await mount({
+      ...value,
+      document: {
+        ...value.document,
+        diagrams: value.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          graphs: diagram.graphs.map((graph) => ({
+            ...graph,
+            edges: [{ from: HOME_THING_ID, to: SPACE_THING_ID }],
+          })),
+        })),
+      },
+    });
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(anyPresentControl());
+    await waitFor(() => expect(screen.getByTestId('presenting-chrome')).toBeVisible());
+    fireEvent.wheel(containingNode(SPACE_THING_ID), { deltaY: -120, bubbles: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+    const thing = session
+      .getState()
+      .working.things.find((candidate) => candidate.id === SPACE_THING_ID);
+    if (thing?.document.kind !== 'space') throw new Error('Space Thing missing');
+    expect(thing.document.framing).toBeUndefined();
+  });
+
+  it('does not author portal framing from wheel during a chrome Space rename', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const session = await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy(),
+    );
+    openSpaceMenu('Home');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(screen.getByRole('textbox', { name: 'Space name' })).toBeTruthy();
+    fireEvent.wheel(containingNode(SPACE_THING_ID), { deltaY: -120, bubbles: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+    const thing = session
+      .getState()
+      .working.things.find((candidate) => candidate.id === SPACE_THING_ID);
+    if (thing?.document.kind !== 'space') throw new Error('Space Thing missing');
+    expect(thing.document.framing).toBeUndefined();
+  });
+
+  /**
+   * Two host Space Things, both Open, both in portal Edit. Wheel is debounced
+   * 160 ms so a burst on one portal is one Edit; a burst that crosses two
+   * portals must still author each. The canvas-root listener that used a single
+   * pending slot dropped the first portal's framing when the second wheel
+   * arrived inside the window.
+   */
+  it('authors framing on each Space Thing wheeled within the debounce window', async () => {
+    const spaceThing: Extract<ThingDocument, { kind: 'space' }> = {
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    };
+    const value = home(spaceThing);
+    const session = await mount({
+      ...value,
+      things: value.things.map((thing) =>
+        thing.id === HOME_THING_ID ? { ...thing, document: spaceThing } : thing,
+      ),
+      document: {
+        ...value.document,
+        diagrams: value.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          positions: {
+            ...diagram.positions,
+            [HOME_THING_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+          },
+        })),
+      },
+    });
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    await waitFor(() => expect(embeddedNodeOf(HOME_THING_ID, DRAWN_A)).toBeTruthy());
+    const first = containingNode(SPACE_THING_ID);
+    const second = containingNode(HOME_THING_ID);
+    beginPortalEdit(first);
+    beginPortalEdit(second);
+    await waitFor(() => {
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy();
+      expect(
+        within(embeddedNodeOf(HOME_THING_ID, DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy();
+    });
+    fireEvent.wheel(first, { deltaY: -120, bubbles: true });
+    fireEvent.wheel(second, { deltaY: -120, bubbles: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+    const authoredZoom = (thingId: ThingId): number | undefined => {
+      const thing = session.getState().working.things.find((candidate) => candidate.id === thingId);
+      if (thing?.document.kind !== 'space') throw new Error('Space Thing missing');
+      return thing.document.framing?.zoom;
+    };
+    expect(authoredZoom(SPACE_THING_ID)).toBe(1.1);
+    expect(authoredZoom(HOME_THING_ID)).toBe(1.1);
+  });
+
+  /**
+   * Unmounting while a wheel is still pending used to clear the timer and leave
+   * the framing only in portalDraft. Cleanup must flush what has not landed.
+   */
+  it('persists a pending portal zoom when the canvas unmounts before the debounce', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      diagram: SELECTED_DIAGRAM_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    );
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    const initial = await spaces.open(HOME_ID);
+    const { unmount } = render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
+    await waitFor(() =>
+      expect(
+        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
+      ).toBeTruthy(),
+    );
+    fireEvent.wheel(containingNode(SPACE_THING_ID), { deltaY: -120, bubbles: true });
+    unmount();
+    const thing = initial.session
+      .getState()
+      .working.things.find((candidate) => candidate.id === SPACE_THING_ID);
+    if (thing?.document.kind !== 'space') throw new Error('Space Thing missing');
+    expect(thing.document.framing?.zoom).toBe(1.1);
+  });
+
   it('keeps an embedded draft safe from containing controls and sibling editors', async () => {
     const value = home({
       title: 'Elsewhere',
@@ -364,14 +626,19 @@ describe('the Diagram an Open Space Thing draws', () => {
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     expect(unavailable(anyPresentControl())).toBe(false);
+    beginPortalEdit(containingNode(SPACE_THING_ID));
     fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }));
     await waitFor(() =>
       expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy(),
     );
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_THING_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Thing missing');
-    expect(within(parent).queryByRole('button', { name: /Close Thing/ })).toBeNull();
-    expect(within(parent).getByTestId('space-thing-diagram').hasAttribute('disabled')).toBe(true);
+    expect(within(controlsOf(parent)).queryByRole('button', { name: /Close Thing/ })).toBeNull();
+    expect(
+      within(controlsOf(parent))
+        .getByTestId('space-thing-diagram')
+        .getAttribute('aria-disabled') === 'true',
+    ).toBe(true);
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_THING_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Thing missing');
     expect(within(sibling).queryByRole('button', { name: /Edit Thing/ })).toBeNull();
@@ -379,7 +646,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     expect(unavailable(anyPresentControl())).toBe(true);
     fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Cancel/ }));
     await waitFor(() =>
-      expect(within(parent).getByRole('button', { name: /Close Thing/ })).toBeTruthy(),
+      expect(within(controlsOf(parent)).getByRole('button', { name: /Close Thing/ })).toBeTruthy(),
     );
   });
 
@@ -409,6 +676,8 @@ describe('the Diagram an Open Space Thing draws', () => {
       },
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
+    beginPortalEdit(containingNode(HOME_THING_ID));
     fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }));
     await waitFor(() =>
       expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy(),
@@ -471,9 +740,11 @@ describe('the Diagram an Open Space Thing draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     const editing = containingNode(SPACE_THING_ID);
     const other = containingNode(HOME_THING_ID);
+    beginPortalEdit(editing);
+    beginPortalEdit(other);
     const otherEmbedded = embeddedNodeOf(HOME_THING_ID, DRAWN_A);
-    expect(within(editing).getByRole('button', { name: /Close Thing/ })).toBeTruthy();
-    expect(within(other).getByRole('button', { name: /Close Thing/ })).toBeTruthy();
+    expect(within(controlsOf(editing)).getByRole('button', { name: /Close Thing/ })).toBeTruthy();
+    expect(within(controlsOf(other)).getByRole('button', { name: /Close Thing/ })).toBeTruthy();
     expect(within(otherEmbedded).getByRole('button', { name: 'Edit Title Intake' })).toBeTruthy();
 
     fireEvent.click(
@@ -491,19 +762,26 @@ describe('the Diagram an Open Space Thing draws', () => {
     ).toBeTruthy();
     // Every containing Thing control goes, on the Space Thing holding the edit
     // and on its sibling alike, and so does the other embedding's own.
-    expect(within(editing).queryByRole('button', { name: /Close Thing/ })).toBeNull();
-    expect(within(editing).getByTestId('space-thing-diagram').hasAttribute('disabled')).toBe(true);
-    expect(within(other).queryByRole('button', { name: /Close Thing/ })).toBeNull();
-    expect(within(other).getByTestId('space-thing-diagram').hasAttribute('disabled')).toBe(true);
+    expect(within(controlsOf(editing)).queryByRole('button', { name: /Close Thing/ })).toBeNull();
+    expect(
+      within(controlsOf(editing))
+        .getByTestId('space-thing-diagram')
+        .getAttribute('aria-disabled') === 'true',
+    ).toBe(true);
+    expect(within(controlsOf(other)).queryByRole('button', { name: /Close Thing/ })).toBeNull();
+    expect(
+      within(controlsOf(other)).getByTestId('space-thing-diagram').getAttribute('aria-disabled') ===
+        'true',
+    ).toBe(true);
     expect(within(otherEmbedded).queryByRole('button', { name: 'Edit Title Intake' })).toBeNull();
 
     fireEvent.keyDown(within(embeddedNode(DRAWN_A)).getByRole('textbox', { name: 'Thing title' }), {
       key: 'Escape',
     });
     await waitFor(() =>
-      expect(within(editing).getByRole('button', { name: /Close Thing/ })).toBeTruthy(),
+      expect(within(controlsOf(editing)).getByRole('button', { name: /Close Thing/ })).toBeTruthy(),
     );
-    expect(within(other).getByRole('button', { name: /Close Thing/ })).toBeTruthy();
+    expect(within(controlsOf(other)).getByRole('button', { name: /Close Thing/ })).toBeTruthy();
     expect(within(otherEmbedded).getByRole('button', { name: 'Edit Title Intake' })).toBeTruthy();
   });
 
@@ -682,6 +960,8 @@ describe('the Diagram an Open Space Thing draws', () => {
       if (!(element instanceof HTMLElement)) throw new Error('Nested Thing missing');
       return element;
     };
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
     await waitFor(() =>
       expect(within(nested()).getByRole('button', { name: /Edit Thing/ })).toBeTruthy(),
     );
@@ -689,17 +969,21 @@ describe('the Diagram an Open Space Thing draws', () => {
     await waitFor(() =>
       expect(within(nested()).getByRole('button', { name: /Save/ })).toBeTruthy(),
     );
-    expect(within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Close Thing/ })).toBeNull();
     expect(
-      within(embeddedNode(DRAWN_B)).getByTestId('space-thing-diagram').hasAttribute('disabled'),
+      within(controlsOf(embeddedNode(DRAWN_B))).queryByRole('button', { name: /Close Thing/ }),
+    ).toBeNull();
+    expect(
+      within(controlsOf(embeddedNode(DRAWN_B)))
+        .getByTestId('space-thing-diagram')
+        .getAttribute('aria-disabled') === 'true',
     ).toBe(true);
     const outer = document.querySelector(`.react-flow__node[data-id="${SPACE_THING_ID}"]`);
     if (!(outer instanceof HTMLElement)) throw new Error('Outer Thing missing');
-    expect(within(outer).queryByRole('button', { name: /Close Thing/ })).toBeNull();
+    expect(within(controlsOf(outer)).queryByRole('button', { name: /Close Thing/ })).toBeNull();
     fireEvent.click(within(nested()).getByRole('button', { name: /Cancel/ }));
     await waitFor(() =>
       expect(
-        within(embeddedNode(DRAWN_B)).getByRole('button', { name: /Close Thing/ }),
+        within(controlsOf(embeddedNode(DRAWN_B))).getByRole('button', { name: /Close Thing/ }),
       ).toBeTruthy(),
     );
   });
@@ -922,11 +1206,8 @@ describe('the Diagram an Open Space Thing draws', () => {
     });
     const initial = await spaces.open(HOME_ID);
     render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-    await waitFor(() =>
-      expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }),
-      ).toBeTruthy(),
-    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
     fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Thing/ }));
     await waitFor(() =>
       expect(
@@ -986,22 +1267,27 @@ describe('the Diagram an Open Space Thing draws', () => {
     );
 
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_THING_ID));
     // React Flow renders a child as a sibling of its parent and offsets it by
     // the parent origin, so the parenting is read off the store rather than off
     // the DOM tree. What the DOM does carry is the refusal: no rail, and so no
     // control that could author another Space from this canvas (ADR 0040).
     const drawn = embeddedNode(DRAWN_A);
     expect(within(drawn).getByRole('button', { name: /Open Thing/ })).toBeTruthy();
-    // The four sides are anchors here and nothing more. They render because an
-    // embedded Diagram draws Edges and an Edge attaches to an anchor (ADR 0087),
-    // and the Thing publishes that they are not affordances — which is what
-    // keeps the reveal in `styles.css` off them and what leaves no labelled
-    // control for a pointer to take hold of.
+    // Edit publishes the same hover handles the host canvas does. Read withholds
+    // the affordance (`connectionAuthoringEnabled: false`) so a pointer cannot
+    // start an Edge; the four sides still render as anchors (ADR 0087).
     expect(drawn.querySelector('.rf-thing-node__inner')).toHaveAttribute(
       'data-connection-authoring',
-      'false',
+      'true',
     );
-    expect(within(drawn).queryByRole('button', { name: /^Connect (from|to) / })).toBeNull();
+    const handles = [...drawn.querySelectorAll('.rf-thing-node__authoring-handle')];
+    expect(handles).toHaveLength(8);
+    expect(
+      handles.every((handle) =>
+        /^Connect (from|to) /.test(handle.getAttribute('aria-label') ?? ''),
+      ),
+    ).toBe(true);
   });
 
   /**

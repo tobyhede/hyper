@@ -134,6 +134,7 @@
    the Thing's is that a resting Thing on the canvas is quiet and shows its
    commands with itself. */
 .canvas-thing__actions {
+  min-width: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
@@ -293,9 +294,8 @@
   outline-offset: 2px;
 }
 
-/* The stand-in while the referenced Space has not been read. Sized and coloured
-   as the selectors that replace it so the Thing does not change shape when they
-   arrive. */
+/* Plain feedback while the referenced Space is unread. Its selection commands
+   join the rail once the read completes; feedback contributes to footer height. */
 .canvas-thing__space-note {
   margin: 8px 0 0;
   color: var(--canvas-thing-muted);
@@ -303,28 +303,10 @@
   line-height: 1.2;
 }
 
-/* The two choices an Open Space Thing publishes, on the shared command surface.
-
-   **Nothing here paints them.** The panel, its border, its corners, its padding
-   and the column it stacks in are `.command-surface`'s, and each row is the
-   shared quiet button the Command Dock's own controls are — which is the whole
-   of what "a Space Thing uses the Dock's Diagram and Graph controls" means
-   (`.scratch/command-dock/issues/12`). The two rules below are arrangement, and
-   arrangement is what a mounting surface keeps: where the panel sits on the
-   Thing, and that its rows fill it.
-
-   The surface is a neutral panel on cream paper, exactly as the Thing's own
-   command strip is — so the Select trigger's four Thing-inked overrides that used
-   to live here are gone with the control they corrected. */
-.canvas-thing__space-choices {
-  margin-top: 8px;
-}
-
-/* A column of named rows: each fills the panel's width and reads from its glyph
-   rather than floating in the middle of a width the longest title happened to
-   set — the same rule, and the same reason, as the vertical Command Dock's. The
-   name takes the slack so every chevron lands in one column. */
+/* Named rail triggers shrink with their groups, keeping long target titles
+   from pushing the shared commands beyond the Thing's border. */
 .canvas-thing__space-choice {
+  max-width: 180px;
   width: 100%;
   justify-content: flex-start;
   gap: 6px;
@@ -334,20 +316,10 @@
   flex: 1 1 auto;
 }
 
-/* An Open Space Thing draws the Diagram it selects (ADR 0068), and that view
-   is React Flow sub-flow nodes painted *over* this Thing rather than DOM inside
-   it — so nothing here can lay out around them, and the room they get has to be
-   a number both sides agree on. The Thing's own passengers take a footer of
-   exactly `SPACE_THING_FOOTER_HEIGHT`, leaving the region above it for the view.
-   `packages/ui/test/canvas-thing-embedded-diagram.test.ts` holds this rule and that
-   constant to the same number.
-
-   `flex: none` with `margin-top: auto` rather than the `flex: 1` the body
-   normally takes: bottom-aligning the content of a body that fills the Thing
-   leaves the free region above it a different size on every Thing, which is the
-   one thing a projection reading a constant cannot survive. */
-.canvas-thing[data-kind='space'][data-expanded='true'] .canvas-thing__body {
-  height: 176px;
+/* The title footer takes only its content. CanvasThing reports its measured
+   height so embedded nodes and Edges clip at the same boundary. */
+.canvas-thing[data-content-kind='space'][data-expanded='true'] .canvas-thing__body {
+  height: auto;
   flex: none;
   margin-top: auto;
 }
@@ -474,4 +446,31 @@
   .canvas-thing {
     --thing-placement-duration: 1ms;
   }
+}
+
+/* A Thing's command surface floats eight pixels inside its paper border. */
+.canvas-thing__rail {
+  position: absolute;
+  inset: 8px 8px auto;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  z-index: 2;
+  pointer-events: none;
+  gap: 8px;
+}
+.canvas-thing__rail .canvas-thing__actions {
+  margin-left: auto;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.canvas-thing__rail[data-revealed='true'] .canvas-thing__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.canvas-thing__content {
+  padding-top: 54px;
+}
+.canvas-thing[data-expanded='false'] > .canvas-thing__body {
+  padding-top: 46px;
 }

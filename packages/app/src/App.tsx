@@ -9,6 +9,8 @@ import {
   DeleteIcon,
   FALLBACK_GRAPH_COLOR,
   RemoveFromDiagramIcon,
+  EnterSpaceIcon,
+  EditIcon,
   ThingKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -37,6 +39,12 @@ import {
   describeSpaceThingCreationBreak,
   describeSpaceThingRefusal,
 } from './authoring-refusal';
+import {
+  coordinatedDeleteOk,
+  coordinatedDiagramDelete,
+  coordinatedGraphDelete,
+} from './coordinated-context-delete';
+import { coordinatedContextCreate, createdDiagramContext } from './coordinated-context-create';
 import { useSpaceThingTargets } from './space-thing-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { THING_HEIGHT, THING_WIDTH, thingSizeVars } from './thing';
@@ -219,6 +227,8 @@ export const createApp = (
     const [createDiagramRefusal, setCreateDiagramRefusal] = useState<AuthoringRefusal | null>(null);
     const [diagramManagementRefusal, setDiagramManagementRefusal] =
       useState<AuthoringRefusal | null>(null);
+    const [diagramDeleteMessage, setDiagramDeleteMessage] = useState<string | null>(null);
+    const [graphDeleteMessage, setGraphDeleteMessage] = useState<string | null>(null);
     /**
      * A Space command that broke rather than refusing, in words.
      *
@@ -760,7 +770,9 @@ export const createApp = (
       setRefusedUnder(selectedDiagramId);
       setCreateDiagramRefusal(null);
       setDiagramManagementRefusal(null);
+      setDiagramDeleteMessage(null);
       setGraphRefusal(null);
+      setGraphDeleteMessage(null);
       thingDeletion.dismissRefusal();
     }
     /**
@@ -893,13 +905,23 @@ export const createApp = (
           // on the canvas.
           onRename: null,
           onDeleteDiagram: availability.entityEdits
-            ? (diagramId) => {
-                const result = authoring.complete({ kind: 'deleted-diagram', diagramId });
-                setDiagramManagementRefusal(result.kind === 'refused' ? result.refusal : null);
-                // Answered rather than swallowed: the refusal set above renders in
-                // the shell's standing notice, and the answer is what tells a caller
-                // whether the Delete had a canvas result at all.
-                return result.kind === 'completed';
+            ? async (diagramId) => {
+                const result = await coordinatedDiagramDelete(spaceThings.deleteDiagram, {
+                  targetSpaceId: renderedSpace.id,
+                  diagramId,
+                  preferredDiagramId: null,
+                });
+                setDiagramManagementRefusal(null);
+                setDiagramDeleteMessage(null);
+                if (result.kind === 'error') {
+                  setDiagramDeleteMessage(result.message);
+                  return false;
+                }
+                if (result.kind === 'completed') {
+                  navigation.selectDiagram(result.diagramId);
+                  navigation.activateGraph(result.graphId);
+                }
+                return coordinatedDeleteOk(result);
               }
             : null,
         }),
@@ -1012,7 +1034,7 @@ export const createApp = (
         setSpaceCommandBreak(null);
         void (async () => {
           try {
-            await spaces.enter(thing.spaceId, thing.diagram, thing.graph);
+            await spaces.enter(thing.spaceId, thing.diagram, thing.graph, thing.framing);
           } catch (failure) {
             reportBreak(failure);
             setSpaceCommandBreak(`${title} could not be entered.`);
@@ -1029,28 +1051,7 @@ export const createApp = (
         // longer has. No commands rather than commands that name nothing.
         if (thing === undefined) return [];
         const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
-        /**
-         * **Present and unavailable wherever the single hop ends, rather than absent.**
-         *
-         * ADR 0009 requires a Target to own its Markdown content, so
-         * `aliasTargetRefusal` refuses *every* non-`markdown` kind — an Alias
-         * and a Space Thing alike (`space-authoring.ts`). Reading the rule as
-         * "not an Alias" left the row live on a Space Thing, where the press
-         * could only ever refuse.
-         *
-         * It is drawn and greyed rather than withheld because the Things it
-         * applies to are otherwise regular Things: a menu one row shorter, for a
-         * reason the reader cannot see, teaches nothing, and this row is where
-         * the product says where aliasing stops. Each kind says why in its own
-         * words, because "aliasing terminates here" and "this was never a thing
-         * with content to alias" are two different facts.
-         */
-        const terminal =
-          thing.kind === 'alias'
-            ? 'An Alias cannot be aliased.'
-            : thing.kind === 'markdown'
-              ? null
-              : 'Only a Markdown Thing can be aliased.';
+        const terminal = thing.kind === 'alias' ? 'An Alias cannot be aliased.' : null;
         const alias: readonly EntityActionGroup[] = availability.addThing
           ? [
               [
@@ -1143,6 +1144,44 @@ export const createApp = (
               ]
             : []),
         ];
+        if (thing.kind === 'space') {
+          const rename: EntityActionGroup = [
+            {
+              id: 'rename',
+              label: 'Rename',
+              icon: <EditIcon />,
+              onSelect: () => {
+                continuation.request({
+                  target: { kind: 'thing', thingId: thing.id },
+                  select: true,
+                  then: 'rename',
+                });
+                return 'done';
+              },
+            },
+          ];
+          const links = addresses.flat();
+          const enter: EntityActionGroup =
+            spaces === null
+              ? []
+              : [
+                  {
+                    id: 'enter',
+                    label: 'Enter',
+                    icon: <EnterSpaceIcon />,
+                    onSelect: () => {
+                      enterSpaceThing(thing.id);
+                      return 'done';
+                    },
+                  },
+                ];
+          return [
+            [...rename, ...alias.flat()],
+            [...enter, ...links.filter((action) => action.id === 'open-independently')],
+            links.filter((action) => action.id !== 'open-independently'),
+            leaving.filter((action) => action.id === 'remove-from-diagram'),
+          ];
+        }
         return [...addresses, ...alias, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
@@ -1154,6 +1193,8 @@ export const createApp = (
         availability.deleteThing,
         editingThingBody,
         createAliasFrom,
+        spaces,
+        enterSpaceThing,
       ],
     );
 
@@ -1568,15 +1609,27 @@ export const createApp = (
                * (`.scratch/command-dock/issues/13`).
                */
               onCreate: () => {
-                const result = authoring.complete({ kind: 'created-diagram' });
-                setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
-                setDiagramManagementRefusal(null);
-                createDiagramMovedCaret.current = false;
-                if (result.kind !== 'completed') return;
-                continuation.request({
-                  target: { kind: 'control', name: 'diagram-name' },
-                  select: false,
-                  then: 'rename',
+                void coordinatedContextCreate({
+                  create: () => {
+                    const result = authoring.complete({ kind: 'created-diagram' });
+                    setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
+                    setDiagramManagementRefusal(null);
+                    createDiagramMovedCaret.current = false;
+                    return result;
+                  },
+                  createdOf: () =>
+                    createdDiagramContext(
+                      currentSpace().diagrams,
+                      navigation.getState().selectedDiagramId,
+                    ),
+                  afterCreated: () => {
+                    continuation.request({
+                      target: { kind: 'control', name: 'diagram-name' },
+                      select: false,
+                      then: 'rename',
+                    });
+                    return null;
+                  },
                 });
               },
               didCreateMoveCaret: () => createDiagramMovedCaret.current,
@@ -1618,7 +1671,21 @@ export const createApp = (
                 reportGraphEdit(authoring.complete({ kind: 'added-graph' }));
               },
               onDelete: (graphId) => {
-                reportGraphEdit(authoring.complete({ kind: 'deleted-graph', graphId }));
+                void (async () => {
+                  const result = await coordinatedGraphDelete(spaceThings.deleteGraph, {
+                    targetSpaceId: renderedSpace.id,
+                    diagramId: selectedDiagram.diagram.id,
+                    graphId,
+                    preferredGraphId: null,
+                  });
+                  if (result.kind === 'error') {
+                    setGraphDeleteMessage(result.message);
+                    return;
+                  }
+                  if (result.kind === 'completed') {
+                    navigation.activateGraph(result.graphId);
+                  }
+                })();
               },
               editsDisabled: !availability.entityEdits,
               onCopyLink: runEntityCommand(
@@ -1736,6 +1803,14 @@ export const createApp = (
                 {describeAuthoringRefusal(diagramRefusal)}
               </ShellNotice>
             )}
+            {diagramDeleteMessage === null ? null : (
+              <ShellNotice
+                title="Diagram not deleted"
+                onDismiss={() => setDiagramDeleteMessage(null)}
+              >
+                {diagramDeleteMessage}
+              </ShellNotice>
+            )}
             {spaceThingRefusal === null ? null : (
               <ShellNotice
                 /* It names what died. A Space Thing's placement is optimistic
@@ -1770,6 +1845,11 @@ export const createApp = (
             {graphRefusal === null ? null : (
               <ShellNotice title="Graph unchanged" onDismiss={() => setGraphRefusal(null)}>
                 {describeAuthoringRefusal(graphRefusal)}
+              </ShellNotice>
+            )}
+            {graphDeleteMessage === null ? null : (
+              <ShellNotice title="Graph not deleted" onDismiss={() => setGraphDeleteMessage(null)}>
+                {graphDeleteMessage}
               </ShellNotice>
             )}
             {/* **The one report here with no dismissal, and it is not an
@@ -1862,6 +1942,7 @@ export const createApp = (
                 onSelectEdge={selectEdge}
               />
               <SpaceCanvas
+                continuation={continuation}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but
@@ -1904,7 +1985,6 @@ export const createApp = (
                 activeGraphThingIds={activeGraphThingIds}
                 spaceThingTargets={spaceThingTargets}
                 thingEntityActions={thingRailActions}
-                onEnterSpace={spaces === null ? undefined : enterSpaceThing}
               />
             </ReactFlowProvider>
           ) : (

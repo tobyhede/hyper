@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { Placement } from '@project/graph';
 import { MemorySpaceBackend, type ObserverErrorReporter } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createEmbeddedAuthoring } from '../src/embedded-authoring';
@@ -9,16 +10,17 @@ import { openTestSpace } from './opened-space';
 /**
  * What an embedded canvas does with a completion it does not support.
  *
- * The six kinds it forwards are the whole of what its surfaces produce, so a
- * seventh arriving is a wiring defect rather than a domain rule the author has
- * run into. `AuthoringResult` says a broken invariant "throws, or is reported
- * through the non-throwing reporter", and the refusal that used to stand here
- * broke that twice over — it dressed a defect as the author's mistake, and it
- * did so with a sentence about Edge endpoints.
+ * The kinds it forwards are the whole of what its surfaces produce, so any
+ * other kind arriving is a wiring defect rather than a domain rule the author
+ * has run into. `AuthoringResult` says a broken invariant "throws, or is
+ * reported through the non-throwing reporter", and the refusal that used to
+ * stand here broke that twice over — it dressed a defect as the author's
+ * mistake, and it did so with a sentence about Edge endpoints.
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
@@ -32,13 +34,19 @@ const snapshot: SpaceSnapshot = {
         id: DIAGRAM_ID,
         title: 'Diagram 1',
         kind: 'positioned',
-        positions: { [THING_A]: { x: 10, y: 20, open: false } },
+        positions: {
+          [THING_A]: { x: 10, y: 20, open: false },
+          [THING_B]: { x: 300, y: 40, open: false },
+        },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },
     ],
     defaultDiagram: DIAGRAM_ID,
   },
-  things: [{ id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  things: [
+    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  ],
 };
 
 const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
@@ -126,7 +134,29 @@ describe('a completion an embedded Diagram does not support', () => {
     expect(String(reported[0])).not.toContain('completion reached');
   });
 
-  /** The six supported kinds still reach the target's own Space Authoring. */
+  it('forwards a connection into the Graph the embedding is showing', () => {
+    const { composition, reported } = embedded();
+    const rendered = Placement.fromEntries([
+      [THING_A, { x: 10, y: 20, open: false }],
+      [THING_B, { x: 300, y: 40, open: false }],
+    ]);
+
+    expect(
+      composition.authoring.complete({
+        kind: 'connected-things',
+        from: THING_A,
+        to: THING_B,
+        rendered,
+        graphId: GRAPH_ID,
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(reported).toEqual([]);
+    expect(
+      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs[0]?.edges,
+    ).toEqual([{ from: THING_A, to: THING_B }]);
+  });
+
+  /** Supported kinds still reach the target's own Space Authoring. */
   it('still forwards a supported kind into the Diagram', () => {
     const { composition, reported } = embedded();
 
@@ -136,5 +166,65 @@ describe('a completion an embedded Diagram does not support', () => {
       kind: 'completed',
     });
     expect(reported).toEqual([]);
+  });
+
+  it('does not forward Graph deletion, which coordinated lifecycle owns', () => {
+    const { composition, reported } = embedded();
+
+    expect(composition.authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
+      kind: 'unchanged',
+    });
+    expect(String(reported[0])).toContain('deleted-graph');
+    expect(
+      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs,
+    ).toHaveLength(1);
+  });
+});
+
+describe('context commands on the Diagram an embedding is showing', () => {
+  it('forwards renaming the Diagram', () => {
+    const { composition, reported } = embedded();
+
+    expect(
+      composition.authoring.complete({
+        kind: 'renamed-diagram',
+        diagramId: DIAGRAM_ID,
+        title: 'Renamed',
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(reported).toEqual([]);
+    expect(composition.authoring.getState().session.working.document.diagrams?.[0]?.title).toBe(
+      'Renamed',
+    );
+  });
+
+  it('forwards renaming, recoloring and adding a Graph', () => {
+    const { composition, reported } = embedded();
+
+    expect(
+      composition.authoring.complete({
+        kind: 'renamed-graph',
+        graphId: GRAPH_ID,
+        title: 'Renamed Graph',
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(
+      composition.authoring.complete({
+        kind: 'recolored-graph',
+        graphId: GRAPH_ID,
+        color: '#aec7e8',
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(composition.authoring.complete({ kind: 'added-graph' })).toMatchObject({
+      kind: 'completed',
+    });
+    expect(reported).toEqual([]);
+    const graph =
+      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs[0];
+    expect(graph?.title).toBe('Renamed Graph');
+    expect(graph?.color).toBe('#aec7e8');
+    expect(
+      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs,
+    ).toHaveLength(2);
   });
 });
