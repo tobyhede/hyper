@@ -1,10 +1,7 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
-import type {
-  CanvasThingBodyEditor,
-  CanvasSpaceThingSelection,
-  EntityActionGroup,
-} from '@project/ui';
+import type { ReactNode } from 'react';
+import type { CanvasThingBodyEditor, EntityActionGroup } from '@project/ui';
 import type { Thing, ThingId, GraphId } from '@project/core';
 import { resolveContentThing } from '@project/graph';
 import type {
@@ -45,11 +42,13 @@ export type ThingTitleEditor = {
 /** Data carried by each custom thing node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ThingNodeData = {
+  /** Reports rendered title geometry by placement, including embedded placements. */
+  onBodyHeightChange?: (id: string, height: number | null) => void;
   thingId: ThingId;
   title: string;
   /** Whether the Thing's reusable component must withhold authoring affordances. */
   readOnly: boolean;
-  /** An embedded Space boundary offers no connection-authoring controls. */
+  /** False withholds hover-reveal; omitted or true offers the host-canvas handles. */
   connectionAuthoringEnabled?: boolean;
   /**
    * What kind of Thing this is, drawn as a persistent glyph on the Front.
@@ -161,20 +160,31 @@ export type ThingNodeData = {
    */
   entityActions?: readonly EntityActionGroup[];
   /**
-   * For a space thing, what the Space it references offers its selections to be
-   * chosen from.
+   * Diagram and Graph clusters for an Open Space Thing, assembled by the
+   * application and inserted at the head of the Thing rail.
    *
-   * Not derived here, and it could not be: it describes a *second* Space, which
-   * this projection has no reader for and no business loading. The composition
-   * that read the target supplies it, exactly as it supplies every other
-   * operation on this node (ADR 0068, ADR 0074).
+   * Not derived here: it describes a second Space's choices, which this
+   * projection has no reader for. Absent while the Thing is closed, the surface
+   * is read-only, or the target has not been read yet (ADR 0068, ADR 0074).
    */
-  spaceSelection?: CanvasSpaceThingSelection;
+  spaceRail?: ReactNode;
   /**
-   * Enter the Space this Thing references. A Space Thing kind command
-   * (ADR 0073); absent on every other kind and on a canvas that cannot enter.
+   * The Read/Edit boundary for an Open Space Thing's embedded target canvas.
+   *
+   * Presence is the capability. The containing canvas owns which Things are in
+   * Edit because the embedding is sibling nodes, not markup inside the Thing.
    */
-  onEnter?: () => void;
+  portal?: {
+    readonly editing: boolean;
+    readonly onEditingChange: (editing: boolean) => void;
+  };
+  /**
+   * A refusal or busy notice from this Thing's context commands. Absent or null
+   * leaves the alert region unmounted.
+   */
+  contextNotice?: string | null;
+  /** The resolved content kind, including a Space Thing reached through an Alias. */
+  spaceContent?: Extract<Thing, { kind: 'space' }>;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -306,8 +316,9 @@ export function projectThingNodes(
     // is about.
     const open = options.openThingIds?.has(thing.id) === true;
     // An alias shows its target's content under its own title (ADR 0009).
+    const content = resolveContentThing(space, thing.id);
     const body =
-      showContent || open ? (resolveContentThing(space, thing.id)?.body ?? '') : undefined;
+      showContent || open ? (content?.kind === 'markdown' ? content.body : '') : undefined;
     const node: ThingFlowNode = {
       id: thing.id,
       type: 'thing',
@@ -346,6 +357,7 @@ export function projectThingNodes(
       node.height = placedThing.height;
       node.handles = declaredHandles(placedThing);
     }
+    if (content?.kind === 'space') node.data.spaceContent = content;
     if (body !== undefined) node.data.body = body;
     if (open) {
       node.data.expanded = true;

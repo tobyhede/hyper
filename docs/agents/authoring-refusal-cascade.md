@@ -73,7 +73,7 @@ that has not been decided.
 | Action | Its own checks, in order |
 | --- | --- |
 | `create-and-connect` | `edge-thing-outside-diagram` → `diagram-active-graph-required` → completed |
-| `connected-things` | `edge-thing-outside-diagram` → `diagram-active-graph-required` → `edge-already-exists` → completed |
+| `connected-things` | `graph-not-owned` → `edge-thing-outside-diagram` → `diagram-active-graph-required` → `edge-already-exists` → completed |
 | `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Thing ⇒ `unchanged`) → `edge-thing-outside-diagram` → `edge-already-exists` → completed |
 | `deleted-edge` | `graph-not-owned` → `edge-not-found` → completed |
 

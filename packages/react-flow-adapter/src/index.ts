@@ -3,6 +3,7 @@ import { ThingNode } from './ThingNode';
 import { RoutedEdge } from './RoutedEdge';
 
 export * from './projection';
+export { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 export { ThingNode } from './ThingNode';
 export {
   CONNECTION_TARGET_PROXIMITY,

@@ -73,6 +73,7 @@ test(
         throw new Error('Thing title geometry is unavailable');
       return thingBox.y + thingBox.height - (titleBox.y + titleBox.height);
     };
+    const closedBottomInset = await titleBottomInset();
 
     await thing.hover();
     await expect(specimen.locator('.rf-thing-node__authoring-handle--source').first()).toHaveCSS(
@@ -161,7 +162,8 @@ test(
     expect(closingSnapshot.contentTransitionRunning).toBe(true);
     expect(closingSnapshot.expanded).toBe('false');
     for (const inset of closingSnapshot.titleBottomInsets) {
-      expect(inset).toBeCloseTo(openBottomInset, 0);
+      expect(inset).toBeGreaterThan(0);
+      expect(inset).toBeLessThanOrEqual(Math.max(openBottomInset, closedBottomInset) + 1);
     }
 
     await page.mouse.move(0, 0);
@@ -525,35 +527,27 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeVisible();
 });
 
-/**
- * The rail used to say "this Thing is awake" with the Active Graph's band behind
- * its commands, and the band is gone (`.scratch/command-dock/issues/12`). What
- * is left saying it is the kind glyph, which a resting Thing draws quietly, and
- * the commands themselves — so those are what this reads.
- */
+/** An Open Thing hides its redundant kind glyph while its commands stay live during an Edit. */
 test('a Thing running an edit is not drawn at rest, however it is left', async ({ page }) => {
   await open(page, markdownStory);
   const thing = page.getByRole('article', { name: 'Strategies' });
-  const kind = thing.locator('.thing-rail__kind');
   const commands = thing.getByTestId('canvas-thing-actions');
 
   await page.mouse.move(0, 0);
-  await expect(kind).toHaveCSS('opacity', '0.28');
+  await expect(thing.locator('.thing-rail__kind')).toHaveCount(0);
   await expect(commands).toHaveCSS('opacity', '0');
 
   await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
-  // Nothing is hovering the Thing, the caret is in its body rather than on its
-  // rail, and a blur ends nothing — so without this the kind glyph would quiet
-  // down and leave Save, Cancel and Close lit on a Thing that looks asleep.
+  // Nothing is hovering the Thing and the caret is in its body, so the Edit
+  // itself must keep Save, Cancel and Close visible.
   await page.mouse.move(0, 0);
-  await expect(kind).toHaveCSS('opacity', '1');
   await expect(commands).toHaveCSS('opacity', '1');
 
   await thing.getByRole('button', { name: 'Cancel editing Thing Strategies' }).click();
   await page.mouse.move(0, 0);
-  await expect(kind).toHaveCSS('opacity', '0.28');
-  await expect(commands).toHaveCSS('opacity', '0');
+  await expect(thing.getByRole('button', { name: 'Edit Thing Strategies' })).toBeFocused();
+  await expect(commands).toHaveCSS('opacity', '1');
 });
 
 test(

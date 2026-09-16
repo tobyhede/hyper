@@ -159,7 +159,10 @@ describe('spaceEntityActions', () => {
     { outcome: 'done', deleted: true, name: 'the Diagram was deleted' },
     { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
   ])('answers $outcome when $name', async ({ outcome, deleted }) => {
-    const groups = build({ onDeleteDiagram: () => deleted })({ kind: 'diagram', diagram: DIAGRAM });
+    const groups = build({ onDeleteDiagram: () => Promise.resolve(deleted) })({
+      kind: 'diagram',
+      diagram: DIAGRAM,
+    });
     const action = commands(groups).find((candidate) => candidate.id === DELETE_DIAGRAM_ACTION_ID);
 
     expect(await action?.onSelect()).toBe(outcome);
@@ -195,10 +198,10 @@ describe('spaceEntityActions', () => {
     };
 
     expect(labels(build()(entity))).toEqual([
-      'Copy Link to Thing in Diagram',
-      'Copy Link to Thing',
+      'Copy link to Thing in Diagram',
+      'Copy link to Thing',
     ]);
-    expect(copied(entity, 'Copy Link to Thing in Diagram')).toEqual({
+    expect(copied(entity, 'Copy link to Thing in Diagram')).toEqual({
       kind: 'diagram-thing',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
@@ -211,7 +214,7 @@ describe('spaceEntityActions', () => {
    * (ADR 0083). The description is one line of prose beneath a label, and a
    * Title's later lines reaching it would break the sentence in half.
    */
-  it('describes a Thing’s addresses by the Thing’s name', () => {
+  it('uses concise copy labels without description text', () => {
     const entity: SpaceEntity = {
       kind: 'thing',
       thing: thing(PLACED_THING_ID, 'Auth\nHow a session begins'),
@@ -222,7 +225,7 @@ describe('spaceEntityActions', () => {
       .map((action) => action.description ?? '')
       .join(' ');
 
-    expect(written).toContain('Opens Auth inside');
+    expect(written.trim()).toBe('');
     expect(written).not.toContain('How a session begins');
   });
 
@@ -238,8 +241,8 @@ describe('spaceEntityActions', () => {
       diagram: DIAGRAM,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy Link to Thing']);
-    expect(copied(entity, 'Copy Link to Thing')).toEqual({
+    expect(labels(build()(entity))).toEqual(['Copy link to Thing']);
+    expect(copied(entity, 'Copy link to Thing')).toEqual({
       kind: 'thing',
       spaceId: SPACE_ID,
       thingId: OUTSIDE_THING_ID,
@@ -247,7 +250,7 @@ describe('spaceEntityActions', () => {
   });
 
   /** Every address command confirms in place, which is what holds the menu open. */
-  it('confirms every copy and describes where it lands', () => {
+  it('confirms every copy without a subtitle', () => {
     const copies = commands(build()({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM })).filter(
       (action) => action.label.startsWith('Copy'),
     );
@@ -255,7 +258,7 @@ describe('spaceEntityActions', () => {
     expect(copies).toHaveLength(2);
     for (const action of copies) {
       expect(action.report?.done).toBe('Copied');
-      expect(action.description).toBeTypeOf('string');
+      expect(action.description).toBeUndefined();
       expect(action.icon).toBeDefined();
     }
   });
@@ -273,18 +276,18 @@ describe('spaceEntityActions', () => {
     };
 
     expect(labels(build()(entity))).toEqual([
-      'Copy Link to Thing in Diagram',
-      'Copy Link to Thing',
-      'Copy Space link',
-      'Open in new tab',
+      'Copy link to Thing in Diagram',
+      'Copy link to Thing',
+      'Copy link to Space',
+      'Open in New Tab',
     ]);
-    expect(copied(entity, 'Copy Link to Thing in Diagram')).toEqual({
+    expect(copied(entity, 'Copy link to Thing in Diagram')).toEqual({
       kind: 'diagram-thing',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
       thingId: PLACED_THING_ID,
     });
-    expect(copied(entity, 'Copy Space link')).toEqual({
+    expect(copied(entity, 'Copy link to Space')).toEqual({
       kind: 'space',
       spaceId: TARGET_SPACE_ID,
     });
@@ -303,7 +306,7 @@ describe('spaceEntityActions', () => {
         return true;
       },
     })(entity);
-    const action = commands(actions).find((candidate) => candidate.label === 'Open in new tab');
+    const action = commands(actions).find((candidate) => candidate.label === 'Open in New Tab');
 
     expect(action).toBeDefined();
     expect(await action?.onSelect()).toBe('done');
@@ -318,8 +321,8 @@ describe('spaceEntityActions', () => {
     };
 
     expect(labels(build()(entity))).toEqual([
-      'Copy Link to Thing in Diagram',
-      'Copy Link to Thing',
+      'Copy link to Thing in Diagram',
+      'Copy link to Thing',
     ]);
   });
 

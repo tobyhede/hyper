@@ -41,8 +41,8 @@ const copyMatchingFromMenu = async (
 };
 
 /** Canonical Thing address — not the contextual Diagram one. */
-const THING_COPY_LINK = /^Copy Link to Thing(?! in Diagram)/;
-const THING_COPY_LINK_IN_DIAGRAM = /^Copy Link to Thing in Diagram/;
+const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
+const THING_COPY_LINK_IN_DIAGRAM = /^Copy link to Thing in Diagram/;
 
 const installClipboard = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {

@@ -95,15 +95,7 @@ const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/**
- * The same Space with a Space Thing in it, for the other terminal row.
- *
- * The Target of an Alias must own its Markdown content (ADR 0009), which is one
- * rule with two terminal kinds — `aliasTargetRefusal` refuses `space` exactly as
- * it refuses `alias`. This fixture is what stops the row being drawn live on the
- * second of them again; `spaceId` names a Space this snapshot does not hold,
- * which is the ordinary shape of a Space Thing read on its own.
- */
+/** A Space Thing with a target that the test backend also stores. */
 const withSpaceThing: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
@@ -147,7 +139,35 @@ function mount(
 ): SpaceSession {
   const stored = { snapshot: mounted, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceThings } = openTestSpace(
-    new MemorySpaceBackend([stored]),
+    new MemorySpaceBackend([
+      stored,
+      ...(mounted.things.some((thing) => thing.document.kind === 'space')
+        ? [
+            {
+              snapshot: spaceSnapshotSchema.parse({
+                id: TARGET_SPACE_ID,
+                document: {
+                  version: 1,
+                  title: 'Target',
+                  defaultDiagram: TARGET_DIAGRAM_ID,
+                  diagrams: [
+                    {
+                      id: TARGET_DIAGRAM_ID,
+                      title: 'Target Diagram',
+                      kind: 'positioned',
+                      positions: {},
+                      graphs: [{ id: TARGET_GRAPH_ID, title: 'Target Graph', edges: [] }],
+                    },
+                  ],
+                },
+                things: [],
+              }),
+              revision: 0n,
+              exportedRevision: null,
+            },
+          ]
+        : []),
+    ]),
     stored,
   );
   let view: RenderResult | undefined;
@@ -213,17 +233,17 @@ describe('a Thing’s commands on the canvas rail', () => {
 
     expect(
       await screen.findByRole('menuitem', {
-        name: (accessibleName) => accessibleName.startsWith('Copy Link to Thing in Diagram'),
+        name: (accessibleName) => accessibleName.startsWith('Copy link to Thing in Diagram'),
       }),
     ).toBeVisible();
     expect(
       await screen.findByRole('menuitem', {
         name: (accessibleName) =>
-          accessibleName.startsWith('Copy Link to Thing') && !accessibleName.includes('Diagram'),
+          accessibleName.startsWith('Copy link to Thing') && !accessibleName.includes('Diagram'),
       }),
     ).toBeVisible();
-    expect(screen.queryByRole('menuitem', { name: /^Copy Space link/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /^Open in new tab/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /^Copy link to Space/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /^Open in New Tab/ })).not.toBeInTheDocument();
     expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
     expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
     await settled(session);
@@ -426,30 +446,27 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
-   * **The single hop has two terminal kinds, and the row knows both.**
-   *
-   * `aliasTargetRefusal` refuses every non-`markdown` Target with
-   * `alias-target-must-own-content` (ADR 0009), so a Space Thing is as terminal
-   * as an Alias. Read as "not an Alias", the row was drawn live on a Space Thing
-   * and the press could only ever refuse — a command offered where it can never
-   * succeed, whose failure said "Alias not created" and gave no reason.
-   *
-   * The two kinds say different things, because "aliasing stops here" and "this
-   * never had content to alias" are different facts, so the reason is asserted
-   * and not only the unavailability.
+   * Delete from Space is a leaving action on every Thing, including a Space
+   * Thing. Filtering the rail down to Remove from Diagram alone would withdraw
+   * a command that is still available (`availability.deleteThing`).
    */
-  /**
-   * Independently opening the Space a Space Thing shows is a link to that
-   * Space's own address (ADR 0068, ADR 0069). Copy link still names the Thing;
-   * these two commands are the target, and they carry no containing Diagram.
-   */
+  it('offers Delete from Space on a Space Thing when deletion is available', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    await settled(session);
+  });
+
   it('offers a Space Thing the target Space’s address and opens it independently', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(window);
     const session = mount(undefined, undefined, withSpaceThing);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
-    expect(await screen.findByRole('menuitem', { name: /^Copy Space link/ })).toBeVisible();
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Open in new tab/ }));
+    expect(await screen.findByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Open in New Tab/ }));
 
     await waitFor(() =>
       expect(open).toHaveBeenCalledWith(
@@ -462,15 +479,17 @@ describe('a Thing’s commands on the canvas rail', () => {
     open.mockRestore();
   });
 
-  it('offers Create Alias unavailable on a Space Thing, which owns no content', async () => {
+  it('creates an Alias from a Space Thing', async () => {
     const session = mount(undefined, undefined, withSpaceThing);
-
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
-
-    const row = await screen.findByRole('menuitem', { name: /^Create Alias/ });
-    expect(row).toHaveAttribute('aria-disabled', 'true');
-    expect(row).toHaveTextContent('Only a Markdown Thing can be aliased.');
-    expect(thingIds(session)).toHaveLength(3);
+    const row = await screen.findByRole('menuitem', { name: 'Create Alias' });
+    expect(row).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(row);
+    expect(thingIds(session)).toHaveLength(4);
+    expect(session.getState().working.things.at(-1)?.document).toMatchObject({
+      kind: 'alias',
+      title: 'A space',
+    });
     await settled(session);
   });
 

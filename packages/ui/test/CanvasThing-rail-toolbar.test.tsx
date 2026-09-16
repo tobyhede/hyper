@@ -217,7 +217,7 @@ describe('the rail says whose command each one is', () => {
       <CanvasThing
         front={{
           kind: 'alias',
-          source: '',
+          target: { kind: 'markdown', source: '' },
           open: false,
           onOpenChange: () => 'completed',
         }}

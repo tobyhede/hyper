@@ -1,42 +1,44 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import type { Edge, NodeChange } from '@xyflow/react';
-import { SPACE_THING_EMBED_INSET, type ThingId, type GraphId, type DiagramId } from '@project/core';
+import type { NodeChange } from '@xyflow/react';
+import { type ThingId, type GraphId, type DiagramId } from '@project/core';
 import { Placement, positionedStrategy } from '@project/graph';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../authoring-availability';
 import { canvasProjection } from '../canvas-projection';
 import { useCanvasThingAuthoring } from '../canvas-thing-authoring';
 import { createEmbeddedAuthoring } from '../embedded-authoring';
-import { constrainEmbeddedPosition, type EmbeddedBounds } from '../embedded-diagram';
-import { useEmbeddedDiagram } from '../use-embedded-diagram';
+import {
+  constrainEmbeddedPosition,
+  embeddedDiagram,
+  type EmbeddedBounds,
+  type EmbeddedParentProjection,
+} from '../embedded-diagram';
 import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceThingTargets } from '../space-thing-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
+import type { Continuation } from '../continuation';
+import type { EmbeddedPublication } from '../embedded-publication';
+import { authoredFromDrawn, type SpaceThingFraming } from '../space-thing-framing';
+import { spaceThingEmbedCamera } from '../camera';
 
-export interface EmbeddedPublication {
-  readonly entry: OpenSpace;
-  readonly diagramId: DiagramId;
-  readonly bodyEditing: boolean;
-  readonly titleEditing: boolean;
-  readonly nodes: readonly ThingFlowNode[];
-  readonly edges: readonly Edge[];
-  readonly changeNodes: (changes: NodeChange<ThingFlowNode>[]) => void;
-  readonly removeThing: (id: string) => string | null;
-}
+export type { EmbeddedPublication };
 
 const EMPTY_NODES: readonly ThingFlowNode[] = [];
 
 /** Reuse production projection and Thing controls over an explicitly addressed target Diagram. */
 export function EmbeddedDiagramAuthoring({
+  continuation,
   parent,
   entry,
   diagramId,
   graphId,
   enabled,
+  framing,
   bounds: { left, top, right, bottom },
   publish,
 }: {
+  readonly continuation: Continuation;
   readonly parent: ThingFlowNode;
   readonly entry: OpenSpace;
   readonly diagramId: DiagramId;
@@ -49,6 +51,7 @@ export function EmbeddedDiagramAuthoring({
    */
   readonly graphId: GraphId;
   readonly enabled: boolean;
+  readonly framing: SpaceThingFraming | undefined;
   readonly bounds: EmbeddedBounds;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
@@ -128,6 +131,7 @@ export function EmbeddedDiagramAuthoring({
     [enabled],
   );
   const authoring = useCanvasThingAuthoring({
+    continuation,
     nodes: state.projection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation: null,
@@ -144,24 +148,51 @@ export function EmbeddedDiagramAuthoring({
       y: positions.length === 0 ? 0 : Math.min(...positions.map((at) => at.y)),
     };
   });
-  const offset = useMemo(
-    () => ({
-      x: SPACE_THING_EMBED_INSET.left - origin.x,
-      y: SPACE_THING_EMBED_INSET.top - origin.y,
-    }),
-    [origin],
+  const camera = useMemo(
+    () => spaceThingEmbedCamera({ left, top, right, bottom }, origin, framing),
+    [origin, left, top, right, bottom, framing],
   );
   const drawingProjection = useMemo(
     () => ({ nodes: authoring.nodes, edges: state.projection?.edges ?? [] }),
     [authoring.nodes, state.projection?.edges],
   );
-  const { nodes, edges } = useEmbeddedDiagram({
-    parent,
-    projection: drawingProjection,
-    offset,
-    enabled,
-    bounds: { left, top, right, bottom },
-  });
+  const parentWidth = parent.width;
+  const parentHeight = parent.height;
+  const parentZIndex = parent.zIndex;
+  const projectionParent = useMemo(
+    (): EmbeddedParentProjection => ({
+      id: parentId,
+      width: parentWidth,
+      height: parentHeight,
+      zIndex: parentZIndex,
+    }),
+    [parentId, parentWidth, parentHeight, parentZIndex],
+  );
+  const offsetX = camera.offset.x;
+  const offsetY = camera.offset.y;
+  const { nodes, edges } = useMemo(
+    () =>
+      embeddedDiagram({
+        parent: projectionParent,
+        projection: drawingProjection,
+        offset: { x: offsetX, y: offsetY },
+        zoom: camera.zoom,
+        enabled,
+        bounds: { left, top, right, bottom },
+      }),
+    [
+      projectionParent,
+      drawingProjection,
+      offsetX,
+      offsetY,
+      camera.zoom,
+      enabled,
+      left,
+      top,
+      right,
+      bottom,
+    ],
+  );
   const value = useMemo((): EmbeddedPublication => {
     const localIds = new Map(nodes.map((node) => [node.id, node.data.thingId]));
     return {
@@ -169,6 +200,7 @@ export function EmbeddedDiagramAuthoring({
       diagramId,
       nodes,
       edges,
+      origin,
       bodyEditing: authoring.bodyEditing,
       titleEditing: authoring.titleEditing,
       removeThing: (id) => {
@@ -179,6 +211,26 @@ export function EmbeddedDiagramAuthoring({
           thingId,
         });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
+      },
+      mayConnectThings: (from, to) => {
+        const resolvedDiagram = entry.app.currentSpace().lookup.diagram(diagramId);
+        const owned = entry.app.currentSpace().lookup.graph(graphId);
+        if (resolvedDiagram === undefined || owned?.owner.diagram.id !== diagramId) return false;
+        const members = Placement.fromDiagram(resolvedDiagram.diagram);
+        if (!members.has(from) || !members.has(to)) return false;
+        return !owned.graph.edges.some((edge) => edge.from === from && edge.to === to);
+      },
+      connectThings: (from, to) => {
+        const resolvedDiagram = entry.app.currentSpace().lookup.diagram(diagramId);
+        if (resolvedDiagram === undefined) return false;
+        const result = composition.authoring.complete({
+          kind: 'connected-things',
+          from,
+          to,
+          rendered: Placement.fromDiagram(resolvedDiagram.diagram),
+          graphId,
+        });
+        return result.kind === 'completed';
       },
       changeNodes: (changes) => {
         const local = changes.flatMap((change): NodeChange<ThingFlowNode>[] => {
@@ -199,7 +251,7 @@ export function EmbeddedDiagramAuthoring({
               {
                 ...change,
                 id,
-                position: { x: held.x - offset.x, y: held.y - offset.y },
+                position: authoredFromDrawn(held, camera.offset, camera.zoom),
               },
             ];
           }
@@ -213,10 +265,12 @@ export function EmbeddedDiagramAuthoring({
     authoring.titleEditing,
     nodes,
     edges,
-    offset,
+    camera,
+    origin,
     composition,
     entry,
     diagramId,
+    graphId,
     left,
     top,
     right,

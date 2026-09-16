@@ -84,24 +84,19 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-  PaletteColorSwatchGrid,
-  paletteSwatchPanelClassName,
-  DeleteIcon,
   EditIcon,
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
   InlineTitleEditor,
   DiagramIcon,
   ParentIcon,
-  PlusIcon,
   PresentIcon,
   Separator,
   ChoiceMenu,
   ChoiceMenuTrigger,
+  DiagramMenuActions,
+  GraphMenuActions,
   CommandName,
   CommandToolbar,
   ToolbarButton,
@@ -1012,42 +1007,15 @@ function DiagramIdentityMenu({
       )}
       trigger={trigger}
     >
-      {/* The same order the Spaces popover pins below its scroll: the set
-            first, then the commands on the one it is naming. A Diagram list is
-            short enough that nothing scrolls, so the end of the list and the
-            pinned position are the same place — which is why one rule covers
-            both and neither has to know which case it is. */}
-      {renameItem}
-      <DropdownMenuItem
-        className="gap-2"
-        disabled={canvas.createDisabled}
-        onClick={() => {
-          canvas.onCreate();
-        }}
-      >
-        <PlusIcon />
-        New Diagram
-      </DropdownMenuItem>
-      <DropdownMenuItem className="gap-2" onClick={canvas.onCopyLink}>
-        <CopyIcon />
-        Copy link
-      </DropdownMenuItem>
-      {/* The last Diagram cannot be deleted (ADR 0079), so the command is
-            present and unavailable rather than absent — a control that
-            disappears teaches nothing about why. */}
-      {/* Delete is destructive and sits behind its own rule, away from
-            the commands above it — the same separation the menu already
-            makes between the list and the commands. */}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        variant="destructive"
-        className="gap-2"
-        disabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
-        onClick={() => canvas.onDelete(canvas.selected.id)}
-      >
-        <DeleteIcon />
-        Delete {canvas.selected.title}
-      </DropdownMenuItem>
+      <DiagramMenuActions
+        title={canvas.selected.title}
+        renameItem={renameItem}
+        createDisabled={canvas.createDisabled}
+        deleteDisabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
+        onCreate={canvas.onCreate}
+        onCopyLink={canvas.onCopyLink}
+        onDelete={() => canvas.onDelete(canvas.selected.id)}
+      />
     </ChoiceMenu>
   );
 }
@@ -1184,87 +1152,22 @@ function GraphIdentityMenu({
       restoresFocusOnClose={restoresFocusOnClose}
       trigger={trigger}
     >
-      {renameItem}
-      {/* **A submenu, not a control beside Present.** The rule this
-                cluster already keeps is frequency: Present earns a permanent
-                control because traversing is what a Graph is *for*, and New
-                Graph sits in the menu because Graphs are made rarely. Colour is
-                rarer still — set once when a Graph is created and then left —
-                so a swatch row standing beside Present would spend the Dock's
-                scarcest width on its least-used command, and would put four
-                controls on the one cluster that already has three.
-
-                It is not in both places either. Two paths to one command is
-                what this arrangement keeps removing, and a menu row that
-                duplicates a visible control is the second one nobody reviews.
-
-                **Colour… opens a palette-bound swatch grid**, not an inline
-                radio list: twenty Tableau slots need a grid, and the closed
-                palette lives in `colors.ts` either way. The grid is the shared
-                swatch component from `@project/ui`, mounted in a submenu here
-                because a menu row cannot host a popover trigger beside an open
-                list — `command-dock-recolors-graph-through-swatch-picker`. */}
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="gap-2" disabled={graph.editsDisabled}>
-          <GraphIcon color={graph.activeColor} size={14} />
-          Colour…
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
-          <PaletteColorSwatchGrid
-            entries={GRAPH_PALETTE_ENTRIES}
-            value={graph.activeColor}
-            onValueChange={(color) => {
-              graph.onRecolor(graph.active.id, color);
-              onOpenChange(false);
-            }}
-            disabled={graph.editsDisabled}
-            aria-label="Graph colour"
-          />
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-      <DropdownMenuItem className="gap-2" disabled={graph.editsDisabled} onClick={graph.onCreate}>
-        <PlusIcon />
-        New Graph
-      </DropdownMenuItem>
-      {/* **A copy reports through the application's standing notice**, not
-                in the item's own label. `EntityActionsMenu` swaps a pressed
-                item's words to "Copied" or "Not copied", and it does that
-                because the Sidebar's menus were inside a Sheet drawn over the
-                area a pinned notice renders in — on a phone the reader could
-                not see the report any other way. This surface has no Sheet and
-                covers nothing: "Link not copied" is pinned in the shell at every
-                width, so the in-place swap has lost the reason it existed for.
-                The Thing rail keeps it, being a menu on the canvas itself. */}
-      {/* Both forms, always: a Diagram owns its Graphs (ADR 0040), so a
-                Graph always has a within-Diagram address as well as its own —
-                which is exactly what `spaceEntityActions` offers on a Graph.
-
-                They are not the same address. "Copy link" reproduces *what is
-                on screen*: this Graph inside this Diagram, so a recipient lands
-                where the sender was. "Copy permanent link" is the Graph's own
-                address and always opens it in whichever Diagram draws it, which
-                survives the sender's Diagram being renamed, redrawn or deleted.
-                The second form is offered only where it differs from the first,
-                which on a Graph is always — a Diagram row shows one link for the
-                same reason, having only its own. */}
-      <DropdownMenuItem className="gap-2" onClick={graph.onCopyLink}>
-        <CopyIcon />
-        Copy link
-      </DropdownMenuItem>
-      <DropdownMenuItem className="gap-2" onClick={graph.onCopyPermanentLink}>
-        <CopyIcon />
-        Copy permanent link
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        variant="destructive"
-        className="gap-2"
-        disabled={graph.editsDisabled || graph.graphs.length <= 1}
-        onClick={() => graph.onDelete(graph.active.id)}
-      >
-        <DeleteIcon />
-        Delete {graph.active.title}
-      </DropdownMenuItem>
+      <GraphMenuActions
+        title={graph.active.title}
+        renameItem={renameItem}
+        editsDisabled={graph.editsDisabled}
+        deleteDisabled={graph.editsDisabled || graph.graphs.length <= 1}
+        color={graph.activeColor}
+        colors={GRAPH_PALETTE_ENTRIES}
+        onRecolor={(color) => {
+          graph.onRecolor(graph.active.id, color);
+          onOpenChange(false);
+        }}
+        onCreate={graph.onCreate}
+        onCopyLink={graph.onCopyLink}
+        onCopyPermanentLink={graph.onCopyPermanentLink}
+        onDelete={() => graph.onDelete(graph.active.id)}
+      />
     </ChoiceMenu>
   );
 }

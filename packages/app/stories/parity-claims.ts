@@ -258,7 +258,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'EnterSpace',
     claim:
-      'A Space Thing offers Enter on its rail as a kind command; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
+      'A Space Thing offers Enter in its entity menu; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
   },
   {
     id: 'space-thing-opens-independently',
@@ -603,11 +603,45 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
   },
   {
+    id: 'thing-dock-floats',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'The Thing dock floats eight pixels inside the border, remains operable above embedded content, and replaces the open kind glyph.',
+  },
+  {
+    id: 'space-thing-content-sized-footer',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'The Space Thing title footer grows with title content and the embedded Diagram clips at its measured edge.',
+  },
+  {
+    id: 'space-thing-canvas-padding',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim: 'Embedded Things drag against equal top, left and right canvas padding.',
+  },
+  {
+    id: 'space-thing-entity-menu',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Space Thing entity menus group Rename and Create Alias, Enter and independent opening, concise copy links, and removal; creating an Alias shows the selected target Diagram read-only.',
+  },
+  {
+    id: 'space-thing-context-menus-share-dock-actions',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Space Thing Diagram and Graph menus share the Dock commands and author the target: Rename, New, Delete, Colour and canonical links, without navigating the containing Space.',
+  },
+  {
     id: 'open-space-thing-chooses-its-context-on-the-shared-controls',
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      "An Open Space Thing's Diagram and Graph choices are drawn on the Command Dock's own command surface and through the same shared control and list, and choosing one writes the Thing's stored context without moving the containing Space.",
+      "An Open Space Thing's Diagram and Graph choices extend its one rail toolbar with the Command Dock's shared clusters, controls and lists; arrows traverse them alongside Enter, entity actions and Close, and choosing one writes the Thing's stored context without moving the containing Space.",
   },
   {
     id: 'open-space-thing-drag-keeps-embedded-diagram-aligned',
@@ -621,7 +655,36 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'Editing a Thing inside an Open Space Thing authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
+      'Editing a Thing inside an Open Space Thing authors its target Space and updates both canvases; Edit offers the same connection handles as the host canvas, and those handles author the Graph the Space Thing is showing rather than a cross-Space Edge.',
+  },
+  {
+    id: 'space-thing-portal-read-edit',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'An Open Space Thing offers Edit and Done on its floating dock; Read keeps the embedding inert so dragging moves the containing Thing, and Edit makes the embedded canvas interactive without a second command surface.',
+  },
+  {
+    id: 'space-thing-portal-framing',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'EnteredFromSpaceThing',
+    claim:
+      'A Space Thing stores camera framing independently of other Things on the same target; Done, Close, reopen and Return restore it, Enter uses the browser-sized canvas rather than the source Thing rectangle, Diagram fallback clears framing and Graph fallback keeps it.',
+  },
+  {
+    id: 'space-thing-portal-edit-is-the-host-canvas',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Portal Edit frames authored coordinates without stretching a Thing flow-pixel size; a Thing that leaves the window is clipped to it and never paints on the containing canvas after zoom-out.',
+  },
+  {
+    id: 'space-thing-portal-independent-framing',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'TwoSelectionsOfOneTarget',
+    claim: 'Two Space Things selecting the same target author framing independently of each other.',
+    applicationEvidence:
+      'Two Space Things on one two-Diagram target is the Ladle fixture; the e2e fixture does not author that pair through the browser. packages/app/ladle-e2e/space-thing-embedded-diagram.spec.ts holds the independent-framing proof, and packages/app/e2e/space-thing.spec.ts covers persistence, reload, Enter/Return and Diagram/Graph fallback on one Space Thing.',
   },
   {
     id: 'graph-hud-and-dock-agree-on-the-active-graph',

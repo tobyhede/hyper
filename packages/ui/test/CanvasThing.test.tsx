@@ -1,12 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { CanvasThing, type CanvasThingFront, type CanvasSpaceThingSelection } from '../src';
+import { CanvasThing, type CanvasThingFront } from '../src';
 
 /**
- * Base UI's Select positions itself by measuring, and jsdom ships no pointer
- * capture. Both are reached before a Space Thing's selector can open at all,
- * which is why this file needs the stubs `Select.test.tsx` already makes; the
+ * Base UI's menus position themselves by measuring, and jsdom ships no pointer
+ * capture. The stubs remain for entity-action menus this file still opens; the
  * `scrollIntoView` an item-aligned list calls is stubbed globally in
  * `vitest.setup.ts`.
  */
@@ -61,13 +60,13 @@ describe('CanvasThing kind and interaction state', () => {
     // Every kind draws its glyph, Markdown included — ThingKindIcon has no
     // silent-nothing case, and the rail is not the centred, icon-optional
     // diagram the pre-design-system Thing used.
-    expect(screen.getByRole('img', { name: 'Markdown Thing' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Markdown Thing' })).toBeNull();
   });
 
   it('presents an Alias front by its kind alone', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: '', open: false }}
+        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -84,7 +83,12 @@ describe('CanvasThing kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: 'Markdown', open: false, onOpenChange }}
+        front={{
+          kind: 'alias',
+          target: { kind: 'markdown', source: 'Markdown' },
+          open: false,
+          onOpenChange,
+        }}
         state="selected"
         title="Return"
         graphColor="#ffc53d"
@@ -603,8 +607,8 @@ describe('CanvasThing Title ladder', () => {
       { kind: 'preview' },
       { kind: 'markdown', source: '', open: false },
       { kind: 'markdown', source: '', open: true },
-      { kind: 'alias', source: '', open: false },
-      { kind: 'alias', source: '', open: true },
+      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false },
+      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: true },
       { kind: 'space', open: false },
       { kind: 'space', open: true },
     ];
@@ -960,7 +964,7 @@ describe('CanvasThing open Markdown front', () => {
   it('draws no body on a closed Alias', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', source: '', open: false }}
+        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"
@@ -994,27 +998,58 @@ describe('CanvasThing open Markdown front', () => {
 });
 
 describe('CanvasThing Space front', () => {
-  const selection = (over: Partial<CanvasSpaceThingSelection> = {}): CanvasSpaceThingSelection => ({
-    diagrams: [
-      { id: 'l1', title: 'Collection 1' },
-      { id: 'l2', title: 'Collection 2' },
-    ],
-    graphs: [{ id: 'g1', title: 'Long' }],
-    diagramId: 'l1',
-    graphId: 'g1',
-    onDiagramChange: vi.fn(),
-    onGraphChange: vi.fn(),
-    ...over,
+  const spaceRail = (
+    <>
+      <button type="button" data-testid="space-thing-diagram">
+        Diagram 1
+      </button>
+      <button type="button" data-testid="space-thing-graph">
+        Long
+      </button>
+    </>
+  );
+
+  it('inserts a provided spaceRail at the head of the Thing rail', () => {
+    render(
+      <CanvasThing
+        front={{ kind: 'space', open: true, spaceRail }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    const rail = screen.getByTestId('canvas-thing-actions');
+    expect(screen.getByRole('toolbar')).toBe(rail);
+    for (const id of ['space-thing-diagram', 'space-thing-graph']) {
+      expect(rail).toContainElement(screen.getByTestId(id));
+      expect(screen.getByTestId(id).closest('.canvas-thing__body')).toBeNull();
+    }
+  });
+
+  it('draws a context notice supplied by decoration', () => {
+    render(
+      <CanvasThing
+        front={{ kind: 'space', open: true, spaceRail }}
+        contextNotice="Link copied."
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Link copied.');
   });
 
   /**
-   * A Closed Space Thing draws neither selector even when the selections are
-   * available to it: those are what Opening it is for.
+   * A Closed Space Thing draws neither selector even when the rail fragment is
+   * available to it: those are what Opening it is for, and authoring omits the
+   * fragment. CanvasThing still withholds a supplied fragment while closed.
    */
-  it('withholds both selectors while closed', () => {
+  it('withholds a supplied spaceRail while closed', () => {
     render(
       <CanvasThing
-        front={{ kind: 'space', open: false, selection: selection() }}
+        front={{ kind: 'space', open: false, spaceRail }}
         state="rest"
         title="Strategy elsewhere"
         graphColor="#35d6c3"
@@ -1030,8 +1065,9 @@ describe('CanvasThing Space front', () => {
   /**
    * Opening is the shared Thing operation, not a Space-Thing-specific one, so it
    * is the same rail control an Alias uses and it names the same two states. A
-   * Space Thing has no Markdown of its own, so there is no Edit, Save or Cancel
-   * for the rail to draw — Enter is the kind command that sits beside them.
+   * Space Thing has no Markdown of its own, so there is no content Edit, Save or
+   * Cancel for the rail to draw unless the portal Read/Edit boundary is composed
+   * onto the front — Enter is the kind command that sits beside them.
    */
   it('opens and closes through the shared rail control, and offers no content edit', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
@@ -1061,87 +1097,56 @@ describe('CanvasThing Space front', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('offers both selectors seeded with the Thing’s own selections when open', () => {
-    render(
-      <CanvasThing
-        front={{ kind: 'space', open: true, selection: selection() }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    // Named by the set they choose from as well as by what they hold, not only
-    // reachable by test id: the two controls are one word apart and an author
-    // has to be able to tell which is which by ear.
-    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
-    // And each draws the title it holds, which is what a reader sees.
-    expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
-    expect(screen.getByTestId('space-thing-graph')).toHaveTextContent('Long');
-  });
-
   /**
-   * The Thing publishes the choice and authors nothing itself — the selected
-   * Diagram is the caller's to store and hand back, which is what makes the
-   * Graph list beside it the selected Diagram's rather than a stale one.
+   * An Open Space Thing's kind command is the Read/Edit boundary for the
+   * embedded target canvas, not Markdown content edit. Diagram and Graph stay
+   * on the same dock in both modes; Done replaces Edit and Close stays.
    */
-  it('publishes a chosen Diagram without selecting it itself', () => {
-    const onDiagramChange = vi.fn();
-    render(
+  it('offers Edit on the floating dock, and Done once the portal is being edited', () => {
+    const onEditingChange = vi.fn();
+    const { rerender } = render(
       <CanvasThing
         front={{
           kind: 'space',
           open: true,
-          selection: selection({ onDiagramChange }),
+          onOpenChange: () => 'completed',
+          spaceRail,
+          portal: { editing: false, onEditingChange },
         }}
-        state="rest"
+        state="selected"
         title="Elsewhere"
         graphColor="#35d6c3"
       />,
     );
 
-    // The shared `ChoiceMenu` the Command Dock's own Diagram list is: a menu of
-    // radio rows, one marked, opened from its trigger. Its keyboard is Base UI's
-    // and is not restated here.
-    fireEvent.click(screen.getByTestId('space-thing-diagram'));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
+    expect(screen.getByTestId('space-thing-diagram')).toBeEnabled();
+    expect(screen.getByTestId('space-thing-diagram')).not.toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByTestId('space-thing-graph')).toBeEnabled();
+    expect(screen.getByTestId('space-thing-graph')).not.toHaveAttribute('aria-disabled', 'true');
+    screen.getByRole('button', { name: 'Edit Thing Elsewhere' }).click();
+    expect(onEditingChange).toHaveBeenCalledWith(true);
 
-    expect(onDiagramChange).toHaveBeenCalledWith('l2');
-    expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
-  });
-
-  /**
-   * The one state that leaves a selector with nothing to say: the Diagram this
-   * Thing names is no longer in the target.
-   *
-   * A Space Thing selects a Diagram and a Graph from the moment it exists
-   * (ADR 0079), so a `null` here is a dangling reference to something deleted
-   * and never a choice that was not made. The Graphs on offer are the selected
-   * Diagram's alone, so a Diagram resolving to nothing leaves none — while the
-   * Diagram list stays the target's, because choosing another is exactly what
-   * answers this.
-   */
-  it('draws a selection the target no longer holds as unavailable', () => {
-    render(
+    rerender(
       <CanvasThing
         front={{
           kind: 'space',
           open: true,
-          selection: selection({ diagramId: null, graphs: [], graphId: null }),
+          onOpenChange: () => 'completed',
+          spaceRail,
+          portal: { editing: true, onEditingChange },
         }}
-        state="rest"
+        state="selected"
         title="Elsewhere"
         graphColor="#35d6c3"
       />,
     );
 
-    const diagram = screen.getByTestId('space-thing-diagram');
-    expect(diagram).toBeEnabled();
-    expect(diagram).toHaveTextContent('No Diagram');
-    const graph = screen.getByTestId('space-thing-graph');
-    expect(graph).toBeDisabled();
-    expect(graph).toHaveTextContent('No Graph');
+    expect(screen.queryByRole('button', { name: 'Edit Thing Elsewhere' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('space-thing-diagram')).toBeEnabled();
+    expect(screen.getByTestId('space-thing-diagram')).not.toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Close Thing Elsewhere' })).toBeEnabled();
+    screen.getByRole('button', { name: 'Done Thing Elsewhere' }).click();
+    expect(onEditingChange).toHaveBeenCalledWith(false);
   });
 
   it('stands a plain note in for the selectors while the Space is unread', () => {
@@ -1162,11 +1167,11 @@ describe('CanvasThing Space front', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('withholds both selectors from a read-only Thing', () => {
+  it('withholds a supplied spaceRail from a read-only Thing', () => {
     render(
       <CanvasThing
         readOnly
-        front={{ kind: 'space', open: true, selection: selection() }}
+        front={{ kind: 'space', open: true, spaceRail }}
         state="rest"
         title="Elsewhere"
         graphColor="#35d6c3"
@@ -1177,49 +1182,15 @@ describe('CanvasThing Space front', () => {
     expect(screen.queryByTestId('space-thing-graph')).not.toBeInTheDocument();
   });
 
-  /**
-   * Enter is the Space Thing's kind command (ADR 0073, ADR 0068): it belongs on
-   * the rail whether the Thing is Open or Closed, and it is withheld from a
-   * read-only surface the same way every other authoring control is.
-   */
-  it('offers Enter on the rail while Closed or Open, and withholds it when read-only', () => {
-    const onEnter = vi.fn();
-    const { rerender } = render(
+  it('keeps Enter off the rail', () => {
+    render(
       <CanvasThing
-        front={{ kind: 'space', open: false, onEnter }}
+        front={{ kind: 'space', open: false }}
         state="selected"
         title="Architecture"
         graphColor="#35d6c3"
       />,
     );
-
-    const enter = screen.getByRole('button', { name: 'Enter Space Architecture' });
-    expect(enter).toBeVisible();
-    expect(enter.closest('[data-slot="thing-rail-kind-actions"]')).not.toBeNull();
-    enter.click();
-    expect(onEnter).toHaveBeenCalledOnce();
-
-    rerender(
-      <CanvasThing
-        front={{ kind: 'space', open: true, onEnter }}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Enter Space Architecture' })).toBeVisible();
-
-    rerender(
-      <CanvasThing
-        readOnly
-        front={{ kind: 'space', open: false, onEnter }}
-        state="selected"
-        title="Architecture"
-        graphColor="#35d6c3"
-      />,
-    );
-    expect(
-      screen.queryByRole('button', { name: 'Enter Space Architecture' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Enter/ })).not.toBeInTheDocument();
   });
 });

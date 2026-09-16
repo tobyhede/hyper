@@ -25,7 +25,7 @@ const thingSheet = read('packages/ui/src/canvas-thing.css');
 const railSheet = read('packages/ui/src/thing-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const thingRailActions = read('packages/ui/src/ThingRailActions.tsx');
-const canvasThing = read('packages/ui/src/CanvasThing.tsx');
+const spaceThingRail = read('packages/app/src/SpaceThingRailClusters.tsx');
 
 /** The declaration block of the rule whose selector is exactly `selector`. */
 const block = (stylesheet: string, selector: string): string => {
@@ -133,6 +133,6 @@ describe('choosing a Diagram or a Graph', () => {
   it('is the same shared menu on the Dock and on a Space Thing', () => {
     expect(dock).toContain('<ChoiceMenu<DiagramId>');
     expect(dock).toContain('<ChoiceMenu<GraphId>');
-    expect(canvasThing).toContain('<ChoiceMenu<string>');
+    expect(spaceThingRail).toContain('<ChoiceMenu<string>');
   });
 });

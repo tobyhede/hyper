@@ -912,11 +912,17 @@ describe('referencing an existing Space', () => {
     // nodes by draw order rather than by authored order — `findAllByRole(…)[0]`
     // passed against whichever it happened to draw first.
     const [authoredFirst] = spaceThingsOf(session);
-    const node = document.querySelector(`.react-flow__node[data-id="${authoredFirst!.id}"]`);
+    if (authoredFirst === undefined) throw new Error('The first Space Thing was not authored');
+    const node = document.querySelector(`.react-flow__node[data-id="${authoredFirst.id}"]`);
     if (!(node instanceof HTMLElement)) throw new Error('The first Space Thing is not on canvas');
     fireEvent.click(within(node).getByRole('button', { name: 'Open Thing Other Space' }));
-    await within(node).findByTestId('space-thing-diagram');
-    fireEvent.click(within(node).getByTestId('space-thing-diagram'));
+    const rail = await waitFor(() => {
+      const found = document.querySelector(`[data-thing-rail-for="${authoredFirst.id}"]`);
+      if (!(found instanceof HTMLElement))
+        throw new Error('The first Space Thing rail is not drawn');
+      return found;
+    });
+    fireEvent.click(within(rail).getByTestId('space-thing-diagram'));
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
 
     await waitFor(() =>
