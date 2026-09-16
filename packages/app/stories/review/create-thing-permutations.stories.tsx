@@ -426,7 +426,7 @@ function PlusBadgedGlyph({
   const unit = size / 24;
   return (
     <span
-      className="relative inline-flex flex-none items-center text-[var(--muted-foreground)]"
+      className="relative inline-flex flex-none items-center text-muted-foreground"
       role="img"
       aria-label={`Create ${thingKindName(kind)}`}
       style={{ width: size, height: size }}

@@ -86,7 +86,7 @@ export const PopoverContent = forwardRef<
           // moves with the theme; an arbitrary value has to be fought by
           // whichever surface the popover lands on.
           className={cn(
-            'nokey z-50 min-w-[15rem] rounded-chrome-md border border-[var(--border)] bg-[var(--card)] p-[0.6rem] text-[var(--foreground)] shadow-lg outline-none',
+            'nokey z-50 min-w-[15rem] rounded-chrome-md border border-border bg-card p-[0.6rem] text-foreground shadow-lg outline-none',
             className,
           )}
           {...popupProps}

@@ -10,6 +10,8 @@ A carve-out is a value that genuinely should not be on a scale, carrying its rea
 
 That makes the registration list beside `cn()` a second list that must agree with the token list in the theme file. Tickets 03 to 07 each add to both. A reminder in those tickets is not enough, because the repository's own rule is that a claim needs something that fails when a person reverses it. So this check reads both lists and fails when a token has no registration, or a registration has no token.
 
+**Land ticket 11 before this one.** A colour token wrapped as `text-[var(--foreground)]` matches the same `text-[…]` shape this scan reports, and there are fourteen of them. Ticket 11 removes them, which is cheaper than a carve-out that outlives its reason.
+
 The scan must distinguish a structural **value** from a Tailwind **selector**: roughly a hundred and fifty `data-[…]`, `has-[…]` and `group-data-[…]` constructs in the tree are state selectors, not geometry, and reporting them would make the check useless on its first run.
 
 **Blocked by:** 03, 04, 05, 06, 07.
