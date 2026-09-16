@@ -159,7 +159,10 @@ describe('spaceEntityActions', () => {
     { outcome: 'done', deleted: true, name: 'the Diagram was deleted' },
     { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
   ])('answers $outcome when $name', async ({ outcome, deleted }) => {
-    const groups = build({ onDeleteDiagram: () => deleted })({ kind: 'diagram', diagram: DIAGRAM });
+    const groups = build({ onDeleteDiagram: () => Promise.resolve(deleted) })({
+      kind: 'diagram',
+      diagram: DIAGRAM,
+    });
     const action = commands(groups).find((candidate) => candidate.id === DELETE_DIAGRAM_ACTION_ID);
 
     expect(await action?.onSelect()).toBe(outcome);

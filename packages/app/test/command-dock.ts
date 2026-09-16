@@ -244,6 +244,12 @@ export const newGraphItem = (graphTitle: string): HTMLElement => {
   return screen.getByRole('menuitem', { name: 'New Graph' });
 };
 
+/** Delete, on the Graph the cluster is showing. */
+export const deleteGraphItem = (graphTitle: string): HTMLElement => {
+  openGraphMenu(graphTitle);
+  return screen.getByRole('menuitem', { name: `Delete ${graphTitle}` });
+};
+
 /**
  * The Space cluster's disclosure: New Space, Copy link, the open set and Exit.
  *

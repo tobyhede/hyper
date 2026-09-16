@@ -166,7 +166,10 @@ User follow-up: Enter belongs inside the entity menu. The groups are now
 Rename / Create Alias; Enter / Open in New Tab; Copy link to Thing in Diagram /
 Copy link to Thing / Copy link to Space; Remove from Diagram. Copy actions carry
 no explanatory subtitles. Alias creation accepts a Space Thing and still refuses
-an Alias Target. Its Open content uses the graph resolver and the shared Diagram
+an Alias Target. Delete from Space remains on the Space Thing entity menu
+([`space-cards/18`](../../space-cards/issues/18-design-space-thing-delete-from-space.md)
+designed the earlier omission; production kept the command). Its Open content uses
+the graph resolver and the shared Diagram
 embedding, with authoring disabled throughout the Alias view.
 
 The branch was rebased onto main to incorporate the shared compact-button icon
@@ -201,3 +204,71 @@ The agreed TDD boundary is browser interaction through both the production
 application and its Ladle host: equal padding and drag limits, title-dependent
 footer height, and floating dock interaction. Each new behavior was observed
 red before its implementation passed. Full final verification runs on PR CI.
+
+### Space Thing Edit portal — prototype, decision pending
+
+Branch: `prototype/space-thing-edit-portal`.
+Source: `packages/app/stories/review/space-thing-edit-portal.stories.tsx`
+and its scoped stylesheet. Run `pnpm ladle` and open
+`http://localhost:61000/?story=review--space-thing-edit-portal--edit-portal&mode=preview&variant=read`.
+The other URL variants are `edit` and `entered`.
+
+Question: does an explicit Edit/Done boundary and an independent camera make
+an Open Space Thing a clearer window onto its target Diagram?
+
+Read mode makes the inner application inert, so dragging moves the containing
+Thing. Edit enables the real application's Diagram/Graph controls, pan/zoom,
+Thing operations and Graph authoring. Enter expands that same mounted application;
+Return restores the window. Camera movement never rewrites target positions.
+The on-screen diagnostic displays authored positions separately from the camera.
+Close/Open and Reset are available. All state is an isolated memory repository.
+
+This is a throwaway interaction experiment, not the production Enter wiring:
+Enter expands one existing host and the selectors use its live navigation.
+It does not yet author a containing Space Thing's durable selection or implement
+cross-boundary Edges. A production implementation would need those ownership
+choices and the corresponding regression coverage.
+
+Browser inspection verified that Read dragging moves only the container; Edit
+background dragging pans without changing authored positions; Thing dragging
+changes target positions; a new Graph edge can be created; and Enter/Return
+preserve authored positions. Typecheck passed. No permanent prototype tests or
+production behavior were added.
+
+### Space Thing selection and framing — deletion rule implemented
+
+Space saving keeps its existing behaviour: target edits persist as they do today.
+Diagram and Graph selections belong to the Space Thing, and framing is also a
+Space Thing property. Enter means operating inside the target Space: the view
+expands to the browser canvas and then operates independently of the containing
+Thing. Target authored positions do not change merely because its canvas expands.
+
+Confirmed deletion rule:
+
+- Deleting a Diagram updates every Space Thing selecting it to the target's
+  resulting selected Diagram and that Diagram's active Graph. Those updates and
+  the deletion are one atomic operation.
+- Deleting a Graph similarly updates every affected Space Thing to the surviving
+  Graph selected by the deletion operation, atomically with deletion.
+- Valid selections remain unchanged. A replacement Diagram resets the affected
+  Thing's framing to fit that Diagram; a Graph-only replacement retains framing.
+- Loading does not repair dangling selections. Referential integrity remains a
+  write-time requirement; repair cannot wait until Return.
+
+The coordinated lifecycle now derives the replacement from the target's latest
+working snapshot after its persistence barrier, updates every affected Space
+Thing, and commits those changes with the deletion. It returns the actual
+replacement pair so the initiating canvas can follow the same choice. Diagram
+replacement clears framing; Graph replacement retains it. Persistence continues
+to reject dangling references rather than repairing them on load.
+
+Still to settle: whether Done/Return always captures the final view, without a
+Save/Discard choice, and the precise framing transform between differently sized
+embedded and entered canvases. These alternatives have been discussed but are
+not accepted by the deletion-rule confirmation.
+
+Review found and corrected two defects: the shared Diagram menu now awaits an
+async deletion before reporting its outcome, and replacement selection now occurs
+inside lifecycle coordination rather than in callers. Focused regressions and the
+full repository, application-browser and Ladle suites pass; final CI verification
+runs on the PR.

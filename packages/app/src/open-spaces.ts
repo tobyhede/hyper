@@ -14,6 +14,7 @@ import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import { createSpaceThingLifecycle, type SpaceThingAuthoring } from './space-thing-lifecycle';
+import type { SpaceThingFraming } from './space-thing-framing';
 
 export interface OpenSpace {
   readonly id: UUID;
@@ -92,7 +93,20 @@ export interface OpenSpaces {
     readonly opened: OpenSpace;
     readonly opening?: DestinationOpening;
   }>;
-  readonly enter: (spaceId: UUID, selection?: DiagramId, graph?: GraphId) => Promise<OpenSpace>;
+  readonly enter: (
+    spaceId: UUID,
+    selection?: DiagramId,
+    graph?: GraphId,
+    framing?: SpaceThingFraming,
+  ) => Promise<OpenSpace>;
+  /**
+   * The camera Enter asked the first canvas showing to take, or `undefined`.
+   *
+   * Peeked, not consumed: `packages/app/test/open-spaces.test.ts` holds that a
+   * second read still answers the same seed, and that a later Enter of a Space
+   * already shown does not write one.
+   */
+  readonly openingFraming: (entry: OpenSpace) => SpaceThingFraming | undefined;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly exit: (
     spaceId: UUID,
@@ -134,6 +148,7 @@ interface ValidatedLoadedSpace {
 interface FirstCanvasSeed {
   selection?: DiagramId;
   graph?: GraphId;
+  framing?: SpaceThingFraming;
 }
 
 const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
@@ -181,6 +196,7 @@ export function createOpenSpaces({
    * live selection, which that file's already-open case holds.
    */
   const shownOnCanvas = new WeakSet<OpenSpace>();
+  const openingFramingByEntry = new WeakMap<OpenSpace, SpaceThingFraming>();
   const browserLocation = createBrowserLocation(history, report, async (pathname) => {
     await openPath(pathname);
   });
@@ -401,6 +417,12 @@ export function createOpenSpaces({
     // compose may have produced a new one while an exit settled.
     const seedFrom =
       firstDisplay !== undefined && !shownOnCanvas.has(target) ? firstDisplay : undefined;
+    // Seed before include publishes — `makes the Enter framing seed readable
+    // on the activation that first shows an embedded Space` holds the order.
+    if (seedFrom !== undefined) {
+      if (seedFrom.framing !== undefined) openingFramingByEntry.set(target, seedFrom.framing);
+      else openingFramingByEntry.delete(target);
+    }
     include(target, target.id, from);
     if (seedFrom !== undefined) {
       if (seedFrom.selection !== undefined) target.app.navigation.selectDiagram(seedFrom.selection);
@@ -444,10 +466,16 @@ export function createOpenSpaces({
    * reader was standing in when they pressed — not whichever Space the canvas
    * happens to hold once the load settles.
    */
-  const enter = (spaceId: UUID, selection?: DiagramId, graph?: GraphId): Promise<OpenSpace> => {
+  const enter = (
+    spaceId: UUID,
+    selection?: DiagramId,
+    graph?: GraphId,
+    framing?: SpaceThingFraming,
+  ): Promise<OpenSpace> => {
     const firstDisplay: FirstCanvasSeed = {};
     if (selection !== undefined) firstDisplay.selection = selection;
     if (graph !== undefined) firstDisplay.graph = graph;
+    if (framing !== undefined) firstDisplay.framing = framing;
     return activate(spaceId, undefined, observable.getState().activeSpaceId, firstDisplay);
   };
 
@@ -622,6 +650,7 @@ export function createOpenSpaces({
     },
     openPath,
     enter,
+    openingFraming: (entry) => openingFramingByEntry.get(entry),
     switchTo,
     exit,
     spaceThings,

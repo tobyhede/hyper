@@ -140,7 +140,12 @@ body {
   height: 100%;
 }
 
-.react-flow__node[class~='dragging'].rf-thing-node {
+/* React Flow sub-flow children move with their parent but are DOM siblings of
+   it, so only disabling the directly dragged wrapper leaves embedded Things
+   interpolating toward the parent's current position. Treat the whole canvas
+   as directly manipulated while any node carries React Flow's dragging state.
+   The rule stops applying on release, restoring authored placement motion. */
+.graph-area:has(.react-flow__node[class~='dragging']) .rf-thing-node {
   transition: none;
 }
 
@@ -278,9 +283,9 @@ body {
    Every rule below is conditioned on `data-connection-authoring`, because the
    four sides are **anchors** before they are affordances and they render on
    every Thing: an Edge attaches to one, and React Flow draws no Edge at all for
-   a Thing whose handles it cannot resolve (ADR 0087). A Thing inside a Space
-   Thing's embedded Diagram draws its Edges and offers no gesture, so the reveal
-   is what withholds the affordance the anchors would otherwise expose. */
+   a Thing whose handles it cannot resolve (ADR 0087). A Read embedding keeps
+   the anchors and withholds the gesture; Edit publishes the same affordance
+   the host canvas does. */
 .react-flow__node:hover
   .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,

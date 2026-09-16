@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { SPACE_THING_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import { AUTHORING_HANDLE_DIAMETER, type ThingFlowNode } from '@project/react-flow-adapter';
 import { canvasProjection } from '../src/canvas-projection';
 import {
+  canvasNodeConnection,
   clipEmbeddedNode,
   constrainEmbeddedPosition,
   embeddedDiagram,
   embeddedNodeId,
+  parseEmbeddedNodeId,
+  type EmbeddedParentProjection,
 } from '../src/embedded-diagram';
 import { resolveDiagram } from '../src/diagram-resolution';
 
@@ -109,7 +112,63 @@ const view = (parent: {
   bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
 });
 
+const projectionParent = (source: ThingFlowNode): EmbeddedParentProjection => ({
+  id: source.id,
+  width: source.width,
+  height: source.height,
+  zIndex: source.zIndex,
+});
+
+const drawFrom = (
+  source: ThingFlowNode,
+  projected: Awaited<ReturnType<typeof projection>>,
+  bounds = view(source),
+) =>
+  embeddedDiagram({
+    parent: projectionParent(source),
+    projection: projected,
+    offset: { x: 16, y: 42 },
+    enabled: true,
+    bounds,
+  });
+
 describe('an embedded production projection', () => {
+  it('does not reparent from the containing Thing canvas position', async () => {
+    const { parent: initial, projected } = await draw();
+    const before = drawFrom(initial, projected);
+    const after = drawFrom(
+      {
+        ...initial,
+        position: { x: initial.position.x + 120, y: initial.position.y + 80 },
+      },
+      projected,
+    );
+    expect(after).toEqual(before);
+  });
+
+  it('redraws when the containing Thing z-index changes', async () => {
+    const { parent: initial, projected } = await draw();
+    expect(drawFrom({ ...initial, zIndex: (initial.zIndex ?? 0) + 1 }, projected)).not.toEqual(
+      drawFrom(initial, projected),
+    );
+  });
+
+  it('redraws when the target projection or ancestor bounds change', async () => {
+    const { parent: initial, projected } = await draw();
+    const before = drawFrom(initial, projected);
+    const first = projected.nodes[0];
+    if (first === undefined) throw new Error('No fixture Thing');
+    const moved = {
+      ...projected,
+      nodes: [
+        { ...first, position: { x: first.position.x + 24, y: first.position.y } },
+        ...projected.nodes.slice(1),
+      ],
+    };
+    expect(drawFrom(initial, moved)).not.toEqual(before);
+    expect(drawFrom(initial, projected, { ...view(initial), right: 300 })).not.toEqual(before);
+  });
+
   it('parents Things and translates their authored positions without moving the source', async () => {
     const { drawn, projected } = await draw();
     expect(drawn.nodes.find((node) => node.data.thingId === B)).toMatchObject({
@@ -119,7 +178,8 @@ describe('an embedded production projection', () => {
       draggable: true,
       selectable: true,
       focusable: true,
-      connectable: false,
+      connectable: true,
+      data: { connectionAuthoringEnabled: true },
     });
     expect(projected.nodes.find((node) => node.data.thingId === B)?.position).toEqual({
       x: 400,
@@ -137,7 +197,7 @@ describe('an embedded production projection', () => {
     const beyond = drawn.nodes.find((node) => node.data.thingId === B);
     expect(beyond?.position).toEqual({ x: 416, y: 42 });
     expect(beyond?.extent).toBeUndefined();
-    expect(beyond?.style?.clipPath).toBe('inset(0px 292px 0px 0px)');
+    expect(beyond?.style?.clipPath).toBe('inset(-12px 292px -12px -12px)');
   });
 
   it('constrains a gesture proposal to the drawn region, not the containing box', () => {
@@ -170,7 +230,7 @@ describe('an embedded production projection', () => {
     // containing box instead, both clips exceeded the Thing's own extent and the
     // committed Thing vanished from the embedded view altogether.
     expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(
-      'inset(0px 236px 122px 0px)',
+      'inset(-12px 236px 122px -12px)',
     );
   });
 
@@ -178,8 +238,9 @@ describe('an embedded production projection', () => {
     const { drawn, parent } = await draw(false, 700, 500);
     const node = embedded(drawn.nodes, B);
     const held = constrainEmbeddedPosition({ x: -30, y: -8 }, view(parent));
+    const slack = AUTHORING_HANDLE_DIAMETER / 2;
     expect(clipEmbeddedNode({ ...node, position: held }, view(parent)).style?.clipPath).toBe(
-      'inset(0px 0px 0px 0px)',
+      `inset(-${slack}px -${slack}px -${slack}px -${slack}px)`,
     );
   });
 
@@ -187,7 +248,7 @@ describe('an embedded production projection', () => {
     const { drawn } = await draw(false, 560, 420);
     expect(drawn.nodes).toHaveLength(3);
     expect(drawn.nodes.find((node) => node.data.thingId === B)?.style?.clipPath).toBe(
-      'inset(0px 132px 0px 0px)',
+      'inset(-12px 132px -12px -12px)',
     );
   });
 
@@ -218,6 +279,115 @@ describe('an embedded production projection', () => {
     });
     expect(drawn.nodes[0]?.handles).toEqual(projected.nodes[0]?.handles);
     expect(drawn.edges[0]?.sourceHandle).toBe(projected.edges[0]?.sourceHandle);
+  });
+
+  it('reads a placement id back into its parent and Thing', () => {
+    expect(parseEmbeddedNodeId(embeddedNodeId(PARENT, A))).toEqual({
+      parentId: PARENT,
+      thingId: A,
+    });
+    const nestedParent = embeddedNodeId(PARENT, B);
+    expect(parseEmbeddedNodeId(embeddedNodeId(nestedParent, A))).toEqual({
+      parentId: nestedParent,
+      thingId: A,
+    });
+    expect(parseEmbeddedNodeId(A)).toBeUndefined();
+    expect(parseEmbeddedNodeId('embedded:not-a-thing')).toBeUndefined();
+  });
+
+  it('routes a pair of canvas node ids to one Space or refuses a cross-Space pair', () => {
+    expect(canvasNodeConnection(A, B)).toEqual({ kind: 'host', from: A, to: B });
+    expect(canvasNodeConnection(embeddedNodeId(PARENT, A), embeddedNodeId(PARENT, B))).toEqual({
+      kind: 'embedded',
+      parentId: PARENT,
+      from: A,
+      to: B,
+    });
+    expect(canvasNodeConnection(embeddedNodeId(PARENT, A), B)).toEqual({ kind: 'invalid' });
+    expect(canvasNodeConnection(embeddedNodeId(PARENT, A), embeddedNodeId(A, B))).toEqual({
+      kind: 'invalid',
+    });
+  });
+
+  it('gives embedded nodes placement ids that are not Thing identities', async () => {
+    const { drawn } = await draw();
+    for (const node of drawn.nodes) {
+      expect(uuidSchema.safeParse(node.id).success).toBe(false);
+      expect(node.id).toBe(embeddedNodeId(PARENT, node.data.thingId));
+      expect(uuidSchema.safeParse(node.data.thingId).success).toBe(true);
+    }
+    for (const edge of drawn.edges) {
+      expect(uuidSchema.safeParse(edge.source).success).toBe(false);
+      expect(uuidSchema.safeParse(edge.target).success).toBe(false);
+    }
+  });
+
+  it('does not change a Thing flow-pixel size when the portal zooms', async () => {
+    const projected = await projection();
+    const first = projected.nodes[0];
+    if (first === undefined) throw new Error('No fixture Thing');
+    const source = projected.nodes.find((node) => node.data.thingId === B);
+    if (source === undefined) throw new Error('No fixture Thing B');
+    const zoomed = embeddedDiagram({
+      parent: parent(first),
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      zoom: 0.5,
+      enabled: true,
+    });
+    const drawn = embedded(zoomed.nodes, B);
+    expect(drawn.width).toBe(source.width);
+    expect(drawn.height).toBe(source.height);
+    expect(drawn.position).toEqual({ x: 400 * 0.5 + 16, y: 0 * 0.5 + 42 });
+    expect(drawn.handles).toEqual(source.handles);
+    expect(drawn.style).not.toHaveProperty('--embed-zoom');
+    expect(drawn.style).toMatchObject({ transition: 'none' });
+  });
+
+  it('clips a zoomed Thing to the containing window so it cannot paint outside', async () => {
+    const projected = await projection();
+    const first = projected.nodes[0];
+    if (first === undefined) throw new Error('No fixture Thing');
+    const source = projected.nodes.find((node) => node.data.thingId === B);
+    if (source === undefined) throw new Error('No fixture Thing B');
+    const containing = parent(first, 400, 400);
+    const zoomed = embeddedDiagram({
+      parent: containing,
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      zoom: 4,
+      enabled: true,
+    });
+    const drawn = embedded(zoomed.nodes, B);
+    // B is authored at 400,0. Framing multiplies the point, not the box, so the
+    // Thing sits at 1616,42 at its Closed Size and is fully to the right of a
+    // 400-wide window (right edge 384). The 1492px right inset is that overflow.
+    expect(drawn.width).toBe(source.width);
+    expect(drawn.height).toBe(source.height);
+    expect(drawn.position).toEqual({ x: 1616, y: 42 });
+    expect(drawn.style?.clipPath).toBe('inset(-12px 1492px -12px -12px)');
+  });
+
+  it('makes a Read embedding inert so the containing Space Thing remains the drag target', async () => {
+    const projected = await projection();
+    const first = projected.nodes[0];
+    if (first === undefined) throw new Error('No fixture Thing');
+    const containing = parent(first);
+    const inert = embeddedDiagram({
+      parent: containing,
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      enabled: false,
+    });
+    expect(inert.nodes[0]).toMatchObject({
+      draggable: false,
+      selectable: false,
+      focusable: false,
+      connectable: false,
+      className: 'nopan nowheel nodrag',
+      data: { connectionAuthoringEnabled: false },
+    });
+    expect(inert.nodes[0]?.style?.pointerEvents).toBe('none');
   });
 
   it('gives two embeddings of the same Space distinct node and Edge identities', async () => {

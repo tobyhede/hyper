@@ -97,11 +97,18 @@ export function ThingNode({
   );
   const connectionInProgress = seeking !== null;
   /**
+   * React Flow has already snapped here. A snapped Thing is near by definition
+   * (`ThingNode.test.tsx`).
+   */
+  const snappedHere = useConnection(
+    (connection) => connection.inProgress && connection.toNode?.id === id,
+  );
+  /**
    * Seeking-end handles show only when the pointer is near this Thing *and*
    * Space Authoring would accept a release here. Far or refused Things stay
    * quiet; anchors remain mounted either way (ADR 0087).
    */
-  const near = useConnectionTargetProximity(id);
+  const near = useConnectionTargetProximity(id) || snappedHere;
   const eligible = useConnectionEndEligible(data.thingId);
   const offerEnd = offersConnectionEnd({ seeking, near, eligible });
   const visuallySelected = selected || data.selectedForAuthoring;
@@ -114,6 +121,7 @@ export function ThingNode({
    * design-system component knowing React Flow exists.
    */
   const inner = useRef<HTMLDivElement>(null);
+  const [railHovered, setRailHovered] = useState(false);
   const renderRail = useCallback(
     (rail: ReactNode) => {
       if (data.expanded !== true || data.spaceContent === undefined) return rail;
@@ -127,6 +135,8 @@ export function ThingNode({
               width: (width ?? 260) - 8,
               zIndex: 2000 + zIndex,
             }}
+            onPointerEnter={() => setRailHovered(true)}
+            onPointerLeave={() => setRailHovered(false)}
           >
             {rail}
           </div>
@@ -178,7 +188,7 @@ export function ThingNode({
   }
   // A Space Thing's own front carries nothing it authors of the target: its
   // Title is the Thing's, its content is the target Space's, and the
-  // composition hands down the two selections plus Enter.
+  // composition hands down the rail fragment plus Enter.
   const spaceFront: SpaceFront = {
     kind: 'space',
     open: data.expanded === true,
@@ -187,16 +197,18 @@ export function ThingNode({
     spaceFront.onOpenChange = data.onEditThing;
   }
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
+  if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
+  if (data.portal !== undefined) spaceFront.portal = data.portal;
   const front: CanvasThingFront =
     data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
 
   /**
    * Whether this Thing's anchors are also affordances.
    *
-   * Read-only draws a Thing without Thing-owned controls, and an embedded Space
-   * boundary offers no connection authoring — but both still draw Edges, and an
-   * Edge attaches to an anchor (ADR 0087). So the four sides render either way
-   * and this decides only whether an author may take hold of one.
+   * Read-only draws a Thing without Thing-owned controls, and a Read embedding
+   * withholds the gesture — but both still draw Edges, and an Edge attaches to
+   * an anchor (ADR 0087). So the four sides render either way and this decides
+   * only whether an author may take hold of one.
    */
   const connectionAuthoring = !data.readOnly && data.connectionAuthoringEnabled !== false;
 
@@ -256,8 +268,18 @@ export function ThingNode({
    * withholding it here is the same answer one layer up.
    */
   const canvasThingOptionalProps: Mutable<
-    Pick<CanvasThingProps, 'onBeginTitleEdit' | 'entityActions'>
+    Pick<
+      CanvasThingProps,
+      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice' | 'railHovered'
+    >
   > = {};
+  if (railHovered) canvasThingOptionalProps.railHovered = true;
+  if (data.contextNotice !== undefined && data.contextNotice !== null) {
+    canvasThingOptionalProps.contextNotice = data.contextNotice;
+  }
+  if (reportBodyHeight !== undefined) {
+    canvasThingOptionalProps.onBodyHeightChange = onBodyHeightChange;
+  }
   if (
     data.bodyEditor === undefined &&
     data.titleEditingEnabled === true &&
@@ -456,7 +478,6 @@ export function ThingNode({
           readOnly={data.readOnly}
           front={front}
           renderRail={renderRail}
-          {...(reportBodyHeight === undefined ? {} : { onBodyHeightChange })}
           title={data.title}
           graphColor={data.activeGraphColor}
           state="editing"
@@ -470,7 +491,6 @@ export function ThingNode({
           readOnly={data.readOnly}
           front={front}
           renderRail={renderRail}
-          {...(reportBodyHeight === undefined ? {} : { onBodyHeightChange })}
           title={data.title}
           graphColor={data.activeGraphColor}
           state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}

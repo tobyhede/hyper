@@ -29,6 +29,7 @@ import { uuid } from './uuid';
 interface MockConnectionState {
   inProgress: boolean;
   fromHandle: { type: 'source' | 'target' };
+  toNode?: { id: string };
 }
 
 const { updateNodeInternals, connection, proximity } = vi.hoisted(() => {
@@ -138,6 +139,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 beforeEach(() => {
   connection.inProgress = false;
   connection.fromHandle.type = 'source';
+  delete connection.toNode;
   proximity.near = true;
 });
 
@@ -588,6 +590,19 @@ describe('ThingNode graph authoring', () => {
 
     expect(connectable('Connect to', 'end')).toEqual([true, true, true, true]);
     expect(connectable('Connect from', 'start')).toEqual([false, false, false, false]);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-connection-seeking',
+      'target',
+    );
+  });
+
+  it('reveals seeking ends when React Flow has snapped to the Thing', () => {
+    connection.inProgress = true;
+    connection.toNode = { id: thingId };
+    proximity.near = false;
+
+    render(<ThingNode {...props({ selected: true })} />);
+
     expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
       'data-connection-seeking',
       'target',

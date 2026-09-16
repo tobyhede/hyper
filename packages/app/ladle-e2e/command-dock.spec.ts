@@ -132,6 +132,80 @@ test(
 );
 
 /**
+ * New Graph is in the Graph menu, beside the list it adds to, and it appends,
+ * colours and activates one empty Graph in one Edit (ADR 0040).
+ */
+test(
+  'New Graph creates and selects an empty Graph from the Graph menu',
+  { tag: '@parity:command-dock-adds-graph' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const menu = await disclose(page, 'Active Graph: Long');
+    await menu.getByRole('menuitem', { name: 'New Graph' }).click();
+
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText(
+      'Graph 1',
+    );
+
+    const reopened = await disclose(page, 'Active Graph: Graph 1');
+    await expect(reopened.getByRole('menuitemradio')).toHaveCount(4);
+  },
+);
+
+/**
+ * Recolour is a submenu on the Graph the cluster is naming, not a second
+ * permanent control — the same frequency rule that keeps New Graph in the menu.
+ */
+test(
+  'the Graph menu stores a palette colour on the active Graph',
+  { tag: '@parity:command-dock-recolors-graph' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const menu = await disclose(page, 'Active Graph: Long');
+    await menu.getByRole('menuitem', { name: 'Colour…' }).click();
+    const submenu = page.getByRole('radiogroup', { name: 'Graph colour' });
+    await submenu.getByRole('radio', { name: 'Green', exact: true }).click();
+
+    const reopened = await disclose(page, 'Active Graph: Long');
+    await reopened.getByRole('menuitem', { name: 'Colour…' }).click();
+    const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
+    await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  },
+);
+
+/**
+ * Delete Graph is present and unavailable on the last Graph a Diagram keeps,
+ * and removes the active Graph when more than one survive (ADR 0040).
+ */
+test(
+  'Delete Graph removes a Graph and withholds the last one',
+  { tag: '@parity:command-dock-deletes-graph' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const diagrams = await disclose(page, 'Diagram: Collection 1');
+    await diagrams.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
+    const lone = await disclose(page, 'Active Graph: Echo');
+    await expect(lone.getByRole('menuitem', { name: 'Delete Echo' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await page.keyboard.press('Escape');
+
+    const menu = await disclose(page, 'Active Graph: Echo');
+    await menu.getByRole('menuitem', { name: 'New Graph' }).click();
+    const created = await disclose(page, 'Active Graph: Graph 1');
+    await created.getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+    await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Echo');
+  },
+);
+
+/**
  * The two addresses a Graph has, from the Graph's own menu.
  *
  * The application writes the real product URL to the clipboard. Both addresses
@@ -690,6 +764,9 @@ test(
 
     const conflict = page.getByRole('alertdialog', { name: 'Changes conflict' });
     await expect(conflict).toBeVisible();
+    await expect(conflict).toContainText(/unsaved text/i);
+    await expect(conflict).toContainText(/open Thing/);
+    await expect(conflict).toContainText(/Keep local and retry preserves/);
     await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
     // Escape is withheld: a conflict has no safe dismissal, so the dialog owns

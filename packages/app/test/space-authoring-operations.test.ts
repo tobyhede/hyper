@@ -2060,6 +2060,104 @@ describe('Stale identities', () => {
   });
 });
 
+describe('connecting Things on an embedded Diagram', () => {
+  const SHOWN_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+  const other = {
+    id: OTHER_DIAGRAM_ID,
+    title: 'Other Diagram',
+    kind: 'positioned' as const,
+    positions: {
+      [THING_A]: { x: 500, y: 600, open: false as const },
+      [THING_C]: { x: 800, y: 600, open: false as const },
+    },
+    graphs: [
+      { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+      { id: SHOWN_GRAPH_ID, title: 'Shown Graph', edges: [] },
+    ],
+    activeGraph: OTHER_GRAPH_ID,
+  };
+  const withOther = {
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      diagrams: [...(positionedSnapshot.document.diagrams ?? []), other],
+    },
+    things: [
+      ...positionedSnapshot.things,
+      { id: THING_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
+    ],
+  };
+  const rendered = Placement.fromEntries([
+    [THING_A, { x: 500, y: 600, open: false }],
+    [THING_C, { x: 800, y: 600, open: false }],
+  ]);
+
+  it('writes the Edge into the Graph the Space Thing is showing, not the canvas Active Graph', () => {
+    const { session, navigation, authoring } = open(withOther);
+    place(authoring, {
+      [THING_A]: [10, 20],
+      [THING_B]: [300, 40],
+    });
+    const initialNavigation = navigation.getState();
+
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'connected-things',
+        from: THING_A,
+        to: THING_C,
+        rendered,
+        graphId: SHOWN_GRAPH_ID,
+      }).kind,
+    ).toBe('completed');
+
+    expect(navigation.getState()).toEqual(initialNavigation);
+    expect(diagramOf(session.getState().working, OTHER_DIAGRAM_ID)?.graphs).toEqual([
+      { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+      { id: SHOWN_GRAPH_ID, title: 'Shown Graph', edges: [{ from: THING_A, to: THING_C }] },
+    ]);
+    expect(diagramOf(session.getState().working, DIAGRAM_ID)).toEqual(
+      diagramOf(positionedSnapshot, DIAGRAM_ID),
+    );
+  });
+
+  it('refuses a duplicate on the Graph being shown', () => {
+    const { authoring } = open({
+      ...withOther,
+      document: {
+        ...withOther.document,
+        diagrams: [
+          ...(positionedSnapshot.document.diagrams ?? []),
+          {
+            ...other,
+            graphs: [
+              { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
+              {
+                id: SHOWN_GRAPH_ID,
+                title: 'Shown Graph',
+                edges: [{ from: THING_A, to: THING_C }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    place(authoring, {
+      [THING_A]: [10, 20],
+      [THING_B]: [300, 40],
+    });
+
+    expect(
+      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+        kind: 'connected-things',
+        from: THING_A,
+        to: THING_C,
+        rendered,
+        graphId: SHOWN_GRAPH_ID,
+      }),
+    ).toMatchObject({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
+  });
+});
+
 describe('context commands on an embedded Diagram', () => {
   it('authors the addressed Diagram and Graph without switching the target canvas', () => {
     const other = {
@@ -2089,7 +2187,7 @@ describe('context commands on an embedded Diagram', () => {
       authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
         kind: 'renamed-graph',
         graphId: OTHER_GRAPH_ID,
-        title: 'Renamed path',
+        title: 'Renamed Graph',
       }).kind,
     ).toBe('completed');
     expect(
@@ -2118,7 +2216,7 @@ describe('context commands on an embedded Diagram', () => {
     expect(diagramOf(working, OTHER_DIAGRAM_ID)).toMatchObject({
       title: 'Renamed context',
       positions: other.positions,
-      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed path', color: '#f472b6' }],
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }],
     });
     expect(diagramOf(working, DIAGRAM_ID)).toEqual(diagramOf(positionedSnapshot, DIAGRAM_ID));
     expect(working.document.defaultDiagram).toBe(DIAGRAM_ID);

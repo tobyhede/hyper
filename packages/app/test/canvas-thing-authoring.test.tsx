@@ -12,6 +12,8 @@ import { THING_SIZE } from '../src/thing';
 import { authoringAvailability } from '../src/authoring-availability';
 import { useCanvasThingAuthoring } from '../src/canvas-thing-authoring';
 import { composeApp } from '../src/compose-app';
+import type { SpaceThingTarget } from '../src/space-thing-lifecycle';
+import { NO_SPACE_THING_TARGETS, type SpaceThingTargets } from '../src/space-thing-targets';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -516,5 +518,227 @@ describe('canvas Thing authoring', () => {
       thingId: THING_ID,
     });
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
+  });
+});
+
+describe('canvas Thing authoring Space rail', () => {
+  const target: SpaceThingTarget = {
+    id: TARGET_SPACE_ID,
+    title: 'Architecture',
+    diagrams: [
+      {
+        id: TARGET_DIAGRAM_ID,
+        title: 'Collection 1',
+        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview' }],
+      },
+    ],
+  };
+
+  const spaceNode = (expanded: boolean, readOnly = false): ThingFlowNode => ({
+    ...node(expanded, SPACE_THING_ID, 'space'),
+    data: { ...node(expanded, SPACE_THING_ID, 'space').data, readOnly },
+  });
+
+  const mountRail = (expanded: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
+    const loaded = { snapshot, revision: 0n, exportedRevision: null };
+    const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const { authoring, adapter } = composeApp({ spaceSession });
+    return renderHook(() =>
+      useCanvasThingAuthoring({
+        nodes: [spaceNode(expanded, readOnly)],
+        availability: authoringAvailability({
+          editable: true,
+          presenting: false,
+          editingThingBody: false,
+          editingThingTitle: false,
+          thingIsOpen: false,
+          editingChromeTitle: !enabled,
+          spaceOnCanvas: true,
+          editingEmbeddedDiagram: false,
+          creatingSpaceThing: false,
+        }),
+        nameOnCreation: null,
+        authoring,
+        spaceSession,
+        thingResize: adapter.getState().thingResize,
+        onSelectThing: () => undefined,
+        spaceThingTargets: withTarget ? new Map([[TARGET_SPACE_ID, target]]) : undefined,
+      }),
+    );
+  };
+
+  it('omits the rail while closed even when the target is read', () => {
+    const { result } = mountRail(false, true);
+    expect(onlyNode(result.current.nodes).data.spaceRail).toBeUndefined();
+    expect(onlyNode(result.current.nodes).data.portal).toBeUndefined();
+  });
+
+  it('omits the rail while the target is unread', () => {
+    const { result } = mountRail(true, false);
+    expect(onlyNode(result.current.nodes).data.spaceRail).toBeUndefined();
+  });
+
+  it('omits the rail on a read-only Thing', () => {
+    const { result } = mountRail(true, true, true);
+    expect(onlyNode(result.current.nodes).data.spaceRail).toBeUndefined();
+  });
+
+  it('builds the rail for an Open Space Thing whose target is read', () => {
+    const { result } = mountRail(true, true);
+    expect(onlyNode(result.current.nodes).data.spaceRail).toBeDefined();
+  });
+
+  it('still draws a disabled rail when canvas authoring is withdrawn', () => {
+    const { result } = mountRail(true, true, false, false);
+    expect(onlyNode(result.current.nodes).data.spaceRail).toBeDefined();
+  });
+});
+
+describe('canvas Thing authoring decoration identity', () => {
+  const markdownNode = node(false, THING_ID, 'markdown');
+  const aliasNode = node(false, ALIAS_ID, 'alias');
+  const space = node(true, SPACE_THING_ID, 'space');
+  const projection = [markdownNode, aliasNode, space];
+  const target: SpaceThingTarget = {
+    id: TARGET_SPACE_ID,
+    title: 'Architecture',
+    diagrams: [
+      {
+        id: TARGET_DIAGRAM_ID,
+        title: 'Collection 1',
+        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview' }],
+      },
+    ],
+  };
+
+  interface IdentityProps {
+    readonly spaceThingTargets: SpaceThingTargets;
+    readonly portalEditing: ReadonlySet<ThingId>;
+  }
+
+  const dataOf = (nodes: readonly ThingFlowNode[], thingId: ThingId) => {
+    const found = nodes.find((candidate) => candidate.data.thingId === thingId);
+    if (found === undefined) throw new Error('The Thing was not decorated.');
+    return found.data;
+  };
+
+  const editedBodySnapshot = () =>
+    spaceSnapshotSchema.parse({
+      id: snapshot.id,
+      document: snapshot.document,
+      things: [
+        { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'Edited source' } },
+        { id: ALIAS_ID, document: { title: 'Return', kind: 'alias', target: THING_ID } },
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Architecture',
+            kind: 'space',
+            spaceId: TARGET_SPACE_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
+      ],
+    });
+
+  const mountIdentity = () => {
+    const loaded = { snapshot, revision: 0n, exportedRevision: null };
+    const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const { authoring, adapter } = composeApp({ spaceSession });
+    const onSelectThing = () => undefined;
+    const onPortalEditingChange = () => undefined;
+    const thingResize = adapter.getState().thingResize;
+    const hook = renderHook(
+      ({ spaceThingTargets, portalEditing }: IdentityProps) =>
+        useCanvasThingAuthoring({
+          nodes: projection,
+          availability: authoringAvailability({
+            editable: true,
+            presenting: false,
+            editingThingBody: false,
+            editingThingTitle: false,
+            thingIsOpen: false,
+            editingChromeTitle: false,
+            spaceOnCanvas: true,
+            editingEmbeddedDiagram: false,
+            creatingSpaceThing: false,
+          }),
+          nameOnCreation: null,
+          authoring,
+          spaceSession,
+          thingResize,
+          onSelectThing,
+          spaceThingTargets,
+          portalEditing,
+          onPortalEditingChange,
+        }),
+      {
+        initialProps: {
+          spaceThingTargets: NO_SPACE_THING_TARGETS,
+          portalEditing: new Set<ThingId>(),
+        },
+      },
+    );
+    return { ...hook, spaceSession };
+  };
+
+  it('keeps markdown and Alias node.data when only Space Thing targets change', () => {
+    const { result, rerender } = mountIdentity();
+    const markdownData = dataOf(result.current.nodes, THING_ID);
+    const aliasData = dataOf(result.current.nodes, ALIAS_ID);
+
+    rerender({
+      spaceThingTargets: new Map([[TARGET_SPACE_ID, target]]),
+      portalEditing: new Set<ThingId>(),
+    });
+
+    expect(dataOf(result.current.nodes, THING_ID)).toBe(markdownData);
+    expect(dataOf(result.current.nodes, ALIAS_ID)).toBe(aliasData);
+    expect(dataOf(result.current.nodes, SPACE_THING_ID).spaceRail).toBeDefined();
+  });
+
+  it('keeps markdown node.data when only portal editing changes', () => {
+    const { result, rerender } = mountIdentity();
+    rerender({
+      spaceThingTargets: new Map([[TARGET_SPACE_ID, target]]),
+      portalEditing: new Set<ThingId>(),
+    });
+    const markdownData = dataOf(result.current.nodes, THING_ID);
+
+    rerender({
+      spaceThingTargets: new Map([[TARGET_SPACE_ID, target]]),
+      portalEditing: new Set([SPACE_THING_ID]),
+    });
+
+    expect(dataOf(result.current.nodes, THING_ID)).toBe(markdownData);
+    expect(dataOf(result.current.nodes, SPACE_THING_ID).portal?.editing).toBe(true);
+  });
+
+  it('keeps markdown and Alias node.data when a body save does not change Thing membership', () => {
+    const { result, spaceSession } = mountIdentity();
+    const markdownData = dataOf(result.current.nodes, THING_ID);
+    const aliasData = dataOf(result.current.nodes, ALIAS_ID);
+
+    act(() => spaceSession.submit(editedBodySnapshot()));
+
+    expect(dataOf(result.current.nodes, THING_ID)).toBe(markdownData);
+    expect(dataOf(result.current.nodes, ALIAS_ID)).toBe(aliasData);
+  });
+
+  it('keeps an Open Space Thing node.data when a markdown body save does not change its document', () => {
+    const { result, rerender, spaceSession } = mountIdentity();
+    rerender({
+      spaceThingTargets: new Map([[TARGET_SPACE_ID, target]]),
+      portalEditing: new Set<ThingId>(),
+    });
+    const markdownData = dataOf(result.current.nodes, THING_ID);
+    const spaceData = dataOf(result.current.nodes, SPACE_THING_ID);
+    expect(spaceData.spaceRail).toBeDefined();
+
+    act(() => spaceSession.submit(editedBodySnapshot()));
+
+    expect(dataOf(result.current.nodes, THING_ID)).toBe(markdownData);
+    expect(dataOf(result.current.nodes, SPACE_THING_ID)).toBe(spaceData);
   });
 });

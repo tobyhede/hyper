@@ -11,8 +11,9 @@ export const DEFAULT_SPACE_THING_OPEN_SIZE = { width: 960, height: 720 } as cons
  * paper on the top and sides. The dock floats over this region.
  *
  * `bottom` is a conservative reserve before the rendered title is measured.
- * SpaceCanvas replaces it with the content-sized footer plus the border; the
- * reserve also keeps the resize floor large enough for the full Title ladder.
+ * `embedded-diagram.test.ts` asserts SpaceCanvas replaces it with the
+ * content-sized footer plus the border; the reserve also keeps the resize floor
+ * large enough for the full Title ladder.
  */
 export const SPACE_THING_EMBED_INSET = { top: 16, right: 16, bottom: 104, left: 16 } as const;
 

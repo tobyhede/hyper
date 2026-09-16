@@ -149,12 +149,12 @@ describe('PersistenceControl', () => {
     [
       'reload',
       { current: STORED, baseline: undefined },
-      /A newer version of this space is available/,
+      /A newer version of this space is available\. Reload discards your local changes, including unsaved text you have typed into an open Thing\. Keep local and retry preserves that editing and tries to save it again\./,
     ],
     [
       'revert',
       { current: undefined, baseline: SNAPSHOT },
-      /A related space changed while this coordinated edit was saving/,
+      /A related space changed while this coordinated edit was saving\. Reload returns this space to how it was before the edit and discards unsaved text typed into an open Thing\. Keep local and retry preserves that editing and tries to save it again\./,
     ],
     [
       'none',

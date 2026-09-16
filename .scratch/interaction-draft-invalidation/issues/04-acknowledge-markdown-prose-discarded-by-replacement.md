@@ -1,6 +1,6 @@
 # Accepting a stored Space discards an opened Card's Markdown draft with no acknowledgement
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1
 
 Surfaced by: resolving `02-interaction-draft-invalidation-is-mostly-already-covered.md`
@@ -134,23 +134,23 @@ effort's `03`, not the error-feedback effort's.)
 - [x] Whether it is scoped to long-form prose or to drafts generally is
       recorded: neither, because the warning describes what Reload does rather
       than what is open.
-- [ ] The conflict dialog's Reload description names the unsaved Card editing
+- [x] The conflict dialog's Reload description names the unsaved Thing editing
       Reload ends, and the `revert` arm is decided in the same edit.
-- [ ] Accepting a stored Space while an opened Card's Markdown draft is live
+- [x] Accepting a stored Space while an opened Thing's Markdown draft is live
       still discards it, and the accepted Space still wins. No new epoch
-      subscriber, no `editingCardBody` read, no dirtiness published from
+      subscriber, no `editingThingBody` read, no dirtiness published from
       `@project/ui`.
-- [ ] A test pins that behaviour against an interaction that can actually hold
+- [x] A test pins that behaviour against an interaction that can actually hold
       the draft. The contract-test fixture stages it with one field: give the
-      Card `open: true` (with the ADR 0066 `openSize`) in `LOCAL`'s placement.
-      The Card is then Open at rest, `Edit Markdown source of Local card` is on
+      Thing `open: true` (with the ADR 0066 `openSize`) in `LOCAL`'s placement.
+      The Thing is then Open at rest, `Edit Markdown source of Local thing` is on
       screen, and clicking it mounts the editor with no Edit authored —
       persistence stays `settled` — so the conflict can be raised afterwards
       with the draft already live.
-- [ ] A test pins that Keep local and retry leaves the draft alive, which is the
+- [x] A test pins that Keep local and retry leaves the draft alive, which is the
       contrast the new sentence promises and the reason it is worth giving.
-- [ ] `pnpm verify` and `pnpm e2e` pass. `pnpm e2e:ladle` applies —
-      `PersistenceControl` has stories, and `packages/app/ladle-e2e/issue-14-space-sidebar.spec.ts`
+- [x] `pnpm verify` and `pnpm e2e` pass. `pnpm e2e:ladle` applies —
+      `PersistenceControl` has stories, and `packages/app/ladle-e2e/command-dock.spec.ts`
       already drives the conflict dialog.
 
 ## Comments
@@ -216,3 +216,14 @@ The dependency on the error-feedback effort is gone with it. The acknowledgement
 is not a notice, so it needs no notice component, and
 `.scratch/error-feedback-pattern/issues/03` and this ticket no longer have to be
 sequenced or decided together.
+
+### 2026-09-16 — implemented
+
+Card→Thing throughout: the product name is Thing, including the conflict copy and
+the Open-at-rest fixture (`Edit Markdown source of Local thing`). Copy lives in
+`packages/app/src/authoring-refusal.ts` as `CONFLICT_DESCRIPTIONS` (consumed via
+`describeConflictRecovery`), not in `PersistenceControl.tsx`. Ladle evidence is
+`packages/app/ladle-e2e/command-dock.spec.ts` (`command-dock-resolves-conflict`),
+not `issue-14-space-sidebar.spec.ts`. Reload and revert now name unsaved Thing
+editing and Keep local and retry; `none` is unchanged. Discard mechanics were
+not touched.

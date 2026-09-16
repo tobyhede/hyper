@@ -1,5 +1,6 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
+import type { ReactNode } from 'react';
 import type {
   CanvasThingBodyEditor,
   CanvasSpaceThingSelection,
@@ -51,7 +52,7 @@ export type ThingNodeData = {
   title: string;
   /** Whether the Thing's reusable component must withhold authoring affordances. */
   readOnly: boolean;
-  /** An embedded Space boundary offers no connection-authoring controls. */
+  /** False withholds hover-reveal; omitted or true offers the host-canvas handles. */
   connectionAuthoringEnabled?: boolean;
   /**
    * What kind of Thing this is, drawn as a persistent glyph on the Front.
@@ -172,6 +173,30 @@ export type ThingNodeData = {
    * operation on this node (ADR 0068, ADR 0074).
    */
   spaceSelection?: CanvasSpaceThingSelection;
+  /**
+   * Diagram and Graph clusters for an Open Space Thing, assembled by the
+   * application and inserted at the head of the Thing rail.
+   *
+   * Not derived here: it describes a second Space's choices, which this
+   * projection has no reader for. Absent while the Thing is closed, the surface
+   * is read-only, or the target has not been read yet (ADR 0068, ADR 0074).
+   */
+  spaceRail?: ReactNode;
+  /**
+   * The Read/Edit boundary for an Open Space Thing's embedded target canvas.
+   *
+   * Presence is the capability. The containing canvas owns which Things are in
+   * Edit because the embedding is sibling nodes, not markup inside the Thing.
+   */
+  portal?: {
+    readonly editing: boolean;
+    readonly onEditingChange: (editing: boolean) => void;
+  };
+  /**
+   * A refusal or busy notice from this Thing's context commands. Absent or null
+   * leaves the alert region unmounted.
+   */
+  contextNotice?: string | null;
   /** The resolved content kind, including a Space Thing reached through an Alias. */
   spaceContent?: Extract<Thing, { kind: 'space' }>;
   active: boolean;

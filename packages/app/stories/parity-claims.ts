@@ -334,6 +334,27 @@ export const parityClaims: readonly ParityClaim[] = [
       'New Diagram sits in the Diagram menu beside the list it adds to, and creates and selects an empty Diagram without implicitly placing Things.',
   },
   {
+    id: 'command-dock-adds-graph',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'New Graph sits in the Graph menu beside the list it adds to, and appends, colours and activates one empty Graph in one Edit.',
+  },
+  {
+    id: 'command-dock-recolors-graph',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "The Graph menu's Colour submenu offers the application's palette and stores the chosen colour on the active Graph.",
+  },
+  {
+    id: 'command-dock-deletes-graph',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Delete Graph removes the active Graph when the Diagram owns more than one, and is present but unavailable on the last Graph the Diagram keeps.',
+  },
+  {
     id: 'command-dock-copies-graph-destinations',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
@@ -620,14 +641,50 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      "An Open Space Thing's Diagram and Graph choices extend its one rail toolbar with the Command Dock's shared clusters, controls and lists; arrows traverse them alongside Enter, entity actions and Close, and choosing one writes the Thing's stored context without moving the containing Space.",
+      "An Open Space Thing's Diagram and Graph choices extend its one rail toolbar with the Command Dock's shared clusters, controls and lists; arrows traverse them alongside entity actions and Close, and choosing one writes the Thing's stored context without moving the containing Space.",
+  },
+  {
+    id: 'open-space-thing-drag-keeps-embedded-diagram-aligned',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Dragging an Open Space Thing translates its embedded Things and Graph connectors as one aligned drawing throughout the gesture, without delayed catch-up after release.',
   },
   {
     id: 'embedded-diagram-things-author-target',
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'Editing a Thing inside an Open Space Thing authors its target Space and updates both canvases; cross-Space connection handles remain unavailable.',
+      'Editing a Thing inside an Open Space Thing authors its target Space and updates both canvases; Edit offers the same connection handles as the host canvas, and those handles author the Graph the Space Thing is showing rather than a cross-Space Edge.',
+  },
+  {
+    id: 'space-thing-portal-read-edit',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'An Open Space Thing offers Edit and Done on its floating dock; Read keeps the embedding inert so dragging moves the containing Thing, and Edit makes the embedded canvas interactive without a second command surface.',
+  },
+  {
+    id: 'space-thing-portal-framing',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'EnteredFromSpaceThing',
+    claim:
+      'A Space Thing stores camera framing independently of other Things on the same target; Done, Close, reopen and Return restore it, Enter uses the browser-sized canvas rather than the source Thing rectangle, Diagram fallback clears framing and Graph fallback keeps it.',
+  },
+  {
+    id: 'space-thing-portal-edit-is-the-host-canvas',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'SelectedDiagram',
+    claim:
+      'Portal Edit frames authored coordinates without stretching a Thing flow-pixel size; a Thing that leaves the window is clipped to it and never paints on the containing canvas after zoom-out.',
+  },
+  {
+    id: 'space-thing-portal-independent-framing',
+    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    storyExport: 'TwoSelectionsOfOneTarget',
+    claim: 'Two Space Things selecting the same target author framing independently of each other.',
+    applicationEvidence:
+      'Two Space Things on one two-Diagram target is the Ladle fixture; the e2e fixture does not author that pair through the browser. packages/app/ladle-e2e/space-thing-embedded-diagram.spec.ts holds the independent-framing proof, and packages/app/e2e/space-thing.spec.ts covers persistence, reload, Enter/Return and Diagram/Graph fallback on one Space Thing.',
   },
   {
     id: 'graph-hud-and-dock-agree-on-the-active-graph',

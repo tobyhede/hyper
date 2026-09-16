@@ -110,7 +110,7 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
 export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): Promise<void> {
   const id = await thing.getAttribute('data-id');
   if (id === null) throw new Error('Space Thing id missing');
-  const card = page.locator(`.react-flow__node[data-id="${id}"]`);
+  const thingNode = page.locator(`.react-flow__node[data-id="${id}"]`);
   const typography = (control: Locator) =>
     control.evaluate((element) => ({
       font: getComputedStyle(element).fontSize,
@@ -122,13 +122,13 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
       })),
     }));
   expect(
-    await typography((await thingControls(page, card)).getByTestId('space-thing-diagram')),
+    await typography((await thingControls(page, thingNode)).getByTestId('space-thing-diagram')),
   ).toEqual(await typography(page.locator('[data-testid="selected-canvas"]:visible')));
   expect(
-    await typography((await thingControls(page, card)).getByTestId('space-thing-graph')),
+    await typography((await thingControls(page, thingNode)).getByTestId('space-thing-graph')),
   ).toEqual(await typography(page.locator('[data-testid="active-graph"]:visible')));
   const menu = async () => {
-    const trigger = (await thingControls(page, card)).getByRole('button', {
+    const trigger = (await thingControls(page, thingNode)).getByRole('button', {
       name: /^Actions for Thing/,
     });
     await trigger.focus();
@@ -146,24 +146,26 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
     'Remove from Diagram',
   ]);
   await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(3);
-  await expect(card.getByRole('button', { name: /^Enter/ })).toHaveCount(0);
+  await expect(
+    (await thingControls(page, thingNode)).getByRole('button', { name: /^Enter/ }),
+  ).toHaveCount(0);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   const title = page.getByRole('textbox', { name: 'Thing title', exact: true });
   await expect(title).toBeFocused();
-  await title.fill('Space card');
+  await title.fill('Space Thing');
   await title.press('Enter');
-  await expect(card.getByRole('heading', { name: 'Space card', exact: true })).toBeVisible();
+  await expect(thingNode.getByRole('heading', { name: 'Space Thing', exact: true })).toBeVisible();
   await menu();
   await page.getByRole('menuitem', { name: 'Create Alias', exact: true }).click();
   await expect(title).toBeFocused();
-  await title.fill('Space card alias');
+  await title.fill('Space Thing alias');
   await title.press('Enter');
   const alias = page.locator('.react-flow__node').filter({
-    has: page.getByRole('heading', { name: 'Space card alias', exact: true }),
+    has: page.getByRole('heading', { name: 'Space Thing alias', exact: true }),
   });
   await expect(alias.locator('[data-testid="thing"]')).toHaveAttribute('data-kind', 'alias');
   const openAlias = (await thingControls(page, alias)).getByRole('button', {
-    name: 'Open Thing Space card alias',
+    name: 'Open Thing Space Thing alias',
   });
   await openAlias.focus();
   await openAlias.press('Enter');
@@ -177,7 +179,7 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
   ).toBeLessThan(50);
   await expect(embedded.getByTestId('canvas-thing-actions')).toHaveCount(0);
   const aliasMenu = (await thingControls(page, alias)).getByRole('button', {
-    name: 'Actions for Thing Space card alias',
+    name: 'Actions for Thing Space Thing alias',
   });
   await aliasMenu.focus();
   await aliasMenu.press('Enter');

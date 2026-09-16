@@ -1,9 +1,15 @@
 import type { ThingDocument, GraphId, UUID } from '@project/core';
-import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from '@project/ui';
+import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from './space-thing-rail';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
 import { describeAuthoringRefusal } from './authoring-refusal';
+import {
+  coordinatedDiagramDelete,
+  coordinatedGraphDelete,
+  PERSISTENCE_UNSETTLED,
+} from './coordinated-context-delete';
+import { coordinatedContextCreate, createdDiagramContext } from './coordinated-context-create';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceThingTargetDiagram } from './space-thing-lifecycle';
@@ -24,35 +30,37 @@ export function spaceThingContextCommands(
   document: Extract<ThingDocument, { kind: 'space' }>,
   select: (diagram: Pick<SpaceThingTargetDiagram, 'id'>, graphId: GraphId) => string | null,
   continuation: Continuation,
+  complete: (
+    completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
+  ) => AuthoringResult,
 ): SpaceThingContextCommands {
   const location = spaces.browserLocation;
-  const persistenceError = 'The change could not be saved. Check the Space persistence status.';
   const settled = async () =>
     (await spaces.waitForPersistence(entry.id)) &&
     (await spaces.waitForPersistence(containingSpaceId));
   const selectAndSave = async (next: Pick<SpaceThingTargetDiagram, 'id'>, nextGraph: GraphId) => {
     const refusal = select(next, nextGraph);
     if (refusal !== null) return refusal;
-    return (await spaces.waitForPersistence(containingSpaceId)) ? null : persistenceError;
+    return (await spaces.waitForPersistence(containingSpaceId)) ? null : PERSISTENCE_UNSETTLED;
   };
   const { diagram: diagramId, graph: graphId } = document;
   const space = entry.app.currentSpace();
   const diagram = space.diagrams.find((each) => each.id === diagramId);
   const graph = diagram?.graphs.find((each) => each.id === graphId);
-  const complete = (completion: EmbeddedContextCompletion) =>
-    entry.app.authoring.completeInDiagram(diagramId, completion);
   const diagramCommands: CanvasSpaceThingCommands = {
     deleteDisabled: space.diagrams.length <= 1 || diagram === undefined,
     onRename: (title) => refusalOf(complete({ kind: 'renamed-diagram', diagramId, title })),
-    onCreate: async (scope) => {
-      if (!(await settled())) return persistenceError;
-      const result = entry.app.authoring.complete({ kind: 'created-diagram' });
-      if (result.kind === 'completed') {
-        if (!(await spaces.waitForPersistence(entry.id))) return persistenceError;
-        const selected = entry.app.navigation.getState().selectedDiagramId;
-        const created = entry.app.currentSpace().diagrams.find((each) => each.id === selected);
-        const active = created?.activeGraph ?? created?.graphs[0]?.id;
-        if (created !== undefined && active !== undefined) {
+    onCreate: async (scope) =>
+      coordinatedContextCreate({
+        waitBefore: settled,
+        create: () => entry.app.authoring.complete({ kind: 'created-diagram' }),
+        waitUntilPersisted: () => spaces.waitForPersistence(entry.id),
+        createdOf: () =>
+          createdDiagramContext(
+            entry.app.currentSpace().diagrams,
+            entry.app.navigation.getState().selectedDiagramId,
+          ),
+        afterCreated: async (created, active) => {
           const refusal = await selectAndSave(created, active);
           if (refusal !== null) return refusal;
           continuation.request({
@@ -64,22 +72,29 @@ export function spaceThingContextCommands(
             select: false,
             then: 'rename',
           });
-        }
-      }
-      return refusalOf(result);
-    },
+          return null;
+        },
+      }),
     onDelete: async () => {
-      if (!(await settled())) return persistenceError;
-      const next = entry.app.currentSpace().diagrams.find((each) => each.id !== diagramId);
-      const active = next?.activeGraph ?? next?.graphs[0]?.id;
-      if (next !== undefined && active !== undefined) {
-        const refusal = await selectAndSave(next, active);
-        if (refusal !== null) return refusal;
-      }
-      const result = entry.app.authoring.complete({ kind: 'deleted-diagram', diagramId });
-      return (
-        refusalOf(result) ?? ((await spaces.waitForPersistence(entry.id)) ? null : persistenceError)
+      const selected = entry.app.navigation.getState().selectedDiagramId;
+      const result = await coordinatedDiagramDelete(
+        entry.spaceThings.deleteDiagram,
+        {
+          targetSpaceId: entry.id,
+          diagramId,
+          preferredDiagramId: selected,
+        },
+        settled,
       );
+      if (result.kind === 'error') return result.message;
+      if (
+        result.kind === 'completed' &&
+        entry.app.navigation.getState().selectedDiagramId === diagramId
+      ) {
+        entry.app.navigation.selectDiagram(result.diagramId);
+        entry.app.navigation.activateGraph(result.graphId);
+      }
+      return null;
     },
     onCopyLink: () => copyLink(location.href({ kind: 'diagram', spaceId: entry.id, diagramId })),
   };
@@ -92,33 +107,38 @@ export function spaceThingContextCommands(
       colors: GRAPH_PALETTE_ENTRIES,
       onRename: (title) => refusalOf(complete({ kind: 'renamed-graph', graphId, title })),
       onRecolor: (color) => refusalOf(complete({ kind: 'recolored-graph', graphId, color })),
-      onCreate: async () => {
-        if (!(await settled())) return persistenceError;
-        const result = complete({ kind: 'added-graph' });
-        if (result.kind === 'completed' && !(await spaces.waitForPersistence(entry.id)))
-          return persistenceError;
+      onCreate: async () =>
+        coordinatedContextCreate({
+          waitBefore: settled,
+          create: () => complete({ kind: 'added-graph' }),
+          waitUntilPersisted: () => spaces.waitForPersistence(entry.id),
+          createdOf: (result) => {
+            const updated = entry.app.currentSpace().diagrams.find((each) => each.id === diagramId);
+            return result.createdGraphId !== undefined && updated !== undefined
+              ? { created: updated, active: result.createdGraphId }
+              : undefined;
+          },
+          afterCreated: selectAndSave,
+        }),
+      onDelete: async () => {
         const updated = entry.app.currentSpace().diagrams.find((each) => each.id === diagramId);
+        const result = await coordinatedGraphDelete(
+          entry.spaceThings.deleteGraph,
+          {
+            targetSpaceId: entry.id,
+            diagramId,
+            graphId,
+            preferredGraphId: updated?.activeGraph ?? null,
+          },
+          settled,
+        );
+        if (result.kind === 'error') return result.message;
         if (
           result.kind === 'completed' &&
-          result.createdGraphId !== undefined &&
-          updated !== undefined
+          entry.app.navigation.getState().selectedDiagramId === diagramId
         )
-          return selectAndSave(updated, result.createdGraphId);
-        return refusalOf(result);
-      },
-      onDelete: async () => {
-        if (!(await settled())) return persistenceError;
-        const updated = entry.app.currentSpace().diagrams.find((each) => each.id === diagramId);
-        const survivor = updated?.graphs.find((each) => each.id !== graphId);
-        if (updated !== undefined && survivor !== undefined) {
-          const refusal = await selectAndSave(updated, survivor.id);
-          if (refusal !== null) return refusal;
-        }
-        const result = complete({ kind: 'deleted-graph', graphId });
-        return (
-          refusalOf(result) ??
-          ((await spaces.waitForPersistence(entry.id)) ? null : persistenceError)
-        );
+          entry.app.navigation.activateGraph(result.graphId);
+        return null;
       },
       onCopyLink: () =>
         copyLink(location.href({ kind: 'diagram-graph', spaceId: entry.id, diagramId, graphId })),

@@ -13,17 +13,18 @@ import {
   Background,
   ReactFlow,
   type Edge,
+  type IsValidConnection,
+  type OnConnect,
+  type OnConnectEnd,
+  type OnConnectStart,
   type ReactFlowProps,
   type OnEdgesChange,
   type OnNodesChange,
   useReactFlow,
 } from '@xyflow/react';
 import {
-  SPACE_THING_EMBED_INSET,
   titleName,
   uuidSchema,
-  type DiagramPosition,
-  type DiagramId,
   type Thing,
   type ThingId,
   type Graph,
@@ -50,15 +51,28 @@ import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { THING_SIZE } from '../thing';
 import { THING_DRAG_TYPE } from './ThingsPopover';
-import { OverviewCamera, PresentingCamera } from './cameras';
-import type { OpenSpace } from '../open-spaces';
-import { clipEmbeddedNode, embeddedClipId, type EmbeddedBounds } from '../embedded-diagram';
+import { OverviewCamera, PresentingCamera, OpeningFramingCamera } from './cameras';
+import {
+  canvasNodeConnection,
+  clipEmbeddedNode,
+  embeddedClipId,
+  parseEmbeddedNodeId,
+} from '../embedded-diagram';
+import {
+  embeddedAuthoringEnabled,
+  editingPortalAncestor,
+  embeddingIsPortalEditing,
+} from '../embedded-open-space-thing';
+import { useEmbeddedOpenSpaceThings } from '../use-embedded-open-space-things';
 import { useOpenSpaces } from '../open-spaces-context';
-import { EmbeddedDiagramAuthoring, type EmbeddedPublication } from './EmbeddedDiagramAuthoring';
+import { EmbeddedDiagramAuthoring } from './EmbeddedDiagramAuthoring';
 import type { Continuation } from '../continuation';
-
-const EMPTY_ENTRIES = [] as const;
-const emptySubscription = () => () => undefined;
+import {
+  framingFromFit,
+  panFraming,
+  zoomFraming,
+  type SpaceThingFraming,
+} from '../space-thing-framing';
 
 /**
  * What the graph tells assistive technology it can do.
@@ -97,6 +111,8 @@ const PENDING_ARIA_LABEL_CONFIG = {
  * without anything failing.
  */
 export const ADD_THING_KEY = 'C';
+
+const subscribeToNothing = (): (() => void) => () => undefined;
 
 /**
  * Where an unmodified letter is somebody else's, not the canvas's command.
@@ -309,142 +325,37 @@ export function SpaceCanvas({
   const { screenToFlowPosition } = useReactFlow();
 
   const spaces = useOpenSpaces();
-  const getEntries = useCallback(() => spaces?.getState().entries ?? EMPTY_ENTRIES, [spaces]);
-  const entries = useSyncExternalStore(spaces?.subscribe ?? emptySubscription, getEntries);
-  const [embeddedPublications, setEmbeddedPublications] = useState<
-    ReadonlyMap<string, EmbeddedPublication>
-  >(new Map());
-  /**
-   * What each target could not be read with, kept apart from the others'.
-   *
-   * One string for the whole canvas made every embedding answer for every
-   * other: any target that opened cleared a sentence raised by a different
-   * Space Thing, and the one on screen never said which target it was about.
-   * Keyed by the Space the read was aimed at, because that is what
-   * `spaces.embed` is asked for — two Things reaching the same missing Space
-   * are reporting one failure, and each names itself where it is drawn.
-   */
-  const [embeddedFailures, setEmbeddedFailures] = useState<ReadonlyMap<ThingId, string>>(new Map());
-  const [bodyHeights, setBodyHeights] = useState<ReadonlyMap<string, number>>(new Map());
-  const reportBodyHeight = useCallback((id: string, height: number | null) => {
-    setBodyHeights((previous) => {
-      if (height === null ? !previous.has(id) : previous.get(id) === height) return previous;
-      const next = new Map(previous);
-      if (height === null) next.delete(id);
-      else next.set(id, height);
-      return next;
-    });
-  }, []);
-  const embeddedRequests = useMemo(() => {
-    const requests: {
-      parent: ThingFlowNode;
-      spaceId: ThingId;
-      diagramId: DiagramId;
-      graphId: GraphId;
-      entry: OpenSpace | undefined;
-      absolute: DiagramPosition;
-      bounds: EmbeddedBounds;
-      readOnly: boolean;
-    }[] = [];
-    const queue: {
-      parent: ThingFlowNode;
-      origin: DiagramPosition;
-      clip: EmbeddedBounds | null;
-      /** The Diagrams already crossed to reach this parent, newest last. */
-      path: ReadonlySet<string>;
-      readOnly: boolean;
-    }[] = nodes.map((parent) => ({
-      parent,
-      origin: { x: 0, y: 0 },
-      clip: null,
-      path: new Set<string>(),
-      readOnly: false,
-    }));
-    for (const item of queue) {
-      const { parent, origin, clip, path } = item;
-      if (parent.data.expanded !== true) continue;
-      const document = parent.data.spaceContent;
-      if (document === undefined) continue;
-      const readOnly = item.readOnly || parent.data.kind === 'alias';
-      // A Diagram already on this path would embed itself. Single-Space intake
-      // refuses only a Thing targeting its own Space, so a mutual pair reaches
-      // here validated and would otherwise nest one level deeper per commit.
-      const crossing = `${document.spaceId}:${document.diagram}`;
-      if (path.has(crossing)) continue;
-      const crossed = new Set(path).add(crossing);
-      const absolute = { x: origin.x + parent.position.x, y: origin.y + parent.position.y };
-      const footer = bodyHeights.get(parent.id);
-      const bottomInset = footer === undefined ? SPACE_THING_EMBED_INSET.bottom : footer + 4;
-      const intersection = {
-        left: Math.max(absolute.x + SPACE_THING_EMBED_INSET.left, clip?.left ?? -Infinity),
-        top: Math.max(absolute.y + SPACE_THING_EMBED_INSET.top, clip?.top ?? -Infinity),
-        right: Math.min(
-          absolute.x + (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
-          clip?.right ?? Infinity,
-        ),
-        bottom: Math.min(absolute.y + (parent.height ?? 0) - bottomInset, clip?.bottom ?? Infinity),
-      };
-      requests.push({
-        parent,
-        readOnly,
-        spaceId: document.spaceId,
-        diagramId: document.diagram,
-        graphId: document.graph,
-        entry: entries.find((entry) => entry.id === document.spaceId),
-        absolute,
-        bounds: {
-          left: intersection.left - absolute.x,
-          top: intersection.top - absolute.y,
-          right: intersection.right - absolute.x,
-          bottom: intersection.bottom - absolute.y,
-        },
-      });
-      const published = embeddedPublications.get(parent.id);
-      if (published?.diagramId === document.diagram) {
-        for (const child of published.nodes)
-          queue.push({
-            parent: child,
-            origin: absolute,
-            clip: intersection,
-            path: crossed,
-            readOnly,
-          });
-      }
-    }
-    return requests;
-  }, [nodes, entries, embeddedPublications, bodyHeights]);
-  /**
-   * A read outlives its embedding only while the *target* is gone.
-   *
-   * That is the Exit case: the request still stands, `request.entry` is
-   * `undefined`, and the last read is what the retained read-only drawing is
-   * made of. A Space Thing that is simply **Closed** makes no request at all, so
-   * its read ends with it — a publication left in the map would be picked up as
-   * *live* by the next Open of that same Thing at that same Diagram, one commit
-   * of nodes whose `changeNodes` and `removeThing` are bound to a composition
-   * whose `observe()` was torn down, and it would seed the nested traversal
-   * above from a Diagram nobody is reading any more.
-   *
-   * Adjusted during render, the way `commandRefusal` is below: React discards
-   * this pass, so neither the DOM nor the load effect ever sees the requests the
-   * dead publication produced.
-   */
-  if (embeddedPublications.size > 0) {
-    const standing = new Set(embeddedRequests.map((request) => request.parent.id));
-    if ([...embeddedPublications.keys()].some((id) => !standing.has(id))) {
-      setEmbeddedPublications(
-        new Map([...embeddedPublications].filter(([id]) => standing.has(id))),
-      );
-    }
+  const thisSpaceId = spaceSession.getState().working.id;
+  const activeSpaceId = useSyncExternalStore(spaces?.subscribe ?? subscribeToNothing, () =>
+    spaces === null ? null : spaces.getState().activeSpaceId,
+  );
+  const readThisCanvasOpeningFraming = (): SpaceThingFraming | undefined => {
+    if (spaces === null) return undefined;
+    const entry = spaces.entry(thisSpaceId);
+    return entry === undefined ? undefined : spaces.openingFraming(entry);
+  };
+  const [openingFraming, setOpeningFraming] = useState(() =>
+    spaces?.getState().activeSpaceId !== thisSpaceId ? undefined : readThisCanvasOpeningFraming(),
+  );
+  const [seededOpeningFraming, setSeededOpeningFraming] = useState(
+    () => spaces?.getState().activeSpaceId === thisSpaceId || spaces === null,
+  );
+  if (!seededOpeningFraming && activeSpaceId === thisSpaceId) {
+    setSeededOpeningFraming(true);
+    setOpeningFraming(readThisCanvasOpeningFraming());
   }
-  // A refusal belongs to the embedding that asked for the read, so it goes the
-  // same way: no standing request means nothing left to announce it on.
-  if (embeddedFailures.size > 0) {
-    const asked = new Set(embeddedRequests.map((request) => request.spaceId));
-    if ([...embeddedFailures.keys()].some((spaceId) => !asked.has(spaceId))) {
-      setEmbeddedFailures(new Map([...embeddedFailures].filter(([id]) => asked.has(id))));
-    }
-  }
+  const {
+    embeddedRequests,
+    embeddedPublications,
+    embeddedFailures,
+    resumeEmbedded,
+    publishEmbedded,
+    reportBodyHeight,
+    editingPortals,
+    onPortalEditingChange,
+    portalDraft,
+    setPortalDraft,
+  } = useEmbeddedOpenSpaceThings(nodes, spaces);
   const editingEmbeddingIds = new Set(
     embeddedRequests.flatMap((request) => {
       const value = embeddedPublications.get(request.parent.id);
@@ -488,8 +399,15 @@ export function SpaceCanvas({
     onSelectThing,
     spaceThingTargets,
     thingEntityActions,
+    portalEditing: editingPortals,
+    onPortalEditingChange,
   });
-  const { bodyEditing, openThing: onOpenThing, beginTitleEditing } = thingAuthoring;
+  const {
+    bodyEditing,
+    openThing: onOpenThing,
+    beginTitleEditing,
+    completeSpaceThingFraming,
+  } = thingAuthoring;
 
   const embeddedBodyEditing = embeddedRequests.some(
     (request) =>
@@ -508,54 +426,6 @@ export function SpaceCanvas({
     onTitleEditingChange?.(thingAuthoring.titleEditing || embeddedTitleEditing);
     return () => onTitleEditingChange?.(false);
   }, [thingAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
-  const requested = useRef(new Set<string>());
-  const resumeEmbedded = useCallback(
-    async (spaceId: ThingId) => {
-      try {
-        await spaces?.embed(spaceId);
-        setEmbeddedFailures((previous) =>
-          previous.has(spaceId)
-            ? new Map([...previous].filter(([id]) => id !== spaceId))
-            : previous,
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setEmbeddedFailures((previous) =>
-          previous.get(spaceId) === message ? previous : new Map(previous).set(spaceId, message),
-        );
-      }
-    },
-    [spaces],
-  );
-  useEffect(() => {
-    const visible = new Map(
-      embeddedRequests.map((request) => [
-        `${request.parent.id}:${request.diagramId}:${request.graphId}`,
-        request,
-      ]),
-    );
-    for (const id of requested.current) if (!visible.has(id)) requested.current.delete(id);
-    for (const [id, request] of visible) {
-      if (spaces === null || requested.current.has(id)) continue;
-      // The claim outlives the answer, refusal included. This effect re-runs
-      // whenever `embeddedRequests` changes identity — which every session
-      // change in every open Space does — so releasing the id on failure asks a
-      // permanently unreadable target again on essentially every edit anywhere.
-      // One read per embedding: closing and reopening the Thing, or selecting
-      // another Diagram, is what asks again, and so is `resumeEmbedded`.
-      requested.current.add(id);
-      void resumeEmbedded(request.spaceId);
-    }
-  }, [spaces, embeddedRequests, resumeEmbedded]);
-  const publishEmbedded = useCallback((id: string, value: EmbeddedPublication | null) => {
-    setEmbeddedPublications((previous) => {
-      if (previous.get(id) === value || (value === null && !previous.has(id))) return previous;
-      const next = new Map(previous);
-      if (value === null) next.delete(id);
-      else next.set(id, value);
-      return next;
-    });
-  }, []);
   const liveEmbeddings = useMemo(
     () =>
       embeddedRequests.flatMap((request) => {
@@ -598,6 +468,17 @@ export function SpaceCanvas({
     [embeddedRequests, embeddedPublications, resumeEmbedded],
   );
 
+  const embedConnectFrom = useRef<{ parentId: string; from: ThingId } | null>(null);
+  const mayOfferEmbedded = useCallback(
+    (thingId: ThingId) => {
+      const session = embedConnectFrom.current;
+      if (session === null) return false;
+      return (
+        embeddedPublications.get(session.parentId)?.mayConnectThings(session.from, thingId) === true
+      );
+    },
+    [embeddedPublications],
+  );
   const edgeSurface = useEdgeAuthoring({
     authoring: edgeAuthoring,
     edges,
@@ -609,6 +490,7 @@ export function SpaceCanvas({
     newThingTitle,
     enabled: availability.authorOnCanvas,
     onSelectEdge,
+    mayOfferAlso: mayOfferEmbedded,
   });
 
   // Every handler and object below is memoized because React Flow's own docs
@@ -729,16 +611,41 @@ export function SpaceCanvas({
    */
   const canvasNodes = useMemo(
     () =>
-      [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) =>
-        node.data.spaceContent === undefined
-          ? node
-          : {
-              ...node,
-              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
-            },
-      ),
-    [editableNodes, liveEmbeddings, reportBodyHeight],
+      [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
+        const withHeight =
+          node.data.spaceContent === undefined
+            ? node
+            : {
+                ...node,
+                data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+              };
+        if (!editingPortals.has(withHeight.data.thingId) || withHeight.data.kind !== 'space') {
+          return withHeight;
+        }
+        // `nopan` only: an Open Thing does not take `nowheel` (ADR 0064).
+        // Portal wheel is the capture listener below;
+        // `space-thing-embedded-diagram.test.tsx` ('does not put nowheel on an
+        // Open Space Thing in portal Edit, and wheel still authors its framing')
+        // holds both that class and that the wheel still frames.
+        const classes = [withHeight.className, 'nopan'].filter(
+          (value): value is string => value !== undefined && value !== '',
+        );
+        return {
+          ...withHeight,
+          draggable: false,
+          className: classes.join(' '),
+        };
+      }),
+    [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals],
   );
+  const portalNodesById = useMemo(() => {
+    const map = new Map<string, ThingFlowNode>();
+    for (const node of nodes) map.set(node.id, node);
+    for (const value of liveEmbeddings) {
+      for (const child of value.nodes) map.set(child.id, child);
+    }
+    return map;
+  }, [nodes, liveEmbeddings]);
   const canvasEdges = useMemo(
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
     [edgeSurface.edges, liveEmbeddings],
@@ -751,6 +658,213 @@ export function SpaceCanvas({
     [onNodesChange, liveEmbeddings],
   );
   const canvasRef = useRef<HTMLDivElement>(null);
+  const portalGestureSnapshot = useRef({
+    editingPortals,
+    portalNodesById,
+    portalDraft,
+    embeddedPublications,
+    embeddedRequests,
+    completeSpaceThingFraming,
+    screenToFlowPosition,
+    authorOnCanvas: availability.authorOnCanvas,
+  });
+  // Native pointer and wheel events can arrive after commit but before
+  // passive effects. Refresh in the synchronous commit phase so the stable
+  // listener cannot pan or zoom from the previous gesture-session snapshot.
+  useLayoutEffect(() => {
+    portalGestureSnapshot.current = {
+      editingPortals,
+      portalNodesById,
+      portalDraft,
+      embeddedPublications,
+      embeddedRequests,
+      completeSpaceThingFraming,
+      screenToFlowPosition,
+      authorOnCanvas: availability.authorOnCanvas,
+    };
+  }, [
+    editingPortals,
+    portalNodesById,
+    portalDraft,
+    embeddedPublications,
+    embeddedRequests,
+    completeSpaceThingFraming,
+    screenToFlowPosition,
+    availability.authorOnCanvas,
+  ]);
+
+  useEffect(() => {
+    const root = canvasRef.current;
+    if (root === null) return;
+
+    let pan: {
+      pointerId: number;
+      thingId: ThingId;
+      lastX: number;
+      lastY: number;
+      framing: SpaceThingFraming;
+    } | null = null;
+    const zoomPending = new Map<ThingId, SpaceThingFraming>();
+    const zoomTimers = new Map<ThingId, ReturnType<typeof setTimeout>>();
+
+    const persist = (thingId: ThingId, framing: SpaceThingFraming, dropDraft = true) => {
+      if (dropDraft) {
+        setPortalDraft((previous) => {
+          const next = new Map(previous);
+          next.delete(thingId);
+          return next;
+        });
+      }
+      portalGestureSnapshot.current.completeSpaceThingFraming(thingId, framing);
+    };
+
+    const flushPendingZoom = (thingId: ThingId, dropDraft = true) => {
+      const pending = zoomPending.get(thingId);
+      const timer = zoomTimers.get(thingId);
+      if (timer !== undefined) clearTimeout(timer);
+      zoomPending.delete(thingId);
+      zoomTimers.delete(thingId);
+      if (pending !== undefined) persist(thingId, pending, dropDraft);
+    };
+
+    const framingOf = (thingId: ThingId, parentId: string): SpaceThingFraming | undefined => {
+      const session = portalGestureSnapshot.current;
+      const drafted = session.portalDraft.get(thingId);
+      if (drafted !== undefined) return drafted;
+      const parent = session.portalNodesById.get(parentId);
+      const stored = parent?.data.spaceContent?.framing;
+      if (stored !== undefined) return stored;
+      const published = session.embeddedPublications.get(parentId);
+      const request = session.embeddedRequests.find(
+        (candidate) => candidate.parent.id === parentId,
+      );
+      if (published === undefined || request === undefined) return undefined;
+      return framingFromFit(published.origin, request.bounds);
+    };
+
+    const portalParent = (target: EventTarget | null): ThingFlowNode | undefined => {
+      if (!(target instanceof Element)) return undefined;
+      if (
+        target.closest('.nokey, button, [role="toolbar"], .react-flow__resize-control') !== null
+      ) {
+        return undefined;
+      }
+      const nodeEl = target.closest<HTMLElement>('.react-flow__node[data-id]');
+      if (nodeEl === null) return undefined;
+      const id = nodeEl.dataset['id'];
+      if (id === undefined) return undefined;
+      const node = portalGestureSnapshot.current.portalNodesById.get(id);
+      if (node === undefined || node.parentId !== undefined) return undefined;
+      if (node.data.kind !== 'space') return undefined;
+      if (!portalGestureSnapshot.current.editingPortals.has(node.data.thingId)) return undefined;
+      return node;
+    };
+
+    const portalUnder = (target: EventTarget | null): ThingFlowNode | undefined => {
+      if (!(target instanceof Element)) return undefined;
+      const nodeEl = target.closest<HTMLElement>('.react-flow__node[data-id]');
+      if (nodeEl === null) return undefined;
+      const id = nodeEl.dataset['id'];
+      if (id === undefined) return undefined;
+      const session = portalGestureSnapshot.current;
+      return editingPortalAncestor(
+        session.portalNodesById.get(id),
+        session.portalNodesById,
+        session.editingPortals,
+      );
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      if (!portalGestureSnapshot.current.authorOnCanvas) return;
+      const parent = portalParent(event.target);
+      if (parent === undefined) return;
+      const thingId = parent.data.thingId;
+      const existingTimer = zoomTimers.get(thingId);
+      if (existingTimer !== undefined) clearTimeout(existingTimer);
+      zoomTimers.delete(thingId);
+      const pendingZoom = zoomPending.get(thingId);
+      if (pendingZoom !== undefined) zoomPending.delete(thingId);
+      const framing = pendingZoom ?? framingOf(thingId, parent.id);
+      if (framing === undefined) return;
+      event.preventDefault();
+      pan = {
+        pointerId: event.pointerId,
+        thingId,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        framing,
+      };
+      root.setPointerCapture(event.pointerId);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (pan?.pointerId !== event.pointerId) return;
+      const from = portalGestureSnapshot.current.screenToFlowPosition({
+        x: pan.lastX,
+        y: pan.lastY,
+      });
+      const to = portalGestureSnapshot.current.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const next = panFraming(pan.framing, { x: to.x - from.x, y: to.y - from.y });
+      const thingId = pan.thingId;
+      pan = { ...pan, lastX: event.clientX, lastY: event.clientY, framing: next };
+      setPortalDraft((previous) => {
+        if (previous.get(thingId) === next) return previous;
+        const drafted = new Map(previous);
+        drafted.set(thingId, next);
+        return drafted;
+      });
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (pan?.pointerId !== event.pointerId) return;
+      persist(pan.thingId, pan.framing);
+      pan = null;
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!portalGestureSnapshot.current.authorOnCanvas) return;
+      const parent = portalUnder(event.target);
+      if (parent === undefined) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const thingId = parent.data.thingId;
+      const current = zoomPending.get(thingId) ?? framingOf(thingId, parent.id);
+      if (current === undefined) return;
+      const next = zoomFraming(current, event.deltaY < 0 ? 1.1 : 1 / 1.1);
+      zoomPending.set(thingId, next);
+      setPortalDraft((previous) => {
+        const drafted = new Map(previous);
+        drafted.set(thingId, next);
+        return drafted;
+      });
+      const existing = zoomTimers.get(thingId);
+      if (existing !== undefined) clearTimeout(existing);
+      zoomTimers.set(
+        thingId,
+        setTimeout(() => {
+          flushPendingZoom(thingId);
+        }, 160),
+      );
+    };
+
+    root.addEventListener('pointerdown', onPointerDown);
+    root.addEventListener('pointermove', onPointerMove);
+    root.addEventListener('pointerup', onPointerUp);
+    root.addEventListener('pointercancel', onPointerUp);
+    root.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    return () => {
+      root.removeEventListener('pointerdown', onPointerDown);
+      root.removeEventListener('pointermove', onPointerMove);
+      root.removeEventListener('pointerup', onPointerUp);
+      root.removeEventListener('pointercancel', onPointerUp);
+      root.removeEventListener('wheel', onWheel, { capture: true });
+      for (const thingId of [...zoomPending.keys()]) flushPendingZoom(thingId, false);
+    };
+  }, [setPortalDraft]);
 
   /**
    * What a refused canvas command left the author with, or `null`.
@@ -896,6 +1010,51 @@ export function SpaceCanvas({
     selectionOnDrag,
   } = edgeSurface.reactFlowProps;
 
+  const onEmbeddedConnectStart = useCallback<OnConnectStart>(
+    (event, params) => {
+      const parsed = parseEmbeddedNodeId(params.nodeId ?? '');
+      if (parsed !== undefined) {
+        embedConnectFrom.current = { parentId: parsed.parentId, from: parsed.thingId };
+        return;
+      }
+      embedConnectFrom.current = null;
+      onConnectStart(event, params);
+    },
+    [onConnectStart],
+  );
+  const onEmbeddedConnect = useCallback<OnConnect>(
+    (connection) => {
+      const routed = canvasNodeConnection(connection.source, connection.target);
+      if (routed.kind === 'embedded') {
+        embeddedPublications.get(routed.parentId)?.connectThings(routed.from, routed.to);
+        return;
+      }
+      if (routed.kind === 'host') onConnect(connection);
+    },
+    [embeddedPublications, onConnect],
+  );
+  const onEmbeddedConnectEnd = useCallback<OnConnectEnd>(
+    (event, connection) => {
+      embedConnectFrom.current = null;
+      onConnectEnd(event, connection);
+    },
+    [onConnectEnd],
+  );
+  const isEmbeddedConnectionValid = useCallback<IsValidConnection>(
+    (connection) => {
+      const routed = canvasNodeConnection(connection.source, connection.target);
+      if (routed.kind === 'invalid') return false;
+      if (routed.kind === 'embedded') {
+        return (
+          embeddedPublications.get(routed.parentId)?.mayConnectThings(routed.from, routed.to) ===
+          true
+        );
+      }
+      return isValidConnection(connection);
+    },
+    [embeddedPublications, isValidConnection],
+  );
+
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
       if (!availability.authorOnCanvas || !event.dataTransfer.types.includes(THING_DRAG_TYPE))
@@ -948,10 +1107,10 @@ export function SpaceCanvas({
       onEdgesChange={onEdgesChange}
       // Edge Authoring's own properties, named one by one rather than spread, so
       // no property order below can silently replace one of its handlers.
-      onConnect={onConnect}
-      onConnectStart={onConnectStart}
-      onConnectEnd={onConnectEnd}
-      isValidConnection={isValidConnection}
+      onConnect={onEmbeddedConnect}
+      onConnectStart={onEmbeddedConnectStart}
+      onConnectEnd={onEmbeddedConnectEnd}
+      isValidConnection={isEmbeddedConnectionValid}
       onReconnectStart={onReconnectStart}
       onReconnect={onReconnect}
       onReconnectEnd={onReconnectEnd}
@@ -974,7 +1133,7 @@ export function SpaceCanvas({
       // nothing for the repair to focus without this. Negative, so the canvas
       // never becomes a stop a keyboard author has to pass through.
       tabIndex={-1}
-      fitView
+      fitView={openingFraming === undefined}
       fitViewOptions={OVERVIEW_FIT}
       // Nothing on a Thing answers a double click. ADR 0065 made the Title a
       // one-activation control, so the second click of a pair lands in the field
@@ -1053,12 +1212,22 @@ export function SpaceCanvas({
             // The two live edits are this canvas's own and read at same-render
             // freshness; the answers `App` holds are a frame behind them, since
             // each is reported up through an effect.
-            enabled={
-              !request.readOnly &&
-              availability.authorInEmbeddedDiagram &&
-              (availability.authorOnCanvas || editingEmbeddingIds.has(request.parent.id)) &&
-              !bodyEditing &&
-              !thingAuthoring.titleEditing
+            enabled={embeddedAuthoringEnabled({
+              readOnly: request.readOnly,
+              portalEditing: embeddingIsPortalEditing(
+                request.parent,
+                portalNodesById,
+                editingPortals,
+              ),
+              authorInEmbeddedDiagram: availability.authorInEmbeddedDiagram,
+              authorOnCanvas: availability.authorOnCanvas,
+              thisEmbeddingEditing: editingEmbeddingIds.has(request.parent.id),
+              hostBodyEditing: bodyEditing,
+              hostTitleEditing: thingAuthoring.titleEditing,
+            })}
+            framing={
+              portalDraft.get(request.parent.data.thingId) ??
+              request.parent.data.spaceContent?.framing
             }
             bounds={request.bounds}
             publish={publishEmbedded}
@@ -1103,6 +1272,7 @@ export function SpaceCanvas({
       )}
       <OverviewCamera presenting={presenting} />
       <PresentingCamera activeThingId={activeThingId} />
+      <OpeningFramingCamera framing={openingFraming} />
       {edgeSurface.layer}
     </ReactFlow>,
   );

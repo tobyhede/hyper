@@ -12,6 +12,84 @@ import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
 /** Nothing was authored: the answer this canvas owes the author no prose for. */
 const NOTHING_AUTHORED = { kind: 'unchanged' } as const;
 
+const completeEmbedded = (
+  entry: OpenSpace,
+  diagramId: DiagramId,
+  completion: AuthoringCompletion,
+  report: ObserverErrorReporter,
+): AuthoringResult => {
+  if (
+    completion.kind === 'opened-thing' ||
+    completion.kind === 'closed-thing' ||
+    completion.kind === 'resized-thing' ||
+    completion.kind === 'edited-thing' ||
+    completion.kind === 'settled-thing-movement' ||
+    completion.kind === 'removed-thing-from-diagram' ||
+    completion.kind === 'connected-things' ||
+    completion.kind === 'renamed-diagram' ||
+    completion.kind === 'added-graph' ||
+    completion.kind === 'renamed-graph' ||
+    completion.kind === 'recolored-graph'
+  ) {
+    return entry.app.authoring.completeInDiagram(diagramId, completion);
+  }
+  /**
+   * Anything else is a broken invariant, not a refusal.
+   *
+   * The kinds above are the whole of what the surfaces holding this
+   * `authoring` produce — `EmbeddedDiagramAuthoring`, the render adapter's
+   * resize and movement settlements, Canvas Thing Authoring, and the Space
+   * Thing rail's rename / recolor / add-Graph commands. Graph deletion is
+   * not forwarded (`embedded-authoring.test.ts` — "does not forward Graph
+   * deletion, which coordinated lifecycle owns"). Connecting two embedded Things is
+   * completed here as `connected-things`; the host Edge Authoring module is
+   * still not composed over this adapter. So any other kind arriving here is a
+   * wiring defect, and `AuthoringResult`'s own rule (`space-authoring.ts`) says
+   * a broken invariant "throws, or is reported through the non-throwing
+   * reporter — dressing a programming defect as a refusal would put it in front
+   * of the author as their own mistake". The refusal that used to stand here
+   * did exactly that, and with an unrelated sentence:
+   * `edge-thing-outside-diagram` presents as "An Edge can only join Things in
+   * this Diagram."
+   *
+   * Reported rather than thrown, under the canvas-wide rule recorded once in
+   * `docs/agents/rendering.md` ("React Flow itself") and argued in
+   * `connection-completion.ts`. `unchanged` is the honest answer — nothing
+   * was authored, and it is the one outcome that owes the author no prose.
+   */
+  report(
+    new Error(
+      `A ${completion.kind} completion reached an embedded Diagram, which supports only Open, Close, Edit, Resize, movement, Remove from Diagram, connecting Things, renaming the Diagram, and renaming, recoloring or adding a Graph.`,
+    ),
+  );
+  return NOTHING_AUTHORED;
+};
+
+/**
+ * The diagram-scoped authoring port: Thing gestures and context commands on
+ * the Diagram a Space Thing shows, completed by the target's sole Space
+ * Authoring. Graph deletion is not forwarded here
+ * (`embedded-authoring.test.ts` — "does not forward Graph deletion, which
+ * coordinated lifecycle owns").
+ *
+ * The reporter is required with no default (ADR 0016): the composition names
+ * the ambient console once and answers it as `ComposedApp.reportObserverError`,
+ * so this module never mints a second, invisible one.
+ */
+export function completeEmbeddedAuthoring(
+  entry: OpenSpace,
+  diagramId: DiagramId,
+  completion: AuthoringCompletion,
+  reportObserverError: ObserverErrorReporter,
+): AuthoringResult {
+  return completeEmbedded(
+    entry,
+    diagramId,
+    completion,
+    createNonThrowingReporter(reportObserverError),
+  );
+}
+
 /**
  * One embedded canvas's gestures, completed by the target's sole Space Authoring.
  *
@@ -30,44 +108,8 @@ export function createEmbeddedAuthoring(
   const notifications = createObservableState(null, (error) =>
     report(new Error('An embedded authoring observer failed.', { cause: error })),
   );
-  const complete = (completion: AuthoringCompletion): AuthoringResult => {
-    if (
-      completion.kind === 'opened-thing' ||
-      completion.kind === 'closed-thing' ||
-      completion.kind === 'resized-thing' ||
-      completion.kind === 'edited-thing' ||
-      completion.kind === 'settled-thing-movement' ||
-      completion.kind === 'removed-thing-from-diagram'
-    ) {
-      return entry.app.authoring.completeInDiagram(diagramId, completion);
-    }
-    /**
-     * Anything else is a broken invariant, not a refusal.
-     *
-     * The six kinds above are the whole of what the surfaces holding this
-     * `authoring` produce — `EmbeddedDiagramAuthoring`, the render adapter's
-     * resize and movement settlements, and Canvas Thing Authoring — and Edge
-     * Authoring is never composed over an embedded adapter. So a seventh kind
-     * arriving here is a wiring defect, and `AuthoringResult`'s own rule
-     * (`space-authoring.ts`) says a broken invariant "throws, or is reported
-     * through the non-throwing reporter — dressing a programming defect as a
-     * refusal would put it in front of the author as their own mistake". The
-     * refusal that used to stand here did exactly that, and with an unrelated
-     * sentence: `edge-thing-outside-diagram` presents as "An Edge can only join
-     * Things in this Diagram."
-     *
-     * Reported rather than thrown, under the canvas-wide rule recorded once in
-     * `docs/agents/rendering.md` ("React Flow itself") and argued in
-     * `connection-completion.ts`. `unchanged` is the honest answer — nothing
-     * was authored, and it is the one outcome that owes the author no prose.
-     */
-    report(
-      new Error(
-        `A ${completion.kind} completion reached an embedded Diagram, which supports only Open, Close, Edit, Resize, movement and Remove from Diagram.`,
-      ),
-    );
-    return NOTHING_AUTHORED;
-  };
+  const complete = (completion: AuthoringCompletion): AuthoringResult =>
+    completeEmbeddedAuthoring(entry, diagramId, completion, reportObserverError);
   const authoring: RenderAdapterAuthoring = {
     getState: entry.app.authoring.getState,
     complete,

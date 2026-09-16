@@ -1,14 +1,19 @@
-import { thingControls } from '../e2e/graph';
+import { authoringHandle, connectHandles, thingControls, boxOf } from '../e2e/graph';
 import {
+  beginPortalEdit,
+  embeddedGraphEdgeCount,
+  exercisePortalEditHostCanvas,
   exerciseSpaceThingPadding,
   exerciseSpaceThingFooter,
   exerciseFloatingThingDock,
+  hostGraphEdgeCount,
 } from '../e2e/space-thing-frame';
 import {
   exerciseSpaceThingContextMenus,
   exerciseSpaceThingEntityMenu,
 } from '../e2e/space-thing-context-menu';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectEmbeddedThingToFollowDrag } from '../e2e/support/embedded-drag';
 
 const STORY = '/?story=surfaces--space-thing-embedded-diagram--selected-diagram&mode=preview';
 
@@ -68,6 +73,26 @@ test(
   },
 );
 
+test(
+  'an Open Space Thing keeps its embedded Diagram aligned throughout a drag',
+  { tag: '@parity:open-space-thing-drag-keeps-embedded-diagram-aligned' },
+  async ({ page }) => {
+    await open(page);
+    await expectEmbeddedThingToFollowDrag(
+      page,
+      spaceThing(page),
+      embeddedNodes(page).first(),
+      [page.locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]')],
+      {
+        connector: page.locator(
+          '.react-flow__edge:not([data-id^="00000000-0000-4000-8000-000000000005:"])',
+        ),
+        endpoint: 'target',
+      },
+    );
+  },
+);
+
 /**
  * The two choices an Open Space Thing publishes, drawn as the Dock draws the same
  * two (`.scratch/command-dock/issues/12`).
@@ -107,6 +132,8 @@ test(
     await expect(rail.getByTestId('space-thing-graph')).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(rail.getByRole('button', { name: /^Actions for Thing/ })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('button', { name: /^Edit Thing/ })).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(rail.getByRole('button', { name: /^Close Thing/ })).toBeFocused();
     await expect(rail.getByRole('button', { name: /^Enter Space/ })).toHaveCount(0);
@@ -173,19 +200,22 @@ test(
   { tag: '@parity:embedded-diagram-things-author-target' },
   async ({ page }) => {
     await open(page);
+    await beginPortalEdit(page, spaceThing(page));
     const embedded = embeddedNodes(page).filter({
       has: page.getByRole('heading', { name: 'Intake', exact: true }),
     });
     await embedded.hover();
-    // Anchors, not affordances (ADR 0087): an embedded Diagram draws Edges, and
-    // an Edge attaches to an anchor — but nothing here offers a drag one.
+    // Edit offers the same hover handles as the host canvas. They author the
+    // Graph this Space Thing is showing and refuse a cross-Space Edge (ADR 0040).
     await expect(embedded.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
-    await expect(embedded.getByRole('button', { name: /^Connect (from|to) / })).toHaveCount(0);
+    await expect(embedded.getByLabel(/^Connect (from|to) /)).toHaveCount(8);
     await embedded.getByRole('button', { name: 'Edit Thing Intake' }).click();
     await embedded
       .getByRole('textbox', { name: 'Markdown source of Intake' })
       .fill('Edited in the embedded Diagram');
-    await embedded.getByRole('button', { name: 'Save Thing Intake' }).click();
+    await embedded
+      .getByRole('textbox', { name: 'Markdown source of Intake' })
+      .press('ControlOrMeta+Enter');
     await expect(embedded).toContainText('Edited in the embedded Diagram');
     // Crossing into the target Space to read the same edit there. The vertical
     // tab strip that used to do this went with the Space Sidebar (ADR 0082), so
@@ -203,6 +233,37 @@ test(
     await expect(intake).toContainText('Edited in the embedded Diagram');
   },
 );
+
+/**
+ * Ticket 04 / spec.md: handles author the Graph the Space Thing is showing
+ * and do not complete a cross-Space Edge on the containing canvas (ADR 0040).
+ * Overview already has Intake→Storage; the reverse is a new Edge (cycles are
+ * legal). The containing Graph also has Start here→Elsewhere, so the host
+ * count is snapshotted rather than assumed empty.
+ */
+test('a connect between two embedded Things authors the shown Graph, not the host Graph', async ({
+  page,
+}) => {
+  await open(page);
+  const parent = spaceThing(page);
+  await beginPortalEdit(page, parent);
+  const intake = embeddedNodes(page).filter({
+    has: page.getByRole('heading', { name: 'Intake', exact: true }),
+  });
+  const storage = embeddedNodes(page).filter({
+    has: page.getByRole('heading', { name: 'Storage', exact: true }),
+  });
+  const hostBefore = await hostGraphEdgeCount(page, parent);
+  const shownBefore = await embeddedGraphEdgeCount(page, parent);
+  await storage.hover();
+  await connectHandles(
+    page,
+    authoringHandle(storage, 'source', 'right'),
+    authoringHandle(intake, 'target', 'left'),
+  );
+  await expect.poll(() => hostGraphEdgeCount(page, parent)).toBe(hostBefore);
+  await expect.poll(() => embeddedGraphEdgeCount(page, parent)).toBe(shownBefore + 1);
+});
 
 test('the embedded Diagram story is isolated from the Ladle catalogue', async ({ page }) => {
   await page.goto('/?story=surfaces--space-thing-embedded-diagram--selected-diagram');
@@ -300,5 +361,113 @@ test(
     await open(page);
     const thing = spaceThing(page);
     await exerciseFloatingThingDock(page, thing);
+  },
+);
+
+test(
+  'Edit and Done toggle the portal using the same accessible names as the application',
+  { tag: '@parity:space-thing-portal-read-edit' },
+  async ({ page }) => {
+    await open(page);
+    const parent = spaceThing(page);
+    const embedded = embeddedNodes(page).first();
+    await expect(embedded.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
+    const outerBefore = await boxOf(parent, 'containing Thing');
+    const innerBefore = await boxOf(embedded, 'embedded Thing');
+    await page.mouse.move(
+      innerBefore.x + innerBefore.width / 2,
+      innerBefore.y + innerBefore.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      innerBefore.x + innerBefore.width / 2 + 70,
+      innerBefore.y + innerBefore.height / 2,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    const outerAfter = await boxOf(parent, 'moved containing Thing');
+    expect(outerAfter.x).toBeGreaterThan(outerBefore.x + 30);
+    const innerAfter = await boxOf(embedded, 'embedded Thing after outer drag');
+    expect(innerAfter.x - outerAfter.x).toBeCloseTo(innerBefore.x - outerBefore.x, 0);
+
+    const rail = (await thingControls(page, parent)).getByTestId('canvas-thing-actions');
+    await rail.getByRole('button', { name: 'Edit Thing Elsewhere' }).click();
+    await expect(rail.getByRole('button', { name: 'Done Thing Elsewhere' })).toBeVisible();
+    await expect(
+      embeddedNodes(page).getByRole('button', { name: 'Edit Thing Intake' }),
+    ).toBeVisible();
+    await rail.getByRole('button', { name: 'Done Thing Elsewhere' }).click();
+    await expect(rail.getByRole('button', { name: 'Edit Thing Elsewhere' })).toBeVisible();
+    await expect(embeddedNodes(page).getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
+  },
+);
+
+test(
+  'portal zoom frames authored coordinates without stretching Things or painting outside',
+  { tag: '@parity:space-thing-portal-edit-is-the-host-canvas' },
+  async ({ page }) => {
+    await open(page);
+    await exercisePortalEditHostCanvas(page, spaceThing(page), embeddedNodes(page).first());
+  },
+);
+
+test(
+  'two Space Things frame the same target independently',
+  { tag: '@parity:space-thing-portal-independent-framing' },
+  async ({ page }) => {
+    await page.goto(TWO_SELECTIONS_STORY);
+    await expect(embeddedNodes(page)).toHaveCount(4, { timeout: 20_000 });
+    const overview = page.locator(
+      '.react-flow__node[data-id="00000000-0000-4000-8000-000000000023"]',
+    );
+    const detail = page.locator(
+      '.react-flow__node[data-id="00000000-0000-4000-8000-000000000024"]',
+    );
+    const intake = page.locator(
+      '.react-flow__node[data-id="embedded:00000000-0000-4000-8000-000000000023:00000000-0000-4000-8000-000000000035"]',
+    );
+    const index = page.locator(
+      '.react-flow__node[data-id="embedded:00000000-0000-4000-8000-000000000024:00000000-0000-4000-8000-000000000037"]',
+    );
+    await beginPortalEdit(page, overview);
+    const intakeBefore = await boxOf(intake, 'Intake');
+    const outer = await boxOf(overview, 'overview Space Thing');
+    await page.mouse.move(outer.x + 8, outer.y + outer.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(outer.x + 8 + 80, outer.y + outer.height / 2 + 40, { steps: 8 });
+    await page.mouse.up();
+    const intakeAfter = await boxOf(intake, 'framed Intake');
+    expect(intakeAfter.x).not.toBeCloseTo(intakeBefore.x, 0);
+    const indexBefore = await boxOf(index, 'Index');
+    await beginPortalEdit(page, detail);
+    expect((await boxOf(index, 'Index while the other portal pans')).x).toBeCloseTo(
+      indexBefore.x,
+      0,
+    );
+  },
+);
+
+test(
+  'Enter shows the target at browser size and Return restores the containing portal',
+  { tag: '@parity:space-thing-portal-framing' },
+  async ({ page }) => {
+    await page.goto(
+      '/?story=surfaces--space-thing-embedded-diagram--entered-from-space-thing&mode=preview',
+    );
+    await expect(page.locator('[data-testid="space-title"]:visible')).toContainText(
+      'Architecture',
+      {
+        timeout: 20_000,
+      },
+    );
+    await expect(page.getByRole('button', { name: 'Go to Home' })).toBeVisible();
+    const enteredCanvas = page.locator('.react-flow:visible').first();
+    const enteredPane = await enteredCanvas.boundingBox();
+    if (enteredPane === null) throw new Error('entered canvas missing');
+    await page.getByRole('button', { name: 'Go to Home' }).click();
+    await expect(page.locator('[data-testid="space-title"]:visible')).toContainText('Home');
+    await expect(embeddedNodes(page)).toHaveCount(2);
+    const portal = await boxOf(spaceThing(page), 'containing Space Thing');
+    expect(enteredPane.width).toBeGreaterThan(portal.width + 20);
   },
 );

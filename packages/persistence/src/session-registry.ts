@@ -135,6 +135,17 @@ export interface DeleteSpaceThingInput {
   readonly containingSpaceId: UUID;
   readonly thingId: UUID;
 }
+export interface DeleteReferencedDiagramInput {
+  readonly targetSpaceId: UUID;
+  readonly diagramId: UUID;
+  readonly preferredDiagramId: UUID | null;
+}
+export interface DeleteReferencedGraphInput {
+  readonly targetSpaceId: UUID;
+  readonly diagramId: UUID;
+  readonly graphId: UUID;
+  readonly preferredGraphId: UUID | null;
+}
 /** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
 export type SpaceThingRefusal =
   | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
@@ -185,10 +196,21 @@ export type SpaceThingCreationResult =
 export type SpaceThingDeletionResult =
   { readonly kind: 'completed' } | SpaceThingLifecycleUnsettled;
 
+/** What context deletion answers so navigation can follow the coordinated choice. */
+export type SpaceThingContextDeletionResult =
+  | { readonly kind: 'completed'; readonly diagramId: UUID; readonly graphId: UUID }
+  | SpaceThingLifecycleUnsettled;
+
 export interface SpaceThingLifecycle {
   readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingCreationResult>;
   readonly link: (input: LinkSpaceThingInput) => Promise<SpaceThingCreationResult>;
   readonly delete: (input: DeleteSpaceThingInput) => Promise<SpaceThingDeletionResult>;
+  readonly deleteDiagram: (
+    input: DeleteReferencedDiagramInput,
+  ) => Promise<SpaceThingContextDeletionResult>;
+  readonly deleteGraph: (
+    input: DeleteReferencedGraphInput,
+  ) => Promise<SpaceThingContextDeletionResult>;
 }
 
 /**
@@ -239,6 +261,10 @@ const clone = <T>(value: T): T => structuredClone(value);
 const completed = { kind: 'completed' } as const;
 /** The refused arm on its own, which is the only one the three bodies build early. */
 type SpaceThingRefused = { readonly kind: 'refused'; readonly refusal: SpaceThingRefusal };
+const recordedRefusal = (
+  outcome: ReadonlyMap<'refusal', SpaceThingRefused>,
+): SpaceThingRefused | undefined => outcome.get('refusal');
+const recordedChange = (outcome: ReadonlySet<'changed'>): boolean => outcome.has('changed');
 
 /**
  * The completion a creating operation built when it minted its Thing's id.
@@ -303,6 +329,28 @@ const addSpaceThing = (
         : diagram,
     ),
   },
+});
+
+const replaceSpaceThingSelection = (
+  snapshot: SpaceSnapshot,
+  targetSpaceId: UUID,
+  matches: (document: Extract<ThingDocument, { kind: 'space' }>) => boolean,
+  diagram: UUID,
+  graph: UUID,
+  resetFraming: boolean,
+): SpaceSnapshot => ({
+  ...snapshot,
+  things: snapshot.things.map((thing) => {
+    if (
+      thing.document.kind !== 'space' ||
+      thing.document.spaceId !== targetSpaceId ||
+      !matches(thing.document)
+    )
+      return thing;
+    const document = { ...thing.document, diagram, graph };
+    if (resetFraming) delete document.framing;
+    return { ...thing, document };
+  }),
 });
 
 const protocolFailure = (
@@ -874,6 +922,153 @@ export function createSpaceSessionRegistry(
       if (refusal !== undefined) return refusal;
       return completedCreation(completion);
     };
+    const deleteContext = async (
+      input: DeleteReferencedDiagramInput | DeleteReferencedGraphInput,
+    ): Promise<SpaceThingContextDeletionResult> => {
+      const outcome = new Map<'refusal', SpaceThingRefused>();
+      const changeOutcome = new Set<'changed'>();
+      const selectionOutcome = new Map<'selection', { diagramId: UUID; graphId: UUID }>();
+      const result = await coordinateSpaceThingLifecycle(async () => {
+        let aggregate: LoadedAggregate;
+        try {
+          const loaded = await backend.loadAggregate();
+          if (loaded.kind === 'uninitialized') throw new Error('The repository is uninitialized');
+          aggregate = loaded.aggregate;
+        } catch {
+          outcome.set('refusal', {
+            kind: 'refused',
+            refusal: { code: 'persistence-read-failed' },
+          });
+          return undefined;
+        }
+        const snapshots = new Map(
+          aggregate.spaces.map((loaded) => [loaded.snapshot.id, loaded.snapshot]),
+        );
+        for (const [id, managed] of sessions) snapshots.set(id, managed.session.getState().working);
+        const target = snapshots.get(input.targetSpaceId);
+        if (target === undefined) {
+          outcome.set('refusal', {
+            kind: 'refused',
+            refusal: { code: 'persistence-read-failed' },
+          });
+          return undefined;
+        }
+        const targetDiagram = target.document.diagrams?.find(({ id }) => id === input.diagramId);
+        const deletingDiagram = 'preferredDiagramId' in input;
+        if (
+          targetDiagram === undefined ||
+          (deletingDiagram
+            ? (target.document.diagrams?.length ?? 0) <= 1
+            : targetDiagram.graphs.length <= 1 ||
+              !targetDiagram.graphs.some(({ id }) => id === input.graphId))
+        )
+          return undefined;
+
+        const replacementDiagram = deletingDiagram
+          ? ((target.document.diagrams ?? []).find(
+              ({ id }) => id === input.preferredDiagramId && id !== input.diagramId,
+            ) ?? (target.document.diagrams ?? []).find(({ id }) => id !== input.diagramId))
+          : targetDiagram;
+        const replacementGraph = deletingDiagram
+          ? (replacementDiagram?.graphs.find(({ id }) => id === replacementDiagram.activeGraph) ??
+            replacementDiagram?.graphs[0])
+          : (targetDiagram.graphs.find(
+              ({ id }) => id === input.preferredGraphId && id !== input.graphId,
+            ) ?? targetDiagram.graphs.find(({ id }) => id !== input.graphId));
+        if (replacementDiagram === undefined || replacementGraph === undefined) return undefined;
+
+        const affected = [...snapshots.values()].filter((snapshot) =>
+          snapshot.things.some(
+            ({ document }) =>
+              document.kind === 'space' &&
+              document.spaceId === input.targetSpaceId &&
+              (deletingDiagram
+                ? document.diagram === input.diagramId
+                : document.diagram === input.diagramId && document.graph === input.graphId),
+          ),
+        );
+        const participantIds = new Set([input.targetSpaceId, ...affected.map(({ id }) => id)]);
+        for (const id of participantIds) {
+          const recovery = recoveryRefusal(id);
+          if (recovery !== undefined) {
+            outcome.set('refusal', recovery);
+            return undefined;
+          }
+          if (!sessions.has(id)) {
+            const loaded = aggregate.spaces.find(({ snapshot }) => snapshot.id === id);
+            if (loaded === undefined) {
+              outcome.set('refusal', {
+                kind: 'refused',
+                refusal: { code: 'persistence-read-failed' },
+              });
+              return undefined;
+            }
+            open(loaded);
+          }
+        }
+        const targetChange: SpaceThingLifecycleChange = {
+          kind: 'update',
+          spaceId: input.targetSpaceId,
+          edit: (current) => {
+            const document = {
+              ...current.document,
+              diagrams: (current.document.diagrams ?? [])
+                .filter(({ id }) => !deletingDiagram || id !== input.diagramId)
+                .map((diagram) =>
+                  !deletingDiagram && diagram.id === input.diagramId
+                    ? {
+                        ...diagram,
+                        activeGraph:
+                          diagram.activeGraph === input.graphId
+                            ? replacementGraph.id
+                            : diagram.activeGraph,
+                        graphs: diagram.graphs.filter(({ id }) => id !== input.graphId),
+                      }
+                    : diagram,
+                ),
+            };
+            if (deletingDiagram && current.document.defaultDiagram === input.diagramId) {
+              document.defaultDiagram = replacementDiagram.id;
+            }
+            return { ...current, document };
+          },
+        };
+        const referenceChanges = affected
+          .filter(({ id }) => id !== input.targetSpaceId)
+          .map(({ id }): SpaceThingLifecycleChange => ({
+            kind: 'update',
+            spaceId: id,
+            edit: (current) =>
+              replaceSpaceThingSelection(
+                current,
+                input.targetSpaceId,
+                (document) =>
+                  deletingDiagram
+                    ? document.diagram === input.diagramId
+                    : document.diagram === input.diagramId && document.graph === input.graphId,
+                replacementDiagram.id,
+                replacementGraph.id,
+                deletingDiagram,
+              ),
+          }));
+        changeOutcome.add('changed');
+        selectionOutcome.set('selection', {
+          diagramId: replacementDiagram.id,
+          graphId: replacementGraph.id,
+        });
+        return [targetChange, ...referenceChanges];
+      });
+      if (result.kind === 'persistence-read-failed')
+        return { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
+      if (result.kind === 'aggregate-refused')
+        return { kind: 'refused', refusal: { code: 'aggregate-refused', errors: result.errors } };
+      const refusal = recordedRefusal(outcome);
+      if (refusal !== undefined) return refusal;
+      const selection = selectionOutcome.get('selection');
+      return recordedChange(changeOutcome) && selection !== undefined
+        ? { kind: 'completed', ...selection }
+        : { kind: 'unchanged' };
+    };
     return {
       create: async (input) => {
         let refusal: SpaceThingRefused | undefined;
@@ -938,6 +1133,8 @@ export function createSpaceSessionRegistry(
         return completedCreation(completion);
       },
       link,
+      deleteDiagram: deleteContext,
+      deleteGraph: deleteContext,
       delete: async (input) => {
         let refusal: SpaceThingRefused | undefined;
         const result = await coordinateSpaceThingLifecycle(async () => {

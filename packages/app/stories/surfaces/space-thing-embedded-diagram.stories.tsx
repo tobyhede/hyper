@@ -107,7 +107,13 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
             openSize: { width: 640, height: 420 },
           },
         },
-        graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        graphs: [
+          {
+            id: HOME_GRAPH_ID,
+            title: 'Graph 1',
+            edges: [{ from: HOME_THING_ID, to: SPACE_THING_ID }],
+          },
+        ],
       },
     ],
     defaultDiagram: HOME_DIAGRAM_ID,
@@ -135,6 +141,26 @@ const openEmbeddedDiagram = async () => {
 /** The production application host over an isolated multi-Space repository. */
 export const SelectedDiagram: Story = () => <Application resolve={openEmbeddedDiagram} />;
 SelectedDiagram.meta = { iframed: true };
+
+const PORTAL_FRAMING = { centreX: 80, centreY: 40, zoom: 1.4 };
+
+const openEnteredFromSpaceThing = async () => {
+  const spaces = storySpaces(HOME_ID, [home, target]);
+  await spaces.open(HOME_ID);
+  return storyOpening(
+    spaces,
+    await spaces.enter(TARGET_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, PORTAL_FRAMING),
+  );
+};
+
+/**
+ * Enter from a Space Thing: the target is the canvas, at the stored framing
+ * and the browser's size, with Return naming the containing Space.
+ */
+export const EnteredFromSpaceThing: Story = () => (
+  <Application resolve={openEnteredFromSpaceThing} />
+);
+EnteredFromSpaceThing.meta = { iframed: true };
 
 const PAIR_HOME_ID = id('000000000020');
 const PAIR_HOME_DIAGRAM_ID = id('000000000021');

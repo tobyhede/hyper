@@ -626,7 +626,9 @@ describe('the last Diagram and Graph', () => {
       for (let guard = 0; guard < 10; guard += 1) {
         const item = deleteItem(kind);
         if (unavailable(item)) break;
+        const before = showing(kind);
         fireEvent.click(item);
+        await waitFor(() => expect(showing(kind)).not.toBe(before));
       }
       expect(unavailable(deleteItem(kind))).toBe(true);
     }

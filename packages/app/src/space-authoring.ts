@@ -123,6 +123,11 @@ export type AuthoringCompletion =
       readonly from: ThingId;
       readonly to: ThingId;
       readonly rendered: Placement;
+      /**
+       * The Graph this Edge joins. Host canvas omits it and writes the Active
+       * Graph. A Space Thing names the Graph it is showing.
+       */
+      readonly graphId?: GraphId;
     }
   | {
       readonly kind: 'edited-thing';
@@ -446,7 +451,8 @@ export type EmbeddedThingCompletion = Extract<
       | 'resized-thing'
       | 'edited-thing'
       | 'settled-thing-movement'
-      | 'removed-thing-from-diagram';
+      | 'removed-thing-from-diagram'
+      | 'connected-things';
   }
 >;
 
@@ -1126,9 +1132,9 @@ export function createSpaceAuthoring({
    * It is the same value the completion reports, so the preview and the
    * completion cannot disagree.
    */
-  const connectable = (thingId: ThingId): boolean =>
-    placement !== null &&
-    placement.has(thingId) &&
+  const connectable = (thingId: ThingId, members: Placement | null = placement): boolean =>
+    members !== null &&
+    members.has(thingId) &&
     session.getState().working.things.some((thing) => thing.id === thingId);
 
   /**
@@ -1143,12 +1149,20 @@ export function createSpaceAuthoring({
    * An exact duplicate within one Graph is what intake rejects (ADR 0032), so it
    * can only be a duplicate of an Edge in the Graph the Edge is about to join.
    * A created Thing cannot duplicate anything, which is why the callers differ.
+   *
+   * `members` and `graph` are the Diagram and Graph this Edit writes. The host
+   * canvas omits them and uses the installed placement and the Active Graph. A
+   * Space Thing names the Diagram it draws and the Graph it is showing.
    */
-  const connectRefusal = (from: ThingId, to: ThingId | null): AuthoringRefusal | null => {
-    if (!connectable(from) || (to !== null && !connectable(to))) {
+  const connectRefusal = (
+    from: ThingId,
+    to: ThingId | null,
+    members: Placement | null = placement,
+    graph: Graph | null = targetGraph(),
+  ): AuthoringRefusal | null => {
+    if (!connectable(from, members) || (to !== null && !connectable(to, members))) {
       return { code: 'edge-thing-outside-diagram' };
     }
-    const graph = targetGraph();
     if (graph === null) return { code: 'diagram-active-graph-required' };
     if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
       return { code: 'edge-already-exists' };
@@ -1582,7 +1596,22 @@ export function createSpaceAuthoring({
       );
       connection = { from: completion.from, to: createdThing.id };
     } else if (completion.kind === 'connected-things') {
-      const refusal = connectRefusal(completion.from, completion.to);
+      const named =
+        completion.graphId === undefined
+          ? undefined
+          : currentSpace().lookup.graph(completion.graphId);
+      if (completion.graphId !== undefined && named?.owner.diagram.id !== resolved.diagram.id) {
+        return refuse({ code: 'graph-not-owned' });
+      }
+      const fallbackId = resolved.diagram.activeGraph ?? resolved.diagram.graphs[0]?.id;
+      const graph =
+        named?.graph ??
+        (embeddedDiagramId === undefined
+          ? targetGraph()
+          : fallbackId === undefined
+            ? null
+            : (resolved.diagram.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
+      const refusal = connectRefusal(completion.from, completion.to, reportedPlacement, graph);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
     }
@@ -1640,7 +1669,11 @@ export function createSpaceAuthoring({
       completedPlacement = removedThing(completedPlacement, deletedThingId);
     }
     if (connection !== null) {
-      const graphIndex = ownedGraphs.findIndex((graph) => graph.id === activeGraphId);
+      const writeGraphId =
+        completion.kind === 'connected-things' && completion.graphId !== undefined
+          ? completion.graphId
+          : activeGraphId;
+      const graphIndex = ownedGraphs.findIndex((graph) => graph.id === writeGraphId);
       const graph = ownedGraphs[graphIndex];
       if (graph === undefined) {
         return refuse({ code: 'diagram-active-graph-required' });

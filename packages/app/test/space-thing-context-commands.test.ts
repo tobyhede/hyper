@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot, type ThingDocument } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
+import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
 import { createOpenSpaces } from '../src/open-spaces';
 import { spaceThingContextCommands } from '../src/space-thing-context-commands';
 import { recordingHistory } from './browser-history';
@@ -106,6 +107,8 @@ async function setup() {
       return result.kind === 'refused' ? result.refusal.code : null;
     },
     source.app.continuation,
+    (completion) =>
+      completeEmbeddedAuthoring(entry, document.diagram, completion, entry.app.reportObserverError),
   );
   return { backend, spaces, commands, source, control };
 }

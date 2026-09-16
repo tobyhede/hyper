@@ -142,7 +142,7 @@ export interface SpaceEntityActionsOptions {
    * outcome left the item answering `done` either way. Same shape and same
    * reason as `onCopy` above.
    */
-  readonly onDeleteDiagram: ((diagramId: DiagramId) => boolean) | null;
+  readonly onDeleteDiagram: ((diagramId: DiagramId) => boolean | Promise<boolean>) | null;
 }
 
 /**
@@ -271,8 +271,8 @@ export function spaceEntityActions({
                 // alert, and this item carries no words of its own to swap — so
                 // what the outcome is read for is not the label. It is what
                 // tells a caller whether the Delete had a canvas result at all.
-                onSelect: (): EntityActionOutcome =>
-                  onDeleteDiagram(diagramId) ? 'done' : 'failed',
+                onSelect: async (): Promise<EntityActionOutcome> =>
+                  (await onDeleteDiagram(diagramId)) ? 'done' : 'failed',
               },
             ],
       ];

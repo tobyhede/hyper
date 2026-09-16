@@ -97,6 +97,24 @@ export type CanvasThingFront =
        * the target Space has not been read yet.
        */
       readonly selection?: CanvasSpaceThingSelection;
+      /**
+       * Diagram and Graph clusters, assembled by the application and inserted
+       * at the head of this Thing's rail. Absent while the Thing is closed, the
+       * surface is read-only, or the target Space has not been read yet.
+       */
+      readonly spaceRail?: ReactNode;
+      /**
+       * The Read/Edit boundary for the embedded target canvas.
+       *
+       * Absent means this surface does not offer one — a Closed Thing, an unread
+       * target, or a composition that has not wired the portal. Present on an Open
+       * Space Thing: Read leaves the embedding inert so dragging moves this Thing;
+       * Edit activates the target canvas and replaces the control with Done.
+       */
+      readonly portal?: {
+        readonly editing: boolean;
+        readonly onEditingChange: (editing: boolean) => void;
+      };
     };
 
 /** One entity a Space Thing's selectors can be pointed at, named as an author reads it. */
@@ -166,8 +184,15 @@ interface CanvasThingCommonProps {
   readonly front: CanvasThingFront;
   /** A canvas adapter may lift the rail above embedded content in its viewport. */
   readonly renderRail?: (rail: ReactNode) => ReactNode;
+  /** Pointer is over a portalled rail lifted outside this Card subtree. */
+  readonly railHovered?: boolean;
   /** Reports the content-sized title footer in unscaled layout pixels. */
   readonly onBodyHeightChange?: (height: number | null) => void;
+  /**
+   * A refusal or busy notice from this Thing's context commands, supplied by
+   * decoration. Absent or null leaves the alert region unmounted.
+   */
+  readonly contextNotice?: string | null;
   readonly title: string;
   readonly graphColor: string;
   /**
@@ -337,13 +362,19 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions = entityActions?.some((group) => group.length > 0) === true;
-  const [contextNotice, setContextNotice] = useState<string | null>(null);
+  const [selectorNotice, setContextNotice] = useState<string | null>(null);
+  const contextNotice = props.contextNotice ?? selectorNotice;
   const spaceSelection =
     !readOnly && front.kind === 'space' && front.open ? front.selection : undefined;
+  const spaceRail = !readOnly && front.kind === 'space' && front.open ? front.spaceRail : undefined;
+  const portal = !readOnly && front.kind === 'space' && front.open ? front.portal : undefined;
+  const portalEditing = portal?.editing === true;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
     (spaceSelection !== undefined ||
+      spaceRail !== undefined ||
+      portal !== undefined ||
       visibleContentEdit !== null ||
       onOpenChange !== undefined ||
       actionableEntityActions ||
@@ -385,12 +416,18 @@ export function CanvasThing(props: CanvasThingProps) {
     };
   }, [onBodyHeightChange]);
 
+  const railHovered = props.railHovered === true;
   const rail = (
     <ThingRail
       kind={visualKind}
       hideKind={open}
       revealed={
-        hovered || state === 'selected' || state === 'editing' || visibleContentEdit !== null
+        hovered ||
+        railHovered ||
+        state === 'selected' ||
+        state === 'editing' ||
+        visibleContentEdit !== null ||
+        portalEditing
       }
       className="canvas-thing__rail"
     >
@@ -417,6 +454,7 @@ export function CanvasThing(props: CanvasThingProps) {
           {spaceSelection !== undefined && (
             <SpaceThingSelectors selection={spaceSelection} onReport={setContextNotice} />
           )}
+          {spaceRail}
           {actionableEntityActions && (
             <EntityActionsTrigger
               groups={entityActions}
@@ -426,19 +464,35 @@ export function CanvasThing(props: CanvasThingProps) {
             />
           )}
           <ThingRailKindActions kind={visualKind}>
-            {visibleContentEdit === null ? (
-              beginContentEdit !== undefined && (
+            {visibleContentEdit !== null ? (
+              <ContentEditActions name={name} edit={visibleContentEdit} />
+            ) : beginContentEdit !== undefined ? (
+              <ThingRailAction
+                ref={editControl}
+                aria-label={`Edit Thing ${name}`}
+                onClick={beginContentEdit}
+              >
+                <EditIcon data-icon="inline-start" />
+              </ThingRailAction>
+            ) : portal !== undefined ? (
+              portalEditing ? (
+                <ThingRailAction
+                  ref={editControl}
+                  aria-label={`Done Thing ${name}`}
+                  onClick={() => portal.onEditingChange(false)}
+                >
+                  <CommitEditIcon data-icon="inline-start" />
+                </ThingRailAction>
+              ) : (
                 <ThingRailAction
                   ref={editControl}
                   aria-label={`Edit Thing ${name}`}
-                  onClick={beginContentEdit}
+                  onClick={() => portal.onEditingChange(true)}
                 >
                   <EditIcon data-icon="inline-start" />
                 </ThingRailAction>
               )
-            ) : (
-              <ContentEditActions name={name} edit={visibleContentEdit} />
-            )}
+            ) : null}
           </ThingRailKindActions>
           <ThingRailSharedActions>
             {onOpenChange !== undefined && (
@@ -492,7 +546,7 @@ export function CanvasThing(props: CanvasThingProps) {
       // A running edit is not a hover, so the controls that end it are read off
       // this instead — an author writing in the body must be able to see the way
       // out without going looking for it with the pointer.
-      data-content-editing={visibleContentEdit !== null}
+      data-content-editing={visibleContentEdit !== null || portalEditing}
       style={style}
     >
       {/* Neutral: the band carries no colour and the commands on it sit on the
@@ -558,9 +612,13 @@ export function CanvasThing(props: CanvasThingProps) {
         {/* Withheld while the Thing is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Thing
             shows, not what could be changed about it. */}
-        {front.kind === 'space' && front.open && !readOnly && front.selection === undefined && (
-          <p className="canvas-thing__space-note">Reading the referenced Space…</p>
-        )}
+        {front.kind === 'space' &&
+          front.open &&
+          !readOnly &&
+          spaceSelection === undefined &&
+          spaceRail === undefined && (
+            <p className="canvas-thing__space-note">Reading the referenced Space…</p>
+          )}
         {contextNotice !== null && (
           <p role="status" className="canvas-thing__space-note">
             {contextNotice}

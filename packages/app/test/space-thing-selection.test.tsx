@@ -267,9 +267,9 @@ async function openSpaceThing(): Promise<HTMLElement> {
   const control = await screen.findByRole('button', { name: /^(Open|Close) Thing Elsewhere$/ });
   if (control.getAttribute('aria-label') === 'Open Thing Elsewhere') fireEvent.click(control);
   await screen.findByTestId('space-thing-diagram');
-  const node = document.querySelector(`.react-flow__node[data-id="${SPACE_THING_ID}"]`);
-  if (!(node instanceof HTMLElement)) throw new Error('the Space Thing is not drawn as a node');
-  return node;
+  const rail = document.querySelector(`[data-thing-rail-for="${SPACE_THING_ID}"]`);
+  if (!(rail instanceof HTMLElement)) throw new Error('the Space Thing rail is not drawn');
+  return rail;
 }
 
 /**
