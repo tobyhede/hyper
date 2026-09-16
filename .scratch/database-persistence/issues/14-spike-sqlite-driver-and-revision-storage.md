@@ -244,3 +244,7 @@ Left in the worktree for this review but **not git-tracked**: the root `.gitigno
 - `04c-isolate-race-then-recover.ts`, `04d-pk-only-update-race.ts`, `04e-single-client-race.ts` — isolate and explain the mutual-BUSY result.
 - `05-uuid-default-check.ts` — confirms no DB-side UUID default.
 - `.spike-db/`, `migrations-text/`, `migrations-bigint/`, `contract-*.json`, `contract-*.d.ts` — generated/throwaway; not hand-authored evidence, kept only so the scripts are re-runnable.
+
+## Comments
+
+**15 approved, 18 rewritten (2026-09-16).** The GO stands. Ticket 18 as first written required two independent runtimes against one file to both succeed on different Spaces; the spike showed that shape is the ~5.3s mutual-BUSY stall, not PostgreSQL row locking. 18 now requires one process to own the file, in-process writer serialisation so overlapping commits do not each open a deferred transaction, and exhausted BUSY only when a second process is on the same live file. 15–17 carry that composition constraint. Spike scripts stay untracked; do not force-add them — the write-up is this ticket.

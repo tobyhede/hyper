@@ -184,8 +184,11 @@ export default tseslint.config(
       // Prisma Next owns these emitted declarations. They are consumed by
       // typecheck but are not repository-authored lint targets.
       '**/src/prisma/contract.d.ts',
+      '**/src/sqlite/contract.d.ts',
       '**/migrations/**/end-contract.d.ts',
       '**/migrations/**/start-contract.d.ts',
+      '**/migrations-sqlite/**/end-contract.d.ts',
+      '**/migrations-sqlite/**/start-contract.d.ts',
       // Vendored anti-slop Oxlint plugin (.scratch/anti-slop/). Third-party
       // source at a pinned commit, not repository-authored — not part of any
       // tsconfig project, and not ours to reformat or re-lint.
@@ -266,7 +269,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['migrations/**/migration.ts'],
+    files: ['migrations/**/migration.ts', 'migrations-sqlite/**/migration.ts'],
     rules: {
       // Prisma Next renders this module-level self-emit bookend. It owns the
       // call shape, and generated migration sources must not be patched.
