@@ -18,6 +18,10 @@ export type {
   CanvasThingFront,
   CanvasThingProps,
   CanvasThingState,
+  CanvasSpaceThingChoice,
+  CanvasSpaceThingCommands,
+  CanvasSpaceThingGraphCommands,
+  CanvasSpaceThingSelection,
 } from './CanvasThing';
 export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';

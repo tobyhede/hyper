@@ -196,6 +196,7 @@ export function ThingNode({
   if (data.thingEditingEnabled === true && data.onEditThing !== undefined) {
     spaceFront.onOpenChange = data.onEditThing;
   }
+  if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
   if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
   if (data.portal !== undefined) spaceFront.portal = data.portal;
   const front: CanvasThingFront =

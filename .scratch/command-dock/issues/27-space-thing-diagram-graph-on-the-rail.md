@@ -165,9 +165,11 @@ no server was stopped. Full final verification is delegated to PR CI as requeste
 User follow-up: Enter belongs inside the entity menu. The groups are now
 Rename / Create Alias; Enter / Open in New Tab; Copy link to Thing in Diagram /
 Copy link to Thing / Copy link to Space; Remove from Diagram. Copy actions carry
-no explanatory subtitles. Delete from Space is not in that list; designing it
-is [`space-cards/18`](../../space-cards/issues/18-design-space-thing-delete-from-space.md). Alias creation accepts a Space Thing and still refuses
-an Alias Target. Its Open content uses the graph resolver and the shared Diagram
+no explanatory subtitles. Alias creation accepts a Space Thing and still refuses
+an Alias Target. Delete from Space remains on the Space Thing entity menu
+([`space-cards/18`](../../space-cards/issues/18-design-space-thing-delete-from-space.md)
+designed the earlier omission; production kept the command). Its Open content uses
+the graph resolver and the shared Diagram
 embedding, with authoring disabled throughout the Alias view.
 
 The branch was rebased onto main to incorporate the shared compact-button icon

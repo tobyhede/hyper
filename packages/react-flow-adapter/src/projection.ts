@@ -1,7 +1,11 @@
 import type { Edge, Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
-import type { CanvasThingBodyEditor, EntityActionGroup } from '@project/ui';
+import type {
+  CanvasThingBodyEditor,
+  CanvasSpaceThingSelection,
+  EntityActionGroup,
+} from '@project/ui';
 import type { Thing, ThingId, GraphId } from '@project/core';
 import { resolveContentThing } from '@project/graph';
 import type {
@@ -159,6 +163,16 @@ export type ThingNodeData = {
    * already applies to the value it is handed.
    */
   entityActions?: readonly EntityActionGroup[];
+  /**
+   * For a space thing, what the Space it references offers its selections to be
+   * chosen from.
+   *
+   * Not derived here, and it could not be: it describes a *second* Space, which
+   * this projection has no reader for and no business loading. The composition
+   * that read the target supplies it, exactly as it supplies every other
+   * operation on this node (ADR 0068, ADR 0074).
+   */
+  spaceSelection?: CanvasSpaceThingSelection;
   /**
    * Diagram and Graph clusters for an Open Space Thing, assembled by the
    * application and inserted at the head of the Thing rail.

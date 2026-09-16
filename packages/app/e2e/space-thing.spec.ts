@@ -22,6 +22,7 @@ import {
   createThing,
   dragBy,
   expectThingFillsNode,
+  FIXTURE_ORDINARY_SPACE_COUNT,
   nodeByTitle,
   selectCanvas,
   settled,
@@ -197,6 +198,62 @@ test(
 );
 
 /**
+ * Destroying a Space takes it out of the list that offers it.
+ *
+ * The Spaces source is read once and re-read on an epoch, and creating a Space
+ * Thing is not the only Edit that changes the set: deleting the last Space Thing
+ * that references a Space destroys that Space and every Space below it that
+ * nothing else references (ADR 0074, ADR 0076). A list still offering it would
+ * spend `link` against a Space that is gone, on a row the reader had no way to
+ * know was stale.
+ */
+test('stops offering a Space the moment the last Space Thing referencing it is deleted', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await createSpaceThingNamed(page, 'Architecture');
+
+  const openList = async () => {
+    await page.getByRole('button', { name: 'Things' }).click();
+    const list = page.getByRole('dialog', { name: 'Things' });
+    await expect(list).toBeVisible();
+    return list;
+  };
+
+  const offered = await openList();
+  await expect(offered.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+
+  const thing = nodeByTitle(page, 'Architecture').first();
+  await thing.click();
+  await thing.hover();
+  await (
+    await thingControls(page, thing)
+  )
+    .getByRole('button', { name: 'Actions for Thing Architecture' })
+    .click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete from Space' }).click();
+  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
+
+  // The Space went with its last reference, so the cube goes with it — and the
+  // count on the toggle agrees, which is the claim the count exists to make.
+  // The fixture already holds ordinary Spaces; deleting Architecture lands
+  // back on those, not on an empty Meta Space.
+  const after = await openList();
+  await expect(after.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', {
+      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
+    }),
+  ).toBeVisible();
+});
+
+/**
  * The second Space Thing is offered the first's Space, and referencing it is not
  * a copy.
  *
@@ -345,7 +402,7 @@ test(
 
     // The containing Thing offers Close, portal Edit and its own title editing.
     // Embedded target Things carry their own content-editing controls only
-    // after portal Edit.
+    // after portal Edit. Enter lives in the entity menu, not on the rail.
     await expect(
       (await thingControls(page, thing)).getByRole('button', { name: 'Close Thing Architecture' }),
     ).toBeVisible();
@@ -354,6 +411,59 @@ test(
     ).toBeVisible();
   },
 );
+
+/**
+ * Deleting a Space Thing says what it destroys before it is confirmed.
+ *
+ * V1 has no undo and the cascade can reach Spaces that are not on screen, so
+ * the confirmation naming that is the thing standing in place of a refusal
+ * (ADR 0074). Deleting the only reference takes its Space with it, which is
+ * what leaves the Space count where it started.
+ */
+test('deleting the last Space Thing deletes the Space it referenced', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await createSpaceThingNamed(page, 'Architecture');
+  await settled(page);
+
+  // Deleting a Thing is the Thing's own rail (ADR 0073), reached by hovering it —
+  // the Space's command surface draws no Thing commands at all (ADR 0082).
+  const created = nodeByTitle(page, 'Architecture');
+  await created.hover();
+  await (
+    await thingControls(page, created)
+  )
+    .getByRole('button', { name: 'Actions for Thing Architecture', exact: true })
+    .click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
+  await expect(
+    page.getByText(
+      'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
+    ),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Delete from Space', exact: true }).click();
+
+  await settled(page);
+  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+
+  // The Space went with it, so the Things list no longer offers Space 1 —
+  // which is the only way this surface can see the cascade. The fixture's
+  // ordinary Spaces remain; the count lands back where this Space started.
+  await page.getByRole('button', { name: 'Things' }).click();
+  const list = page.getByRole('dialog', { name: 'Things' });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', {
+      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
+    }),
+  ).toBeVisible();
+});
 
 /* -------------------------------------------------------------------------- */
 /* The Diagram an Open Space Thing draws                                        */
@@ -891,7 +1001,7 @@ test(
     await exerciseSpaceThingEntityMenu(page, thing);
     await settled(page);
     await page.reload();
-    await expect(nodeByTitle(page, 'Space card alias')).toBeVisible();
+    await expect(nodeByTitle(page, 'Space Thing alias')).toBeVisible();
   },
 );
 

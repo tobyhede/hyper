@@ -93,6 +93,68 @@ describe('SpaceThingRailClusters', () => {
     expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
   });
 
+  it('releases busy when creating a Diagram rejects', async () => {
+    let rejectCreate: () => void = () => undefined;
+    mount(
+      clusters({
+        diagramCommands: {
+          onRename: () => null,
+          onCreate: () =>
+            new Promise<string | null>((_, reject) => {
+              rejectCreate = () => {
+                reject(new Error('persist failed'));
+              };
+            }),
+          onDelete: () => Promise.resolve(null),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Diagram' }));
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await act(async () => {
+      rejectCreate();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+  });
+
+  it('releases busy when deleting a Diagram rejects', async () => {
+    let rejectDelete: () => void = () => undefined;
+    mount(
+      clusters({
+        diagramCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(null),
+          onDelete: () =>
+            new Promise<string | null>((_, reject) => {
+              rejectDelete = () => {
+                reject(new Error('persist failed'));
+              };
+            }),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Collection 1' }));
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await act(async () => {
+      rejectDelete();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+  });
+
   it('draws a selection the target no longer holds as unavailable', () => {
     mount(clusters({ diagramId: null, graphs: [], graphId: null }));
 

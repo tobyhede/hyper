@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { CanvasThing, type CanvasThingFront } from '../src';
+import { CanvasThing, type CanvasSpaceThingSelection, type CanvasThingFront } from '../src';
 
 /**
  * Base UI's menus position themselves by measuring, and jsdom ships no pointer
@@ -998,6 +998,19 @@ describe('CanvasThing open Markdown front', () => {
 });
 
 describe('CanvasThing Space front', () => {
+  const selection = (over: Partial<CanvasSpaceThingSelection> = {}): CanvasSpaceThingSelection => ({
+    diagrams: [
+      { id: 'l1', title: 'Collection 1' },
+      { id: 'l2', title: 'Collection 2' },
+    ],
+    graphs: [{ id: 'g1', title: 'Long' }],
+    diagramId: 'l1',
+    graphId: 'g1',
+    onDiagramChange: vi.fn(),
+    onGraphChange: vi.fn(),
+    ...over,
+  });
+
   const spaceRail = (
     <>
       <button type="button" data-testid="space-thing-diagram">
@@ -1039,6 +1052,146 @@ describe('CanvasThing Space front', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('Link copied.');
+  });
+
+  it('keeps focus on the destination when a context rename completes on blur', async () => {
+    const onRename = vi.fn(() => null);
+    render(
+      <>
+        <CanvasThing
+          front={{
+            kind: 'space',
+            open: true,
+            selection: selection({
+              diagramCommands: {
+                onRename,
+                onCreate: () => Promise.resolve(null),
+                onDelete: () => Promise.resolve(null),
+                onCopyLink: () => Promise.resolve(null),
+                deleteDisabled: false,
+              },
+            }),
+          }}
+          state="selected"
+          title="Elsewhere"
+          graphColor="#35d6c3"
+        />
+        <button>Destination</button>
+      </>,
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+      await Promise.resolve();
+    });
+    const editor = screen.getByRole('textbox', { name: 'Diagram name' });
+    expect(editor).toHaveFocus();
+    fireEvent.change(editor, { target: { value: 'New title' } });
+    const destination = screen.getByRole('button', { name: 'Destination' });
+    act(() => destination.focus());
+    expect(onRename).toHaveBeenCalledWith('New title');
+    expect(screen.queryByRole('textbox', { name: 'Diagram name' })).not.toBeInTheDocument();
+    expect(destination).toHaveFocus();
+  });
+
+  it('releases busy when creating a Diagram rejects', async () => {
+    let rejectCreate: () => void = () => undefined;
+    render(
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: true,
+          selection: selection({
+            diagramCommands: {
+              onRename: () => null,
+              onCreate: () =>
+                new Promise<string | null>((_, reject) => {
+                  rejectCreate = () => {
+                    reject(new Error('persist failed'));
+                  };
+                }),
+              onDelete: () => Promise.resolve(null),
+              onCopyLink: () => Promise.resolve(null),
+              deleteDisabled: false,
+            },
+          }),
+        }}
+        state="selected"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Diagram' }));
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await act(async () => {
+      rejectCreate();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+  });
+
+  it('releases busy when deleting a Diagram rejects', async () => {
+    let rejectDelete: () => void = () => undefined;
+    render(
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: true,
+          selection: selection({
+            diagramCommands: {
+              onRename: () => null,
+              onCreate: () => Promise.resolve(null),
+              onDelete: () =>
+                new Promise<string | null>((_, reject) => {
+                  rejectDelete = () => {
+                    reject(new Error('persist failed'));
+                  };
+                }),
+              onCopyLink: () => Promise.resolve(null),
+              deleteDisabled: false,
+            },
+          }),
+        }}
+        state="selected"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Collection 1' }));
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await act(async () => {
+      rejectDelete();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+  });
+
+  /**
+   * A Closed Space Thing draws neither selector even when the selections are
+   * available to it: those are what Opening it is for.
+   */
+  it('withholds both selectors while closed', () => {
+    render(
+      <CanvasThing
+        front={{ kind: 'space', open: false, selection: selection() }}
+        state="rest"
+        title="Strategy elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    const thing = screen.getByRole('article', { name: 'Strategy elsewhere' });
+    expect(thing).toHaveAttribute('data-kind', 'space');
+    expect(screen.queryByTestId('space-thing-diagram')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-thing-graph')).not.toBeInTheDocument();
   });
 
   /**
@@ -1095,6 +1248,95 @@ describe('CanvasThing Space front', () => {
 
     screen.getByRole('button', { name: 'Close Thing Elsewhere' }).click();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('offers both selectors seeded with the Thing’s own selections when open', () => {
+    render(
+      <CanvasThing
+        front={{ kind: 'space', open: true, selection: selection() }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    // Named by the set they choose from as well as by what they hold, not only
+    // reachable by test id: the two controls are one word apart and an author
+    // has to be able to tell which is which by ear.
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
+    const rail = screen.getByTestId('canvas-thing-actions');
+    expect(screen.getByRole('toolbar')).toBe(rail);
+    for (const id of ['space-thing-diagram', 'space-thing-graph']) {
+      expect(rail).toContainElement(screen.getByTestId(id));
+      expect(screen.getByTestId(id).closest('.canvas-thing__body')).toBeNull();
+    }
+    // And each draws the title it holds, which is what a reader sees.
+    expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
+    expect(screen.getByTestId('space-thing-graph')).toHaveTextContent('Long');
+  });
+
+  /**
+   * The Thing publishes the choice and authors nothing itself — the selected
+   * Diagram is the caller's to store and hand back, which is what makes the
+   * Graph list beside it the selected Diagram's rather than a stale one.
+   */
+  it('publishes a chosen Diagram without selecting it itself', () => {
+    const onDiagramChange = vi.fn();
+    render(
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: true,
+          selection: selection({ onDiagramChange }),
+        }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    // The shared `ChoiceMenu` the Command Dock's own Diagram list is: a menu of
+    // radio rows, one marked, opened from its trigger. Its keyboard is Base UI's
+    // and is not restated here.
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
+
+    expect(onDiagramChange).toHaveBeenCalledWith('l2');
+    expect(screen.getByTestId('space-thing-diagram')).toHaveTextContent('Collection 1');
+  });
+
+  /**
+   * The one state that leaves a selector with nothing to say: the Diagram this
+   * Thing names is no longer in the target.
+   *
+   * A Space Thing selects a Diagram and a Graph from the moment it exists
+   * (ADR 0079), so a `null` here is a dangling reference to something deleted
+   * and never a choice that was not made. The Graphs on offer are the selected
+   * Diagram's alone, so a Diagram resolving to nothing leaves none — while the
+   * Diagram list stays the target's, because choosing another is exactly what
+   * answers this.
+   */
+  it('draws a selection the target no longer holds as unavailable', () => {
+    render(
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: true,
+          selection: selection({ diagramId: null, graphs: [], graphId: null }),
+        }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    const diagram = screen.getByTestId('space-thing-diagram');
+    expect(diagram).toBeEnabled();
+    expect(diagram).toHaveTextContent('No Diagram');
+    const graph = screen.getByTestId('space-thing-graph');
+    expect(graph).toHaveAttribute('aria-disabled', 'true');
+    expect(graph).toHaveTextContent('No Graph');
   });
 
   /**
@@ -1165,6 +1407,21 @@ describe('CanvasThing Space front', () => {
     // One note, not a live region: a canvas of Space Things resolving would
     // otherwise announce each one, for a wait nobody asked for.
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('withholds both selectors from a read-only Thing', () => {
+    render(
+      <CanvasThing
+        readOnly
+        front={{ kind: 'space', open: true, selection: selection() }}
+        state="rest"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+
+    expect(screen.queryByTestId('space-thing-diagram')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('space-thing-graph')).not.toBeInTheDocument();
   });
 
   it('withholds a supplied spaceRail from a read-only Thing', () => {
