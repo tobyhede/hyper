@@ -50,6 +50,11 @@ const UNWELL_STATUS = {
   pending: null,
   failed: 'failed',
   rejected: 'rejected',
+  // An aggregate refusal is its own persistence state (`v1-release/17`), but
+  // this row reports the same word a permanent rejection does: both mean "the
+  // server declined this Space's last commit, and only a further Edit
+  // recovers it," which is exactly what `OpenSpaceStatus`'s `rejected` says.
+  refused: 'rejected',
   conflicted: 'conflicted',
 } as const satisfies Record<SpaceSessionState['persistence']['kind'], OpenSpaceStatus | null>;
 

@@ -1,6 +1,6 @@
 # 17 — Preserve structured aggregate refusals
 
-Status: ready-for-agent
+Status: resolved
 Why: the contradiction between criteria 1 and 5 was settled on 9 September 2026.
 The one-sentence presentation stands for V1 — a refusal keeps its location on
 the wire and the surface deliberately does not recite it — and criterion 5 is
@@ -24,16 +24,16 @@ with it (see the audit below), and it moved the ground under criterion 2:
 `rejected`/`refused` split is the state machine and the recovery it names, not
 the sentence. Criteria 2, 4 and 5 are what is left.
 
-- [ ] Persistence state carries structured aggregate refusals without losing
+- [x] Persistence state carries structured aggregate refusals without losing
       Space, Card, Layout, Graph or field location.
-- [ ] Retry, conflict and permanent rejection remain distinct states; aggregate
+- [x] Retry, conflict and permanent rejection remain distinct states; aggregate
       refusal is the `refused` persistence state and recovers through an authored
       correction, never Retry of the unchanged aggregate.
 - [x] `PersistenceControl` explains each actionable refusal without exposing
       storage or transport vocabulary and without colour as the only signal.
-- [ ] Coordinated participants observe the same completed refusal and remain in
+- [x] Coordinated participants observe the same completed refusal and remain in
       valid recoverable state.
-- [ ] Aggregate-refusal evidence reaches the **persistence rejection** surface:
+- [x] Aggregate-refusal evidence reaches the **persistence rejection** surface:
       a stable story and its Ladle E2E spec drive a rejection whose failure is
       `aggregate-refused` rather than `permanent-failure`, and a Chromium spec
       drives a refused coordinated save end to end. This criterion asks for the
@@ -41,7 +41,7 @@ the sentence. Criteria 2, 4 and 5 are what is left.
       location to be shown — criterion 1 keeps the location on the wire and the
       surface deliberately does not recite it (see "The decision, 9 September
       2026").
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
 
 ## Audit, 6 September 2026
 
@@ -170,3 +170,84 @@ Spaces a coordinated refusal names are not all open, so resolving a
 `targetSpaceId` or a `cardId` to a title means a reader the refusal surface does
 not have today. That is a new seam, not a formatting change, and it is the whole
 of the work.
+
+## Built, 16 September 2026
+
+Criteria 2, 4 and 5 landed; criteria 1 and 3 were re-confirmed built rather than
+rebuilt.
+
+**Criterion 2 — `refused` is a distinct `SpaceSessionState['persistence']` kind.**
+`packages/persistence/src/session.ts` splits what used to be one `rejected` arm
+carrying `PermanentFailure | AggregateRefusal` into two: `rejected` now carries
+`PermanentFailure` alone and a new `refused` arm carries `AggregateRefusal`.
+Every producer of the state (`startCommit`'s `aggregate-refused` branch,
+`failCoordinatedCommit`) was re-pointed at `refused`, and every consumer
+`noImplicitReturns`/`satisfies` made non-optional to update was updated at the
+compiler's own prompting rather than found by inspection —
+`packages/app/test/session-fixtures.ts`'s switch, `dock-model.ts`'s
+`UNWELL_STATUS` record and `authoring-refusal.ts`'s `PersistenceFailure` type
+among them. `SpaceSession.retry()` already answered only `failed`, so `refused`
+inherits the "no Retry" rule for free; `submit()`'s "an authored correction
+resumes the commit" branch was widened from `previous.kind === 'rejected'` to
+also match `'refused'`, proved in `packages/persistence/test/session.test.ts`'s
+new `'does not recover a refused aggregate through retry()'` and the renamed
+`EVERY_UNCONFLICTED_KIND`/`openSessionIn` exhaustive-state harness, which now
+drives and asserts `refused` alongside the other three. `PersistenceControl`,
+`CommandDock`'s `PersistenceReport`, `open-spaces.ts`'s exit warning and
+`dock-model.ts`'s unwell-row label all now name `refused` explicitly beside
+`rejected` rather than inferring it from `failure.kind`; where the two share
+one presentation (the dialog text, the exit warning, the row label) that is
+now a visible decision in each module rather than a side effect of one shared
+`kind`.
+
+**Criterion 4 — the backend's own refusal, not only the client pre-flight.**
+`packages/persistence/test/space-thing-lifecycle.test.ts` gained `'refuses
+every participant together when the backend refuses the coordinated
+aggregate'`, mirrored on `'reattempts a permanently rejected coordinated edit
+with every original participant'`: it queues `aggregate-refused` on the mocked
+backend for a candidate that passes `coordinateSpaceThingLifecycle`'s own local
+`loadSpaceAggregate` pre-flight cleanly, so the refusal can only be answered by
+`backend.commit`, then asserts Meta and the newly created Target session both
+observe the identical `refused` state, that `retry()` on either does nothing,
+and that a further `submit()` recovers through the ordinary path. An existing
+test (`'validates against the latest working snapshot of every open Space'`)
+that drove an uncoordinated commit into what the intake refusal already
+produces was asserting `'rejected'`; it now asserts `'refused'`, which is the
+one behavioural change this ticket makes to already-passing coverage.
+
+**Criterion 5 — the two things the audit's correction said were genuinely
+missing, both landed.** `SaveRefused`
+(`packages/app/stories/space/command-dock.stories.tsx`) drives
+`CommandDockFixture`'s new `'save-refused'` scenario, which queues
+`aggregate-refused` on the same real-session fixture `'save-rejected'` uses and
+reaches it through a real `edited-thing` Edit rather than a synthetic
+persistence object. Its parity claim is
+`command-dock-reports-aggregate-refusal`
+(`packages/app/stories/parity-claims.ts`), proved by
+`packages/app/ladle-e2e/command-dock.spec.ts`'s `'a refused aggregate explains
+itself as one sentence and can be acknowledged'` and by
+`packages/app/e2e/http-persistence.spec.ts`'s `'a refused aggregate explains
+the reason as a distinct persistence state and leaves the Space available'`.
+The Chromium spec drives the refusal end to end over the real HTTP wire: the
+gesture is an ordinary drag against the tracked fixture, and what is faked is
+only the server's `422` answer to the real `POST /api/spaces` it sends, in
+exactly the shape `encodeCommitRefusal`/`decodeCommitRefusal` round-trip
+(`packages/persistence/src/http-protocol.ts`) — the same technique the
+neighbouring permanent-rejection test already used for a fake `403`. No
+test-only backdoor was needed; the gesture a real author makes is sufficient
+once the fake response is shaped like a real repository's. The spec also
+asserts the hidden `persistence-status` span's `data-persistence-state`
+attribute reads `refused` (not `rejected`) while the dialog is up and `settled`
+after the corrective Edit — the state-machine distinction criterion 2 asks
+for, which the shared dialog text alone cannot show.
+
+`pnpm ui:catalog:check` (part of `verify`) confirms the story/claim/Ladle/Chromium
+evidence wiring; `pnpm verify`, `pnpm e2e` (216 passed) and `pnpm e2e:ladle`
+(104 passed) all pass on the finished tree.
+
+**Out of scope, deliberately.** `pnpm e2e:postgres` was not run — it needs a
+live database this session did not start, per the repo's own rule — and
+`test/e2e/` was grepped for anything this change could break; it references
+`persistence-status` the way the new Chromium spec does, but nothing there
+drives an aggregate refusal, so the change does not reach it. The Post-V1
+per-error-location disclosure above remains unscheduled and untouched.

@@ -197,6 +197,78 @@ test(
   },
 );
 
+/**
+ * `v1-release/17`, criterion 4/5: a refused aggregate, driven end to end
+ * through the real HTTP wire rather than a test-only backdoor.
+ *
+ * The gesture is an ordinary drag — the same one the permanent-rejection test
+ * above makes — and what is faked is only the server's answer to the real
+ * `POST /api/spaces` it sends: a `422` carrying `{ errors: [...] }`, exactly
+ * the shape `encodeCommitRefusal`/`decodeCommitRefusal` round-trip
+ * (`http-protocol.ts`). The real backend answers this way whenever a commit
+ * passes this client's own pre-flight checks but fails complete aggregate
+ * intake — a concurrent Edit elsewhere in the aggregate is the ordinary way
+ * that happens — so this is a faithful stand-in for that race rather than a
+ * shape the application could not otherwise receive.
+ */
+test(
+  'a refused aggregate explains the reason as a distinct persistence state and leaves the Space available',
+  { tag: '@parity:command-dock-reports-aggregate-refusal' },
+  async ({ page }) => {
+    await page.route('**/api/spaces', async (route) => {
+      const request = route.request();
+      if (!isCommit(request.method(), request.url())) return route.continue();
+      await route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [
+            {
+              kind: 'ordinary-space-unreferenced',
+              spaceId: '00000000-0000-4000-8000-000000000099',
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await settled(page);
+    await dragBy(page, thing, 0, 180);
+
+    // The same dialog a permanent rejection draws (`PersistenceControl` treats
+    // the two `Rejection` kinds alike), but reached through the session's own
+    // `refused` state rather than `rejected` — proved on the hidden status
+    // span `data-persistence-state` carries, which is the *state machine*
+    // distinction criterion 2 asks for and nothing about the dialog's text
+    // could show.
+    const refusal = page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' });
+    await expect(refusal).toContainText('A space would be left with nothing pointing at it.');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+      'data-persistence-state',
+      'refused',
+    );
+    await refusal.getByRole('button', { name: 'Continue editing' }).click();
+    await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
+    await expect(thing).toBeVisible();
+
+    // Retry is not reachable from this state at all — no such control is drawn
+    // — and the one recovery is a further Edit, which resumes the ordinary
+    // commit path.
+    await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+    await page.unroute('**/api/spaces');
+    await dragBy(page, thing, 0, 40);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+      'data-persistence-state',
+      'settled',
+    );
+    await expect(page.getByRole('button', { name: 'Persistence rejected' })).toHaveCount(0);
+  },
+);
+
 test(
   'a stale browser reports conflict and accepts the remote space without overwriting it',
   { tag: '@parity:command-dock-resolves-conflict' },

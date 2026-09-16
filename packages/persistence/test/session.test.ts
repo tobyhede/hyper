@@ -71,6 +71,7 @@ const EVERY_UNCONFLICTED_KIND = {
   pending: 'pending',
   failed: 'failed',
   rejected: 'rejected',
+  refused: 'refused',
 } as const satisfies Readonly<Record<UnconflictedKind, UnconflictedKind>>;
 
 interface DrivenSession {
@@ -104,6 +105,12 @@ const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => 
       break;
     case 'rejected':
       control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'No access' });
+      break;
+    case 'refused':
+      control.queueResult({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID }],
+      });
       break;
   }
   const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
@@ -959,7 +966,7 @@ describe('openSpaceSession', () => {
     expect(managed.isIdle()).toBe(true);
   });
 
-  it('preserves coordinated aggregate refusal identities in rejected session state', () => {
+  it('preserves coordinated aggregate refusal identities in a distinct refused session state', () => {
     const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const managed = openManagedSpaceSession(backend, loaded);
 
@@ -974,7 +981,7 @@ describe('openSpaceSession', () => {
     });
 
     expect(managed.session.getState().persistence).toEqual({
-      kind: 'rejected',
+      kind: 'refused',
       failure: {
         kind: 'aggregate-refused',
         errors: [
@@ -984,5 +991,50 @@ describe('openSpaceSession', () => {
       },
     });
     expect(managed.isIdle()).toBe(true);
+  });
+
+  /*
+   * `v1-release/17`, criterion 2: `refused` recovers only through an authored
+   * correction, never through `retry()` — the method that answers `failed`
+   * alone. An uncorrected `submit()` of the same working snapshot re-attempts
+   * the aggregate exactly as `retry()` would have, so the assertion is that
+   * `retry()` itself does nothing: no request reaches the backend and the
+   * published state does not move.
+   */
+  it('does not recover a refused aggregate through retry()', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID }],
+    });
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
+
+    session.submit(changedTitle('Refused'));
+    const refused = await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind === 'refused',
+    );
+    expect(control.requests).toHaveLength(1);
+
+    session.retry();
+
+    expect(session.getState()).toBe(refused);
+    expect(control.requests).toHaveLength(1);
+
+    // Recovery is a subsequent Edit: submitting a corrected snapshot resumes
+    // the ordinary commit path exactly as it would from `rejected`.
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+    session.submit(changedTitle('Corrected'));
+    await waitFor(
+      session.getState,
+      session.subscribe,
+      ({ persistence }) => persistence.kind === 'settled',
+    );
+    expect(control.requests).toHaveLength(2);
   });
 });

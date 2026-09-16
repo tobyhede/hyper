@@ -334,13 +334,15 @@ export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
  *
  * Derived from the session state rather than imported as a union, because
  * `CommitResult` is not on `@project/persistence`'s surface and the two states
- * that carry these failures are.
+ * that carry these failures are. An aggregate refusal is excluded by
+ * construction now rather than by `Exclude`: `rejected`'s `failure` no longer
+ * carries it, `refused` does (`v1-release/17`), and `describeAggregateRefusal`
+ * is that state's own translation.
  */
 type Persistence = SpaceSessionState['persistence'];
-type Rejected = Extract<Persistence, { kind: 'rejected' }>['failure'];
 export type PersistenceFailure =
   | Extract<Persistence, { kind: 'failed' }>['failure']
-  | Exclude<Rejected, { kind: 'aggregate-refused' }>;
+  | Extract<Persistence, { kind: 'rejected' }>['failure'];
 
 /**
  * What each persistence failure means, in the author's terms rather than the

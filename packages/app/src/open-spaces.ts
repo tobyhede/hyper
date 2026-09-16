@@ -575,7 +575,15 @@ export function createOpenSpaces({
           refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
         };
       }
-      if (persistence.kind === 'rejected' && confirmation?.warning !== 'persistence-rejected') {
+      // A permanent rejection and an aggregate refusal (`v1-release/17`) warn
+      // the same way here: both leave nothing stored to lose by leaving, and
+      // both recover only through a further Edit rather than through this
+      // Space's own persistence surface, so exiting is the same choice either
+      // way.
+      if (
+        (persistence.kind === 'rejected' || persistence.kind === 'refused') &&
+        confirmation?.warning !== 'persistence-rejected'
+      ) {
         return { kind: 'warning', warning: 'persistence-rejected' };
       }
       // The registry stops owning this session here, so anything still driving

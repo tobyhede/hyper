@@ -2673,7 +2673,11 @@ function PersistenceReport({
   readonly edge: DockEdge;
 }) {
   const { state } = persistence;
-  const decision = state.kind === 'conflicted' || state.kind === 'rejected';
+  // An aggregate refusal (`v1-release/17`) draws the same dialog a permanent
+  // rejection does — `PersistenceControl` treats the two `Rejection` kinds
+  // alike — so it is a decision here too.
+  const decision =
+    state.kind === 'conflicted' || state.kind === 'rejected' || state.kind === 'refused';
 
   return (
     <>
