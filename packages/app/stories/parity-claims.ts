@@ -433,6 +433,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'Permanent persistence rejection explains the reason and can be acknowledged.',
   },
   {
+    id: 'command-dock-reports-aggregate-refusal',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'SaveRefused',
+    claim:
+      'A refused aggregate — a distinct persistence state from permanent rejection — explains the reason as one sentence and can be acknowledged, with no retry offered.',
+  },
+  {
     id: 'command-dock-resolves-conflict',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveConflict',

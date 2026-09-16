@@ -8,6 +8,7 @@ function settlementFor(state: SpaceSessionState): Promise<SpaceSessionState> | n
       return Promise.resolve(state);
     case 'failed':
     case 'rejected':
+    case 'refused':
     case 'conflicted':
       return Promise.reject(new Error(`Persistence ended as ${state.persistence.kind}`));
   }

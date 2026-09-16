@@ -75,6 +75,15 @@ SaveFailed.meta = { iframed: true };
 export const SaveRejected: Story = () => <CommandDockFixture scenario="save-rejected" />;
 SaveRejected.meta = { iframed: true };
 
+/**
+ * A refused aggregate: the backend declined the whole aggregate rather than
+ * this Space's request (ADR 0057, `v1-release/17`), a distinct persistence
+ * state that draws the same one-sentence dialog and, like a rejection, offers
+ * no retry.
+ */
+export const SaveRefused: Story = () => <CommandDockFixture scenario="save-refused" />;
+SaveRefused.meta = { iframed: true };
+
 /** A conflicting save: recovery is resolve-conflict rather than retry. */
 export const SaveConflict: Story = () => <CommandDockFixture scenario="save-conflict" />;
 SaveConflict.meta = { iframed: true };

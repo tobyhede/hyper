@@ -23,6 +23,7 @@ export type DockScenario =
   | 'presenting'
   | 'save-failed'
   | 'save-rejected'
+  | 'save-refused'
   | 'save-conflict'
   | 'save-failed-elsewhere';
 
@@ -31,6 +32,10 @@ const UNWELL = {
   'save-failed': 'failed',
   'save-failed-elsewhere': 'failed',
   'save-rejected': 'rejected',
+  // A distinct state from `save-rejected` (`v1-release/17`): the backend
+  // refused the aggregate rather than declining the request outright, and the
+  // Dock draws the same dialog from a structured refusal instead of a code.
+  'save-refused': 'refused',
   'save-conflict': 'conflicted',
 } as const satisfies Partial<Record<DockScenario, SpaceSessionState['persistence']['kind']>>;
 
@@ -147,6 +152,11 @@ export async function openDockStory(scenario: DockScenario) {
         kind: 'permanent-failure',
         code: 'forbidden',
         message: 'Permission denied',
+      });
+    } else if (scenario === 'save-refused') {
+      control.queueResult({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: target.id }],
       });
     } else {
       control.queueResult({

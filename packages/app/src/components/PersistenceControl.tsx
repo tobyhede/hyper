@@ -33,7 +33,17 @@ export interface PersistenceControlProps {
 }
 
 type Persistence = SpaceSessionState['persistence'];
-type Rejection = Extract<Persistence, { kind: 'rejected' }>;
+/**
+ * A permanent rejection and an aggregate refusal draw the same dialog.
+ *
+ * They are distinct `SpaceSessionState['persistence']` kinds (`v1-release/17`
+ * criterion 2) with distinct recoveries in the session — an aggregate refusal
+ * never offers Retry, and neither offers it here either — but nothing on this
+ * surface needs to tell them apart: both are "the server declined this,
+ * continue editing to correct it," and `rejectionDescription` below is what
+ * already carries the one difference an author reads, the sentence.
+ */
+type Rejection = Extract<Persistence, { kind: 'rejected' } | { kind: 'refused' }>;
 type Conflict = Extract<Persistence, { kind: 'conflicted' }>;
 
 const conflictRecovery = ({ current, baseline }: Conflict): ConflictRecovery =>
@@ -59,7 +69,8 @@ export function PersistenceControl({
   onAcceptRemote,
   onKeepLocal,
 }: PersistenceControlProps) {
-  const rejection = persistence.kind === 'rejected' ? persistence : null;
+  const rejection: Rejection | null =
+    persistence.kind === 'rejected' || persistence.kind === 'refused' ? persistence : null;
   /*
    * The acknowledgement lives here rather than in `RejectionControl` because
    * `active` is what Open Spaces moves, and a dismissal is spent by the
@@ -84,13 +95,13 @@ export function PersistenceControl({
     );
   }
 
-  if (rejection !== null) {
+  if (persistence.kind === 'rejected' || persistence.kind === 'refused') {
     if (acknowledged !== null) return <PersistenceIndicator state="rejected" />;
     return (
       <RejectionControl
-        persistence={rejection}
+        persistence={persistence}
         onAcknowledge={() => {
-          setAcknowledged(rejection.failure);
+          setAcknowledged(persistence.failure);
         }}
       />
     );

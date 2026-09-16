@@ -313,7 +313,10 @@ describe('Space Thing lifecycle', () => {
         },
       ],
     });
-    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('rejected'));
+    // The target's own commit is refused by aggregate intake (`ordinary Space
+    // unreferenced` for the unsaved child), which is `refused` rather than
+    // `rejected` (`v1-release/17`).
+    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('refused'));
     const lifecycle = registry.spaceThings(idSource([SPACE_THING_ID]));
 
     await expect(
@@ -923,6 +926,84 @@ describe('Space Thing lifecycle', () => {
       { kind: 'update', snapshot: { document: { title: 'Newest Meta' } } },
       { kind: 'create', spaceId: TARGET_ID },
     ]);
+  });
+
+  /*
+   * `v1-release/17`, criterion 4: the backend itself refuses the coordinated
+   * aggregate — not the client-side pre-flight `loadSpaceAggregate` check
+   * `coordinateSpaceThingLifecycle` runs before ever calling `backend.commit`.
+   * The candidate this builds (a fresh Target Space linked from Meta) passes
+   * that local check cleanly, so the queued `aggregate-refused` can only be
+   * answered by the mocked backend — mirroring a real repository's own
+   * aggregate-intake refusal on the commit path, e.g. a concurrent Edit that
+   * made the candidate invalid between the read and the write.
+   *
+   * Every participant the coordinated commit touched — Meta and the newly
+   * created Target alike — must observe the same completed `refused` state,
+   * and neither the standalone `retry()` nor `coordinatedRecovery.retry()`
+   * gets past it: only a further Edit (`submit`) resubmits the aggregate,
+   * exactly as the permanent-failure case above recovers.
+   */
+  it('refuses every participant together when the backend refuses the coordinated aggregate', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: TARGET_ID }],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceThings(
+      idSource([TARGET_ID, TARGET_THING_ID, TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, SPACE_THING_ID]),
+    );
+
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      diagramId: META_DIAGRAM_ID,
+      title: 'Architecture',
+      position: { x: 240, y: 80 },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('refused'));
+    const target = registry.session(TARGET_ID);
+    expect(target?.getState().persistence.kind).toBe('refused');
+    expect(meta.getState().persistence).toMatchObject({
+      kind: 'refused',
+      failure: {
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: TARGET_ID }],
+      },
+    });
+    expect(target?.getState().persistence).toEqual(meta.getState().persistence);
+
+    // Retry recovers nothing: it answers only `failed`, and a coordinated
+    // refusal is not that.
+    const requestsBeforeRetry = control.requests.length;
+    meta.retry();
+    target?.retry();
+    expect(control.requests).toHaveLength(requestsBeforeRetry);
+    expect(meta.getState().persistence.kind).toBe('refused');
+    expect(target?.getState().persistence.kind).toBe('refused');
+
+    // Recovery is a subsequent, authored Edit: correcting the working Space
+    // and submitting resumes the coordinated commit through the ordinary path.
+    control.queueResult({
+      kind: 'committed',
+      revisions: [
+        { spaceId: META_ID, revision: 4n },
+        { spaceId: TARGET_ID, revision: 0n },
+      ],
+      deletedSpaceIds: [],
+    });
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Corrected Meta' },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+    expect(target?.getState().persistence.kind).toBe('settled');
   });
 
   it('atomically creates the first Space Thing and its normal target Space', async () => {

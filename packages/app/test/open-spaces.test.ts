@@ -386,6 +386,35 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
+  /**
+   * `v1-release/17`: a refused aggregate warns before exit exactly as a
+   * permanent rejection does — both leave nothing stored to lose, and both
+   * recover only through a further Edit rather than this Space's own
+   * persistence surface — even though the two are now distinct
+   * `SpaceSessionState['persistence']` kinds.
+   */
+  it('warns before exiting refused work and permits an explicit exit', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_ID }],
+    });
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('refused'));
+
+    await expect(openSpaces.exit(OTHER_ID)).resolves.toEqual({
+      kind: 'warning',
+      warning: 'persistence-rejected',
+    });
+    expect(openSpaces.entry(OTHER_ID)).toBe(other);
+    await expect(openSpaces.exit(OTHER_ID, { warning: 'persistence-rejected' })).resolves.toEqual({
+      kind: 'exited',
+    });
+    expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
+  });
+
   it('commits an edit queued behind a Space Thing coordination before exiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { backend, openSpaces } = setup(control, countingIds());

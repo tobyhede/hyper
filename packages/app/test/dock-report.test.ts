@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { uuidSchema } from '@project/core';
 import { openSpaceStatusLabel } from '@project/ui';
 import {
   exitReportSentence,
@@ -30,6 +31,13 @@ describe('the Command Dock reports an unwell Space', () => {
     expect(unwellReport({ kind: 'rejected', failure: permanent })).toBe(
       openSpaceStatusLabel('rejected'),
     );
+    // A refused aggregate is a distinct persistence state from a permanent
+    // rejection (`v1-release/17`), reported with the same word: both mean the
+    // server declined this Space's last commit and only a further Edit
+    // recovers it.
+    expect(unwellReport({ kind: 'refused', failure: refused })).toBe(
+      openSpaceStatusLabel('rejected'),
+    );
     expect(unwellReport({ kind: 'conflicted', current: undefined, baseline: undefined })).toBe(
       openSpaceStatusLabel('conflicted'),
     );
@@ -46,6 +54,16 @@ const permanent = {
   kind: 'permanent-failure',
   code: 'forbidden',
   message: 'Permission denied',
+} as const;
+
+const refused = {
+  kind: 'aggregate-refused',
+  errors: [
+    {
+      kind: 'ordinary-space-unreferenced',
+      spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000001'),
+    },
+  ],
 } as const;
 
 /**
