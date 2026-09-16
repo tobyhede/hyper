@@ -16,6 +16,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/integration/**/*.test.ts'],
+    exclude: ['test/integration/sqlite-*.test.ts'],
     testTimeout: 30_000,
     /**
      * One database, so one file at a time (issue `12`).

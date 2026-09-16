@@ -10,6 +10,7 @@
     "packages/app/e2e",
     "packages/app/ladle-e2e",
     "migrations/**/*.ts",
+    "migrations-sqlite/**/*.ts",
     "src",
     "test/integration",
     "test/e2e",

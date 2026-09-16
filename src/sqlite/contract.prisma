@@ -1,0 +1,34 @@
+// use prisma-next
+
+model Space {
+  id               String   @id
+  document         Json
+  revision         String   @default("0")
+  exportedRevision String?  @map("exported_revision")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        temporal.updatedAt() @map("updated_at")
+  things           Thing[]
+  repositoryStates RepositoryState[]
+
+  @@map("spaces")
+}
+
+model RepositoryState {
+  singletonId Int    @id @default(1) @map("singleton_id")
+  metaSpaceId String @map("meta_space_id")
+  metaSpace   Space  @relation(fields: [metaSpaceId], references: [id], onDelete: Restrict)
+
+  @@map("repository_state")
+}
+
+model Thing {
+  id        String   @id
+  spaceId   String   @map("space_id")
+  document  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt temporal.updatedAt() @map("updated_at")
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+  @@map("things")
+}

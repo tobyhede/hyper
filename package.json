@@ -20,7 +20,10 @@
     "http-server:build": "pnpm --filter @project/app http-server:build",
     "contract:emit": "prisma-next contract emit",
     "contract:check": "pnpm contract:emit && git diff --exit-code -- src/prisma/contract.json src/prisma/contract.d.ts && prisma-next migration check --format json",
+    "contract:emit:sqlite": "prisma-next contract emit --config prisma-next.config.sqlite.ts",
+    "contract:check:sqlite": "pnpm contract:emit:sqlite && git diff --exit-code -- src/sqlite/contract.json src/sqlite/contract.d.ts && prisma-next migration check --config prisma-next.config.sqlite.ts --format json",
     "db:migrate": "prisma-next migrate",
+    "db:migrate:sqlite": "prisma-next migrate --config prisma-next.config.sqlite.ts",
     "hyper": "node --disable-warning=DEP0205 --import tsx src/cli/entry.ts",
     "postgres:up": "docker compose up -d --wait",
     "postgres:down": "docker compose down",
@@ -46,6 +49,8 @@
     "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
+    "test:integration:sqlite": "pnpm contract:emit:sqlite && pnpm db:migrate:sqlite && vitest run --config vitest.sqlite.config.ts",
+    "dev:sqlite": "mkdir -p .scratch/sqlite && export SQLITE_PATH=\"${SQLITE_PATH:-$PWD/.scratch/sqlite/hyper.db}\" && pnpm db:migrate:sqlite && pnpm --filter @project/app dev:sqlite",
     "verify:static": "pnpm typecheck:toolchain && pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check",
     "verify": "pnpm verify:static && pnpm test:coverage",
     "verify:local": "pnpm verify:static && pnpm test:coverage --maxWorkers=2 --minWorkers=1"
@@ -63,6 +68,7 @@
     "@oxlint/plugins": "1.78.0",
     "@playwright/test": "^1.49.1",
     "@prisma-next/adapter-postgres": "0.16.0",
+    "@prisma-next/adapter-sqlite": "0.16.0",
     "@prisma-next/contract": "0.16.0",
     "@prisma-next/sql-contract": "0.16.0",
     "@prisma-next/target-postgres": "0.16.0",
@@ -98,6 +104,7 @@
   },
   "dependencies": {
     "@prisma-next/postgres": "0.16.0",
+    "@prisma-next/sqlite": "0.16.0",
     "dotenv": "^17.4.2"
   }
 }

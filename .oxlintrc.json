@@ -22,8 +22,11 @@
     "**/.agents/**",
     "**/.worktrees/**",
     "**/src/prisma/contract.d.ts",
+    "**/src/sqlite/contract.d.ts",
     "**/migrations/**/end-contract.d.ts",
     "**/migrations/**/start-contract.d.ts",
+    "**/migrations-sqlite/**/end-contract.d.ts",
+    "**/migrations-sqlite/**/start-contract.d.ts",
     "tools/oxlint/anti-slop/**",
     "tools/typing-fixtures/**"
   ],
@@ -69,6 +72,19 @@
         // lose precision above Number.MAX_SAFE_INTEGER — see the SAFETY comment
         // on that function for the full rationale.
         "anti-slop/no-chained-type-assertions": "off"
+      }
+    },
+    {
+      // The SQLite repository is the same class of boundary as the PostgreSQL
+      // one: classifying caught driver errors, converting TEXT revisions at the
+      // adapter edge, and parsing Json columns that the driver sometimes
+      // answers as already-decoded objects and sometimes as stored TEXT
+      // (`test/integration/sqlite-space-repository.test.ts` initialize/load).
+      "files": ["src/persistence/sqlite-space-repository.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-runtime-typeof": "off",
+        "anti-slop/no-unknown-returns": "off"
       }
     },
     {

@@ -1,0 +1,207 @@
+[
+  {
+    "id": "table.repository_state",
+    "label": "Create table repository_state",
+    "summary": "Creates table repository_state with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "repository_state"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"repository_state\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "repository_state"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"repository_state\"",
+        "sql": "CREATE TABLE \"repository_state\" (\n  \"meta_space_id\" TEXT NOT NULL,\n  \"singleton_id\" INTEGER NOT NULL DEFAULT 1,\n  PRIMARY KEY (\"singleton_id\"),\n  FOREIGN KEY (\"meta_space_id\") REFERENCES \"spaces\" (\"id\") ON DELETE RESTRICT\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"repository_state\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "repository_state"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.spaces",
+    "label": "Create table spaces",
+    "summary": "Creates table spaces with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"spaces\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "spaces"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"spaces\"",
+        "sql": "CREATE TABLE \"spaces\" (\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"document\" TEXT NOT NULL,\n  \"exported_revision\" TEXT,\n  \"id\" TEXT NOT NULL,\n  \"revision\" TEXT NOT NULL DEFAULT '0',\n  \"updated_at\" TEXT NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"spaces\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "spaces"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.things",
+    "label": "Create table things",
+    "summary": "Creates table things with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "things"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"things\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "things"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"things\"",
+        "sql": "CREATE TABLE \"things\" (\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"document\" TEXT NOT NULL,\n  \"id\" TEXT NOT NULL,\n  \"space_id\" TEXT NOT NULL,\n  \"updated_at\" TEXT NOT NULL,\n  PRIMARY KEY (\"id\"),\n  FOREIGN KEY (\"space_id\") REFERENCES \"spaces\" (\"id\") ON DELETE CASCADE\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"things\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "things"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.repository_state.repository_state_meta_space_id_idx",
+    "label": "Create index repository_state_meta_space_id_idx on repository_state",
+    "summary": "Creates index repository_state_meta_space_id_idx on repository_state",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "index",
+        "name": "repository_state_meta_space_id_idx",
+        "table": "repository_state"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"repository_state_meta_space_id_idx\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "repository_state_meta_space_id_idx"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"repository_state_meta_space_id_idx\"",
+        "sql": "CREATE INDEX \"repository_state_meta_space_id_idx\" ON \"repository_state\" (\"meta_space_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"repository_state_meta_space_id_idx\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "repository_state_meta_space_id_idx"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.things.things_space_id_idx",
+    "label": "Create index things_space_id_idx on things",
+    "summary": "Creates index things_space_id_idx on things",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "index",
+        "name": "things_space_id_idx",
+        "table": "things"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"things_space_id_idx\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "things_space_id_idx"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"things_space_id_idx\"",
+        "sql": "CREATE INDEX \"things_space_id_idx\" ON \"things\" (\"space_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"things_space_id_idx\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "things_space_id_idx"
+        ]
+      }
+    ]
+  }
+]
