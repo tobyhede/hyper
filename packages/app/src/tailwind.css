@@ -33,6 +33,32 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* The chrome's structural scale (radius and type size): every command
+     surface, menu, popover and control states a step from this list by name
+     rather than restating its own arbitrary value. The Thing's own geometry is
+     a second, deliberately separate scale declared beside `CanvasThing` in
+     `canvas-thing.css`, not here. */
+  --radius-chrome-2xs: 2px;
+  --radius-chrome-xs: 3px;
+  --radius-chrome-sm: 4px;
+  --radius-chrome-md: 6px;
+  --radius-chrome-lg: 8px;
+  --radius-chrome-xl: 10px;
+  --text-chrome-2xs: 10px;
+  --text-chrome-xs: 0.75rem;
+  --text-chrome-sm: 0.85rem;
+}
+
+/*
+ * Tailwind v4 ships no themable border-width scale — `border`, `border-2`,
+ * `border-4` and `border-8` are the only named steps, and its own `theme.css`
+ * declares no `--border-width-*` namespace a project can extend. `commit`'s
+ * accent border is the one chrome control off that fixed list, so it reaches
+ * a name through a custom utility (Tailwind v4's `@utility`) instead of
+ * restating `border-[3px]`.
+ */
+@utility border-chrome-accent {
+  border-width: var(--border-width-chrome-accent);
 }
 
 /*
@@ -105,6 +131,22 @@
   --canvas-thing-muted-color: #4a505c;
   --canvas-thing-error-color: #b3261e;
   --radius-md: 0.5rem;
+  --border-width-chrome-accent: 3px;
+  /* The chrome's one elevation: a contact edge and a wider cast, both washed
+     in the chrome's own ink rather than black, lifting a command surface off
+     whatever it sits over. Not wired into `@theme` alongside the radius and
+     type steps above: `command-surface.css` reads this custom property
+     directly rather than applying a class, and the only thing routing it
+     through the `shadow-*` theme namespace would add is Tailwind's
+     `--tw-shadow-color` override hook for a `shadow-<color>` modifier class,
+     which nothing here uses — verified against the compiled CSS, both
+     placements produce the same `color-mix()` value (and the same
+     `@supports`-gated fallback for a browser without it, which is Lightning
+     CSS's handling of `color-mix()` generally and already true of `Button`'s
+     existing `receded` variant, not something this token introduces). */
+  --shadow-chrome-elevated:
+    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 6px 18px color-mix(in oklab, var(--foreground) 10%, transparent);
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
