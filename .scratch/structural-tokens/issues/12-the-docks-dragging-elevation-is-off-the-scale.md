@@ -7,7 +7,7 @@ packages/app/src/components/command-dock.css:171
   box-shadow: 0 14px 34px color-mix(in oklab, var(--foreground) 20%, transparent);
 ```
 
-The theme states one elevation, `--shadow-chrome-elevated` — a two-layer contact-and-cast wash at 6% and 10%. This is a single layer at 20%, and it is deliberately more prominent, because a Dock the author has picked up should read as lifted further than a Dock at rest.
+The theme states one elevation, `--shadow-chrome-elevated` — since ticket 14 a hard unblurred `6px 6px 0 var(--foreground)` offset. This is a 34px blur at 20%, and it is deliberately more prominent, because a Dock the author has picked up should read as lifted further than a Dock at rest. Ticket 14 widened the gap: the two no longer differ only in size, they differ in character, so this surface is the one place the chrome still casts a soft shadow of its own making.
 
 Ticket 06 found it. Ticket 01's inventory did not, because that inventory read the four axes it had named and this value is already written in theme terms — it spends `var(--foreground)` through `color-mix`, so it is not a literal and no scan for one reports it. It is off the scale rather than off the theme.
 

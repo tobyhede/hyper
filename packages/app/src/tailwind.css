@@ -37,13 +37,28 @@
      surface, menu, popover and control states a step from this list by name
      rather than restating its own arbitrary value. The Thing's own geometry is
      a second, deliberately separate scale — declared below, beside the Thing's
-     colour tokens, rather than here (ticket 06). */
-  --radius-chrome-2xs: 2px;
-  --radius-chrome-xs: 3px;
-  --radius-chrome-sm: 4px;
-  --radius-chrome-md: 6px;
-  --radius-chrome-lg: 8px;
-  --radius-chrome-xl: 10px;
+     colour tokens, rather than here (ticket 06).
+
+     **Every radius step is zero, and the six names are kept.** The chrome now
+     draws the Thing's corner, so the steps collapse to one value; the names
+     stay because they are what makes the corner one edit rather than a hundred
+     (`.scratch/structural-tokens/issues/09-...`). Give them distinct values
+     again and every surface follows, which is the property the effort bought.
+
+     Tailwind's own `--radius-*` is set with them, further down. The chrome is
+     drawn in two radius vocabularies — the registry components this effort did
+     not touch read `rounded-lg` and `rounded-md` — and a block that names only
+     one leaves half the chrome rounded. */
+  --radius-chrome-2xs: 0;
+  --radius-chrome-xs: 0;
+  --radius-chrome-sm: 0;
+  --radius-chrome-md: 0;
+  --radius-chrome-lg: 0;
+  --radius-chrome-xl: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
   --text-chrome-2xs: 10px;
   --text-chrome-xs: 0.75rem;
   --text-chrome-sm: 0.85rem;
@@ -133,34 +148,38 @@
   /* The Thing's own structural scale: border weight, corner and shadow
      character, kept apart from the chrome's for the same reason the two text
      roles above are — the Thing is paper lying on the canvas and the chrome
-     floats above it, and one shared scale would erase what the geometry says.
-     Chrome draws a 1px border, a 10px corner and a soft two-layer wash; the
-     Thing draws a 4px border, no corner at all, and states a shadow only while
-     it is being handled (`.scratch/structural-tokens/issues/06-...`). Both
-     shadows below are stated as one composite value each, the same way
-     `--shadow-chrome-elevated` further down is, rather than decomposed into
-     separate offset/blur primitives. */
+     floats above it, so each states its own geometry even where the two agree
+     (`.scratch/structural-tokens/issues/06-...`). They agree on the corner and
+     on the shadow's character and part on weight: the chrome draws a 1px border
+     and the Thing a 4px one, and the Thing states a shadow only while it is
+     being handled. Both shadows below are stated as one composite value each,
+     the same way `--shadow-chrome-elevated` further down is, rather than
+     decomposed into separate offset/blur primitives. */
   --canvas-thing-border-width: 4px;
   --canvas-thing-radius: 0;
   --canvas-thing-shadow-dragging: 7px 7px 0 var(--canvas-thing-ink-color);
   --canvas-thing-shadow-selected: 0 0 0 3px var(--canvas-thing-ink-color);
-  --radius-md: 0.5rem;
+  /* Declared unlayered as well as in `@theme` above, and both are needed: an
+     unlayered declaration beats the `@layer theme` one `@theme` emits, so a
+     theme entry alone would leave `rounded-md` at the old value. */
+  --radius-md: 0;
   --border-width-chrome-accent: 3px;
-  /* The chrome's one elevation: a contact edge and a wider cast, both washed
-     in the chrome's own ink rather than black, lifting a command surface off
-     whatever it sits over. Not wired into `@theme` alongside the radius and
-     type steps above: `command-surface.css` reads this custom property
-     directly rather than applying a class, and the only thing routing it
-     through the `shadow-*` theme namespace would add is Tailwind's
-     `--tw-shadow-color` override hook for a `shadow-<color>` modifier class,
-     which nothing here uses — verified against the compiled CSS, both
-     placements produce the same `color-mix()` value (and the same
-     `@supports`-gated fallback for a browser without it, which is Lightning
-     CSS's handling of `color-mix()` generally and already true of `Button`'s
-     existing `receded` variant, not something this token introduces). */
-  --shadow-chrome-elevated:
-    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
-    0 6px 18px color-mix(in oklab, var(--foreground) 10%, transparent);
+  /* The chrome's one elevation: an unblurred offset cast in the chrome's own
+     ink rather than black, lifting a command surface off whatever it sits
+     over. It is the Thing's shadow in the chrome's ink — the Thing draws
+     `7px 7px 0` while it is handled — because the chrome and the Thing are one
+     material.
+
+     Not wired into `@theme` alongside the radius and type steps above:
+     `command-surface.css` reads this custom property directly rather than
+     applying a class, so routing it through the `shadow-*` namespace would add
+     only Tailwind's `--tw-shadow-color` hook for a `shadow-<color>` modifier,
+     which nothing here uses.
+
+     **Tailwind's own `shadow-md` and `shadow-lg` are untouched**, so a menu,
+     popover and dialog still cast a blurred shadow while the Dock casts a hard
+     one. Reconciling those is a decision of its own. */
+  --shadow-chrome-elevated: 6px 6px 0 var(--foreground);
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);

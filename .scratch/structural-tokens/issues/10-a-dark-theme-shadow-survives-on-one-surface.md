@@ -9,7 +9,7 @@ packages/app/src/components/SelectedEdgeControls.tsx:38
 
 A shadow written in black at that opacity is a value chosen against a dark canvas. The theme has been light since `a5a76669`. On sand it reads as a grey cloud rather than as a lift.
 
-The theme already states its one elevation as `--shadow-chrome-elevated`, the two-layer contact-plus-cast wash the command surface draws. Whether this surface wants that, Tailwind's `shadow-lg` — which is what `Popover` and `Select` both chose for the same problem — or a second named elevation is the decision this ticket takes. It is a decision about what the product looks like, so it wants an eye on it rather than a substitution.
+The theme already states its one elevation as `--shadow-chrome-elevated`, which ticket 14 made the hard unblurred `6px 6px 0 var(--foreground)` offset the command surface now draws. Whether this surface wants that, Tailwind's `shadow-lg` — which is what `Popover` and `Select` both chose for the same problem — or a second named elevation is the decision this ticket takes. It is a decision about what the product looks like, so it wants an eye on it rather than a substitution.
 
 **This ticket is smaller than it first claimed, and the correction is worth reading.** It originally said four surfaces were affected, and named `Command.tsx` among them, on the strength of a grep for the literal value. Three of those four were wrong:
 
