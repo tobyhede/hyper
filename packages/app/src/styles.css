@@ -113,7 +113,7 @@ body {
 
 /* ---- Thing node ---- */
 .rf-thing-node {
-  border-radius: var(--radius-chrome-xl);
+  border-radius: var(--canvas-thing-radius);
   transition:
     width var(--thing-placement-duration) var(--thing-placement-easing),
     height var(--thing-placement-duration) var(--thing-placement-easing),
@@ -325,10 +325,15 @@ body {
   pointer-events: none;
 }
 
+/* A Thing is drawn in the Thing's vocabulary, never the chrome's. `--card`,
+   `--border` and `--radius-chrome-xl` stood here and made an opened Thing take
+   chrome paper, a chrome hairline and a chrome corner, so a block that changed
+   only the chrome changed a Thing as well. `.canvas-thing` has always read the
+   tokens below; this rule and the two after it had not. */
 .thing {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-chrome-xl);
+  background: var(--canvas-thing-face-rest);
+  border: var(--canvas-thing-border-width) solid var(--canvas-thing-ink-color);
+  border-radius: var(--canvas-thing-radius);
   padding: 0.85rem 1rem;
   overflow: hidden;
 }
@@ -341,8 +346,10 @@ body {
    presented Thing" fact, which is adapter/app state and has no reason to be
    known inside the design-system package. */
 .rf-thing-node--active :is(.thing, .canvas-thing) {
-  border-color: var(--accent);
-  outline: 2px solid var(--primary);
+  /* The border stays the Thing's ink and is not restated: `--accent` was set
+     here, which on a cream face draws a border a shade off the paper and so
+     removed the Thing's edge for as long as it was the presented one. */
+  outline: 2px solid var(--canvas-thing-ink-color);
 }
 
 /* Where a selected Edge's controls are placed, and nothing about how they look.
@@ -415,9 +422,9 @@ body {
   width: 100%;
   height: 100%;
   padding: 4cqw 5cqw;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-chrome-xl);
+  background: var(--canvas-thing-face-rest);
+  border: var(--canvas-thing-border-width) solid var(--canvas-thing-ink-color);
+  border-radius: var(--canvas-thing-radius);
   overflow: hidden;
   text-align: left;
   font-size: 3.4cqw;
@@ -452,8 +459,10 @@ body {
 .rf-thing-node__content .thing__body pre {
   overflow-x: auto;
   padding: 2cqw;
-  border-radius: var(--radius-chrome-sm);
-  background: var(--secondary);
+  border-radius: var(--canvas-thing-radius);
+  /* A tint of the Thing's own ink rather than a chrome fill, which is how
+     `markdown-thing-body.css` already grounds a code block on a Thing. */
+  background: color-mix(in srgb, currentcolor 8%, transparent);
 }
 
 /* React Flow viewport coordinates keep a Space dock above its embedded nodes. */
