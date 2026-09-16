@@ -203,6 +203,7 @@ function SpaceThingSelector({
         .then((refusal) => {
           onReport(refusal);
         })
+        .catch(() => undefined)
         .finally(() => {
           onBusy(false);
         });

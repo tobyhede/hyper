@@ -124,6 +124,37 @@ describe('SpaceThingRailClusters', () => {
     expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
   });
 
+  it('releases busy when deleting a Diagram rejects', async () => {
+    let rejectDelete: () => void = () => undefined;
+    mount(
+      clusters({
+        diagramCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(null),
+          onDelete: () =>
+            new Promise<string | null>((_, reject) => {
+              rejectDelete = () => {
+                reject(new Error('persist failed'));
+              };
+            }),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Collection 1' }));
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await act(async () => {
+      rejectDelete();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+  });
+
   it('draws a selection the target no longer holds as unavailable', () => {
     mount(clusters({ diagramId: null, graphs: [], graphId: null }));
 
