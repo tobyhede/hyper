@@ -90,11 +90,11 @@ body {
   /* The lift is the shell's, not the `Alert`'s: an `Alert` is also drawn inside
      a dialog, where it is part of the surface rather than over one. Here it is
      chrome laid on the canvas, and on sand paper an unlifted panel reads as a
-     hole cut in the Space rather than a report about it. The same two-part
-     shadow `.canvas-refusal` spends, being the same kind of thing. */
-  box-shadow:
-    0 1px 2px rgb(31 41 51 / 6%),
-    0 6px 18px rgb(31 41 51 / 10%);
+     hole cut in the Space rather than a report about it. `--shadow-chrome-elevated`
+     is the same wash `.canvas-refusal` and the shared command surface spend —
+     this used to hand-copy it as a hardcoded `rgb(31 41 51 / N%)` rather than
+     reading the token (ticket 01), which is what this now does instead. */
+  box-shadow: var(--shadow-chrome-elevated);
   border-radius: var(--radius-md);
 }
 
@@ -113,7 +113,7 @@ body {
 
 /* ---- Thing node ---- */
 .rf-thing-node {
-  border-radius: 10px;
+  border-radius: var(--radius-chrome-xl);
   transition:
     width var(--thing-placement-duration) var(--thing-placement-easing),
     height var(--thing-placement-duration) var(--thing-placement-easing),
@@ -214,13 +214,19 @@ body {
 }
 
 .rf-thing-node__resize-mark {
+  /* This mark's own border weight — a singleton, drawn in the Thing's own ink
+     but not the Thing's own `--canvas-thing-border-width` (4px): the mark is a
+     small resize gizmo, not the Thing's paper edge, and the two values are not
+     the same fact. */
+  --resize-mark-border-width: 2px;
+
   position: absolute;
   translate: 1px 1px;
   transform-origin: right bottom;
   width: 20px;
   height: 20px;
   background: #000;
-  border: 2px solid var(--canvas-thing-ink-color);
+  border: var(--resize-mark-border-width) solid var(--canvas-thing-ink-color);
   opacity: 0;
   pointer-events: none;
   transition: opacity 100ms ease;
@@ -265,8 +271,14 @@ body {
    The size is declared alongside the handle bounds in `authoring-handle.ts` so
    the two cannot drift. */
 .rf-thing-node__authoring-handle.react-flow__handle {
+  /* This handle's own border weight — a singleton, and not the Thing's own
+     `--canvas-thing-border-width` (4px): an anchor dot is not the Thing's
+     paper edge, and the two happening to be close is not a reason to share
+     one token between them. */
+  --authoring-handle-border-width: 3px;
+
   z-index: 1;
-  border: 3px solid #0b0d11;
+  border: var(--authoring-handle-border-width) solid #0b0d11;
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -316,7 +328,7 @@ body {
 .thing {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-chrome-xl);
   padding: 0.85rem 1rem;
   overflow: hidden;
 }
@@ -352,18 +364,15 @@ body {
   left: 50%;
   z-index: 10;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-chrome-md);
   padding: 0.35rem 0.6rem;
   background: var(--card);
   color: var(--destructive);
   font-size: 0.8rem;
-  /* Lifted off the sand rather than smudged onto it. Half of black was what it
-     took to separate this from a near-black canvas; on light ground the same
-     value is a grey cloud, so it is two stated shadows in the foreground's own
-     ink — a contact edge and a spread. */
-  box-shadow:
-    0 1px 2px rgb(31 41 51 / 6%),
-    0 6px 18px rgb(31 41 51 / 10%);
+  /* Lifted off the sand rather than smudged onto it: `--shadow-chrome-elevated`,
+     the same wash `.shell__notice` and the shared command surface spend, in the
+     foreground's own ink rather than black — a contact edge and a spread. */
+  box-shadow: var(--shadow-chrome-elevated);
   transform: translateX(-50%);
 }
 
@@ -408,7 +417,7 @@ body {
   padding: 4cqw 5cqw;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-chrome-xl);
   overflow: hidden;
   text-align: left;
   font-size: 3.4cqw;
@@ -443,7 +452,7 @@ body {
 .rf-thing-node__content .thing__body pre {
   overflow-x: auto;
   padding: 2cqw;
-  border-radius: 4px;
+  border-radius: var(--radius-chrome-sm);
   background: var(--secondary);
 }
 

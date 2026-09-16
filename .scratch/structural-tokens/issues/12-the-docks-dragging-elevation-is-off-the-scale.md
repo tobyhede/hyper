@@ -1,0 +1,27 @@
+# 12: The Dock's dragging elevation is off the scale
+
+**What to build:** The Command Dock's elevation while it is being dragged is either a named step on the chrome scale or a recorded exception. Today it is neither.
+
+```
+packages/app/src/components/command-dock.css:171
+  box-shadow: 0 14px 34px color-mix(in oklab, var(--foreground) 20%, transparent);
+```
+
+The theme states one elevation, `--shadow-chrome-elevated` — a two-layer contact-and-cast wash at 6% and 10%. This is a single layer at 20%, and it is deliberately more prominent, because a Dock the author has picked up should read as lifted further than a Dock at rest.
+
+Ticket 06 found it. Ticket 01's inventory did not, because that inventory read the four axes it had named and this value is already written in theme terms — it spends `var(--foreground)` through `color-mix`, so it is not a literal and no scan for one reports it. It is off the scale rather than off the theme.
+
+**So the question is not whether it is wrong. It is whether one elevation is enough.** Two answers are reasonable and the ticket picks one:
+
+- The scale gains a second step — a `--shadow-chrome-lifted` beside `--shadow-chrome-elevated` — and the Dock spends it. A future surface that means "picked up" then has a name to reach for.
+- The value stays where it is as a surface-specific exception, recorded as such, on the grounds that exactly one surface in the product can be dragged and a scale of two where one has a single consumer is a list.
+
+Either way the decision is written down, which is the part that does not exist now.
+
+**Blocked by:** None (can start immediately). Touches one declaration in one stylesheet.
+
+**Status:** ready-for-agent
+
+- [ ] The Dock's dragging elevation is a named step or a recorded exception, and the reasoning is written down
+- [ ] If a second step is added, `things-popover.css`'s and `command-dock.css`'s other elevations are checked against it rather than left behind
+- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass and the output is reported

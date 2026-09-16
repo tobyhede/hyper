@@ -23,6 +23,15 @@
   --canvas-thing-subtitle-ratio: 0.78;
   --canvas-thing-caption-ratio: 0.67;
 
+  /* The ladder's weight step, named once beside its size and ratios rather
+     than restated at each rung. Not the chrome's `font-semibold`/`-medium`/
+     `-normal` vocabulary: a Thing's own type should not move because an
+     unrelated control's Tailwind class changed, which is exactly the coupling
+     reusing that vocabulary from a hand-rolled sheet would introduce. */
+  --canvas-thing-title-weight: 600;
+  --canvas-thing-subtitle-weight: 500;
+  --canvas-thing-caption-weight: 400;
+
   /* The ladder's ceiling, in lines of the `title` role. Placement is authored,
      so a Title is clamped to the room available and never accommodated (ADR
      0014, ADR 0066, ADR 0083) — a Title with more lines than fit is clipped.
@@ -36,6 +45,14 @@
      Thing's own geometry. */
   --canvas-thing-title-ladder-lines: 4;
 
+  /* Three singleton values with nowhere else to be looked up from: the Title
+     control's own focus ring, and the two underline previews drawn beneath it
+     while a pointer hovers or the field is live (below, and in
+     `.canvas-thing__title-input`). */
+  --canvas-thing-title-focus-radius: 2px;
+  --canvas-thing-title-underline-hover: inset 0 -2px 0 var(--canvas-thing-graph);
+  --canvas-thing-title-underline-editing: inset 0 -3px 0 var(--canvas-thing-graph);
+
   position: relative;
   box-sizing: border-box;
   width: var(--thing-width);
@@ -43,8 +60,8 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border: 4px solid var(--canvas-thing-ink);
-  border-radius: 0;
+  border: var(--canvas-thing-border-width) solid var(--canvas-thing-ink);
+  border-radius: var(--canvas-thing-radius);
   background: var(--canvas-thing-face);
   background-clip: padding-box;
   box-shadow: none;
@@ -91,11 +108,11 @@
 
 .canvas-thing[data-state='selected'],
 .canvas-thing[data-state='editing'] {
-  box-shadow: 0 0 0 3px var(--canvas-thing-ink);
+  box-shadow: var(--canvas-thing-shadow-selected);
 }
 
 .canvas-thing[data-state='dragging'] {
-  box-shadow: 7px 7px 0 var(--canvas-thing-ink);
+  box-shadow: var(--canvas-thing-shadow-dragging);
   transform: rotate(-1deg);
 }
 
@@ -202,7 +219,7 @@
   overflow: hidden;
   color: var(--canvas-thing-title);
   font-size: var(--canvas-thing-title-size);
-  font-weight: 600;
+  font-weight: var(--canvas-thing-title-weight);
   line-height: var(--canvas-thing-title-leading);
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -244,19 +261,19 @@
    reader looks for it. */
 .canvas-thing__title-line[data-role='title'] {
   font-size: var(--canvas-thing-title-size);
-  font-weight: 600;
+  font-weight: var(--canvas-thing-title-weight);
   -webkit-line-clamp: 3;
 }
 
 .canvas-thing__title-line[data-role='subtitle'] {
   font-size: calc(var(--canvas-thing-title-size) * var(--canvas-thing-subtitle-ratio));
-  font-weight: 500;
+  font-weight: var(--canvas-thing-subtitle-weight);
   -webkit-line-clamp: 2;
 }
 
 .canvas-thing__title-line[data-role='caption'] {
   font-size: calc(var(--canvas-thing-title-size) * var(--canvas-thing-caption-ratio));
-  font-weight: 400;
+  font-weight: var(--canvas-thing-caption-weight);
   -webkit-line-clamp: 1;
 }
 
@@ -285,11 +302,11 @@
 
 .canvas-thing__title:has(.canvas-thing__title-control:hover) {
   background: color-mix(in srgb, var(--canvas-thing-graph) 10%, transparent);
-  box-shadow: inset 0 -2px 0 var(--canvas-thing-graph);
+  box-shadow: var(--canvas-thing-title-underline-hover);
 }
 
 .canvas-thing__title-control:focus-visible {
-  border-radius: 2px;
+  border-radius: var(--canvas-thing-title-focus-radius);
   outline: 2px solid var(--canvas-thing-graph);
   outline-offset: 2px;
 }
@@ -406,15 +423,15 @@
   );
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--canvas-thing-radius);
   outline: 0;
   overflow-y: auto;
   background: transparent;
-  box-shadow: inset 0 -3px 0 var(--canvas-thing-graph);
+  box-shadow: var(--canvas-thing-title-underline-editing);
   color: var(--canvas-thing-title);
   font: inherit;
   font-size: var(--canvas-thing-title-size);
-  font-weight: 600;
+  font-weight: var(--canvas-thing-title-weight);
   line-height: var(--canvas-thing-title-leading);
   letter-spacing: -0.02em;
   text-align: left;

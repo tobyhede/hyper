@@ -28,6 +28,16 @@
   --markdown-thing-content-top: 10px;
   --markdown-thing-gutter-width: 29px;
 
+  /* This surface's own structural values, named once rather than restated at
+     each rule below. Not the Thing's central `--canvas-thing-*` scale
+     (ticket 06): a rendered heading's boldness and a blockquote's accent bar
+     are this content's own facts, not part of the Thing's own frame. */
+  --markdown-thing-heading-weight: 700;
+  --markdown-thing-blockquote-border-width: 3px;
+  --markdown-thing-shortcut-weight: 500;
+  --markdown-thing-kbd-weight: 600;
+  --markdown-thing-kbd-radius: 3px;
+
   position: relative;
   display: flex;
   flex: 1;
@@ -61,7 +71,7 @@
 .markdown-thing-body__rendered :is(h1, h2, h3, h4) {
   margin-bottom: 0.5em;
   font-size: 1.2em;
-  font-weight: 700;
+  font-weight: var(--markdown-thing-heading-weight);
   line-height: 1.25;
 }
 
@@ -78,7 +88,7 @@
 }
 
 .markdown-thing-body__rendered strong {
-  font-weight: 700;
+  font-weight: var(--markdown-thing-heading-weight);
 }
 
 .markdown-thing-body__rendered a {
@@ -90,7 +100,8 @@
 
 .markdown-thing-body__rendered blockquote {
   padding-left: 0.75em;
-  border-left: 3px solid var(--canvas-thing-graph, currentcolor);
+  border-left: var(--markdown-thing-blockquote-border-width) solid
+    var(--canvas-thing-graph, currentcolor);
 }
 
 .markdown-thing-body__rendered :is(code, pre) {
@@ -115,7 +126,7 @@
   height: 100%;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--canvas-thing-radius);
   background: transparent;
   opacity: 0;
 }
@@ -182,7 +193,7 @@
   gap: 14px;
   color: var(--canvas-thing-muted-color, currentcolor);
   font-size: 10px;
-  font-weight: 500;
+  font-weight: var(--markdown-thing-shortcut-weight);
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -210,14 +221,14 @@
   min-width: 14px;
   padding: 0 3px;
   border: 1px solid color-mix(in srgb, currentcolor 42%, transparent);
-  border-radius: 3px;
+  border-radius: var(--markdown-thing-kbd-radius);
   background: transparent;
   /* One ink for the whole line. A cap set in the Thing's full-strength ink beside
      a muted word reads as two different kinds of text; the cap is already told
      apart by its outline, and nothing is gained by also making it darker. */
   color: inherit;
   font-size: 9px;
-  font-weight: 600;
+  font-weight: var(--markdown-thing-kbd-weight);
   line-height: 1;
 }
 

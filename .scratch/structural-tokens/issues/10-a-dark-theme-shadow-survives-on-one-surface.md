@@ -18,10 +18,17 @@ The theme already states its one elevation as `--shadow-chrome-elevated`, the tw
 
 So the sweep in `a5a76669` was very nearly complete, and the commit message that claims it is accurate. One surface was missed.
 
+## A second, smaller one found by ticket 06
+
+`packages/app/src/components/things-popover.css:124` draws `box-shadow: 0 1px 0 rgb(0 0 0 / 4%)`. Ticket 06 found it, correctly left it, and reported it here.
+
+It is the same class of value — a shadow whose colour is written as black rather than taken from the theme — but it is a 1px hairline at 4%, not an elevation sized for a dark canvas. It may simply want `color-mix(in oklab, var(--foreground) 4%, transparent)`, which is what every other hairline in the theme spends. Decide it with the other one.
+
 **Blocked by:** None (can start immediately).
 
 **Status:** ready-for-agent
 
 - [ ] `SelectedEdgeControls`'s raised surface draws an elevation the light theme states, and the choice is recorded
 - [ ] No surface in the repository draws an elevation shadow whose colour is written as black or `rgba(0,0,0,…)` — a contrast outline on a glyph is not an elevation and is out of scope
+- [ ] `things-popover.css`'s hairline shadow takes its colour from the theme
 - [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass and the output is reported

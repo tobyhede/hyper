@@ -36,8 +36,8 @@
   /* The chrome's structural scale (radius and type size): every command
      surface, menu, popover and control states a step from this list by name
      rather than restating its own arbitrary value. The Thing's own geometry is
-     a second, deliberately separate scale declared beside `CanvasThing` in
-     `canvas-thing.css`, not here. */
+     a second, deliberately separate scale — declared below, beside the Thing's
+     colour tokens, rather than here (ticket 06). */
   --radius-chrome-2xs: 2px;
   --radius-chrome-xs: 3px;
   --radius-chrome-sm: 4px;
@@ -130,6 +130,20 @@
      `test/unit/canvas-thing-contrast.test.ts` holds them to AA on both faces. */
   --canvas-thing-muted-color: #4a505c;
   --canvas-thing-error-color: #b3261e;
+  /* The Thing's own structural scale: border weight, corner and shadow
+     character, kept apart from the chrome's for the same reason the two text
+     roles above are — the Thing is paper lying on the canvas and the chrome
+     floats above it, and one shared scale would erase what the geometry says.
+     Chrome draws a 1px border, a 10px corner and a soft two-layer wash; the
+     Thing draws a 4px border, no corner at all, and states a shadow only while
+     it is being handled (`.scratch/structural-tokens/issues/06-...`). Both
+     shadows below are stated as one composite value each, the same way
+     `--shadow-chrome-elevated` further down is, rather than decomposed into
+     separate offset/blur primitives. */
+  --canvas-thing-border-width: 4px;
+  --canvas-thing-radius: 0;
+  --canvas-thing-shadow-dragging: 7px 7px 0 var(--canvas-thing-ink-color);
+  --canvas-thing-shadow-selected: 0 0 0 3px var(--canvas-thing-ink-color);
   --radius-md: 0.5rem;
   --border-width-chrome-accent: 3px;
   /* The chrome's one elevation: a contact edge and a wider cast, both washed

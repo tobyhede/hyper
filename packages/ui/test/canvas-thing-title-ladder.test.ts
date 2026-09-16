@@ -35,6 +35,19 @@ const railStylesheet = readFileSync(
   'utf8',
 );
 
+/**
+ * The Thing's own structural scale (ticket 06) is declared centrally in
+ * `tailwind.css`, beside its colour tokens, rather than on `.canvas-thing`
+ * itself — the same place `--canvas-thing-ink-color` and its neighbours are.
+ * The ladder's ceiling test below needs the border's numeric width, which
+ * lives there now rather than inline in `canvas-thing.css`'s own `border`
+ * declaration.
+ */
+const themeStylesheet = readFileSync(
+  fileURLToPath(new URL('../../app/src/tailwind.css', import.meta.url)),
+  'utf8',
+);
+
 /** The declaration block of the rule whose selector is exactly `selector`. */
 const block = (selector: string): string => {
   const escaped = selector.replaceAll(/[.[\]^$*+?()|{}\\]/gu, String.raw`\$&`);
@@ -57,6 +70,15 @@ const declared = (declarations: string, property: string): string | undefined =>
 const token = (name: string, unit = ''): number => {
   const value = declared(block('.canvas-thing'), name);
   expect(value, `no ${name} on .canvas-thing`).toBeDefined();
+  expect(value?.endsWith(unit)).toBe(true);
+  return Number.parseFloat(value ?? '');
+};
+
+/** A custom property declared anywhere in `tailwind.css`, as a number of `unit`. */
+const themeToken = (name: string, unit = ''): number => {
+  const found = new RegExp(String.raw`(?<![\w-])${name}:\s*([^;]+)`, 'u').exec(themeStylesheet);
+  expect(found, `no ${name} in tailwind.css`).not.toBeNull();
+  const value = found?.[1]?.trim();
   expect(value?.endsWith(unit)).toBe(true);
   return Number.parseFloat(value ?? '');
 };
@@ -84,16 +106,17 @@ describe('a single-line Title', () => {
    */
   it('is still drawn at 18px, weight 600, leading 1.12 and tracking -0.02em', () => {
     expect(token('--canvas-thing-title-size', 'px')).toBe(18);
+    expect(token('--canvas-thing-title-weight')).toBe(600);
     expect(token('--canvas-thing-title-leading')).toBe(1.12);
 
     const heading = block('.canvas-thing__title');
     expect(declared(heading, 'font-size')).toBe('var(--canvas-thing-title-size)');
-    expect(declared(heading, 'font-weight')).toBe('600');
+    expect(declared(heading, 'font-weight')).toBe('var(--canvas-thing-title-weight)');
     expect(declared(heading, 'line-height')).toBe('var(--canvas-thing-title-leading)');
     expect(declared(heading, 'letter-spacing')).toBe('-0.02em');
 
     expect(declared(rung('title'), 'font-size')).toBe('var(--canvas-thing-title-size)');
-    expect(declared(rung('title'), 'font-weight')).toBe('600');
+    expect(declared(rung('title'), 'font-weight')).toBe('var(--canvas-thing-title-weight)');
   });
 
   /** Bottom-anchored: the body puts its passengers at the foot of the Thing. */
@@ -129,9 +152,13 @@ describe('the rungs below the name', () => {
   });
 
   it('step the weight 600 / 500 / 400', () => {
-    expect(declared(rung('title'), 'font-weight')).toBe('600');
-    expect(declared(rung('subtitle'), 'font-weight')).toBe('500');
-    expect(declared(rung('caption'), 'font-weight')).toBe('400');
+    expect(token('--canvas-thing-title-weight')).toBe(600);
+    expect(token('--canvas-thing-subtitle-weight')).toBe(500);
+    expect(token('--canvas-thing-caption-weight')).toBe(400);
+
+    expect(declared(rung('title'), 'font-weight')).toBe('var(--canvas-thing-title-weight)');
+    expect(declared(rung('subtitle'), 'font-weight')).toBe('var(--canvas-thing-subtitle-weight)');
+    expect(declared(rung('caption'), 'font-weight')).toBe('var(--canvas-thing-caption-weight)');
   });
 
   /**
@@ -176,8 +203,10 @@ describe('the ladder ceiling', () => {
    * room would otherwise show up as a Title quietly overrunning its Thing.
    */
   it('fits inside the body of a Closed Thing', () => {
-    const thing = block('.canvas-thing');
-    const border = Number.parseFloat(declared(thing, 'border')?.split('px')[0] ?? '');
+    // The Thing's own border width is `--canvas-thing-border-width` (ticket 06),
+    // declared in `tailwind.css` beside the Thing's colour tokens rather than
+    // stated inline in this stylesheet's own `border` shorthand.
+    const border = themeToken('--canvas-thing-border-width', 'px');
     const railHeight = Number.parseFloat(/min-height:\s*(\d+)px/u.exec(railStylesheet)?.[1] ?? '');
     const bodyPadding = Number.parseFloat(
       declared(block('.canvas-thing__body'), 'padding')?.split('px')[0] ?? '',
@@ -224,7 +253,7 @@ describe('the field that writes the Title', () => {
     const input = titleInput();
     expect(declared(input, 'font-size')).toBe('var(--canvas-thing-title-size)');
     expect(declared(input, 'line-height')).toBe('var(--canvas-thing-title-leading)');
-    expect(declared(input, 'font-weight')).toBe('600');
+    expect(declared(input, 'font-weight')).toBe('var(--canvas-thing-title-weight)');
     expect(declared(input, 'letter-spacing')).toBe('-0.02em');
   });
 
