@@ -1094,6 +1094,44 @@ describe('CanvasThing Space front', () => {
     expect(destination).toHaveFocus();
   });
 
+  it('releases busy when creating a Diagram rejects', async () => {
+    let rejectCreate: (reason?: unknown) => void = () => undefined;
+    render(
+      <CanvasThing
+        front={{
+          kind: 'space',
+          open: true,
+          selection: selection({
+            diagramCommands: {
+              onRename: () => null,
+              onCreate: () =>
+                new Promise<string | null>((_, reject) => {
+                  rejectCreate = reject;
+                }),
+              onDelete: () => Promise.resolve(null),
+              onCopyLink: () => Promise.resolve(null),
+              deleteDisabled: false,
+            },
+          }),
+        }}
+        state="selected"
+        title="Elsewhere"
+        graphColor="#35d6c3"
+      />,
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New Diagram' }));
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await act(async () => {
+      rejectCreate(new Error('persist failed'));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
+  });
+
   /**
    * A Closed Space Thing draws neither selector even when the selections are
    * available to it: those are what Opening it is for.

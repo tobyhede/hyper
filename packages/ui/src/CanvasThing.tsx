@@ -866,19 +866,30 @@ function SpaceThingSelector({
       // from restoring focus while its adapter waits for the new name.
       movedCaret.current = label === 'Diagram';
       onBusy(true);
-      void commands.onCreate(renameScope).then((refusal) => {
-        onReport(refusal);
-        if (refusal !== null) movedCaret.current = false;
-        onBusy(false);
-      });
+      void commands
+        .onCreate(renameScope)
+        .then((refusal) => {
+          onReport(refusal);
+          if (refusal !== null) movedCaret.current = false;
+        })
+        .catch(() => {
+          movedCaret.current = false;
+        })
+        .finally(() => {
+          onBusy(false);
+        });
     },
     onDelete: () => {
       if (commands === undefined) return;
       onBusy(true);
-      void commands.onDelete().then((refusal) => {
-        onReport(refusal);
-        onBusy(false);
-      });
+      void commands
+        .onDelete()
+        .then((refusal) => {
+          onReport(refusal);
+        })
+        .finally(() => {
+          onBusy(false);
+        });
     },
     onCopyLink: () => {
       if (commands === undefined) return;
