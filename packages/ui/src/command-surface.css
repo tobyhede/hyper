@@ -24,13 +24,11 @@
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-chrome-xl);
   background: color-mix(in oklab, var(--card) 92%, transparent);
   /* The ink, washed twice: a contact shadow and the cast one that lifts the
      strip off whatever it is over. */
-  box-shadow:
-    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
-    0 6px 18px color-mix(in oklab, var(--foreground) 10%, transparent);
+  box-shadow: var(--shadow-chrome-elevated);
   backdrop-filter: blur(8px);
 }
 

@@ -43,7 +43,7 @@ const quietFeedback =
  * button, `destructive` the panel button with the danger border.
  */
 const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center rounded-[6px] border text-[0.85rem] whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed aria-disabled:cursor-not-allowed aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex cursor-pointer items-center justify-center rounded-chrome-md border text-chrome-sm whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed aria-disabled:cursor-not-allowed aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -64,7 +64,7 @@ const buttonVariants = cva(
         // from whatever `--muted-foreground` is, in either theme.
         receded: `border-transparent bg-transparent text-[color-mix(in_oklab,var(--muted-foreground)_72%,transparent)] ${quietFeedback}`,
         commit:
-          'border-[3px] border-transparent border-b-primary bg-transparent text-foreground hover:border-primary disabled:opacity-50',
+          'border-chrome-accent border-transparent border-b-primary bg-transparent text-foreground hover:border-primary disabled:opacity-50',
       },
       size: {
         default: 'px-[0.8rem] py-[0.4rem]',
@@ -72,7 +72,11 @@ const buttonVariants = cva(
         // the shape rather than for a place: `Toolbar` is a component now
         // (ADR 0073), and its own items are `size: 'icon'`, so a size called
         // "toolbar" named neither where it is used nor what a toolbar carries.
-        compact: "px-[11px] py-[6px] text-[13px] [&_svg:not([class*='size-'])]:size-3.5",
+        // Padding only: type size is the base recipe's `text-chrome-sm`, which
+        // used to be one step smaller here (`text-[13px]`) until the
+        // structural scale merged that into the same 0.85rem step every other
+        // size already drew from (`.scratch/structural-tokens/issues/01-define-the-structural-scale.md`).
+        compact: "px-[11px] py-[6px] [&_svg:not([class*='size-'])]:size-3.5",
         icon: 'size-7 p-0',
       },
     },
