@@ -94,14 +94,16 @@ describe('SpaceThingRailClusters', () => {
   });
 
   it('releases busy when creating a Diagram rejects', async () => {
-    let rejectCreate: (reason?: unknown) => void = () => undefined;
+    let rejectCreate: () => void = () => undefined;
     mount(
       clusters({
         diagramCommands: {
           onRename: () => null,
           onCreate: () =>
             new Promise<string | null>((_, reject) => {
-              rejectCreate = reject;
+              rejectCreate = () => {
+                reject(new Error('persist failed'));
+              };
             }),
           onDelete: () => Promise.resolve(null),
           onCopyLink: () => Promise.resolve(null),
@@ -116,7 +118,7 @@ describe('SpaceThingRailClusters', () => {
       'true',
     );
     await act(async () => {
-      rejectCreate(new Error('persist failed'));
+      rejectCreate();
       await Promise.resolve();
     });
     expect(screen.getByRole('button', { name: 'Diagram: Collection 1' })).toBeEnabled();
