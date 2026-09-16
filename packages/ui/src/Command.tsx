@@ -40,7 +40,7 @@ export const CommandInput = forwardRef<
   <CommandPrimitive.Input
     ref={ref}
     className={cn(
-      'w-full rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.4rem] text-[0.85rem] text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--accent)]',
+      'w-full rounded-chrome-md border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.4rem] text-chrome-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--accent)]',
       className,
     )}
     {...props}
@@ -55,7 +55,7 @@ export const CommandList = forwardRef<
   <CommandPrimitive.List
     ref={ref}
     className={cn(
-      'max-h-[12rem] overflow-x-hidden overflow-y-auto rounded-[6px] border border-[var(--border)] bg-[var(--card)] p-[0.25rem]',
+      'max-h-[12rem] overflow-x-hidden overflow-y-auto rounded-chrome-md border border-[var(--border)] bg-[var(--card)] p-[0.25rem]',
       className,
     )}
     {...props}
@@ -70,7 +70,7 @@ export const CommandEmpty = forwardRef<
   <CommandPrimitive.Empty
     ref={ref}
     className={cn(
-      'px-[0.5rem] py-[0.5rem] text-[0.8rem] text-[var(--muted-foreground)]',
+      'px-[0.5rem] py-[0.5rem] text-chrome-xs text-[var(--muted-foreground)]',
       className,
     )}
     {...props}
@@ -85,7 +85,7 @@ export const CommandGroup = forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      '[&_[cmdk-group-heading]]:px-[0.5rem] [&_[cmdk-group-heading]]:py-[0.3rem] [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--muted-foreground)] [&_[cmdk-group-heading]]:uppercase',
+      '[&_[cmdk-group-heading]]:px-[0.5rem] [&_[cmdk-group-heading]]:py-[0.3rem] [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-chrome-2xs [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--muted-foreground)] [&_[cmdk-group-heading]]:uppercase',
       className,
     )}
     {...props}
@@ -100,7 +100,7 @@ export const CommandItem = forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      'flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[4px] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--foreground)] outline-none select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-[var(--secondary)]',
+      'flex w-full cursor-pointer items-center gap-[0.5rem] rounded-chrome-sm px-[0.5rem] py-[0.35rem] text-chrome-sm text-[var(--foreground)] outline-none select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-[var(--secondary)]',
       className,
     )}
     {...props}
