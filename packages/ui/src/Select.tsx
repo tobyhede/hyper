@@ -19,7 +19,7 @@ export const SelectTrigger = forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-between gap-[0.4rem] rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.35rem] text-[0.85rem] text-[var(--foreground)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--foreground)]',
+      'inline-flex items-center justify-between gap-[0.4rem] rounded-chrome-md border border-[var(--border)] bg-[var(--secondary)] px-[0.5rem] py-[0.35rem] text-chrome-sm text-[var(--foreground)] transition-colors outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-[var(--foreground)]',
       className,
     )}
     {...props}
@@ -76,7 +76,7 @@ export const SelectContent = forwardRef<
         // to separate a dark popup from a dark canvas, and on light paper it is
         // a grey cloud under the list.
         className={cn(
-          'max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-[6px] border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-lg data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
+          'max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-chrome-md border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] shadow-lg data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
           className,
         )}
         {...props}
@@ -97,7 +97,7 @@ export const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-pointer items-center rounded-[4px] px-[0.5rem] py-[0.35rem] text-[0.85rem] outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--secondary)] data-[highlighted]:outline-none data-[selected]:text-[var(--accent)]',
+      'relative flex w-full cursor-pointer items-center rounded-chrome-sm px-[0.5rem] py-[0.35rem] text-chrome-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-[var(--secondary)] data-[highlighted]:outline-none data-[selected]:text-[var(--accent)]',
       className,
     )}
     {...props}
