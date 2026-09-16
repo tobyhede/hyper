@@ -318,9 +318,9 @@ export type ConflictRecovery = 'reload' | 'revert' | 'none';
 
 const CONFLICT_DESCRIPTIONS = {
   reload:
-    'A newer version of this space is available. Reload discards your local changes; keeping your local version tries to save it again.',
+    'A newer version of this space is available. Reload discards your local changes, including unsaved text you have typed into an open Thing. Keep local and retry preserves that editing and tries to save it again.',
   revert:
-    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit; keeping your local version tries to save it again.',
+    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit and discards unsaved text typed into an open Thing. Keep local and retry preserves that editing and tries to save it again.',
   none: 'There is no stored version of this space. Keep your local version to restore it.',
 } satisfies Record<ConflictRecovery, string>;
 

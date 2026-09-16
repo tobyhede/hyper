@@ -7,7 +7,12 @@ import {
   type RenderResult,
 } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  DEFAULT_OPEN_SIZE,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+} from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
@@ -93,6 +98,7 @@ const snapshot = (
   body: string,
   x: number,
   y: number,
+  open = false,
 ): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: SPACE_ID,
@@ -104,7 +110,11 @@ const snapshot = (
           id: DIAGRAM_ID,
           title: diagramTitle,
           kind: 'positioned',
-          positions: { [THING_ID]: { x, y, open: false } },
+          positions: {
+            [THING_ID]: open
+              ? { x, y, open: true, openSize: DEFAULT_OPEN_SIZE }
+              : { x, y, open: false },
+          },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
       ],
@@ -114,6 +124,15 @@ const snapshot = (
   });
 
 const LOCAL = snapshot('Local space', 'Local diagram', 'Local thing', 'Local source', 10, 20);
+const LOCAL_OPEN = snapshot(
+  'Local space',
+  'Local diagram',
+  'Local thing',
+  'Local source',
+  10,
+  20,
+  true,
+);
 const REMOTE = snapshot(
   'Remote space',
   'Remote diagram',
@@ -122,6 +141,18 @@ const REMOTE = snapshot(
   900,
   700,
 );
+const MARKDOWN_SOURCE = 'Markdown source of Local thing';
+const MARKDOWN_EDIT = 'Edit Markdown source of Local thing';
+const MARKDOWN_DRAFT = 'Unsaved prose that Reload must discard';
+
+/** Replace CodeMirror source through its public editable surface. */
+const replaceMarkdownSource = (value: string): HTMLElement => {
+  const source = screen.getByRole('textbox', { name: MARKDOWN_SOURCE });
+  source.focus();
+  fireEvent.keyDown(source, { key: 'a', ctrlKey: true });
+  fireEvent.paste(source, { clipboardData: { getData: () => value } });
+  return source;
+};
 
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
@@ -138,12 +169,12 @@ const runtime = (value: SpaceSnapshot) => {
  * modal AlertDialog that marks the rest of the shell inert, so a Space app
  * mounted already-conflicted has no reachable Thing to open a draft on.
  */
-async function mountedSpaceApp(): Promise<SpaceSession> {
+async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSession> {
   const backend = new MemorySpaceBackend([
     { snapshot: REMOTE, revision: 4n, exportedRevision: null },
   ]);
   const { spaceSession: session, spaceThings } = openTestSpace(backend, {
-    snapshot: LOCAL,
+    snapshot: local,
     revision: 3n,
     exportedRevision: null,
   });
@@ -151,7 +182,7 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
   let view: RenderResult | undefined;
   mountSpace(
     {
-      id: runtime(LOCAL).id,
+      id: runtime(local).id,
       session,
       app: composeApp({ spaceSession: session, spaceThings }),
       spaceThings,
@@ -171,8 +202,11 @@ async function mountedSpaceApp(): Promise<SpaceSession> {
  * Discover the conflict with the draft already open: a commit against the
  * revision this session acknowledged, which the backend has moved past.
  */
-const raiseConflict = async (session: SpaceSession): Promise<void> => {
-  session.submit(LOCAL);
+const raiseConflict = async (
+  session: SpaceSession,
+  local: SpaceSnapshot = LOCAL,
+): Promise<void> => {
+  session.submit(local);
   await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
   await screen.findByTestId('persistence-accept-remote');
 };
@@ -180,6 +214,28 @@ const raiseConflict = async (session: SpaceSession): Promise<void> => {
 const acceptRemote = (): void => {
   fireEvent.click(screen.getByTestId('persistence-accept-remote'));
 };
+
+const keepLocal = (): void => {
+  fireEvent.click(screen.getByTestId('persistence-keep-local'));
+};
+
+/**
+ * Open-at-rest: the Thing starts Open, so Edit Markdown source is on screen
+ * without an Open Edit. Persistence stays settled until the conflict is raised
+ * afterwards with the draft already live.
+ */
+async function stageOpenMarkdownDraft(session: SpaceSession): Promise<void> {
+  expect(session.getState().persistence.kind).toBe('settled');
+  fireEvent.click(await screen.findByRole('button', { name: MARKDOWN_EDIT }));
+  await screen.findByRole('textbox', { name: MARKDOWN_SOURCE }, { timeout: 5000 });
+  const source = replaceMarkdownSource(MARKDOWN_DRAFT);
+  expect(source).toHaveTextContent(MARKDOWN_DRAFT);
+  expect(session.getState().persistence.kind).toBe('settled');
+  await raiseConflict(session, LOCAL_OPEN);
+  expect(screen.getByRole('textbox', { name: MARKDOWN_SOURCE, hidden: true })).toHaveTextContent(
+    MARKDOWN_DRAFT,
+  );
+}
 
 /**
  * The accepted Space is the one on screen — read off the shell's title, which is
@@ -277,8 +333,10 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * The inline Title draft lives inside the Canvas Thing. Replacement remounts
    * the keyed canvas subtree, so neither its caret nor its uncompleted value can
    * cross into the new Space. An open Markdown draft cannot be staged against
-   * this fixture: opening is itself an authored commit and therefore raises the
-   * fixture's deliberately waiting conflict before body editing can begin.
+   * this fixture's closed Thing: opening is itself an authored commit and
+   * therefore raises the fixture's deliberately waiting conflict before body
+   * editing can begin. The Open-at-rest mount below stages that draft without
+   * an Open Edit.
    */
   it('discards a Thing title editor holding an uncompleted draft', async () => {
     const session = await mountedSpaceApp();
@@ -297,6 +355,37 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
     expect(screen.queryByText('Title nobody pressed Enter on')).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(REMOTE);
     expect(await screen.findByRole('heading', { name: 'Remote thing' })).toBeVisible();
+  });
+
+  /**
+   * A Markdown body draft is component-local state (ADR 0064: no commit on blur),
+   * so the conflict dialog can come up while the editor is still mounted. Reload
+   * remounts the canvas and the accepted Space wins; Keep local and retry is
+   * the contrast that leaves the typed prose in place.
+   */
+  it('discards an unsaved Markdown draft when the stored Space is accepted', async () => {
+    const session = await mountedSpaceApp(LOCAL_OPEN);
+    await stageOpenMarkdownDraft(session);
+    acceptRemote();
+
+    await replacementLanded();
+    expect(
+      screen.queryByRole('textbox', { name: MARKDOWN_SOURCE, hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(MARKDOWN_DRAFT)).not.toBeInTheDocument();
+    expect(session.getState().working).toEqual(REMOTE);
+    expect(await screen.findByRole('heading', { name: 'Remote thing' })).toBeVisible();
+  });
+
+  it('keeps an unsaved Markdown draft when Keep local and retry is chosen', async () => {
+    const session = await mountedSpaceApp(LOCAL_OPEN);
+    await stageOpenMarkdownDraft(session);
+    keepLocal();
+
+    expect(screen.getByRole('textbox', { name: MARKDOWN_SOURCE, hidden: true })).toHaveTextContent(
+      MARKDOWN_DRAFT,
+    );
+    expect(session.getState().working).toEqual(LOCAL_OPEN);
   });
 
   /**
