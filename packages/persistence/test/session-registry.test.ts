@@ -275,4 +275,272 @@ describe('Space session registry', () => {
       'waitUntilRetirable',
     ]);
   });
+
+  // Ticket 01 (`.scratch/snapshot-edits/issues/01-registry-edits-through-snapshot-edit.md`):
+  // the registry's own copy of the membership rules diverged from Space
+  // Authoring's. These three are the failing tests that prove it, written
+  // before `SnapshotEdit` existed.
+  describe('Space Thing membership through SnapshotEdit', () => {
+    it("reclaims an Open Space Thing's room from every Thing it displaced, on delete", async () => {
+      const OPEN_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
+      const DISPLACED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+      const DELETE_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+      const DELETE_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
+      const DELETE_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000025');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: CONTAINING_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {
+                  // 400x300 Open against the 260x146 collapsed rect is a growth
+                  // of 140x154, already written into the neighbour's coordinates
+                  // by the Open Edit that placed it (ADR 0084) — exactly the
+                  // fixture `Placement.reclaim`'s own unit test uses.
+                  [OPEN_SPACE_THING_ID]: {
+                    x: 0,
+                    y: 0,
+                    open: true as const,
+                    openSize: { width: 400, height: 300 },
+                  },
+                  [DISPLACED_THING_ID]: { x: 140, y: 154, open: false as const },
+                },
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [
+            {
+              id: OPEN_SPACE_THING_ID,
+              document: {
+                title: 'Target',
+                kind: 'space' as const,
+                spaceId: DELETE_TARGET_ID,
+                diagram: DELETE_TARGET_DIAGRAM,
+                graph: DELETE_TARGET_GRAPH,
+              },
+            },
+            {
+              id: DISPLACED_THING_ID,
+              document: { title: 'Displaced', kind: 'markdown' as const, body: '' },
+            },
+          ],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const target = {
+        snapshot: {
+          id: DELETE_TARGET_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: DELETE_TARGET_DIAGRAM,
+            diagrams: [
+              {
+                id: DELETE_TARGET_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: DELETE_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target]);
+      const registry = createSpaceSessionRegistry(backend);
+      registry.open(containing);
+      registry.open(target);
+
+      const result = await registry
+        .spaceThings(() => THING_ID)
+        .delete({ containingSpaceId: SPACE_ID, thingId: OPEN_SPACE_THING_ID });
+
+      expect(result).toEqual({ kind: 'completed' });
+      const stored = await backend.loadSpace(SPACE_ID);
+      expect(stored?.snapshot.document.diagrams?.[0]?.positions).toEqual({
+        [DISPLACED_THING_ID]: { x: 0, y: 0, open: false },
+      });
+    });
+
+    it('refuses to delete a Space Thing an Alias targets, and commits nothing', async () => {
+      const ALIASED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
+      const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
+      const ALIAS_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
+      const ALIAS_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
+      const ALIAS_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000034');
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000035');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000036');
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: CONTAINING_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {
+                  [ALIASED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
+                  [ALIAS_ID]: { x: 300, y: 0, open: false as const },
+                },
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [
+            {
+              id: ALIASED_SPACE_THING_ID,
+              document: {
+                title: 'Target',
+                kind: 'space' as const,
+                spaceId: ALIAS_TARGET_SPACE_ID,
+                diagram: ALIAS_TARGET_DIAGRAM,
+                graph: ALIAS_TARGET_GRAPH,
+              },
+            },
+            {
+              id: ALIAS_ID,
+              document: {
+                title: 'Alias of Target',
+                kind: 'alias' as const,
+                target: ALIASED_SPACE_THING_ID,
+              },
+            },
+          ],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const target = {
+        snapshot: {
+          id: ALIAS_TARGET_SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: ALIAS_TARGET_DIAGRAM,
+            diagrams: [
+              {
+                id: ALIAS_TARGET_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: ALIAS_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target]);
+      const registry = createSpaceSessionRegistry(backend);
+      registry.open(containing);
+      registry.open(target);
+
+      const result = await registry
+        .spaceThings(() => THING_ID)
+        .delete({ containingSpaceId: SPACE_ID, thingId: ALIASED_SPACE_THING_ID });
+
+      expect(result).toEqual({
+        kind: 'refused',
+        refusal: { code: 'thing-has-aliases', aliasTitles: ['Alias of Target'] },
+      });
+      const stored = await backend.loadSpace(SPACE_ID);
+      expect(stored?.revision).toBe(3n);
+      expect(stored?.snapshot.things).toHaveLength(2);
+      expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
+    });
+
+    it('steps a created Space Thing off a point another Thing already occupies', async () => {
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
+      const OCCUPYING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000042');
+      const NEW_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000043');
+      const NEW_TARGET_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000044');
+      const NEW_TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000045');
+      const NEW_TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000046');
+      const NEW_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000047');
+      const OCCUPIED_ANCHOR = { x: 240, y: 80 };
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: CONTAINING_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: { [OCCUPYING_THING_ID]: { ...OCCUPIED_ANCHOR, open: false as const } },
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [
+            {
+              id: OCCUPYING_THING_ID,
+              document: { title: 'Occupying', kind: 'markdown' as const, body: '' },
+            },
+          ],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing]);
+      const registry = createSpaceSessionRegistry(backend);
+      registry.open(containing);
+
+      const ids = [
+        NEW_TARGET_ID,
+        NEW_TARGET_THING_ID,
+        NEW_TARGET_DIAGRAM_ID,
+        NEW_TARGET_GRAPH_ID,
+        NEW_SPACE_THING_ID,
+      ];
+      const remaining = [...ids];
+      const newId = () => {
+        const id = remaining.shift();
+        if (id === undefined) throw new Error('test identity source exhausted');
+        return id;
+      };
+
+      const result = await registry.spaceThings(newId).create({
+        containingSpaceId: SPACE_ID,
+        diagramId: CONTAINING_DIAGRAM,
+        title: 'New Space Thing',
+        position: OCCUPIED_ANCHOR,
+      });
+
+      expect(result).toEqual({ kind: 'completed', thingId: NEW_SPACE_THING_ID });
+      const stored = await backend.loadSpace(SPACE_ID);
+      expect(stored?.snapshot.document.diagrams?.[0]?.positions[NEW_SPACE_THING_ID]).toEqual({
+        x: OCCUPIED_ANCHOR.x + 24,
+        y: OCCUPIED_ANCHOR.y + 24,
+        open: false,
+      });
+    });
+  });
 });

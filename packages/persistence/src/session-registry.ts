@@ -10,8 +10,10 @@ import {
   loadSpace,
   loadSpaceAggregate,
   loadSpaceSnapshot,
+  SnapshotEdit,
   type Space,
   type SpaceAggregateError,
+  type SnapshotEditOutcome,
 } from '@project/graph';
 import { createWorkingSpaceLoader } from './working-space';
 import type {
@@ -150,6 +152,13 @@ export interface DeleteReferencedGraphInput {
 export type SpaceThingRefusal =
   | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
   | { readonly code: 'space-thing-not-found'; readonly thingId: UUID }
+  /**
+   * Deleting this Space Thing is refused because an Alias in the same Space
+   * still targets it (ADR 0070), named by `SnapshotEdit.deleteFromSpace`.
+   * Mapped from the same `thing-has-aliases` code Space Authoring's own
+   * `deleted-thing` refuses with, and presented with the same wording.
+   */
+  | { readonly code: 'thing-has-aliases'; readonly aliasTitles: readonly string[] }
   | {
       readonly code: 'persistence-recovery-required';
       readonly spaceId: UUID;
@@ -292,44 +301,24 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
     things: space.things.map(({ id, ...thingDocument }) => ({ id, document: thingDocument })),
   };
 };
-const removeSpaceThing = (snapshot: SpaceSnapshot, thingId: UUID): SpaceSnapshot => ({
-  ...snapshot,
-  things: snapshot.things.filter(({ id }) => id !== thingId),
-  document: {
-    ...snapshot.document,
-    diagrams: (snapshot.document.diagrams ?? []).map((diagram) => ({
-      ...diagram,
-      positions: Object.fromEntries(
-        Object.entries(diagram.positions).filter(([id]) => id !== thingId),
-      ),
-      graphs: diagram.graphs.map((graph) => ({
-        ...graph,
-        edges: graph.edges.filter(({ from, to }) => from !== thingId && to !== thingId),
-      })),
-    })),
-  },
-});
-const addSpaceThing = (
-  snapshot: SpaceSnapshot,
-  diagramId: UUID,
-  thingId: UUID,
-  document: ThingDocument,
-  position: DiagramPosition,
-): SpaceSnapshot => ({
-  ...snapshot,
-  things: [...snapshot.things, { id: thingId, document }],
-  document: {
-    ...snapshot.document,
-    diagrams: (snapshot.document.diagrams ?? []).map((diagram) =>
-      diagram.id === diagramId
-        ? {
-            ...diagram,
-            positions: { ...diagram.positions, [thingId]: { ...position, open: false } },
-          }
-        : diagram,
-    ),
-  },
-});
+/**
+ * The snapshot a `SnapshotEdit` operation produced, or a thrown invariant
+ * violation for anything else.
+ *
+ * Every call site here has already asked `derive` to refuse on the Space's
+ * working state — against `source`, before minting any id or opening any
+ * other Space — so an `edit` closure reaching this is re-applying an
+ * operation `derive` already found completes, against the snapshot as it
+ * stands at commit time (`SpaceThingLifecycleChange`'s own contract). Meeting
+ * `refused` or `unchanged` there instead is a broken invariant, not a domain
+ * refusal with anywhere left to go (ADR 0057).
+ */
+const completedSnapshot = (outcome: SnapshotEditOutcome, label: string): SpaceSnapshot => {
+  if (outcome.kind !== 'completed') {
+    throw new Error(`${label} through SnapshotEdit answered '${outcome.kind}'`);
+  }
+  return outcome.snapshot;
+};
 
 const replaceSpaceThingSelection = (
   snapshot: SpaceSnapshot,
@@ -909,7 +898,17 @@ export function createSpaceSessionRegistry(
             kind: 'update',
             spaceId: input.containingSpaceId,
             edit: (current) =>
-              addSpaceThing(current, input.diagramId, thingId, document, input.position),
+              completedSnapshot(
+                SnapshotEdit.createInDiagram(
+                  current,
+                  input.diagramId,
+                  thingId,
+                  document,
+                  input.position,
+                  'avoidingOverlap',
+                ),
+                'Space Thing creation',
+              ),
           },
         ];
       });
@@ -1103,18 +1102,22 @@ export function createSpaceSessionRegistry(
               kind: 'update',
               spaceId: input.containingSpaceId,
               edit: (current) =>
-                addSpaceThing(
-                  current,
-                  input.diagramId,
-                  thingId,
-                  {
-                    title: input.title,
-                    kind: 'space',
-                    spaceId: target.id,
-                    diagram: selection.diagram,
-                    graph: selection.graph,
-                  },
-                  input.position,
+                completedSnapshot(
+                  SnapshotEdit.createInDiagram(
+                    current,
+                    input.diagramId,
+                    thingId,
+                    {
+                      title: input.title,
+                      kind: 'space',
+                      spaceId: target.id,
+                      diagram: selection.diagram,
+                      graph: selection.graph,
+                    },
+                    input.position,
+                    'avoidingOverlap',
+                  ),
+                  'Space Thing creation',
                 ),
             },
             { kind: 'create', snapshot: target },
@@ -1158,13 +1161,32 @@ export function createSpaceSessionRegistry(
             };
             return undefined;
           }
+          // Asked before the cascade below reads a single Thing out of `source`,
+          // so a Thing an Alias still targets refuses before any other Space is
+          // opened and before any id it does not need is minted (ADR 0070). The
+          // only refusal `deleteFromSpace` can answer here is `thing-has-aliases`
+          // — `thing-not-found` cannot occur for an id `source.things` was just
+          // found to hold, so meeting it would be a broken invariant.
+          const deletion = SnapshotEdit.deleteFromSpace(source, input.thingId);
+          if (deletion.kind === 'refused') {
+            if (deletion.refusal.code !== 'thing-has-aliases') {
+              throw new Error(
+                `Space Thing deletion refused unexpectedly: ${deletion.refusal.code}`,
+              );
+            }
+            refusal = { kind: 'refused', refusal: deletion.refusal };
+            return undefined;
+          }
           const snapshots = new Map(
             aggregate.spaces.map((loaded) => [loaded.snapshot.id, loaded.snapshot]),
           );
           for (const [id, managed] of sessions) {
             snapshots.set(id, managed.session.getState().working);
           }
-          snapshots.set(input.containingSpaceId, removeSpaceThing(source, input.thingId));
+          snapshots.set(
+            input.containingSpaceId,
+            completedSnapshot(deletion, 'Space Thing deletion'),
+          );
           const inbound = new Map<UUID, number>();
           for (const snapshot of snapshots.values()) inbound.set(snapshot.id, 0);
           for (const snapshot of snapshots.values())
@@ -1206,7 +1228,11 @@ export function createSpaceSessionRegistry(
             {
               kind: 'update',
               spaceId: input.containingSpaceId,
-              edit: (current) => removeSpaceThing(current, input.thingId),
+              edit: (current) =>
+                completedSnapshot(
+                  SnapshotEdit.deleteFromSpace(current, input.thingId),
+                  'Space Thing deletion',
+                ),
             },
             ...deleted.map((spaceId) => ({ kind: 'delete' as const, spaceId })),
           ];

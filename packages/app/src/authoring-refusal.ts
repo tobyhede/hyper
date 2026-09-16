@@ -415,6 +415,11 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
       return 'The stored Spaces could not be read, so this edit was not attempted.';
     case 'space-thing-target-unavailable':
       return TARGET_UNAVAILABLE_REASONS[refusal.reason];
+    // Same wording Authoring's own `deleted-thing` refuses a Markdown or Alias
+    // Thing's Aliases with (ADR 0070) — one sentence for one meaning, whichever
+    // seam the deletion reached it through.
+    case 'thing-has-aliases':
+      return `Delete the Aliases of this Thing first: ${refusal.aliasTitles.join(', ')}.`;
   }
 };
 
