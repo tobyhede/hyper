@@ -764,6 +764,9 @@ test(
 
     const conflict = page.getByRole('alertdialog', { name: 'Changes conflict' });
     await expect(conflict).toBeVisible();
+    await expect(conflict).toContainText(/unsaved text/i);
+    await expect(conflict).toContainText(/open Thing/);
+    await expect(conflict).toContainText(/Keep local and retry preserves/);
     await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
     // Escape is withheld: a conflict has no safe dismissal, so the dialog owns
