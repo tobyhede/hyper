@@ -114,7 +114,7 @@ export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: Thing
   if (decorative)
     return (
       <span
-        className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
+        className="inline-flex flex-none items-center text-muted-foreground"
         aria-hidden="true"
         data-thing-kind={kind}
         data-alias-of={kind === 'alias' ? aliasOf : undefined}
@@ -125,7 +125,7 @@ export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: Thing
   const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];
   return (
     <span
-      className="inline-flex flex-none items-center text-[var(--muted-foreground)]"
+      className="inline-flex flex-none items-center text-muted-foreground"
       role="img"
       aria-label={name}
       title={name}

@@ -56,14 +56,14 @@ export function PaletteColorSwatchGrid({
             disabled={disabled}
             data-testid={`palette-swatch-${label.replace(/\s+/g, '-').toLowerCase()}`}
             className={cn(
-              'flex cursor-pointer items-center justify-center rounded-[6px] border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
+              'flex cursor-pointer items-center justify-center rounded-chrome-md border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
               selected && 'border-border bg-accent',
             )}
             onClick={() => onValueChange(color)}
           >
             <span
               aria-hidden
-              className="relative h-[1.35rem] w-[1.35rem] rounded-[4px] border border-border/60"
+              className="relative h-[1.35rem] w-[1.35rem] rounded-chrome-sm border border-border/60"
               style={{ backgroundColor: color }}
             >
               {selected ? (
@@ -136,7 +136,7 @@ export function PaletteColorPicker({
       <PopoverTrigger
         disabled={disabled}
         className={cn(
-          'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-[6px] border border-border bg-secondary px-[0.6rem] py-[0.35rem] text-[13px] disabled:cursor-not-allowed disabled:opacity-50',
+          'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-chrome-md border border-border bg-secondary px-[0.6rem] py-[0.35rem] text-chrome-sm disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
       >

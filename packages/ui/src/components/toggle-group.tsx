@@ -55,6 +55,13 @@ function ToggleGroup<Value extends string>({
  *
  * A caller that draws a glyph and no text owes the item an `aria-label`; the
  * component cannot name a mark it did not choose.
+ *
+ * The corner and the type size below are the chrome scale's own steps
+ * (`rounded-chrome-md`, `text-chrome-sm`), not a restated `rounded-[6px]` or
+ * `text-[13px]`. This file is a hand-written wrapper rather than the
+ * registry's own `toggle-group.tsx`, but a future regeneration of the
+ * underlying primitive is still the moment those raw values would come back
+ * (`.scratch/structural-tokens/issues/04-registry-derived-components-consume-the-tokens.md`).
  */
 function ToggleGroupItem<Value extends string>({
   className,
@@ -64,7 +71,7 @@ function ToggleGroupItem<Value extends string>({
     <TogglePrimitive
       data-slot="toggle-group-item"
       className={cn(
-        'inline-flex cursor-pointer items-center justify-center gap-[0.35rem] rounded-[6px] border border-transparent bg-transparent px-[0.5rem] py-[0.3rem] text-[13px] whitespace-nowrap text-muted-foreground transition-[color,background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex cursor-pointer items-center justify-center gap-[0.35rem] rounded-chrome-md border border-transparent bg-transparent px-[0.5rem] py-[0.3rem] text-chrome-sm whitespace-nowrap text-muted-foreground transition-[color,background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
         'data-[pressed]:border-border data-[pressed]:bg-accent data-[pressed]:text-foreground',
         className,
       )}

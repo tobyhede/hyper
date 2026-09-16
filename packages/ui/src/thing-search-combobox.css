@@ -27,13 +27,22 @@
   --muted-foreground: #9aa3b3;
   --csc-divider: #ded6c7;
   --csc-refused-foreground: #887f70;
+  /* This popup's own border weight and item weight: a private singleton and a
+     private step, neither part of the Thing's central `--canvas-thing-*`
+     scale (ticket 06) — 3px is this popup's own pick, not the Thing's 4px, and
+     forcing the two together would be an unrecorded reconciliation. The
+     corners below *are* the Thing's own `--canvas-thing-radius`, reused
+     rather than restated: the popup deliberately echoes the Thing's flush
+     paper, unlike its border weight or its shadow. */
+  --csc-border-width: 3px;
+  --csc-item-weight: 600;
 
   width: var(--anchor-width);
   min-width: var(--anchor-width);
   color: var(--popover-foreground);
   background: var(--popover);
-  border: 3px solid var(--foreground);
-  border-radius: 0;
+  border: var(--csc-border-width) solid var(--foreground);
+  border-radius: var(--canvas-thing-radius);
   box-shadow: none;
 }
 
@@ -42,7 +51,7 @@
   padding: 0;
   background: var(--popover);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--canvas-thing-radius);
 }
 
 [data-thing-search-combobox] [data-slot='combobox-item'] {
@@ -51,9 +60,9 @@
   padding: 10px 20px;
   color: var(--foreground);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: var(--csc-item-weight);
   border-bottom: 1px solid var(--csc-divider);
-  border-radius: 0;
+  border-radius: var(--canvas-thing-radius);
 }
 
 /* A refused choice stays legible rather than dimmed: the Combobox's own disabled

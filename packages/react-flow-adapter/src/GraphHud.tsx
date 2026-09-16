@@ -47,9 +47,9 @@ export function GraphHud({
         reach — separated a dark panel from a dark canvas; over sand it is a
         grey cloud under the legend.
       */}
-      <div className="w-[214px] overflow-hidden rounded-[8px] border border-border bg-card shadow-lg">
+      <div className="w-[214px] overflow-hidden rounded-chrome-lg border border-border bg-card shadow-lg">
         <div className="flex flex-col gap-[6px] px-[10px] py-[9px]" data-testid="graph-legend">
-          <div className="flex items-center gap-[7px] font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+          <div className="flex items-center gap-[7px] font-mono text-chrome-2xs tracking-[0.12em] text-muted-foreground uppercase">
             <GraphIcon size={13} />
             <span>Graphs</span>
           </div>
@@ -61,11 +61,11 @@ export function GraphHud({
                 <li
                   key={graph.id}
                   data-active={activeGraphId !== null && graph.id === activeGraphId}
-                  className="legend__item flex items-center gap-[8px] text-[12px] text-foreground"
+                  className="legend__item flex items-center gap-[8px] text-chrome-xs text-foreground"
                   style={{ opacity: dimmed ? 0.5 : 1 }}
                 >
                   <span
-                    className="h-[3px] w-[14px] shrink-0 rounded-[2px]"
+                    className="h-[3px] w-[14px] shrink-0 rounded-chrome-2xs"
                     style={{ background: graphColor(graph, colorByGraphId) }}
                     aria-hidden="true"
                   />

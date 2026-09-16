@@ -28,7 +28,7 @@ describe('BreadcrumbList', () => {
     render(trail('compact'));
 
     const { className } = screen.getByRole('list');
-    expect(className).toContain('text-[13px]');
+    expect(className).toContain('text-chrome-sm');
     expect(className).not.toContain('text-sm');
   });
 });

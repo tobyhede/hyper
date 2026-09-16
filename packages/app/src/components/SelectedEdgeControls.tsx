@@ -35,10 +35,10 @@ const TO_ERROR = 'edge-to-error';
 
 /** The raised thing these controls and their refusal are both drawn on. */
 const RAISED_SURFACE =
-  'rounded-[6px] border border-border bg-card shadow-[0_6px_20px_rgb(0_0_0/45%)]';
+  'rounded-chrome-md border border-border bg-card shadow-[0_6px_20px_rgb(0_0_0/45%)]';
 
 /** Two commands in one group: square edges, and the group's border around them. */
-const GROUPED_COMMAND = 'rounded-none border-0 text-[0.75rem] text-foreground';
+const GROUPED_COMMAND = 'rounded-none border-0 text-chrome-xs text-foreground';
 
 /**
  * Escape closes the topmost layer: the open endpoint list first, this editor
@@ -185,7 +185,7 @@ export function SelectedEdgeControls({
         {deletion !== null && (
           <FieldError
             data-testid="edge-delete-refusal"
-            className={cn('max-w-[15rem] px-[0.5rem] py-[0.25rem] text-[0.75rem]', RAISED_SURFACE)}
+            className={cn('max-w-[15rem] px-[0.5rem] py-[0.25rem] text-chrome-xs', RAISED_SURFACE)}
           >
             {deletion.form}
           </FieldError>

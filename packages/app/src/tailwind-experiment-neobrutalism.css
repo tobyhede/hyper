@@ -1,0 +1,78 @@
+/*
+ * EXPERIMENT BLOCK — INERT. Nothing imports this file.
+ *
+ * Ticket 09. The values come from neobrutalism.dev's own styling registry,
+ * `https://neobrutalism.dev/r/styling/blue.json`, read on 2026-09-16:
+ *
+ *   radius-base            5px
+ *   shadow                 4px 4px 0px 0px var(--border)
+ *   border                 oklch(0% 0 0)
+ *   main                   hsl(217, 100%, 66%)
+ *   background             hsl(214, 95%, 93%)
+ *   secondary-background   oklch(100% 0 0)
+ *   font-weight-base       500
+ *   font-weight-heading    700
+ *
+ * The mapping is approximate and cannot be otherwise: their vocabulary has
+ * eight colour tokens and this one has more than thirty, so `main` is put on
+ * `--primary` and `secondary-background` on `--card`. Their `background` is
+ * NOT applied, because in this product the background is the sand canvas the
+ * Things lie on, not a chrome surface.
+ *
+ * Their palette puts strong colour on every control. This product reserves
+ * colour for a Graph. That conflict is the point of looking at this block.
+ *
+ * Append to the end of `tailwind.css` to run. See the sibling experiment file
+ * for why you append rather than import, and for which tokens need a rebuild.
+ */
+
+/*
+ * The chrome is drawn in TWO radius vocabularies, and a block that names only
+ * one moves only half the chrome. This was measured, not assumed:
+ *
+ *   surface      class            token             baseline
+ *   dock panel   (hand-rolled)    --radius-chrome-xl   10px
+ *   dock button  rounded-chrome-* --radius-chrome-md    6px
+ *   menu panel   rounded-lg       --radius-lg           8px
+ *   menu item    rounded-md       --radius-md           8px
+ *
+ * The components tickets 02 to 07 touched read `--radius-chrome-*`. The
+ * registry components they did not touch — `dropdown-menu`, `context-menu`,
+ * `combobox`, `card`, `alert`, `alert-dialog`, `kbd`, `textarea`,
+ * `input-group`, `field` — read Tailwind's own `--radius-*`. Both scales are
+ * named below.
+ *
+ * `--radius-md` needs two declarations, and the second is not a mistake.
+ * `tailwind.css` declares `--radius-md: 0.5rem` in an unlayered `:root`, and
+ * an unlayered declaration beats the `@layer theme` one that `@theme` emits.
+ * Ticket 01 recorded that rule; here it means a `@theme` entry alone does
+ * nothing for `rounded-md`.
+ */
+
+@theme {
+  --radius-chrome-2xs: 5px;
+  --radius-chrome-xs: 5px;
+  --radius-chrome-sm: 5px;
+  --radius-chrome-md: 5px;
+  --radius-chrome-lg: 5px;
+  --radius-chrome-xl: 5px;
+  --radius-sm: 5px;
+  --radius-md: 5px;
+  --radius-lg: 5px;
+  --radius-xl: 5px;
+}
+
+:root {
+  --radius-md: 5px;
+  --border: oklch(0% 0 0);
+  --input: oklch(0% 0 0);
+  --ring: oklch(0% 0 0);
+  --primary: hsl(217, 100%, 66%);
+  --primary-foreground: oklch(0% 0 0);
+  --card: oklch(100% 0 0);
+  --popover: oklch(100% 0 0);
+  --secondary: oklch(100% 0 0);
+  --accent: hsl(217, 100%, 66%);
+  --shadow-chrome-elevated: 4px 4px 0px 0px var(--border);
+  --border-width-chrome-accent: 2px;
+}

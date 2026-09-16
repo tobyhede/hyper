@@ -191,7 +191,7 @@
   height: 22px;
   flex: 0 0 auto;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-chrome-sm);
   margin-inline: 2px;
   background-color: transparent;
   background-image: radial-gradient(circle, var(--muted-foreground) 1px, transparent 1px);
@@ -225,7 +225,7 @@
   z-index: 19;
   width: 34px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-chrome-xs);
   background: var(--primary);
   opacity: 0.4;
 }
