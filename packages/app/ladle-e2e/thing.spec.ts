@@ -299,6 +299,61 @@ test(
   },
 );
 
+/**
+ * The withdrawal is asserted mid-gesture, with the pointer still down, because
+ * that is the only moment it is about: released, the Thing is hovered and
+ * Selected and every affordance is owed again. The two reads after `mouse.up`
+ * are that other half — the same pointer, on the same Thing, revealing what the
+ * drag withheld.
+ */
+test(
+  'a Thing being moved returns its chrome to rest, and release reveals it again',
+  { tag: '@parity:dragged-thing-returns-its-chrome-to-rest' },
+  async ({ page }) => {
+    await page.goto('/?story=components--thing--drag&mode=preview');
+
+    const node = specimen(page, 'drag to return the chrome to rest').locator('.react-flow__node');
+    const inner = node.locator('.rf-thing-node__inner');
+    const actions = node.getByTestId('canvas-thing-actions');
+    const handle = node.locator('.rf-thing-node__authoring-handle--source').first();
+
+    const box = await node.boundingBox();
+    if (box === null) throw new Error('The draggable Thing was not drawn');
+    // The Title band rather than the middle: a press on the body is still a
+    // drag, and grabbing where an author grabs keeps the pointer clear of the
+    // handles the assertions are about.
+    const from = { x: box.x + box.width / 2, y: box.y + 12 };
+    await page.mouse.move(from.x, from.y);
+    await expect(handle).toHaveCSS('opacity', '1');
+    await page.mouse.down();
+    // React Flow begins the drag on the first move past `nodeDragThreshold`, so
+    // the travel is stepped rather than jumped — a single move can be swallowed
+    // and would leave every assertion below reading a Thing at rest.
+    await page.mouse.move(from.x + 20, from.y + 16, { steps: 4 });
+    await page.mouse.move(from.x + 40, from.y + 32, { steps: 4 });
+
+    // Being moved, hovered and Selected all at once — and drawn as dragging.
+    await expect(inner).toHaveAttribute('data-dragging', 'true');
+    await expect(inner).toHaveAttribute('data-selected', 'true');
+    await expect(node.getByRole('article')).toHaveAttribute('data-state', 'dragging');
+    await expect(handle).toHaveCSS('opacity', '0');
+    // The rail is `CanvasThing`'s own withdrawal and predates this: a dragging
+    // Thing renders no actions at all, rather than hiding them.
+    await expect(actions).toHaveCount(0);
+    // The anchors are not the rail's case. They stay mounted throughout, because
+    // React Flow measures a handle and one that is not there reports nothing to
+    // attach an Edge to.
+    await expect(node.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
+    await expect(handle).not.toHaveCSS('display', 'none');
+
+    await page.mouse.up();
+
+    await expect(inner).toHaveAttribute('data-dragging', 'false');
+    await expect(handle).toHaveCSS('opacity', '1');
+    await expect(actions).toHaveCSS('opacity', '1');
+  },
+);
+
 test('a read-only Thing owns the absence of authoring affordances', async ({ page }) => {
   await page.goto('/?story=components--thing--hover&mode=preview');
 

@@ -609,6 +609,64 @@ test('a dragged thing stays where it is dropped, and nothing else moves', async 
   }
 });
 
+/**
+ * Moving a Thing is one gesture, and the affordances that begin the other two
+ * are no part of it.
+ *
+ * The Thing is Opened first so both are on it at once — the four Edge anchors
+ * and the one resize control — and the reveal is observed at rest before the
+ * drag, so the withdrawal below is evidence of the gesture rather than of a
+ * Thing that was never offering anything. Mid-drag the pointer is on the Thing
+ * and React Flow has Selected it, which is every condition either reveal reads.
+ */
+test(
+  'a Thing being moved reveals neither its Edge handles nor its resize control, and offers both again on release',
+  { tag: '@parity:dragged-thing-returns-its-chrome-to-rest' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const thing = nodeByTitle(page, 'A').first();
+    await expect(thing).toBeVisible();
+    await openThing(thing, 'A');
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    // Opening grows the Thing through a transition, so its rect is still moving
+    // for a moment: a drag started inside it would be measuring the animation.
+    await thing.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+
+    const inner = thing.locator('.rf-thing-node__inner');
+    const handle = authoringHandle(thing, 'source', 'right');
+    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+
+    await thing.hover();
+    await expect(handle).toHaveCSS('opacity', '1');
+    await expect(control).toHaveCSS('opacity', '1');
+
+    await dragBy(page, thing, 160, 120, async () => {
+      await expect(inner).toHaveAttribute('data-dragging', 'true');
+      await expect(handle).toHaveCSS('opacity', '0');
+      await expect(control).toHaveCSS('opacity', '0');
+      // The rail is `CanvasThing`'s own withdrawal, and it predates this: a
+      // dragging Thing renders no actions rather than hiding them.
+      await expect(thing.getByTestId('canvas-thing-actions')).toHaveCount(0);
+      // The anchors are not the rail's case — they stay mounted and measurable,
+      // because React Flow measures a handle to place an Edge on it and a
+      // `display: none` one reports 0x0 (ADR 0087).
+      await expect(thing.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
+      const anchor = await boxOf(handle, "the dragged Thing's right source anchor");
+      expect(anchor.width).toBeGreaterThan(0);
+      expect(anchor.height).toBeGreaterThan(0);
+    });
+
+    // Released under the same pointer that carried it: hover is true again, and
+    // so is everything hover reveals.
+    await expect(inner).toHaveAttribute('data-dragging', 'false');
+    await expect(handle).toHaveCSS('opacity', '1');
+    await expect(control).toHaveCSS('opacity', '1');
+  },
+);
+
 /* -------------------------------------------------------------------------- */
 /* Displacement is applied by the Edit that causes it (ADR 0084)               */
 /* -------------------------------------------------------------------------- */

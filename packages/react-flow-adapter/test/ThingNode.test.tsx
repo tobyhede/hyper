@@ -257,6 +257,28 @@ describe('ThingNode canvas Thing state adapter', () => {
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
   });
 
+  /*
+   * A Thing being moved has one gesture, and its hover chrome is no part of it.
+   * The anchors and the resize control are `opacity: 0` at rest and revealed by
+   * hover, Selection or focus — every one of which a drag satisfies, the pointer
+   * being on the Thing it is carrying and React Flow having Selected it. So the
+   * withdrawal is stated where the reveal is decided, and this is the fact the
+   * stylesheet reads to decide it.
+   */
+  it('publishes whether it is being moved, which is what the chrome reveal reads', () => {
+    const { rerender } = render(<ThingNode {...props({})} />);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-dragging',
+      'false',
+    );
+
+    rerender(<ThingNode {...props({ dragging: true, selected: true })} />);
+    expect(document.querySelector('.rf-thing-node__inner')).toHaveAttribute(
+      'data-dragging',
+      'true',
+    );
+  });
+
   it('renders a Reference Thing through the shared kind treatment', () => {
     render(<ThingNode {...props({ kind: 'reference', title: 'A, again' })} />);
 
