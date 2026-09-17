@@ -19,6 +19,21 @@ const reportSafely = (report: (cause: unknown) => void, cause: unknown): void =>
 };
 
 /**
+ * The file `SQLITE_PATH` names, opened once at composition.
+ *
+ * Required rather than defaulted, as `pnpm hyper:sqlite` requires it
+ * (`test/integration/sqlite-hyper-cli.test.ts`): a client with no file behind
+ * it would compose, then fail every query, leaving a host that starts and
+ * answers every request with an error. Ticket 15 puts setup failures at composition
+ * (`test/integration/sqlite-http-runtime.test.ts`).
+ */
+const openConfiguredDatabase = (): SqliteDatabase => {
+  const path = configuredSqlitePath();
+  if (path === undefined) throw new Error('SQLITE_PATH must name the SQLite database file');
+  return createSqliteDatabase(path);
+};
+
+/**
  * What this runtime can be handed instead of the ambient timer, stderr, and
  * hosted SQLite client (ADR 0016, ADR 0081).
  *
@@ -40,7 +55,7 @@ export interface SqliteHttpRuntimeOptions {
 export const createApp = async ({
   wait = (milliseconds) => sleep(milliseconds, undefined, { ref: false }),
   report = reportEstablishmentFailure,
-  database = createSqliteDatabase(configuredSqlitePath()),
+  database = openConfiguredDatabase(),
 }: SqliteHttpRuntimeOptions = {}): Promise<SpaceHostApplication> => {
   const repository = new SqliteSpaceRepository(database);
   try {

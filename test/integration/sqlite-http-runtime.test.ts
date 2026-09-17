@@ -9,7 +9,7 @@ import {
   problemCatalogue,
   type SpaceCommit,
 } from '@project/persistence';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/http/sqlite-http-runtime';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { openSqliteRepository } from '../support/sqlite-harness';
@@ -18,8 +18,28 @@ describe('SQLite HTTP runtime', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await close?.();
     close = undefined;
+  });
+
+  // Composition is where a setup problem is reported (ticket 15): a host with no
+  // file behind it would start, then answer every request with a driver error.
+  it.each([
+    ['unset', undefined],
+    ['empty', ''],
+    ['blank', ' \t '],
+  ])('refuses to compose when SQLITE_PATH is %s', async (_, configured) => {
+    vi.stubEnv('SQLITE_PATH', configured);
+    const reported: unknown[] = [];
+
+    await expect(
+      createApp({
+        wait: () => new Promise<void>(() => undefined),
+        report: (cause) => reported.push(cause),
+      }),
+    ).rejects.toThrow('SQLITE_PATH must name the SQLite database file');
+    expect(reported).toEqual([]);
   });
 
   it('establishes Default Content and serves the collection and Meta Space', async () => {
