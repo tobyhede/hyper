@@ -562,7 +562,7 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'unresolved-default-diagram':
     case 'duplicate-graph-edge':
     case 'unresolved-reference-target':
-    case 'reference-self-reference':
+    case 'reference-targets-self':
     case 'reference-targets-reference':
     case 'reference-target-must-own-content':
     case 'space-thing-reference-cycle': {

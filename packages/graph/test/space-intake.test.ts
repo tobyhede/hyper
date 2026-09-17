@@ -591,7 +591,7 @@ describe.each([
     it('refuses a reference thing that points at itself', () => {
       const errors = refused(load({ things: [referenceTo(A, A)], diagrams: [] }));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'reference-self-reference', ref: A }),
+        expect.objectContaining({ kind: 'reference-targets-self', ref: A }),
       );
     });
 

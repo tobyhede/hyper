@@ -199,7 +199,7 @@ describe('aggregate wire protocol', () => {
       { kind: 'unresolved-default-diagram', ...described },
       { kind: 'duplicate-graph-edge', ...described },
       { kind: 'unresolved-reference-target', ...described },
-      { kind: 'reference-self-reference', ...described },
+      { kind: 'reference-targets-self', ...described },
       { kind: 'reference-targets-reference', ...described },
       { kind: 'reference-target-must-own-content', ...described },
       { kind: 'space-thing-reference-cycle', ...described },

@@ -47,7 +47,7 @@ export type SpaceReferenceErrorKind =
   | 'unresolved-default-diagram'
   | 'duplicate-graph-edge'
   | 'unresolved-reference-target'
-  | 'reference-self-reference'
+  | 'reference-targets-self'
   | 'reference-targets-reference'
   | 'reference-target-must-own-content'
   | 'space-thing-reference-cycle';
@@ -244,7 +244,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     if (thing.kind !== 'reference') continue;
     if (thing.target === thing.id) {
       errors.push({
-        kind: 'reference-self-reference',
+        kind: 'reference-targets-self',
         ref: thing.id,
         message: `Reference Thing "${thing.id}" points at itself`,
       });

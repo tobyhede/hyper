@@ -209,6 +209,14 @@ const PRE_REWRITES = [
   ],
   ['an aliased', 'a referenced'],
   ['An aliased', 'A referenced'],
+  // A judgement-call fix, not a spelling: the general table below would carry
+  // `alias-self-reference` straight across to `reference-self-reference`,
+  // doubling `reference` where `alias`/`reference` used to differ. Its
+  // sibling refusal kind stays `reference-targets-reference` (the doubling
+  // there names two distinct Things, the way `diagram-active-graph-outside-diagram`
+  // already does), so this row spends the same `targets-` shape rather than
+  // `self-reference`'s stutter. See the ledger R6 fix for the reasoning.
+  ['alias-self-reference', 'reference-targets-self'],
 ];
 
 /**
