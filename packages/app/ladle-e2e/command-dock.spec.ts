@@ -270,6 +270,45 @@ test(
 );
 
 /**
+ * The Space menu's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
+ * Space, then Exit Space — one separator between the two groups. Reorganisation
+ * only: the Space's own address is unchanged, and Exit still stays trailing and
+ * disabled on Meta (`command-dock-edits-identity-names`,
+ * `space-thing.spec.ts`'s Exit coverage).
+ */
+test('the Space menu groups Rename with Copy link to Space, then Exit Space', async ({ page }) => {
+  await page.goto(story('default'));
+
+  const menu = await disclose(page, 'Space: Rendering');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Rename',
+    'Copy link to Space',
+    'Exit Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(1);
+});
+
+/**
+ * The Space's own copied destination, exercised the way the Graph's is above:
+ * the application writes the real product URL to the clipboard, and it is the
+ * Space's own address rather than the drawing Diagram's
+ * (`link-actions.spec.ts` holds the reason no second address is offered).
+ */
+test('Copy link to Space copies the Space’s own durable address', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto(story('default'));
+
+  const menu = await disclose(page, 'Space: Rendering');
+  await menu.getByRole('menuitem', { name: 'Copy link to Space', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(
+      `https://example.test${productDestinationPath({ kind: 'space', spaceId: commandDockSnapshot.id })}`,
+    );
+});
+
+/**
  * The name is the rename control, and there is no second surface to return the
  * caret to.
  *

@@ -372,6 +372,35 @@ test('the Diagram cluster holds every Diagram command including Rename', async (
   ).toBeVisible();
 });
 
+/**
+ * The Space menu's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
+ * Space, then Exit Space — one separator between the two groups. The address
+ * copied is the Space's own, not the drawing Diagram's
+ * (`link-actions.spec.ts` holds why no second address is offered here).
+ */
+test('the Space menu groups Rename with Copy link to Space, then Exit Space', async ({ page }) => {
+  await installClipboard(page);
+  await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
+
+  await page
+    .getByRole('button', { name: 'Space: Diagram fixture', exact: true })
+    .click({ delay: 120 });
+  const menu = page.getByRole('menu');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Rename',
+    'Copy link to Space',
+    'Exit Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(1);
+
+  await menu.getByRole('menuitem', { name: 'Copy link to Space', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(`${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
+});
+
 test('canonical and contextual Graph links restore navigation context without authoring', async ({
   page,
 }) => {

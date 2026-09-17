@@ -185,7 +185,7 @@ export function graphMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Active Graph: /);
 }
 
-/** The Space cluster's disclosure: Rename, Copy link and Exit Space. */
+/** The Space cluster's disclosure: Rename, Copy link to Space, then Exit Space. */
 export function spaceMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Space: /);
 }
