@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { MemorySpaceBackend } from '../src/memory';
+import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
 import type { SpaceSession, SpaceSessionState } from '../src/session';
 
@@ -238,140 +238,336 @@ describe('Space session registry', () => {
     });
   });
 
-  it('chooses a different replacement Graph when the preferred one goes during the wait', async () => {
-    const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000100');
-    const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
-    const DELETED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000102');
-    const PREFERRED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000103');
+  // The behavioural invariant proved by both tests below (spec.md,
+  // "Coordinated operations decide after their last wait"): whichever server
+  // read a late removal of the preferred replacement lands in, `deleteGraph`
+  // and `deleteDiagram` never reject and never answer `aggregate-refused` —
+  // when the removal landed before the coordination's one decision, the
+  // decision re-chooses a surviving candidate; when it did not, the
+  // originally preferred one is chosen exactly as if nothing had happened.
+  // The coordination makes exactly one aggregate read, so injecting on read 2
+  // never fires and exercises the ordinary, nothing-removed choice instead.
+  it.each([1, 2] as const)(
+    'chooses a different replacement Graph when the preferred one goes during the wait (late Edit on read %i)',
+    async (readToInject) => {
+      const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000100');
+      const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
+      const DELETED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000102');
+      const PREFERRED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000103');
 
-    const target = {
+      const target = {
+        snapshot: {
+          id: TARGET_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: DIAGRAM,
+            diagrams: [
+              {
+                id: DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                activeGraph: DELETED_GRAPH,
+                graphs: [
+                  { id: KEEP_GRAPH, title: 'Keep', edges: [] },
+                  { id: DELETED_GRAPH, title: 'Deleted', edges: [] },
+                  { id: PREFERRED_GRAPH, title: 'Preferred', edges: [] },
+                ],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(TARGET_ID, [target]);
+      const registry = createSpaceSessionRegistry(backend);
+      const targetSession = registry.open(target);
+
+      // An ordinary Edit — removing the preferred replacement Graph from the
+      // target's own live session — landing on the named read of the
+      // coordination's aggregate loads.
+      const loadAggregate = backend.loadAggregate.bind(backend);
+      let reads = 0;
+      const injected = { value: false };
+      backend.loadAggregate = async () => {
+        reads += 1;
+        if (reads === readToInject) {
+          injected.value = true;
+          const working = targetSession.getState().working;
+          targetSession.submit({
+            ...working,
+            document: {
+              ...working.document,
+              diagrams: (working.document.diagrams ?? []).map((diagram) =>
+                diagram.id === DIAGRAM
+                  ? {
+                      ...diagram,
+                      graphs: diagram.graphs.filter(({ id }) => id !== PREFERRED_GRAPH),
+                    }
+                  : diagram,
+              ),
+            },
+          });
+        }
+        return loadAggregate();
+      };
+
+      const deletion = registry
+        .spaceThings(() => THING_ID)
+        .deleteGraph({
+          targetSpaceId: TARGET_ID,
+          diagramId: DIAGRAM,
+          graphId: DELETED_GRAPH,
+          preferredGraphId: PREFERRED_GRAPH,
+        });
+
+      await expect(deletion).resolves.toBeDefined();
+      const result = await deletion;
+      if (result.kind === 'refused') expect(result.refusal.code).not.toBe('aggregate-refused');
+
+      if (injected.value) {
+        // The preferred replacement was gone by the time the decision ran:
+        // the surviving Graph is chosen instead.
+        expect(result).toEqual({ kind: 'completed', diagramId: DIAGRAM, graphId: KEEP_GRAPH });
+        expect(
+          targetSession.getState().working.document.diagrams?.[0]?.graphs.map(({ id }) => id),
+        ).toEqual([KEEP_GRAPH]);
+        expect(targetSession.getState().working.document.diagrams?.[0]?.activeGraph).toEqual(
+          KEEP_GRAPH,
+        );
+      } else {
+        // No late removal ever landed: the ordinarily preferred Graph is
+        // chosen.
+        expect(result).toEqual({
+          kind: 'completed',
+          diagramId: DIAGRAM,
+          graphId: PREFERRED_GRAPH,
+        });
+        expect(
+          targetSession.getState().working.document.diagrams?.[0]?.graphs.map(({ id }) => id),
+        ).toEqual([KEEP_GRAPH, PREFERRED_GRAPH]);
+        expect(targetSession.getState().working.document.diagrams?.[0]?.activeGraph).toEqual(
+          PREFERRED_GRAPH,
+        );
+      }
+    },
+  );
+
+  it.each([1, 2] as const)(
+    'chooses a different replacement Diagram when the preferred one goes during the wait (late Edit on read %i)',
+    async (readToInject) => {
+      const DELETED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000110');
+      const PREFERRED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000111');
+      const KEEP_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000112');
+      const DELETED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000113');
+      const PREFERRED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000114');
+      const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000115');
+
+      const target = {
+        snapshot: {
+          id: TARGET_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: DELETED_DIAGRAM,
+            diagrams: [
+              {
+                id: DELETED_DIAGRAM,
+                title: 'Deleted',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: DELETED_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+              {
+                id: PREFERRED_DIAGRAM,
+                title: 'Preferred',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: PREFERRED_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+              {
+                id: KEEP_DIAGRAM,
+                title: 'Keep',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: KEEP_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(TARGET_ID, [target]);
+      const registry = createSpaceSessionRegistry(backend);
+      const targetSession = registry.open(target);
+
+      // Same shape as the Graph case above: an ordinary Edit removes the
+      // preferred replacement Diagram from the target's own live session,
+      // landing on the named read of the coordination's aggregate loads.
+      const loadAggregate = backend.loadAggregate.bind(backend);
+      let reads = 0;
+      const injected = { value: false };
+      backend.loadAggregate = async () => {
+        reads += 1;
+        if (reads === readToInject) {
+          injected.value = true;
+          const working = targetSession.getState().working;
+          targetSession.submit({
+            ...working,
+            document: {
+              ...working.document,
+              diagrams: (working.document.diagrams ?? []).filter(
+                (diagram) => diagram.id !== PREFERRED_DIAGRAM,
+              ),
+            },
+          });
+        }
+        return loadAggregate();
+      };
+
+      const deletion = registry
+        .spaceThings(() => THING_ID)
+        .deleteDiagram({
+          targetSpaceId: TARGET_ID,
+          diagramId: DELETED_DIAGRAM,
+          preferredDiagramId: PREFERRED_DIAGRAM,
+        });
+
+      await expect(deletion).resolves.toBeDefined();
+      const result = await deletion;
+      if (result.kind === 'refused') expect(result.refusal.code).not.toBe('aggregate-refused');
+
+      if (injected.value) {
+        // The preferred replacement was gone by the time the decision ran:
+        // the surviving Diagram is chosen instead.
+        expect(result).toEqual({ kind: 'completed', diagramId: KEEP_DIAGRAM, graphId: KEEP_GRAPH });
+        expect(targetSession.getState().working.document.diagrams?.map(({ id }) => id)).toEqual([
+          KEEP_DIAGRAM,
+        ]);
+        expect(targetSession.getState().working.document.defaultDiagram).toEqual(KEEP_DIAGRAM);
+      } else {
+        // No late removal ever landed: the ordinarily preferred Diagram is
+        // chosen.
+        expect(result).toEqual({
+          kind: 'completed',
+          diagramId: PREFERRED_DIAGRAM,
+          graphId: PREFERRED_GRAPH,
+        });
+        expect(targetSession.getState().working.document.diagrams?.map(({ id }) => id)).toEqual([
+          PREFERRED_DIAGRAM,
+          KEEP_DIAGRAM,
+        ]);
+        expect(targetSession.getState().working.document.defaultDiagram).toEqual(PREFERRED_DIAGRAM);
+      }
+    },
+  );
+
+  it("does not open a referencing Space's session before every participant clears recovery", async () => {
+    const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000120');
+    const THING_TO_TARGET = uuidSchema.parse('00000000-0000-4000-8000-000000000121');
+    const THING_TO_B = uuidSchema.parse('00000000-0000-4000-8000-000000000122');
+    const AFFECTED_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000123');
+    const AFFECTED_B_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000124');
+    const AFFECTED_B_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000125');
+    const THING_B_TO_TARGET = uuidSchema.parse('00000000-0000-4000-8000-000000000126');
+    const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000127');
+    const DIAGRAM_TO_DELETE = uuidSchema.parse('00000000-0000-4000-8000-000000000128');
+    const TARGET_GRAPH_TO_DELETE = uuidSchema.parse('00000000-0000-4000-8000-000000000129');
+    const DIAGRAM_KEEP = uuidSchema.parse('00000000-0000-4000-8000-000000000130');
+    const TARGET_GRAPH_KEEP = uuidSchema.parse('00000000-0000-4000-8000-000000000131');
+
+    // Meta is itself one of the two Spaces referencing Target's Diagram, so it
+    // needs no session open before the deletion runs — exactly the Space
+    // `deleteDiagram`'s own participant loop would have to open.
+    const meta = {
       snapshot: {
-        id: TARGET_ID,
+        id: META_ID,
+        document: { version: 1 as const, title: 'Meta' },
+        things: [
+          {
+            id: THING_TO_TARGET,
+            document: {
+              title: 'Target',
+              kind: 'space' as const,
+              spaceId: TARGET_ID,
+              diagram: DIAGRAM_TO_DELETE,
+              graph: TARGET_GRAPH_TO_DELETE,
+            },
+          },
+          {
+            id: THING_TO_B,
+            document: {
+              title: 'Affected B',
+              kind: 'space' as const,
+              spaceId: AFFECTED_B_ID,
+              diagram: AFFECTED_B_DIAGRAM,
+              graph: AFFECTED_B_GRAPH,
+            },
+          },
+        ],
+      },
+      revision: 3n,
+      exportedRevision: null,
+    };
+    const affectedB = {
+      snapshot: {
+        id: AFFECTED_B_ID,
         document: {
           version: 1 as const,
-          title: 'Target',
-          defaultDiagram: DIAGRAM,
+          title: 'Affected B',
+          defaultDiagram: AFFECTED_B_DIAGRAM,
           diagrams: [
             {
-              id: DIAGRAM,
+              id: AFFECTED_B_DIAGRAM,
               title: 'Diagram 1',
               kind: 'positioned' as const,
               positions: {},
-              activeGraph: DELETED_GRAPH,
-              graphs: [
-                { id: KEEP_GRAPH, title: 'Keep', edges: [] },
-                { id: DELETED_GRAPH, title: 'Deleted', edges: [] },
-                { id: PREFERRED_GRAPH, title: 'Preferred', edges: [] },
-              ],
+              graphs: [{ id: AFFECTED_B_GRAPH, title: 'Graph 1', edges: [] }],
             },
           ],
         },
-        things: [],
+        things: [
+          {
+            id: THING_B_TO_TARGET,
+            document: {
+              title: 'Target',
+              kind: 'space' as const,
+              spaceId: TARGET_ID,
+              diagram: DIAGRAM_TO_DELETE,
+              graph: TARGET_GRAPH_TO_DELETE,
+            },
+          },
+        ],
       },
-      revision: 3n,
+      revision: 5n,
       exportedRevision: null,
     };
-    const backend = new MemorySpaceBackend(TARGET_ID, [target]);
-    const registry = createSpaceSessionRegistry(backend);
-    const targetSession = registry.open(target);
-
-    // The coordination reads the aggregate exactly once, right before it
-    // plans the successor. The preferred replacement Graph is removed from
-    // the target's own live session during that one read — an ordinary Edit
-    // landing in the same window ticket 05 used for a deleted Diagram.
-    const loadAggregate = backend.loadAggregate.bind(backend);
-    let reads = 0;
-    backend.loadAggregate = async () => {
-      reads += 1;
-      if (reads === 1) {
-        const working = targetSession.getState().working;
-        targetSession.submit({
-          ...working,
-          document: {
-            ...working.document,
-            diagrams: (working.document.diagrams ?? []).map((diagram) =>
-              diagram.id === DIAGRAM
-                ? { ...diagram, graphs: diagram.graphs.filter(({ id }) => id !== PREFERRED_GRAPH) }
-                : diagram,
-            ),
-          },
-        });
-      }
-      return loadAggregate();
-    };
-
-    const deletion = registry
-      .spaceThings(() => THING_ID)
-      .deleteGraph({
-        targetSpaceId: TARGET_ID,
-        diagramId: DIAGRAM,
-        graphId: DELETED_GRAPH,
-        preferredGraphId: PREFERRED_GRAPH,
-      });
-
-    await expect(deletion).resolves.toEqual({
-      kind: 'completed',
-      diagramId: DIAGRAM,
-      graphId: KEEP_GRAPH,
-    });
-    expect(reads).toBe(1);
-
-    // The coordinated commit installs the target's fully merged next state —
-    // the injected mid-wait removal of the preferred Graph, and the
-    // coordinated removal of the deleted one — into the session's own
-    // `working` synchronously, the moment `deleteGraph` resolves (ADR 0030),
-    // well before the backend round trip completes. Asserting here, rather
-    // than on the eventual settled/stored value, is deliberate: the target's
-    // session also still holds the injected Edit's own local commit queued
-    // (`waiting`, `session.ts`) from before the coordination claimed it, and
-    // that queued commit later replays over the coordinated one once the
-    // barrier lifts — an existing interaction between a plain queued Edit and
-    // a coordinated commit landing on the same session, unrelated to and out
-    // of scope for this ticket, which this test therefore does not depend on.
-    expect(
-      targetSession.getState().working.document.diagrams?.[0]?.graphs.map(({ id }) => id),
-    ).toEqual([KEEP_GRAPH]);
-    expect(targetSession.getState().working.document.diagrams?.[0]?.activeGraph).toEqual(
-      KEEP_GRAPH,
-    );
-  });
-
-  it('chooses a different replacement Diagram when the preferred one goes during the wait', async () => {
-    const DELETED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000110');
-    const PREFERRED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000111');
-    const KEEP_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000112');
-    const DELETED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000113');
-    const PREFERRED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000114');
-    const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000115');
-
     const target = {
       snapshot: {
         id: TARGET_ID,
         document: {
           version: 1 as const,
           title: 'Target',
-          defaultDiagram: DELETED_DIAGRAM,
+          defaultDiagram: DIAGRAM_KEEP,
           diagrams: [
             {
-              id: DELETED_DIAGRAM,
-              title: 'Deleted',
+              id: DIAGRAM_TO_DELETE,
+              title: 'To delete',
               kind: 'positioned' as const,
               positions: {},
-              graphs: [{ id: DELETED_GRAPH, title: 'Graph 1', edges: [] }],
+              graphs: [{ id: TARGET_GRAPH_TO_DELETE, title: 'Graph 1', edges: [] }],
             },
             {
-              id: PREFERRED_DIAGRAM,
-              title: 'Preferred',
-              kind: 'positioned' as const,
-              positions: {},
-              graphs: [{ id: PREFERRED_GRAPH, title: 'Graph 1', edges: [] }],
-            },
-            {
-              id: KEEP_DIAGRAM,
+              id: DIAGRAM_KEEP,
               title: 'Keep',
               kind: 'positioned' as const,
               positions: {},
-              graphs: [{ id: KEEP_GRAPH, title: 'Graph 1', edges: [] }],
+              graphs: [{ id: TARGET_GRAPH_KEEP, title: 'Graph 1', edges: [] }],
             },
           ],
         },
@@ -380,54 +576,37 @@ describe('Space session registry', () => {
       revision: 3n,
       exportedRevision: null,
     };
-    const backend = new MemorySpaceBackend(TARGET_ID, [target]);
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    const backend = new MemorySpaceBackend(META_ID, [target, meta, affectedB], control);
     const registry = createSpaceSessionRegistry(backend);
-    const targetSession = registry.open(target);
+    registry.open(target);
+    // Meta is deliberately left with no live session: the participant loop
+    // is what would have to open one for it.
+    const affectedBSession = registry.open(affectedB);
+    affectedBSession.submit(affectedBSession.getState().working);
+    await waitFor(affectedBSession, (state) => state.persistence.kind === 'failed');
 
-    // Same shape as the Graph case above: the preferred replacement Diagram
-    // is removed from the target's own live session during the coordination's
-    // one aggregate read.
-    const loadAggregate = backend.loadAggregate.bind(backend);
-    let reads = 0;
-    backend.loadAggregate = async () => {
-      reads += 1;
-      if (reads === 1) {
-        const working = targetSession.getState().working;
-        targetSession.submit({
-          ...working,
-          document: {
-            ...working.document,
-            diagrams: (working.document.diagrams ?? []).filter(
-              (diagram) => diagram.id !== PREFERRED_DIAGRAM,
-            ),
-          },
-        });
-      }
-      return loadAggregate();
-    };
-
-    const deletion = registry
-      .spaceThings(() => THING_ID)
+    const result = await registry
+      .spaceThings(() => THING_TO_TARGET)
       .deleteDiagram({
         targetSpaceId: TARGET_ID,
-        diagramId: DELETED_DIAGRAM,
-        preferredDiagramId: PREFERRED_DIAGRAM,
+        diagramId: DIAGRAM_TO_DELETE,
+        preferredDiagramId: null,
       });
 
-    await expect(deletion).resolves.toEqual({
-      kind: 'completed',
-      diagramId: KEEP_DIAGRAM,
-      graphId: KEEP_GRAPH,
+    expect(result).toEqual({
+      kind: 'refused',
+      refusal: {
+        code: 'persistence-recovery-required',
+        spaceId: AFFECTED_B_ID,
+        recovery: 'retry',
+      },
     });
-    expect(reads).toBe(1);
-
-    // Same reasoning as the Graph case above: assert the session's own
-    // `working`, installed synchronously by the coordinated commit, rather
-    // than the eventual settled/stored value — see the comment there.
-    expect(targetSession.getState().working.document.diagrams?.map(({ id }) => id)).toEqual([
-      KEEP_DIAGRAM,
-    ]);
-    expect(targetSession.getState().working.document.defaultDiagram).toEqual(KEEP_DIAGRAM);
+    // The whole operation refused, so Meta's session — opened only to check
+    // whether *it* held up the deletion — must not linger: nothing here ever
+    // needed it once a later participant already refused.
+    expect(registry.session(META_ID)).toBeUndefined();
   });
 
   it('owns one live session for each Space id', () => {
@@ -688,332 +867,390 @@ describe('Space session registry', () => {
       expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
     });
 
-    it('refuses to delete a Space Thing an Alias came to target while the deletion was reading persistence', async () => {
-      const ALIASED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
-      const LATE_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
-      const ALIAS_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
-      const ALIAS_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
-      const ALIAS_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
-      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000055');
-      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000056');
+    // The behavioural invariant proved below (spec.md, "Coordinated
+    // operations decide after their last wait"): whichever server read a
+    // late Alias lands in, the deletion never rejects and never answers
+    // `aggregate-refused` — when the Alias landed before the coordination's
+    // one decision, the deletion refuses `thing-has-aliases`; when it did
+    // not, the ordinary Alias-free deletion completes. The coordination
+    // makes exactly one aggregate read, so injecting on read 2 never fires
+    // and exercises the ordinary completion instead.
+    it.each([1, 2] as const)(
+      'refuses to delete a Space Thing an Alias came to target while the deletion was reading persistence (late Edit on read %i)',
+      async (readToInject) => {
+        const ALIASED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+        const LATE_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
+        const ALIAS_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
+        const ALIAS_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
+        const ALIAS_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
+        const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000055');
+        const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000056');
 
-      const containing = {
-        snapshot: {
-          id: SPACE_ID,
-          document: {
-            version: 1 as const,
-            title: 'Space',
-            defaultDiagram: CONTAINING_DIAGRAM,
-            diagrams: [
-              {
-                id: CONTAINING_DIAGRAM,
-                title: 'Diagram 1',
-                kind: 'positioned' as const,
-                positions: {
-                  [ALIASED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
+        const containing = {
+          snapshot: {
+            id: SPACE_ID,
+            document: {
+              version: 1 as const,
+              title: 'Space',
+              defaultDiagram: CONTAINING_DIAGRAM,
+              diagrams: [
+                {
+                  id: CONTAINING_DIAGRAM,
+                  title: 'Diagram 1',
+                  kind: 'positioned' as const,
+                  positions: {
+                    [ALIASED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
+                  },
+                  graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
                 },
-                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
-              },
-            ],
-          },
-          things: [
-            {
-              id: ALIASED_SPACE_THING_ID,
-              document: {
-                title: 'Target',
-                kind: 'space' as const,
-                spaceId: ALIAS_TARGET_SPACE_ID,
-                diagram: ALIAS_TARGET_DIAGRAM,
-                graph: ALIAS_TARGET_GRAPH,
-              },
+              ],
             },
-          ],
-        },
-        revision: 3n,
-        exportedRevision: null,
-      };
-      const target = {
-        snapshot: {
-          id: ALIAS_TARGET_SPACE_ID,
-          document: {
-            version: 1 as const,
-            title: 'Target',
-            defaultDiagram: ALIAS_TARGET_DIAGRAM,
-            diagrams: [
-              {
-                id: ALIAS_TARGET_DIAGRAM,
-                title: 'Diagram 1',
-                kind: 'positioned' as const,
-                positions: {},
-                graphs: [{ id: ALIAS_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
-              },
-            ],
-          },
-          things: [],
-        },
-        revision: 0n,
-        exportedRevision: null,
-      };
-      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target]);
-      const registry = createSpaceSessionRegistry(backend);
-      const containingSession = registry.open(containing);
-      registry.open(target);
-
-      // The deletion's coordination reads the aggregate exactly once, right
-      // before it decides. An Alias of the Space Thing lands in the
-      // containing Space during that one read.
-      const loadAggregate = backend.loadAggregate.bind(backend);
-      let reads = 0;
-      backend.loadAggregate = async () => {
-        reads += 1;
-        if (reads === 1) {
-          const working = containingSession.getState().working;
-          const document = working.document;
-          const diagrams = (document.diagrams ?? []).map((diagram) => ({
-            ...diagram,
-            positions: {
-              ...diagram.positions,
-              [LATE_ALIAS_ID]: { x: 300, y: 0, open: false as const },
-            },
-          }));
-          containingSession.submit({
-            ...working,
-            document: { ...document, diagrams },
             things: [
-              ...working.things,
               {
-                id: LATE_ALIAS_ID,
+                id: ALIASED_SPACE_THING_ID,
                 document: {
-                  title: 'Late Alias of Target',
-                  kind: 'alias' as const,
-                  target: ALIASED_SPACE_THING_ID,
+                  title: 'Target',
+                  kind: 'space' as const,
+                  spaceId: ALIAS_TARGET_SPACE_ID,
+                  diagram: ALIAS_TARGET_DIAGRAM,
+                  graph: ALIAS_TARGET_GRAPH,
                 },
               },
             ],
-          });
-        }
-        return loadAggregate();
-      };
-
-      const deletion = registry
-        .spaceThings(() => THING_ID)
-        .delete({ containingSpaceId: SPACE_ID, thingId: ALIASED_SPACE_THING_ID });
-
-      await expect(deletion).resolves.toEqual({
-        kind: 'refused',
-        refusal: { code: 'thing-has-aliases', aliasTitles: ['Late Alias of Target'] },
-      });
-      expect(reads).toBe(1);
-      expect(containingSession.getState().working.things.map(({ id }) => id)).toEqual([
-        ALIASED_SPACE_THING_ID,
-        LATE_ALIAS_ID,
-      ]);
-
-      // The refused deletion must not have swallowed the late Alias's own
-      // Edit: the containing Space still holds the Space Thing and the Alias,
-      // and that Edit commits once the coordination's barrier lifts.
-      const settled = await waitFor(
-        containingSession,
-        (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
-      );
-      expect(settled.working.things.map(({ id }) => id)).toEqual([
-        ALIASED_SPACE_THING_ID,
-        LATE_ALIAS_ID,
-      ]);
-      const stored = await backend.loadSpace(SPACE_ID);
-      expect(stored?.snapshot.things.map(({ id }) => id)).toEqual([
-        ALIASED_SPACE_THING_ID,
-        LATE_ALIAS_ID,
-      ]);
-      expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
-    });
-
-    it('keeps a target Space alive when another Space comes to reference it while the deletion was reading persistence', async () => {
-      const REFERENCING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
-      const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
-      const TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000062');
-      const TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000063');
-      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000064');
-      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000065');
-      const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000066');
-      const OTHER_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000067');
-      const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000068');
-      const LATE_REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000069');
-      const OTHER_REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
-
-      const containing = {
-        snapshot: {
-          id: SPACE_ID,
-          document: {
-            version: 1 as const,
-            title: 'Space',
-            defaultDiagram: CONTAINING_DIAGRAM,
-            diagrams: [
-              {
-                id: CONTAINING_DIAGRAM,
-                title: 'Diagram 1',
-                kind: 'positioned' as const,
-                positions: {
-                  [REFERENCING_THING_ID]: { x: 0, y: 0, open: false as const },
-                  // Keeps Other reachable from Meta independently of the
-                  // deletion below, so the scenario isolates what happens to
-                  // Target rather than also depending on Other's own reachability.
-                  [OTHER_REFERENCE_THING_ID]: { x: 240, y: 0, open: false as const },
+          },
+          revision: 3n,
+          exportedRevision: null,
+        };
+        const target = {
+          snapshot: {
+            id: ALIAS_TARGET_SPACE_ID,
+            document: {
+              version: 1 as const,
+              title: 'Target',
+              defaultDiagram: ALIAS_TARGET_DIAGRAM,
+              diagrams: [
+                {
+                  id: ALIAS_TARGET_DIAGRAM,
+                  title: 'Diagram 1',
+                  kind: 'positioned' as const,
+                  positions: {},
+                  graphs: [{ id: ALIAS_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
                 },
-                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
-              },
-            ],
-          },
-          things: [
-            {
-              id: REFERENCING_THING_ID,
-              document: {
-                title: 'Target',
-                kind: 'space' as const,
-                spaceId: TARGET_SPACE_ID,
-                diagram: TARGET_DIAGRAM,
-                graph: TARGET_GRAPH,
-              },
+              ],
             },
-            {
-              id: OTHER_REFERENCE_THING_ID,
-              document: {
-                title: 'Other',
-                kind: 'space' as const,
-                spaceId: OTHER_SPACE_ID,
-                diagram: OTHER_DIAGRAM,
-                graph: OTHER_GRAPH,
-              },
-            },
-          ],
-        },
-        revision: 3n,
-        exportedRevision: null,
-      };
-      const target = {
-        snapshot: {
-          id: TARGET_SPACE_ID,
-          document: {
-            version: 1 as const,
-            title: 'Target',
-            defaultDiagram: TARGET_DIAGRAM,
-            diagrams: [
-              {
-                id: TARGET_DIAGRAM,
-                title: 'Diagram 1',
-                kind: 'positioned' as const,
-                positions: {},
-                graphs: [{ id: TARGET_GRAPH, title: 'Graph 1', edges: [] }],
-              },
-            ],
+            things: [],
           },
-          things: [],
-        },
-        revision: 0n,
-        exportedRevision: null,
-      };
-      const other = {
-        snapshot: {
-          id: OTHER_SPACE_ID,
-          document: {
-            version: 1 as const,
-            title: 'Other',
-            defaultDiagram: OTHER_DIAGRAM,
-            diagrams: [
-              {
-                id: OTHER_DIAGRAM,
-                title: 'Diagram 1',
-                kind: 'positioned' as const,
-                positions: {},
-                graphs: [{ id: OTHER_GRAPH, title: 'Graph 1', edges: [] }],
-              },
-            ],
-          },
-          things: [],
-        },
-        revision: 0n,
-        exportedRevision: null,
-      };
-      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target, other]);
-      const registry = createSpaceSessionRegistry(backend);
-      const containingSession = registry.open(containing);
-      registry.open(target);
+          revision: 0n,
+          exportedRevision: null,
+        };
+        const backend = new MemorySpaceBackend(SPACE_ID, [containing, target]);
+        const registry = createSpaceSessionRegistry(backend);
+        const containingSession = registry.open(containing);
+        registry.open(target);
 
-      // The deletion's coordination reads the aggregate exactly once, right
-      // before it plans the cascade. An entirely ordinary Edit — Other
-      // referencing Target — commits to the backend during that one read, the
-      // way an unrelated author's Edit could land in the same window.
-      const loadAggregate = backend.loadAggregate.bind(backend);
-      const commit = backend.commit.bind(backend);
-      let reads = 0;
-      backend.loadAggregate = async () => {
-        reads += 1;
-        if (reads === 1) {
-          const diagrams = other.snapshot.document.diagrams.map((diagram) => ({
-            ...diagram,
-            positions: {
-              ...diagram.positions,
-              [LATE_REFERENCE_THING_ID]: { x: 0, y: 0, open: false as const },
-            },
-          }));
-          const committed = await commit({
-            changes: [
-              {
-                kind: 'update',
-                spaceId: OTHER_SPACE_ID,
-                expectedRevision: other.revision,
-                snapshot: {
-                  ...other.snapshot,
-                  document: { ...other.snapshot.document, diagrams },
-                  things: [
-                    ...other.snapshot.things,
-                    {
-                      id: LATE_REFERENCE_THING_ID,
-                      document: {
-                        title: 'Late reference to Target',
-                        kind: 'space' as const,
-                        spaceId: TARGET_SPACE_ID,
-                        diagram: TARGET_DIAGRAM,
-                        graph: TARGET_GRAPH,
-                      },
-                    },
-                  ],
-                },
+        // An Alias of the Space Thing lands in the containing Space on the
+        // named read of the coordination's aggregate loads.
+        const loadAggregate = backend.loadAggregate.bind(backend);
+        let reads = 0;
+        const injected = { value: false };
+        backend.loadAggregate = async () => {
+          reads += 1;
+          if (reads === readToInject) {
+            injected.value = true;
+            const working = containingSession.getState().working;
+            const document = working.document;
+            const diagrams = (document.diagrams ?? []).map((diagram) => ({
+              ...diagram,
+              positions: {
+                ...diagram.positions,
+                [LATE_ALIAS_ID]: { x: 300, y: 0, open: false as const },
               },
-            ],
-          });
-          if (committed.kind !== 'committed') {
-            throw new Error(`Other's late reference failed to commit: ${committed.kind}`);
+            }));
+            containingSession.submit({
+              ...working,
+              document: { ...document, diagrams },
+              things: [
+                ...working.things,
+                {
+                  id: LATE_ALIAS_ID,
+                  document: {
+                    title: 'Late Alias of Target',
+                    kind: 'alias' as const,
+                    target: ALIASED_SPACE_THING_ID,
+                  },
+                },
+              ],
+            });
           }
+          return loadAggregate();
+        };
+
+        const deletion = registry
+          .spaceThings(() => THING_ID)
+          .delete({ containingSpaceId: SPACE_ID, thingId: ALIASED_SPACE_THING_ID });
+
+        await expect(deletion).resolves.toBeDefined();
+        const result = await deletion;
+        if (result.kind === 'refused') expect(result.refusal.code).not.toBe('aggregate-refused');
+
+        if (injected.value) {
+          expect(result).toEqual({
+            kind: 'refused',
+            refusal: { code: 'thing-has-aliases', aliasTitles: ['Late Alias of Target'] },
+          });
+          expect(containingSession.getState().working.things.map(({ id }) => id)).toEqual([
+            ALIASED_SPACE_THING_ID,
+            LATE_ALIAS_ID,
+          ]);
+
+          // The refused deletion must not have swallowed the late Alias's own
+          // Edit: the containing Space still holds the Space Thing and the
+          // Alias, and that Edit commits once the coordination's barrier
+          // lifts.
+          const settled = await waitFor(
+            containingSession,
+            (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+          );
+          expect(settled.working.things.map(({ id }) => id)).toEqual([
+            ALIASED_SPACE_THING_ID,
+            LATE_ALIAS_ID,
+          ]);
+          const stored = await backend.loadSpace(SPACE_ID);
+          expect(stored?.snapshot.things.map(({ id }) => id)).toEqual([
+            ALIASED_SPACE_THING_ID,
+            LATE_ALIAS_ID,
+          ]);
+          expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
+        } else {
+          // No late Alias ever landed: the ordinary deletion completes, and
+          // the Alias Target — now unreferenced — is cascaded away with it.
+          expect(result).toEqual({ kind: 'completed' });
+          await waitFor(
+            containingSession,
+            (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+          );
+          const stored = await backend.loadSpace(SPACE_ID);
+          expect(stored?.snapshot.things).toEqual([]);
+          expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeUndefined();
         }
-        return loadAggregate();
-      };
+      },
+    );
 
-      const deletion = registry
-        .spaceThings(() => THING_ID)
-        .delete({ containingSpaceId: SPACE_ID, thingId: REFERENCING_THING_ID });
+    // The behavioural invariant proved below (spec.md, "Coordinated
+    // operations decide after their last wait"): whichever server read a
+    // late reference to Target lands in, the deletion never rejects and
+    // never answers `aggregate-refused` — when the reference landed before
+    // the coordination's one decision, Target survives the cascade; when it
+    // did not, Target — now unreferenced — is deleted along with the Space
+    // Thing. The coordination makes exactly one aggregate read, so injecting
+    // on read 2 never fires and exercises the ordinary cascade instead.
+    it.each([1, 2] as const)(
+      'keeps a target Space alive when another Space comes to reference it while the deletion was reading persistence (late Edit on read %i)',
+      async (readToInject) => {
+        const REFERENCING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+        const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
+        const TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000062');
+        const TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000063');
+        const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000064');
+        const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000065');
+        const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000066');
+        const OTHER_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000067');
+        const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000068');
+        const LATE_REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000069');
+        const OTHER_REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 
-      await expect(deletion).resolves.toEqual({ kind: 'completed' });
-      expect(reads).toBe(1);
+        const containing = {
+          snapshot: {
+            id: SPACE_ID,
+            document: {
+              version: 1 as const,
+              title: 'Space',
+              defaultDiagram: CONTAINING_DIAGRAM,
+              diagrams: [
+                {
+                  id: CONTAINING_DIAGRAM,
+                  title: 'Diagram 1',
+                  kind: 'positioned' as const,
+                  positions: {
+                    [REFERENCING_THING_ID]: { x: 0, y: 0, open: false as const },
+                    // Keeps Other reachable from Meta independently of the
+                    // deletion below, so the scenario isolates what happens to
+                    // Target rather than also depending on Other's own reachability.
+                    [OTHER_REFERENCE_THING_ID]: { x: 240, y: 0, open: false as const },
+                  },
+                  graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+                },
+              ],
+            },
+            things: [
+              {
+                id: REFERENCING_THING_ID,
+                document: {
+                  title: 'Target',
+                  kind: 'space' as const,
+                  spaceId: TARGET_SPACE_ID,
+                  diagram: TARGET_DIAGRAM,
+                  graph: TARGET_GRAPH,
+                },
+              },
+              {
+                id: OTHER_REFERENCE_THING_ID,
+                document: {
+                  title: 'Other',
+                  kind: 'space' as const,
+                  spaceId: OTHER_SPACE_ID,
+                  diagram: OTHER_DIAGRAM,
+                  graph: OTHER_GRAPH,
+                },
+              },
+            ],
+          },
+          revision: 3n,
+          exportedRevision: null,
+        };
+        const target = {
+          snapshot: {
+            id: TARGET_SPACE_ID,
+            document: {
+              version: 1 as const,
+              title: 'Target',
+              defaultDiagram: TARGET_DIAGRAM,
+              diagrams: [
+                {
+                  id: TARGET_DIAGRAM,
+                  title: 'Diagram 1',
+                  kind: 'positioned' as const,
+                  positions: {},
+                  graphs: [{ id: TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+                },
+              ],
+            },
+            things: [],
+          },
+          revision: 0n,
+          exportedRevision: null,
+        };
+        const other = {
+          snapshot: {
+            id: OTHER_SPACE_ID,
+            document: {
+              version: 1 as const,
+              title: 'Other',
+              defaultDiagram: OTHER_DIAGRAM,
+              diagrams: [
+                {
+                  id: OTHER_DIAGRAM,
+                  title: 'Diagram 1',
+                  kind: 'positioned' as const,
+                  positions: {},
+                  graphs: [{ id: OTHER_GRAPH, title: 'Graph 1', edges: [] }],
+                },
+              ],
+            },
+            things: [],
+          },
+          revision: 0n,
+          exportedRevision: null,
+        };
+        const backend = new MemorySpaceBackend(SPACE_ID, [containing, target, other]);
+        const registry = createSpaceSessionRegistry(backend);
+        const containingSession = registry.open(containing);
+        registry.open(target);
 
-      // The coordinated commit is asynchronous even once `delete` resolves
-      // (ADR 0030): wait for the containing Space's own commit to land before
-      // reading it back off the backend.
-      await waitFor(
-        containingSession,
-        (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
-      );
+        // An entirely ordinary Edit — Other referencing Target — commits to
+        // the backend on the named read of the coordination's aggregate
+        // loads, the way an unrelated author's Edit could land in that
+        // window.
+        const loadAggregate = backend.loadAggregate.bind(backend);
+        const commit = backend.commit.bind(backend);
+        let reads = 0;
+        const injected = { value: false };
+        backend.loadAggregate = async () => {
+          reads += 1;
+          if (reads === readToInject) {
+            injected.value = true;
+            const diagrams = other.snapshot.document.diagrams.map((diagram) => ({
+              ...diagram,
+              positions: {
+                ...diagram.positions,
+                [LATE_REFERENCE_THING_ID]: { x: 0, y: 0, open: false as const },
+              },
+            }));
+            const committed = await commit({
+              changes: [
+                {
+                  kind: 'update',
+                  spaceId: OTHER_SPACE_ID,
+                  expectedRevision: other.revision,
+                  snapshot: {
+                    ...other.snapshot,
+                    document: { ...other.snapshot.document, diagrams },
+                    things: [
+                      ...other.snapshot.things,
+                      {
+                        id: LATE_REFERENCE_THING_ID,
+                        document: {
+                          title: 'Late reference to Target',
+                          kind: 'space' as const,
+                          spaceId: TARGET_SPACE_ID,
+                          diagram: TARGET_DIAGRAM,
+                          graph: TARGET_GRAPH,
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            });
+            if (committed.kind !== 'committed') {
+              throw new Error(`Other's late reference failed to commit: ${committed.kind}`);
+            }
+          }
+          return loadAggregate();
+        };
 
-      // Other's late reference must have kept Target alive through the
-      // cascade, planned from the Spaces as they stood after that one read.
-      expect(await backend.loadSpace(TARGET_SPACE_ID)).toBeDefined();
-      const storedContaining = await backend.loadSpace(SPACE_ID);
-      expect(storedContaining?.snapshot.things.map(({ id }) => id)).toEqual([
-        OTHER_REFERENCE_THING_ID,
-      ]);
-      const storedOther = await backend.loadSpace(OTHER_SPACE_ID);
-      expect(storedOther?.snapshot.things.map(({ id }) => id)).toEqual([LATE_REFERENCE_THING_ID]);
-    });
+        const deletion = registry
+          .spaceThings(() => THING_ID)
+          .delete({ containingSpaceId: SPACE_ID, thingId: REFERENCING_THING_ID });
+
+        await expect(deletion).resolves.toBeDefined();
+        const result = await deletion;
+        if (result.kind === 'refused') expect(result.refusal.code).not.toBe('aggregate-refused');
+        expect(result).toEqual({ kind: 'completed' });
+
+        // The coordinated commit is asynchronous even once `delete` resolves
+        // (ADR 0030): wait for the containing Space's own commit to land
+        // before reading it back off the backend.
+        await waitFor(
+          containingSession,
+          (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+        );
+
+        if (injected.value) {
+          // Other's late reference landed before the cascade was planned, so
+          // it kept Target alive through it.
+          expect(await backend.loadSpace(TARGET_SPACE_ID)).toBeDefined();
+          const storedContaining = await backend.loadSpace(SPACE_ID);
+          expect(storedContaining?.snapshot.things.map(({ id }) => id)).toEqual([
+            OTHER_REFERENCE_THING_ID,
+          ]);
+          const storedOther = await backend.loadSpace(OTHER_SPACE_ID);
+          expect(storedOther?.snapshot.things.map(({ id }) => id)).toEqual([
+            LATE_REFERENCE_THING_ID,
+          ]);
+        } else {
+          // No late reference ever landed: Target, now unreferenced, is
+          // deleted along with the Space Thing that named it.
+          expect(await backend.loadSpace(TARGET_SPACE_ID)).toBeUndefined();
+          const storedContaining = await backend.loadSpace(SPACE_ID);
+          expect(storedContaining?.snapshot.things.map(({ id }) => id)).toEqual([
+            OTHER_REFERENCE_THING_ID,
+          ]);
+          const storedOther = await backend.loadSpace(OTHER_SPACE_ID);
+          expect(storedOther?.snapshot.things).toEqual([]);
+        }
+      },
+    );
 
     it('steps a created Space Thing off a point another Thing already occupies', async () => {
       const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000040');

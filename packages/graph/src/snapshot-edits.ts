@@ -84,12 +84,11 @@ const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosit
  *
  * The caller mints the Thing's id and document — this only places it. Refuses
  * `diagram-not-found` for a Diagram this snapshot does not name, changing
- * nothing, rather than the silence `addSpaceThing` used to answer with — a
- * Thing added to the Space but positioned nowhere, which is what let a
- * coordinated create or link report `completed` after its containing Diagram
- * went during a wait (`.scratch/snapshot-edits/issues/05-creation-decides-after-its-last-wait.md`).
- * A freshly minted id is otherwise never already a member of anything, so a
- * found Diagram always completes.
+ * nothing: a coordinated create or link needs that refusal to answer a
+ * containing Diagram gone by the time the Edit lands, rather than adding the
+ * Thing to the Space with no position at all. A freshly minted id is
+ * otherwise never already a member of anything, so a found Diagram always
+ * completes.
  *
  * `avoidingOverlap` steps diagonally off a point another Thing in the named
  * Diagram already occupies exactly, exactly as a menu-created Markdown Thing

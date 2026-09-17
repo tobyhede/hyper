@@ -22,7 +22,7 @@ Blocked by: none
 ## Done when
 
 - [x] Both red tests pass; the delete-after-Alias test also asserts the containing Space still holds the Space Thing and the Alias, and that the Alias Edit commits once the coordination ends.
-- [x] `pnpm verify` is green. `pnpm e2e` is run because Space Thing deletion is canvas-visible. `pnpm e2e:ladle` is not applicable unless a story changes.
+- [x] `pnpm verify` is green. `pnpm e2e` is run because Space Thing deletion is canvas-visible — deferred to after 07; `pnpm e2e` was run once, after 07 landed on top of 04–06: 215 passed (2.6m). `pnpm e2e:ladle` is not applicable unless a story changes.
 
 ## Comments
 

@@ -21,7 +21,7 @@ Blocked by: 04
 ## Done when
 
 - [x] The red tests pass; existing context-deletion tests stay green.
-- [x] `pnpm verify` is green. `pnpm e2e` is deferred to run once after tickets 04–07 land together, per the coordinator's standing instruction for this series (see tickets 04/05).
+- [x] `pnpm verify` is green. `pnpm e2e` was deferred to after 07; `pnpm e2e` was run once, after 07 landed on top of 04–06: 215 passed (2.6m).
 
 ## Comments
 
@@ -32,3 +32,4 @@ Blocked by: 04
 - **`deleteContext`'s `prepare` deliberately does not require the target to already be a live session**, unlike `create`/`link`'s `prepare` (which legitimately need `working(containingSpaceId)` to avoid minting ids/initializing a target for a doomed Edit). `deleteContext` mints nothing and initializes nothing, so there is no wasted work to save by requiring liveness early; `prepare` holds only `recoveryRefusal(targetSpaceId)`, matching `delete`'s (ticket 04) shape, and the "is this even a deletion candidate" check happens once, for real, in `plan`, against the coordination's merged candidate map (aggregate ∪ live sessions) exactly as the pre-ticket-06 code read it — so a target present only in the aggregate (never opened) is handled exactly as before. This is a deliberate difference from `create`/`link`'s `prepare`, not an oversight.
 - `pnpm verify` is green (typecheck, typecheck:packages, ui:catalog:check, lint, lint:anti-slop, format:check, then `vitest run --coverage`: 222 test files, 2736 tests, all passed).
 - `pnpm e2e` is deferred, per the coordinator's standing instruction, to run once after tickets 04–07 land together rather than after each one.
+- **Review follow-up.** The `session.ts` interaction above is fixed: `prepareCoordinatedCommit` drops a `waiting` snapshot the coordinated one already contains, held by `does not let a plain Edit queued before a coordinated commit overwrite it at resume` in `session.test.ts`. The late-Edit tests no longer assert a read count; each runs with the Edit on read 1 and read 2 and asserts the outcome, red on read 2 against the pre-04 registry (`aggregate-refused`). Whether a vanished successor should be re-chosen (built) or refused (as this ticket first said) is open with the user.

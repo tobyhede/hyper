@@ -21,7 +21,7 @@ Blocked by: 04
 ## Done when
 
 - [x] The red tests pass or are struck with a reason.
-- [x] `pnpm verify` is green. `pnpm e2e` is run because Space Thing creation is canvas-visible. `pnpm e2e:ladle` is not applicable unless a story changes.
+- [x] `pnpm verify` is green. `pnpm e2e` is run because Space Thing creation is canvas-visible — deferred to after 07; `pnpm e2e` was run once, after 07 landed on top of 04–06: 215 passed (2.6m). `pnpm e2e:ladle` is not applicable unless a story changes.
 
 ## Comments
 

@@ -174,8 +174,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 
 describe('SnapshotEdit.createInDiagram properties', () => {
   it('refuses creation into a Diagram the snapshot does not name, and changes nothing', () => {
-    // Ticket 05 (`.scratch/snapshot-edits/issues/05-creation-decides-after-its-last-wait.md`):
-    // a coordinated create or link must not silently add an unpositioned
+    // A coordinated create or link must not silently add an unpositioned
     // Thing when its containing Diagram is gone by the time the Edit lands.
     fc.assert(
       fc.property(
