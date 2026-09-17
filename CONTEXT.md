@@ -33,12 +33,12 @@ _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id
 **Thing**:
 A single addressable piece of a space, and what a Graph's Edges run between.
 
-A Thing has a **Title** and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Thing front draws around the Title. Thing fronts keep one uniform geometry across kinds. Markdown owns its body; Alias owns its Target. There is no shared Description, summary, or second content slot on Thing, and the Thing front draws no text the author did not write there — a kind shows as treatment, not as a line of prose beneath the Title.
+A Thing has a **Title** and a **kind**, which owns everything else: the additional fields, the opened editor, and what the Thing front draws around the Title. Thing fronts keep one uniform geometry across kinds. Markdown owns its body; Reference Thing owns its Target. There is no shared Description, summary, or second content slot on Thing, and the Thing front draws no text the author did not write there — a kind shows as treatment, not as a line of prose beneath the Title.
 
 A Title is one or more **Title Lines**. The first line is the Thing's **name**: it is what every surface that lists or refers to the Thing shows, and it is the Thing's accessible name. The lines after it draw only on the Thing front, beneath the name, at descending typographic weight. They name and qualify the Thing — they are not content, which lives in the body an Open Thing reads. A Title with one line is the ordinary case and the whole of what most Things have.
 _Avoid_: heading, label, caption as a name for the Title itself (a caption is the role the third and later Title Lines take), and description or subtitle as a name for a separate field — there is no separate field.
 
-A Thing is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or an **alias** — another Thing, shown again here.
+A Thing is one of three kinds, and the kind is what its content is: **Markdown** — written directly by the author; a **space** — a nested graph the viewer opens and explores in place; or a **reference** — a read-only view of another Thing.
 _Avoid_: Card (retired by ADR 0085), node, slide, page, tile, subgraph. For the content: prose (it may be a table, a drawing or code, not only writing), body (works for markdown, but a Space Thing's content is a graph).
 
 **Space Thing**:
@@ -48,11 +48,11 @@ _Avoid_: subspace, portal, link, nested space (as a second name for the same ent
 **Space Thing Framing**:
 The authored view of a target Diagram owned by a Space Thing, alongside its Diagram and Graph selections. Framing determines which part of that Diagram is visible and at what scale; it does not change the target Things' authored positions.
 
-**Alias**:
-A Thing that shows another Thing's **content** read-only: the same content appearing again elsewhere in the space, with a single source of truth, so editing the Target changes every place it appears. An Alias carries its own Title and chooses its immutable Target when created; it may target any non-Alias Thing kind, including a Markdown Thing or a Space Thing, but never itself or another Alias.
+**Reference Thing**:
+A Thing that is a reference to another Thing (its **Target**): a read-only view of that Thing's content. It carries its own Title and chooses its immutable Target when created; it may target a Markdown Thing or a Space Thing, never itself or another Reference Thing.
 
-An Alias is authorable as a Thing and through the Diagrams and Graphs that contain it: it may be renamed, moved, connected, Opened, Closed and Resized. An Open Alias renders its Target's content without authoring it; the Target Thing must be opened explicitly to author that content or its kind-specific configuration.
-_Avoid_: reference, link (an alias shows content, it does not merely jump), copy, transclusion, mirror.
+A Reference Thing is authorable as a Thing and through the Diagrams and Graphs that contain it: renamed, moved, connected, Opened, Closed, Resized. An Open Reference Thing renders its Target's content without authoring it; the Target is opened to author that content or its kind-specific configuration.
+_Avoid_: alias, link (as a name for the Thing; Copy link is a command), copy, transclusion, mirror, and Reference as a family Space Thing belongs to (a Space Thing references a Space; it is not a Reference Thing).
 
 ## Graphs
 
@@ -160,7 +160,7 @@ Taking a complete aggregate from outside Hyper and making it the stored one. It 
 _Avoid_: loading, restoring, syncing; merging.
 
 **Opening**:
-Bringing a single Thing's content up **on the Thing itself**, by growing it where it already sits. A Markdown Thing opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. An Alias opens on its own Title and its immutable Target's content read-only, while the Target Thing must be opened explicitly to author that content. A Space Thing opens on the Diagram it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
+Bringing a single Thing's content up **on the Thing itself**, by growing it where it already sits. A Markdown Thing opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. A Reference Thing opens on its own Title and its immutable Target's content read-only, while the Target Thing must be opened explicitly to author that content. A Space Thing opens on the Diagram it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
 
 A Thing is **Open** or **Closed**, and that state is a property of the **Diagram**, not of the Thing and not of the viewer: opening a Thing is an Edit, it survives a reload, and any number of a Diagram's Things may be Open at once. Every Closed Thing has the fixed Thing size. Every Open Thing has an **Open Size**: the concrete dimensions authored when it first Opens and changed by Resize. Close preserves the Open Size, so reopening returns to it. Resizing is a Thing capability, not behavior supplied by a Thing kind; a kind decides what its Open Thing contains.
 
