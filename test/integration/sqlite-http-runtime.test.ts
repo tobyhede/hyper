@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import { HttpSpaceBackend } from '@project/http';
 import {
   decodeCommitConflict,
@@ -39,6 +42,23 @@ describe('SQLite HTTP runtime', () => {
         report: (cause) => reported.push(cause),
       }),
     ).rejects.toThrow('SQLITE_PATH must name the SQLite database file');
+    expect(reported).toEqual([]);
+  });
+
+  // `pnpm dev:sqlite` migrates from the repository root and serves from
+  // `packages/app`, so a relative path names a different file in each step.
+  it('refuses to compose when SQLITE_PATH is relative', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'hyper-sqlite-relative-'));
+    close = () => rm(directory, { recursive: true, force: true });
+    vi.stubEnv('SQLITE_PATH', relative(process.cwd(), join(directory, 'hyper.db')));
+    const reported: unknown[] = [];
+
+    await expect(
+      createApp({
+        wait: () => new Promise<void>(() => undefined),
+        report: (cause) => reported.push(cause),
+      }),
+    ).rejects.toThrow('SQLITE_PATH must be an absolute path');
     expect(reported).toEqual([]);
   });
 
