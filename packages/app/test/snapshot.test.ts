@@ -256,7 +256,8 @@ it('answers the snapshot it was given when no Diagram held the Thing', () => {
  */
 it('reclaims the room an Open Thing held in every Diagram it is deleted from', () => {
   // THING_A is Open at 800x600 in the second Diagram, so its growth of 540x454
-  // is already written into THING_B's coordinates there: (100, 100) + (540, 454).
+  // is already written into THING_B's coordinates there. B is clear of A on `x`,
+  // so it took the width alone (ADR 0093): (100, 100) + (540, 0).
   const withDiagrams = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
@@ -269,7 +270,7 @@ it('reclaims the room an Open Thing held in every Diagram it is deleted from', (
           kind: 'positioned',
           positions: {
             [THING_A]: { x: 0, y: 0, open: true, openSize: { width: 800, height: 600 } },
-            [THING_B]: { x: 640, y: 554, open: false },
+            [THING_B]: { x: 640, y: 100, open: false },
           },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
         },

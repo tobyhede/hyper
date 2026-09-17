@@ -974,10 +974,12 @@ export const createApp = (
      * drags it off. A Thing this Diagram does not place has no offset to take,
      * so its Reference Thing lands at the visible centre like any other creation.
      *
-     * **The offset leaves a fixed corner overlap before and after Close.**
-     * An Open Target holds room that Close reclaims from every Thing beyond it
-     * (ADR 0084), including this new Reference Thing. Add that growth to the collapsed
-     * offset so reclaiming it leaves the Reference Thing's centre clear of the Target.
+     * **The offset leaves the Reference Thing clear of the Target after Close.**
+     * An Open Target holds room that Close reclaims from every Thing clear of it
+     * (ADR 0084). Adding the growth to the collapsed offset puts this new
+     * Reference Thing at the Open Target's corner, clear of its collapsed rect on
+     * `x`, so Close reclaims the width alone (ADR 0093): it lands back on the
+     * collapsed step across and stays below the Closed Target by the height.
      */
     const createReferenceFrom = useCallback(
       (thing: Thing): EntityActionOutcome => {

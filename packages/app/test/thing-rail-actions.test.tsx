@@ -459,11 +459,15 @@ describe('a Thing’s commands on the canvas rail', () => {
       await waitFor(() => {
         const positions = session.getState().working.document.diagrams?.[0]?.positions;
         expect(positions?.[THING_ID]?.open).toBe(false);
-        // Same authored offset the closed-Target creation asserts: Close reclaims
-        // the growth that `createReferenceFrom` added ahead of the collapsed step, so
-        // the Reference Thing lands back on the rounded 0.75 of each collapsed axis.
+        // Close reclaims the width `createReferenceFrom` added ahead of the
+        // collapsed step and nothing else: the Reference Thing is clear of the
+        // Target on `x`, so that is its one room axis (ADR 0093). It lands back on
+        // the rounded 0.75 of the collapsed width, and below the Closed Target by
+        // the height growth it keeps.
+        const heightGrowth = THING_HEIGHT * scale - THING_HEIGHT;
         expect(positions?.[reference]?.x).toBe(Math.round(THING_WIDTH * 0.75));
-        expect(positions?.[reference]?.y).toBe(Math.round(THING_HEIGHT * 0.75));
+        expect(positions?.[reference]?.y).toBe(Math.round(THING_HEIGHT * 0.75) + heightGrowth);
+        expect(positions?.[reference]?.y).toBeGreaterThanOrEqual(THING_HEIGHT);
       });
       await settled(session);
     },

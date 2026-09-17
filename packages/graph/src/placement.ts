@@ -301,41 +301,71 @@ function growth(openSize: Extent): Extent {
 }
 
 /**
- * The placement with every Thing beyond a subject moved by a growth.
+ * The axis a Thing makes room on when a subject grows, or `null` for none.
  *
- * This is the whole of displacement (ADR 0084). Opening a Thing applies its
- * growth here as part of the Open Edit, and the coordinates it writes are
- * authored ones with the same standing as any other — the author opened the
- * Thing, and opening is a Diagram decision. Closing applies the negation, and
- * resizing the difference. Between those Edits nothing derives anything: the
- * Diagram's positions are what the canvas draws.
+ * A Thing is **clear** of the subject on an axis when it starts at or past the
+ * far edge of the subject's *collapsed* rect on that axis — past where the
+ * subject ends before it grows (ADR 0093). A Thing clear on `x` takes the width
+ * growth and nothing else; failing that, a Thing clear on `y` takes the height
+ * growth; a Thing clear on neither already overlaps the collapsed subject and
+ * moves on neither.
  *
- * The comparison is **strict and per-axis**. A Thing whose authored `x` is
- * strictly greater than the subject's takes `growth.width`, and its `y` is
- * decided separately against `growth.height`, so a Thing below the subject and
- * level with it moves down and not right. A Thing sharing the subject's
- * coordinate on an axis does not move on that axis, and the subject itself never
- * moves on either: a Thing does not displace itself.
+ * **One axis, and `x` first**, because the half-plane rule ADR 0084 stated —
+ * any Thing strictly past the subject's origin on an axis takes that axis's
+ * growth — moved a Thing beside the subject by the whole height growth for
+ * being one unit lower than it. Read memorylessly at Close, a Thing the author
+ * nudged below the Open subject's top while it stood beside it was pulled up by
+ * the full height the Open never pushed it down by. A Thing clear on `x` is
+ * clear of the grown rect after taking the width alone, so it has no need of
+ * the height, and a Thing clear on both is the same case.
+ *
+ * **The collapsed rect and not the Open one**, because the membership has to
+ * be the same at every Edit in a sequence for Open and Close to be a pair. The
+ * collapsed size is a constant, and a nonnegative growth only carries a clear
+ * Thing further clear on the axis it moved on while leaving the other axis
+ * untouched, so what Open selects Close selects again. A shrinking Resize moves
+ * a Thing back by no more than the growth still held, which leaves it at least
+ * at the collapsed edge, so it too stays in the set.
+ */
+function roomAxis(at: DiagramPosition, subject: DiagramPosition): 'x' | 'y' | null {
+  if (at.x >= subject.x + COLLAPSED_THING_SIZE.width) return 'x';
+  if (at.y >= subject.y + COLLAPSED_THING_SIZE.height) return 'y';
+  return null;
+}
+
+/**
+ * The placement with every Thing clear of a subject moved by a growth.
+ *
+ * This is the whole of displacement (ADR 0084, ADR 0093). Opening a Thing
+ * applies its growth here as part of the Open Edit, and the coordinates it
+ * writes are authored ones with the same standing as any other — the author
+ * opened the Thing, and opening is a Diagram decision. Closing applies the
+ * negation, and resizing the difference. Between those Edits nothing derives
+ * anything: the Diagram's positions are what the canvas draws.
+ *
+ * Which Things move, and on which one axis, is {@link roomAxis}. The subject is
+ * never clear of itself, so it never moves.
  *
  * A negative growth is how Close is expressed and nothing here special-cases it,
  * because the round trip is what makes Open and Close a pair:
  * `displace(displace(p, c, g), c, negate(g))` is `p` for every **nonnegative**
  * `g`. The bound is load-bearing rather than a convenience. Applying a negative
- * growth *first* can carry a Thing back across the subject, and the negation then
- * skips it as no longer beyond — subject at `x = 0`, neighbour at `x = 1`,
- * `growth.width = -2`. `growth` above floors Open's at zero, so no Open reaches
- * it — but Close and a shrinking Resize both apply a negative growth, and the
- * Things they reach are whichever ones are beyond the subject *now*, not the
- * ones the Open pushed. A Thing the author dropped inside an Open Thing's rect is
- * beyond it and was never displaced by it, so closing carries that Thing back
- * across the subject and the reopen leaves it there. The asymmetry is therefore
- * stated rather than repaired — clamping it, or remembering which Things a
- * particular Open pushed, is the per-Thing history ADR 0084 rejected for making
- * two identical Diagrams behave differently.
+ * growth *first* can carry a Thing back inside the subject's collapsed extent,
+ * and the negation then skips it as no longer clear — subject at `x = 0`,
+ * neighbour at `x = 260`, `growth.width = -2`. `growth` above floors Open's at
+ * zero, so no Open reaches it — but Close and a shrinking Resize both apply a
+ * negative growth, and the Things they reach are whichever ones are clear of
+ * the subject *now*, not the ones the Open pushed. A Thing the author dropped
+ * inside an Open Thing's rect, past its collapsed edge, is clear of it and was
+ * never displaced by it, so closing carries that Thing back over the subject
+ * and the reopen leaves it there. The asymmetry is therefore stated rather than
+ * repaired — clamping it, or remembering which Things a particular Open pushed,
+ * is the per-Thing history ADR 0084 rejected for making two identical Diagrams
+ * behave differently.
  *
  * The same memorylessness read from the subject's side: a subject the author
- * has dragged past the neighbours its own Open displaced finds nobody beyond it
- * and gives nothing back, so that room stays where it is and a further
+ * has dragged past the neighbours its own Open displaced finds nobody clear of
+ * it and gives nothing back, so that room stays where it is and a further
  * Open/drag/Close cycle adds more. ADR 0084 states this face for a moved
  * *neighbour*; it is one rule, and the subject is not exempt from it, because
  * this compares against wherever the subject now sits rather than wherever it
@@ -345,10 +375,10 @@ function growth(openSize: Extent): Extent {
  * `x` and `y` move (ADR 0066). Answers the placement it was given whenever no
  * Thing actually moves — a subject the map does not hold, a growth that is zero
  * on both axes, and the case neither of those catches: a nonzero growth with
- * nothing beyond the subject on either axis, which `reclaim` reaches for a
- * subject the author dragged past its own displaced neighbours. Like `remove`,
- * so an Edit that moves nothing keeps the placement's identity and a settled
- * graph is not laid out again.
+ * nothing clear of the subject, which `reclaim` reaches for a subject the
+ * author dragged past its own displaced neighbours. Like `remove`, so an Edit
+ * that moves nothing keeps the placement's identity and a settled graph is not
+ * laid out again.
  */
 function displace(placement: Placement, subjectId: ThingId, growth: Extent): Placement {
   const subject = placement.get(subjectId);
@@ -358,8 +388,9 @@ function displace(placement: Placement, subjectId: ThingId, growth: Extent): Pla
   const displaced = new Map<ThingId, ThingPlacement>();
   let moved = false;
   for (const [thingId, at] of placement) {
-    const x = at.x > subject.x ? at.x + growth.width : at.x;
-    const y = at.y > subject.y ? at.y + growth.height : at.y;
+    const axis = roomAxis(at, subject);
+    const x = axis === 'x' ? at.x + growth.width : at.x;
+    const y = axis === 'y' ? at.y + growth.height : at.y;
     if (x !== at.x || y !== at.y) moved = true;
     displaced.set(thingId, point({ ...at, x, y }));
   }
