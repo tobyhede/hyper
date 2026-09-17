@@ -112,7 +112,7 @@ pnpm hyper ./my-aggregate                  # initialize an empty repository from
 pnpm hyper ./my-aggregate --dangerous-truncate   # replace the stored aggregate outright
 ```
 
-Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, the stored aggregate and its Meta identity are replaced atomically, authorized by the identity the repository just reported. There is no merge mode.
+Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, whatever is stored — a valid aggregate or state the repository refuses to read — is truncated and replaced atomically, authorized by the Meta identity the repository just reported ([ADR 0092](docs/adr/0092-dangerous-truncate-replaces-whatever-is-stored.md)). There is no merge mode.
 
 The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
 

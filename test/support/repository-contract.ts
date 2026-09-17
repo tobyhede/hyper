@@ -357,10 +357,43 @@ export const spaceRepositoryContract = (
   it(`${name} refuses replacement before initialization`, async () => {
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [THING_ID]);
-      await expect(
-        repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, SPACE_ID),
-      ).resolves.toEqual({ kind: 'uninitialized' });
+      for (const expected of [SPACE_ID, undefined]) {
+        await expect(
+          repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, expected),
+        ).resolves.toEqual({ kind: 'uninitialized' });
+      }
       await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+    });
+  });
+
+  it(`${name} reads the stored Meta identity as each lifecycle door leaves it`, async () => {
+    await withHarness(async (repository) => {
+      await expect(repository.loadMetaSpaceId()).resolves.toBeUndefined();
+      await repository.initializeAggregate({
+        metaSpaceId: SPACE_ID,
+        spaces: [space(SPACE_ID, 'Meta', [THING_ID])],
+      });
+      await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
+      await repository.replaceAggregate(
+        { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'Other', [])] },
+        SPACE_ID,
+      );
+      await expect(repository.loadMetaSpaceId()).resolves.toBe(OTHER_SPACE_ID);
+    });
+  });
+
+  it(`${name} refuses a replacement expecting no Meta identity where one is stored`, async () => {
+    await withHarness(async (repository) => {
+      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'Other', [])] },
+          undefined,
+        ),
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
+      await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
     });
   });
 

@@ -183,6 +183,11 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
   });
 };
 
+const storedMetaSpaceId = async (orm: Orm): Promise<UUID | undefined> => {
+  const state = await orm.RepositoryState.where({ singletonId: 1 }).first();
+  return state === null ? undefined : uuidSchema.parse(state.metaSpaceId);
+};
+
 const lockMetaIdentity = async (orm: Orm): Promise<UUID | undefined> => {
   const state = await orm.RepositoryState.where({ singletonId: 1 }).first();
   if (state === null) return undefined;
@@ -414,16 +419,20 @@ export class SqliteSpaceRepository implements SpaceRepository {
     }
   }
 
+  loadMetaSpaceId(): Promise<UUID | undefined> {
+    return this.#serialise(() => storedMetaSpaceId(this.#database.orm));
+  }
+
   replaceAggregate(
     input: AggregateInput,
-    expectedMetaSpaceId: UUID,
+    expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult> {
     return this.#serialise(() => this.#replaceUnserialised(input, expectedMetaSpaceId));
   }
 
   async #replaceUnserialised(
     input: AggregateInput,
-    expectedMetaSpaceId: UUID,
+    expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult> {
     const intake = loadSpaceAggregate({
       metaSpaceId: input.metaSpaceId,
@@ -431,20 +440,15 @@ export class SqliteSpaceRepository implements SpaceRepository {
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     return this.#database.transaction(async ({ orm }) => {
+      // Read raw rather than through `loadEverySpace`: truncation replaces
+      // stored state whether or not it parses (ADR 0092).
       const metaSpaceId = await lockMetaIdentity(orm);
-      if (metaSpaceId === undefined) {
-        if ((await loadEverySpace(orm)).length > 0) {
-          throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
-        }
+      if (metaSpaceId === undefined && (await orm.Space.first()) === null) {
         return { kind: 'uninitialized' };
       }
       if (metaSpaceId !== expectedMetaSpaceId) {
         return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
       }
-      // Replacement is not a repair: stored state that is not an aggregate
-      // fails here exactly as it fails a read, before anything is deleted
-      // (`test/integration/sqlite-space-repository.test.ts` invariant cases).
-      await authoritativeAggregate(orm, metaSpaceId);
       return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
     });
   }
