@@ -582,4 +582,31 @@ describe('SqliteSpaceRepository', () => {
       aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
     });
   });
+
+  /*
+   * Ticket 18 keeps what ticket 14 measured: rollback journal in `delete` mode
+   * and `synchronous=FULL`. Journal mode is a property of the file once written,
+   * so it is read after the repository has written. `synchronous` is
+   * per-connection, and the driver sets only `foreign_keys` and `busy_timeout`
+   * when it opens one (`@prisma-next/driver-sqlite`'s `openConnection`), so a
+   * connection opened the same way reports what the driver's run with.
+   */
+  it('writes the file in rollback-journal delete mode with synchronous FULL', async () => {
+    const { path, repository } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'Journalled', [THING_ID])],
+    });
+
+    // A static `import 'node:sqlite'` fails to load under this Vitest's resolver.
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+    const connection = new DatabaseSync(path);
+    try {
+      expect(connection.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'delete' });
+      // 2 is FULL.
+      expect(connection.prepare('PRAGMA synchronous').get()).toEqual({ synchronous: 2 });
+    } finally {
+      connection.close();
+    }
+  });
 });

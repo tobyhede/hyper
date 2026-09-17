@@ -79,6 +79,21 @@ deployed environments should inject `DATABASE_URL` through their secret
 manager. `pnpm postgres:down` keeps the named data volume. To delete local
 database state, run the destructive reset `docker compose down --volumes`.
 
+### Local SQLite
+
+SQLite is an opt-in development host beside PostgreSQL, not a replacement for it:
+
+```sh
+pnpm dev:sqlite                                   # app at http://localhost:5177, file at .scratch/sqlite/hyper.db
+SQLITE_PATH=/absolute/path/hyper.db pnpm test:integration:sqlite
+```
+
+`SQLITE_PATH` names the file. Use a stable absolute path in a local directory the application owns; the host and CLI refuse to start when it is unset or blank, or when its parent directory is missing or not writable. A network filesystem, a file shared between hosts and a hosted SQLite service are not supported deployments.
+
+**One Hyper process per file.** Inside that process every repository operation is serialised, so overlapping Edits answer as they would on PostgreSQL: a stale revision is a conflict, and nothing waits on SQLite. A second process on the same live file — `pnpm hyper:sqlite` against a file `pnpm dev:sqlite` holds, or two hosts — is unsupported. SQLite locks the whole file, so when the two meet, an operation either fails at once or waits out the driver's fixed 5 second busy timeout and then fails. A second process that is only reading is enough: a commit here cannot finish while that read's transaction is open. The wait is synchronous, so the host answers nothing else for those seconds. Either way the host answers `503 persistence-unavailable`, which the browser retries, never a `409`, and no partial write or stuck lock is left behind (`test/integration/sqlite-contention.test.ts`).
+
+The file uses SQLite's default rollback journal (`journal_mode=delete`) with `synchronous=FULL`; WAL is not enabled. To back it up, stop the host (or anything else writing the file) and copy the file, or use SQLite's own backup API (`sqlite3 hyper.db ".backup copy.db"`). Do not copy the file while a writer has it open: a copy taken mid-transaction need not be a consistent database.
+
 ## The space format
 
 A space is a **space directory**: a space file (`space.json`) plus one Markdown file per thing. Things are not listed anywhere — a thing exists because its file does ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)), and they are discovered by scanning two locations **non-recursively**: `*.md` beside the space file, and `things/*.md`. The bundled example lives in [`packages/app/example`](packages/app/example).

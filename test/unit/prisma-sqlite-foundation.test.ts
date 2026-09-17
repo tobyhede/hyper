@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import contractJson from '../../src/sqlite/contract.json' with { type: 'json' };
@@ -65,6 +67,19 @@ describe('Prisma Next SQLite foundation', () => {
     expect(() => createSqliteDatabase('/no-such-hyper-sqlite-parent/hyper.db')).toThrow(
       /SQLite parent directory is missing or unwritable/,
     );
+  });
+
+  it('fails clearly when the SQLite parent directory is not writable', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'hyper-sqlite-readonly-'));
+    try {
+      chmodSync(parent, 0o500);
+      expect(() => createSqliteDatabase(join(parent, 'hyper.db'))).toThrow(
+        /SQLite parent directory is missing or unwritable/,
+      );
+    } finally {
+      chmodSync(parent, 0o700);
+      rmSync(parent, { recursive: true, force: true });
+    }
   });
 
   it('leaves PostgreSQL as the default Vite host', () => {
