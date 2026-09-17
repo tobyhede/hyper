@@ -1,6 +1,7 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { diagramMenu, expectMenuGroups, graphMenu, spaceMenu } from './graph';
 import { SEEDED_GRAPH_ID, SEEDED_DIAGRAM_ID, seedPositionedDiagram } from './seed';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -104,10 +105,8 @@ test('choosing a Diagram pushes history and Back, Forward and reload restore it 
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
-  await page
-    .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
-    .click({ delay: 120 });
-  await page.getByRole('menuitemradio', { name: 'Collection 2' }).click();
+  const diagrams = await diagramMenu(page);
+  await diagrams.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
   await expect(page).toHaveURL(second);
   await page.reload();
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
@@ -346,25 +345,13 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
 test('the Diagram cluster holds every Diagram command including Rename', async ({ page }) => {
   await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
-  await page
-    .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
-    .click({ delay: 120 });
-  const menu = page.getByRole('menu');
-  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'New Diagram' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Copy link to Diagram' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Delete Collection 1' })).toBeVisible();
-
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Collection 1',
-    'Collection 2',
-    'Linked Spaces',
-    'New Diagram',
-    'Rename',
-    'Copy link to Diagram',
-    'Delete Collection 1',
+  const menu = await diagramMenu(page);
+  await expectMenuGroups(menu, [
+    ['Collection 1', 'Collection 2', 'Linked Spaces'],
+    ['New Diagram'],
+    ['Rename', 'Copy link to Diagram'],
+    ['Delete Collection 1'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(3);
   await page.keyboard.press('Escape');
 
   await expect(
@@ -383,16 +370,8 @@ test('the Space menu groups Rename with Copy link to Space, then Exit Space', as
   await installClipboard(page);
   await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
-  await page
-    .getByRole('button', { name: 'Space: Diagram fixture', exact: true })
-    .click({ delay: 120 });
-  const menu = page.getByRole('menu');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Rename',
-    'Copy link to Space',
-    'Exit Space',
-  ]);
-  await expect(menu.getByRole('separator')).toHaveCount(1);
+  const menu = await spaceMenu(page);
+  await expectMenuGroups(menu, [['Rename', 'Copy link to Space'], ['Exit Space']]);
 
   await menu.getByRole('menuitem', { name: 'Copy link to Space', exact: true }).click();
   await page.keyboard.press('Escape');
@@ -439,8 +418,8 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
   const mid = `${diagram}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
   await page.goto(diagram);
 
-  await page.getByRole('button', { name: /^Active Graph: /, exact: false }).click({ delay: 120 });
-  await page.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
+  const graphs = await graphMenu(page);
+  await graphs.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
   await expect(page).toHaveURL(mid);
   await page.goBack();
   await expect(page).toHaveURL(diagram);
@@ -467,22 +446,15 @@ test(
     const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
     await page.goto(diagram);
 
-    await page.getByRole('button', { name: 'Active Graph: Long', exact: true }).click({
-      delay: 120,
-    });
-    const menu = page.getByRole('menu');
+    const menu = await graphMenu(page);
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
-    await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-      'Long',
-      'Mid',
-      'Short',
-      'Colour…',
-      'New Graph',
-      'Rename',
-      'Copy link to Graph',
-      'Delete Long',
+    await expectMenuGroups(menu, [
+      ['Long', 'Mid', 'Short'],
+      ['Colour…'],
+      ['New Graph'],
+      ['Rename', 'Copy link to Graph'],
+      ['Delete Long'],
     ]);
-    await expect(menu.getByRole('separator')).toHaveCount(4);
 
     await menu.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
     await page.keyboard.press('Escape');

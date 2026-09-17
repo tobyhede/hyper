@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { nodeByTitle } from '../e2e/graph';
+import { expectMenuGroups, thingActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -39,20 +39,6 @@ const disclose = async (page: Page, name: string) => {
   // a shorter `Diagram:` would also hit `Active Graph` is not the issue — a
   // title that is a prefix of another identity's title would be.
   await surface(page).getByRole('button', { name, exact: true }).click({ delay: 120 });
-  const menu = page.getByRole('menu').last();
-  await expect(menu).toBeVisible();
-  return menu;
-};
-
-/**
- * Reveal a placed Thing's own rail and open its actions menu — the Dock's
- * organising rule that a Thing's own commands are not on this surface, drawn
- * through the real production host (ADR 0073).
- */
-const thingActionsMenu = async (page: Page, title: string) => {
-  const node = nodeByTitle(page, title).first();
-  await node.hover();
-  await node.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
   const menu = page.getByRole('menu').last();
   await expect(menu).toBeVisible();
   return menu;
@@ -158,15 +144,12 @@ test('the Diagram menu groups New Diagram, Rename with Copy link, then Delete', 
   await page.goto(story('default'));
 
   const menu = await disclose(page, 'Diagram: Collection 1');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Collection 1',
-    'Collection 2',
-    'New Diagram',
-    'Rename',
-    'Copy link to Diagram',
-    'Delete Collection 1',
+  await expectMenuGroups(menu, [
+    ['Collection 1', 'Collection 2'],
+    ['New Diagram'],
+    ['Rename', 'Copy link to Diagram'],
+    ['Delete Collection 1'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(3);
 });
 
 /**
@@ -263,17 +246,13 @@ test(
 
     const menu = await disclose(page, 'Active Graph: Long');
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
-    await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-      'Long',
-      'Mid',
-      'Short',
-      'Colour…',
-      'New Graph',
-      'Rename',
-      'Copy link to Graph',
-      'Delete Long',
+    await expectMenuGroups(menu, [
+      ['Long', 'Mid', 'Short'],
+      ['Colour…'],
+      ['New Graph'],
+      ['Rename', 'Copy link to Graph'],
+      ['Delete Long'],
     ]);
-    await expect(menu.getByRole('separator')).toHaveCount(4);
 
     await menu.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
     await expect
@@ -296,12 +275,7 @@ test('the Space menu groups Rename with Copy link to Space, then Exit Space', as
   await page.goto(story('default'));
 
   const menu = await disclose(page, 'Space: Rendering');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Rename',
-    'Copy link to Space',
-    'Exit Space',
-  ]);
-  await expect(menu.getByRole('separator')).toHaveCount(1);
+  await expectMenuGroups(menu, [['Rename', 'Copy link to Space'], ['Exit Space']]);
 });
 
 /**
@@ -336,15 +310,12 @@ test('a Markdown Thing’s actions menu groups Create Reference, both copy links
 }) => {
   await page.goto(story('default'));
 
-  const menu = await thingActionsMenu(page, 'Opening');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Create Reference',
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Remove from Diagram',
-    'Delete from Space',
+  const menu = await thingActions(page, 'Opening');
+  await expectMenuGroups(menu, [
+    ['Create Reference'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
+    ['Remove from Diagram', 'Delete from Space'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**
@@ -357,20 +328,16 @@ test('a Reference Thing’s actions menu keeps Create Reference leading, drawn u
 }) => {
   await page.goto(story('default'));
 
-  const menu = await thingActionsMenu(page, 'Strategy overview');
+  const menu = await thingActions(page, 'Strategy overview');
   await expect(menu.getByRole('menuitem', { name: /^Create Reference/ })).toHaveAttribute(
     'aria-disabled',
     'true',
   );
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    /^Create Reference/,
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Copy link to Target',
-    'Remove from Diagram',
-    'Delete from Space',
+  await expectMenuGroups(menu, [
+    [/^Create Reference/],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
+    ['Remove from Diagram', 'Delete from Space'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**
@@ -386,19 +353,13 @@ test('a Space Thing’s actions menu groups Create Reference, Enter, links, then
 }) => {
   await page.goto(story('default'));
 
-  const menu = await thingActionsMenu(page, 'Design system');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Create Reference',
-    'Enter',
-    'Open in New Tab',
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Copy link to Space',
-    'Remove from Diagram',
-    'Delete from Space',
+  const menu = await thingActions(page, 'Design system');
+  await expectMenuGroups(menu, [
+    ['Create Reference'],
+    ['Enter', 'Open in New Tab'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+    ['Remove from Diagram', 'Delete from Space'],
   ]);
-  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
-  await expect(menu.getByRole('separator')).toHaveCount(3);
 });
 
 /**

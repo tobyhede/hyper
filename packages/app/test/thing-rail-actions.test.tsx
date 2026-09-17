@@ -16,6 +16,7 @@ import type { HistoryApi } from '../src/browser-location';
 import { composeApp } from '../src/compose-app';
 import type { DestinationOpening } from '../src/destination-opening';
 import { recordingHistory } from './browser-history';
+import { expectMenuGroups } from './menu-assertions';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 import { THING_HEIGHT, THING_WIDTH } from '../src/thing';
@@ -218,18 +219,6 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-/**
- * A menu item's own label, past its optional leading icon column.
- *
- * `EntityActionItems` draws an icon in an `aria-hidden` column ahead of the
- * label wrapper — and an icon that is itself a `ThingKindIcon` (Create Reference's)
- * nests a second `span`, so a bare `span > span` selector reads that empty
- * glyph wrapper instead of the label past it. The label wrapper is the one
- * direct child of the item that is not `aria-hidden`.
- */
-const itemLabel = (item: Element): string | null =>
-  item.querySelector(':scope > span:not([aria-hidden]) > span')?.textContent ?? null;
-
 describe('a Thing’s commands on the canvas rail', () => {
   /**
    * Reached without selecting anything first. The Space's command surface drew
@@ -274,16 +263,12 @@ describe('a Thing’s commands on the canvas rail', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
     const menu = await screen.findByRole('menu');
-    const items = within(menu).getAllByRole('menuitem');
 
-    expect(items.map(itemLabel)).toEqual([
-      'Create Reference',
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
-      'Remove from Diagram',
-      'Delete from Space',
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing'],
+      ['Remove from Diagram', 'Delete from Space'],
     ]);
-    expect(within(menu).getAllByRole('separator')).toHaveLength(2);
     await settled(session);
   });
 
@@ -298,16 +283,12 @@ describe('a Thing’s commands on the canvas rail', () => {
     const menu = await screen.findByRole('menu');
     const items = within(menu).getAllByRole('menuitem');
 
-    expect(items.map(itemLabel)).toEqual([
-      'Create Reference',
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
-      'Copy link to Target',
-      'Remove from Diagram',
-      'Delete from Space',
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
+      ['Remove from Diagram', 'Delete from Space'],
     ]);
     expect(items[0]).toHaveAttribute('aria-disabled', 'true');
-    expect(within(menu).getAllByRole('separator')).toHaveLength(2);
     await settled(session);
   });
 
@@ -590,18 +571,13 @@ describe('a Thing’s commands on the canvas rail', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
     const menu = await screen.findByRole('menu');
-    const items = within(menu).getAllByRole('menuitem');
 
-    expect(items.map(itemLabel)).toEqual([
-      'Create Reference',
-      'Open in New Tab',
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
-      'Copy link to Space',
-      'Remove from Diagram',
-      'Delete from Space',
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Open in New Tab'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+      ['Remove from Diagram', 'Delete from Space'],
     ]);
-    expect(within(menu).getAllByRole('separator')).toHaveLength(3);
     await settled(session);
   });
 

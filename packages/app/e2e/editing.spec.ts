@@ -24,6 +24,7 @@ import {
   createThingControl,
   dock,
   dragBy,
+  expectMenuGroups,
   expectThingFillsNode,
   diagramChoices,
   diagramMenu,
@@ -42,6 +43,7 @@ import {
   selectedCanvas,
   settled,
   spaceName,
+  thingActions,
   viewportTransform,
 } from './graph';
 import { seedPositionedDiagram } from './seed';
@@ -1961,15 +1963,6 @@ test(
  * Thing's own actions menu, and "withdrawn" means the row is absent from that
  * menu rather than a button absent from the chrome.
  */
-const thingActions = async (page: Page, title: string): Promise<Locator> => {
-  const thing = nodeByTitle(page, title).first();
-  await thing.hover();
-  await thing.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
-  const menu = page.getByRole('menu');
-  await expect(menu).toBeVisible();
-  return menu;
-};
-
 test('Delete Thing confirms before removing the Thing from the whole Space', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
@@ -3471,14 +3464,11 @@ test('the Thing menu groups Create Reference, both copy links, then Remove and D
   await settled(page);
 
   const menu = await thingActions(page, 'B');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Create Reference',
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Remove from Diagram',
-    'Delete from Space',
+  await expectMenuGroups(menu, [
+    ['Create Reference'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
+    ['Remove from Diagram', 'Delete from Space'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**
@@ -3496,14 +3486,11 @@ test('a right click on a Thing opens the same ordered menu as its actions contro
 
   await nodeByTitle(page, 'B').first().click({ button: 'right' });
   const menu = page.getByRole('menu');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    'Create Reference',
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Remove from Diagram',
-    'Delete from Space',
+  await expectMenuGroups(menu, [
+    ['Create Reference'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
+    ['Remove from Diagram', 'Delete from Space'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**
@@ -3533,15 +3520,11 @@ test('Create Reference is drawn unavailable on a Reference Thing, still leading 
   const row = menu.getByRole('menuitem', { name: /^Create Reference/ });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-disabled', 'true');
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
-    /^Create Reference/,
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Copy link to Target',
-    'Remove from Diagram',
-    'Delete from Space',
+  await expectMenuGroups(menu, [
+    [/^Create Reference/],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
+    ['Remove from Diagram', 'Delete from Space'],
   ]);
-  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**

@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { ThingRailActions } from '@project/ui';
 import { SpaceThingRailClusters } from '../src/SpaceThingRailClusters';
 import type { SpaceThingRailClustersProps } from '../src/space-thing-rail';
+import { menuItemLabels } from './menu-assertions';
 
 /**
  * Base UI's menu positions itself by measuring, and jsdom ships no pointer
@@ -175,11 +176,6 @@ describe('SpaceThingRailClusters', () => {
   const topLevelRoles = (menu: HTMLElement): readonly (string | null)[] =>
     Array.from(menu.children).map((child) => child.getAttribute('role'));
 
-  const itemLabels = (menu: HTMLElement): readonly string[] =>
-    Array.from(menu.querySelectorAll('[role="menuitemradio"], [role="menuitem"]')).map((item) =>
-      item.textContent.trim(),
-    );
-
   it('groups the Diagram menu into New Diagram, Rename with Copy link, then Delete', () => {
     mount(
       clusters({
@@ -204,7 +200,7 @@ describe('SpaceThingRailClusters', () => {
       'separator',
       'group',
     ]);
-    expect(itemLabels(menu)).toEqual([
+    expect(menuItemLabels(menu)).toEqual([
       'Collection 1',
       'Collection 2',
       'New Diagram',
@@ -244,7 +240,7 @@ describe('SpaceThingRailClusters', () => {
       'separator',
       'group',
     ]);
-    expect(itemLabels(menu)).toEqual([
+    expect(menuItemLabels(menu)).toEqual([
       'Long',
       'Colour…',
       'New Graph',

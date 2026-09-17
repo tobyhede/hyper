@@ -1,4 +1,4 @@
-import { thingControls } from './graph';
+import { expectMenuGroups, thingControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Exercise the same target commands through the application and its production story. */
@@ -159,17 +159,12 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
   // closed Space Thing are covered by `space-thing.spec.ts`'s "deleting the
   // last Space Thing deletes the Space it referenced" and "removing a Space
   // Thing from the Diagram leaves the Thing and its target Space intact".
-  await expect(page.getByRole('menuitem')).toHaveText([
-    'Create Reference',
-    'Enter',
-    'Open in New Tab',
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Copy link to Space',
-    'Remove from Diagram',
+  await expectMenuGroups(page.getByRole('menu'), [
+    ['Create Reference'],
+    ['Enter', 'Open in New Tab'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+    ['Remove from Diagram'],
   ]);
-  await expect(page.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
-  await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(3);
   await expect(
     (await thingControls(page, thingNode)).getByRole('button', { name: /^Enter/ }),
   ).toHaveCount(0);

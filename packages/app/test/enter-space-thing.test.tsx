@@ -6,6 +6,7 @@ import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { beginRename, dock, exitSpaceItem } from './command-dock';
+import { expectMenuGroups } from './menu-assertions';
 
 /**
  * Entering a Space Thing from its rail (ADR 0068, ADR 0073).
@@ -234,21 +235,13 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Thing Architecture' }));
     const menu = await screen.findByRole('menu');
-    const items = within(menu)
-      .getAllByRole('menuitem')
-      .map((item) => item.textContent.trim());
 
-    expect(items).toEqual([
-      'Create Reference',
-      'Enter',
-      'Open in New Tab',
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
-      'Copy link to Space',
-      'Remove from Diagram',
-      'Delete from Space',
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Enter', 'Open in New Tab'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+      ['Remove from Diagram', 'Delete from Space'],
     ]);
-    expect(within(menu).getAllByRole('separator')).toHaveLength(3);
   });
 
   it('adds the target to Open Spaces, shows it, and seeds the Thing’s Diagram and Graph', async () => {
