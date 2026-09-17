@@ -33,6 +33,19 @@ export const configuredSqlitePath = (): string | undefined => {
   return configured === undefined || configured === '' ? undefined : configured;
 };
 
+/**
+ * `configuredSqlitePath`, or the one message a host and a CLI both report for
+ * an unset `SQLITE_PATH`. The host lets the throw propagate at composition
+ * (`src/http/sqlite-http-runtime.ts`); the CLI catches it and writes the same
+ * message to stderr ahead of every other setup failure
+ * (`src/cli/sqlite-entry.ts`).
+ */
+export const requireConfiguredSqlitePath = (): string => {
+  const configured = configuredSqlitePath();
+  if (configured === undefined) throw new Error('SQLITE_PATH must name the SQLite database file');
+  return configured;
+};
+
 export const createSqliteDatabase = (path?: string) =>
   sqlite<Contract>(optionsFor(path === undefined ? undefined : requireWritableParent(path)));
 

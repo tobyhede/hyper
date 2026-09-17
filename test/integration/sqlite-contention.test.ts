@@ -35,6 +35,12 @@ const CONTESTED_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-00000000001
 const REPLACEMENT_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000014');
 const DIAGRAM_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000020');
 const GRAPH_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000021');
+const NEW_CHILD_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000004');
+const NEW_CHILD_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000017');
+const NEW_CHILD_DIAGRAM_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000022');
+const NEW_CHILD_GRAPH_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000023');
+const LINK_A_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000015');
+const LINK_B_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000016');
 
 /** The driver's hard-coded `PRAGMA busy_timeout` (`@prisma-next/driver-sqlite`). */
 const BUSY_TIMEOUT_MS = 5_000;
@@ -112,6 +118,64 @@ const update = (snapshot: SpaceSnapshot, expectedRevision = 0n): SpaceCommit => 
   changes: [{ kind: 'update', spaceId: snapshot.id, snapshot, expectedRevision }],
 });
 
+/**
+ * A brand new Space, entirely disjoint from `meta`/`child`, that a racing
+ * `create` change set would also need to link from Meta to be valid.
+ */
+const newChildSnapshot = (title: string): SpaceSnapshot => ({
+  id: NEW_CHILD_ID,
+  document: {
+    version: 1,
+    title,
+    defaultDiagram: NEW_CHILD_DIAGRAM_ID,
+    diagrams: [
+      {
+        id: NEW_CHILD_DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: NEW_CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: NEW_CHILD_GRAPH_ID,
+      },
+    ],
+  },
+  things: [markdown(NEW_CHILD_THING_ID, 'New child thing')],
+});
+
+const metaLinkingNewChild = (linkThingId: UUID): SpaceSnapshot => ({
+  ...meta,
+  things: [
+    ...meta.things,
+    {
+      id: linkThingId,
+      document: {
+        title: 'Open new child',
+        kind: 'space' as const,
+        spaceId: NEW_CHILD_ID,
+        diagram: NEW_CHILD_DIAGRAM_ID,
+        graph: NEW_CHILD_GRAPH_ID,
+      },
+    },
+  ],
+});
+
+/**
+ * A valid `create` of a brand new Space id, paired with the Meta update that
+ * links it — a create can never be valid alone, since nothing yet refers to
+ * the new Space (ADR 0079's `ordinary-space-unreferenced`).
+ */
+const createNewChild = (linkThingId: UUID, title: string): SpaceCommit => ({
+  changes: [
+    { kind: 'create', spaceId: NEW_CHILD_ID, snapshot: newChildSnapshot(title) },
+    {
+      kind: 'update',
+      spaceId: META_ID,
+      snapshot: metaLinkingNewChild(linkThingId),
+      expectedRevision: 0n,
+    },
+  ],
+});
+
 const timed = async <T>(operation: () => T | Promise<T>) => {
   const started = performance.now();
   const settled = await Promise.allSettled([operation()]);
@@ -185,6 +249,46 @@ describe('SQLite contention', () => {
         snapshot: child,
         revision: 0n,
         exportedRevision: null,
+      });
+    });
+
+    /*
+     * A `create` of a brand new Space id can never stand alone — the create
+     * needs a Meta update that links it, or ADR 0079's
+     * `ordinary-space-unreferenced` refuses it. So two overlapping change
+     * sets that each create the *same* new Space id also each carry a Meta
+     * update at the Meta revision they both last saw. Serialisation (ticket
+     * 16) means the loser's read happens after the winner has already
+     * written, so by the time `decideAggregateCommit` loops over the loser's
+     * changes, both are stale: Meta's revision moved, and the create's
+     * target Space id now already exists. The loop collects every stale
+     * change rather than stopping at the first one, so the loser's answer
+     * names both — not Meta alone.
+     */
+    it('conflicts the loser of a same-id create race on both the new Space and Meta, and writes nothing of it', async () => {
+      const { repository } = await initialized();
+
+      const { settled, elapsed } = await timed(() =>
+        Promise.all([
+          repository.commit(createNewChild(LINK_A_THING_ID, 'From A')),
+          repository.commit(createNewChild(LINK_B_THING_ID, 'From B')),
+        ]),
+      );
+
+      expect(elapsed).toBeLessThan(WELL_UNDER_BUSY_TIMEOUT_MS);
+      expect(settled).toMatchObject({
+        status: 'fulfilled',
+        value: [
+          { kind: 'committed' },
+          {
+            kind: 'conflict',
+            conflicts: [{ spaceId: NEW_CHILD_ID }, { spaceId: META_ID }],
+          },
+        ],
+      });
+      await expect(repository.loadSpace(NEW_CHILD_ID)).resolves.toMatchObject({
+        snapshot: { document: { title: 'From A' } },
+        revision: 0n,
       });
     });
 

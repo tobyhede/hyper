@@ -3,14 +3,14 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 import { spaceHttpPlugin } from './vite-space-http-plugin';
-import { workspaceAliases } from './workspace-aliases';
+import { resolveAliases } from './vite.config';
 
 const sqliteRuntime = fileURLToPath(
   new URL('../../src/http/sqlite-http-runtime.ts', import.meta.url),
 );
 
 export default defineConfig({
-  resolve: { alias: workspaceAliases() },
+  resolve: resolveAliases,
   plugins: [
     react(),
     tailwindcss(),

@@ -771,14 +771,16 @@ const isAuthoredSource = (file: string): boolean =>
 /**
  * The modules that are pnpm's vocabulary rather than ours: the alias
  * table, the Vite configs that import it, and the toolchain check that
- * reads the package list plus its test. Composed from the fragment above for
- * the same reason every retired name in this file is — written out, this file
- * would hold the word it bans, and it is scanned now that `test/` is in scope.
+ * reads the package list plus its test. `vite.sqlite.config.ts` reuses
+ * `vite.config.ts`'s already-resolved aliases rather than importing the
+ * alias table a second time, so it carries no hit and is not listed here.
+ * Composed from the fragment above for the same reason every retired name in
+ * this file is — written out, this file would hold the word it bans, and it
+ * is scanned now that `test/` is in scope.
  */
 const MONOREPO_VOCABULARY: readonly string[] = [
   `packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`,
   'packages/app/vite.config.ts',
-  'packages/app/vite.sqlite.config.ts',
   'packages/app/http-server-build.config.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',

@@ -69,18 +69,27 @@ describe('Prisma Next SQLite foundation', () => {
     );
   });
 
-  it('fails clearly when the SQLite parent directory is not writable', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'hyper-sqlite-readonly-'));
-    try {
-      chmodSync(parent, 0o500);
-      expect(() => createSqliteDatabase(join(parent, 'hyper.db'))).toThrow(
-        /SQLite parent directory is missing or unwritable/,
-      );
-    } finally {
-      chmodSync(parent, 0o700);
-      rmSync(parent, { recursive: true, force: true });
-    }
-  });
+  // `access(W_OK)` is a discretionary check the superuser bypasses (POSIX
+  // access(2)): running as root, `chmodSync(parent, 0o500)` below would not
+  // stop `accessSync` from succeeding, so `requireWritableParent` would not
+  // throw and this test would fail (not pass with a false green) — skip
+  // rather than leave a root run red for a permission model this test
+  // cannot exercise there.
+  it.skipIf(process.getuid?.() === 0)(
+    'fails clearly when the SQLite parent directory is not writable',
+    () => {
+      const parent = mkdtempSync(join(tmpdir(), 'hyper-sqlite-readonly-'));
+      try {
+        chmodSync(parent, 0o500);
+        expect(() => createSqliteDatabase(join(parent, 'hyper.db'))).toThrow(
+          /SQLite parent directory is missing or unwritable/,
+        );
+      } finally {
+        chmodSync(parent, 0o700);
+        rmSync(parent, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('leaves PostgreSQL as the default Vite host', () => {
     expect(viteConfig).toContain('postgres-http-runtime.ts');

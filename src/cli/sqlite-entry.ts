@@ -3,7 +3,11 @@ import { newUuid } from '@project/core';
 import { runCliMain } from './main';
 import { cliArguments, processIo } from './process';
 import { SqliteSpaceRepository } from '../persistence/sqlite-space-repository';
-import { configuredSqlitePath, createSqliteDatabase, type SqliteDatabase } from '../sqlite/db';
+import {
+  createSqliteDatabase,
+  requireConfiguredSqlitePath,
+  type SqliteDatabase,
+} from '../sqlite/db';
 
 /**
  * `pnpm hyper:sqlite`: the same commands as `pnpm hyper`, against the SQLite
@@ -18,9 +22,11 @@ import { configuredSqlitePath, createSqliteDatabase, type SqliteDatabase } from 
  * have it open.
  */
 const openDatabase = (): SqliteDatabase | undefined => {
-  const path = configuredSqlitePath();
-  if (path === undefined) {
-    processIo.stderr('SQLITE_PATH must name the SQLite database file\n');
+  let path: string;
+  try {
+    path = requireConfiguredSqlitePath();
+  } catch (error) {
+    processIo.stderr(`${error instanceof Error ? error.message : String(error)}\n`);
     return undefined;
   }
   try {
