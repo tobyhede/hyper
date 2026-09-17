@@ -27,6 +27,12 @@ const requireWritableParent = (path: string): string => {
   return absolute;
 };
 
+/** The `SQLITE_PATH` a host or CLI was started with, when it names anything. */
+export const configuredSqlitePath = (): string | undefined => {
+  const configured = process.env['SQLITE_PATH']?.trim();
+  return configured === undefined || configured === '' ? undefined : configured;
+};
+
 export const createSqliteDatabase = (path?: string) =>
   sqlite<Contract>(optionsFor(path === undefined ? undefined : requireWritableParent(path)));
 

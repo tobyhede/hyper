@@ -116,6 +116,13 @@ Two doors and no mode parameter on either. Without the flag, an already-initiali
 
 The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
 
+The same commands run against a SQLite file through `pnpm hyper:sqlite`, which requires `SQLITE_PATH` to name an already-migrated file (`pnpm db:migrate:sqlite`). The script, not an argument or the environment's contents, picks the database, so `pnpm hyper` stays PostgreSQL even when `.env` names both. Run it only against a file no host has open — stop `pnpm dev:sqlite` first, or point it at a different file. An exported directory is the only way to move an aggregate between the two databases:
+
+```sh
+pnpm hyper export ./my-aggregate                               # from PostgreSQL
+SQLITE_PATH=/absolute/path/hyper.db pnpm hyper:sqlite ./my-aggregate   # into an empty SQLite file
+```
+
 ### Durable URLs and HTTP resources
 
 Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Diagram and Graph context needed to reopen the same canvas or Active Thing while Presenting:
