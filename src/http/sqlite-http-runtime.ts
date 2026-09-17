@@ -2,7 +2,11 @@ import { isAbsolute } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { newUuid } from '@project/core';
 import { SqliteSpaceRepository } from '../persistence/sqlite-space-repository';
-import { configuredSqlitePath, createSqliteDatabase, type SqliteDatabase } from '../sqlite/db';
+import {
+  createSqliteDatabase,
+  requireConfiguredSqlitePath,
+  type SqliteDatabase,
+} from '../sqlite/db';
 import { establishMetaSpace, retryMetaSpaceEstablishment } from '../startup/database-startup';
 import { createSpaceHost, type SpaceHostApplication } from './space-host';
 
@@ -33,8 +37,7 @@ const reportSafely = (report: (cause: unknown) => void, cause: unknown): void =>
  * serve another.
  */
 const openConfiguredDatabase = (): SqliteDatabase => {
-  const path = configuredSqlitePath();
-  if (path === undefined) throw new Error('SQLITE_PATH must name the SQLite database file');
+  const path = requireConfiguredSqlitePath();
   if (!isAbsolute(path)) throw new Error(`SQLITE_PATH must be an absolute path: ${path}`);
   return createSqliteDatabase(path);
 };

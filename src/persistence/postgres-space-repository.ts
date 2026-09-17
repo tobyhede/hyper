@@ -554,6 +554,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
       });
     } catch (error) {
       if (!(error instanceof StaleSpaceRevisionError)) throw error;
+      // A stored Space moved, not necessarily the Meta identity, so this id is
+      // usually the one the caller expected. The CLI words the conflict to hold
+      // either way (`test/unit/hyper-cli.test.ts`, "does not claim the Meta
+      // identity moved ...").
       return { kind: 'conflict', currentMetaSpaceId: await this.loadMetaSpaceId() };
     }
   }

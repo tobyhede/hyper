@@ -237,7 +237,7 @@ describe('hyper:sqlite CLI', () => {
 
     expect(status).toBe(1);
     expect(output).toEqual([
-      `The Meta Space changed to ${OTHER_META_SPACE_ID} during replacement. Nothing was written; run the command again.\n`,
+      `The repository changed during replacement; it now holds Meta Space ${OTHER_META_SPACE_ID}. Nothing was written; run the command again.\n`,
     ]);
     await withRepository(path, async (repository) => {
       await expect(repository.loadAggregate()).resolves.toMatchObject({

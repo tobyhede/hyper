@@ -708,6 +708,33 @@ describe('runHyper', () => {
   });
 
   /*
+   * PostgreSQL's replacement can conflict on a stored Space that changed mid-
+   * replacement without the Meta identity itself moving at all — the row lock
+   * loop in `PostgresSpaceRepository.replaceAggregate` re-reads the current
+   * Meta identity after rolling back, and that read answers the same id the
+   * command already expected. The sentence must not claim that id is new.
+   */
+  it('does not claim the Meta identity moved when replacement conflicts with the same id it expected', async () => {
+    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    repository.replaceAggregate = () =>
+      Promise.resolve({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
+    const output = captureIo();
+
+    const exitCode = await runHyper([directory, '--dangerous-truncate'], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([
+      `The repository changed during replacement; it now holds Meta Space ${SPACE_ID}. Nothing was written; run the command again.\n`,
+    ]);
+  });
+
+  /*
    * There is no public merge, so the only thing an import into an initialized
    * repository could do is destroy what is there. It refuses instead, and the
    * refusal has to name both the Meta identity in the way and the flag that

@@ -592,7 +592,7 @@ describe('SqliteSpaceRepository', () => {
    * connection opened the same way reports what the driver's run with.
    */
   it('writes the file in rollback-journal delete mode with synchronous FULL', async () => {
-    const { path, repository } = await opened();
+    const { path, repository, database } = await opened();
     await repository.initializeAggregate({
       metaSpaceId: SPACE_ID,
       spaces: [space(SPACE_ID, 'Journalled', [THING_ID])],
@@ -603,10 +603,32 @@ describe('SqliteSpaceRepository', () => {
     const connection = new DatabaseSync(path);
     try {
       expect(connection.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'delete' });
-      // 2 is FULL.
-      expect(connection.prepare('PRAGMA synchronous').get()).toEqual({ synchronous: 2 });
     } finally {
       connection.close();
     }
+
+    /*
+     * `synchronous` is per-connection, so a freshly opened, independent
+     * `DatabaseSync` (above) reports SQLite's own default and would not
+     * notice the driver starting to set it on the connections it opens. Read
+     * it instead through a connection the driver itself opened
+     * (`SqliteDriver.execute`/`acquireConnection`, both `openConnection`),
+     * via the one raw-SQL seam the ORM exposes: `pragma_synchronous` is a
+     * SQLite table-valued function, embedded here through `database.raw` and
+     * run as an ordinary `SELECT ... FROM` query through `database.runtime()`.
+     */
+    const synchronousPlan = database.sql.repository_state
+      .select(() => ({
+        synchronous: database.raw`(select synchronous from pragma_synchronous)`.returns(
+          'sqlite/integer@1',
+        ),
+      }))
+      .build();
+    const synchronousRows: { synchronous: number }[] = [];
+    for await (const row of database.runtime().execute(synchronousPlan)) {
+      synchronousRows.push(row);
+    }
+    // 2 is FULL.
+    expect(synchronousRows).toEqual([{ synchronous: 2 }]);
   });
 });
