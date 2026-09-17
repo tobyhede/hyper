@@ -36,6 +36,7 @@ import { Placement } from './placement';
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
 export type SnapshotEditRefusal =
   | { readonly code: 'thing-not-found' }
+  | { readonly code: 'diagram-not-found' }
   | {
       readonly code: 'thing-has-aliases';
       /** The Aliases by **name**, which is what a sentence listing Things says (ADR 0083). */
@@ -81,13 +82,14 @@ const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosit
 /**
  * Add a new Thing to a Space, positioned closed in one named Diagram.
  *
- * The caller mints the Thing's id and document — this only places it — so
- * there is nothing here that can be refused or leave the snapshot unchanged:
- * a freshly minted id is never already a member of anything. A Diagram this
- * snapshot does not name receives no position for the Thing, the same silence
- * `addSpaceThing` answered with — the Thing still joins the Space, and the
- * containing Edit is what checks the Diagram exists before this runs
- * (`diagram-not-found`).
+ * The caller mints the Thing's id and document — this only places it. Refuses
+ * `diagram-not-found` for a Diagram this snapshot does not name, changing
+ * nothing, rather than the silence `addSpaceThing` used to answer with — a
+ * Thing added to the Space but positioned nowhere, which is what let a
+ * coordinated create or link report `completed` after its containing Diagram
+ * went during a wait (`.scratch/snapshot-edits/issues/05-creation-decides-after-its-last-wait.md`).
+ * A freshly minted id is otherwise never already a member of anything, so a
+ * found Diagram always completes.
  *
  * `avoidingOverlap` steps diagonally off a point another Thing in the named
  * Diagram already occupies exactly, exactly as a menu-created Markdown Thing
@@ -105,10 +107,11 @@ function createInDiagram(
 ): SnapshotEditOutcome {
   const diagrams = snapshot.document.diagrams ?? [];
   const target = diagrams.find((diagram) => diagram.id === diagramId);
+  if (target === undefined) {
+    return { kind: 'refused', refusal: { code: 'diagram-not-found' } };
+  }
   const at =
-    mode === 'avoidingOverlap' && target !== undefined
-      ? freeAnchor(Placement.fromDiagram(target), position)
-      : position;
+    mode === 'avoidingOverlap' ? freeAnchor(Placement.fromDiagram(target), position) : position;
   return {
     kind: 'completed',
     snapshot: {

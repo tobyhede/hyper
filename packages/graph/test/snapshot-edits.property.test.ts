@@ -173,6 +173,37 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 });
 
 describe('SnapshotEdit.createInDiagram properties', () => {
+  it('refuses creation into a Diagram the snapshot does not name, and changes nothing', () => {
+    // Ticket 05 (`.scratch/snapshot-edits/issues/05-creation-decides-after-its-last-wait.md`):
+    // a coordinated create or link must not silently add an unpositioned
+    // Thing when its containing Diagram is gone by the time the Edit lands.
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.uuid().map(uuid),
+        fc.uuid().map(uuid),
+        (ids, coords, newThingId, missingDiagramId) => {
+          fc.pre(!ids.includes(newThingId));
+          fc.pre(missingDiagramId !== DIAGRAM_ID);
+          const positions = Placement.toPositions(closedPlacement(ids, coords));
+          const snapshot = baseSnapshot(ids, positions);
+
+          const outcome = SnapshotEdit.createInDiagram(
+            snapshot,
+            missingDiagramId,
+            newThingId,
+            markdownDocument('New'),
+            { x: 0, y: 0 },
+            'avoidingOverlap',
+          );
+
+          expect(outcome).toEqual({ kind: 'refused', refusal: { code: 'diagram-not-found' } });
+        },
+      ),
+    );
+  });
+
   it('never lands avoidingOverlap on a point another Thing already occupies', () => {
     fc.assert(
       fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newThingId) => {

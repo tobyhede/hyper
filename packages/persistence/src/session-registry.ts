@@ -1004,62 +1004,108 @@ export function createSpaceSessionRegistry(
       }
       return undefined;
     };
+    /**
+     * On the `prepare`/`plan` shape (ticket 05, following ticket 04's shape for
+     * deletion): `prepare` holds the containing Diagram's early-exit check —
+     * which must run, and refuse, before the target is made working or any id
+     * is minted (ADR 0079) — and every wait this operation needs: making the
+     * target working, which durably initializes a stored diagramless Space,
+     * and minting the Thing's id once that succeeds. `plan` runs
+     * `SnapshotEdit.createInDiagram` against the Spaces the coordination's own
+     * aggregate read just produced, so a containing Diagram deleted during
+     * that read is what the decision sees rather than something re-applied
+     * afterward.
+     */
     const link = async (input: LinkSpaceThingInput): Promise<SpaceThingCreationResult> => {
-      let refusal: SpaceThingRefused | undefined;
       let completion: SpaceThingCreationResult | undefined;
-      const result = await coordinateSpaceThingLifecycle(async () => {
-        refusal = recoveryRefusal(input.containingSpaceId);
-        if (refusal !== undefined) return undefined;
-        const source = working(input.containingSpaceId);
-        if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
-          refusal = {
-            kind: 'refused',
-            refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+      let prepared: { readonly selection: SpaceThingSelection; readonly thingId: UUID } | undefined;
+      const result = await coordinateSpaceThingPlan({
+        prepare: async (): Promise<SpaceThingPreparationOutcome> => {
+          const recovery = recoveryRefusal(input.containingSpaceId);
+          if (recovery !== undefined) return recovery;
+          const source = working(input.containingSpaceId);
+          if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
+            return {
+              kind: 'refused',
+              refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+            };
+          }
+          // Last, and deliberately: an Edit the containing Space has already
+          // refused must not initialize the Space it was pointed at, and must
+          // not mint the two identities doing so would spend.
+          const target = await workingTargetSelection(input.targetSpaceId);
+          if (target.kind === 'unavailable') {
+            return {
+              kind: 'refused',
+              refusal: {
+                code: 'space-thing-target-unavailable',
+                spaceId: input.targetSpaceId,
+                reason: target.reason,
+              },
+            };
+          }
+          prepared = { selection: target.selection, thingId: newId() };
+          return { kind: 'proceed' };
+        },
+        plan: (spaces) => {
+          const data = prepared;
+          if (data === undefined) {
+            throw new Error('Space Thing link planned with no prepared data');
+          }
+          const source = spaces.get(input.containingSpaceId);
+          if (source === undefined) {
+            throw new Error(`Space ${input.containingSpaceId} has no live session`);
+          }
+          const document: ThingDocument = {
+            title: input.title,
+            kind: 'space',
+            spaceId: input.targetSpaceId,
+            diagram: data.selection.diagram,
+            graph: data.selection.graph,
           };
-          return undefined;
-        }
-        // Last, and deliberately: an Edit the containing Space has already
-        // refused must not initialize the Space it was pointed at, and must not
-        // mint the two identities doing so would spend.
-        const target = await workingTargetSelection(input.targetSpaceId);
-        if (target.kind === 'unavailable') {
-          refusal = {
-            kind: 'refused',
-            refusal: {
-              code: 'space-thing-target-unavailable',
-              spaceId: input.targetSpaceId,
-              reason: target.reason,
-            },
+          const created = SnapshotEdit.createInDiagram(
+            source,
+            input.diagramId,
+            data.thingId,
+            document,
+            input.position,
+            'avoidingOverlap',
+          );
+          if (created.kind === 'refused') {
+            // The only refusal `createInDiagram` can answer is
+            // `diagram-not-found` — `thing-not-found` and `thing-has-aliases`
+            // belong to `deleteFromSpace`.
+            if (created.refusal.code !== 'diagram-not-found') {
+              throw new Error(`Space Thing creation refused unexpectedly: ${created.refusal.code}`);
+            }
+            return {
+              kind: 'refused',
+              refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+            };
+          }
+          completion = { kind: 'completed', thingId: data.thingId };
+          return {
+            kind: 'changes',
+            changes: [
+              {
+                kind: 'update',
+                spaceId: input.containingSpaceId,
+                edit: (current) =>
+                  completedSnapshot(
+                    SnapshotEdit.createInDiagram(
+                      current,
+                      input.diagramId,
+                      data.thingId,
+                      document,
+                      input.position,
+                      'avoidingOverlap',
+                    ),
+                    'Space Thing creation',
+                  ),
+              },
+            ],
           };
-          return undefined;
-        }
-        const document: ThingDocument = {
-          title: input.title,
-          kind: 'space',
-          spaceId: input.targetSpaceId,
-          diagram: target.selection.diagram,
-          graph: target.selection.graph,
-        };
-        const thingId = newId();
-        completion = { kind: 'completed', thingId };
-        return [
-          {
-            kind: 'update',
-            spaceId: input.containingSpaceId,
-            edit: (current) =>
-              completedSnapshot(
-                SnapshotEdit.createInDiagram(
-                  current,
-                  input.diagramId,
-                  thingId,
-                  document,
-                  input.position,
-                  'avoidingOverlap',
-                ),
-                'Space Thing creation',
-              ),
-          },
-        ];
+        },
       });
       if (result.kind === 'persistence-read-failed') {
         return { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
@@ -1067,7 +1113,7 @@ export function createSpaceSessionRegistry(
       if (result.kind === 'aggregate-refused') {
         return { kind: 'refused', refusal: { code: 'aggregate-refused', errors: result.errors } };
       }
-      if (refusal !== undefined) return refusal;
+      if (result.kind === 'refused') return result;
       return completedCreation(completion);
     };
     const deleteContext = async (
@@ -1218,59 +1264,115 @@ export function createSpaceSessionRegistry(
         : { kind: 'unchanged' };
     };
     return {
+      /**
+       * On the `prepare`/`plan` shape (ticket 05, following ticket 04's shape
+       * for deletion): `prepare` holds the containing Diagram's early-exit
+       * check and every wait this operation needs — minting the new target
+       * Space's identities and running it through the normal on-disk intake
+       * (ADR 0010), then minting the Thing's id. `plan` runs
+       * `SnapshotEdit.createInDiagram` against the Spaces the coordination's
+       * own aggregate read just produced, so a containing Diagram deleted
+       * during that read is what the decision sees rather than something
+       * re-applied afterward.
+       */
       create: async (input) => {
-        let refusal: SpaceThingRefused | undefined;
         let completion: SpaceThingCreationResult | undefined;
-        const result = await coordinateSpaceThingLifecycle(() => {
-          refusal = recoveryRefusal(input.containingSpaceId);
-          if (refusal !== undefined) return undefined;
-          const source = working(input.containingSpaceId);
-          if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
-            refusal = {
-              kind: 'refused',
-              refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+        let prepared:
+          | {
+              readonly target: SpaceSnapshot;
+              readonly selection: SpaceThingSelection;
+              readonly thingId: UUID;
+            }
+          | undefined;
+        const result = await coordinateSpaceThingPlan({
+          prepare: (): Promise<SpaceThingPreparationOutcome> => {
+            const recovery = recoveryRefusal(input.containingSpaceId);
+            if (recovery !== undefined) return Promise.resolve(recovery);
+            const source = working(input.containingSpaceId);
+            if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
+              return Promise.resolve({
+                kind: 'refused',
+                refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+              });
+            }
+            const initialized = initializeSpace({ title: input.title, newId });
+            const loaded = loadSpace(initialized.file, initialized.thingFiles);
+            if (!loaded.ok) throw new Error(loaded.errors.map(({ message }) => message).join('\n'));
+            const target = snapshotFromSpace(loaded.space);
+            // The Diagram and Graph the initializer just minted, read back
+            // through the same rule a stored target answers rather than off
+            // the file it wrote (ADR 0079). A new Space is complete, so the
+            // boundary below is type-level: `initializeSpace` authors a
+            // `defaultDiagram` owning one Graph, and the intake above has
+            // already accepted it.
+            const selection = selectionOf(loaded.space);
+            if (selection === undefined)
+              throw new Error('An initialized Space supplied no Diagram to select');
+            prepared = { target, selection, thingId: newId() };
+            return Promise.resolve({ kind: 'proceed' });
+          },
+          plan: (spaces) => {
+            const data = prepared;
+            if (data === undefined) {
+              throw new Error('Space Thing creation planned with no prepared data');
+            }
+            const source = spaces.get(input.containingSpaceId);
+            if (source === undefined) {
+              throw new Error(`Space ${input.containingSpaceId} has no live session`);
+            }
+            const document: ThingDocument = {
+              title: input.title,
+              kind: 'space',
+              spaceId: data.target.id,
+              diagram: data.selection.diagram,
+              graph: data.selection.graph,
             };
-            return undefined;
-          }
-          const initialized = initializeSpace({ title: input.title, newId });
-          const loaded = loadSpace(initialized.file, initialized.thingFiles);
-          if (!loaded.ok) throw new Error(loaded.errors.map(({ message }) => message).join('\n'));
-          const target = snapshotFromSpace(loaded.space);
-          // The Diagram and Graph the initializer just minted, read back through
-          // the same rule a stored target answers rather than off the file it
-          // wrote (ADR 0079). A new Space is complete, so the boundary below is
-          // type-level: `initializeSpace` authors a `defaultDiagram` owning one
-          // Graph, and the intake above has already accepted it.
-          const selection = selectionOf(loaded.space);
-          if (selection === undefined)
-            throw new Error('An initialized Space supplied no Diagram to select');
-          const thingId = newId();
-          completion = { kind: 'completed', thingId };
-          return [
-            {
-              kind: 'update',
-              spaceId: input.containingSpaceId,
-              edit: (current) =>
-                completedSnapshot(
-                  SnapshotEdit.createInDiagram(
-                    current,
-                    input.diagramId,
-                    thingId,
-                    {
-                      title: input.title,
-                      kind: 'space',
-                      spaceId: target.id,
-                      diagram: selection.diagram,
-                      graph: selection.graph,
-                    },
-                    input.position,
-                    'avoidingOverlap',
-                  ),
-                  'Space Thing creation',
-                ),
-            },
-            { kind: 'create', snapshot: target },
-          ];
+            const created = SnapshotEdit.createInDiagram(
+              source,
+              input.diagramId,
+              data.thingId,
+              document,
+              input.position,
+              'avoidingOverlap',
+            );
+            if (created.kind === 'refused') {
+              // The only refusal `createInDiagram` can answer is
+              // `diagram-not-found` — `thing-not-found` and
+              // `thing-has-aliases` belong to `deleteFromSpace`.
+              if (created.refusal.code !== 'diagram-not-found') {
+                throw new Error(
+                  `Space Thing creation refused unexpectedly: ${created.refusal.code}`,
+                );
+              }
+              return {
+                kind: 'refused',
+                refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+              };
+            }
+            completion = { kind: 'completed', thingId: data.thingId };
+            return {
+              kind: 'changes',
+              changes: [
+                {
+                  kind: 'update',
+                  spaceId: input.containingSpaceId,
+                  edit: (current) =>
+                    completedSnapshot(
+                      SnapshotEdit.createInDiagram(
+                        current,
+                        input.diagramId,
+                        data.thingId,
+                        document,
+                        input.position,
+                        'avoidingOverlap',
+                      ),
+                      'Space Thing creation',
+                    ),
+                },
+                { kind: 'create', snapshot: data.target },
+              ],
+            };
+          },
         });
         if (result.kind === 'persistence-read-failed') {
           return { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
@@ -1281,7 +1383,7 @@ export function createSpaceSessionRegistry(
             refusal: { code: 'aggregate-refused', errors: result.errors },
           };
         }
-        if (refusal !== undefined) return refusal;
+        if (result.kind === 'refused') return result;
         return completedCreation(completion);
       },
       link,

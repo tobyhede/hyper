@@ -894,5 +894,230 @@ describe('Space session registry', () => {
         open: false,
       });
     });
+
+    // Ticket 05 (`.scratch/snapshot-edits/issues/05-creation-decides-after-its-last-wait.md`):
+    // create and link checked their containing Diagram once, before the
+    // coordination's own aggregate read, and never again.
+    it('refuses to create a Space Thing when its containing Diagram is deleted while the creation was reading persistence', async () => {
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
+      const KEEP_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000082');
+      const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000083');
+      const NEW_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000084');
+      const NEW_TARGET_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000085');
+      const NEW_TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000086');
+      const NEW_TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000087');
+      const NEW_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000088');
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: KEEP_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+              {
+                id: KEEP_DIAGRAM,
+                title: 'Diagram 2',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: KEEP_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing]);
+      const registry = createSpaceSessionRegistry(backend);
+      const containingSession = registry.open(containing);
+
+      // The creation's coordination reads the aggregate exactly once, right
+      // before it decides. The containing Diagram is deleted in the
+      // containing Space during that one read.
+      const loadAggregate = backend.loadAggregate.bind(backend);
+      let reads = 0;
+      backend.loadAggregate = async () => {
+        reads += 1;
+        if (reads === 1) {
+          const working = containingSession.getState().working;
+          containingSession.submit({
+            ...working,
+            document: {
+              ...working.document,
+              diagrams: (working.document.diagrams ?? []).filter(
+                (diagram) => diagram.id !== CONTAINING_DIAGRAM,
+              ),
+            },
+          });
+        }
+        return loadAggregate();
+      };
+
+      const ids = [
+        NEW_TARGET_ID,
+        NEW_TARGET_THING_ID,
+        NEW_TARGET_DIAGRAM_ID,
+        NEW_TARGET_GRAPH_ID,
+        NEW_SPACE_THING_ID,
+      ];
+      const remaining = [...ids];
+      const newId = () => {
+        const id = remaining.shift();
+        if (id === undefined) throw new Error('test identity source exhausted');
+        return id;
+      };
+
+      const creation = registry.spaceThings(newId).create({
+        containingSpaceId: SPACE_ID,
+        diagramId: CONTAINING_DIAGRAM,
+        title: 'New Space Thing',
+        position: { x: 0, y: 0 },
+      });
+
+      await expect(creation).resolves.toEqual({
+        kind: 'refused',
+        refusal: { code: 'diagram-not-found', diagramId: CONTAINING_DIAGRAM },
+      });
+      expect(reads).toBe(1);
+      expect(containingSession.getState().working.things).toEqual([]);
+
+      // The refused creation must not have swallowed the Diagram-deletion
+      // Edit: it commits once the coordination's barrier lifts.
+      const settled = await waitFor(
+        containingSession,
+        (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+      );
+      expect(settled.working.document.diagrams?.map(({ id }) => id)).toEqual([KEEP_DIAGRAM]);
+      const stored = await backend.loadSpace(SPACE_ID);
+      expect(stored?.snapshot.document.diagrams?.map(({ id }) => id)).toEqual([KEEP_DIAGRAM]);
+      expect(stored?.snapshot.things).toEqual([]);
+    });
+
+    it('refuses to link a Space Thing when its containing Diagram is deleted while the link was reading persistence', async () => {
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000090');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000091');
+      const KEEP_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000092');
+      const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000093');
+      const LINK_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000094');
+      const LINK_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000095');
+      const LINK_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
+      const LINKED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: KEEP_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+              {
+                id: KEEP_DIAGRAM,
+                title: 'Diagram 2',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: KEEP_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const target = {
+        snapshot: {
+          id: LINK_TARGET_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: LINK_TARGET_DIAGRAM,
+            diagrams: [
+              {
+                id: LINK_TARGET_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: LINK_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target]);
+      const registry = createSpaceSessionRegistry(backend);
+      const containingSession = registry.open(containing);
+      registry.open(target);
+
+      // Same shape as the creation test above: the containing Diagram is
+      // deleted during the coordination's one aggregate read, after `link`
+      // has already confirmed the Diagram exists and read the target's
+      // selection off its live session.
+      const loadAggregate = backend.loadAggregate.bind(backend);
+      let reads = 0;
+      backend.loadAggregate = async () => {
+        reads += 1;
+        if (reads === 1) {
+          const working = containingSession.getState().working;
+          containingSession.submit({
+            ...working,
+            document: {
+              ...working.document,
+              diagrams: (working.document.diagrams ?? []).filter(
+                (diagram) => diagram.id !== CONTAINING_DIAGRAM,
+              ),
+            },
+          });
+        }
+        return loadAggregate();
+      };
+
+      const linking = registry
+        .spaceThings(() => LINKED_SPACE_THING_ID)
+        .link({
+          containingSpaceId: SPACE_ID,
+          diagramId: CONTAINING_DIAGRAM,
+          targetSpaceId: LINK_TARGET_ID,
+          title: 'Linked',
+          position: { x: 0, y: 0 },
+        });
+
+      await expect(linking).resolves.toEqual({
+        kind: 'refused',
+        refusal: { code: 'diagram-not-found', diagramId: CONTAINING_DIAGRAM },
+      });
+      expect(reads).toBe(1);
+      expect(containingSession.getState().working.things).toEqual([]);
+
+      const settled = await waitFor(
+        containingSession,
+        (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+      );
+      expect(settled.working.document.diagrams?.map(({ id }) => id)).toEqual([KEEP_DIAGRAM]);
+      const stored = await backend.loadSpace(SPACE_ID);
+      expect(stored?.snapshot.document.diagrams?.map(({ id }) => id)).toEqual([KEEP_DIAGRAM]);
+      expect(stored?.snapshot.things).toEqual([]);
+    });
   });
 });
