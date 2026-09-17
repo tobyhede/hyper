@@ -2,6 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { MemorySpaceBackend } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
+import type { SpaceSession, SpaceSessionState } from '../src/session';
+
+/**
+ * Wait for a session's state to satisfy `predicate` — used to confirm an Edit
+ * made while a coordination held the persistence barrier actually reaches the
+ * backend once the coordination releases it, rather than only checking the
+ * local working state a `submit` while paused installs synchronously.
+ * `settled` alone does not say that: it is already true, from the previous
+ * commit, at the moment a paused `submit` queues the next one.
+ */
+const waitFor = (
+  session: SpaceSession,
+  predicate: (state: SpaceSessionState) => boolean,
+): Promise<SpaceSessionState> => {
+  const state = session.getState();
+  if (predicate(state)) return Promise.resolve(state);
+  return new Promise((resolve) => {
+    const unsubscribe = session.subscribe(() => {
+      const next = session.getState();
+      if (!predicate(next)) return;
+      unsubscribe();
+      resolve(next);
+    });
+  });
+};
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -469,6 +494,333 @@ describe('Space session registry', () => {
       expect(stored?.revision).toBe(3n);
       expect(stored?.snapshot.things).toHaveLength(2);
       expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
+    });
+
+    it('refuses to delete a Space Thing an Alias came to target while the deletion was reading persistence', async () => {
+      const ALIASED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+      const LATE_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
+      const ALIAS_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
+      const ALIAS_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
+      const ALIAS_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000055');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000056');
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: CONTAINING_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {
+                  [ALIASED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
+                },
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [
+            {
+              id: ALIASED_SPACE_THING_ID,
+              document: {
+                title: 'Target',
+                kind: 'space' as const,
+                spaceId: ALIAS_TARGET_SPACE_ID,
+                diagram: ALIAS_TARGET_DIAGRAM,
+                graph: ALIAS_TARGET_GRAPH,
+              },
+            },
+          ],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const target = {
+        snapshot: {
+          id: ALIAS_TARGET_SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: ALIAS_TARGET_DIAGRAM,
+            diagrams: [
+              {
+                id: ALIAS_TARGET_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: ALIAS_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target]);
+      const registry = createSpaceSessionRegistry(backend);
+      const containingSession = registry.open(containing);
+      registry.open(target);
+
+      // The deletion's coordination reads the aggregate exactly once, right
+      // before it decides. An Alias of the Space Thing lands in the
+      // containing Space during that one read.
+      const loadAggregate = backend.loadAggregate.bind(backend);
+      let reads = 0;
+      backend.loadAggregate = async () => {
+        reads += 1;
+        if (reads === 1) {
+          const working = containingSession.getState().working;
+          const document = working.document;
+          const diagrams = (document.diagrams ?? []).map((diagram) => ({
+            ...diagram,
+            positions: {
+              ...diagram.positions,
+              [LATE_ALIAS_ID]: { x: 300, y: 0, open: false as const },
+            },
+          }));
+          containingSession.submit({
+            ...working,
+            document: { ...document, diagrams },
+            things: [
+              ...working.things,
+              {
+                id: LATE_ALIAS_ID,
+                document: {
+                  title: 'Late Alias of Target',
+                  kind: 'alias' as const,
+                  target: ALIASED_SPACE_THING_ID,
+                },
+              },
+            ],
+          });
+        }
+        return loadAggregate();
+      };
+
+      const deletion = registry
+        .spaceThings(() => THING_ID)
+        .delete({ containingSpaceId: SPACE_ID, thingId: ALIASED_SPACE_THING_ID });
+
+      await expect(deletion).resolves.toEqual({
+        kind: 'refused',
+        refusal: { code: 'thing-has-aliases', aliasTitles: ['Late Alias of Target'] },
+      });
+      expect(reads).toBe(1);
+      expect(containingSession.getState().working.things.map(({ id }) => id)).toEqual([
+        ALIASED_SPACE_THING_ID,
+        LATE_ALIAS_ID,
+      ]);
+
+      // The refused deletion must not have swallowed the late Alias's own
+      // Edit: the containing Space still holds the Space Thing and the Alias,
+      // and that Edit commits once the coordination's barrier lifts.
+      const settled = await waitFor(
+        containingSession,
+        (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+      );
+      expect(settled.working.things.map(({ id }) => id)).toEqual([
+        ALIASED_SPACE_THING_ID,
+        LATE_ALIAS_ID,
+      ]);
+      const stored = await backend.loadSpace(SPACE_ID);
+      expect(stored?.snapshot.things.map(({ id }) => id)).toEqual([
+        ALIASED_SPACE_THING_ID,
+        LATE_ALIAS_ID,
+      ]);
+      expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
+    });
+
+    it('keeps a target Space alive when another Space comes to reference it while the deletion was reading persistence', async () => {
+      const REFERENCING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+      const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
+      const TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000062');
+      const TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000063');
+      const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000064');
+      const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000065');
+      const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000066');
+      const OTHER_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000067');
+      const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000068');
+      const LATE_REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000069');
+      const OTHER_REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+
+      const containing = {
+        snapshot: {
+          id: SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Space',
+            defaultDiagram: CONTAINING_DIAGRAM,
+            diagrams: [
+              {
+                id: CONTAINING_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {
+                  [REFERENCING_THING_ID]: { x: 0, y: 0, open: false as const },
+                  // Keeps Other reachable from Meta independently of the
+                  // deletion below, so the scenario isolates what happens to
+                  // Target rather than also depending on Other's own reachability.
+                  [OTHER_REFERENCE_THING_ID]: { x: 240, y: 0, open: false as const },
+                },
+                graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [
+            {
+              id: REFERENCING_THING_ID,
+              document: {
+                title: 'Target',
+                kind: 'space' as const,
+                spaceId: TARGET_SPACE_ID,
+                diagram: TARGET_DIAGRAM,
+                graph: TARGET_GRAPH,
+              },
+            },
+            {
+              id: OTHER_REFERENCE_THING_ID,
+              document: {
+                title: 'Other',
+                kind: 'space' as const,
+                spaceId: OTHER_SPACE_ID,
+                diagram: OTHER_DIAGRAM,
+                graph: OTHER_GRAPH,
+              },
+            },
+          ],
+        },
+        revision: 3n,
+        exportedRevision: null,
+      };
+      const target = {
+        snapshot: {
+          id: TARGET_SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Target',
+            defaultDiagram: TARGET_DIAGRAM,
+            diagrams: [
+              {
+                id: TARGET_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      };
+      const other = {
+        snapshot: {
+          id: OTHER_SPACE_ID,
+          document: {
+            version: 1 as const,
+            title: 'Other',
+            defaultDiagram: OTHER_DIAGRAM,
+            diagrams: [
+              {
+                id: OTHER_DIAGRAM,
+                title: 'Diagram 1',
+                kind: 'positioned' as const,
+                positions: {},
+                graphs: [{ id: OTHER_GRAPH, title: 'Graph 1', edges: [] }],
+              },
+            ],
+          },
+          things: [],
+        },
+        revision: 0n,
+        exportedRevision: null,
+      };
+      const backend = new MemorySpaceBackend(SPACE_ID, [containing, target, other]);
+      const registry = createSpaceSessionRegistry(backend);
+      const containingSession = registry.open(containing);
+      registry.open(target);
+
+      // The deletion's coordination reads the aggregate exactly once, right
+      // before it plans the cascade. An entirely ordinary Edit — Other
+      // referencing Target — commits to the backend during that one read, the
+      // way an unrelated author's Edit could land in the same window.
+      const loadAggregate = backend.loadAggregate.bind(backend);
+      const commit = backend.commit.bind(backend);
+      let reads = 0;
+      backend.loadAggregate = async () => {
+        reads += 1;
+        if (reads === 1) {
+          const diagrams = other.snapshot.document.diagrams.map((diagram) => ({
+            ...diagram,
+            positions: {
+              ...diagram.positions,
+              [LATE_REFERENCE_THING_ID]: { x: 0, y: 0, open: false as const },
+            },
+          }));
+          const committed = await commit({
+            changes: [
+              {
+                kind: 'update',
+                spaceId: OTHER_SPACE_ID,
+                expectedRevision: other.revision,
+                snapshot: {
+                  ...other.snapshot,
+                  document: { ...other.snapshot.document, diagrams },
+                  things: [
+                    ...other.snapshot.things,
+                    {
+                      id: LATE_REFERENCE_THING_ID,
+                      document: {
+                        title: 'Late reference to Target',
+                        kind: 'space' as const,
+                        spaceId: TARGET_SPACE_ID,
+                        diagram: TARGET_DIAGRAM,
+                        graph: TARGET_GRAPH,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          });
+          if (committed.kind !== 'committed') {
+            throw new Error(`Other's late reference failed to commit: ${committed.kind}`);
+          }
+        }
+        return loadAggregate();
+      };
+
+      const deletion = registry
+        .spaceThings(() => THING_ID)
+        .delete({ containingSpaceId: SPACE_ID, thingId: REFERENCING_THING_ID });
+
+      await expect(deletion).resolves.toEqual({ kind: 'completed' });
+      expect(reads).toBe(1);
+
+      // The coordinated commit is asynchronous even once `delete` resolves
+      // (ADR 0030): wait for the containing Space's own commit to land before
+      // reading it back off the backend.
+      await waitFor(
+        containingSession,
+        (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
+      );
+
+      // Other's late reference must have kept Target alive through the
+      // cascade, planned from the Spaces as they stood after that one read.
+      expect(await backend.loadSpace(TARGET_SPACE_ID)).toBeDefined();
+      const storedContaining = await backend.loadSpace(SPACE_ID);
+      expect(storedContaining?.snapshot.things.map(({ id }) => id)).toEqual([
+        OTHER_REFERENCE_THING_ID,
+      ]);
+      const storedOther = await backend.loadSpace(OTHER_SPACE_ID);
+      expect(storedOther?.snapshot.things.map(({ id }) => id)).toEqual([LATE_REFERENCE_THING_ID]);
     });
 
     it('steps a created Space Thing off a point another Thing already occupies', async () => {
