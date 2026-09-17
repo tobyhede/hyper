@@ -63,16 +63,14 @@ export const DELETE_DIAGRAM_ACTION_ID = 'delete-diagram';
  * {@link EntityCommandId} is what stops a fifth being invented.
  */
 export const COPY_LINK_ACTION_ID = 'copy-link';
-export const COPY_PERMANENT_LINK_ACTION_ID = 'copy-permanent-link';
+export const COPY_THING_LINK_ACTION_ID = 'copy-thing-link';
 export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
 export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';
 export const OPEN_INDEPENDENTLY_ACTION_ID = 'open-independently';
 
 /** The commands a surface may ask this list for by id. */
 export type EntityCommandId =
-  | typeof DELETE_DIAGRAM_ACTION_ID
-  | typeof COPY_LINK_ACTION_ID
-  | typeof COPY_PERMANENT_LINK_ACTION_ID;
+  typeof DELETE_DIAGRAM_ACTION_ID | typeof COPY_LINK_ACTION_ID | typeof COPY_THING_LINK_ACTION_ID;
 
 /**
  * An entity a surface offers commands for, named the way that surface knows it.
@@ -318,7 +316,7 @@ export function spaceEntityActions({
             { kind: 'diagram-thing', spaceId, diagramId: diagram.id, thingId: thing.id },
             onCopy,
           ),
-          copy(COPY_PERMANENT_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy),
+          copy(COPY_THING_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy),
         ]
       : [copy(COPY_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy)];
     /**
