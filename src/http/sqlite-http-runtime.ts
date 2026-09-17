@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { newUuid } from '@project/core';
 import { SqliteSpaceRepository } from '../persistence/sqlite-space-repository';
@@ -26,10 +27,15 @@ const reportSafely = (report: (cause: unknown) => void, cause: unknown): void =>
  * it would compose, then fail every query, leaving a host that starts and
  * answers every request with an error. Ticket 15 puts setup failures at composition
  * (`test/integration/sqlite-http-runtime.test.ts`).
+ *
+ * Absolute, too: `pnpm dev:sqlite` migrates from the repository root and runs
+ * this host from `packages/app`, so a relative path would migrate one file and
+ * serve another.
  */
 const openConfiguredDatabase = (): SqliteDatabase => {
   const path = configuredSqlitePath();
   if (path === undefined) throw new Error('SQLITE_PATH must name the SQLite database file');
+  if (!isAbsolute(path)) throw new Error(`SQLITE_PATH must be an absolute path: ${path}`);
   return createSqliteDatabase(path);
 };
 
