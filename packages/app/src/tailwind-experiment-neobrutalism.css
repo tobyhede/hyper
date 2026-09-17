@@ -73,6 +73,8 @@
   --popover: oklch(100% 0 0);
   --secondary: oklch(100% 0 0);
   --accent: hsl(217, 100%, 66%);
-  --shadow-chrome-elevated: 4px 4px 0px 0px var(--border);
+  --shadow-chrome-elevated-offset: 4px;
+  --shadow-chrome-elevated: var(--shadow-chrome-elevated-offset)
+    var(--shadow-chrome-elevated-offset) 0 0 var(--border);
   --border-width-chrome-accent: 2px;
 }

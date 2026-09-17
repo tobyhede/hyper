@@ -465,10 +465,13 @@
   }
 }
 
-/* A Thing's command surface floats eight pixels inside its paper border. */
+/* A Thing's command surface floats eight pixels inside its paper border,
+   measured from where the surface is drawn rather than from its box: the chrome
+   casts its shadow right and down, and a box-shadow takes no room, so the gaps
+   on those two sides are taken past the shadow. */
 .canvas-thing__rail {
   position: absolute;
-  inset: 8px 8px auto;
+  inset: 8px calc(8px + var(--shadow-chrome-elevated-offset, 0px)) auto 8px;
   height: auto;
   min-height: 0;
   padding: 0;
@@ -486,7 +489,7 @@
   pointer-events: auto;
 }
 .canvas-thing__content {
-  padding-top: 54px;
+  padding-top: calc(54px + var(--shadow-chrome-elevated-offset, 0px));
 }
 .canvas-thing[data-expanded='false'] > .canvas-thing__body {
   padding-top: 46px;

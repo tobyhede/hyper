@@ -224,8 +224,14 @@ export async function exerciseFloatingThingDock(page: Page, parent: Locator) {
     node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
   );
   const panel = await boxOf(dock, 'floating dock');
+  // The chrome's shadow is cast right and down and takes no room, so the right
+  // gap is measured past it. Read from the page, because a theme sets it.
+  const shadowOffset = await dock.evaluate((node) =>
+    Number.parseFloat(getComputedStyle(node).getPropertyValue('--shadow-chrome-elevated-offset')),
+  );
+  expect(shadowOffset).toBeGreaterThan(0);
   expect((panel.y - outer.y) / zoom).toBeCloseTo(12, 0);
-  expect((outer.x + outer.width - panel.x - panel.width) / zoom).toBeCloseTo(12, 0);
+  expect((outer.x + outer.width - panel.x - panel.width) / zoom).toBeCloseTo(12 + shadowOffset, 0);
   await dock.getByRole('button', { name: /^Diagram:/ }).click({ delay: 120 });
   await expect(page.getByRole('menu')).toBeVisible();
   await page.keyboard.press('Escape');

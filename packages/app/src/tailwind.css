@@ -179,7 +179,9 @@
      **Tailwind's own `shadow-md` and `shadow-lg` are untouched**, so a menu,
      popover and dialog still cast a blurred shadow while the Dock casts a hard
      one. Reconciling those is a decision of its own. */
-  --shadow-chrome-elevated: 6px 6px 0 var(--foreground);
+  --shadow-chrome-elevated-offset: 6px;
+  --shadow-chrome-elevated: var(--shadow-chrome-elevated-offset)
+    var(--shadow-chrome-elevated-offset) 0 var(--foreground);
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
