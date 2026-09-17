@@ -652,20 +652,31 @@ export async function thingControls(page: Page, thing: Locator): Promise<Locator
  * entity, Diagram, Graph and Space menu in this product now shares
  * (`.scratch/dock-menu-reorganisation/`).
  *
- * Reads labels plus the separator count rather than `role="group"`, because
- * that is the one shape every menu here supports: the Diagram and Graph
- * command lists (`DiagramMenuActions`, `GraphMenuActions`) do render a
- * `role="group"` per group, but the Thing and Space Thing entity menus
- * (`EntityActionsMenu`) deliberately do not — its own `MenuGroup` doc comment
- * explains why. The caller's nested arrays still say what the groups are;
- * this only reads them back flattened, against every row whose role starts
- * `menuitem` (`menuitem` itself, or the Diagram/Graph list's
- * `menuitemradio`).
+ * Reads the ordered `menuitem` / `menuitemradio` / `separator` rows rather
+ * than `role="group"`, because that is the one shape every menu here
+ * supports: the Diagram and Graph command lists (`DiagramMenuActions`,
+ * `GraphMenuActions`) do render a `role="group"` per group, but the Thing
+ * and Space Thing entity menus (`EntityActionsMenu`) deliberately do not —
+ * its own `MenuGroup` doc comment explains why. A matching separator count
+ * in the wrong place still fails.
  */
 export async function expectMenuGroups(
   menu: Locator,
   groups: readonly (readonly (string | RegExp)[])[],
 ): Promise<void> {
-  await expect(menu.locator('[role^="menuitem"]')).toHaveText(groups.flat());
-  await expect(menu.getByRole('separator')).toHaveCount(Math.max(groups.length - 1, 0));
+  const rows = menu.locator('[role="menuitem"], [role="menuitemradio"], [role="separator"]');
+  const expected: (string | RegExp)[] = [];
+  for (const [index, group] of groups.entries()) {
+    if (index > 0) expected.push('separator');
+    expected.push(...group);
+  }
+  await expect(rows).toHaveCount(expected.length);
+  for (const [index, row] of expected.entries()) {
+    const locator = rows.nth(index);
+    if (row === 'separator') {
+      await expect(locator).toHaveAttribute('role', 'separator');
+      continue;
+    }
+    await expect(locator).toHaveText(row);
+  }
 }

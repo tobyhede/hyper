@@ -1,4 +1,3 @@
-import { within } from '@testing-library/react';
 import { expect } from 'vitest';
 
 /**
@@ -33,18 +32,34 @@ export const menuItemLabel = (item: Element): string =>
     item.textContent
   ).trim();
 
+const MENU_ROW_SELECTOR = '[role="menuitem"], [role="menuitemradio"], [role="separator"]';
+
 /** Every item's label, in document order, matched by role rather than by menu family. */
 export const menuItemLabels = (menu: HTMLElement): readonly string[] =>
   Array.from(menu.querySelectorAll('[role="menuitem"], [role="menuitemradio"]')).map(menuItemLabel);
 
 /**
- * Assert a menu's items read as the given groups, in order, with exactly one
+ * Item labels and separators in document order. A separator is the word
+ * `separator`, not its (empty) text, so a matching count in the wrong place
+ * cannot hide behind a flattened label list.
+ */
+export const menuRows = (menu: HTMLElement): readonly string[] =>
+  Array.from(menu.querySelectorAll(MENU_ROW_SELECTOR)).map((item) =>
+    item.getAttribute('role') === 'separator' ? 'separator' : menuItemLabel(item),
+  );
+
+const groupedMenuRows = (groups: readonly (readonly string[])[]): readonly string[] =>
+  groups.flatMap((group, index) => (index === 0 ? [...group] : ['separator', ...group]));
+
+/**
+ * Assert a menu's rows read as the given groups, in order, with exactly one
  * separator between each pair of groups — the one grouping grammar every
  * entity, Diagram, Graph and Space menu in this product now shares
- * (`.scratch/dock-menu-reorganisation/`). The Playwright counterpart of this
- * assertion is `expectMenuGroups` in `packages/app/e2e/graph.ts`.
+ * (`.scratch/dock-menu-reorganisation/`). Does not require `role="group"`:
+ * `EntityActionsMenu` deliberately does not render one. The Playwright
+ * counterpart of this assertion is `expectMenuGroups` in
+ * `packages/app/e2e/graph.ts`.
  */
 export function expectMenuGroups(menu: HTMLElement, groups: readonly (readonly string[])[]): void {
-  expect(menuItemLabels(menu)).toEqual(groups.flat());
-  expect(within(menu).queryAllByRole('separator')).toHaveLength(Math.max(groups.length - 1, 0));
+  expect(menuRows(menu)).toEqual(groupedMenuRows(groups));
 }

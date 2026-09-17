@@ -27,12 +27,13 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   // Diagram list, New Diagram on its own, Rename beside Copy link to
   // Diagram, then Delete — one separator between each group.
   await openMenu('diagram');
-  await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
-  await expect(
-    page.getByRole('menuitem', { name: 'Copy link to Diagram', exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: /^Delete / })).toBeVisible();
-  await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(3);
+  const diagramMenu = page.getByRole('menu');
+  await expectMenuGroups(diagramMenu, [
+    await diagramMenu.getByRole('menuitemradio').allInnerTexts(),
+    ['New Diagram'],
+    ['Rename', 'Copy link to Diagram'],
+    [/^Delete /],
+  ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).fill('Target context');
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).press('Enter');
@@ -54,12 +55,15 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   // Same grammar, with Colour… standing alone immediately after the list —
   // and no permanent address offered any more.
   await openMenu('graph');
-  await expect(page.getByRole('menuitem', { name: 'Colour…', exact: true })).toBeVisible();
-  await expect(
-    page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
-  await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(4);
+  const graphMenu = page.getByRole('menu');
+  await expect(graphMenu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
+  await expectMenuGroups(graphMenu, [
+    await graphMenu.getByRole('menuitemradio').allInnerTexts(),
+    ['Colour…'],
+    ['New Graph'],
+    ['Rename', 'Copy link to Graph'],
+    [/^Delete /],
+  ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill('Target path');
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).press('Enter');
