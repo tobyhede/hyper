@@ -134,7 +134,9 @@ export class MemorySpaceBackend implements SpaceBackend {
     const decision = decideCommit(
       request,
       this.#metaSpaceId,
-      [...this.#spaces.values()].map(clone),
+      [...this.#spaces.values()]
+        .map(clone)
+        .sort((left, right) => (left.snapshot.id < right.snapshot.id ? -1 : 1)),
     );
     if (decision.kind === 'answer') return backendResult(decision.result);
     for (const change of request.changes) {
