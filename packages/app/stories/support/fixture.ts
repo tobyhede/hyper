@@ -16,7 +16,7 @@ import {
  * The inventory's fixture: a small, believable Space, shaped to exercise the
  * cases the design has to survive rather than to tell a story.
  *
- * Six Things, two Graphs sharing two of them, one Alias, and one deliberately
+ * Six Things, two Graphs sharing two of them, one Reference Thing, and one deliberately
  * long title.
  *
  * Real ids, parsed through `uuidSchema`, so this data is the same shape the
@@ -31,7 +31,7 @@ export const thingIds = {
   problem: id('1c7a5b63-9021-4b8d-8a3e-2d5c6f7b8e91'),
   strategies: id('2d8b6c74-a132-4c9e-9b4f-3e6d7a8c9f02'),
   traversal: id('3e9c7d85-b243-4daf-8c5a-4f7e8b9daf13'),
-  openingAlias: id('4fad8e96-c354-4eb0-9d6b-5a8f9cae0b24'),
+  openingReference: id('4fad8e96-c354-4eb0-9d6b-5a8f9cae0b24'),
   closing: id('6bcfa0b8-e576-40d2-9f8d-7cabedca2d46'),
 } as const;
 
@@ -75,9 +75,9 @@ export const things: readonly Thing[] = [
     body: '# Traversal\n\nPresenting is this canvas, closer in.',
   },
   {
-    id: thingIds.openingAlias,
+    id: thingIds.openingReference,
     title: 'Strategy overview',
-    kind: 'alias',
+    kind: 'reference',
     target: thingIds.strategies,
   },
   {
@@ -97,7 +97,7 @@ export const graphs: readonly Graph[] = [
       { from: thingIds.opening, to: thingIds.problem },
       { from: thingIds.problem, to: thingIds.strategies },
       { from: thingIds.strategies, to: thingIds.traversal },
-      { from: thingIds.traversal, to: thingIds.openingAlias },
+      { from: thingIds.traversal, to: thingIds.openingReference },
     ],
   },
   {
@@ -130,7 +130,7 @@ export const positions = {
   [thingIds.problem]: { x: 380, y: 30, open: false },
   [thingIds.strategies]: { x: 720, y: 170, open: false },
   [thingIds.traversal]: { x: 1060, y: 30, open: false },
-  [thingIds.openingAlias]: { x: 1400, y: 170, open: false },
+  [thingIds.openingReference]: { x: 1400, y: 170, open: false },
   [thingIds.closing]: { x: 1060, y: 330, open: false },
 } as const;
 

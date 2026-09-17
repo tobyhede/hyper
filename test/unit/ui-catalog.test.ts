@@ -290,20 +290,24 @@ describe('production component coverage', () => {
 
   it('reports a production component no stable story renders', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const NewAlias = () => null;');
+    write(
+      root,
+      'packages/app/src/components/NewReference.tsx',
+      'export const NewReference = () => null;',
+    );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/components\/NewAlias\.tsx is rendered by no stable story/,
+      /packages\/app\/src\/components\/NewReference\.tsx is rendered by no stable story/,
     );
   });
 
   it('follows a relative import out of a story into the component it renders', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      storyRendering('../../src/components/NewAlias'),
+      storyRendering('../../src/components/NewReference'),
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -365,9 +369,9 @@ describe('production component coverage', () => {
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
   });
 
-  it('resolves a wildcard subpath entry listed after an exact alias', () => {
+  it('resolves a wildcard subpath entry listed after an exact reference', () => {
     const root = fixture();
-    // An exact alias matches only itself, so a specifier it does not match has
+    // An exact reference matches only itself, so a specifier it does not match has
     // to fall through to the later entries rather than end the search.
     write(
       root,
@@ -375,11 +379,11 @@ describe('production component coverage', () => {
       '{"imports":{"#shell":"./src/Shell.tsx","#components/*":"./src/components/*.tsx"}}',
     );
     write(root, 'packages/app/src/Shell.tsx', 'export const Shell = null;');
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      `import { Widget } from '#components/NewAlias';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Widget, Shell];\n`,
+      `import { Widget } from '#components/NewReference';\nimport { Shell } from '#shell';\nexport default { title: 'Components/Button' };\nexport const Primary = () => [Widget, Shell];\n`,
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -392,11 +396,11 @@ describe('production component coverage', () => {
       'packages/app/package.json',
       '{"imports":{"#components/*":"./src/components/*.tsx"}}',
     );
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      storyRendering('#components/NewAlias'),
+      storyRendering('#components/NewReference'),
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -423,11 +427,11 @@ describe('production component coverage', () => {
   });
 
   it.each([
-    ["import type { Widget } from '../../src/components/NewAlias';", 'a type-only declaration'],
-    ["import { type Widget } from '../../src/components/NewAlias';", 'a type-only specifier'],
+    ["import type { Widget } from '../../src/components/NewReference';", 'a type-only declaration'],
+    ["import { type Widget } from '../../src/components/NewReference';", 'a type-only specifier'],
   ])('does not treat %s as rendering the module it names', (statement) => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export type Widget = string;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export type Widget = string;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
@@ -435,7 +439,7 @@ describe('production component coverage', () => {
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/components\/NewAlias\.tsx is rendered by no stable story/,
+      /packages\/app\/src\/components\/NewReference\.tsx is rendered by no stable story/,
     );
   });
 
@@ -459,19 +463,19 @@ describe('production component coverage', () => {
     );
   });
 
-  it('resolves a re-export alias by the name consumers import, not the local one', () => {
+  it('resolves a re-export reference by the name consumers import, not the local one', () => {
     const root = fixture();
     // `packages/ui/src/index.ts` really did this, re-exporting the shadcn
     // registry's content component under a second name because a domain
     // component held the first one. Reading `propertyName` on an export
-    // specifier takes the local name, so importing either matched the aliased
+    // specifier takes the local name, so importing either matched the referenced
     // line too and catalogued a module the story never rendered. ADR 0085
-    // resolved that collision and the barrel aliases nothing today — which is
+    // resolved that collision and the barrel references nothing today — which is
     // why this fixture is synthetic rather than a quotation.
     write(
       root,
       'packages/ui/src/index.ts',
-      "export { Widget } from './Rendered';\nexport { Widget as Aliased } from './Unrendered';",
+      "export { Widget } from './Rendered';\nexport { Widget as Referenced } from './Unrendered';",
     );
     write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(root, 'packages/ui/src/Unrendered.tsx', 'export const Widget = null;');
@@ -486,14 +490,14 @@ describe('production component coverage', () => {
     );
   });
 
-  it('follows an aliased re-export when the story imports the alias', () => {
+  it('follows a referenced re-export when the story imports the reference', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/index.ts', "export { Widget as Aliased } from './Rendered';");
+    write(root, 'packages/ui/src/index.ts', "export { Widget as Referenced } from './Rendered';");
     write(root, 'packages/ui/src/Rendered.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      "import { Aliased } from '@project/ui';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Aliased;\n",
+      "import { Referenced } from '@project/ui';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Referenced;\n",
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -501,11 +505,11 @@ describe('production component coverage', () => {
 
   it('keeps a default import that sits beside a type-only specifier', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export default null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export default null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      "import Widget, { type Props } from '../../src/components/NewAlias';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Widget as Props;\n",
+      "import Widget, { type Props } from '../../src/components/NewReference';\nexport default { title: 'Components/Button' };\nexport const Primary = () => Widget as Props;\n",
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([]);
@@ -528,31 +532,31 @@ describe('production component coverage', () => {
 
   it('rejects the same module recorded twice', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [
-          { module: 'packages/app/src/components/NewAlias.tsx', reason: 'First reason.' },
-          { module: 'packages/app/src/components/NewAlias.tsx', reason: 'Second reason.' },
+          { module: 'packages/app/src/components/NewReference.tsx', reason: 'First reason.' },
+          { module: 'packages/app/src/components/NewReference.tsx', reason: 'Second reason.' },
         ],
         [],
       ),
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/components\/NewAlias\.tsx is recorded twice/,
+      /packages\/app\/src\/components\/NewReference\.tsx is recorded twice/,
     );
   });
 
   it('reads the exported list, not a same-named local declaration above it', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
-      `const uncataloguedComponents = [{ module: 'packages/app/src/components/NewAlias.tsx', reason: 'Decoy.' }] as const;\nvoid uncataloguedComponents;\nexport const handRolledStyles = [] as const;\n`,
+      `const uncataloguedComponents = [{ module: 'packages/app/src/components/NewReference.tsx', reason: 'Decoy.' }] as const;\nvoid uncataloguedComponents;\nexport const handRolledStyles = [] as const;\n`,
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
@@ -571,40 +575,54 @@ describe('production component coverage', () => {
 
   it('takes a recorded reason in place of a story, and reports it', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const NewAlias = () => null;');
+    write(
+      root,
+      'packages/app/src/components/NewReference.tsx',
+      'export const NewReference = () => null;',
+    );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
-        [{ module: 'packages/app/src/components/NewAlias.tsx', reason: 'Retired by ADR 0058.' }],
+        [
+          {
+            module: 'packages/app/src/components/NewReference.tsx',
+            reason: 'Retired by ADR 0058.',
+          },
+        ],
         [],
       ),
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([
-      { module: 'packages/app/src/components/NewAlias.tsx', reason: 'Retired by ADR 0058.' },
+      { module: 'packages/app/src/components/NewReference.tsx', reason: 'Retired by ADR 0058.' },
     ]);
   });
 
   it('rejects a recorded reason for a component a stable story does render', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/components/button.stories.tsx',
-      storyRendering('../../src/components/NewAlias'),
+      storyRendering('../../src/components/NewReference'),
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
-        [{ module: 'packages/app/src/components/NewAlias.tsx', reason: 'Retired by ADR 0058.' }],
+        [
+          {
+            module: 'packages/app/src/components/NewReference.tsx',
+            reason: 'Retired by ADR 0058.',
+          },
+        ],
         [],
       ),
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/components\/NewAlias\.tsx is rendered by a stable story/,
+      /packages\/app\/src\/components\/NewReference\.tsx is rendered by a stable story/,
     );
   });
 
@@ -623,32 +641,32 @@ describe('production component coverage', () => {
 
   it('does not ask a review-only story to catalogue anything', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/review/proposal.stories.tsx',
-      `import { Widget } from '../../src/components/NewAlias';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Widget;\n`,
+      `import { Widget } from '../../src/components/NewReference';\nexport default { title: 'Review/Proposal' };\nexport const Draft = () => Widget;\n`,
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/components\/NewAlias\.tsx is rendered by no stable story/,
+      /packages\/app\/src\/components\/NewReference\.tsx is rendered by no stable story/,
     );
   });
 
   it('lets a review-only surface appear beside its future Space stories', () => {
     const root = fixture();
-    write(root, 'packages/app/src/components/NewAlias.tsx', 'export const Widget = null;');
+    write(root, 'packages/app/src/components/NewReference.tsx', 'export const Widget = null;');
     write(
       root,
       'packages/app/stories/review/multiple-spaces.stories.tsx',
-      `import { Widget } from '../../src/components/NewAlias';
+      `import { Widget } from '../../src/components/NewReference';
 export default { title: 'Space/Multiple Spaces' };
 export const MultipleSpaces = () => Widget;
 `,
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/src\/components\/NewAlias\.tsx is rendered by no stable story/,
+      /packages\/app\/src\/components\/NewReference\.tsx is rendered by no stable story/,
     );
   });
 });

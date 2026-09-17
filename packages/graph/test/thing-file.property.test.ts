@@ -31,10 +31,10 @@ const markdownFrontmatterArb: fc.Arbitrary<ThingFrontmatter> = fc.record(
   { requiredKeys: ['id', 'title', 'kind'] },
 );
 
-const aliasFrontmatterArb: fc.Arbitrary<ThingFrontmatter> = fc.record({
+const referenceFrontmatterArb: fc.Arbitrary<ThingFrontmatter> = fc.record({
   id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   title: lineArb,
-  kind: fc.constant('alias' as const),
+  kind: fc.constant('reference' as const),
   target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
 });
 
@@ -60,7 +60,7 @@ describe('thing file round-trip', () => {
   it('gives back the frontmatter it was written with, and the body verbatim', () => {
     const thingFileArb = fc.oneof(
       fc.tuple(markdownFrontmatterArb, bodyArb),
-      fc.tuple(aliasFrontmatterArb, fc.constant('')),
+      fc.tuple(referenceFrontmatterArb, fc.constant('')),
     );
     fc.assert(
       fc.property(thingFileArb, ([frontmatter, body]) => {

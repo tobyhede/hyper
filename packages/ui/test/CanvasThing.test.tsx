@@ -63,10 +63,10 @@ describe('CanvasThing kind and interaction state', () => {
     expect(screen.queryByRole('img', { name: 'Markdown Thing' })).toBeNull();
   });
 
-  it('presents an Alias front by its kind alone', () => {
+  it('presents a Reference Thing front by its kind alone', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
+        front={{ kind: 'reference', target: { kind: 'markdown', source: '' }, open: false }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -74,17 +74,17 @@ describe('CanvasThing kind and interaction state', () => {
     );
 
     const thing = screen.getByRole('article', { name: 'Opening, again' });
-    expect(thing).toHaveAttribute('data-kind', 'alias');
+    expect(thing).toHaveAttribute('data-kind', 'reference');
     expect(thing).toHaveAttribute('data-state', 'selected');
-    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Reference Thing' })).toBeVisible();
   });
 
-  it('offers an Alias the shared Open operation', () => {
+  it('offers a Reference Thing the shared Open operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasThing
         front={{
-          kind: 'alias',
+          kind: 'reference',
           target: { kind: 'markdown', source: 'Markdown' },
           open: false,
           onOpenChange,
@@ -607,8 +607,8 @@ describe('CanvasThing Title ladder', () => {
       { kind: 'preview' },
       { kind: 'markdown', source: '', open: false },
       { kind: 'markdown', source: '', open: true },
-      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false },
-      { kind: 'alias', target: { kind: 'markdown', source: '' }, open: true },
+      { kind: 'reference', target: { kind: 'markdown', source: '' }, open: false },
+      { kind: 'reference', target: { kind: 'markdown', source: '' }, open: true },
       { kind: 'space', open: false },
       { kind: 'space', open: true },
     ];
@@ -961,10 +961,10 @@ describe('CanvasThing open Markdown front', () => {
     expect(screen.getByText('the Thing’s own source')).toBeVisible();
   });
 
-  it('draws no body on a closed Alias', () => {
+  it('draws no body on a closed Reference Thing', () => {
     render(
       <CanvasThing
-        front={{ kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }}
+        front={{ kind: 'reference', target: { kind: 'markdown', source: '' }, open: false }}
         state="rest"
         title="Strategy overview"
         graphColor="#35d6c3"
@@ -1217,7 +1217,7 @@ describe('CanvasThing Space front', () => {
 
   /**
    * Opening is the shared Thing operation, not a Space-Thing-specific one, so it
-   * is the same rail control an Alias uses and it names the same two states. A
+   * is the same rail control a Reference Thing uses and it names the same two states. A
    * Space Thing has no Markdown of its own, so there is no content Edit, Save or
    * Cancel for the rail to draw unless the portal Read/Edit boundary is composed
    * onto the front — Enter is the kind command that sits beside them.

@@ -281,26 +281,28 @@ describe('thing frontmatter schema', () => {
     expect('content' in thing).toBe(false);
   });
 
-  it('parses an alias thing, which points at a target instead of holding content', () => {
-    const alias = thingFrontmatterSchema.parse({
+  it('parses a reference thing, which points at a target instead of holding content', () => {
+    const reference = thingFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
-      kind: 'alias',
+      kind: 'reference',
       target: '00000000-0000-4000-8000-000000000002',
     });
-    expect(alias.kind).toBe('alias');
-    expect(alias.kind === 'alias' && alias.target).toBe('00000000-0000-4000-8000-000000000002');
+    expect(reference.kind).toBe('reference');
+    expect(reference.kind === 'reference' && reference.target).toBe(
+      '00000000-0000-4000-8000-000000000002',
+    );
   });
 
-  it('gives an alias no body field at all', () => {
-    const alias = thingSchema.parse({
+  it('gives a reference thing no body field at all', () => {
+    const reference = thingSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
-      kind: 'alias',
+      kind: 'reference',
       target: '00000000-0000-4000-8000-000000000002',
     });
 
-    expect('body' in alias).toBe(false);
+    expect('body' in reference).toBe(false);
   });
 
   it('parses a Space Thing that names both the Diagram and the Graph it selects', () => {
@@ -345,12 +347,12 @@ describe('thing frontmatter schema', () => {
     expect(thingFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
   });
 
-  it('rejects an alias with no target', () => {
+  it('rejects a reference thing with no target', () => {
     expect(
       thingFrontmatterSchema.safeParse({
         id: '00000000-0000-4000-8000-000000000002',
         title: 'A',
-        kind: 'alias',
+        kind: 'reference',
       }).success,
     ).toBe(false);
   });

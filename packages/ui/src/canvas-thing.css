@@ -71,7 +71,7 @@
     background-color var(--thing-hover-duration, 120ms) var(--thing-hover-easing, ease);
 }
 
-.canvas-thing[data-kind='alias'] {
+.canvas-thing[data-kind='reference'] {
   border-style: dotted;
 }
 
@@ -98,7 +98,7 @@
   background: var(--canvas-thing-active-face);
 }
 
-.canvas-thing[data-kind='alias']:is(
+.canvas-thing[data-kind='reference']:is(
     :hover,
     :has(~ .rf-thing-node__authoring-handle:hover),
     :not([data-state='rest'])
@@ -344,9 +344,9 @@
 /* A Title is the same bottom passenger before, during and after the React Flow
    wrapper moves. Opening adds the content surface above it; it never switches
    the Title's layout in the middle of that motion. Both kinds that draw content
-   claim it, so an Open Alias reads exactly as an Open Markdown Thing does
+   claim it, so an Open Reference Thing reads exactly as an Open Markdown Thing does
    (ADR 0070) — the `space` kind has no content front to sit above a Title. */
-.canvas-thing:is([data-kind='markdown'], [data-kind='alias']) .canvas-thing__body {
+.canvas-thing:is([data-kind='markdown'], [data-kind='reference']) .canvas-thing__body {
   order: 2;
   flex: none;
   margin-top: auto;

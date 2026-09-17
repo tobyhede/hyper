@@ -396,9 +396,9 @@ const resolveModule = (specifier: string, from: string, repositoryRoot: string):
     const packageDirectory = owningPackage(from, repositoryRoot);
     if (packageDirectory === null) return null;
     for (const [pattern, target] of subpathImports(packageDirectory)) {
-      // An entry without a `*` is an exact alias — `"#env": "./src/env.ts"` —
+      // An entry without a `*` is an exact reference — `"#env": "./src/env.ts"` —
       // and matches only itself. A miss falls through to the entries after it:
-      // ending the search there let an exact alias listed first hide the
+      // ending the search there let an exact reference listed first hide the
       // wildcard pattern that does match.
       const [prefix, suffix] = pattern.split('*');
       if (suffix === undefined) {
@@ -461,13 +461,13 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
         : node.exportClause;
       // An import specifier's `propertyName` is the *exported* name and its
       // `name` the local one; an export specifier is the other way round, and
-      // `name` is what a consumer writes. Reading the wrong side made an aliased
+      // `name` is what a consumer writes. Reading the wrong side made a referenced
       // re-export match on its *local* name, so importing one component reached
-      // a second module that no story rendered. The alias that found this —
+      // a second module that no story rendered. The reference that found this —
       // `packages/ui/src/index.ts` re-exporting the shadcn registry's content
       // component under a second name, because a domain component of the same
       // name stood in the way — is gone with the collision ADR 0085 resolved.
-      // The rule is not: the barrel may alias again, and the fixtures below are
+      // The rule is not: the barrel may reference again, and the fixtures below are
       // the executable statement of it.
       const named =
         bindings === undefined

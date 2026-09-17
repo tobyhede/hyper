@@ -32,7 +32,7 @@ const DELETES_THE_THING =
 
 const DELETION_DESCRIPTIONS = {
   markdown: DELETES_THE_THING,
-  alias: DELETES_THE_THING,
+  reference: DELETES_THE_THING,
   space: `${DELETES_THE_THING} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
 } satisfies Record<Thing['kind'], string>;
 

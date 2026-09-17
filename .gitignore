@@ -46,6 +46,8 @@ test-results/
 # rename landed replays one instead of hand-merging it, which only works if
 # every branch can reach the same script. They go when the second rename lands.
 !.scratch/thing-and-diagram/rename-*.mjs
+# ADR 0092's rename codemod, tracked for the same reason.
+!.scratch/reference-thing/rename-*.mjs
 
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in

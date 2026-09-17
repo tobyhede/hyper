@@ -96,7 +96,7 @@ export function ThingSearchCombobox({
   const unavailable = choices.length === 0;
   /*
    * The empty-list note is an addition to the caller's description, never a
-   * replacement for it. The two are true at once on a real screen: an Alias
+   * replacement for it. The two are true at once on a real screen: a Reference Thing
    * whose Target has left the Space is refused *and* has no eligible Thing left
    * to choose, so the field carries a `FieldError` and an empty list together.
    * Overwriting left `aria-invalid="true"` announcing a problem whose sentence

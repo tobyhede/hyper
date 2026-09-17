@@ -23,7 +23,7 @@ import {
 // Each collection is a Diagram, because a Graph is a nested owned value of one
 // (ADR 0040) and these two share no Things. The fixture opens in Collection 1,
 // and each Diagram draws only the Things and Graphs it owns.
-// Each returns to its start via an alias, so this particular fixture is acyclic
+// Each returns to its start via a reference thing, so this particular fixture is acyclic
 // and lays out as clean forward paths even though Graphs may contain cycles
 // (ADR 0032). These tests assert *behaviour* against that shape; none read thing prose. See
 // packages/app/README.md for why each case is there.
@@ -35,7 +35,7 @@ import {
 // surface that no longer exists.
 
 /** A graph node located by its exact thing title, so single-letter titles don't
- *  collide (an alias node names its target, so "A" appears on more than one). */
+ *  collide (a reference thing node names its target, so "A" appears on more than one). */
 function nodeByTitle(page: Page, title: string): Locator {
   return page
     .locator('.react-flow__node')
@@ -72,7 +72,7 @@ test('draws every Graph in the selected Diagram, each in its own color', async (
 });
 
 test(
-  'production Canvas Things expose Alias identity and a keyboard Open action',
+  'production Canvas Things expose Reference Thing identity and a keyboard Open action',
   {
     tag: [
       '@parity:canvas-thing-exposes-kind-and-keyboard-actions',
@@ -84,8 +84,8 @@ test(
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
 
-    const alias = nodeByTitle(page, 'A′').first();
-    await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
+    const reference = nodeByTitle(page, 'A′').first();
+    await expect(reference.getByRole('img', { name: 'Reference Thing' })).toBeVisible();
 
     const markdown = nodeByTitle(page, 'A').first();
     await markdown.click();
@@ -480,8 +480,8 @@ test('things are drawn at exactly the size the strategy placed them at', async (
 });
 
 test(
-  'an Alias Opens on its Target Markdown read-only with click, Enter and Space',
-  { tag: '@parity:open-alias-shows-target-markdown-read-only' },
+  'a Reference Thing Opens on its Target Markdown read-only with click, Enter and Space',
+  { tag: '@parity:open-reference-shows-target-markdown-read-only' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -515,7 +515,7 @@ test(
     await expect(persistence).toHaveText('Persisted');
     const beforeResizeRevisionValue = await persistence.getAttribute('data-revision');
     if (beforeResizeRevisionValue === null) {
-      throw new Error('Persisted Alias A′ has no revision');
+      throw new Error('Persisted Reference Thing A′ has no revision');
     }
     const beforeResizeRevision = Number(beforeResizeRevisionValue);
     const openSize = await recap.evaluate((element) => ({
@@ -524,7 +524,7 @@ test(
     }));
     await page.getByRole('button', { name: 'Zoom out' }).click();
     await settled(page);
-    const resizeBox = await boxOf(resizeControl, "Alias A′'s resize control");
+    const resizeBox = await boxOf(resizeControl, "Reference Thing A′'s resize control");
     // The drag has to end **inside the viewport**: a `mousemove` past the
     // window's edge is clamped, and the gesture then ends where it never went
     // and commits nothing. `A′` is the last Thing on the spine and sits near the

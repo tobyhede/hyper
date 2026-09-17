@@ -460,7 +460,7 @@ describe('runHyper', () => {
       things: [
         {
           id: THIRD_SPACE_ID,
-          document: { title: 'Alias: opening', kind: 'alias', target: THING_ID },
+          document: { title: 'Reference Thing: opening', kind: 'reference', target: THING_ID },
         },
         {
           id: THING_ID,

@@ -257,19 +257,22 @@ describe('ThingNode canvas Thing state adapter', () => {
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-state', 'dragging');
   });
 
-  it('renders an Alias through the shared kind treatment', () => {
-    render(<ThingNode {...props({ kind: 'alias', title: 'A, again' })} />);
+  it('renders a Reference Thing through the shared kind treatment', () => {
+    render(<ThingNode {...props({ kind: 'reference', title: 'A, again' })} />);
 
-    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute('data-kind', 'alias');
-    expect(screen.getByRole('img', { name: 'Alias' })).toBeVisible();
+    expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute(
+      'data-kind',
+      'reference',
+    );
+    expect(screen.getByRole('img', { name: 'Reference Thing' })).toBeVisible();
   });
 
-  it('passes the Alias metadata Open operation through its own front', () => {
+  it('passes the Reference Thing metadata Open operation through its own front', () => {
     const onEditThing = vi.fn();
     render(
       <ThingNode
         {...props({
-          kind: 'alias',
+          kind: 'reference',
           title: 'A, again',
           thingEditingEnabled: true,
           onEditThing,
@@ -850,11 +853,11 @@ describe('ThingNode Expanded Thing front', () => {
     );
   });
 
-  it("draws an Open Alias's resolved Markdown read-only under the Alias Title", () => {
+  it("draws an Open Reference Thing's resolved Markdown read-only under the Reference Thing Title", () => {
     render(
       <ThingNode
         {...props({
-          kind: 'alias',
+          kind: 'reference',
           title: 'Return',
           expanded: true,
           body: SOURCE,
@@ -1013,7 +1016,7 @@ describe('ThingNode Expanded Thing front', () => {
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
   });
 
-  it('offers a resize control on an Expanded Alias, because resize follows state rather than Thing kind', () => {
+  it('offers a resize control on an Expanded Reference Thing, because resize follows state rather than Thing kind', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
@@ -1022,9 +1025,9 @@ describe('ThingNode Expanded Thing front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ThingNode {...props({ kind: 'alias', expanded: true, resize })} />);
+    render(<ThingNode {...props({ kind: 'reference', expanded: true, resize })} />);
 
-    // `projection.ts` never marks an Alias Expanded in production (ADR 0064), but
+    // `projection.ts` never marks a Reference Thing Expanded in production (ADR 0064), but
     // this Thing's own resize gate must not repeat that as a second opinion —
     // ADR 0066 makes resize Thing behaviour, not kind behaviour.
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();

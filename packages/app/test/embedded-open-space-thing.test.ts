@@ -138,8 +138,12 @@ describe('embedded open Space Thing discovery', () => {
     });
   });
 
-  it('marks an Alias embedding and everything nested under it read-only', () => {
-    const parent = openSpaceThing(HOST, { spaceId: TARGET, diagram: DIAGRAM }, { kind: 'alias' });
+  it('marks a Reference Thing embedding and everything nested under it read-only', () => {
+    const parent = openSpaceThing(
+      HOST,
+      { spaceId: TARGET, diagram: DIAGRAM },
+      { kind: 'reference' },
+    );
     const nested = openSpaceThing(
       NESTED,
       { spaceId: TARGET, diagram: OTHER_DIAGRAM },

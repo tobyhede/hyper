@@ -19,7 +19,7 @@ const THINGS: readonly Thing[] = [
   {
     id: id('000000000004'),
     title: 'Constraints',
-    kind: 'alias',
+    kind: 'reference',
     target: id('000000000003'),
   },
   {

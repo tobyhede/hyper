@@ -502,7 +502,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Thing then reads as selected on screen, since `selectedForAuthoring` is
       // right, while React Flow holds no selected node at all — and `F2` asks
       // React Flow, so `F2` is what stops working until a click repairs it.
-      // Add Thing, Add Alias and create-and-connect all land here.
+      // Add Thing, Add Reference Thing and create-and-connect all land here.
       const state = get();
       const reconciled = withSelection(
         reconcile(current?.nodes ?? [], nodes, state.dragOrigins),

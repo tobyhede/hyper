@@ -20,7 +20,7 @@ A **Graph** is a set of directed edges between things.
 
 A thing may have several edges out — a **fork** — and several in — a **merge**.
 A Graph may contain cycles and self-edges; presenting decides how to traverse
-them. An **alias** is a distinct thing with its own title and position that shows
+them. A **reference thing** is a distinct thing with its own title and position that shows
 another thing's content, not a workaround for returning to an existing thing.
 
 A Graph whose Things form a single chain, with one outgoing Edge from each
