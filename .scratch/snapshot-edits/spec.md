@@ -50,8 +50,18 @@ Where the copy does disagree with the Diagram, it looks like defects rather than
 - **Scope of change:** `things`, the target Diagram's `positions`, and Edges incident to the Thing. It does **not** touch `defaultDiagram`, `activeGraph`, the Diagram's title or `kind` — those come from Navigation and stay in Authoring's own write (`updatePositionedDiagram` in `app/src/snapshot.ts`).
 - **Kinds:** `deleteFromSpace` is kind-agnostic. Routing a Space Thing to the registry because its deletion cascades across Spaces stays with the callers — Authoring keeps `space-thing-deletion-unsupported`, and the registry calls the same operation on the containing Space. `open` does read the Thing's kind, to choose `DEFAULT_SPACE_THING_OPEN_SIZE` or `DEFAULT_OPEN_SIZE`: that is a property of the Thing being opened, not routing.
 - **Resize:** a resize to exactly `COLLAPSED_THING_SIZE` is a Close, and the module owns that. ADR 0066's 24-unit magnetic range is application-owned and stays in `app`, which already snaps a near miss to the exact size before completing.
-- **Creation:** `createInDiagram` adds the Thing to `things` and positions it as one step, placed either `exact` (create-and-connect's aimed drop point) or `avoidingOverlap` (a menu creation, stepping diagonally off an occupied point — today's `freeAnchor`). The caller still mints the Thing and still owns the Alias Target check, which needs the loaded Space's lookup.
+- **Creation:** `createInDiagram` adds the Thing to `things` and positions it as one step, placed either `exact` (create-and-connect's aimed drop point) or `avoidingOverlap` (a menu creation, stepping diagonally off an occupied point — today's `freeAnchor`). The caller still mints the Thing. `createInDiagram` also refuses an Alias whose Target the snapshot does not hold (`alias-target-not-found`) or whose Target is itself an Alias (`alias-target-must-own-content`): with `deleteFromSpace`'s `thing-has-aliases` that is both halves of one rule, and a snapshot answers it without the loaded Space's lookup, so no Thing constraint stays outside the module.
 - **Placement** becomes an implementation detail behind these operations, reached for `reclaim`, `displace`, `growth`, `place` and `remove`.
+
+### Coordinated operations decide after their last wait
+
+Reproduced by `refuses to delete a Space Thing an Alias came to target while the deletion was reading persistence` (`packages/persistence/test/session-registry.test.ts`), red against ticket 01: the registry checks an operation's rules in `derive`, waits on `backend.loadAggregate()`, then re-applies a closure to a `working` snapshot an Edit changed during the wait. `submit` publishes `working` while persistence is paused, so the wait is a real window. Delete then throws from `completedSnapshot`; creation and the Diagram and Graph deletions do not re-check at all.
+
+- **Every coordinated operation is `prepare` then `plan`.** `prepare` is async and holds every wait — loading the aggregate, initializing a target Space, minting ids. `plan` is synchronous, reads the Spaces as they stand, runs the `SnapshotEdit` operations and answers the changes or a refusal. The coordination does its own aggregate read before `plan`, and nothing suspends between `plan` and installing its result; `plan`'s return type is not a Promise, so an `await` inside it does not compile.
+- **`plan` is the decision.** A check in `prepare` is only an early exit that saves work — `link` still refuses a missing Diagram before initializing a target (ADR 0079) — and `plan` asks again.
+- **The cascade is planned too.** Which target Spaces a Space Thing deletion removes is computed in `plan` from current Spaces, not carried from an earlier read.
+- **One refusal path.** A refusal from `plan` is installed and answered as a value by the coordination, and each operation maps it the way it maps `aggregate-refused`. The `update` rebase closure and `completedSnapshot` are deleted.
+- **Diagram and Graph deletion move onto the same shape.** `deleteDiagram` and `deleteGraph` plan their successor and reference rewrites in `plan`. Their rules stay in the registry — moving those is still review candidate 2 — but there is one coordination shape, not two.
 
 ### Authoring reads the Diagram, not a copy
 
@@ -75,15 +85,18 @@ Where the copy does disagree with the Diagram, it looks like defects rather than
 
 | Ticket | Blocked by | Status |
 |---|---|---|
-| [01 — The session registry edits snapshots through `SnapshotEdit`](issues/01-registry-edits-through-snapshot-edit.md) | none | ready-for-agent |
+| [01 — The session registry edits snapshots through `SnapshotEdit`](issues/01-registry-edits-through-snapshot-edit.md) | none | done |
 | [02 — Space Authoring stops keeping its own placement](issues/02-remove-authorings-placement-copy.md) | none | ready-for-agent |
-| [03 — Space Authoring edits snapshots through `SnapshotEdit`](issues/03-authoring-edits-through-snapshot-edit.md) | 01, 02 | needs-triage |
+| [03 — Space Authoring edits snapshots through `SnapshotEdit`](issues/03-authoring-edits-through-snapshot-edit.md) | 01, 02, 05 | needs-triage |
+| [04 — A Space Thing deletion refuses when an Alias arrives during its wait](issues/04-deletion-decides-after-its-last-wait.md) | none | ready-for-agent |
+| [05 — Space Thing creation and linking refuse when their Diagram goes during the wait](issues/05-creation-decides-after-its-last-wait.md) | 04 | ready-for-agent |
+| [06 — Diagram and Graph deletion refuse when their successor goes during the wait](issues/06-context-deletion-decides-after-its-last-wait.md) | 04 | ready-for-agent |
+| [07 — The coordination has one shape](issues/07-one-coordination-shape.md) | 05, 06 | ready-for-agent |
 
-01 and 02 touch disjoint modules (`graph` + `persistence`, and `app`'s Authoring + render adapter) and may run in parallel.
+04 opens with the red test already in the registry suite. 05 and 06 touch different operations and may run in parallel. 01 and 02 touch disjoint modules (`graph` + `persistence`, and `app`'s Authoring + render adapter) and may run in parallel.
 
 ## Out of scope
 
-- Diagram and Graph context commands — create/delete Diagram and Graph, their successor and keep-last rules, and the dead `deleted-diagram`/`deleted-graph` Authoring arms (review candidate 2).
+- Diagram and Graph context commands' rules — create/delete Diagram and Graph, their successor and keep-last rules (their coordination shape is in scope, above), and the dead `deleted-diagram`/`deleted-graph` Authoring arms (review candidate 2).
 - Splitting `deriveCompletedEdit` into completion families, and one entry that routes deletion by Thing kind (review candidate 7).
 - Edge operations (connect, reconnect, delete Edge) beyond removing Edges incident to a removed Thing.
-- The Alias Target check on creation.
