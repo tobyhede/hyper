@@ -24,12 +24,12 @@ test(
     expect(await selected.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe('none');
     expect(await dragging.evaluate((el) => getComputedStyle(el).transform)).not.toBe('none');
 
-    // An Alias's dotted border solidifies once it leaves rest, same as a Thing's shadow.
-    await expect(specimen(page, 'alias · rest').getByRole('article')).toHaveCSS(
+    // A Reference Thing's dotted border solidifies once it leaves rest, same as a Thing's shadow.
+    await expect(specimen(page, 'reference · rest').getByRole('article')).toHaveCSS(
       'border-style',
       'dotted',
     );
-    await expect(specimen(page, 'alias · selected').getByRole('article')).toHaveCSS(
+    await expect(specimen(page, 'reference · selected').getByRole('article')).toHaveCSS(
       'border-style',
       'solid',
     );
@@ -44,7 +44,7 @@ test(
  */
 const FRONTS = [
   { label: 'markdown', kind: 'markdown', glyph: 'Markdown Thing', border: 'solid' },
-  { label: 'alias', kind: 'alias', glyph: 'Alias', border: 'dotted' },
+  { label: 'reference', kind: 'reference', glyph: 'Reference Thing', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Thing', border: 'solid' },
   // The creation ghost is not a Thing and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
@@ -167,7 +167,7 @@ test('a wrapped single-line Title stays one rung while an authored three-line Ti
 });
 
 test(
-  "an Alias front's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
+  "a Reference Thing front's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
   { tag: '@parity:canvas-thing-shows-kind-treatment' },
   async ({ page }) => {
     await page.goto('/?story=components--thing--kinds&mode=preview');
@@ -177,8 +177,8 @@ test(
       'solid',
     );
 
-    const alias = specimen(page, 'alias').getByRole('article');
-    await expect(alias).toHaveCSS('border-style', 'dotted');
+    const reference = specimen(page, 'reference').getByRole('article');
+    await expect(reference).toHaveCSS('border-style', 'dotted');
 
     const longTitle = specimen(page, 'markdown · long title').getByRole('heading');
     await expect(longTitle).toBeVisible();
@@ -372,13 +372,13 @@ test('a read-only Thing owns the absence of authoring affordances', async ({ pag
 });
 
 test(
-  'production Canvas Things expose Alias identity and keyboard-focusable actions',
+  'production Canvas Things expose Reference Thing identity and keyboard-focusable actions',
   { tag: '@parity:canvas-thing-exposes-kind-and-keyboard-actions' },
   async ({ page }) => {
     await page.goto('/?story=components--thing--actions&mode=preview');
 
-    const alias = page.getByRole('article', { name: 'Opening, again' });
-    await expect(alias.getByRole('img', { name: 'Alias' })).toBeVisible();
+    const reference = page.getByRole('article', { name: 'Opening, again' });
+    await expect(reference.getByRole('img', { name: 'Reference Thing' })).toBeVisible();
 
     const markdown = page.getByRole('article', { name: 'Strategies' });
     const actions = markdown.getByTestId('canvas-thing-actions');

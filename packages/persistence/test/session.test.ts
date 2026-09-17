@@ -966,6 +966,94 @@ describe('openSpaceSession', () => {
     expect(managed.isIdle()).toBe(true);
   });
 
+  /*
+   * The registry derives a coordinated participant's snapshot from this same
+   * session's `working` state, read while persistence is paused — the exact
+   * moment a plain `submit` made during that pause has already installed its
+   * snapshot into `working` (ADR 0030) without announcing `pending`, so it is
+   * folded into the coordinated snapshot the registry then hands to
+   * `prepareCoordinatedCommit`. The Edit that queued it must not also survive
+   * as `waiting`: replayed by `resumePersistence` once the barrier lifts, it
+   * would overwrite the just-acknowledged coordinated result in storage with
+   * the older content, while `working` kept reporting the coordinated value —
+   * a silent divergence between what the author sees and what is stored.
+   */
+  it('does not let a plain Edit queued before a coordinated commit overwrite it at resume', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    const managed = openManagedSpaceSession(backend, loaded);
+
+    managed.pausePersistence();
+    managed.session.submit(changedTitle('Queued before coordination'));
+    expect(managed.hasQueuedWork()).toBe(true);
+
+    // The registry builds the coordinated snapshot from that same paused
+    // working state (already containing the queued Edit) and installs it.
+    const coordinated = changedTitle('Coordinated result');
+    managed.prepareCoordinatedCommit(coordinated);
+    managed.publishCoordinatedCommit();
+
+    const committed = await commitSnapshot(backend, coordinated, loaded.revision);
+    if (committed.kind !== 'committed') throw new Error(`Unexpected result: ${committed.kind}`);
+    const revision = committed.revisions[0]?.revision;
+    if (revision === undefined) throw new Error('Commit result omitted its revision');
+    managed.acknowledgeCoordinatedCommit(revision);
+
+    // The registry's `finally` resumes every session once the coordination
+    // settles, regardless of which ones participated.
+    managed.resumePersistence();
+
+    await waitFor(
+      managed.session.getState,
+      managed.session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+
+    expect(managed.session.getState().working.document.title).toBe('Coordinated result');
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Coordinated result' } },
+    });
+  });
+
+  /*
+   * The twin of the case above, so the fix does not over-correct: an Edit
+   * submitted *after* `prepareCoordinatedCommit` has run is genuinely newer
+   * than the coordinated snapshot, not superseded by it, and must still reach
+   * the backend once the coordination settles and the barrier lifts.
+   */
+  it('still commits a plain Edit submitted while a coordinated commit is in flight', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
+    const managed = openManagedSpaceSession(backend, loaded);
+
+    managed.pausePersistence();
+    const coordinated = changedTitle('Coordinated result');
+    managed.prepareCoordinatedCommit(coordinated);
+    managed.publishCoordinatedCommit();
+
+    managed.session.submit(changedTitle('Edited during coordination'));
+    expect(managed.hasQueuedWork()).toBe(true);
+
+    const committed = await commitSnapshot(backend, coordinated, loaded.revision);
+    if (committed.kind !== 'committed') throw new Error(`Unexpected result: ${committed.kind}`);
+    const revision = committed.revisions[0]?.revision;
+    if (revision === undefined) throw new Error('Commit result omitted its revision');
+    managed.acknowledgeCoordinatedCommit(revision);
+
+    managed.resumePersistence();
+
+    await waitFor(
+      managed.session.getState,
+      managed.session.subscribe,
+      (state) => state.persistence.kind === 'settled',
+    );
+
+    expect(managed.session.getState().working.document.title).toBe('Edited during coordination');
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Edited during coordination' } },
+    });
+  });
+
   it('preserves coordinated aggregate refusal identities in a distinct refused session state', () => {
     const backend = new MemorySpaceBackend(SPACE_ID, [loaded]);
     const managed = openManagedSpaceSession(backend, loaded);

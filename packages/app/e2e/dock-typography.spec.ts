@@ -90,7 +90,7 @@ async function dismissOpenMenus(page: Page) {
 const identityMenu = (page: Page, testId: 'space-title' | 'selected-canvas' | 'active-graph') => {
   const marker =
     testId === 'space-title'
-      ? 'Copy link'
+      ? 'Copy link to Space'
       : testId === 'selected-canvas'
         ? 'New Diagram'
         : 'New Graph';

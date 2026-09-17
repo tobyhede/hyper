@@ -465,6 +465,61 @@ test('deleting the last Space Thing deletes the Space it referenced', async ({ p
   ).toBeVisible();
 });
 
+/**
+ * Remove from Diagram takes only the placement — the opposite of Delete from
+ * Space above, which takes the Thing and, on a last reference, its Space too.
+ */
+test('removing a Space Thing from the Diagram leaves the Thing and its target Space intact', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+  const nodes = await page.locator('.react-flow__node').count();
+
+  await createSpaceThingNamed(page, 'Architecture');
+  await settled(page);
+
+  const created = nodeByTitle(page, 'Architecture');
+  await created.hover();
+  await (
+    await thingControls(page, created)
+  )
+    .getByRole('button', { name: 'Actions for Thing Architecture', exact: true })
+    .click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Remove from Diagram' }).click();
+
+  // Unlike Delete from Space, Remove asks nothing before it runs.
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await settled(page);
+  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+
+  await page.getByRole('button', { name: 'Things' }).click();
+  const list = page.getByRole('dialog', { name: 'Things' });
+  await expect(list).toBeVisible();
+  // The Thing survives, unplaced rather than gone — the opposite of what the
+  // test above leaves in this same list.
+  await expect(list.getByRole('button', { name: 'Add Architecture to Diagram' })).toBeVisible();
+  // And the Space it names still exists: deleting the last reference to a
+  // Space takes this row away (the test above), and Remove is not that Edit.
+  await expect(list.getByRole('button', { name: 'Add Space 1 to Diagram' })).toBeVisible();
+
+  // Placing it again is the same Thing, stored context and all, not a fresh
+  // Space Thing minted from scratch.
+  await list.getByRole('button', { name: 'Add Architecture to Diagram' }).click();
+  await page.keyboard.press('Escape');
+  await settled(page);
+  const restored = nodeByTitle(page, 'Architecture');
+  await expect(restored).toHaveCount(1);
+  await restored.focus();
+  await restored.press('Enter');
+  await expect((await thingControls(page, restored)).getByTestId('space-thing-diagram')).toHaveText(
+    'Diagram 1',
+  );
+});
+
 /* -------------------------------------------------------------------------- */
 /* The Diagram an Open Space Thing draws                                        */
 /* -------------------------------------------------------------------------- */
@@ -994,14 +1049,14 @@ test(
 );
 
 test(
-  'Space Thing entity menu groups commands and creates a Space Alias',
+  'Space Thing entity menu groups commands and creates a Space Reference Thing',
   { tag: '@parity:space-thing-entity-menu' },
   async ({ page }) => {
     const thing = await openSpaceThingOnItsDiagram(page);
     await exerciseSpaceThingEntityMenu(page, thing);
     await settled(page);
     await page.reload();
-    await expect(nodeByTitle(page, 'Space Thing alias')).toBeVisible();
+    await expect(nodeByTitle(page, 'Space Thing reference')).toBeVisible();
   },
 );
 

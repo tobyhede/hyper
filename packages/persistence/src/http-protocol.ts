@@ -561,10 +561,10 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'graph-edge-thing-outside-diagram':
     case 'unresolved-default-diagram':
     case 'duplicate-graph-edge':
-    case 'unresolved-alias-target':
-    case 'alias-self-reference':
-    case 'alias-targets-alias':
-    case 'alias-target-must-own-content':
+    case 'unresolved-reference-target':
+    case 'reference-targets-self':
+    case 'reference-targets-reference':
+    case 'reference-target-must-own-content':
     case 'space-thing-reference-cycle': {
       const error = exactRecord(value, ['kind', 'ref', 'message'], 'Space reference error');
       return {

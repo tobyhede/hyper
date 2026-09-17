@@ -4,7 +4,7 @@ import type { SpaceFile } from '@project/core';
 import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
 import { projectThingNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
-import { aliasFile, thingFile } from './thing-files';
+import { referenceFile, thingFile } from './thing-files';
 import { uuid } from './uuid';
 
 function load(
@@ -230,9 +230,9 @@ describe('projectThingNodes', () => {
     );
   });
 
-  it("resolves an Open Alias's Target Markdown under the Alias identity", () => {
-    const aliasId = uuid('00000000-0000-4000-8000-000000000007');
-    const withAlias = load(
+  it("resolves an Open Reference Thing's Target Markdown under the Reference Thing identity", () => {
+    const referenceId = uuid('00000000-0000-4000-8000-000000000007');
+    const withReference = load(
       spaceFile([
         {
           id: '00000000-0000-4000-8000-000000000004',
@@ -240,23 +240,23 @@ describe('projectThingNodes', () => {
           edges: [
             {
               from: '00000000-0000-4000-8000-000000000002',
-              to: aliasId,
+              to: referenceId,
             },
           ],
         },
       ]),
       [
         thingFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
-        aliasFile(aliasId, 'Return', '00000000-0000-4000-8000-000000000002'),
+        referenceFile(referenceId, 'Return', '00000000-0000-4000-8000-000000000002'),
       ],
     );
 
-    const nodes = projectThingNodes(withAlias, {
-      openThingIds: new Set([aliasId]),
+    const nodes = projectThingNodes(withReference, {
+      openThingIds: new Set([referenceId]),
     });
-    expect(nodes.find((node) => node.id === aliasId)?.data).toMatchObject({
+    expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
       title: 'Return',
-      kind: 'alias',
+      kind: 'reference',
       expanded: true,
       body: '## Authored once',
     });

@@ -118,11 +118,11 @@ export interface EntityAction {
    * and can never run on *this* one.
    *
    * The rule above this interface is that an address which does not exist is
-   * not offered at all — so this is deliberately narrow. Create Alias is the
-   * case it was added for: ADR 0070 forbids an Alias of an Alias, and an Alias
+   * not offered at all — so this is deliberately narrow. Create Reference is the
+   * case it was added for: ADR 0070 forbids a Reference Thing of a Reference Thing, and a Reference Thing
    * is otherwise a regular Thing, so withholding the row would make one Thing's
    * menu shorter than every other's for a reason the reader cannot see. The
-   * greyed row is where the product says that aliasing terminates.
+   * greyed row is where the product says that referencing terminates.
    *
    * The primitive owns what unavailable *means* — both `DropdownMenuItem` and
    * `ContextMenuItem` are Base UI `Menu.Item`s, which suppress activation for
@@ -380,7 +380,7 @@ export interface EntityActionsTriggerProps {
    * what the trigger sits beside rather than on this component.
    *
    * Defaults to `<EntityActionsIcon />`, the conventional "more" glyph, because
-   * the menu holds rename, copy, alias and delete commands — not one kind of
+   * the menu holds rename, copy, reference and delete commands — not one kind of
    * action the trigger could name on its own.
    */
   readonly icon?: ReactNode;

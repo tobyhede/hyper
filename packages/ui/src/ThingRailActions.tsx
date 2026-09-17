@@ -89,7 +89,7 @@ const GROUP_LAYOUT = 'inline-flex items-center gap-px';
  * entity menu. Content-edit commands on other kinds sit between the entity
  * actions and Open/Close. The mounting Thing supplies that order.
  *
- * Either group draws nothing when it holds nothing — an Alias Thing offers one
+ * Either group draws nothing when it holds nothing — a Reference Thing offers one
  * kind command and no shared one — so a rail never carries an empty named
  * group for a set of commands this Thing does not have.
  */

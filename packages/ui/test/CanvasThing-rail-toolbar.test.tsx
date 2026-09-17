@@ -212,11 +212,11 @@ describe('the rail says whose command each one is', () => {
     expect(sharedGroup()).toContainElement(screen.getByRole('button', { name: 'Close Thing A' }));
   });
 
-  it('draws Alias Open in the shared Thing command group', () => {
+  it('draws Reference Thing Open in the shared Thing command group', () => {
     render(
       <CanvasThing
         front={{
-          kind: 'alias',
+          kind: 'reference',
           target: { kind: 'markdown', source: '' },
           open: false,
           onOpenChange: () => 'completed',

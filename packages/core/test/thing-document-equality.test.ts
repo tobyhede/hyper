@@ -18,7 +18,7 @@ import { markdownThingDocumentSchema, markdownThingSchema } from '../src/index';
  * checking its own source at import time.
  *
  * Only the markdown pair is guarded because Markdown is the authorable content
- * document. An Open Alias reuses its Target's renderer read-only.
+ * document. An Open Reference Thing reuses its Target's renderer read-only.
  */
 describe('a stored markdown document is the thing less its id', () => {
   const THING_ID = '00000000-0000-4000-8000-000000000002';
@@ -74,7 +74,7 @@ describe('a stored markdown document is the thing less its id', () => {
    */
   const titles = ['', ' ', '   ', 'A', ' A '];
   const bodies = [undefined, '', 'source'];
-  const kinds = [undefined, 'markdown', 'alias'];
+  const kinds = [undefined, 'markdown', 'reference'];
 
   /** One combination from the title/body/kind product, present only when drawn. */
   interface CandidateDocument {

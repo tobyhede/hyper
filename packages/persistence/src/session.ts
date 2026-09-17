@@ -446,6 +446,20 @@ export const openManagedSpaceSession = (
     prepareCoordinatedCommit: (snapshot) => {
       if (inFlight || coordinating) throw new Error('Space session is already committing');
       coordinating = true;
+      /*
+       * Any snapshot already queued here was set by a plain `submit` while
+       * persistence was paused for this coordination's own reads — the same
+       * reads the registry derives every participant's coordinated snapshot
+       * from. That queued content is therefore already folded into whatever
+       * this call installs (or, for a participant this coordination deletes,
+       * moot regardless). Left in place, it outlives the coordinated commit:
+       * `resumePersistence` would replay it over the just-acknowledged result,
+       * silently reverting the coordinated portion in storage while `working`
+       * kept showing the correct value. A snapshot submitted *after* this call
+       * (`coordinating` is now true) queues into a fresh `waiting` exactly as
+       * before, and is genuinely newer, not superseded.
+       */
+      waiting = undefined;
       const state = observable.getState();
       const pendingState: SpaceSessionState = {
         ...state,

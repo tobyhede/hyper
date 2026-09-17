@@ -18,11 +18,15 @@ export type {
   CanvasThingFront,
   CanvasThingProps,
   CanvasThingState,
+} from './CanvasThing';
+export { SpaceThingSelectors } from './SpaceThingSelectors';
+export type {
   CanvasSpaceThingChoice,
   CanvasSpaceThingCommands,
   CanvasSpaceThingGraphCommands,
   CanvasSpaceThingSelection,
-} from './CanvasThing';
+  SpaceThingSelectorsProps,
+} from './SpaceThingSelectors';
 export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';
 export { ThingRail } from './ThingRail';
@@ -97,7 +101,7 @@ export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   AbandonEditIcon,
   AlertIcon,
-  AliasIcon,
+  ReferenceIcon,
   CheckIcon,
   CommitEditIcon,
   ChevronDownIcon,

@@ -28,7 +28,7 @@ import { offersConnectionEnd } from './connection-target-reveal';
  * presenting independently draws the active Thing's rendered content at the
  * frame's scale (ADR 0064, ADR 0027).
  *
- * The Thing front itself — Markdown and Alias treatment, title editing, refusal
+ * The Thing front itself — Markdown and Reference Thing treatment, title editing, refusal
  * display, Open/Edit controls and interaction-state visuals — is the
  * production `@project/ui` `CanvasThing`. This module owns everything React
  * Flow: handles and their declared geometry, connection state, translating
@@ -47,7 +47,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type MarkdownOperations = Mutable<
   Pick<Extract<CanvasThingFront, { kind: 'markdown' }>, 'onOpenChange' | 'onBeginEdit'>
 >;
-type AliasFront = Mutable<Extract<CanvasThingFront, { kind: 'alias' }>>;
+type ReferenceFront = Mutable<Extract<CanvasThingFront, { kind: 'reference' }>>;
 type SpaceFront = Mutable<Extract<CanvasThingFront, { kind: 'space' }>>;
 
 /*
@@ -175,8 +175,8 @@ export function ThingNode({
             open: false,
             ...markdownOperations,
           };
-  const aliasFront: AliasFront = {
-    kind: 'alias',
+  const referenceFront: ReferenceFront = {
+    kind: 'reference',
     target:
       data.spaceContent !== undefined
         ? { kind: 'space' }
@@ -184,7 +184,7 @@ export function ThingNode({
     open: data.expanded === true,
   };
   if (data.thingEditingEnabled === true && data.onEditThing !== undefined) {
-    aliasFront.onOpenChange = data.onEditThing;
+    referenceFront.onOpenChange = data.onEditThing;
   }
   // A Space Thing's own front carries nothing it authors of the target: its
   // Title is the Thing's, its content is the target Space's, and the
@@ -200,7 +200,7 @@ export function ThingNode({
   if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
   if (data.portal !== undefined) spaceFront.portal = data.portal;
   const front: CanvasThingFront =
-    data.kind === 'alias' ? aliasFront : data.kind === 'space' ? spaceFront : markdownFront;
+    data.kind === 'reference' ? referenceFront : data.kind === 'space' ? spaceFront : markdownFront;
 
   /**
    * Whether this Thing's anchors are also affordances.
@@ -316,7 +316,7 @@ export function ThingNode({
    * seam, while the open Thing swaps that display for source only during an
    * edit.
    *
-   * For an Alias, the projection resolves the immutable Target's Markdown source.
+   * For a Reference Thing, the projection resolves the immutable Target's Markdown source.
    * `CanvasThing` receives that source and authored open state as one front rather
    * than receiving body markup from this adapter.
    */

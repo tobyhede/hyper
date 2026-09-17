@@ -5,6 +5,7 @@ import {
   type PaletteColorEntry,
 } from './PaletteColorPicker';
 import {
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -23,7 +24,14 @@ export interface DiagramMenuActionsProps {
   readonly onDelete: () => void;
 }
 
-/** The Diagram commands, shared by the Dock and a Space Thing's rail. */
+/**
+ * The Diagram commands, shared by the Dock and a Space Thing's rail.
+ *
+ * One grouping grammar, below the selection list `ChoiceMenu` draws: New
+ * Diagram on its own; Rename beside Copy link to Diagram, the two commands
+ * that act on the name already showing; then Delete — one separator between
+ * each group (`.scratch/dock-menu-reorganisation/issues/01`).
+ */
 export function DiagramMenuActions({
   title,
   renameItem,
@@ -35,25 +43,32 @@ export function DiagramMenuActions({
 }: DiagramMenuActionsProps) {
   return (
     <>
-      {renameItem}
-      <DropdownMenuItem className="gap-2" disabled={createDisabled} onClick={onCreate}>
-        <PlusIcon />
-        New Diagram
-      </DropdownMenuItem>
-      <DropdownMenuItem className="gap-2" onClick={onCopyLink}>
-        <CopyIcon />
-        Copy link
-      </DropdownMenuItem>
+      <DropdownMenuGroup>
+        <DropdownMenuItem className="gap-2" disabled={createDisabled} onClick={onCreate}>
+          <PlusIcon />
+          New Diagram
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuItem
-        variant="destructive"
-        className="gap-2"
-        disabled={deleteDisabled}
-        onClick={onDelete}
-      >
-        <DeleteIcon />
-        Delete {title}
-      </DropdownMenuItem>
+      <DropdownMenuGroup>
+        {renameItem}
+        <DropdownMenuItem className="gap-2" onClick={onCopyLink}>
+          <CopyIcon />
+          Copy link to Diagram
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          variant="destructive"
+          className="gap-2"
+          disabled={deleteDisabled}
+          onClick={onDelete}
+        >
+          <DeleteIcon />
+          Delete {title}
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
     </>
   );
 }
@@ -63,10 +78,19 @@ export interface GraphMenuActionsProps extends Omit<DiagramMenuActionsProps, 'cr
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => void;
-  readonly onCopyPermanentLink: () => void;
 }
 
-/** Graph commands use the same palette and menu order wherever a Graph is named. */
+/**
+ * Graph commands use the same palette and menu order wherever a Graph is
+ * named.
+ *
+ * The same grouping grammar as {@link DiagramMenuActions}, with one group
+ * ahead of it: Colour… stands alone immediately after the selection list,
+ * because it is the one command a Graph carries that a Diagram does not.
+ * Copy link to Graph copies the within-Diagram address; this menu offers no
+ * separate permanent address for the Graph itself
+ * (`.scratch/dock-menu-reorganisation/issues/01`).
+ */
 export function GraphMenuActions({
   title,
   renameItem,
@@ -77,49 +101,54 @@ export function GraphMenuActions({
   onRecolor,
   onCreate,
   onCopyLink,
-  onCopyPermanentLink,
   onDelete,
 }: GraphMenuActionsProps) {
   return (
     <>
-      {renameItem}
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
-          <GraphIcon color={color} size={14} />
-          Colour…
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
-          <PaletteColorSwatchGrid
-            entries={colors}
-            value={color}
-            onValueChange={onRecolor}
-            disabled={editsDisabled}
-            aria-label="Graph colour"
-          />
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-      <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>
-        <PlusIcon />
-        New Graph
-      </DropdownMenuItem>
-      <DropdownMenuItem className="gap-2" onClick={onCopyLink}>
-        <CopyIcon />
-        Copy link
-      </DropdownMenuItem>
-      <DropdownMenuItem className="gap-2" onClick={onCopyPermanentLink}>
-        <CopyIcon />
-        Copy permanent link
-      </DropdownMenuItem>
+      <DropdownMenuGroup>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
+            <GraphIcon color={color} size={14} />
+            Colour…
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
+            <PaletteColorSwatchGrid
+              entries={colors}
+              value={color}
+              onValueChange={onRecolor}
+              disabled={editsDisabled}
+              aria-label="Graph colour"
+            />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuItem
-        variant="destructive"
-        className="gap-2"
-        disabled={deleteDisabled}
-        onClick={onDelete}
-      >
-        <DeleteIcon />
-        Delete {title}
-      </DropdownMenuItem>
+      <DropdownMenuGroup>
+        <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>
+          <PlusIcon />
+          New Graph
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        {renameItem}
+        <DropdownMenuItem className="gap-2" onClick={onCopyLink}>
+          <CopyIcon />
+          Copy link to Graph
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          variant="destructive"
+          className="gap-2"
+          disabled={deleteDisabled}
+          onClick={onDelete}
+        >
+          <DeleteIcon />
+          Delete {title}
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
     </>
   );
 }

@@ -52,7 +52,7 @@ export type ContinuationTarget =
  * adapter resolves each of these against `data-continuation-control`.
  *
  * **One address, and it is a destination rather than a return.** This was the
- * two creation panes' return addresses, `'create-alias'` and
+ * two creation panes' return addresses, `'create-reference'` and
  * `'create-space-thing'` — where the caret went when a pane was cancelled. ADR
  * 0089 retired both panes, so there is nothing left to come back *from*: every
  * Thing creation completes its Edit on activation and continues at the Thing it

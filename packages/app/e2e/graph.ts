@@ -143,6 +143,26 @@ export async function openThing(node: Locator, title: string): Promise<void> {
 }
 
 /**
+ * Reveal a placed Thing's own rail and open its actions menu.
+ *
+ * Shared because three suites drove the identical gesture before this was
+ * pulled out — `editing.spec` and `mobile-dock.spec` through the real page
+ * harness, `ladle-e2e/command-dock.spec` through the Ladle story host — all
+ * reaching for the Command Dock's organising rule that a Thing's own commands
+ * live on its rail rather than on the Dock (ADR 0073). `.last()` is what the
+ * Ladle copy already used and costs nothing when only one menu is open, which
+ * is every case these three exercise.
+ */
+export async function thingActions(page: Page, title: string): Promise<Locator> {
+  const thing = nodeByTitle(page, title).first();
+  await thing.hover();
+  await thing.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
+  const menu = page.getByRole('menu').last();
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/**
  * The Space's command surface (ADR 0082).
  *
  * **Every helper below opens a menu where it used to press a button**, and that
@@ -185,7 +205,7 @@ export function graphMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Active Graph: /);
 }
 
-/** The Space cluster's disclosure: Rename, Copy link and Exit Space. */
+/** The Space cluster's disclosure: Rename, Copy link to Space, then Exit Space. */
 export function spaceMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Space: /);
 }
@@ -358,7 +378,7 @@ export function createThingControl(page: Page, kind: ThingKindName = 'Markdown T
  *
  * The two kinds are peers with no disclosure in front of them and each completes
  * its Edit on the press (ADR 0089), so this is one press whichever kind is
- * asked for. An Alias is not here: it is created from the Thing it points at,
+ * asked for. A Reference Thing is not here: it is created from the Thing it points at,
  * through that Thing's own command menu.
  */
 export async function createThing(page: Page, kind: ThingKindName): Promise<void> {
@@ -624,4 +644,39 @@ export async function thingControls(page: Page, thing: Locator): Promise<Locator
   const id = await thing.getAttribute('data-id');
   if (id === null) throw new Error('Thing placement id missing');
   return thing.or(page.locator(`[data-thing-rail-for="${id}"]`));
+}
+
+/**
+ * Assert a menu's rows read as the given groups, in order, with exactly one
+ * separator between each pair of groups — the one grouping grammar every
+ * entity, Diagram, Graph and Space menu in this product now shares
+ * (`.scratch/dock-menu-reorganisation/`).
+ *
+ * Reads the ordered `menuitem` / `menuitemradio` / `separator` rows rather
+ * than `role="group"`, because that is the one shape every menu here
+ * supports: the Diagram and Graph command lists (`DiagramMenuActions`,
+ * `GraphMenuActions`) do render a `role="group"` per group, but the Thing
+ * and Space Thing entity menus (`EntityActionsMenu`) deliberately do not —
+ * its own `MenuGroup` doc comment explains why. A matching separator count
+ * in the wrong place still fails.
+ */
+export async function expectMenuGroups(
+  menu: Locator,
+  groups: readonly (readonly (string | RegExp)[])[],
+): Promise<void> {
+  const rows = menu.locator('[role="menuitem"], [role="menuitemradio"], [role="separator"]');
+  const expected: (string | RegExp)[] = [];
+  for (const [index, group] of groups.entries()) {
+    if (index > 0) expected.push('separator');
+    expected.push(...group);
+  }
+  await expect(rows).toHaveCount(expected.length);
+  for (const [index, row] of expected.entries()) {
+    const locator = rows.nth(index);
+    if (row === 'separator') {
+      await expect(locator).toHaveAttribute('role', 'separator');
+      continue;
+    }
+    await expect(locator).toHaveText(row);
+  }
 }

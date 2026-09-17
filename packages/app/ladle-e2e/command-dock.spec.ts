@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
+import { expectMenuGroups, thingActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -132,6 +133,26 @@ test(
 );
 
 /**
+ * The Diagram menu's one grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/01`): the Diagram list, New
+ * Diagram on its own, Rename beside Copy link to Diagram, then Delete — one
+ * separator between each group.
+ */
+test('the Diagram menu groups New Diagram, Rename with Copy link, then Delete', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await disclose(page, 'Diagram: Collection 1');
+  await expectMenuGroups(menu, [
+    ['Collection 1', 'Collection 2'],
+    ['New Diagram'],
+    ['Rename', 'Copy link to Diagram'],
+    ['Delete Collection 1'],
+  ]);
+});
+
+/**
  * New Graph is in the Graph menu, beside the list it adds to, and it appends,
  * colours and activates one empty Graph in one Edit (ADR 0040).
  */
@@ -206,13 +227,15 @@ test(
 );
 
 /**
- * The two addresses a Graph has, from the Graph's own menu.
- *
- * The application writes the real product URL to the clipboard. Both addresses
- * are asserted against the shared destination contract.
+ * The Graph menu's one grouping grammar and its one address
+ * (`.scratch/dock-menu-reorganisation/issues/01`): the Graph list, Colour…
+ * on its own immediately after it, New Graph, Rename beside Copy link to
+ * Graph, then Delete — one separator between each group. The application
+ * writes the real within-Diagram product URL to the clipboard, and offers no
+ * permanent address of the Graph's own.
  */
 test(
-  'the Graph menu builds the Diagram address and the Graph address separately',
+  'the Graph menu groups its commands and copies only its within-Diagram address',
   { tag: '@parity:command-dock-copies-graph-destinations' },
   async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -222,22 +245,122 @@ test(
     if (diagram === undefined || graph === undefined) throw new Error('Missing fixture Graph');
 
     const menu = await disclose(page, 'Active Graph: Long');
-    await menu.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+    await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
+    await expectMenuGroups(menu, [
+      ['Long', 'Mid', 'Short'],
+      ['Colour…'],
+      ['New Graph'],
+      ['Rename', 'Copy link to Graph'],
+      ['Delete Long'],
+    ]);
+
+    await menu.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
         `https://example.test${productDestinationPath({ kind: 'diagram-graph', spaceId: commandDockSnapshot.id, diagramId: diagram.id, graphId: graph.id })}`,
       );
-
-    const reopened = await disclose(page, 'Active Graph: Long');
-    await reopened.getByRole('menuitem', { name: 'Copy permanent link' }).click();
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(
-        `https://example.test${productDestinationPath({ kind: 'graph', spaceId: commandDockSnapshot.id, graphId: graph.id })}`,
-      );
   },
 );
+
+/**
+ * The Space menu's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
+ * Space, then Exit Space — one separator between the two groups. Reorganisation
+ * only: the Space's own address is unchanged, and Exit still stays trailing and
+ * disabled on Meta (`command-dock-edits-identity-names`,
+ * `space-thing.spec.ts`'s Exit coverage).
+ */
+test('the Space menu groups Rename with Copy link to Space, then Exit Space', async ({ page }) => {
+  await page.goto(story('default'));
+
+  const menu = await disclose(page, 'Space: Rendering');
+  await expectMenuGroups(menu, [['Rename', 'Copy link to Space'], ['Exit Space']]);
+});
+
+/**
+ * The Space's own copied destination, exercised the way the Graph's is above:
+ * the application writes the real product URL to the clipboard, and it is the
+ * Space's own address rather than the drawing Diagram's
+ * (`link-actions.spec.ts` holds the reason no second address is offered).
+ */
+test('Copy link to Space copies the Space’s own durable address', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto(story('default'));
+
+  const menu = await disclose(page, 'Space: Rendering');
+  await menu.getByRole('menuitem', { name: 'Copy link to Space', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(
+      `https://example.test${productDestinationPath({ kind: 'space', spaceId: commandDockSnapshot.id })}`,
+    );
+});
+
+/**
+ * The Thing rail's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/03`), reached through the real
+ * production host: Create Reference on its own, both copy links beside each
+ * other, then Remove from Diagram and Delete from Space sharing the trailing
+ * destructive group — one separator between each. The Command Dock draws no
+ * Thing commands of its own (ADR 0073); this is the rail's own menu.
+ */
+test('a Markdown Thing’s actions menu groups Create Reference, both copy links, then Remove and Delete', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await thingActions(page, 'Opening');
+  await expectMenuGroups(menu, [
+    ['Create Reference'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
+    ['Remove from Diagram', 'Delete from Space'],
+  ]);
+});
+
+/**
+ * Present and unavailable on a Reference Thing (ADR 0070): the same grouping, with
+ * Create Reference leading the menu greyed rather than absent — the row is where
+ * the product says that referencing terminates.
+ */
+test('a Reference Thing’s actions menu keeps Create Reference leading, drawn unavailable', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await thingActions(page, 'Strategy overview');
+  await expect(menu.getByRole('menuitem', { name: /^Create Reference/ })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expectMenuGroups(menu, [
+    [/^Create Reference/],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
+    ['Remove from Diagram', 'Delete from Space'],
+  ]);
+});
+
+/**
+ * A Space Thing's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/04`), reached through the real
+ * production host: Create Reference; Enter and Open in New Tab; the three copy
+ * links; then Remove from Diagram and Delete from Space sharing the trailing
+ * destructive group — one separator between each. Rename is absent — the
+ * Title still edits on the Thing front, unchanged by this grouping.
+ */
+test('a Space Thing’s actions menu groups Create Reference, Enter, links, then Remove and Delete', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await thingActions(page, 'Design system');
+  await expectMenuGroups(menu, [
+    ['Create Reference'],
+    ['Enter', 'Open in New Tab'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+    ['Remove from Diagram', 'Delete from Space'],
+  ]);
+});
 
 /**
  * The name is the rename control, and there is no second surface to return the

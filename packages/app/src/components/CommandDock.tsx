@@ -139,7 +139,7 @@ import './command-dock.css';
 /**
  * The two kinds Create offers, in the order the cluster draws them.
  *
- * **`alias` left, and it left the Dock rather than the list.** An Alias is
+ * **`reference` left, and it left the Dock rather than the list.** A Reference Thing is
  * always created *from* the Thing it points at, which supplies the Target
  * (ADR 0089), so the gesture is a row in that Thing's own command menu and
  * there is nothing here for it to be a peer of.
@@ -470,16 +470,14 @@ export interface DockGraph {
    */
   readonly editsDisabled: boolean;
   /**
-   * The two addresses a Graph always has, and why both are offered.
+   * Copy this Graph's within-Diagram address — "Copy link to Graph" reproduces
+   * what is on screen, so a recipient lands where the sender was.
    *
-   * A Diagram **owns** its Graphs (ADR 0040), so a Graph always has a
-   * within-Diagram address as well as its own. "Copy link" reproduces what is on
-   * screen — this Graph inside this Diagram, so a recipient lands where the
-   * sender was — and "Copy permanent link" is the Graph's own address, which
-   * survives the sender's Diagram being renamed, redrawn or deleted.
+   * A Diagram **owns** its Graphs (ADR 0040) and a Graph also has its own
+   * permanent address, but the Graph menu offers only this one
+   * (`.scratch/dock-menu-reorganisation/issues/01`).
    */
   readonly onCopyLink: () => void;
-  readonly onCopyPermanentLink: () => void;
   readonly presenting: boolean;
   readonly onPresent: () => void;
   /**
@@ -507,7 +505,7 @@ export interface DockGraph {
 export interface DockThingsList {
   /** The Things this Diagram does not place — what the list offers. */
   readonly things: readonly Thing[];
-  /** Every Thing in the Space, for resolving an Alias row's Target Title. */
+  /** Every Thing in the Space, for resolving a Reference Thing row's Target Title. */
   readonly allThings: readonly Thing[];
   /** The Title of every Space a Space Thing in the list references. */
   readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
@@ -1165,7 +1163,6 @@ function GraphIdentityMenu({
         }}
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
-        onCopyPermanentLink={graph.onCopyPermanentLink}
         onDelete={() => graph.onDelete(graph.active.id)}
       />
     </ChoiceMenu>
@@ -1181,10 +1178,10 @@ function GraphIdentityMenu({
  * of the three is the default. That reasoning is kept whole here. What is
  * dropped is the disclosure around them, which cost a press on *every*
  * creation, including the one kind that then needed no second decision:
- * `markdown` completed its Edit on activation, while `alias` and `space` opened
+ * `markdown` completed its Edit on activation, while `reference` and `space` opened
  * a pane because a Target and a target Space were still owed. So the menu
  * charged the cheapest command for a choice it never makes. ADR 0089 has since
- * made every kind complete on activation and taken `alias` out of this cluster
+ * made every kind complete on activation and taken `reference` out of this cluster
  * altogether, which makes the argument stronger rather than weaker.
  *
  * The other half of that recorded design is untouched and still load-bearing:
@@ -1495,7 +1492,7 @@ function ThingsList({ list, side }: { readonly list: DockThingsList; readonly si
   const triggerId = useId();
 
   // Withdrawing the list *closes* it rather than leaving it open behind a
-  // disabled trigger. Presenting and creating an Alias both pass through here,
+  // disabled trigger. Presenting and creating a Reference Thing both pass through here,
   // and a list that reopened itself on the way back would take focus with it,
   // landing the reader in the Things rather than on the canvas they returned to.
   useEffect(() => {
@@ -1592,19 +1589,20 @@ function ThingsControl({
  * the duplication, and the one that had to go is the one whose set was a
  * subset.
  *
- * What is left is what a Diagram and a Graph disclose minus the part that names
- * a set: New and Copy link, in that order, in one group. The list of Spaces
- * this control does *not* draw is the **open** set, and that belongs to the
- * Open Spaces menu beside the parent step, where the question is which Space you are
- * looking at rather than what you can do to it.
+ * **The same grouping grammar as `DiagramMenuActions` and `GraphMenuActions`
+ * minus the part that names a set** (`.scratch/dock-menu-reorganisation/issues/02`):
+ * Rename beside Copy link to Space, then Exit Space — one separator between
+ * the two groups. The list of Spaces this control does *not* draw is the
+ * **open** set, and that belongs to the Open Spaces menu beside the parent
+ * step, where the question is which Space you are looking at rather than what
+ * you can do to it.
  *
  * **Exit is the one command the Open Spaces menu made necessary.** While pressing an
  * ancestor was Exit, leaving and closing were the same gesture and neither
  * needed a name; now that moving closes nothing, the open set only grows unless
- * something takes from it. It sits behind its own separator for the reason
- * Delete does on the other two menus — the commands above it make something and
- * this one takes something away — and it is disabled on the meta Space, which
- * cannot be exited.
+ * something takes from it. It sits in its own trailing group, separated by a
+ * rule — the same position Delete holds on the Diagram and Graph menus — and
+ * it is disabled on the meta Space, which cannot be exited.
  *
  * **It is `openSpaces.exit`'s rules and not this module's.** `CONTEXT.md`'s Exit
  * — wait on an in-flight commit, refuse for `failed` and `conflicted` naming the
@@ -1641,22 +1639,24 @@ function SpaceMenu({
           {renameItem}
           <DropdownMenuItem className="gap-2" onClick={space.onCopyLink}>
             <CopyIcon />
-            Copy link
+            Copy link to Space
           </DropdownMenuItem>
-          {/* Behind its own rule, like Delete on the Diagram and Graph menus:
-              the commands above make something, this one takes something away.
-              It is **not** destructive though, and does not draw as it — exiting
-              a Space discards a session's place in it, not the Space, and
-              re-entering costs one press on a Thing. Meta cannot be exited, so
-              there the row is present and unavailable rather than gone — and
-              that is the *only* case, which `exitDisabled` is named for and
-              `space.parent` was not.
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          {/* Its own trailing group, separated by a rule — the same position
+              Delete holds on the Diagram and Graph menus. It is **not**
+              destructive though, and does not draw as it — exiting a Space
+              discards a session's place in it, not the Space, and
+              re-entering costs one press on a Thing. Meta cannot be exited,
+              so there the row is present and unavailable rather than gone —
+              and that is the *only* case, which `exitDisabled` is named for
+              and `space.parent` was not.
 
               **Exit, because the glossary says Exit.** `CONTEXT.md` gives the
               word to the one action that closes an entered Space, and
               `openSpaces.exit` is spelled that way too; this drew "Close Space"
               and so named a fourth thing beside Open, Close and Exit. */}
-          <DropdownMenuSeparator />
           <DropdownMenuItem
             className="gap-2"
             disabled={space.exitDisabled}

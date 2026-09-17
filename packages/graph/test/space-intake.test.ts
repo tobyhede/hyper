@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type Thing, type ThingPlacement } from '@project/core';
 import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
-import { aliasFile, thingFile, uuid } from './thing-files';
+import { referenceFile, thingFile, uuid } from './thing-files';
 
 /**
  * The Space intake contract, run against **both** loaders.
@@ -52,8 +52,8 @@ const viaFiles: Loader = ({ things, ...structure }) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
     things.map((thing) =>
-      thing.kind === 'alias'
-        ? aliasFile(thing.id, thing.title, thing.target)
+      thing.kind === 'reference'
+        ? referenceFile(thing.id, thing.title, thing.target)
         : thing.kind === 'space'
           ? {
               path: `things/${thing.id}.md`,
@@ -80,10 +80,10 @@ const markdown = (id: string, title = id): Thing => ({
   body: '',
 });
 
-const aliasTo = (id: string, target: string): Thing => ({
+const referenceTo = (id: string, target: string): Thing => ({
   id: uuid(id),
-  title: `alias ${id}`,
-  kind: 'alias',
+  title: `reference ${id}`,
+  kind: 'reference',
   target: uuid(target),
 });
 
@@ -570,42 +570,44 @@ describe.each([
     });
   });
 
-  describe('aliases (ADR 0009)', () => {
-    it('accepts a single-hop alias to a markdown thing', () => {
+  describe('references (ADR 0009)', () => {
+    it('accepts a single-hop reference to a markdown thing', () => {
       const space = loaded(
         load({
-          things: [markdown(A, 'A'), aliasTo(B, A)],
+          things: [markdown(A, 'A'), referenceTo(B, A)],
           diagrams: [],
         }),
       );
       expect(space.things).toHaveLength(2);
     });
 
-    it('refuses an alias whose target resolves to no thing', () => {
-      const errors = refused(load({ things: [aliasTo(A, ABSENT)], diagrams: [] }));
+    it('refuses a reference thing whose target resolves to no thing', () => {
+      const errors = refused(load({ things: [referenceTo(A, ABSENT)], diagrams: [] }));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'unresolved-alias-target', ref: ABSENT }),
+        expect.objectContaining({ kind: 'unresolved-reference-target', ref: ABSENT }),
       );
     });
 
-    it('refuses an alias that points at itself', () => {
-      const errors = refused(load({ things: [aliasTo(A, A)], diagrams: [] }));
+    it('refuses a reference thing that points at itself', () => {
+      const errors = refused(load({ things: [referenceTo(A, A)], diagrams: [] }));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'alias-self-reference', ref: A }),
+        expect.objectContaining({ kind: 'reference-targets-self', ref: A }),
       );
     });
 
-    it('refuses an alias whose target is itself an alias', () => {
+    it('refuses a reference thing whose target is itself a reference thing', () => {
       const errors = refused(
-        load({ things: [markdown(A, 'A'), aliasTo(B, A), aliasTo(C, B)], diagrams: [] }),
+        load({ things: [markdown(A, 'A'), referenceTo(B, A), referenceTo(C, B)], diagrams: [] }),
       );
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'alias-targets-alias', ref: B }),
+        expect.objectContaining({ kind: 'reference-targets-reference', ref: B }),
       );
     });
 
-    it('accepts an alias whose target is a Space Thing', () => {
-      expect(load({ things: [spaceThing(A, ABSENT), aliasTo(B, A)], diagrams: [] }).ok).toBe(true);
+    it('accepts a reference thing whose target is a Space Thing', () => {
+      expect(load({ things: [spaceThing(A, ABSENT), referenceTo(B, A)], diagrams: [] }).ok).toBe(
+        true,
+      );
     });
   });
 
@@ -647,7 +649,7 @@ describe.each([
     it('accumulates unrelated errors rather than reporting the first', () => {
       const errors = refused(
         load({
-          things: [markdown(A, 'A'), aliasTo(B, ABSENT)],
+          things: [markdown(A, 'A'), referenceTo(B, ABSENT)],
           diagrams: [
             diagram(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
             diagram(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
@@ -657,7 +659,11 @@ describe.each([
       );
 
       expect(new Set(errors.map(({ kind }) => kind))).toEqual(
-        new Set(['duplicate-diagram-id', 'unresolved-default-diagram', 'unresolved-alias-target']),
+        new Set([
+          'duplicate-diagram-id',
+          'unresolved-default-diagram',
+          'unresolved-reference-target',
+        ]),
       );
     });
 

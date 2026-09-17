@@ -50,15 +50,15 @@ Guards above are omitted below.
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `edited-thing` | `thing-not-found` → `thing-kind-immutable` → `alias-target-immutable` → `space-thing-target-immutable` → `thing-title-required` → (identical to current ⇒ `unchanged`) → `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `edited-thing` | `thing-not-found` → `thing-kind-immutable` → `reference-target-immutable` → `space-thing-target-immutable` → `thing-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-not-found` → `reference-target-must-own-content` → completed |
 | `created-thing` | none → completed |
-| `created-alias` | `alias-target-not-found` → `alias-target-must-own-content` → completed |
+| `created-reference` | `reference-target-not-found` → `reference-target-must-own-content` → completed |
 | `opened-thing` | `thing-not-in-diagram` → (already Open ⇒ `unchanged`) → completed |
 | `closed-thing` | `thing-not-in-diagram` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-thing` | `thing-not-in-diagram` → `thing-not-expanded` → (same size ⇒ `unchanged`) → completed |
 | `added-thing-to-diagram` | `thing-not-found` → `thing-already-in-diagram` → completed |
 | `removed-thing-from-diagram` | `thing-not-in-diagram` → completed |
-| `deleted-thing` | `thing-not-found` → `space-thing-deletion-unsupported` → `thing-has-aliases` → completed |
+| `deleted-thing` | `thing-not-found` → `space-thing-deletion-unsupported` → `thing-has-references` → completed |
 
 `thing-not-expanded` is the code `resized-thing` raises for a Thing that is
 **Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
@@ -132,13 +132,13 @@ none is produced anywhere else. 22 of those 23 are tabulated above;
 appears in no row.
 Count the codes, not the cells: several serve more than one action —
 `thing-not-found`, `thing-not-in-diagram`, `graph-not-owned`,
-`edge-thing-outside-diagram` and the two `alias-target-*` each appear in more than
+`edge-thing-outside-diagram` and the two `reference-target-*` each appear in more than
 one row.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one
 place each surface's field mapping lives: the domain names the code, the
 application owns the sentence. Five surfaces map it today — Markdown Thing
-editing (`title`), Alias editing and Alias creation (`title` / `target`),
+editing (`title`), Reference Thing editing and Reference Thing creation (`title` / `target`),
 Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
 deletion (form only). Every record is
 `Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each

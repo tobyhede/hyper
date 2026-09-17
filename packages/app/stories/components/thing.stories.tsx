@@ -29,14 +29,14 @@ export const States: Story = () => (
         <Specimen label="thing · dragging">
           <CanvasThingSpecimen title="Strategies" state="dragging" />
         </Specimen>
-        <Specimen label="alias · rest">
-          <CanvasThingSpecimen title="Opening, again" kind="alias" />
+        <Specimen label="reference · rest">
+          <CanvasThingSpecimen title="Opening, again" kind="reference" />
         </Specimen>
-        <Specimen label="alias · selected">
-          <CanvasThingSpecimen title="Opening, again" kind="alias" state="selected" />
+        <Specimen label="reference · selected">
+          <CanvasThingSpecimen title="Opening, again" kind="reference" state="selected" />
         </Specimen>
-        <Specimen label="alias · dragging">
-          <CanvasThingSpecimen title="Opening, again" kind="alias" state="dragging" />
+        <Specimen label="reference · dragging">
+          <CanvasThingSpecimen title="Opening, again" kind="reference" state="dragging" />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -72,7 +72,7 @@ const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuf
  */
 const FRONTS = [
   { kind: 'markdown', label: 'markdown' },
-  { kind: 'alias', label: 'alias' },
+  { kind: 'reference', label: 'reference' },
   { kind: 'space', label: 'space' },
   { kind: 'preview', label: 'creation ghost' },
 ] as const satisfies readonly { kind: CanvasThingFront['kind']; label: string }[];
@@ -81,12 +81,12 @@ const FRONTS = [
  * The whole of a Thing front, at rest, for every front the component draws.
  *
  * This story exists because no other one showed a front entire: `States`,
- * `Kinds`, `Hover`, `Colours`, `Open and close`, `Open Alias` and `Resize
+ * `Kinds`, `Hover`, `Colours`, `Open and close`, `Open Reference Thing` and `Resize
  * control` are each a slice, and two undecided elements lived on the front for
  * months because the slice that drew them was not the slice anyone reviewed.
  *
  * What every specimen below draws, and all it draws: the kind glyph at the
- * leading edge of the rail, the Thing's border — dotted for an Alias, solid for
+ * leading edge of the rail, the Thing's border — dotted for a Reference Thing, solid for
  * every other front — and the Thing's Title, as one `.canvas-thing__title-line`
  * per Title Line. Nothing is drawn beneath the Title: a closed Thing's whole
  * content is the Title its author wrote. No specimen is handed an authoring
@@ -97,7 +97,7 @@ export const Front: Story = () => (
   <div className="inv inv-sheet" style={thingSizeVars}>
     <CatalogueSection
       title="Thing front"
-      note="Every front CanvasThing draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its kind glyph, its border — dotted only for an Alias — and its Title Lines, and beneath the Title it draws nothing."
+      note="Every front CanvasThing draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its kind glyph, its border — dotted only for a Reference Thing — and its Title Lines, and beneath the Title it draws nothing."
     >
       <div className="inv-row">
         {FRONTS.map((front) => (
@@ -135,7 +135,7 @@ export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={thingSizeVars}>
     <CatalogueSection
       title="Thing kinds"
-      note="Kind changes the icon and the border treatment (an Alias's dotted border) without adding a textual kind label. This story exercises CanvasThing's presentation interface directly."
+      note="Kind changes the icon and the border treatment (a Reference Thing's dotted border) without adding a textual kind label. This story exercises CanvasThing's presentation interface directly."
     >
       <div className="inv-row">
         <Specimen label="markdown">
@@ -144,8 +144,8 @@ export const Kinds: Story = () => (
         <Specimen label="markdown · long title">
           <CanvasThingSpecimen title="Why authored placement beats a layout engine that reshuffles on every edit" />
         </Specimen>
-        <Specimen label="alias">
-          <CanvasThingSpecimen title="Opening, again" kind="alias" />
+        <Specimen label="reference">
+          <CanvasThingSpecimen title="Opening, again" kind="reference" />
         </Specimen>
       </div>
     </CatalogueSection>
@@ -291,7 +291,7 @@ function Instance({
   kind = 'markdown',
 }: {
   readonly initialTitle: string;
-  readonly kind?: 'markdown' | 'alias';
+  readonly kind?: 'markdown' | 'reference';
 }) {
   const [title] = useState(initialTitle);
   const [selected, setSelected] = useState(false);
@@ -302,8 +302,8 @@ function Instance({
     return 'completed' as const;
   };
   const front: CanvasThingFront =
-    kind === 'alias'
-      ? { kind: 'alias', target: { kind: 'markdown', source: '' }, open: false }
+    kind === 'reference'
+      ? { kind: 'reference', target: { kind: 'markdown', source: '' }, open: false }
       : open
         ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
         : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen };
@@ -348,7 +348,7 @@ function Instance({
 export const Actions: Story = () => (
   <div className="flex flex-wrap gap-8 p-8" style={thingSizeVars}>
     <Instance initialTitle="Strategies" />
-    <Instance initialTitle="Opening, again" kind="alias" />
+    <Instance initialTitle="Opening, again" kind="reference" />
   </div>
 );
 
@@ -406,7 +406,7 @@ export const OpenAndClose: Story = () => {
 };
 OpenAndClose.meta = { iframed: true };
 
-export const OpenAlias: Story = () => {
+export const OpenReference: Story = () => {
   const [open, setOpen] = useState(true);
   const changeOpen = (next: boolean) => {
     setOpen(next);
@@ -415,7 +415,7 @@ export const OpenAlias: Story = () => {
   return (
     <div className="p-8">
       <CanvasThingNodeSpecimen
-        thingId={thingIds.openingAlias}
+        thingId={thingIds.openingReference}
         expanded={open}
         onOpenChange={changeOpen}
         thingEditingEnabled
@@ -426,8 +426,8 @@ export const OpenAlias: Story = () => {
     </div>
   );
 };
-OpenAlias.storyName = 'Open Alias';
-OpenAlias.meta = { iframed: true };
+OpenReference.storyName = 'Open Reference Thing';
+OpenReference.meta = { iframed: true };
 
 /**
  * Enter is the Space Thing's kind command (ADR 0073, ADR 0068): it sits on the

@@ -73,12 +73,12 @@ describe('loadSpace', () => {
     });
   });
 
-  it('rejects an alias file with a body, because its content comes from its target', () => {
+  it('rejects a reference thing file with a body, because its content comes from its target', () => {
     const result = loadSpace(noStructure, [
       thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
       {
         path: 'things/a-again.md',
-        text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A again\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\nThis would be discarded.\n',
+        text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A again\nkind: reference\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\nThis would be discarded.\n',
       },
     ]);
 

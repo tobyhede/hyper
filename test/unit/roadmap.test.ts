@@ -393,8 +393,8 @@ describe('release scope', () => {
     );
     write(
       root,
-      'parallel/issues/01-alias.md',
-      '# 01 — Alias\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      'parallel/issues/01-reference.md',
+      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
     write(
       root,
@@ -482,8 +482,8 @@ describe('release scope', () => {
     );
     write(
       root,
-      'parallel/issues/01-alias.md',
-      '# 01 — Alias\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      'parallel/issues/01-reference.md',
+      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
 
     const roadmap = buildRoadmap(root);
@@ -558,8 +558,8 @@ describe('release scope', () => {
     );
     write(
       root,
-      'parallel/issues/01-alias.md',
-      '# 01 — Alias\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      'parallel/issues/01-reference.md',
+      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
 
     const release = readReleaseScope(root);
@@ -573,8 +573,8 @@ describe('release scope', () => {
     // outcome, so it has to stay loadable rather than fail intake as empty.
     write(
       root,
-      'parallel/issues/01-alias.md',
-      '# 01 — Alias\n\nStatus: resolved\nTags: release/v1\n',
+      'parallel/issues/01-reference.md',
+      '# 01 — Reference Thing\n\nStatus: resolved\nTags: release/v1\n',
     );
     const emptied = writeReleaseSpace(root, buildRoadmap(root), release);
     if (emptied === null) throw new Error('Expected a generated Space.');
@@ -605,8 +605,8 @@ describe('release scope', () => {
     );
     write(
       root,
-      'parallel/issues/01-alias.md',
-      '# 01 — Alias\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      'parallel/issues/01-reference.md',
+      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
     write(
       root,

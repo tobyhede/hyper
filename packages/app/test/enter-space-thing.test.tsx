@@ -6,6 +6,7 @@ import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { beginRename, dock, exitSpaceItem } from './command-dock';
+import { expectMenuGroups } from './menu-assertions';
 
 /**
  * Entering a Space Thing from its rail (ADR 0068, ADR 0073).
@@ -218,6 +219,29 @@ describe('entering a Space Thing', { timeout: 15_000 }, () => {
 
     await beginRename('space-title');
     expect(screen.getByRole('textbox', { name: 'Space name' })).toHaveValue('Home');
+  });
+
+  /**
+   * The Space Thing menu's own grouping grammar
+   * (`.scratch/dock-menu-reorganisation/issues/04`): Create Reference on its own,
+   * then Enter beside Open in New Tab, then the three copy links, then Remove
+   * from Diagram and Delete from Space sharing the trailing destructive group
+   * — one separator between each. Rename is absent. Unlike
+   * `thing-rail-actions.test.tsx`'s isolated single-Space mount, this file's
+   * `OpenSpacesApplication` composition is what makes Enter reachable at all.
+   */
+  it('groups Create Reference, Enter and Open in New Tab, the copy links, then Remove and Delete', async () => {
+    await mount();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Thing Architecture' }));
+    const menu = await screen.findByRole('menu');
+
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Enter', 'Open in New Tab'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+      ['Remove from Diagram', 'Delete from Space'],
+    ]);
   });
 
   it('adds the target to Open Spaces, shows it, and seeds the Thing’s Diagram and Graph', async () => {

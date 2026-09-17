@@ -1,0 +1,34 @@
+# 04 — A Space Thing deletion refuses when an Alias arrives during its wait
+
+Status: done
+Blocked by: none
+
+**What to build:** Give the registry's lifecycle coordination the `prepare`/`plan` shape beside the existing `derive` shape, and move Space Thing deletion onto it. Deleting a Space Thing decides its rules and its cross-Space cascade from the Spaces as they stand after the coordination's last wait, and a refusal from that decision is answered as a value. See `../spec.md`, "Coordinated operations decide after their last wait".
+
+**Why:** Today deletion checks in `derive`, waits on the aggregate read, then re-applies a closure to a working snapshot an Edit may have changed during the wait. When an Alias of the Space Thing lands in that window, the re-applied `deleteFromSpace` refuses and `completedSnapshot` throws, so `delete()` rejects instead of telling the author the Thing still has Aliases.
+
+## Red first
+
+- [x] **Already written and red:** `refuses to delete a Space Thing an Alias came to target while the deletion was reading persistence` in the registry tests. It rejects today with `Space Thing deletion through SnapshotEdit answered 'refused'`.
+- [x] **The cascade is planned late too.** A Space Thing reference to the target Space, added in another Space during the same wait, keeps the target Space from being deleted. Write it failing first; if it will not fail, strike it here and say why in Comments.
+
+## Build
+
+- [x] The coordination accepts an operation as `prepare` (async: every wait, including the aggregate read deletion needs) and `plan` (synchronous: reads the current Spaces, answers changes or a refusal). The coordination performs its own aggregate read before `plan`, and nothing suspends between `plan` and installing its result. `plan`'s type does not admit a Promise.
+- [x] A refusal from `plan` is installed and answered by the coordination as a value, beside `aggregate-refused` and `persistence-read-failed`.
+- [x] Space Thing deletion runs `SnapshotEdit.deleteFromSpace` and computes the target-Space cascade inside `plan`. Checks left in `prepare` are early exits only.
+- [x] The old `derive` shape stays for create, link, `deleteDiagram` and `deleteGraph` until 05, 06 and 07.
+
+## Done when
+
+- [x] Both red tests pass; the delete-after-Alias test also asserts the containing Space still holds the Space Thing and the Alias, and that the Alias Edit commits once the coordination ends.
+- [x] `pnpm verify` is green. `pnpm e2e` is run because Space Thing deletion is canvas-visible — deferred to after 07; `pnpm e2e` was run once, after 07 landed on top of 04–06: 215 passed (2.6m). `pnpm e2e:ladle` is not applicable unless a story changes.
+
+## Comments
+
+- **Deletion now makes exactly one aggregate read, not two — so both red tests' injection point moved from the coordination's second `loadAggregate()` call to its only one.** The given red test injected the late Alias at `reads === 2` (the outer coordination's redundant read, which is where the old bug lived: `derive`'s own read decided against the Alias-free state, and the second read's re-applied closure met the Alias and threw). Under the `prepare`/`plan` shape there is no second read to inject into — `prepare` does no read of its own for delete (only `recoveryRefusal`, a synchronous early exit), and the coordination's one aggregate read is the only wait before `plan` decides. I moved the injection to `reads === 1` and asserted `expect(reads).toBe(1)` in both tests, which is not a cosmetic tweak: it's the ticket's central guarantee ("decide after your last wait," singular) written as an assertion. One consequence worth recording: at `reads === 1`, the *old* code also happens to answer both scenarios correctly on the domain outcome (its own `derive` re-reads live session state fresh right after its first — and, at this injection point, only — wait, before deciding), so the domain-outcome assertions in these two tests no longer discriminate old from new code by themselves; only the read-count assertion does, confirmed by running both tests against the pre-ticket-04 `session-registry.ts` (via `git checkout HEAD --` and a saved patch, restored after) — output: `expected 2 to be 1` for both, nothing else. This is expected: old code's specific defect (a decision reapplied blindly against a *second*, later read) has no analogue once there is only one read, by construction.
+- **New second red test:** `keeps a target Space alive when another Space comes to reference it while the deletion was reading persistence`. It simulates the late reference as an ordinary, already-committed Edit on a third Space (a direct `backend.commit` inside the mocked `loadAggregate`, awaited before the real read), not a live session's `submit`, because a live session's queued (`waiting`) edit is not part of the coordinated commit's own backend request — only Spaces named in `plan`'s `changes` are — so layering the reference in as an uncommitted session edit produced a self-inconsistency between the coordination's in-memory decision and the backend's own redundant validation (a spurious `ordinary-space-unreferenced`/timeout, not the scenario under test). An already-committed sibling Edit is the honest shape of "another author's Edit landed during the wait."
+- **`prepare` for delete has no `await` in its body** (`Promise.resolve(recoveryRefusal(...) ?? { kind: 'proceed' })` rather than an `async` arrow), because `@typescript-eslint/require-await` flags an `async` function with nothing to await — there being no read left in `prepare` once the coordination owns the aggregate read is exactly the point.
+- Reused the existing `SpaceThingRefused` type (`{ kind: 'refused'; refusal: SpaceThingRefusal }`) as the refused arm of `SpaceThingPlanOutcome`, `SpaceThingPreparationOutcome` and `SpaceThingCoordinationResult`, rather than inventing a new shape, since it already named exactly this.
+- `runSpaceThingCoordination`'s signature changed from a bare `derive` callback to a `SpaceThingCoordinationSource` (`{kind:'derive', derive} | {kind:'plan', prepare, plan}`) so both shapes share the turn-taking/barrier bookkeeping, the participants/`ensureCreateParticipants` machinery, the intake check and the whole commit/recovery tail verbatim — only how `changes`, `aggregate` and the raw candidate map are obtained differs between the two branches. `coordinateSpaceThingLifecycle` (existing, used by create/link/deleteDiagram/deleteGraph) wraps its `derive` argument in `{kind:'derive', derive}` internally, so none of those four call sites changed at all. `coordinateSpaceThingPlan` is the new sibling wrapper delete uses.
+- `pnpm verify` is green (see report). `pnpm e2e` was **not** run per the coordinator's instruction — it is deferred to run once after tickets 04–07 land together.

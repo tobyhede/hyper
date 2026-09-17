@@ -16,6 +16,7 @@ import type { HistoryApi } from '../src/browser-location';
 import { composeApp } from '../src/compose-app';
 import type { DestinationOpening } from '../src/destination-opening';
 import { recordingHistory } from './browser-history';
+import { expectMenuGroups } from './menu-assertions';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 import { THING_HEIGHT, THING_WIDTH } from '../src/thing';
@@ -36,7 +37,7 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
@@ -74,8 +75,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/** The same Space with an Alias of `A` already in it, for the terminal-row case. */
-const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
+/** The same Space with a Reference Thing of `A` already in it, for the terminal-row case. */
+const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
@@ -84,14 +85,14 @@ const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.diagrams?.[0],
         positions: {
           ...snapshot.document.diagrams?.[0]?.positions,
-          [ALIAS_ID]: { x: 0, y: 400, open: false },
+          [REFERENCE_ID]: { x: 0, y: 400, open: false },
         },
       },
     ],
   },
   things: [
     ...snapshot.things,
-    { id: ALIAS_ID, document: { title: 'A alias', kind: 'alias', target: THING_ID } },
+    { id: REFERENCE_ID, document: { title: 'A reference', kind: 'reference', target: THING_ID } },
   ],
 });
 
@@ -134,7 +135,7 @@ const runtime = (value: SpaceSnapshot) => {
 function mount(
   opening?: DestinationOpening,
   history?: HistoryApi,
-  /** The Space to mount, for the one case that needs an Alias already in it. */
+  /** The Space to mount, for the one case that needs a Reference Thing already in it. */
   mounted: SpaceSnapshot = snapshot,
 ): SpaceSession {
   const stored = { snapshot: mounted, revision: 0n, exportedRevision: null };
@@ -250,6 +251,48 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
+   * The Thing menu's one grouping grammar
+   * (`.scratch/dock-menu-reorganisation/issues/03`): Create Reference on its own,
+   * both copy links beside each other, then Remove from Diagram and Delete
+   * from Space sharing the trailing destructive group — one separator between
+   * each. The dropdown and the context menu draw the identical list
+   * (`EntityActionItems`), so this is the one place the order has to hold.
+   */
+  it('groups Create Reference, both copy links, then Remove and Delete, in that order', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    const menu = await screen.findByRole('menu');
+
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing'],
+      ['Remove from Diagram', 'Delete from Space'],
+    ]);
+    await settled(session);
+  });
+
+  /**
+   * Present and unavailable on a Reference Thing (ADR 0070): the same grouping, with
+   * Create Reference leading the menu greyed rather than absent.
+   */
+  it('keeps Create Reference leading and unavailable in a Reference Thing’s own menu', async () => {
+    const session = mount(undefined, undefined, withReference);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
+      ['Remove from Diagram', 'Delete from Space'],
+    ]);
+    expect(items[0]).toHaveAttribute('aria-disabled', 'true');
+    await settled(session);
+  });
+
+  /**
    * Remove from Diagram is the named command for the Edit Delete/Backspace already
    * runs. It must not ask first: that question is Delete from Space's, because only
    * a Space deletion cascades (v1-release/03).
@@ -315,23 +358,23 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
-   * **Create Alias is a command about the Thing, so it lives on the Thing.**
+   * **Create Reference is a command about the Thing, so it lives on the Thing.**
    *
-   * An Alias is always created *from* its Target (ADR 0089), which is what
+   * A Reference Thing is always created *from* its Target (ADR 0089), which is what
    * removes the Target-selection interaction entirely — the gesture is on the
    * Thing, so the Target is the Thing it was invoked on. It inherits this
    * menu's keyboard route rather than needing one invented, which is why it is
    * a row here and not a rail glyph or a bare shortcut.
    */
-  it('creates an Alias of the Thing whose menu ran the command', async () => {
+  it('creates a Reference Thing of the Thing whose menu ran the command', async () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
     await waitFor(() => expect(thingIds(session)).toHaveLength(3));
     const created = session.getState().working.things[2];
-    expect(created?.document).toEqual({ title: 'A', kind: 'alias', target: THING_ID });
+    expect(created?.document).toEqual({ title: 'A', kind: 'reference', target: THING_ID });
     await settled(session);
   });
 
@@ -340,15 +383,15 @@ describe('a Thing’s commands on the canvas rail', () => {
    * caret is in it.
    *
    * ADR 0083 keeps the Target's name off the Thing front, so without the copy
-   * the author has no on-canvas indication of what the Alias points at beyond
+   * the author has no on-canvas indication of what the Reference Thing points at beyond
    * the dotted border. Copying it *once* is what keeps the two ordinary
    * independent Titles afterwards.
    */
-  it('continues in the new Alias’s own Title editor, seeded from its Target', async () => {
+  it('continues in the new Reference Thing’s own Title editor, seeded from its Target', async () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
     const editor = await screen.findByRole('textbox', { name: 'Thing title' });
     expect(editor).toHaveValue('A');
@@ -357,26 +400,26 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
-   * Placed at a fixed offset from the source, so the Alias lands where the
+   * Placed at a fixed offset from the source, so the Reference Thing lands where the
    * author is looking.
    *
    * A free-position search was rejected: that is a placement algorithm, and ADR
    * 0086 put automatic arrangement behind an Edit and out of the render path
    * deliberately. The overlap is authored and the author drags it off.
    */
-  it('places the Alias at a fixed offset from the Thing it was made from', async () => {
+  it('places the Reference Thing at a fixed offset from the Thing it was made from', async () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
     await waitFor(() => expect(thingIds(session)).toHaveLength(3));
-    const alias = session.getState().working.things[2]!.id;
+    const reference = session.getState().working.things[2]!.id;
     const positions = session.getState().working.document.diagrams?.[0]?.positions;
-    // Three quarters of a Thing on each axis, not half: at half the new Alias's
+    // Three quarters of a Thing on each axis, not half: at half the new Reference Thing's
     // centre lands exactly on the Target's bottom-right corner and the Target
-    // takes every pointer event aimed at it (`ALIAS_OFFSET_RATIO` in `App.tsx`).
-    expect(positions?.[alias]).toMatchObject({
+    // takes every pointer event aimed at it (`REFERENCE_OFFSET_RATIO` in `App.tsx`).
+    expect(positions?.[reference]).toMatchObject({
       x: Math.round(THING_WIDTH * 0.75),
       y: Math.round(THING_HEIGHT * 0.75),
     });
@@ -384,7 +427,7 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   it.each([4, 6])(
-    'keeps an Alias separated after closing its %s-times-sized Target',
+    'keeps a Reference Thing separated after closing its %s-times-sized Target',
     async (scale) => {
       const opened = spaceSnapshotSchema.parse({
         ...snapshot,
@@ -408,40 +451,154 @@ describe('a Thing’s commands on the canvas rail', () => {
       });
       const session = mount(undefined, undefined, opened);
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
       const editor = await screen.findByRole('textbox', { name: 'Thing title' });
       fireEvent.keyDown(editor, { key: 'Escape' });
-      const alias = session.getState().working.things[2]!.id;
+      const reference = session.getState().working.things[2]!.id;
       fireEvent.click(await screen.findByRole('button', { name: 'Close Thing A' }));
       await waitFor(() => {
         const positions = session.getState().working.document.diagrams?.[0]?.positions;
         expect(positions?.[THING_ID]?.open).toBe(false);
         // Same authored offset the closed-Target creation asserts: Close reclaims
-        // the growth that `createAliasFrom` added ahead of the collapsed step, so
-        // the Alias lands back on the rounded 0.75 of each collapsed axis.
-        expect(positions?.[alias]?.x).toBe(Math.round(THING_WIDTH * 0.75));
-        expect(positions?.[alias]?.y).toBe(Math.round(THING_HEIGHT * 0.75));
+        // the growth that `createReferenceFrom` added ahead of the collapsed step, so
+        // the Reference Thing lands back on the rounded 0.75 of each collapsed axis.
+        expect(positions?.[reference]?.x).toBe(Math.round(THING_WIDTH * 0.75));
+        expect(positions?.[reference]?.y).toBe(Math.round(THING_HEIGHT * 0.75));
       });
       await settled(session);
     },
   );
 
   /**
-   * **Present and unavailable on an Alias, not absent.**
+   * **Present and unavailable on a Reference Thing, not absent.**
    *
-   * ADR 0070 forbids an Alias of an Alias, and a row that can never apply would
+   * ADR 0070 forbids a Reference Thing of a Reference Thing, and a row that can never apply would
    * ordinarily not be one of that kind's commands. It is drawn and greyed
-   * anyway, because an Alias is otherwise a regular Thing: this row is where the
-   * product says that aliasing terminates.
+   * anyway, because a Reference Thing is otherwise a regular Thing: this row is where the
+   * product says that referencing terminates.
    */
-  it('offers Create Alias unavailable on an Alias, because aliasing terminates', async () => {
-    const session = mount(undefined, undefined, withAlias);
+  it('offers Create Reference unavailable on a Reference Thing, because referencing terminates', async () => {
+    const session = mount(undefined, undefined, withReference);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A alias' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
 
-    const row = await screen.findByRole('menuitem', { name: /^Create Alias/ });
+    const row = await screen.findByRole('menuitem', { name: /^Create Reference/ });
     expect(row).toHaveAttribute('aria-disabled', 'true');
     expect(thingIds(session)).toHaveLength(3);
+    await settled(session);
+  });
+
+  /**
+   * Copy link to Target copies the Target's own Thing address — not a
+   * within-Diagram one, and not this Reference Thing's own address, which is
+   * what the two rows before it already offer. The Target is often absent from
+   * this Diagram entirely (`.scratch/reference-thing/issues/02`).
+   */
+  it('offers a Reference Thing a Copy link to Target, copying the Target’s own address', async () => {
+    const written: string[] = [];
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (value: string) => {
+          written.push(value);
+          return Promise.resolve();
+        },
+      },
+    });
+
+    try {
+      const session = mount(undefined, undefined, withReference);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: /^Copy link to Target/ }));
+
+      await waitFor(() =>
+        expect(written).toEqual([
+          `https://space.test${productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: THING_ID })}`,
+        ]),
+      );
+      await settled(session);
+    } finally {
+      if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+      else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+    }
+  });
+
+  /**
+   * An unavailable Target — here, the clipboard refusing the write — takes the
+   * existing refusal path rather than a new one: the same standing alert and
+   * the same in-place item label every other copy command uses
+   * (`SpaceApp.test.tsx`).
+   */
+  it('reports a refused Copy link to Target the way every other copy command does', async () => {
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard permission denied')) },
+    });
+
+    try {
+      const session = mount(undefined, undefined, withReference);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: /^Copy link to Target/ }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('Link not copied');
+      expect(alert).toHaveTextContent('The browser refused clipboard access.');
+      expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
+      await settled(session);
+    } finally {
+      if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+      else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+    }
+  });
+
+  /**
+   * The Space Thing menu's own grouping grammar
+   * (`.scratch/dock-menu-reorganisation/issues/04`): Create Reference on its own,
+   * then Open in New Tab (Enter is absent here — this isolated single-Space
+   * mount carries no `OpenSpacesContext`, so `spaces === null` withholds it;
+   * `enter-space-thing.test.tsx` holds the full order with Enter present),
+   * then the three copy links, then Remove from Diagram and Delete from
+   * Space sharing the trailing destructive group — one separator between
+   * each. Rename is absent, which this exact-order assertion would catch as
+   * an extra row if it were not.
+   */
+  it('groups Create Reference, Open in New Tab, the copy links, then Remove and Delete on a Space Thing', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
+    const menu = await screen.findByRole('menu');
+
+    expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Open in New Tab'],
+      ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+      ['Remove from Diagram', 'Delete from Space'],
+    ]);
+    await settled(session);
+  });
+
+  /**
+   * Removing Rename from the Space Thing menu must not take on-front Title
+   * editing with it — the two are separate seams, and this presses the
+   * front's own control directly rather than through the menu.
+   */
+  it('still edits a Space Thing’s Title on the Thing front, not through the menu', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A space' }));
+    const editor = screen.getByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveFocus();
+    fireEvent.change(editor, { target: { value: 'Renamed on the front' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    expect(await screen.findByRole('heading', { name: 'Renamed on the front' })).toBeVisible();
+    expect(
+      session.getState().working.things.find((thing) => thing.id === SPACE_THING_ID)?.document,
+    ).toMatchObject({ title: 'Renamed on the front' });
     await settled(session);
   });
 
@@ -479,15 +636,15 @@ describe('a Thing’s commands on the canvas rail', () => {
     open.mockRestore();
   });
 
-  it('creates an Alias from a Space Thing', async () => {
+  it('creates a Reference Thing from a Space Thing', async () => {
     const session = mount(undefined, undefined, withSpaceThing);
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
-    const row = await screen.findByRole('menuitem', { name: 'Create Alias' });
+    const row = await screen.findByRole('menuitem', { name: 'Create Reference' });
     expect(row).not.toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(row);
     expect(thingIds(session)).toHaveLength(4);
     expect(session.getState().working.things.at(-1)?.document).toMatchObject({
-      kind: 'alias',
+      kind: 'reference',
       title: 'A space',
     });
     await settled(session);

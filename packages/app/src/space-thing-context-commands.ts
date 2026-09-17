@@ -1,5 +1,5 @@
 import type { ThingDocument, GraphId, UUID } from '@project/core';
-import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from './space-thing-rail';
+import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from '@project/ui';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
@@ -142,8 +142,6 @@ export function spaceThingContextCommands(
       },
       onCopyLink: () =>
         copyLink(location.href({ kind: 'diagram-graph', spaceId: entry.id, diagramId, graphId })),
-      onCopyPermanentLink: () =>
-        copyLink(location.href({ kind: 'graph', spaceId: entry.id, graphId })),
     },
   };
 }

@@ -5,8 +5,8 @@ import { ThingSearchCombobox, type ThingChoice } from '../src/index';
 
 /**
  * The one production picker, tested at the component rather than through the
- * surfaces that compose it — Edge `From`/`To`, new Alias Target and opened
- * Alias Target. Every behaviour here is the picker's own contract with all of
+ * surfaces that compose it — Edge `From`/`To`, new Reference Thing Target and opened
+ * Reference Thing Target. Every behaviour here is the picker's own contract with all of
  * them, so a regression belongs to this file rather than to
  * whichever surface happened to notice.
  *
@@ -141,7 +141,7 @@ describe('ThingSearchCombobox', () => {
 
   /**
    * The empty-list note is an addition, never a replacement. A caller's own
-   * description is a refusal attached to this field — an Alias whose Target has
+   * description is a refusal attached to this field — a Reference Thing whose Target has
    * left the Space is refused *and* has no Thing left to choose, so both are true
    * at once, and dropping the caller's leaves `aria-invalid` announcing a
    * problem no assistive technology can read out.

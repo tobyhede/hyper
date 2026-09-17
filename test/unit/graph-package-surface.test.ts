@@ -55,6 +55,7 @@ const OFFERED_VALUES = [
   'graphThingIds',
   'graphStartThing',
   'serializeThingFile',
+  'SnapshotEdit',
 ] as const;
 
 const OFFERED_TYPES = [
@@ -84,6 +85,8 @@ const OFFERED_TYPES = [
   'SpaceAggregateLookup',
   'SpaceError',
   'SpaceLookup',
+  'SnapshotEditOutcome',
+  'SnapshotEditRefusal',
 ] as const;
 
 /** What the index declares, split the way the index declares it. */

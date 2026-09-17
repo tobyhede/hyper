@@ -559,7 +559,6 @@ describe('Space app failure reporting', () => {
       reportsInPlace: true,
     },
     { entity: 'Active Graph: Graph', command: /^Copy link/, reportsInPlace: false },
-    { entity: 'Active Graph: Graph', command: /^Copy permanent link/, reportsInPlace: false },
   ])(
     'reports a rejected clipboard write from $entity $command without unmounting the Space',
     async ({ entity, command, reportsInPlace }) => {

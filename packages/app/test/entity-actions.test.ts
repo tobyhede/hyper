@@ -16,6 +16,8 @@ const OUTSIDE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005'
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const REFERENCE_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 const GRAPH: Graph = { id: GRAPH_ID, title: 'Long', edges: [] };
 const DIAGRAM: Diagram = {
@@ -39,6 +41,13 @@ const spaceThing = (id: typeof PLACED_THING_ID, title: string): Thing => ({
   spaceId: TARGET_SPACE_ID,
   diagram: TARGET_DIAGRAM_ID,
   graph: TARGET_GRAPH_ID,
+});
+
+const referenceThing = (id: Thing['id'], title: string, target: Thing['id']): Thing => ({
+  id,
+  title,
+  kind: 'reference',
+  target,
 });
 
 const build = (
@@ -169,23 +178,18 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Diagram owns its Graphs (ADR 0040), so a Graph row always has both forms:
-   * the address within the Diagram drawing it, and the address that opens it
-   * wherever it is drawn.
+   * A Diagram owns its Graphs (ADR 0040), so a Graph row always has the
+   * address within the Diagram drawing it. A Graph's own permanent address is
+   * no longer offered from any menu (`.scratch/dock-menu-reorganisation/issues/01`).
    */
-  it('offers a Graph both link forms, the Diagram one first', () => {
+  it('offers a Graph its within-Diagram address and no permanent one', () => {
     const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, diagram: DIAGRAM };
 
-    expect(labels(build()(entity))).toEqual(['Rename', 'Copy link', 'Copy permanent link']);
+    expect(labels(build()(entity))).toEqual(['Rename', 'Copy link']);
     expect(copied(entity, 'Copy link')).toEqual({
       kind: 'diagram-graph',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
-      graphId: GRAPH_ID,
-    });
-    expect(copied(entity, 'Copy permanent link')).toEqual({
-      kind: 'graph',
-      spaceId: SPACE_ID,
       graphId: GRAPH_ID,
     });
   });
@@ -251,9 +255,9 @@ describe('spaceEntityActions', () => {
 
   /** Every address command confirms in place, which is what holds the menu open. */
   it('confirms every copy without a subtitle', () => {
-    const copies = commands(build()({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM })).filter(
-      (action) => action.label.startsWith('Copy'),
-    );
+    const copies = commands(
+      build()({ kind: 'thing', thing: thing(PLACED_THING_ID, 'A'), diagram: DIAGRAM }),
+    ).filter((action) => action.label.startsWith('Copy'));
 
     expect(copies).toHaveLength(2);
     for (const action of copies) {
@@ -311,6 +315,39 @@ describe('spaceEntityActions', () => {
     expect(action).toBeDefined();
     expect(await action?.onSelect()).toBe('done');
     expect(opened).toEqual([{ kind: 'space', spaceId: TARGET_SPACE_ID }]);
+  });
+
+  /**
+   * A Reference Thing's own two addresses still name the Reference Thing itself.
+   * Copy link to Target is a third row naming the Target's own Thing address —
+   * never a within-Diagram one, because the Target is often not on this
+   * Diagram at all (`.scratch/reference-thing/issues/02`).
+   */
+  it('offers a Reference Thing a Copy link to Target alongside its own addresses', () => {
+    const entity: SpaceEntity = {
+      kind: 'thing',
+      thing: referenceThing(REFERENCE_THING_ID, 'A reference', REFERENCE_TARGET_ID),
+      diagram: DIAGRAM,
+    };
+
+    expect(labels(build()(entity))).toEqual(['Copy link to Thing', 'Copy link to Target']);
+    expect(copied(entity, 'Copy link to Target')).toEqual({
+      kind: 'thing',
+      spaceId: SPACE_ID,
+      thingId: REFERENCE_TARGET_ID,
+    });
+  });
+
+  /** No "in this Diagram" form for the Target: one row, the Target's own address. */
+  it('offers Copy link to Target only once, never a within-Diagram form', () => {
+    const entity: SpaceEntity = {
+      kind: 'thing',
+      thing: referenceThing(REFERENCE_THING_ID, 'A reference', REFERENCE_TARGET_ID),
+      diagram: DIAGRAM,
+    };
+
+    const written = labels(build()(entity));
+    expect(written.filter((label) => label.includes('Target'))).toEqual(['Copy link to Target']);
   });
 
   it('withholds the independent Space address from a Markdown Thing', () => {

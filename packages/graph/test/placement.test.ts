@@ -537,7 +537,7 @@ describe('Placement immutability', () => {
     });
   });
 
-  it('copies the points it is handed instead of aliasing them', () => {
+  it('copies the points it is handed instead of referencing them', () => {
     // `fromEntries` is built from React Flow's live `node.position` objects. A
     // Placement holding those would follow the next drag frame, which is exactly
     // the authored-from-a-report mistake this module exists to prevent.

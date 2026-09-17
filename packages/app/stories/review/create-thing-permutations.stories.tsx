@@ -13,12 +13,17 @@
  * Thing, and it is the one kind that needs no second decision — so the most
  * common command in the product pays for a choice it never makes.
  *
- * **The asymmetry the options are weighed against, because it is real and it is
- * in the code.** `App.tsx` spends the three kinds two different ways:
+ * **The asymmetry the options were weighed against, because it was real and it
+ * was in the code then.** `App.tsx` spent the three kinds two different ways:
  *
- *   markdown  `addThing()`              — one activation completes an Edit
- *   alias     `thingCreation.open()`    — opens a modal pane (a Target is required)
- *   space     `thingCreation.open()`    — opens a modal pane (a Space is required)
+ *   markdown  `addThing()`              — one activation completed an Edit
+ *   reference     `thingCreation.open()`    — opened a modal pane (a Target was required)
+ *   space     `thingCreation.open()`    — opened a modal pane (a Space was required)
+ *
+ * ADR 0089 has since deleted `thingCreation` outright: every kind now completes
+ * on activation, and Reference Thing creation left this cluster for a `Create
+ * Reference` row on the Thing it targets. The table above is the asymmetry this
+ * review found, not what `App.tsx` does today.
  *
  * So the menu was not one command disclosed three ways. It was one command that
  * completes, sitting behind the same trigger as two commands that were always
@@ -75,21 +80,24 @@ import './create-thing-peer-row.css';
 
 export default { title: 'Review/Create Thing' };
 
-/** The three kinds, in the order `CreateMenu` lists them today. */
-const THING_KINDS = ['markdown', 'space', 'alias'] as const;
+/** The three kinds, in the order `CreateMenu` once listed them. */
+const THING_KINDS = ['markdown', 'space', 'reference'] as const;
 
 type ThingKind = (typeof THING_KINDS)[number];
 
 /**
- * What one activation of one kind actually does, which is what the log reports.
+ * What one activation of one kind did, which is what the log reports.
  *
- * Read off `App.tsx`'s own `onCreate`, so the sheet cannot advertise a cost the
- * application does not pay.
+ * Read off `App.tsx`'s own `onCreate` as it stood during this review, so the
+ * sheet did not advertise a cost the application was not then paying. ADR 0089
+ * has since made every kind complete on activation and moved Reference Thing
+ * creation onto the Thing it targets — these outcomes are the review's record,
+ * not current behaviour.
  */
 const KIND_OUTCOME = {
   markdown: 'Edit completed — the Thing is on the canvas',
   space: 'creation pane opened — a target Space is still owed',
-  alias: 'creation pane opened — a Target is still owed',
+  reference: 'creation pane opened — a Target is still owed',
 } as const satisfies Record<ThingKind, string>;
 
 /* ------------------------------------------------------------------ recorder */
@@ -397,13 +405,13 @@ function GroupedPeerCreate({ record }: { readonly record: (line: string) => void
 /**
  * A `+` badge on a kind glyph, which is the "decorate the icons" question drawn.
  *
- * The hole is **cut** rather than painted, for the reason `AliasIcon` gives: the
+ * The hole is **cut** rather than painted, for the reason `ReferenceIcon` gives: the
  * Dock's surface is translucent and blurred, so a disc filled with a background
  * colour composites against whatever canvas is behind the bar. A mask removes
  * the region from the base instead.
  *
  * `corner` exists because the answer differs by kind and that is the finding:
- * an Alias **already** carries a badge at bottom-right, so a `+` there is two
+ * a Reference Thing **already** carries a badge at bottom-right, so a `+` there is two
  * badges on one 14px mark, and moving the `+` to top-right for that one kind
  * makes the three commands disagree about where their own verb lives.
  */
@@ -417,7 +425,7 @@ function PlusBadgedGlyph({
   readonly size?: number;
 }) {
   // The badge's geometry in the glyph's own 24-unit box, so it reads against
-  // `AliasIcon`'s numbers rather than against a second set: centre 17.5 in from
+  // `ReferenceIcon`'s numbers rather than against a second set: centre 17.5 in from
   // the leading edge, radius 7.75, and the same 3-unit stroke, because at 14px
   // it is the mark that has to survive and a filled shape survives where a line
   // weight does not.
@@ -431,12 +439,12 @@ function PlusBadgedGlyph({
       aria-label={`Create ${thingKindName(kind)}`}
       style={{ width: size, height: size }}
     >
-      {/* **The hole is cut, not painted**, which is the rule `AliasIcon` states
+      {/* **The hole is cut, not painted**, which is the rule `ReferenceIcon` states
           and the one this prototype has to honour to be worth looking at: the
           Dock's surface is `--card` at 92% behind an 8px blur, so a disc filled
           with a background colour composites against whatever canvas is behind
           the bar and the badge reads one way over pale paper and another over a
-          Thing. `AliasIcon` cuts it with an SVG mask because it owns its own
+          Thing. `ReferenceIcon` cuts it with an SVG mask because it owns its own
           `svg`; this one is composed over the shipped `ThingKindIcon`, so it
           cuts the same hole from outside with a CSS mask. Same hole, and no new
           export owed by `@project/ui` for a sheet that may be thrown away. */}
@@ -567,7 +575,7 @@ function SplitCreate({ record }: { readonly record: (line: string) => void }) {
  * spent.
  *
  * Create a Markdown Thing once in every strip and read the counts: A costs two,
- * B, C, D and E cost one. Then create an Alias in every strip: A and E cost two,
+ * B, C, D and E cost one. Then create a Reference Thing in every strip: A and E cost two,
  * B, C and D cost one — and all five then hand the author a modal pane, which is
  * the step none of them removes.
  */
@@ -617,7 +625,7 @@ export const Permutations: Story = () => {
           name="D · Peers with + decorated onto each glyph"
           presses={presses['D'] ?? 0}
           claim="B's arithmetic and C's verb at B's width — the mark carries both facts."
-          cost="the badge lands where the Alias already has one, so Create Alias and Create Markdown Thing draw the same mark. See PlusBadges."
+          cost="the badge lands where the Reference Thing already has one, so Create Reference and Create Markdown Thing draw the same mark. See PlusBadges."
         >
           <DockStrip>
             <BadgedPeerCreate record={press('D')} />
@@ -679,7 +687,7 @@ Permutations.meta = { iframed: true };
  * ArrowDown there — `Toolbar.Root` takes `'horizontal' | 'vertical'` and does
  * not expose the composite's own `'both'`. Driven from the keyboard in this
  * story: ArrowRight on the Things trigger does nothing, and ArrowDown three
- * times walks Markdown, Space, Alias in the order they are drawn. So the
+ * times walks Markdown, Space, Reference Thing in the order they are drawn. So the
  * traversal order matches reading order and only the key disagrees with the
  * axis of this one segment. Nothing in the primitive changes that, and adding
  * ArrowLeft/ArrowRight by hand would be a hand-rolled deviation over a
@@ -934,13 +942,13 @@ SingleLine.meta = { iframed: true };
  * a 7.75-unit hole in a 24-unit box, and bottom-right is where `StickyNote`
  * keeps its fold — the one feature separating it from a plain rectangle — so a
  * Markdown Thing badged there is a page with a plus on it. Worse, it is also
- * where an Alias keeps its own arrow, so the `+` does not crowd that badge, it
+ * where a Reference Thing keeps its own arrow, so the `+` does not crowd that badge, it
  * **replaces** it: compare the first and third groups in that row and they are
- * the same mark. Create Markdown Thing and Create Alias would be two commands
+ * the same mark. Create Markdown Thing and Create Reference would be two commands
  * drawing one glyph.
  *
- * **Top-right survives, at a price the Alias pays alone.** The fold and the
- * Alias arrow both live, so the three kinds stay apart — but the Alias is then
+ * **Top-right survives, at a price the Reference Thing pays alone.** The fold and the
+ * Reference Thing arrow both live, so the three kinds stay apart — but the Reference Thing is then
  * carrying two badges on one 14px mark, and at 14px (the chipped glyph at the
  * left of each group, which is the size the Dock draws) it reads as ink rather
  * than as two facts. The other two kinds are fine there.
@@ -959,8 +967,8 @@ export const PlusBadges: Story = () => (
           <h3 className="text-sm font-semibold">
             Badge at {corner}
             {corner === 'bottom-right'
-              ? ' — replaces the Alias badge, and eats the Markdown fold'
-              : ' — both silhouettes survive; the Alias carries two badges'}
+              ? ' — replaces the Reference Thing badge, and eats the Markdown fold'
+              : ' — both silhouettes survive; the Reference Thing carries two badges'}
           </h3>
           <div className="flex flex-wrap items-end gap-8">
             {THING_KINDS.map((kind) => (
