@@ -25,7 +25,9 @@ const thingSheet = read('packages/ui/src/canvas-thing.css');
 const railSheet = read('packages/ui/src/thing-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const thingRailActions = read('packages/ui/src/ThingRailActions.tsx');
+const spaceThingSelectors = read('packages/ui/src/SpaceThingSelectors.tsx');
 const spaceThingRail = read('packages/app/src/SpaceThingRailClusters.tsx');
+const canvasThing = read('packages/ui/src/CanvasThing.tsx');
 
 /** The declaration block of the rule whose selector is exactly `selector`. */
 const block = (stylesheet: string, selector: string): string => {
@@ -133,6 +135,24 @@ describe('choosing a Diagram or a Graph', () => {
   it('is the same shared menu on the Dock and on a Space Thing', () => {
     expect(dock).toContain('<ChoiceMenu<DiagramId>');
     expect(dock).toContain('<ChoiceMenu<GraphId>');
-    expect(spaceThingRail).toContain('<ChoiceMenu<string>');
+    expect(spaceThingSelectors).toContain('<ChoiceMenu<string>');
+  });
+
+  /**
+   * And an Open Space Thing's two choices are themselves **one** control,
+   * mounted by both surfaces that draw them, rather than a control copied
+   * twice: `@project/ui`'s `SpaceThingSelectors` is the sole place a Diagram or
+   * Graph choice is turned into a `ChoiceMenu`, an embedded canvas Thing's own
+   * rail (`CanvasThing`) and the application's Space Thing rail
+   * (`SpaceThingRailClusters`) each mount it rather than restating it.
+   */
+  it('is owned once by @project/ui, not copied onto the canvas Thing or the app rail', () => {
+    expect(spaceThingRail).toContain("from '@project/ui'");
+    expect(spaceThingRail).not.toContain('<ChoiceMenu');
+    expect(spaceThingRail).not.toMatch(/function SpaceThingSelector/u);
+
+    expect(canvasThing).toContain("from './SpaceThingSelectors'");
+    expect(canvasThing).not.toContain('<ChoiceMenu');
+    expect(canvasThing).not.toMatch(/function SpaceThingSelector/u);
   });
 });
