@@ -1,6 +1,6 @@
 # 02 — Copy link to Target
 
-Status: ready-for-agent
+Status: done
 Blocked by: none
 
 **What to build:** A Thing-menu command on a Reference Thing that copies the
@@ -14,11 +14,11 @@ May ship before or after issue 01. If it ships first, the menu still sits on an
 Alias. If it ships after, the row is on a Reference Thing. Either way it is not
 part of the rename commit.
 
-- [ ] One row: **Copy link to Target**.
-- [ ] Clipboard receives the Target's Thing product URL (ADR 0069).
-- [ ] No second “in this Diagram” row.
-- [ ] Unavailable Target uses the existing refusal path, not a new jump.
-- [ ] `pnpm verify`. `pnpm e2e` for the menu row.
+- [x] One row: **Copy link to Target**.
+- [x] Clipboard receives the Target's Thing product URL (ADR 0069).
+- [x] No second “in this Diagram” row.
+- [x] Unavailable Target uses the existing refusal path, not a new jump.
+- [x] `pnpm verify`. `pnpm e2e` for the menu row.
 
 ## Out of scope
 

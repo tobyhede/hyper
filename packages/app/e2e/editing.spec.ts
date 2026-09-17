@@ -5,6 +5,7 @@ import {
   uuidSchema,
   type ThingPlacement,
 } from '@project/core';
+import { productDestinationPath } from '@project/http';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
@@ -3479,6 +3480,54 @@ test('Create Reference is drawn unavailable on a Reference Thing', async ({ page
   const row = menu.getByRole('menuitem', { name: /^Create Reference/ });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-disabled', 'true');
+});
+
+/**
+ * Copy link to Target copies the Target's own canonical Thing address, not a
+ * within-Diagram one — the Target is frequently absent from the Diagram the
+ * Reference Thing itself lives on (`.scratch/reference-thing/issues/02`).
+ */
+const FIXTURE_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
+const THING_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+
+test('Copy link to Target on a Reference Thing copies its Target’s own address', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: (value: string) => {
+          sessionStorage.setItem('copied-product-url', value);
+          return Promise.resolve();
+        },
+        readText: () => Promise.resolve(sessionStorage.getItem('copied-product-url') ?? ''),
+      },
+    });
+  });
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'B').first()).toBeVisible();
+  await settled(page);
+
+  const first = await thingActions(page, 'B');
+  await first.getByRole('menuitem', { name: 'Create Reference' }).click();
+  const title = page.getByRole('textbox', { name: 'Thing title' });
+  await title.fill('Reference Thing of B');
+  await title.press('Enter');
+  await settled(page);
+
+  const menu = await thingActions(page, 'Reference Thing of B');
+  await menu.getByRole('menuitem', { name: /^Copy link to Target/ }).click();
+
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(
+      `${new URL(page.url()).origin}${productDestinationPath({
+        kind: 'thing',
+        spaceId: FIXTURE_SPACE_ID,
+        thingId: THING_B_ID,
+      })}`,
+    );
 });
 
 test(

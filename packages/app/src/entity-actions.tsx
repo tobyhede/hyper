@@ -65,6 +65,7 @@ export const DELETE_DIAGRAM_ACTION_ID = 'delete-diagram';
 export const COPY_LINK_ACTION_ID = 'copy-link';
 export const COPY_PERMANENT_LINK_ACTION_ID = 'copy-permanent-link';
 export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
+export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';
 export const OPEN_INDEPENDENTLY_ACTION_ID = 'open-independently';
 
 /** The commands a surface may ask this list for by id. */
@@ -163,6 +164,7 @@ const COPY_PERMANENT_LINK = 'Copy permanent link';
 const THING_COPY_LINK_IN_DIAGRAM = 'Copy link to Thing in Diagram';
 const THING_COPY_LINK = 'Copy link to Thing';
 const COPY_SPACE_LINK = 'Copy link to Space';
+const COPY_LINK_TO_TARGET = 'Copy link to Target';
 const OPEN_INDEPENDENTLY = 'Open in New Tab';
 
 /**
@@ -357,11 +359,31 @@ export function spaceEntityActions({
                   },
                 ]),
           ];
+    /**
+     * The Target a Reference Thing shows, at that Target's own Thing address.
+     *
+     * **One row, never two.** The Target is frequently absent from this
+     * Diagram entirely, so there is no within-Diagram form for it to differ
+     * from — unlike `thingAddresses` above, which names the Reference Thing
+     * itself and does have one when placed here. Offered only on a Reference
+     * Thing (ADR 0092); a Markdown or Space Thing has no Target to address.
+     */
+    const targetThingAddress: readonly EntityAction[] =
+      thing.kind !== 'reference'
+        ? []
+        : [
+            copy(
+              COPY_LINK_TO_TARGET_ACTION_ID,
+              COPY_LINK_TO_TARGET,
+              { kind: 'thing', spaceId, thingId: thing.target },
+              onCopy,
+            ),
+          ];
     return [
       // No Rename: a Thing's title is renamed in place on the canvas, and the
       // chrome title edit takes Diagram and Graph subjects only.
       [],
-      [...thingAddresses, ...targetSpaceAddress],
+      [...thingAddresses, ...targetSpaceAddress, ...targetThingAddress],
       [],
     ];
   };

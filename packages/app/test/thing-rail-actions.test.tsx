@@ -446,6 +446,73 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
+   * Copy link to Target copies the Target's own Thing address — not a
+   * within-Diagram one, and not this Reference Thing's own address, which is
+   * what the two rows before it already offer. The Target is often absent from
+   * this Diagram entirely (`.scratch/reference-thing/issues/02`).
+   */
+  it('offers a Reference Thing a Copy link to Target, copying the Target’s own address', async () => {
+    const written: string[] = [];
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (value: string) => {
+          written.push(value);
+          return Promise.resolve();
+        },
+      },
+    });
+
+    try {
+      const session = mount(undefined, undefined, withReference);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: /^Copy link to Target/ }));
+
+      await waitFor(() =>
+        expect(written).toEqual([
+          `https://space.test${productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: THING_ID })}`,
+        ]),
+      );
+      await settled(session);
+    } finally {
+      if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+      else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+    }
+  });
+
+  /**
+   * An unavailable Target — here, the clipboard refusing the write — takes the
+   * existing refusal path rather than a new one: the same standing alert and
+   * the same in-place item label every other copy command uses
+   * (`SpaceApp.test.tsx`).
+   */
+  it('reports a refused Copy link to Target the way every other copy command does', async () => {
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard permission denied')) },
+    });
+
+    try {
+      const session = mount(undefined, undefined, withReference);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: /^Copy link to Target/ }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('Link not copied');
+      expect(alert).toHaveTextContent('The browser refused clipboard access.');
+      expect(await screen.findByRole('menuitem', { name: /^Not copied/ })).toBeVisible();
+      await settled(session);
+    } finally {
+      if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+      else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+    }
+  });
+
+  /**
    * Delete from Space is a leaving action on every Thing, including a Space
    * Thing. Filtering the rail down to Remove from Diagram alone would withdraw
    * a command that is still available (`availability.deleteThing`).
