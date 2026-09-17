@@ -38,9 +38,9 @@ export type SnapshotEditRefusal =
   | { readonly code: 'thing-not-found' }
   | { readonly code: 'diagram-not-found' }
   | {
-      readonly code: 'thing-has-aliases';
-      /** The Aliases by **name**, which is what a sentence listing Things says (ADR 0083). */
-      readonly aliasTitles: readonly string[];
+      readonly code: 'thing-has-references';
+      /** The Reference Things by **name**, which is what a sentence listing Things says (ADR 0083). */
+      readonly referenceTitles: readonly string[];
     };
 
 /** What a `SnapshotEdit` operation answers. */
@@ -142,10 +142,10 @@ function createInDiagram(
  * `defaultDiagram`, `activeGraph` and every title are untouched.
  *
  * Refuses `thing-not-found` for an id the Space does not hold, and
- * `thing-has-aliases` — naming every Alias by title — for a Thing an Alias in
- * this Space still targets: an Alias whose Target vanished is not a Thing
+ * `thing-has-references` — naming every Reference Thing by title — for a Thing a Reference Thing in
+ * this Space still targets: a Reference Thing whose Target vanished is not a Thing
  * intake accepts (ADR 0070), so the Space must not lose one out from under its
- * Aliases. Space Thing deletion used to skip this guard entirely and reach
+ * Reference Things. Space Thing deletion used to skip this guard entirely and reach
  * intake instead, which answered the generic `aggregate-refused` — nothing
  * committed, but nothing useful said either.
  */
@@ -154,14 +154,14 @@ function deleteFromSpace(snapshot: SpaceSnapshot, thingId: UUID): SnapshotEditOu
     return { kind: 'refused', refusal: { code: 'thing-not-found' } };
   }
   const incoming = snapshot.things.filter(
-    (thing) => thing.document.kind === 'alias' && thing.document.target === thingId,
+    (thing) => thing.document.kind === 'reference' && thing.document.target === thingId,
   );
   if (incoming.length > 0) {
     return {
       kind: 'refused',
       refusal: {
-        code: 'thing-has-aliases',
-        aliasTitles: incoming.map((alias) => titleName(alias.document.title)),
+        code: 'thing-has-references',
+        referenceTitles: incoming.map((reference) => titleName(reference.document.title)),
       },
     };
   }

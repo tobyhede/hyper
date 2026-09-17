@@ -53,18 +53,18 @@ export interface SpaceLookup {
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/** A Thing that supplies Markdown or a Space view, after resolving an Alias. */
+/** A Thing that supplies Markdown or a Space view, after resolving a Reference Thing. */
 export type ResolvedContentThing = Extract<Thing, { kind: 'markdown' | 'space' }>;
 
 /**
  * The Thing whose content `thingId` shows. Markdown and Space Things resolve
- * to themselves; an alias resolves to its target (ADR 0009). Aliasing is a single hop —
- * validation guarantees a target is never itself an alias — so this follows at
+ * to themselves; a reference thing resolves to its target (ADR 0009). Referencing is a single hop —
+ * validation guarantees a target is never itself a reference thing — so this follows at
  * most one link. Returns `undefined` if the thing or its target does not resolve.
  *
  * A domain operation rather than an identity lookup, which is why it stays a
  * function beside `SpaceLookup` rather than becoming a fourth method on it: what
- * it answers is *content*, and the hop it follows is Alias semantics.
+ * it answers is *content*, and the hop it follows is Reference Thing semantics.
  */
 export function resolveContentThing(
   space: Space,
@@ -72,7 +72,7 @@ export function resolveContentThing(
 ): ResolvedContentThing | undefined {
   const thing = space.lookup.thing(thingId);
   if (thing?.kind === 'markdown' || thing?.kind === 'space') return thing;
-  if (thing?.kind !== 'alias') return undefined;
+  if (thing?.kind !== 'reference') return undefined;
 
   const target = space.lookup.thing(thing.target);
   return target?.kind === 'markdown' || target?.kind === 'space' ? target : undefined;

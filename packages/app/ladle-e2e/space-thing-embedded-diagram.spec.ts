@@ -327,7 +327,7 @@ test(
 );
 
 test(
-  'Space Thing entity menu groups commands and creates a Space Alias',
+  'Space Thing entity menu groups commands and creates a Space Reference Thing',
   { tag: '@parity:space-thing-entity-menu' },
   async ({ page }) => {
     await open(page);

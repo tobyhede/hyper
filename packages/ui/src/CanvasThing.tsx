@@ -78,11 +78,11 @@ export type CanvasThingFront =
       readonly autoFocusEditor?: boolean;
     })
   | {
-      readonly kind: 'alias';
-      /** The resolved Target content this Alias displays read-only. */
+      readonly kind: 'reference';
+      /** The resolved Target content this Reference Thing displays read-only. */
       readonly target:
         { readonly kind: 'markdown'; readonly source: string } | { readonly kind: 'space' };
-      /** Authored Diagram state; an Alias Opens through the shared Thing operation. */
+      /** Authored Diagram state; a Reference Thing Opens through the shared Thing operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
@@ -299,7 +299,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 /**
  * The one visual Thing front shared by the production canvas and its stories.
  *
- * The deep production module for Markdown and Alias Thing fronts, title
+ * The deep production module for Markdown and Reference Thing fronts, title
  * editing, refusal display and interaction-state visual treatment. React Flow
  * geometry, connection state, selection/drag translation and containment stay
  * with the adapter that renders this component (`@project/react-flow-adapter`
@@ -325,7 +325,7 @@ export function CanvasThing(props: CanvasThingProps) {
   const contentFront =
     front.kind === 'markdown'
       ? front
-      : front.kind === 'alias' && front.target.kind === 'markdown'
+      : front.kind === 'reference' && front.target.kind === 'markdown'
         ? { ...front, source: front.target.source }
         : undefined;
   /**
@@ -535,7 +535,7 @@ export function CanvasThing(props: CanvasThingProps) {
       className="canvas-thing"
       data-testid="thing"
       data-kind={visualKind}
-      data-content-kind={front.kind === 'alias' ? front.target.kind : visualKind}
+      data-content-kind={front.kind === 'reference' ? front.target.kind : visualKind}
       data-state={state}
       // Exposes authored state for the Thing's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's

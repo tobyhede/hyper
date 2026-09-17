@@ -14,7 +14,21 @@ export interface SpaceSessionState {
     | { kind: 'settled' }
     | { kind: 'pending' }
     | { kind: 'failed'; failure: RetryableFailure }
-    | { kind: 'rejected'; failure: PermanentFailure | AggregateRefusal }
+    | { kind: 'rejected'; failure: PermanentFailure }
+    /**
+     * A refused aggregate is not a permanent failure (ADR 0057, `v1-release/17`).
+     *
+     * The two used to share `rejected`, and their recovery was already the same
+     * one this keeps: neither offers Retry — `retry()` below answers only
+     * `failed` — and both leave `submit` free to resubmit past them, because an
+     * authored correction is what a refusal or a rejection alike waits for. What
+     * a shared `kind` cost is the type-level distinction between "the server
+     * declined the request" and "the proposed aggregate is invalid," which a
+     * consumer reading `failure.kind` inside `rejected` had to make for itself.
+     * A `refused` state makes that distinction the discriminant, so a consumer
+     * that means one and not the other says so at the type it switches on.
+     */
+    | { kind: 'refused'; failure: AggregateRefusal }
     | {
         kind: 'conflicted';
         /** The newer stored Space to reload, when the conflict named this one. */
@@ -228,7 +242,7 @@ export const openManagedSpaceSession = (
             return;
           case 'aggregate-refused':
             waiting = undefined;
-            publishPersistence({ kind: 'rejected', failure: result });
+            publishPersistence({ kind: 'refused', failure: result });
             publishIdle();
             return;
           case 'conflict': {
@@ -317,11 +331,12 @@ export const openManagedSpaceSession = (
       const working = snapshot === committing ? snapshot : clone(snapshot);
       const previous = observable.getState().persistence;
       observable.publish({ ...observable.getState(), working });
-      if (previous.kind === 'rejected' && coordinatedRecovery !== undefined) {
+      const wasRejectedOrRefused = previous.kind === 'rejected' || previous.kind === 'refused';
+      if (wasRejectedOrRefused && coordinatedRecovery !== undefined) {
         coordinatedRecovery.retry();
         return;
       }
-      if (previous.kind === 'rejected') coordinatedRecovery = undefined;
+      if (wasRejectedOrRefused) coordinatedRecovery = undefined;
       if (previous.kind === 'conflicted' || previous.kind === 'failed') return;
       const newest = observable.getState().working;
       if (inFlight || coordinating || persistencePaused) {
@@ -396,16 +411,17 @@ export const openManagedSpaceSession = (
   const failCoordinatedCommit: ManagedSpaceSession['failCoordinatedCommit'] = (result) => {
     coordinating = false;
     waiting = undefined;
-    // Retryable is the one outcome that leaves the work recoverable on its own;
-    // every other failure — a permanent one and an aggregate refusal alike —
-    // is rejected, and rejected means the same installed state for both.
-    observable.install({
-      ...observable.getState(),
-      persistence:
-        result.kind === 'retryable-failure'
-          ? { kind: 'failed', failure: result }
-          : { kind: 'rejected', failure: result },
-    });
+    // Retryable is the one outcome that leaves the work recoverable on its own.
+    // Of the other two, a permanent failure is rejected and an aggregate
+    // refusal is refused — every participant lands in the same one of the two,
+    // so a coordinated refusal reads exactly as an uncoordinated one does.
+    const persistence: SpaceSessionState['persistence'] =
+      result.kind === 'retryable-failure'
+        ? { kind: 'failed', failure: result }
+        : result.kind === 'aggregate-refused'
+          ? { kind: 'refused', failure: result }
+          : { kind: 'rejected', failure: result };
+    observable.install({ ...observable.getState(), persistence });
     publishIdle();
   };
 

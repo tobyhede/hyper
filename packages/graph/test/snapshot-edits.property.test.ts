@@ -74,7 +74,7 @@ const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Place
   );
 
 describe('SnapshotEdit.deleteFromSpace properties', () => {
-  it('leaves a snapshot intake accepts after deleting any un-aliased Thing', () => {
+  it('leaves a snapshot intake accepts after deleting any un-referenced Thing', () => {
     fc.assert(
       fc.property(idsArb, coordsArb, fc.nat({ max: 8 }), (ids, coords, subjectSeed) => {
         const subject = ids[subjectSeed % ids.length];
@@ -138,7 +138,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     );
   });
 
-  it('always refuses to delete a Thing an Alias in the Space still targets', () => {
+  it('always refuses to delete a Thing a Reference Thing in the Space still targets', () => {
     fc.assert(
       fc.property(
         idsArb,
@@ -146,8 +146,8 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
         fc.nat({ max: 8 }),
         fc.uuid().map(uuid),
         titleArb,
-        (ids, coords, subjectSeed, aliasId, aliasTitle) => {
-          fc.pre(!ids.includes(aliasId));
+        (ids, coords, subjectSeed, referenceId, referenceTitle) => {
+          fc.pre(!ids.includes(referenceId));
           const subject = ids[subjectSeed % ids.length];
           if (subject === undefined) return;
           const positions = Placement.toPositions(closedPlacement(ids, coords));
@@ -156,7 +156,10 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
             ...base,
             things: [
               ...base.things,
-              { id: aliasId, document: { title: aliasTitle, kind: 'alias', target: subject } },
+              {
+                id: referenceId,
+                document: { title: referenceTitle, kind: 'reference', target: subject },
+              },
             ],
           };
 
@@ -164,7 +167,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 
           expect(outcome).toEqual({
             kind: 'refused',
-            refusal: { code: 'thing-has-aliases', aliasTitles: [aliasTitle] },
+            refusal: { code: 'thing-has-references', referenceTitles: [referenceTitle] },
           });
         },
       ),

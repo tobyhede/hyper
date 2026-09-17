@@ -14,7 +14,7 @@ import type { ThingResize } from '../src/render-adapter';
 
 const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
@@ -32,7 +32,7 @@ const snapshot = spaceSnapshotSchema.parse({
         positions: {
           [THING_ID]: { x: 0, y: 0, open: false },
           [OTHER_THING_ID]: { x: 300, y: 0, open: false },
-          [ALIAS_ID]: { x: 600, y: 0, open: false },
+          [REFERENCE_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -42,7 +42,7 @@ const snapshot = spaceSnapshotSchema.parse({
   things: [
     { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
     { id: OTHER_THING_ID, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: THING_ID } },
+    { id: REFERENCE_ID, document: { title: 'A again', kind: 'reference', target: THING_ID } },
   ],
 });
 
@@ -380,27 +380,27 @@ describe.each([
   });
 });
 
-it.each(['Enter', ' '])('opens a focused Alias with %s', (key) => {
-  const alias = thingNode('A again', ALIAS_ID);
-  alias.data.kind = 'alias';
-  const { openThing } = mountGraph([alias]);
+it.each(['Enter', ' '])('opens a focused Reference Thing with %s', (key) => {
+  const reference = thingNode('A again', REFERENCE_ID);
+  reference.data.kind = 'reference';
+  const { openThing } = mountGraph([reference]);
 
-  const focusedAlias = nodeOf(ALIAS_ID);
-  focusedAlias.focus();
-  fireEvent.keyDown(focusedAlias, { key });
+  const focusedReference = nodeOf(REFERENCE_ID);
+  focusedReference.focus();
+  fireEvent.keyDown(focusedReference, { key });
 
-  expect(openThing).toHaveBeenCalledWith(ALIAS_ID);
+  expect(openThing).toHaveBeenCalledWith(REFERENCE_ID);
 });
 
 describe.each([
   ['Thing', thingNode('A'), THING_ID],
   [
-    'Alias',
+    'Reference Thing',
     {
-      ...thingNode('A again', ALIAS_ID),
-      data: { ...thingNode('A again', ALIAS_ID).data, kind: 'alias' as const },
+      ...thingNode('A again', REFERENCE_ID),
+      data: { ...thingNode('A again', REFERENCE_ID).data, kind: 'reference' as const },
     },
-    ALIAS_ID,
+    REFERENCE_ID,
   ],
 ] as const)('a focused %s while placement is pending', (_kind, projected, id) => {
   it.each(['Enter', ' '])('does not open with %s', (key) => {
@@ -552,15 +552,15 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
 /**
  * Resize is Thing behaviour rather than kind behaviour (ADR 0066): a Thing owns
  * the surrounding rect and the resize interaction, while a kind owns only what
- * fills an Open front. Alias has no Open front yet, but that is content
+ * fills an Open front. Reference Thing has no Open front yet, but that is content
  * ownership and must not read back as a second resize gate.
  */
 describe('resize belongs to Thing rather than to a Thing kind', () => {
   it('offers a resize operation to an Open Thing whatever its kind', () => {
-    const alias = thingNode('Alias', THING_ID, false);
-    alias.data.kind = 'alias';
-    alias.data.expanded = true;
-    const { view } = mountGraph([alias]);
+    const reference = thingNode('Reference Thing', THING_ID, false);
+    reference.data.kind = 'reference';
+    reference.data.expanded = true;
+    const { view } = mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
   });

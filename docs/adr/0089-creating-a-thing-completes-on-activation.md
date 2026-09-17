@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0070
+Refined by: 0092
 Related: 0016, 0065, 0074, 0076, 0079, 0080, 0082, 0083, 0085
 
 Every Thing creation completes its Edit on activation. One press places a Thing at a position the gesture already knows, selects it, and puts the caret in its inline Title editor. Nothing is chosen first, so there is no creation pane, no Target picker and no Cancel.

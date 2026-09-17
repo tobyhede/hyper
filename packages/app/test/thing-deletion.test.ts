@@ -123,14 +123,17 @@ describe('confirmation', () => {
   });
 
   it('refuses an ordinary deletion and closes the confirmation', async () => {
-    const aliased: SpaceSnapshot = {
+    const referenced: SpaceSnapshot = {
       ...snapshot,
       things: [
         snapshot.things[0]!,
-        { id: THING_B, document: { title: 'Alias of A', kind: 'alias', target: THING_A } },
+        {
+          id: THING_B,
+          document: { title: 'Reference Thing of A', kind: 'reference', target: THING_A },
+        },
       ],
     };
-    const opened = open(aliased);
+    const opened = open(referenced);
     const { thingDeletion, session } = opened;
     const before = session.getState().working;
     thingDeletion.arm(lookupThing(opened));
@@ -138,7 +141,7 @@ describe('confirmation', () => {
     thingDeletion.confirm();
     await vi.waitFor(() => expect(thingDeletion.getState().pending).toBeNull());
 
-    expect(thingDeletion.getState().refusal).toContain('Aliases');
+    expect(thingDeletion.getState().refusal).toContain('Reference Things');
     expect(session.getState().working).toBe(before);
   });
 

@@ -106,7 +106,7 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await expect(canvas).toHaveText(containingDiagram ?? '');
 }
 
-/** The Space Thing entity menu and its Alias creation, through both production hosts. */
+/** The Space Thing entity menu and its Reference Thing creation, through both production hosts. */
 export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): Promise<void> {
   const id = await thing.getAttribute('data-id');
   if (id === null) throw new Error('Space Thing id missing');
@@ -137,7 +137,7 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
   await menu();
   await expect(page.getByRole('menuitem')).toHaveText([
     'Rename',
-    'Create Alias',
+    'Create Reference',
     'Enter',
     'Open in New Tab',
     'Copy link to Thing in Diagram',
@@ -156,34 +156,37 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
   await title.press('Enter');
   await expect(thingNode.getByRole('heading', { name: 'Space Thing', exact: true })).toBeVisible();
   await menu();
-  await page.getByRole('menuitem', { name: 'Create Alias', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Create Reference', exact: true }).click();
   await expect(title).toBeFocused();
-  await title.fill('Space Thing alias');
+  await title.fill('Space Thing reference');
   await title.press('Enter');
-  const alias = page.locator('.react-flow__node').filter({
-    has: page.getByRole('heading', { name: 'Space Thing alias', exact: true }),
+  const reference = page.locator('.react-flow__node').filter({
+    has: page.getByRole('heading', { name: 'Space Thing reference', exact: true }),
   });
-  await expect(alias.locator('[data-testid="thing"]')).toHaveAttribute('data-kind', 'alias');
-  const openAlias = (await thingControls(page, alias)).getByRole('button', {
-    name: 'Open Thing Space Thing alias',
+  await expect(reference.locator('[data-testid="thing"]')).toHaveAttribute(
+    'data-kind',
+    'reference',
+  );
+  const openReference = (await thingControls(page, reference)).getByRole('button', {
+    name: 'Open Thing Space Thing reference',
   });
-  await openAlias.focus();
-  await openAlias.press('Enter');
-  const aliasId = await alias.getAttribute('data-id');
-  const embedded = page.locator(`.react-flow__node[data-id^="embedded:${aliasId}:"]`);
+  await openReference.focus();
+  await openReference.press('Enter');
+  const referenceId = await reference.getAttribute('data-id');
+  const embedded = page.locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`);
   await expect(embedded.first()).toBeVisible();
   expect(
-    await alias
+    await reference
       .locator('.canvas-thing__body')
       .evaluate((body) => (body instanceof HTMLElement ? body.offsetHeight : 0)),
   ).toBeLessThan(50);
   await expect(embedded.getByTestId('canvas-thing-actions')).toHaveCount(0);
-  const aliasMenu = (await thingControls(page, alias)).getByRole('button', {
-    name: 'Actions for Thing Space Thing alias',
+  const referenceMenu = (await thingControls(page, reference)).getByRole('button', {
+    name: 'Actions for Thing Space Thing reference',
   });
-  await aliasMenu.focus();
-  await aliasMenu.press('Enter');
-  await expect(page.getByRole('menuitem', { name: /^Create Alias/ })).toHaveAttribute(
+  await referenceMenu.focus();
+  await referenceMenu.press('Enter');
+  await expect(page.getByRole('menuitem', { name: /^Create Reference/ })).toHaveAttribute(
     'aria-disabled',
     'true',
   );

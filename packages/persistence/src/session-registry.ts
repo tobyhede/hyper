@@ -209,12 +209,12 @@ export type SpaceThingRefusal =
   | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
   | { readonly code: 'space-thing-not-found'; readonly thingId: UUID }
   /**
-   * Deleting this Space Thing is refused because an Alias in the same Space
+   * Deleting this Space Thing is refused because a Reference Thing in the same Space
    * still targets it (ADR 0070), named by `SnapshotEdit.deleteFromSpace`.
-   * Mapped from the same `thing-has-aliases` code Space Authoring's own
+   * Mapped from the same `thing-has-references` code Space Authoring's own
    * `deleted-thing` refuses with, and presented with the same wording.
    */
-  | { readonly code: 'thing-has-aliases'; readonly aliasTitles: readonly string[] }
+  | { readonly code: 'thing-has-references'; readonly referenceTitles: readonly string[] }
   | {
       readonly code: 'persistence-recovery-required';
       readonly spaceId: UUID;
@@ -368,7 +368,7 @@ const asSpaceThingRefusal = (
  * `SnapshotEdit.createInDiagram`'s outcome into `plan`'s vocabulary.
  *
  * The only refusal `createInDiagram` can answer here is `diagram-not-found`
- * — `thing-not-found` and `thing-has-aliases` belong to `deleteFromSpace`.
+ * — `thing-not-found` and `thing-has-references` belong to `deleteFromSpace`.
  */
 const planSpaceThingCreation = (
   source: SpaceSnapshot,
@@ -1340,9 +1340,9 @@ export function createSpaceSessionRegistry(
        * needing the Spaces as they stand — a containing Space already
        * needing recovery cannot accept this Edit regardless of what the
        * cascade turns out to be. Everything that decides — is this id a
-       * Space Thing, does an Alias still target it, and which target Spaces
+       * Space Thing, does a Reference Thing still target it, and which target Spaces
        * the deletion cascades to — runs in `plan`, against the Spaces the
-       * coordination's own aggregate read just produced, so an Alias or a
+       * coordination's own aggregate read just produced, so a Reference Thing or a
        * reference arriving during that read is what the decision sees
        * rather than something re-applied afterward.
        */
@@ -1368,12 +1368,12 @@ export function createSpaceSessionRegistry(
               };
             }
             // The only refusal `deleteFromSpace` can answer here is
-            // `thing-has-aliases` — `thing-not-found` cannot occur for an id
+            // `thing-has-references` — `thing-not-found` cannot occur for an id
             // `source.things` was just found to hold, so meeting it would be
             // a broken invariant.
             const deletion = SnapshotEdit.deleteFromSpace(source, input.thingId);
             if (deletion.kind === 'refused') {
-              if (deletion.refusal.code !== 'thing-has-aliases') {
+              if (deletion.refusal.code !== 'thing-has-references') {
                 throw new Error(
                   `Space Thing deletion refused unexpectedly: ${deletion.refusal.code}`,
                 );

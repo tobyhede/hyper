@@ -32,8 +32,8 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const SECOND_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const SECOND_REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
@@ -77,15 +77,15 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 /**
- * The same content drawn three times: Thing A and two Aliases of it, each placed
+ * The same content drawn three times: Thing A and two Reference Things of it, each placed
  * and titled in its own right.
  *
- * One Alias can only show that its target changed, which is the weaker half of
+ * One Reference Thing can only show that its target changed, which is the weaker half of
  * a single source of truth. Two is where an edit made through one occurrence
  * has somewhere else to be wrong — and where the editor's composite key stops
- * being redundant, since both Aliases resolve to the same content id.
+ * being redundant, since both Reference Things resolve to the same content id.
  */
-const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
+const twiceReferenced: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
@@ -94,16 +94,19 @@ const twiceAliased: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.diagrams![0],
         positions: {
           ...snapshot.document.diagrams![0]!.positions,
-          [ALIAS_ID]: { x: 600, y: 20, open: false },
-          [SECOND_ALIAS_ID]: { x: 900, y: 20, open: false },
+          [REFERENCE_ID]: { x: 600, y: 20, open: false },
+          [SECOND_REFERENCE_ID]: { x: 900, y: 20, open: false },
         },
       },
     ],
   },
   things: [
     ...snapshot.things,
-    { id: ALIAS_ID, document: { title: 'A again', kind: 'alias', target: THING_ID } },
-    { id: SECOND_ALIAS_ID, document: { title: 'A once more', kind: 'alias', target: THING_ID } },
+    { id: REFERENCE_ID, document: { title: 'A again', kind: 'reference', target: THING_ID } },
+    {
+      id: SECOND_REFERENCE_ID,
+      document: { title: 'A once more', kind: 'reference', target: THING_ID },
+    },
   ],
 });
 
@@ -501,8 +504,8 @@ async function openEditor(): Promise<void> {
 }
 
 describe('authoring an opened Thing', () => {
-  it('renames an Alias through the shared Title interaction and preserves Target content', async () => {
-    const aliased = spaceSnapshotSchema.parse({
+  it('renames a Reference Thing through the shared Title interaction and preserves Target content', async () => {
+    const referenced = spaceSnapshotSchema.parse({
       ...snapshot,
       document: {
         ...snapshot.document,
@@ -511,7 +514,7 @@ describe('authoring an opened Thing', () => {
             ...snapshot.document.diagrams![0],
             positions: {
               ...snapshot.document.diagrams![0]!.positions,
-              [ALIAS_ID]: { x: 600, y: 20, open: false },
+              [REFERENCE_ID]: { x: 600, y: 20, open: false },
             },
           },
         ],
@@ -519,16 +522,16 @@ describe('authoring an opened Thing', () => {
       things: [
         ...snapshot.things,
         {
-          id: ALIAS_ID,
+          id: REFERENCE_ID,
           document: {
             title: 'A again',
-            kind: 'alias',
+            kind: 'reference',
             target: THING_ID,
           },
         },
       ],
     });
-    const session = mount(aliased);
+    const session = mount(referenced);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A again' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Thing title' }), {
@@ -538,33 +541,33 @@ describe('authoring an opened Thing', () => {
 
     expect(session.getState().working.things).toContainEqual(snapshot.things[0]);
     expect(session.getState().working.things).toContainEqual({
-      ...aliased.things[2],
-      document: { ...aliased.things[2]!.document, title: 'Recap' },
+      ...referenced.things[2],
+      document: { ...referenced.things[2]!.document, title: 'Recap' },
     });
     await settled(session);
   });
 
   /**
    * "Every place showing that content changes together" is the promise, and one
-   * Alias cannot test it: reading the edit back through the target only says the
-   * target was written. A second Alias is a second occurrence that has to have
+   * Reference Thing cannot test it: reading the edit back through the target only says the
+   * target was written. A second Reference Thing is a second occurrence that has to have
    * moved with it, and it never touched the edit itself.
    */
   it('updates shared content only when its Target is opened explicitly', async () => {
-    const session = mount(twiceAliased);
+    const session = mount(twiceReferenced);
 
     await openEditor();
     replaceMarkdownSource('Written once, shown everywhere');
     fireEvent.click(screen.getByRole('button', { name: 'Save Thing A' }));
 
     expect(bodyOf(session, THING_ID)).toBe('Written once, shown everywhere');
-    expect(session.getState().working.things).toContainEqual(twiceAliased.things[2]);
-    expect(session.getState().working.things).toContainEqual(twiceAliased.things[3]);
+    expect(session.getState().working.things).toContainEqual(twiceReferenced.things[2]);
+    expect(session.getState().working.things).toContainEqual(twiceReferenced.things[3]);
     await settled(session);
   });
 
-  it('opens each Alias on resolved Target content without a source editor', async () => {
-    const session = mount(twiceAliased);
+  it('opens each Reference Thing on resolved Target content without a source editor', async () => {
+    const session = mount(twiceReferenced);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Thing A again' }));
     expect(await screen.findByText('A source')).toBeVisible();

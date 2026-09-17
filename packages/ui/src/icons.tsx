@@ -217,13 +217,13 @@ export const SpaceIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <CubeGlyph size={size} />
 );
 
-/** Space Things share the Space cube, including when used as an Alias base. */
+/** Space Things share the Space cube, including when used as a Reference Thing base. */
 export const SpaceThingIcon = SpaceIcon;
 
 /**
  * The Thing kinds that own what they draw, and so have a glyph of their own.
  *
- * An Alias is deliberately absent: it is not a third silhouette but a badge on
+ * A Reference Thing is deliberately absent: it is not a third silhouette but a badge on
  * one of these two.
  *
  * **Subtracted from the domain union rather than restated as its own.** Written
@@ -232,7 +232,7 @@ export const SpaceThingIcon = SpaceIcon;
  * type exhaustive and wrong. Derived, the addition lands here, and
  * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
  */
-export type ThingBaseKind = Exclude<Thing['kind'], 'alias'>;
+export type ThingBaseKind = Exclude<Thing['kind'], 'reference'>;
 
 /** The silhouette each Thing kind that owns one draws. */
 export const BASE_GLYPHS = {
@@ -241,9 +241,9 @@ export const BASE_GLYPHS = {
 } satisfies Record<ThingBaseKind, ComponentType<{ size?: number }>>;
 
 /**
- * An Alias, drawn as the glyph of the Thing it points at with a badge on it.
+ * A Reference Thing, drawn as the glyph of the Thing it points at with a badge on it.
  *
- * **An Alias is not a third Thing silhouette.** A single Alias glyph can say
+ * **A Reference Thing is not a third Thing silhouette.** A single Reference Thing glyph can say
  * *that* a Thing refers elsewhere but never *what it refers to* — and a Space
  * Thing is as legitimate a Target as a Markdown Thing (ADR 0070), so the two
  * would draw identically while the kind on the canvas is exactly what the
@@ -262,11 +262,11 @@ export const BASE_GLYPHS = {
  * is the mark that has to survive, and a filled shape survives where a line
  * weight does not.
  */
-export function AliasIcon({
+export function ReferenceIcon({
   base = 'markdown',
   size = 14,
 }: {
-  /** The kind of the Target. Absent, an Alias draws over the Markdown base. */
+  /** The kind of the Target. Absent, a Reference Thing draws over the Markdown base. */
   base?: ThingBaseKind | undefined;
   size?: number | undefined;
 }) {

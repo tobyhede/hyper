@@ -756,6 +756,32 @@ test(
   },
 );
 
+/**
+ * A refused aggregate: a distinct persistence state from a permanent
+ * rejection (`v1-release/17` criterion 2), drawn through the same one-sentence
+ * dialog `PersistenceControl` gives every `Rejection`.
+ */
+test(
+  'a refused aggregate explains itself as one sentence and can be acknowledged',
+  { tag: '@parity:command-dock-reports-aggregate-refusal' },
+  async ({ page }) => {
+    await page.goto(story('save-refused'));
+
+    await expect(
+      page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' }),
+    ).toBeVisible();
+    // The application's translation of `ordinary-space-unreferenced`
+    // (`authoring-refusal.ts`), never the refusal's own kind or any id it
+    // carries — the surface names neither (the 9 September 2026 decision).
+    await expect(
+      page.getByText('A space would be left with nothing pointing at it.'),
+    ).toBeVisible();
+    await expect(page.getByText(/ordinary-space-unreferenced/)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Continue editing' }).click();
+    await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
+  },
+);
+
 test(
   'a revision conflict blocks dismissal until local or stored work is chosen',
   { tag: '@parity:command-dock-resolves-conflict' },

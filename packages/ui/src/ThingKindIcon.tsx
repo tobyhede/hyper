@@ -1,11 +1,11 @@
 import type { Thing } from '@project/core';
-import { AliasIcon, BASE_GLYPHS, type ThingBaseKind } from './icons';
+import { ReferenceIcon, BASE_GLYPHS, type ThingBaseKind } from './icons';
 
 /**
  * What kind of Thing this is, drawn rather than described.
  *
- * Persistent, not a hover affordance: a Thing's kind is a fact about it, and an
- * Alias that only announces itself under the pointer is one an author has to
+ * Persistent, not a hover affordance: a Thing's kind is a fact about it, and a
+ * Reference Thing that only announces itself under the pointer is one an author has to
  * hunt for. It is the same glyph wherever a Thing appears — on its Front, and in
  * the Target picker's results — so recognising one teaches the other.
  *
@@ -16,18 +16,18 @@ import { AliasIcon, BASE_GLYPHS, type ThingBaseKind } from './icons';
 
 const KIND_NAMES = {
   markdown: 'Markdown Thing',
-  alias: 'Alias',
+  reference: 'Reference Thing',
   space: 'Space Thing',
 } satisfies Record<Thing['kind'], string>;
 
 /**
- * What an Alias announces once its Target's kind is known. The glyph carries
+ * What a Reference Thing announces once its Target's kind is known. The glyph carries
  * the distinction, so the accessible name has to carry it too — otherwise the
  * two draw differently and announce identically.
  */
-const ALIAS_NAMES = {
-  markdown: 'Alias of a Markdown Thing',
-  space: 'Alias of a Space Thing',
+const REFERENCE_NAMES = {
+  markdown: 'Reference to a Markdown Thing',
+  space: 'Reference to a Space Thing',
 } satisfies Record<ThingBaseKind, string>;
 
 /**
@@ -40,15 +40,15 @@ export const thingKindName = (kind: Thing['kind']): string => KIND_NAMES[kind];
 export interface ThingKindIconProps {
   readonly kind: Thing['kind'];
   /**
-   * For an Alias, the kind of the Thing it points at.
+   * For a Reference Thing, the kind of the Thing it points at.
    *
-   * The badge is drawn over that kind's glyph, so an Alias of a Space Thing and
-   * an Alias of a Markdown Thing are told apart — which a single Alias glyph
-   * could not do, and which is the whole reason the Alias is a decoration.
-   * Absent, an Alias draws over the Markdown base; it is also ignored for the
-   * other two kinds, which are not Aliases of anything.
+   * The badge is drawn over that kind's glyph, so a Reference to a Space Thing and
+   * a Reference to a Markdown Thing are told apart — which a single Reference Thing glyph
+   * could not do, and which is the whole reason the Reference Thing is a decoration.
+   * Absent, a Reference Thing draws over the Markdown base; it is also ignored for the
+   * other two kinds, which are not Reference Things of anything.
    */
-  readonly aliasOf?: ThingBaseKind | undefined;
+  readonly referenceOf?: ThingBaseKind | undefined;
   readonly size?: number | undefined;
   /**
    * Draw the glyph as a mark and nothing else: no accessible name, and no
@@ -60,7 +60,7 @@ export interface ThingKindIconProps {
    * labelled `Create <kind>`, so an `img` announcing `<kind>` beside it is a
    * second node saying half of what the button just said, and a `title` of
    * `<kind>` is worse: the glyph fills the button, so that tooltip is the one
-   * the pointer gets and `Create Alias` hovers as `Alias`.
+   * the pointer gets and `Create Reference` hovers as `Reference Thing`.
    *
    * It is deliberately not the default. Everywhere else the glyph carries the
    * kind *on its own* — on a Thing's own Front, in the Target picker's results,
@@ -73,21 +73,21 @@ export interface ThingKindIconProps {
  * The glyph for one Thing: a table lookup for the kinds that own a silhouette,
  * and a composition for the one that does not.
  *
- * `alias` is the composition — it draws one of the other silhouettes with a
- * badge on it, because it needs a second input, which kind it is an Alias of,
+ * `reference` is the composition — it draws one of the other silhouettes with a
+ * badge on it, because it needs a second input, which kind it is a Reference Thing of,
  * that the others do not have. Everything else is {@link BASE_GLYPHS}, keyed by
- * the domain union with `alias` subtracted, and **that lookup is what makes
+ * the domain union with `reference` subtracted, and **that lookup is what makes
  * adding a kind a compile-time obligation**. Picking between the two with
  * `kind === 'space' ? … : …` read as the same composition and was not: it gave
  * every future kind the Markdown silhouette by default, silently, while this
  * file's own doc still promised a build failure.
  */
-function KindGlyph({ kind, aliasOf, size }: ThingKindIconProps) {
+function KindGlyph({ kind, referenceOf, size }: ThingKindIconProps) {
   // `size` is forwarded even when absent: every one of these declares its own
   // default by destructuring, and a destructuring default is what `undefined`
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
-  if (kind === 'alias') return <AliasIcon base={aliasOf ?? 'markdown'} size={size} />;
+  if (kind === 'reference') return <ReferenceIcon base={referenceOf ?? 'markdown'} size={size} />;
   const Base = BASE_GLYPHS[kind];
   return <Base size={size} />;
 }
@@ -102,12 +102,12 @@ function KindGlyph({ kind, aliasOf, size }: ThingKindIconProps) {
  * decorative glyph is inside a control that has already named the command it
  * performs, and the glyph fills that control — so it is the node the pointer is
  * over, and its own `title` is the tooltip that appears instead of the button's.
- * Hovering `Create Alias` would read `Alias`: the noun, in a slot that performs
+ * Hovering `Create Reference` would read `Reference Thing`: the noun, in a slot that performs
  * a verb. Withholding it is what lets the button's own name reach the pointer as
  * well as the screen reader.
  */
 
-export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: ThingKindIconProps) {
+export function ThingKindIcon({ kind, referenceOf, size, decorative = false }: ThingKindIconProps) {
   // Named only where a name is drawn: the decorative arm announces nothing and
   // shows the pointer nothing, so deriving one for it would be a value that
   // exists to be discarded.
@@ -117,12 +117,15 @@ export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: Thing
         className="inline-flex flex-none items-center text-muted-foreground"
         aria-hidden="true"
         data-thing-kind={kind}
-        data-alias-of={kind === 'alias' ? aliasOf : undefined}
+        data-reference-of={kind === 'reference' ? referenceOf : undefined}
       >
-        <KindGlyph kind={kind} aliasOf={aliasOf} size={size} />
+        <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
       </span>
     );
-  const name = kind === 'alias' && aliasOf !== undefined ? ALIAS_NAMES[aliasOf] : KIND_NAMES[kind];
+  const name =
+    kind === 'reference' && referenceOf !== undefined
+      ? REFERENCE_NAMES[referenceOf]
+      : KIND_NAMES[kind];
   return (
     <span
       className="inline-flex flex-none items-center text-muted-foreground"
@@ -130,9 +133,9 @@ export function ThingKindIcon({ kind, aliasOf, size, decorative = false }: Thing
       aria-label={name}
       title={name}
       data-thing-kind={kind}
-      data-alias-of={kind === 'alias' ? aliasOf : undefined}
+      data-reference-of={kind === 'reference' ? referenceOf : undefined}
     >
-      <KindGlyph kind={kind} aliasOf={aliasOf} size={size} />
+      <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
     </span>
   );
 }

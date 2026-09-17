@@ -460,7 +460,7 @@ const DOCK_PLACED = [
   },
   { id: dockId(0x12), title: 'Strategies', kind: 'markdown' },
   { id: dockId(0x13), title: 'Design system', kind: 'space' },
-  { id: dockId(0x14), title: 'Strategy overview', kind: 'alias' },
+  { id: dockId(0x14), title: 'Strategy overview', kind: 'reference' },
 ] as const;
 
 /**
@@ -505,12 +505,12 @@ const DOCK_UNPLACED = [
   { title: 'Rendering', kind: 'space' },
   { title: 'HTTP boundary', kind: 'space' },
   { title: 'Tooling', kind: 'space' },
-  { title: 'Camera overview', kind: 'alias' },
-  { title: 'Grid overview', kind: 'alias' },
-  { title: 'Traversal overview', kind: 'alias' },
+  { title: 'Camera overview', kind: 'reference' },
+  { title: 'Grid overview', kind: 'reference' },
+  { title: 'Traversal overview', kind: 'reference' },
 ] as const;
 
-/** Every Thing in the fixture, placed and unplaced, keyed by the title an alias names. */
+/** Every Thing in the fixture, placed and unplaced, keyed by the title a reference thing names. */
 const DOCK_THING_IDS: ReadonlyMap<string, UUID> = new Map([
   ...DOCK_PLACED.map((thing): [string, UUID] => [thing.title, thing.id]),
   ...DOCK_UNPLACED.map((thing, index): [string, UUID] => [thing.title, dockId(0x20 + index)]),
@@ -540,27 +540,28 @@ const dockTargetSpace = (index: number): SpaceSnapshot =>
   DOCK_TARGET_SPACES[index % DOCK_TARGET_SPACES.length] ?? authoredSnapshot;
 
 /**
- * Which Thing each Alias shows, named rather than derived from its title.
+ * Which Thing each Reference Thing shows, named rather than derived from its title.
  *
  * A rule that stripped a suffix would make the Target a fact about spelling —
- * `Strategy overview` would have to point at `Strategys` — and an Alias whose
+ * `Strategy overview` would have to point at `Strategys` — and a Reference Thing whose
  * Target moves when someone rewords a title is not what ADR 0070 makes
  * immutable.
  */
-const DOCK_ALIAS_TARGETS = new Map([
+const DOCK_REFERENCE_TARGETS = new Map([
   ['Strategy overview', 'Strategies'],
   ['Camera overview', 'Camera'],
   ['Grid overview', 'Grid'],
   ['Traversal overview', 'Traversal'],
 ]);
 
-const dockAliasTarget = (title: string): UUID => {
-  const target = DOCK_ALIAS_TARGETS.get(title);
-  if (target === undefined) throw new Error(`Command Dock fixture Alias ${title} names no Target`);
+const dockReferenceTarget = (title: string): UUID => {
+  const target = DOCK_REFERENCE_TARGETS.get(title);
+  if (target === undefined)
+    throw new Error(`Command Dock fixture Reference Thing ${title} names no Target`);
   return dockThingId(target);
 };
 
-type DockThingKind = 'markdown' | 'space' | 'alias';
+type DockThingKind = 'markdown' | 'space' | 'reference';
 
 const dockThingDocument = (
   title: string,
@@ -568,7 +569,7 @@ const dockThingDocument = (
   index: number,
 ): SpaceSnapshot['things'][number]['document'] => {
   if (kind === 'space') return spaceThingDocument(title, dockTargetSpace(index));
-  if (kind === 'alias') return { title, kind, target: dockAliasTarget(title) };
+  if (kind === 'reference') return { title, kind, target: dockReferenceTarget(title) };
   return { title, kind, body: '' };
 };
 

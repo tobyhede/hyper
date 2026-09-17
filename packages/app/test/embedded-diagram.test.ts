@@ -21,7 +21,7 @@ const DIAGRAM = id(2);
 const GRAPH = id(3);
 const A = id(4);
 const B = id(5);
-const ALIAS = id(6);
+const REFERENCE = id(6);
 const PARENT = id(7);
 
 async function projection(open = false) {
@@ -40,7 +40,7 @@ async function projection(open = false) {
             positions: {
               [A]: { x: 0, y: 0, open: false },
               [B]: { x: 400, y: 0, open: false },
-              [ALIAS]: open
+              [REFERENCE]: open
                 ? { x: 0, y: 300, open: true, openSize: { width: 560, height: 420 } }
                 : { x: 0, y: 300, open: false },
             },
@@ -51,7 +51,7 @@ async function projection(open = false) {
       things: [
         { id: A, document: { kind: 'markdown', title: 'A', body: 'Target content' } },
         { id: B, document: { kind: 'markdown', title: 'B', body: '' } },
-        { id: ALIAS, document: { kind: 'alias', title: 'Alias', target: A } },
+        { id: REFERENCE, document: { kind: 'reference', title: 'Reference Thing', target: A } },
       ],
     }),
   );
@@ -252,15 +252,15 @@ describe('an embedded production projection', () => {
     );
   });
 
-  it('uses the target projection for Open Alias content and its authored placement', async () => {
+  it('uses the target projection for Open Reference Thing content and its authored placement', async () => {
     const { drawn } = await draw(true);
-    expect(drawn.nodes.find((node) => node.data.thingId === ALIAS)).toMatchObject({
+    expect(drawn.nodes.find((node) => node.data.thingId === REFERENCE)).toMatchObject({
       width: 560,
       height: 420,
-      data: { expanded: true, body: 'Target content', kind: 'alias' },
+      data: { expanded: true, body: 'Target content', kind: 'reference' },
     });
     // B sits at the target Diagram's authored 400 plus the embedding offset, and
-    // the Open Alias below it moves nothing: displacement is applied by the Edit
+    // the Open Reference Thing below it moves nothing: displacement is applied by the Edit
     // that opens a Thing, so it is already in the coordinates the target Space
     // stores (ADR 0084).
     expect(drawn.nodes.find((node) => node.data.thingId === B)?.position).toEqual({

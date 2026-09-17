@@ -21,7 +21,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         persistence={{
-          kind: 'rejected',
+          kind: 'refused',
           failure: {
             kind: 'aggregate-refused',
             errors: [
@@ -52,7 +52,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         persistence={{
-          kind: 'rejected',
+          kind: 'refused',
           failure: {
             kind: 'aggregate-refused',
             errors: [
@@ -223,6 +223,52 @@ describe('PersistenceControl', () => {
     );
 
     expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
+  });
+
+  /**
+   * `v1-release/17` criterion 2: a permanent rejection (`kind: 'rejected'`)
+   * and an aggregate refusal (`kind: 'refused'`) are distinct
+   * `SpaceSessionState['persistence']` kinds. `PersistenceControl`'s own
+   * `Rejection` type spans both, and this exercises the acknowledge/dismiss
+   * flow across the pair in one sequence — acknowledging one and then
+   * receiving the other draws the dialog again with the other's own sentence,
+   * never the first's.
+   */
+  it('draws an aggregate refusal after acknowledging an unrelated permanent rejection', () => {
+    const rejection = {
+      kind: 'rejected',
+      failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+    } as const;
+    const refusal = {
+      kind: 'refused',
+      failure: {
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID }],
+      },
+    } as const;
+    const view = render(
+      <PersistenceControl
+        persistence={rejection}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    view.rerender(
+      <PersistenceControl
+        persistence={refusal}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' });
+    expect(dialog).toBeVisible();
+    expect(screen.getByText(/nothing pointing at it/i)).toBeVisible();
+    expect(screen.queryByText('You do not have permission to save this space.')).toBeNull();
   });
 
   /**

@@ -21,8 +21,8 @@ export function thingFile(id: string, title = defaultTitle(id), body = ''): Thin
   return file(id, { id, title }, body);
 }
 
-export function aliasFile(id: string, title: string, target: string): ThingFile {
-  return file(id, { id, title, kind: 'alias', target }, '');
+export function referenceFile(id: string, title: string, target: string): ThingFile {
+  return file(id, { id, title, kind: 'reference', target }, '');
 }
 
 /**
@@ -48,6 +48,6 @@ function defaultTitle(id: string): string {
   return DEFAULT_TITLES.get(id) ?? id.toUpperCase();
 }
 
-export function alias(id: string, title: string, target: string): Thing {
-  return { id: uuid(id), title, kind: 'alias', target: uuid(target) };
+export function reference(id: string, title: string, target: string): Thing {
+  return { id: uuid(id), title, kind: 'reference', target: uuid(target) };
 }

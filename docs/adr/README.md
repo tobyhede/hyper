@@ -38,6 +38,7 @@ under `superseded/`.
 | [0039](0039-an-alias-delegates-content-authoring-to-its-target.md) | An Alias gives content authoring to its Target. |
 | [0046](0046-an-occurrence-authors-its-own-title-and-target.md) | An occurrence authors its own Title and Target in the pane that opens it. |
 | [0070](0070-an-open-alias-shows-immutable-target-content-read-only.md) | An Alias keeps its Target for life and shows that content read-only. |
+| [0092](0092-reference-thing-is-the-first-public-name-for-alias.md) | A Reference Thing is the first-public name for Alias. Alias is retired. |
 | [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows another Space through the selection it carries; ADR 0079 makes that selection a Layout. |
 | [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. |
 | [0076](0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md) | Multi-Space edits coordinate per-Space sessions behind the Space Card lifecycle. |

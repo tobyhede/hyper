@@ -39,7 +39,7 @@ if (typeof document !== 'undefined') {
  * nothing else, so that form — plus the `matrix(...)` a real `getComputedStyle`
  * would resolve it to — is what this reads back. Anything else is the identity.
  *
- * Deliberately narrow: the six 2D components and the `m*` aliases over them, not
+ * Deliberately narrow: the six 2D components and the `m*` references over them, not
  * an implementation of the interface. Both guards matter — the setup file also
  * runs under `environment: 'node'`, where there is no `window` at all, and a real
  * `DOMMatrixReadOnly` must win wherever one exists.
@@ -247,7 +247,7 @@ if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype
  * `environment: 'node'`, and any environment that implements the real thing
  * keeps it. The guard reads the value rather than asking `in`, because jsdom
  * *declares* `matchMedia` and leaves it `undefined`: the property is there and
- * calling it throws. Read off a widened alias so the check is about the value
+ * calling it throws. Read off a widened reference so the check is about the value
  * this environment actually holds rather than about the DOM lib's promise,
  * which is what would make it a condition lint can prove pointless.
  */

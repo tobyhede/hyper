@@ -123,7 +123,8 @@ const canonicalThing = (
     id,
     title: document.title,
   };
-  if (document.kind === 'alias') return { ...common, kind: 'alias', target: document.target };
+  if (document.kind === 'reference')
+    return { ...common, kind: 'reference', target: document.target };
   if (document.kind === 'space')
     return {
       ...common,

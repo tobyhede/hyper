@@ -53,8 +53,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Thing is no longer part of the Space.';
     case 'thing-kind-immutable':
       return 'A Thing keeps the kind it was created with.';
-    case 'alias-target-immutable':
-      return 'An Alias keeps the Target it was created with.';
+    case 'reference-target-immutable':
+      return 'A Reference Thing keeps the Target it was created with.';
     case 'space-thing-target-immutable':
       return 'A Space Thing keeps the target Space it was created with.';
     case 'space-thing-deletion-unsupported':
@@ -67,18 +67,18 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Space title is required.';
     case 'space-must-keep-diagram':
       return 'A Space keeps at least one Diagram.';
-    case 'alias-target-not-found':
+    case 'reference-target-not-found':
       return 'That Target is no longer part of the Space.';
-    case 'alias-target-must-own-content':
-      return 'An Alias cannot target another Alias.';
+    case 'reference-target-must-own-content':
+      return 'A Reference Thing cannot target another Reference Thing.';
     case 'thing-already-in-diagram':
       return 'This Thing is already in this Diagram.';
     case 'thing-not-in-diagram':
       return 'This Thing is not in this Diagram.';
     case 'thing-not-expanded':
       return 'Open this Thing before resizing it.';
-    case 'thing-has-aliases':
-      return `Delete the Aliases of this Thing first: ${refusal.aliasTitles.join(', ')}.`;
+    case 'thing-has-references':
+      return `Delete the Reference Things of this Thing first: ${refusal.referenceTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
     case 'diagram-must-keep-graph':
@@ -122,19 +122,19 @@ const correctableByThingChoice = {
   'diagram-required': false,
   'thing-not-found': false,
   'thing-kind-immutable': false,
-  'alias-target-immutable': false,
+  'reference-target-immutable': false,
   'space-thing-target-immutable': false,
   'space-thing-deletion-unsupported': false,
   'thing-title-required': false,
   'diagram-title-required': false,
   'space-title-required': false,
   'space-must-keep-diagram': false,
-  'alias-target-not-found': false,
-  'alias-target-must-own-content': false,
+  'reference-target-not-found': false,
+  'reference-target-must-own-content': false,
   'thing-already-in-diagram': false,
   'thing-not-in-diagram': false,
   'thing-not-expanded': false,
-  'thing-has-aliases': false,
+  'thing-has-references': false,
   'graph-title-required': false,
   'diagram-must-keep-graph': false,
   'graph-not-owned': false,
@@ -334,13 +334,15 @@ export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
  *
  * Derived from the session state rather than imported as a union, because
  * `CommitResult` is not on `@project/persistence`'s surface and the two states
- * that carry these failures are.
+ * that carry these failures are. An aggregate refusal is excluded by
+ * construction now rather than by `Exclude`: `rejected`'s `failure` no longer
+ * carries it, `refused` does (`v1-release/17`), and `describeAggregateRefusal`
+ * is that state's own translation.
  */
 type Persistence = SpaceSessionState['persistence'];
-type Rejected = Extract<Persistence, { kind: 'rejected' }>['failure'];
 export type PersistenceFailure =
   | Extract<Persistence, { kind: 'failed' }>['failure']
-  | Exclude<Rejected, { kind: 'aggregate-refused' }>;
+  | Extract<Persistence, { kind: 'rejected' }>['failure'];
 
 /**
  * What each persistence failure means, in the author's terms rather than the
@@ -415,11 +417,11 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
       return 'The stored Spaces could not be read, so this edit was not attempted.';
     case 'space-thing-target-unavailable':
       return TARGET_UNAVAILABLE_REASONS[refusal.reason];
-    // Same wording Authoring's own `deleted-thing` refuses a Markdown or Alias
-    // Thing's Aliases with (ADR 0070) — one sentence for one meaning, whichever
-    // seam the deletion reached it through.
-    case 'thing-has-aliases':
-      return `Delete the Aliases of this Thing first: ${refusal.aliasTitles.join(', ')}.`;
+    // Same wording Authoring's own `deleted-thing` refuses a Markdown or
+    // Reference Thing's Reference Things with (ADR 0070) — one sentence for
+    // one meaning, whichever seam the deletion reached it through.
+    case 'thing-has-references':
+      return `Delete the Reference Things of this Thing first: ${refusal.referenceTitles.join(', ')}.`;
   }
 };
 

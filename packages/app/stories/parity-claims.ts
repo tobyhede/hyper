@@ -27,7 +27,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Create offers both Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind available in the Dock — and every kind available in the Dock now completes its Edit on that one activation (ADR 0089). Alias is not a Dock Create peer.',
+      'Create offers both Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind available in the Dock — and every kind available in the Dock now completes its Edit on that one activation (ADR 0089). Reference Thing is not a Dock Create peer.',
   },
   {
     id: 'command-dock-packs-things-onto-one-row',
@@ -96,7 +96,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/things-popover.stories.tsx',
     storyExport: 'Disabled',
     claim:
-      'The Things trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Thing, or Alias creation.',
+      'The Things trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Thing, or Reference Thing creation.',
   },
   {
     id: 'things-popover-keeps-an-add-refusal-on-its-surface',
@@ -159,14 +159,15 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'canvas-thing-exposes-kind-and-keyboard-actions',
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'Actions',
-    claim: 'The production canvas Thing exposes Alias identity and keyboard-focusable actions.',
+    claim:
+      'The production canvas Thing exposes Reference Thing identity and keyboard-focusable actions.',
   },
   {
     id: 'canvas-thing-shows-rest-selected-and-dragging-states',
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'States',
     claim:
-      'Rest, selected and dragging are visually distinct states for both the Markdown and Alias front.',
+      'Rest, selected and dragging are visually distinct states for both the Markdown and Reference Thing front.',
     // React Flow's own selection/dragging booleans, and ThingNode's translation
     // of them into CanvasThing's four-value `state`, are unit-tested directly
     // (`ThingNode.test.tsx`, "translates React Flow selection and dragging into
@@ -194,7 +195,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'Kinds',
     claim:
-      "An Alias front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
+      "A Reference Thing front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
     // **The former coloured-rail claim, changed rather than dropped.**
@@ -268,11 +269,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'A Space Thing offers Copy Space link and Open in new tab for the Space it shows, at that Space’s own address and with no containing Diagram or presentation.',
   },
   {
-    id: 'open-alias-shows-target-markdown-read-only',
+    id: 'open-reference-shows-target-markdown-read-only',
     storyFile: 'components/thing.stories.tsx',
-    storyExport: 'OpenAlias',
+    storyExport: 'OpenReference',
     claim:
-      'An Open Alias keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
+      'An Open Reference Thing keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
   },
   /*
    * **`persistence-indicator-shows-save-lifecycle` is retired with its story,
@@ -431,6 +432,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveRejected',
     claim: 'Permanent persistence rejection explains the reason and can be acknowledged.',
+  },
+  {
+    id: 'command-dock-reports-aggregate-refusal',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'SaveRefused',
+    claim:
+      'A refused aggregate — a distinct persistence state from permanent rejection — explains the reason as one sentence and can be acknowledged, with no retry offered.',
   },
   {
     id: 'command-dock-resolves-conflict',
@@ -627,7 +635,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'Space Thing entity menus group Rename and Create Alias, Enter and independent opening, concise copy links, and removal; creating an Alias shows the selected target Diagram read-only.',
+      'Space Thing entity menus group Rename and Create Reference, Enter and independent opening, concise copy links, and removal; creating a Reference Thing shows the selected target Diagram read-only.',
   },
   {
     id: 'space-thing-context-menus-share-dock-actions',

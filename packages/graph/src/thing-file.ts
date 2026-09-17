@@ -30,7 +30,7 @@ export type ParseImportThingFileResult =
   { ok: true; thing: ImportThing } | { ok: false; errors: ThingFileError[] };
 
 type ThingFileFailure = { ok: false; errors: ThingFileError[] };
-type Frontmatter = { kind: 'markdown' } | { kind: 'alias' } | { kind: 'space' };
+type Frontmatter = { kind: 'markdown' } | { kind: 'reference' } | { kind: 'space' };
 type DecodedCandidate<T extends Frontmatter> = T extends { kind: 'markdown' }
   ? T & { body: string }
   : T;

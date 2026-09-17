@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  AliasIcon,
+  ReferenceIcon,
   ParentIcon,
   SpaceIcon,
   SpaceThingIcon,
@@ -90,8 +90,8 @@ describe('the public icon facade', () => {
         <span data-testid="plus">
           <PlusIcon />
         </span>
-        <span data-testid="alias">
-          <AliasIcon />
+        <span data-testid="reference">
+          <ReferenceIcon />
         </span>
         <span data-testid="open-thing">
           <OpenThingIcon />
@@ -123,7 +123,7 @@ describe('the public icon facade', () => {
       </div>,
     );
 
-    // `alias` is absent on purpose and has its own test below: it is the one
+    // `reference` is absent on purpose and has its own test below: it is the one
     // glyph the facade composes rather than forwards, so its outer element is
     // ours and only the base inside it is Lucide's.
     const expectedLucideName = {
@@ -152,14 +152,14 @@ describe('the public icon facade', () => {
     }
   });
 
-  it('draws an Alias as the base glyph it points at, badged rather than replaced', () => {
+  it('draws a Reference Thing as the base glyph it points at, badged rather than replaced', () => {
     render(
       <>
-        <span data-testid="alias-default">
-          <AliasIcon />
+        <span data-testid="reference-default">
+          <ReferenceIcon />
         </span>
-        <span data-testid="alias-of-space">
-          <AliasIcon base="space" />
+        <span data-testid="reference-of-space">
+          <ReferenceIcon base="space" />
         </span>
       </>,
     );
@@ -167,8 +167,8 @@ describe('the public icon facade', () => {
     // The base carries the kind and Lucide still draws it; the outer SVG is the
     // composition, which is why it is ours and why the badge can sit over it.
     for (const [testId, lucideName] of [
-      ['alias-default', 'sticky-note'],
-      ['alias-of-space', 'box'],
+      ['reference-default', 'sticky-note'],
+      ['reference-of-space', 'box'],
     ] as const) {
       const composed = screen.getByTestId(testId).querySelector('svg');
       expect(composed).toHaveAttribute('aria-hidden', 'true');
@@ -178,14 +178,14 @@ describe('the public icon facade', () => {
 
     // The hole is cut rather than painted, so the badge is legible on any
     // surface; a mask that did not resolve would leave the base whole.
-    const masked = screen.getByTestId('alias-default').querySelector('g[mask]');
-    const maskId = screen.getByTestId('alias-default').querySelector('mask')?.id;
+    const masked = screen.getByTestId('reference-default').querySelector('g[mask]');
+    const maskId = screen.getByTestId('reference-default').querySelector('mask')?.id;
     expect(maskId).toBeTruthy();
     expect(masked).toHaveAttribute('mask', `url(#${maskId ?? ''})`);
 
     // Two of them in one tree must not share a mask id.
-    const first = screen.getByTestId('alias-default').querySelector('mask')?.id;
-    const second = screen.getByTestId('alias-of-space').querySelector('mask')?.id;
+    const first = screen.getByTestId('reference-default').querySelector('mask')?.id;
+    const second = screen.getByTestId('reference-of-space').querySelector('mask')?.id;
     expect(first).not.toEqual(second);
   });
 
@@ -195,12 +195,12 @@ describe('the public icon facade', () => {
         <GraphIcon color="#123456" size={13} />
         <PresentIcon color="#654321" />
         <StopPresentingIcon color="#abcdef" />
-        <AliasIcon size={11} />
+        <ReferenceIcon size={11} />
         <MarkdownIcon size={14} />
       </>,
     );
 
-    // `querySelectorAll` is document order, and the Alias contributes two —
+    // `querySelectorAll` is document order, and the Reference Thing contributes two —
     // its own composed SVG and the Lucide base nested inside it — so the
     // indices after it are not the argument order.
     const glyphs = container.querySelectorAll('svg');
@@ -213,7 +213,7 @@ describe('the public icon facade', () => {
     expect(glyphs[2]).toHaveAttribute('width', '16');
     expect(glyphs[2]).toHaveClass('origin-center', 'scale-75');
     expect(glyphs[2]).toHaveAttribute('stroke', '#abcdef');
-    // The Alias sizes its own box; the base inside it always fills the 24-unit
+    // The Reference Thing sizes its own box; the base inside it always fills the 24-unit
     // viewBox, which is what keeps the badge in the same corner at every size.
     expect(glyphs[3]).toHaveAttribute('width', '11');
     expect(glyphs[4]).toHaveAttribute('width', '24');
@@ -244,34 +244,34 @@ describe('the public icon facade', () => {
     render(
       <>
         <ThingKindIcon kind="markdown" />
-        <ThingKindIcon kind="alias" />
+        <ThingKindIcon kind="reference" />
         <ThingKindIcon kind="space" />
       </>,
     );
 
     const markdown = screen.getByRole('img', { name: 'Markdown Thing' });
-    const alias = screen.getByRole('img', { name: 'Alias' });
+    const reference = screen.getByRole('img', { name: 'Reference Thing' });
     const space = screen.getByRole('img', { name: 'Space Thing' });
     expect(markdown).toHaveAttribute('title', 'Markdown Thing');
-    expect(alias).toHaveAttribute('title', 'Alias');
+    expect(reference).toHaveAttribute('title', 'Reference Thing');
     expect(space).toHaveAttribute('title', 'Space Thing');
     expect(markdown.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-    expect(alias.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(reference.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(space.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
   /**
    * A decorative glyph sits inside a control that has already named the command
-   * it performs — `Create Alias`, not `Alias`. A `title` here is a second
+   * it performs — `Create Reference`, not `Reference Thing`. A `title` here is a second
    * tooltip on the same pixels, and the inner node is the one the pointer lands
-   * on, so the button's own tooltip never appears: hovering Create Alias would
-   * read `Alias`, which names the noun the button does not perform.
+   * on, so the button's own tooltip never appears: hovering Create Reference would
+   * read `Reference Thing`, which names the noun the button does not perform.
    */
   it('gives a decorative glyph no tooltip of its own', () => {
     const { container } = render(
       <>
         <ThingKindIcon kind="markdown" decorative />
-        <ThingKindIcon kind="alias" decorative />
+        <ThingKindIcon kind="reference" decorative />
         <ThingKindIcon kind="space" decorative />
       </>,
     );
@@ -286,22 +286,22 @@ describe('the public icon facade', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('tells an Alias of a Space Thing from an Alias of a Markdown Thing', () => {
+  it('tells a Reference to a Space Thing from a Reference to a Markdown Thing', () => {
     render(
       <>
-        <ThingKindIcon kind="alias" aliasOf="markdown" />
-        <ThingKindIcon kind="alias" aliasOf="space" />
+        <ThingKindIcon kind="reference" referenceOf="markdown" />
+        <ThingKindIcon kind="reference" referenceOf="space" />
       </>,
     );
 
     // The glyph carries the distinction, so the accessible name has to as well —
     // otherwise the two draw differently and announce identically, which is
-    // worse than the single Alias glyph this replaced.
-    const ofMarkdown = screen.getByRole('img', { name: 'Alias of a Markdown Thing' });
-    const ofSpace = screen.getByRole('img', { name: 'Alias of a Space Thing' });
-    expect(ofMarkdown).toHaveAttribute('data-thing-kind', 'alias');
-    expect(ofMarkdown).toHaveAttribute('data-alias-of', 'markdown');
-    expect(ofSpace).toHaveAttribute('data-alias-of', 'space');
+    // worse than the single Reference Thing glyph this replaced.
+    const ofMarkdown = screen.getByRole('img', { name: 'Reference to a Markdown Thing' });
+    const ofSpace = screen.getByRole('img', { name: 'Reference to a Space Thing' });
+    expect(ofMarkdown).toHaveAttribute('data-thing-kind', 'reference');
+    expect(ofMarkdown).toHaveAttribute('data-reference-of', 'markdown');
+    expect(ofSpace).toHaveAttribute('data-reference-of', 'space');
     expect(ofMarkdown.querySelector('svg svg')).toHaveClass('lucide-sticky-note');
     expect(ofSpace.querySelector('.lucide')).toHaveClass('lucide-box');
   });

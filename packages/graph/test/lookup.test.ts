@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace, resolveContentThing, type Space } from '../src/index';
-import { aliasFile, thingFile, uuid } from './thing-files';
+import { referenceFile, thingFile, uuid } from './thing-files';
 
 function baseSpace(): Space {
   const result = loadSpace(
@@ -33,7 +33,7 @@ function baseSpace(): Space {
     },
     [
       thingFile(uuid('00000000-0000-4000-8000-000000000045'), 'The model', 'The model body.\n'),
-      aliasFile(
+      referenceFile(
         uuid('00000000-0000-4000-8000-000000000044'),
         'The model, again',
         uuid('00000000-0000-4000-8000-000000000045'),
@@ -45,7 +45,7 @@ function baseSpace(): Space {
 }
 
 describe('resolveContentThing', () => {
-  it('resolves an alias to the thing whose content it shows', () => {
+  it('resolves a reference thing to the thing whose content it shows', () => {
     const resolved = resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000044'));
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.kind === 'markdown' ? resolved.body : undefined).toBe('The model body.\n');

@@ -143,13 +143,13 @@ export type AuthoringCompletion =
   /** Add Thing: a detached Markdown Thing at the visible centre, neutrally titled. */
   | { readonly kind: 'created-thing'; readonly anchor: DiagramPosition }
   /**
-   * Add Alias: created only once its Target is chosen, because an Alias without
+   * Add Reference Thing: created only once its Target is chosen, because a Reference Thing without
    * one is not a valid Thing. An empty title mints `Thing N` like any other Thing
    * rather than copying the Target's, which is what stopped two Things arriving
    * with one name (ADR 0083 refines ADR 0046).
    */
   | {
-      readonly kind: 'created-alias';
+      readonly kind: 'created-reference';
       readonly target: ThingId;
       readonly title?: string;
       readonly anchor: DiagramPosition;
@@ -269,7 +269,7 @@ export type AuthoringRefusal =
   | { readonly code: 'diagram-required'; readonly operation: DiagramRequiredOperation }
   | { readonly code: 'thing-not-found' }
   | { readonly code: 'thing-kind-immutable' }
-  | { readonly code: 'alias-target-immutable' }
+  | { readonly code: 'reference-target-immutable' }
   | { readonly code: 'space-thing-target-immutable' }
   | { readonly code: 'space-thing-deletion-unsupported' }
   // The one code here the domain owns rather than this module: `@project/core`
@@ -283,15 +283,15 @@ export type AuthoringRefusal =
    */
   | { readonly code: 'space-title-required' }
   | { readonly code: 'space-must-keep-diagram' }
-  | { readonly code: 'alias-target-not-found'; readonly targetId: ThingId }
-  | { readonly code: 'alias-target-must-own-content'; readonly targetId: ThingId }
+  | { readonly code: 'reference-target-not-found'; readonly targetId: ThingId }
+  | { readonly code: 'reference-target-must-own-content'; readonly targetId: ThingId }
   | { readonly code: 'thing-already-in-diagram' }
   | { readonly code: 'thing-not-in-diagram' }
   | { readonly code: 'thing-not-expanded' }
   | {
-      readonly code: 'thing-has-aliases';
-      /** The Aliases by **name**, which is what a sentence listing Things says (ADR 0083). */
-      readonly aliasTitles: readonly string[];
+      readonly code: 'thing-has-references';
+      /** The Reference Things by **name**, which is what a sentence listing Things says (ADR 0083). */
+      readonly referenceTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
   | { readonly code: 'diagram-must-keep-graph' }
@@ -717,9 +717,9 @@ const reconnectOutcome = (
 };
 
 /**
- * Why a Thing document's Alias Target may not be authored, or `null`.
+ * Why a Thing document's Reference Thing Target may not be authored, or `null`.
  *
- * This is the creation-time rule for choosing an Alias Target. Existing Alias
+ * This is the creation-time rule for choosing a Reference Thing Target. Existing Reference Thing
  * Targets are immutable and are refused before this validation is reached. It
  * duplicates what `validateReferences` already enforces, and deliberately:
  * intake reports by failing the whole snapshot, which this derivation answers
@@ -727,13 +727,14 @@ const reconnectOutcome = (
  * deserves a sentence rather than an exception. A markdown document has no
  * Target and nothing to refuse.
  */
-const aliasTargetRefusal = (space: Space, document: ThingDocument): AuthoringRefusal | null => {
-  if (document.kind !== 'alias') return null;
+const referenceTargetRefusal = (space: Space, document: ThingDocument): AuthoringRefusal | null => {
+  if (document.kind !== 'reference') return null;
   const target = space.lookup.thing(document.target);
-  if (target === undefined) return { code: 'alias-target-not-found', targetId: document.target };
-  // Alias resolution ends after one Thing reference, including a Space Thing.
-  if (target.kind === 'alias') {
-    return { code: 'alias-target-must-own-content', targetId: document.target };
+  if (target === undefined)
+    return { code: 'reference-target-not-found', targetId: document.target };
+  // Reference Thing resolution ends after one Thing reference, including a Space Thing.
+  if (target.kind === 'reference') {
+    return { code: 'reference-target-must-own-content', targetId: document.target };
   }
   return null;
 };
@@ -754,9 +755,11 @@ interface CreatedThing {
   readonly avoidingOverlap: boolean;
 }
 
-/** The Aliases pointing at a Thing, which are what block deleting it from the Space. */
-const incomingAliases = (things: SnapshotThings, thingId: ThingId): SnapshotThings =>
-  things.filter((thing) => thing.document.kind === 'alias' && thing.document.target === thingId);
+/** The Reference Things pointing at a Thing, which are what block deleting it from the Space. */
+const incomingReferences = (things: SnapshotThings, thingId: ThingId): SnapshotThings =>
+  things.filter(
+    (thing) => thing.document.kind === 'reference' && thing.document.target === thingId,
+  );
 
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
@@ -1394,7 +1397,7 @@ export function createSpaceAuthoring({
     let connection: GraphEdge | null = null;
     let completedPlacement = reportedPlacement;
     // The one way a Thing is added: mint it, place it at a free anchor, append it.
-    // Add Thing and Add Alias differ in the document they carry and in nothing
+    // Add Thing and Add Reference Thing differ in the document they carry and in nothing
     // else — neither creates an Edge, and neither adds a Graph to a Diagram that
     // already has one.
     // Returns rather than assigns: `createdThing` is read further down, and a
@@ -1414,17 +1417,17 @@ export function createSpaceAuthoring({
       if (thing === undefined) return refuse({ code: 'thing-not-found' });
       // Kind is fixed for a Thing's lifetime, and changing it is out of scope for
       // version 1. Everything else the editor holds — a Markdown Thing's Title
-      // and body, or an Alias's Title and Target — is one ordinary Edit of
+      // and body, or a Reference Thing's Title and Target — is one ordinary Edit of
       // this Thing.
       if (thing.document.kind !== completion.document.kind) {
         return refuse({ code: 'thing-kind-immutable' });
       }
       if (
-        thing.document.kind === 'alias' &&
-        completion.document.kind === 'alias' &&
+        thing.document.kind === 'reference' &&
+        completion.document.kind === 'reference' &&
         thing.document.target !== completion.document.target
       ) {
-        return refuse({ code: 'alias-target-immutable' });
+        return refuse({ code: 'reference-target-immutable' });
       }
       if (
         thing.document.kind === 'space' &&
@@ -1443,7 +1446,7 @@ export function createSpaceAuthoring({
       if (title === null) return refuse({ code: THING_TITLE_REQUIRED });
       const document: ThingDocument = { ...completion.document, title };
       if (sameValue(thing.document, document)) return UNCHANGED;
-      const refusal = aliasTargetRefusal(space, document);
+      const refusal = referenceTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
       const things = [...snapshot.things];
       things[thingIndex] = { id: thing.id, document };
@@ -1504,7 +1507,7 @@ export function createSpaceAuthoring({
         { title: nextThingTitle(snapshot), kind: 'markdown', body: '' },
         completion.anchor,
       );
-    } else if (completion.kind === 'created-alias') {
+    } else if (completion.kind === 'created-reference') {
       // An empty title mints the same neutral `Thing N` every other created Thing
       // gets; text the author already entered is never overwritten. `??` cannot
       // express this — the empty string is a value a caller really sends, and
@@ -1512,7 +1515,7 @@ export function createSpaceAuthoring({
       //
       // **Copying the Target's Title is now what the one caller does** (ADR 0089).
       // This arm used to carry an argument against it, from when a pane asked for
-      // a name before the Edit ran: there is no pane, the Alias is named after
+      // a name before the Edit ran: there is no pane, the Reference Thing is named after
       // its Target and renamed in place afterwards, and two Things sharing a name
       // is not a collision because a title is not an identifier (ADR 0016). What
       // stays this module's is the default and the normalization, not the choice.
@@ -1522,10 +1525,10 @@ export function createSpaceAuthoring({
       const entered = namedThingTitle(completion.title ?? '');
       const document: ThingDocument = {
         title: entered ?? nextThingTitle(snapshot),
-        kind: 'alias',
+        kind: 'reference',
         target: completion.target,
       };
-      const refusal = aliasTargetRefusal(space, document);
+      const refusal = referenceTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
       createdThing = createThing(document, completion.anchor);
     } else if (completion.kind === 'added-thing-to-diagram') {
@@ -1564,16 +1567,16 @@ export function createSpaceAuthoring({
       if (deleted.kind === 'space') {
         return refuse({ code: 'space-thing-deletion-unsupported' });
       }
-      // An Alias whose Target vanished is not a Thing intake accepts, so the Space
-      // cannot lose one out from under its Aliases. Removing that Thing from a
+      // A Reference Thing whose Target vanished is not a Thing intake accepts, so the Space
+      // cannot lose one out from under its Reference Things. Removing that Thing from a
       // single Diagram is never blocked this way — only deleting it outright.
-      const incoming = incomingAliases(snapshot.things, completion.thingId);
+      const incoming = incomingReferences(snapshot.things, completion.thingId);
       if (incoming.length > 0) {
         return refuse({
-          code: 'thing-has-aliases',
+          code: 'thing-has-references',
           // Named, not Titled: the wording joins these into one sentence, and
           // a Title's later lines would break the list across it (ADR 0083).
-          aliasTitles: incoming.map((alias) => titleName(alias.document.title)),
+          referenceTitles: incoming.map((reference) => titleName(reference.document.title)),
         });
       }
       // Deferred like a creation so the complete Diagram changes atomically.

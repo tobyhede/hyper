@@ -431,7 +431,7 @@ describe('render adapter', () => {
    * unselected and stays that way — it *reads* as selected, since
    * `selectedForAuthoring` is right, while React Flow holds no selected node at
    * all. `F2` asks React Flow, so `F2` is what stops working, until any click
-   * repairs it. Add Thing, Add Alias and create-and-connect all land here.
+   * repairs it. Add Thing, Add Reference Thing and create-and-connect all land here.
    *
    * The `dimensions` change is the window in front of it: React Flow measures
    * anything it renders, so `changeNodes` is reached before that projection

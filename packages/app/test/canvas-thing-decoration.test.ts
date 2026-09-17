@@ -14,7 +14,7 @@ import type { SpaceThingTarget } from '../src/space-thing-lifecycle';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
@@ -35,7 +35,7 @@ const target: SpaceThingTarget = {
 
 const projectionNode = (
   thingId: ThingId,
-  kind: 'markdown' | 'alias' | 'space',
+  kind: 'markdown' | 'reference' | 'space',
   expanded = false,
   readOnly = false,
 ): ThingFlowNode => ({
@@ -72,7 +72,7 @@ const context = (
 ): CanvasThingDecorationContext => ({
   authorOnCanvas: true,
   bodyEditing: false,
-  editableThingIds: new Set([THING_ID, ALIAS_ID, SPACE_THING_ID]),
+  editableThingIds: new Set([THING_ID, REFERENCE_ID, SPACE_THING_ID]),
   openThing: () => 'completed',
   closeThing: () => 'completed',
   beginTitleEditing: () => undefined,
@@ -167,13 +167,13 @@ describe('decorateSharedThingNode', () => {
 
   it('attaches the title editor only to the Thing holding the caret', () => {
     const patch = decorateSharedThingNode(
-      projectionNode(THING_ID, 'alias'),
+      projectionNode(THING_ID, 'reference'),
       context({ editingTitleThingId: THING_ID }),
     );
     expect(patch.titleEditor).toBeDefined();
     expect(
       decorateSharedThingNode(
-        projectionNode(ALIAS_ID, 'alias'),
+        projectionNode(REFERENCE_ID, 'reference'),
         context({ editingTitleThingId: THING_ID }),
       ).titleEditor,
     ).toBeUndefined();
@@ -189,7 +189,7 @@ describe('decorateMarkdownThingNode', () => {
     patch.onBeginBodyEditing?.();
     expect(beginBodyEditing).toHaveBeenCalledWith(markdown);
     expect(
-      decorateMarkdownThingNode(projectionNode(ALIAS_ID, 'alias', true), context())
+      decorateMarkdownThingNode(projectionNode(REFERENCE_ID, 'reference', true), context())
         .onBeginBodyEditing,
     ).toBeUndefined();
     expect(
@@ -240,11 +240,13 @@ describe('decorateSpaceThingNode', () => {
     ).toBeDefined();
   });
 
-  it('leaves markdown and Alias nodes untouched', () => {
+  it('leaves markdown and Reference Thing nodes untouched', () => {
     expect(decorateSpaceThingNode(projectionNode(THING_ID, 'markdown', true), context())).toEqual(
       {},
     );
-    expect(decorateSpaceThingNode(projectionNode(ALIAS_ID, 'alias', true), context())).toEqual({});
+    expect(
+      decorateSpaceThingNode(projectionNode(REFERENCE_ID, 'reference', true), context()),
+    ).toEqual({});
   });
 
   it('withholds context notice when the rail is absent', () => {

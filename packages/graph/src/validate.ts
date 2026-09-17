@@ -46,10 +46,10 @@ export type SpaceReferenceErrorKind =
   | 'graph-edge-thing-outside-diagram'
   | 'unresolved-default-diagram'
   | 'duplicate-graph-edge'
-  | 'unresolved-alias-target'
-  | 'alias-self-reference'
-  | 'alias-targets-alias'
-  | 'alias-target-must-own-content'
+  | 'unresolved-reference-target'
+  | 'reference-targets-self'
+  | 'reference-targets-reference'
+  | 'reference-target-must-own-content'
   | 'space-thing-reference-cycle';
 
 /**
@@ -241,29 +241,29 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   for (const thing of space.things) {
-    if (thing.kind !== 'alias') continue;
+    if (thing.kind !== 'reference') continue;
     if (thing.target === thing.id) {
       errors.push({
-        kind: 'alias-self-reference',
+        kind: 'reference-targets-self',
         ref: thing.id,
-        message: `Alias "${thing.id}" points at itself`,
+        message: `Reference Thing "${thing.id}" points at itself`,
       });
       continue;
     }
     const target = thingById.get(thing.target);
     if (!target) {
       errors.push({
-        kind: 'unresolved-alias-target',
+        kind: 'unresolved-reference-target',
         ref: thing.target,
-        message: `Alias "${thing.id}" targets missing thing "${thing.target}"`,
+        message: `Reference Thing "${thing.id}" targets missing thing "${thing.target}"`,
       });
       continue;
     }
-    if (target.kind === 'alias') {
+    if (target.kind === 'reference') {
       errors.push({
-        kind: 'alias-targets-alias',
+        kind: 'reference-targets-reference',
         ref: thing.target,
-        message: `Alias "${thing.id}" targets alias "${thing.target}"; aliasing is a single hop`,
+        message: `Reference Thing "${thing.id}" targets reference "${thing.target}"; referencing is a single hop`,
       });
       continue;
     }

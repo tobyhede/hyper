@@ -358,7 +358,7 @@ export function createThingControl(page: Page, kind: ThingKindName = 'Markdown T
  *
  * The two kinds are peers with no disclosure in front of them and each completes
  * its Edit on the press (ADR 0089), so this is one press whichever kind is
- * asked for. An Alias is not here: it is created from the Thing it points at,
+ * asked for. A Reference Thing is not here: it is created from the Thing it points at,
  * through that Thing's own command menu.
  */
 export async function createThing(page: Page, kind: ThingKindName): Promise<void> {

@@ -4,8 +4,8 @@
    of whatever surface opened it, so no ancestor selector can find it.
 
    It is deliberately unscoped, which is what it already was: the same treatment
-   reaches every consumer — the opened Thing's Alias Target, a new Alias, both
-   selected-Edge endpoints and Alias Targets. The design-system
+   reaches every consumer — the opened Thing's Reference Thing Target, a new Reference Thing, both
+   selected-Edge endpoints and Reference Thing Targets. The design-system
    inventory used to record this as part of the Thing editor's debt, which was true
    about where the colours came from and wrong about what they style.
 

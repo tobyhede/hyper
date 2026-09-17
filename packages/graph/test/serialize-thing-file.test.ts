@@ -33,16 +33,16 @@ describe('serializeThingFile', () => {
     expect(parsed.thing.title).toBe('Recap: the data model');
   });
 
-  it('writes an alias with its target, and no body', () => {
+  it('writes a reference thing with its target, and no body', () => {
     const thing: Thing = {
       id: uuid('00000000-0000-4000-8000-00000000000c'),
       title: 'A′',
-      kind: 'alias',
+      kind: 'reference',
       target: uuid('00000000-0000-4000-8000-000000000002'),
     };
 
     expect(serializeThingFile(thing)).toBe(
-      '---\nid: 00000000-0000-4000-8000-00000000000c\ntitle: A′\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\n',
+      '---\nid: 00000000-0000-4000-8000-00000000000c\ntitle: A′\nkind: reference\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\n',
     );
   });
 

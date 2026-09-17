@@ -994,14 +994,14 @@ test(
 );
 
 test(
-  'Space Thing entity menu groups commands and creates a Space Alias',
+  'Space Thing entity menu groups commands and creates a Space Reference Thing',
   { tag: '@parity:space-thing-entity-menu' },
   async ({ page }) => {
     const thing = await openSpaceThingOnItsDiagram(page);
     await exerciseSpaceThingEntityMenu(page, thing);
     await settled(page);
     await page.reload();
-    await expect(nodeByTitle(page, 'Space Thing alias')).toBeVisible();
+    await expect(nodeByTitle(page, 'Space Thing reference')).toBeVisible();
   },
 );
 

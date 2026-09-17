@@ -773,12 +773,12 @@ describe('Space session registry', () => {
       });
     });
 
-    it('refuses to delete a Space Thing an Alias targets, and commits nothing', async () => {
-      const ALIASED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
-      const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
-      const ALIAS_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
-      const ALIAS_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
-      const ALIAS_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000034');
+    it('refuses to delete a Space Thing a Reference Thing targets, and commits nothing', async () => {
+      const REFERENCED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
+      const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
+      const REFERENCE_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
+      const REFERENCE_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
+      const REFERENCE_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000034');
       const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000035');
       const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000036');
 
@@ -795,8 +795,8 @@ describe('Space session registry', () => {
                 title: 'Diagram 1',
                 kind: 'positioned' as const,
                 positions: {
-                  [ALIASED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
-                  [ALIAS_ID]: { x: 300, y: 0, open: false as const },
+                  [REFERENCED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
+                  [REFERENCE_ID]: { x: 300, y: 0, open: false as const },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -804,21 +804,21 @@ describe('Space session registry', () => {
           },
           things: [
             {
-              id: ALIASED_SPACE_THING_ID,
+              id: REFERENCED_SPACE_THING_ID,
               document: {
                 title: 'Target',
                 kind: 'space' as const,
-                spaceId: ALIAS_TARGET_SPACE_ID,
-                diagram: ALIAS_TARGET_DIAGRAM,
-                graph: ALIAS_TARGET_GRAPH,
+                spaceId: REFERENCE_TARGET_SPACE_ID,
+                diagram: REFERENCE_TARGET_DIAGRAM,
+                graph: REFERENCE_TARGET_GRAPH,
               },
             },
             {
-              id: ALIAS_ID,
+              id: REFERENCE_ID,
               document: {
-                title: 'Alias of Target',
-                kind: 'alias' as const,
-                target: ALIASED_SPACE_THING_ID,
+                title: 'Reference Thing of Target',
+                kind: 'reference' as const,
+                target: REFERENCED_SPACE_THING_ID,
               },
             },
           ],
@@ -828,18 +828,18 @@ describe('Space session registry', () => {
       };
       const target = {
         snapshot: {
-          id: ALIAS_TARGET_SPACE_ID,
+          id: REFERENCE_TARGET_SPACE_ID,
           document: {
             version: 1 as const,
             title: 'Target',
-            defaultDiagram: ALIAS_TARGET_DIAGRAM,
+            defaultDiagram: REFERENCE_TARGET_DIAGRAM,
             diagrams: [
               {
-                id: ALIAS_TARGET_DIAGRAM,
+                id: REFERENCE_TARGET_DIAGRAM,
                 title: 'Diagram 1',
                 kind: 'positioned' as const,
                 positions: {},
-                graphs: [{ id: ALIAS_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+                graphs: [{ id: REFERENCE_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
               },
             ],
           },
@@ -855,34 +855,34 @@ describe('Space session registry', () => {
 
       const result = await registry
         .spaceThings(() => THING_ID)
-        .delete({ containingSpaceId: SPACE_ID, thingId: ALIASED_SPACE_THING_ID });
+        .delete({ containingSpaceId: SPACE_ID, thingId: REFERENCED_SPACE_THING_ID });
 
       expect(result).toEqual({
         kind: 'refused',
-        refusal: { code: 'thing-has-aliases', aliasTitles: ['Alias of Target'] },
+        refusal: { code: 'thing-has-references', referenceTitles: ['Reference Thing of Target'] },
       });
       const stored = await backend.loadSpace(SPACE_ID);
       expect(stored?.revision).toBe(3n);
       expect(stored?.snapshot.things).toHaveLength(2);
-      expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
+      expect(await backend.loadSpace(REFERENCE_TARGET_SPACE_ID)).toBeDefined();
     });
 
     // The behavioural invariant proved below (spec.md, "Coordinated
     // operations decide after their last wait"): whichever server read a
-    // late Alias lands in, the deletion never rejects and never answers
-    // `aggregate-refused` — when the Alias landed before the coordination's
-    // one decision, the deletion refuses `thing-has-aliases`; when it did
-    // not, the ordinary Alias-free deletion completes. The coordination
+    // late Reference Thing lands in, the deletion never rejects and never answers
+    // `aggregate-refused` — when the Reference Thing landed before the coordination's
+    // one decision, the deletion refuses `thing-has-references`; when it did
+    // not, the ordinary Reference-free deletion completes. The coordination
     // makes exactly one aggregate read, so injecting on read 2 never fires
     // and exercises the ordinary completion instead.
     it.each([1, 2] as const)(
-      'refuses to delete a Space Thing an Alias came to target while the deletion was reading persistence (late Edit on read %i)',
+      'refuses to delete a Space Thing a Reference Thing came to target while the deletion was reading persistence (late Edit on read %i)',
       async (readToInject) => {
-        const ALIASED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
-        const LATE_ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
-        const ALIAS_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
-        const ALIAS_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
-        const ALIAS_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
+        const REFERENCED_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+        const LATE_REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
+        const REFERENCE_TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000052');
+        const REFERENCE_TARGET_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
+        const REFERENCE_TARGET_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000054');
         const CONTAINING_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000055');
         const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000056');
 
@@ -899,7 +899,7 @@ describe('Space session registry', () => {
                   title: 'Diagram 1',
                   kind: 'positioned' as const,
                   positions: {
-                    [ALIASED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
+                    [REFERENCED_SPACE_THING_ID]: { x: 0, y: 0, open: false as const },
                   },
                   graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
                 },
@@ -907,13 +907,13 @@ describe('Space session registry', () => {
             },
             things: [
               {
-                id: ALIASED_SPACE_THING_ID,
+                id: REFERENCED_SPACE_THING_ID,
                 document: {
                   title: 'Target',
                   kind: 'space' as const,
-                  spaceId: ALIAS_TARGET_SPACE_ID,
-                  diagram: ALIAS_TARGET_DIAGRAM,
-                  graph: ALIAS_TARGET_GRAPH,
+                  spaceId: REFERENCE_TARGET_SPACE_ID,
+                  diagram: REFERENCE_TARGET_DIAGRAM,
+                  graph: REFERENCE_TARGET_GRAPH,
                 },
               },
             ],
@@ -923,18 +923,18 @@ describe('Space session registry', () => {
         };
         const target = {
           snapshot: {
-            id: ALIAS_TARGET_SPACE_ID,
+            id: REFERENCE_TARGET_SPACE_ID,
             document: {
               version: 1 as const,
               title: 'Target',
-              defaultDiagram: ALIAS_TARGET_DIAGRAM,
+              defaultDiagram: REFERENCE_TARGET_DIAGRAM,
               diagrams: [
                 {
-                  id: ALIAS_TARGET_DIAGRAM,
+                  id: REFERENCE_TARGET_DIAGRAM,
                   title: 'Diagram 1',
                   kind: 'positioned' as const,
                   positions: {},
-                  graphs: [{ id: ALIAS_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
+                  graphs: [{ id: REFERENCE_TARGET_GRAPH, title: 'Graph 1', edges: [] }],
                 },
               ],
             },
@@ -948,7 +948,7 @@ describe('Space session registry', () => {
         const containingSession = registry.open(containing);
         registry.open(target);
 
-        // An Alias of the Space Thing lands in the containing Space on the
+        // A Reference Thing of the Space Thing lands in the containing Space on the
         // named read of the coordination's aggregate loads.
         const loadAggregate = backend.loadAggregate.bind(backend);
         let reads = 0;
@@ -963,7 +963,7 @@ describe('Space session registry', () => {
               ...diagram,
               positions: {
                 ...diagram.positions,
-                [LATE_ALIAS_ID]: { x: 300, y: 0, open: false as const },
+                [LATE_REFERENCE_ID]: { x: 300, y: 0, open: false as const },
               },
             }));
             containingSession.submit({
@@ -972,11 +972,11 @@ describe('Space session registry', () => {
               things: [
                 ...working.things,
                 {
-                  id: LATE_ALIAS_ID,
+                  id: LATE_REFERENCE_ID,
                   document: {
-                    title: 'Late Alias of Target',
-                    kind: 'alias' as const,
-                    target: ALIASED_SPACE_THING_ID,
+                    title: 'Late Reference Thing of Target',
+                    kind: 'reference' as const,
+                    target: REFERENCED_SPACE_THING_ID,
                   },
                 },
               ],
@@ -987,7 +987,7 @@ describe('Space session registry', () => {
 
         const deletion = registry
           .spaceThings(() => THING_ID)
-          .delete({ containingSpaceId: SPACE_ID, thingId: ALIASED_SPACE_THING_ID });
+          .delete({ containingSpaceId: SPACE_ID, thingId: REFERENCED_SPACE_THING_ID });
 
         await expect(deletion).resolves.toBeDefined();
         const result = await deletion;
@@ -996,34 +996,37 @@ describe('Space session registry', () => {
         if (injected.value) {
           expect(result).toEqual({
             kind: 'refused',
-            refusal: { code: 'thing-has-aliases', aliasTitles: ['Late Alias of Target'] },
+            refusal: {
+              code: 'thing-has-references',
+              referenceTitles: ['Late Reference Thing of Target'],
+            },
           });
           expect(containingSession.getState().working.things.map(({ id }) => id)).toEqual([
-            ALIASED_SPACE_THING_ID,
-            LATE_ALIAS_ID,
+            REFERENCED_SPACE_THING_ID,
+            LATE_REFERENCE_ID,
           ]);
 
-          // The refused deletion must not have swallowed the late Alias's own
+          // The refused deletion must not have swallowed the late Reference Thing's own
           // Edit: the containing Space still holds the Space Thing and the
-          // Alias, and that Edit commits once the coordination's barrier
+          // Reference Thing, and that Edit commits once the coordination's barrier
           // lifts.
           const settled = await waitFor(
             containingSession,
             (state) => state.persistence.kind === 'settled' && state.acknowledgedRevision > 3n,
           );
           expect(settled.working.things.map(({ id }) => id)).toEqual([
-            ALIASED_SPACE_THING_ID,
-            LATE_ALIAS_ID,
+            REFERENCED_SPACE_THING_ID,
+            LATE_REFERENCE_ID,
           ]);
           const stored = await backend.loadSpace(SPACE_ID);
           expect(stored?.snapshot.things.map(({ id }) => id)).toEqual([
-            ALIASED_SPACE_THING_ID,
-            LATE_ALIAS_ID,
+            REFERENCED_SPACE_THING_ID,
+            LATE_REFERENCE_ID,
           ]);
-          expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeDefined();
+          expect(await backend.loadSpace(REFERENCE_TARGET_SPACE_ID)).toBeDefined();
         } else {
-          // No late Alias ever landed: the ordinary deletion completes, and
-          // the Alias Target — now unreferenced — is cascaded away with it.
+          // No late Reference Thing ever landed: the ordinary deletion completes, and
+          // the Reference Thing Target — now unreferenced — is cascaded away with it.
           expect(result).toEqual({ kind: 'completed' });
           await waitFor(
             containingSession,
@@ -1031,7 +1034,7 @@ describe('Space session registry', () => {
           );
           const stored = await backend.loadSpace(SPACE_ID);
           expect(stored?.snapshot.things).toEqual([]);
-          expect(await backend.loadSpace(ALIAS_TARGET_SPACE_ID)).toBeUndefined();
+          expect(await backend.loadSpace(REFERENCE_TARGET_SPACE_ID)).toBeUndefined();
         }
       },
     );

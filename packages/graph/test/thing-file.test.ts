@@ -39,20 +39,20 @@ describe('parseThingFile', () => {
     });
   });
 
-  it('keeps an id-less alias target UUID-only and bodyless', () => {
+  it('keeps an id-less reference target UUID-only and bodyless', () => {
     expect(
       parseImportThingFile({
-        path: 'things/alias.md',
-        text: `---\ntitle: Alias\nkind: alias\ntarget: ${THING_A}\n---\n`,
+        path: 'things/reference.md',
+        text: `---\ntitle: Reference Thing\nkind: reference\ntarget: ${THING_A}\n---\n`,
       }),
     ).toEqual({
       ok: true,
-      thing: { document: { title: 'Alias', kind: 'alias', target: THING_A } },
+      thing: { document: { title: 'Reference Thing', kind: 'reference', target: THING_A } },
     });
     expect(
       parseImportThingFile({
-        path: 'things/alias.md',
-        text: '---\ntitle: Alias\nkind: alias\ntarget: thing-a\n---\nBody',
+        path: 'things/reference.md',
+        text: '---\ntitle: Reference Thing\nkind: reference\ntarget: thing-a\n---\nBody',
       }).ok,
     ).toBe(false);
   });
@@ -73,10 +73,10 @@ describe('parseThingFile', () => {
     });
   });
 
-  it('reads an alias, which has no body (ADR 0009)', () => {
+  it('reads a reference thing, which has no body (ADR 0009)', () => {
     const result = parseThingFile({
       path: 'things/a-prime.md',
-      text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A′\nkind: alias\ntarget: 00000000-0000-4000-8000-000000000002\n---\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A′\nkind: reference\ntarget: 00000000-0000-4000-8000-000000000002\n---\n',
     });
 
     expect(result.ok).toBe(true);
@@ -84,7 +84,7 @@ describe('parseThingFile', () => {
     expect(result.thing).toEqual({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A′',
-      kind: 'alias',
+      kind: 'reference',
       target: '00000000-0000-4000-8000-000000000002',
     });
   });
