@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import type { Page, Route } from '@playwright/test';
+import type { Route } from '@playwright/test';
 import {
   activateGraph,
   activeGraph,
@@ -18,6 +18,7 @@ import {
   selectCanvas,
   selectedCanvas,
   settled,
+  thingActions,
 } from './graph';
 
 /**
@@ -205,14 +206,6 @@ test('recolouring the active Graph from the Graph menu persists at phone width',
  * the *only* chrome there is — so if the marker were ever dropped, this is where
  * a reader would lose a Thing to a keystroke meant for a menu.
  */
-const thingActions = async (page: Page, title: string) => {
-  const thing = nodeByTitle(page, title).first();
-  await thing.hover();
-  await thing.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
-  const menu = page.getByRole('menu');
-  await expect(menu).toBeVisible();
-  return menu;
-};
 
 /**
  * Delete Thing's confirmation at phone width (v1-release/03). Assertions

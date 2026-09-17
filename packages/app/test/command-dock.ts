@@ -251,7 +251,7 @@ export const deleteGraphItem = (graphTitle: string): HTMLElement => {
 };
 
 /**
- * The Space cluster's disclosure: New Space, Copy link, the open set and Exit.
+ * The Space cluster's disclosure: Rename, Copy link to Space, then Exit Space.
  *
  * Dismissed first for the reason {@link openDiagramMenu} is.
  */

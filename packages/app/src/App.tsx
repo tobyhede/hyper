@@ -10,7 +10,6 @@ import {
   FALLBACK_GRAPH_COLOR,
   RemoveFromDiagramIcon,
   EnterSpaceIcon,
-  EditIcon,
   ThingKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -53,7 +52,6 @@ import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
   COPY_LINK_ACTION_ID,
-  COPY_PERMANENT_LINK_ACTION_ID,
   DELETE_DIAGRAM_ACTION_ID,
   spaceEntityActions,
   type EntityCommandId,
@@ -1146,21 +1144,8 @@ export const createApp = (
             : []),
         ];
         if (thing.kind === 'space') {
-          const rename: EntityActionGroup = [
-            {
-              id: 'rename',
-              label: 'Rename',
-              icon: <EditIcon />,
-              onSelect: () => {
-                continuation.request({
-                  target: { kind: 'thing', thingId: thing.id },
-                  select: true,
-                  then: 'rename',
-                });
-                return 'done';
-              },
-            },
-          ];
+          // The Title edits in place on the Thing front; this menu authors
+          // neither the Thing's name nor the target Space's.
           const links = addresses.flat();
           const enter: EntityActionGroup =
             spaces === null
@@ -1177,15 +1162,20 @@ export const createApp = (
                   },
                 ];
           return [
-            [...rename, ...reference.flat()],
+            reference.flat(),
             [...enter, ...links.filter((action) => action.id === 'open-independently')],
             links.filter((action) => action.id !== 'open-independently'),
-            leaving.filter(
-              (action) => action.id === 'remove-from-diagram' || action.id === 'delete-thing',
-            ),
+            // `leaving` already holds only `remove-from-diagram` and
+            // `delete-thing`, whichever of the two is available, so it is
+            // passed through rather than filtered a second time.
+            leaving,
           ];
         }
-        return [...addresses, ...reference, ...(leaving.length > 0 ? [leaving] : [])];
+        // Create Reference leads (`.scratch/dock-menu-reorganisation/issues/03`):
+        // creation, then its addresses together, then the two commands that
+        // leave the Thing behind — Remove from Diagram and Delete from Space
+        // sharing the trailing destructive group.
+        return [...reference, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
         renderedSpace,
@@ -1695,10 +1685,6 @@ export const createApp = (
               onCopyLink: runEntityCommand(
                 { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
                 COPY_LINK_ACTION_ID,
-              ),
-              onCopyPermanentLink: runEntityCommand(
-                { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
-                COPY_PERMANENT_LINK_ACTION_ID,
               ),
               presenting,
               onPresent: present,

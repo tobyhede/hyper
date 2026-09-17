@@ -1,29 +1,89 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import {
-  ChoiceMenu,
-  ChoiceMenuTrigger,
-  DiagramIcon,
-  DiagramMenuActions,
-  DropdownMenuItem,
-  EditIcon,
-  GraphIcon,
-  GraphMenuActions,
-  InlineTitleEditor,
-  ToolbarButton,
-  ToolbarGroup,
-} from '@project/ui';
-import type {
-  CanvasSpaceThingChoice,
-  CanvasSpaceThingCommands,
-  CanvasSpaceThingGraphCommands,
-  SpaceThingRailClustersProps,
-} from './space-thing-rail';
+import { DropdownMenuItem } from './components/dropdown-menu';
+import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
+import { ToolbarButton, ToolbarGroup } from './components/toolbar';
+import { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
+import { DiagramIcon, EditIcon, GraphIcon } from './icons';
+import { InlineTitleEditor } from './InlineTitleEditor';
+import type { PaletteColorEntry } from './PaletteColorPicker';
+
+/** One entity a Space Thing's selectors can be pointed at, named as an author reads it. */
+export interface CanvasSpaceThingChoice {
+  readonly id: string;
+  readonly title: string;
+}
+
+/**
+ * Kind commands for one Diagram or Graph on an Open Space Thing rail.
+ *
+ * Rename, create, delete and copy — the same verbs the Dock spends on that
+ * entity, addressed here to the context this Thing stores.
+ */
+export interface CanvasSpaceThingCommands {
+  readonly onRename: (title: string) => string | null;
+  readonly onCreate: (renameScope: string) => Promise<string | null>;
+  readonly onDelete: () => Promise<string | null>;
+  readonly onCopyLink: () => Promise<string | null>;
+  readonly deleteDisabled: boolean;
+}
+
+export interface CanvasSpaceThingGraphCommands extends CanvasSpaceThingCommands {
+  readonly color: string;
+  readonly colors: readonly PaletteColorEntry[];
+  readonly onRecolor: (color: string) => string | null;
+}
+
+/**
+ * The two choices an Open Space Thing publishes, and what is available to make
+ * them from.
+ *
+ * One interface rather than four loose props, because the four move together:
+ * the Graphs on offer are the selected Diagram's, so a caller that changed the
+ * Diagram without changing the list beside it would be offering Graphs from a
+ * Diagram this Thing no longer shows. Which Diagrams and Graphs exist is the target
+ * Space's business and neither is derived here.
+ */
+export interface CanvasSpaceThingSelection {
+  readonly onEditingChange?: (editing: boolean) => void;
+  readonly diagramCommands?: CanvasSpaceThingCommands;
+  readonly graphCommands?: CanvasSpaceThingGraphCommands;
+  readonly diagrams: readonly CanvasSpaceThingChoice[];
+  readonly graphs: readonly CanvasSpaceThingChoice[];
+  /** The selected Diagram, or `null` where the Thing selects none. */
+  readonly diagramId: string | null;
+  readonly graphId: string | null;
+  readonly onDiagramChange: (diagramId: string) => void;
+  readonly onGraphChange: (graphId: string) => void;
+  /**
+   * The selections are read but cannot be changed right now.
+   *
+   * Distinct from an absent selection, which means the target Space has not
+   * been read yet: a canvas that has withdrawn authoring — a creation pane is
+   * up, or the Space is presenting — still knows perfectly well which Diagram
+   * and Graph this Thing selects, and a Thing that said otherwise would be
+   * reporting a wait that had already ended.
+   */
+  readonly disabled?: boolean;
+}
+
+/**
+ * What {@link SpaceThingSelectors} needs to draw Diagram and Graph on a Space
+ * Thing rail, minus portal Read/Edit which stays on the Thing front.
+ *
+ * The one shape both an embedded canvas Thing (`CanvasThing`'s own rail) and
+ * the application's Space Thing rail render — the Dock's identical-looking
+ * clusters are a different operation over the same primitive and are not
+ * built from this type (`docs/agents/ui.md`, `command-surface-sharing.test.ts`).
+ */
+export interface SpaceThingSelectorsProps extends CanvasSpaceThingSelection {
+  readonly onReport: (message: string | null) => void;
+}
 
 /**
  * Diagram and Graph kind commands extend the Thing's one rail toolbar.
  * They share the Dock's clusters and choices while writing this Thing's selection.
  */
-export function SpaceThingRailClusters({
+export function SpaceThingSelectors({
   onEditingChange,
   onReport,
   diagramCommands,
@@ -35,7 +95,7 @@ export function SpaceThingRailClusters({
   onDiagramChange,
   onGraphChange,
   disabled,
-}: SpaceThingRailClustersProps) {
+}: SpaceThingSelectorsProps) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -281,11 +341,6 @@ function SpaceThingSelector({
               onRecolor={(color) => {
                 onReport(commands.onRecolor(color));
                 setMenuOpen(false);
-              }}
-              onCopyPermanentLink={() => {
-                void commands
-                  .onCopyPermanentLink()
-                  .then((refusal) => onReport(refusal ?? 'Link copied.'));
               }}
             />
           ) : (

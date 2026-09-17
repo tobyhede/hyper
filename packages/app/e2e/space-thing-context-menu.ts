@@ -1,4 +1,4 @@
-import { thingControls } from './graph';
+import { expectMenuGroups, thingControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Exercise the same target commands through the application and its production story. */
@@ -23,10 +23,17 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
     await trigger.focus();
     await trigger.press('Enter');
   };
+  // One grouping grammar (`.scratch/dock-menu-reorganisation/issues/01`): the
+  // Diagram list, New Diagram on its own, Rename beside Copy link to
+  // Diagram, then Delete — one separator between each group.
   await openMenu('diagram');
-  await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Copy link', exact: true })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: /^Delete / })).toBeVisible();
+  const diagramMenu = page.getByRole('menu');
+  await expectMenuGroups(diagramMenu, [
+    await diagramMenu.getByRole('menuitemradio').allInnerTexts(),
+    ['New Diagram'],
+    ['Rename', 'Copy link to Diagram'],
+    [/^Delete /],
+  ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).fill('Target context');
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).press('Enter');
@@ -40,16 +47,23 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toHaveCount(0);
   await expect(canvas).toBeFocused();
   await openMenu('diagram');
-  await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Copy link to Diagram', exact: true }).click();
   await expect(thing.getByRole('status')).toHaveText('Link copied.');
   const diagramLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(new URL(diagramLink).pathname).toMatch(/^\/spaces\/[^/]+\/diagrams\/[^/]+$/);
 
+  // Same grammar, with Colour… standing alone immediately after the list —
+  // and no permanent address offered any more.
   await openMenu('graph');
-  await expect(page.getByRole('menuitem', { name: 'Colour…', exact: true })).toBeVisible();
-  await expect(
-    page.getByRole('menuitem', { name: 'Copy permanent link', exact: true }),
-  ).toBeVisible();
+  const graphMenu = page.getByRole('menu');
+  await expect(graphMenu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
+  await expectMenuGroups(graphMenu, [
+    await graphMenu.getByRole('menuitemradio').allInnerTexts(),
+    ['Colour…'],
+    ['New Graph'],
+    ['Rename', 'Copy link to Graph'],
+    [/^Delete /],
+  ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill('Target path');
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).press('Enter');
@@ -68,14 +82,9 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
   const graphLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(graphLink).toContain(diagramLink);
-  await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Copy permanent link', exact: true }).click();
-  const permanent = await page.evaluate(() => navigator.clipboard.readText());
-  expect(permanent).not.toBe(graphLink);
-  expect(new URL(permanent).pathname).toMatch(/^\/spaces\/[^/]+\/graphs\/[^/]+$/);
 
   await openMenu('graph');
   await expect(
@@ -134,28 +143,35 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
     await trigger.focus();
     await trigger.press('Enter');
   };
-  await menu();
-  await expect(page.getByRole('menuitem')).toHaveText([
-    'Rename',
-    'Create Reference',
-    'Enter',
-    'Open in New Tab',
-    'Copy link to Thing in Diagram',
-    'Copy link to Thing',
-    'Copy link to Space',
-    'Remove from Diagram',
-  ]);
-  await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(3);
-  await expect(
-    (await thingControls(page, thingNode)).getByRole('button', { name: /^Enter/ }),
-  ).toHaveCount(0);
-  await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
+  // The Title still edits on the Thing front, not from the menu
+  // (`.scratch/dock-menu-reorganisation/issues/04`): the menu carries no Rename
+  // row, so the rename that seeds the rest of this test presses the front's own
+  // control instead.
   const title = page.getByRole('textbox', { name: 'Thing title', exact: true });
+  await thingNode.getByRole('button', { name: /^Edit Title / }).click();
   await expect(title).toBeFocused();
   await title.fill('Space Thing');
   await title.press('Enter');
   await expect(thingNode.getByRole('heading', { name: 'Space Thing', exact: true })).toBeVisible();
   await menu();
+  // No Delete from Space here: `thingNode` is Open — both callers reach it
+  // through `openSpaceThingOnItsDiagram`, which presses Enter on it so its
+  // Diagram and Graph menus have something to exercise — and Delete from
+  // Space is withdrawn while any Thing on the Diagram is Open
+  // (`authoring-availability.ts`'s `deleteThing`), so that Open state cannot
+  // outlive the Thing it names. Delete from Space's presence and effect on a
+  // closed Space Thing are covered by `space-thing.spec.ts`'s "deleting the
+  // last Space Thing deletes the Space it referenced" and "removing a Space
+  // Thing from the Diagram leaves the Thing and its target Space intact".
+  await expectMenuGroups(page.getByRole('menu'), [
+    ['Create Reference'],
+    ['Enter', 'Open in New Tab'],
+    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
+    ['Remove from Diagram'],
+  ]);
+  await expect(
+    (await thingControls(page, thingNode)).getByRole('button', { name: /^Enter/ }),
+  ).toHaveCount(0);
   await page.getByRole('menuitem', { name: 'Create Reference', exact: true }).click();
   await expect(title).toBeFocused();
   await title.fill('Space Thing reference');

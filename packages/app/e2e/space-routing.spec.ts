@@ -1,6 +1,7 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { diagramMenu, expectMenuGroups, graphMenu, spaceMenu } from './graph';
 import { SEEDED_GRAPH_ID, SEEDED_DIAGRAM_ID, seedPositionedDiagram } from './seed';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -104,10 +105,8 @@ test('choosing a Diagram pushes history and Back, Forward and reload restore it 
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
-  await page
-    .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
-    .click({ delay: 120 });
-  await page.getByRole('menuitemradio', { name: 'Collection 2' }).click();
+  const diagrams = await diagramMenu(page);
+  await diagrams.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
   await expect(page).toHaveURL(second);
   await page.reload();
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
@@ -338,23 +337,47 @@ test('copy commands distinguish canonical Thing identity from its current Diagra
  * rather than rows and no `onContextMenu` anywhere, so there is no second route
  * to restate; what survives is that a Diagram's commands are all in one place,
  * including Rename, and that the name itself is the disclosure that opens it.
+ *
+ * **The order is one grouping grammar** (`.scratch/dock-menu-reorganisation/issues/01`):
+ * the Diagram list, New Diagram on its own, Rename beside Copy link to
+ * Diagram, then Delete — one separator between each group.
  */
 test('the Diagram cluster holds every Diagram command including Rename', async ({ page }) => {
   await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
-  await page
-    .getByRole('button', { name: 'Diagram: Collection 1', exact: true })
-    .click({ delay: 120 });
-  const menu = page.getByRole('menu');
-  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'New Diagram' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Delete Collection 1' })).toBeVisible();
+  const menu = await diagramMenu(page);
+  await expectMenuGroups(menu, [
+    ['Collection 1', 'Collection 2', 'Linked Spaces'],
+    ['New Diagram'],
+    ['Rename', 'Copy link to Diagram'],
+    ['Delete Collection 1'],
+  ]);
   await page.keyboard.press('Escape');
 
   await expect(
     page.getByRole('button', { name: 'Diagram: Collection 1', exact: true }),
   ).toBeVisible();
+});
+
+/**
+ * The Space menu's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
+ * Space, then Exit Space — one separator between the two groups. The address
+ * copied is the Space's own, not the drawing Diagram's
+ * (`link-actions.spec.ts` holds why no second address is offered here).
+ */
+test('the Space menu groups Rename with Copy link to Space, then Exit Space', async ({ page }) => {
+  await installClipboard(page);
+  await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
+
+  const menu = await spaceMenu(page);
+  await expectMenuGroups(menu, [['Rename', 'Copy link to Space'], ['Exit Space']]);
+
+  await menu.getByRole('menuitem', { name: 'Copy link to Space', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(`${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 });
 
 test('canonical and contextual Graph links restore navigation context without authoring', async ({
@@ -395,8 +418,8 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
   const mid = `${diagram}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
   await page.goto(diagram);
 
-  await page.getByRole('button', { name: /^Active Graph: /, exact: false }).click({ delay: 120 });
-  await page.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
+  const graphs = await graphMenu(page);
+  await graphs.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
   await expect(page).toHaveURL(mid);
   await page.goBack();
   await expect(page).toHaveURL(diagram);
@@ -406,8 +429,15 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
   await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
 });
 
+/**
+ * The Graph menu's one grouping grammar and its one address
+ * (`.scratch/dock-menu-reorganisation/issues/01`): the Graph list, Colour…
+ * on its own immediately after it, New Graph, Rename beside Copy link to
+ * Graph, then Delete — one separator between each group, and no permanent
+ * address offered any more.
+ */
 test(
-  'Graph copy commands distinguish canonical identity from the current Diagram',
+  'the Graph menu copies its within-Diagram address and offers no permanent one',
   {
     tag: '@parity:command-dock-copies-graph-destinations',
   },
@@ -416,14 +446,18 @@ test(
     const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
     await page.goto(diagram);
 
-    await copyMatchingFromMenu(page, 'Active Graph: Long', /^Copy permanent link/);
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(
-        `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`,
-      );
+    const menu = await graphMenu(page);
+    await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
+    await expectMenuGroups(menu, [
+      ['Long', 'Mid', 'Short'],
+      ['Colour…'],
+      ['New Graph'],
+      ['Rename', 'Copy link to Graph'],
+      ['Delete Long'],
+    ]);
 
-    await copyMatchingFromMenu(page, 'Active Graph: Long', /^Copy link/);
+    await menu.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
+    await page.keyboard.press('Escape');
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(`${new URL(page.url()).origin}${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);

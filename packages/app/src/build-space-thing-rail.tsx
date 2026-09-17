@@ -1,11 +1,10 @@
 import type { GraphId, ThingDocument, UUID } from '@project/core';
+import { SpaceThingSelectors, type SpaceThingSelectorsProps } from '@project/ui';
 import type { Continuation } from './continuation';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
-import { SpaceThingRailClusters } from './SpaceThingRailClusters';
 import { spaceThingContextCommands } from './space-thing-context-commands';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceThingTarget, SpaceThingTargetDiagram } from './space-thing-lifecycle';
-import type { SpaceThingRailClustersProps } from './space-thing-rail';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -67,7 +66,7 @@ export function buildSpaceThingRail({
           context.complete,
         );
   const optional: Mutable<
-    Pick<SpaceThingRailClustersProps, 'onEditingChange' | 'diagramCommands' | 'graphCommands'>
+    Pick<SpaceThingSelectorsProps, 'onEditingChange' | 'diagramCommands' | 'graphCommands'>
   > = {};
   if (onEditingChange !== undefined) optional.onEditingChange = onEditingChange;
   if (commands !== undefined) {
@@ -75,7 +74,7 @@ export function buildSpaceThingRail({
     if (commands.graphCommands !== undefined) optional.graphCommands = commands.graphCommands;
   }
   return (
-    <SpaceThingRailClusters
+    <SpaceThingSelectors
       onReport={onReport}
       diagrams={target.diagrams.map(({ id, title }) => ({ id, title }))}
       graphs={(selectedDiagram?.graphs ?? []).map(({ id, title }) => ({ id, title }))}

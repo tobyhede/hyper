@@ -36,8 +36,8 @@ const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
  * `.scratch/link-ux` has not taken, so this holds the behaviour that stands
  * rather than a claim that no second address is possible.
  *
- * Rename sits in this menu with Copy link — the name discloses, and the
- * editor is begun from the list
+ * Rename sits in this menu with Copy link to Space — the name discloses, and
+ * the editor is begun from the list
  * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
  * `spaceEntityActions` is still handed `onRename: null` by the application
  * (`entity-actions.tsx`): that is the Thing rail's menu, not this cluster's.
@@ -62,7 +62,7 @@ test('the Space cluster discloses from the name and offers one address plus Rena
 
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Copy link to Space' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: /permanent/ })).toHaveCount(0);
 
   // Still open a beat later: a trigger whose ref was dropped opens and is
