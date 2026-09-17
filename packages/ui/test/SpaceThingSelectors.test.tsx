@@ -2,10 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { type ReactNode } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { ThingRailActions } from '@project/ui';
-import { SpaceThingRailClusters } from '../src/SpaceThingRailClusters';
-import type { SpaceThingRailClustersProps } from '../src/space-thing-rail';
-import { menuItemLabels } from './menu-assertions';
+import { SpaceThingSelectors, ThingRailActions, type SpaceThingSelectorsProps } from '../src';
 
 /**
  * Base UI's menu positions itself by measuring, and jsdom ships no pointer
@@ -18,19 +15,38 @@ beforeAll(() => {
   HTMLElement.prototype.releasePointerCapture = () => undefined;
 });
 
-const mount = (props: SpaceThingRailClustersProps, extra?: ReactNode) =>
+/**
+ * A menu item's own label, past a Diagram/Graph list item's checked-radio
+ * indicator.
+ *
+ * `DropdownMenuRadioItem`'s checked indicator is an un-hidden `span` wrapping
+ * Base UI's own `aria-hidden` checkmark `span`, mounted only on the chosen
+ * item — so a selector that allowed any nested `span` would read the
+ * checkmark's empty label on that one item and nothing on the rest. Excluding
+ * `aria-hidden` at both levels makes the whole indicator invisible to this
+ * selector, checked or not, and falls back to the item's own `textContent`
+ * where neither level matches (`DiagramMenuActions` and `GraphMenuActions`
+ * draw their icon as a bare child with no wrapping `span` at all).
+ */
+const menuItemLabels = (menu: HTMLElement): readonly string[] =>
+  Array.from(menu.querySelectorAll('[role="menuitemradio"], [role="menuitem"]')).map((item) =>
+    (
+      item.querySelector(':scope > span:not([aria-hidden]) > span:not([aria-hidden])')
+        ?.textContent ?? item.textContent
+    ).trim(),
+  );
+
+const mount = (props: SpaceThingSelectorsProps, extra?: ReactNode) =>
   render(
     <>
       <ThingRailActions aria-label="Thing rail">
-        <SpaceThingRailClusters {...props} />
+        <SpaceThingSelectors {...props} />
       </ThingRailActions>
       {extra}
     </>,
   );
 
-const clusters = (
-  over: Partial<SpaceThingRailClustersProps> = {},
-): SpaceThingRailClustersProps => ({
+const clusters = (over: Partial<SpaceThingSelectorsProps> = {}): SpaceThingSelectorsProps => ({
   diagrams: [
     { id: 'l1', title: 'Collection 1' },
     { id: 'l2', title: 'Collection 2' },
@@ -44,7 +60,7 @@ const clusters = (
   ...over,
 });
 
-describe('SpaceThingRailClusters', () => {
+describe('SpaceThingSelectors', () => {
   it('keeps focus on the destination when a context rename completes on blur', async () => {
     const onRename = vi.fn(() => null);
     mount(

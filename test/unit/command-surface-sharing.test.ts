@@ -26,7 +26,7 @@ const railSheet = read('packages/ui/src/thing-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const thingRailActions = read('packages/ui/src/ThingRailActions.tsx');
 const spaceThingSelectors = read('packages/ui/src/SpaceThingSelectors.tsx');
-const spaceThingRail = read('packages/app/src/SpaceThingRailClusters.tsx');
+const spaceThingRail = read('packages/app/src/build-space-thing-rail.tsx');
 const canvasThing = read('packages/ui/src/CanvasThing.tsx');
 
 /** The declaration block of the rule whose selector is exactly `selector`. */
@@ -144,7 +144,7 @@ describe('choosing a Diagram or a Graph', () => {
    * twice: `@project/ui`'s `SpaceThingSelectors` is the sole place a Diagram or
    * Graph choice is turned into a `ChoiceMenu`, an embedded canvas Thing's own
    * rail (`CanvasThing`) and the application's Space Thing rail
-   * (`SpaceThingRailClusters`) each mount it rather than restating it.
+   * (`buildSpaceThingRail`) each mount it rather than restating it.
    */
   it('is owned once by @project/ui, not copied onto the canvas Thing or the app rail', () => {
     expect(spaceThingRail).toContain("from '@project/ui'");

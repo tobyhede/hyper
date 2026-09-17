@@ -1,5 +1,5 @@
 import type { ThingDocument, GraphId, UUID } from '@project/core';
-import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from './space-thing-rail';
+import type { CanvasSpaceThingCommands, CanvasSpaceThingGraphCommands } from '@project/ui';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
