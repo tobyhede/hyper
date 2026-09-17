@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
+import { nodeByTitle } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -38,6 +39,20 @@ const disclose = async (page: Page, name: string) => {
   // a shorter `Diagram:` would also hit `Active Graph` is not the issue — a
   // title that is a prefix of another identity's title would be.
   await surface(page).getByRole('button', { name, exact: true }).click({ delay: 120 });
+  const menu = page.getByRole('menu').last();
+  await expect(menu).toBeVisible();
+  return menu;
+};
+
+/**
+ * Reveal a placed Thing's own rail and open its actions menu — the Dock's
+ * organising rule that a Thing's own commands are not on this surface, drawn
+ * through the real production host (ADR 0073).
+ */
+const thingActionsMenu = async (page: Page, title: string) => {
+  const node = nodeByTitle(page, title).first();
+  await node.hover();
+  await node.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
   const menu = page.getByRole('menu').last();
   await expect(menu).toBeVisible();
   return menu;
@@ -306,6 +321,56 @@ test('Copy link to Space copies the Space’s own durable address', async ({ pag
     .toBe(
       `https://example.test${productDestinationPath({ kind: 'space', spaceId: commandDockSnapshot.id })}`,
     );
+});
+
+/**
+ * The Thing rail's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/03`), reached through the real
+ * production host: Create Reference on its own, both copy links beside each
+ * other, then Remove from Diagram and Delete from Space sharing the trailing
+ * destructive group — one separator between each. The Command Dock draws no
+ * Thing commands of its own (ADR 0073); this is the rail's own menu.
+ */
+test('a Markdown Thing’s actions menu groups Create Reference, both copy links, then Remove and Delete', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await thingActionsMenu(page, 'Opening');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Create Reference',
+    'Copy link to Thing in Diagram',
+    'Copy link to Thing',
+    'Remove from Diagram',
+    'Delete from Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(2);
+});
+
+/**
+ * Present and unavailable on a Reference Thing (ADR 0070): the same grouping, with
+ * Create Reference leading the menu greyed rather than absent — the row is where
+ * the product says that referencing terminates.
+ */
+test('a Reference Thing’s actions menu keeps Create Reference leading, drawn unavailable', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await thingActionsMenu(page, 'Strategy overview');
+  await expect(menu.getByRole('menuitem', { name: /^Create Reference/ })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    /^Create Reference/,
+    'Copy link to Thing in Diagram',
+    'Copy link to Thing',
+    'Copy link to Target',
+    'Remove from Diagram',
+    'Delete from Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**

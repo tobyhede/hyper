@@ -3457,13 +3457,66 @@ test('Escape discards a Reference Thing rename without undoing the Reference Thi
 });
 
 /**
+ * The Thing menu's one grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/03`): Create Reference on its own,
+ * both copy links beside each other, then Remove from Diagram and Delete from
+ * Space sharing the trailing destructive group — one separator between each.
+ */
+test('the Thing menu groups Create Reference, both copy links, then Remove and Delete', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  const menu = await thingActions(page, 'B');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Create Reference',
+    'Copy link to Thing in Diagram',
+    'Copy link to Thing',
+    'Remove from Diagram',
+    'Delete from Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(2);
+});
+
+/**
+ * The dropdown and the context menu draw the identical list
+ * (`EntityActionItems`), so a right click on the Thing itself offers the same
+ * ordered menu the actions control does.
+ */
+test('a right click on a Thing opens the same ordered menu as its actions control', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await nodeByTitle(page, 'B').first().click({ button: 'right' });
+  const menu = page.getByRole('menu');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Create Reference',
+    'Copy link to Thing in Diagram',
+    'Copy link to Thing',
+    'Remove from Diagram',
+    'Delete from Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(2);
+});
+
+/**
  * **Present and unavailable on a Reference Thing, not absent.**
  *
  * ADR 0070 forbids a Reference Thing of a Reference Thing, and a Reference Thing is otherwise a regular
  * Thing — so the menu stays consistent with every other Thing's, and the greyed
- * row is where the product says that referencing terminates.
+ * row is where the product says that referencing terminates. Create Reference
+ * still leads the group it always does.
  */
-test('Create Reference is drawn unavailable on a Reference Thing', async ({ page }) => {
+test('Create Reference is drawn unavailable on a Reference Thing, still leading its menu', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -3480,6 +3533,15 @@ test('Create Reference is drawn unavailable on a Reference Thing', async ({ page
   const row = menu.getByRole('menuitem', { name: /^Create Reference/ });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-disabled', 'true');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    /^Create Reference/,
+    'Copy link to Thing in Diagram',
+    'Copy link to Thing',
+    'Copy link to Target',
+    'Remove from Diagram',
+    'Delete from Space',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(2);
 });
 
 /**

@@ -1184,7 +1184,11 @@ export const createApp = (
             ),
           ];
         }
-        return [...addresses, ...reference, ...(leaving.length > 0 ? [leaving] : [])];
+        // Create Reference leads (`.scratch/dock-menu-reorganisation/issues/03`):
+        // creation, then its addresses together, then the two commands that
+        // leave the Thing behind — Remove from Diagram and Delete from Space
+        // sharing the trailing destructive group.
+        return [...reference, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
         renderedSpace,

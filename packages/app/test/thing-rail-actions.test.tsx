@@ -218,6 +218,18 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
+/**
+ * A menu item's own label, past its optional leading icon column.
+ *
+ * `EntityActionItems` draws an icon in an `aria-hidden` column ahead of the
+ * label wrapper — and an icon that is itself a `ThingKindIcon` (Create Reference's)
+ * nests a second `span`, so a bare `span > span` selector reads that empty
+ * glyph wrapper instead of the label past it. The label wrapper is the one
+ * direct child of the item that is not `aria-hidden`.
+ */
+const itemLabel = (item: Element): string | null =>
+  item.querySelector(':scope > span:not([aria-hidden]) > span')?.textContent ?? null;
+
 describe('a Thing’s commands on the canvas rail', () => {
   /**
    * Reached without selecting anything first. The Space's command surface drew
@@ -246,6 +258,56 @@ describe('a Thing’s commands on the canvas rail', () => {
     expect(screen.queryByRole('menuitem', { name: /^Open in New Tab/ })).not.toBeInTheDocument();
     expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
     expect(await screen.findByRole('menuitem', { name: 'Remove from Diagram' })).toBeVisible();
+    await settled(session);
+  });
+
+  /**
+   * The Thing menu's one grouping grammar
+   * (`.scratch/dock-menu-reorganisation/issues/03`): Create Reference on its own,
+   * both copy links beside each other, then Remove from Diagram and Delete
+   * from Space sharing the trailing destructive group — one separator between
+   * each. The dropdown and the context menu draw the identical list
+   * (`EntityActionItems`), so this is the one place the order has to hold.
+   */
+  it('groups Create Reference, both copy links, then Remove and Delete, in that order', async () => {
+    const session = mount();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+
+    expect(items.map(itemLabel)).toEqual([
+      'Create Reference',
+      'Copy link to Thing in Diagram',
+      'Copy link to Thing',
+      'Remove from Diagram',
+      'Delete from Space',
+    ]);
+    expect(within(menu).getAllByRole('separator')).toHaveLength(2);
+    await settled(session);
+  });
+
+  /**
+   * Present and unavailable on a Reference Thing (ADR 0070): the same grouping, with
+   * Create Reference leading the menu greyed rather than absent.
+   */
+  it('keeps Create Reference leading and unavailable in a Reference Thing’s own menu', async () => {
+    const session = mount(undefined, undefined, withReference);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+
+    expect(items.map(itemLabel)).toEqual([
+      'Create Reference',
+      'Copy link to Thing in Diagram',
+      'Copy link to Thing',
+      'Copy link to Target',
+      'Remove from Diagram',
+      'Delete from Space',
+    ]);
+    expect(items[0]).toHaveAttribute('aria-disabled', 'true');
+    expect(within(menu).getAllByRole('separator')).toHaveLength(2);
     await settled(session);
   });
 
