@@ -10,7 +10,6 @@ import {
   FALLBACK_GRAPH_COLOR,
   RemoveFromDiagramIcon,
   EnterSpaceIcon,
-  EditIcon,
   ThingKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
@@ -1145,21 +1144,9 @@ export const createApp = (
             : []),
         ];
         if (thing.kind === 'space') {
-          const rename: EntityActionGroup = [
-            {
-              id: 'rename',
-              label: 'Rename',
-              icon: <EditIcon />,
-              onSelect: () => {
-                continuation.request({
-                  target: { kind: 'thing', thingId: thing.id },
-                  select: true,
-                  then: 'rename',
-                });
-                return 'done';
-              },
-            },
-          ];
+          // No Rename: the Title still edits in place on the Thing front, and
+          // this menu neither renames the Thing nor the target Space
+          // (`.scratch/dock-menu-reorganisation/issues/04`).
           const links = addresses.flat();
           const enter: EntityActionGroup =
             spaces === null
@@ -1176,7 +1163,7 @@ export const createApp = (
                   },
                 ];
           return [
-            [...rename, ...reference.flat()],
+            reference.flat(),
             [...enter, ...links.filter((action) => action.id === 'open-independently')],
             links.filter((action) => action.id !== 'open-independently'),
             leaving.filter(

@@ -575,6 +575,58 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
+   * The Space Thing menu's own grouping grammar
+   * (`.scratch/dock-menu-reorganisation/issues/04`): Create Reference on its own,
+   * then Open in New Tab (Enter is absent here — this isolated single-Space
+   * mount carries no `OpenSpacesContext`, so `spaces === null` withholds it;
+   * `enter-space-thing.test.tsx` holds the full order with Enter present),
+   * then the three copy links, then Remove from Diagram and Delete from
+   * Space sharing the trailing destructive group — one separator between
+   * each. Rename is absent, which this exact-order assertion would catch as
+   * an extra row if it were not.
+   */
+  it('groups Create Reference, Open in New Tab, the copy links, then Remove and Delete on a Space Thing', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+
+    expect(items.map(itemLabel)).toEqual([
+      'Create Reference',
+      'Open in New Tab',
+      'Copy link to Thing in Diagram',
+      'Copy link to Thing',
+      'Copy link to Space',
+      'Remove from Diagram',
+      'Delete from Space',
+    ]);
+    expect(within(menu).getAllByRole('separator')).toHaveLength(3);
+    await settled(session);
+  });
+
+  /**
+   * Removing Rename from the Space Thing menu must not take on-front Title
+   * editing with it — the two are separate seams, and this presses the
+   * front's own control directly rather than through the menu.
+   */
+  it('still edits a Space Thing’s Title on the Thing front, not through the menu', async () => {
+    const session = mount(undefined, undefined, withSpaceThing);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A space' }));
+    const editor = screen.getByRole('textbox', { name: 'Thing title' });
+    expect(editor).toHaveFocus();
+    fireEvent.change(editor, { target: { value: 'Renamed on the front' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    expect(await screen.findByRole('heading', { name: 'Renamed on the front' })).toBeVisible();
+    expect(
+      session.getState().working.things.find((thing) => thing.id === SPACE_THING_ID)?.document,
+    ).toMatchObject({ title: 'Renamed on the front' });
+    await settled(session);
+  });
+
+  /**
    * Delete from Space is a leaving action on every Thing, including a Space
    * Thing. Filtering the rail down to Remove from Diagram alone would withdraw
    * a command that is still available (`availability.deleteThing`).

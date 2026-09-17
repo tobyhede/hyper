@@ -635,7 +635,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'Space Thing entity menus group Rename and Create Reference, Enter and independent opening, concise copy links, and removal; creating a Reference Thing shows the selected target Diagram read-only.',
+      'Space Thing entity menus group Create Reference, Enter and independent opening, three concise copy links, and removal — Rename is absent, the Title editing on the Thing front instead; creating a Reference Thing shows the selected target Diagram read-only.',
   },
   {
     id: 'space-thing-context-menus-share-dock-actions',

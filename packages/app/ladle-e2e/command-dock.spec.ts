@@ -374,6 +374,34 @@ test('a Reference Thing’s actions menu keeps Create Reference leading, drawn u
 });
 
 /**
+ * A Space Thing's own grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/04`), reached through the real
+ * production host: Create Reference; Enter and Open in New Tab; the three copy
+ * links; then Remove from Diagram and Delete from Space sharing the trailing
+ * destructive group — one separator between each. Rename is absent — the
+ * Title still edits on the Thing front, unchanged by this grouping.
+ */
+test('a Space Thing’s actions menu groups Create Reference, Enter, links, then Remove and Delete', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await thingActionsMenu(page, 'Design system');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Create Reference',
+    'Enter',
+    'Open in New Tab',
+    'Copy link to Thing in Diagram',
+    'Copy link to Thing',
+    'Copy link to Space',
+    'Remove from Diagram',
+    'Delete from Space',
+  ]);
+  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
+  await expect(menu.getByRole('separator')).toHaveCount(3);
+});
+
+/**
  * The name is the rename control, and there is no second surface to return the
  * caret to.
  *

@@ -231,7 +231,7 @@ export async function exerciseFloatingThingDock(page: Page, parent: Locator) {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
   await dock.getByRole('button', { name: /^Actions for Thing/ }).click({ delay: 120 });
-  await expect(page.getByRole('menuitem', { name: 'Rename', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Create Reference', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dock.locator('.thing-rail__kind')).toBeHidden();
 }

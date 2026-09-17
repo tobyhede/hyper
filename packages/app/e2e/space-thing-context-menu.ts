@@ -139,9 +139,18 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
     await trigger.focus();
     await trigger.press('Enter');
   };
+  // The Title still edits on the Thing front, not from the menu
+  // (`.scratch/dock-menu-reorganisation/issues/04`): the menu carries no Rename
+  // row, so the rename that seeds the rest of this test presses the front's own
+  // control instead.
+  const title = page.getByRole('textbox', { name: 'Thing title', exact: true });
+  await thingNode.getByRole('button', { name: /^Edit Title / }).click();
+  await expect(title).toBeFocused();
+  await title.fill('Space Thing');
+  await title.press('Enter');
+  await expect(thingNode.getByRole('heading', { name: 'Space Thing', exact: true })).toBeVisible();
   await menu();
   await expect(page.getByRole('menuitem')).toHaveText([
-    'Rename',
     'Create Reference',
     'Enter',
     'Open in New Tab',
@@ -150,17 +159,11 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
     'Copy link to Space',
     'Remove from Diagram',
   ]);
+  await expect(page.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
   await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(3);
   await expect(
     (await thingControls(page, thingNode)).getByRole('button', { name: /^Enter/ }),
   ).toHaveCount(0);
-  await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
-  const title = page.getByRole('textbox', { name: 'Thing title', exact: true });
-  await expect(title).toBeFocused();
-  await title.fill('Space Thing');
-  await title.press('Enter');
-  await expect(thingNode.getByRole('heading', { name: 'Space Thing', exact: true })).toBeVisible();
-  await menu();
   await page.getByRole('menuitem', { name: 'Create Reference', exact: true }).click();
   await expect(title).toBeFocused();
   await title.fill('Space Thing reference');
