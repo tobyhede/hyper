@@ -145,7 +145,6 @@ export interface CanvasSpaceThingGraphCommands extends CanvasSpaceThingCommands 
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
-  readonly onCopyPermanentLink: () => Promise<string | null>;
 }
 
 export interface CanvasSpaceThingSelection {
@@ -965,11 +964,6 @@ function SpaceThingSelector({
               onRecolor={(color) => {
                 onReport(commands.onRecolor(color));
                 setMenuOpen(false);
-              }}
-              onCopyPermanentLink={() => {
-                void commands
-                  .onCopyPermanentLink()
-                  .then((refusal) => onReport(refusal ?? 'Link copied.'));
               }}
             />
           ) : (

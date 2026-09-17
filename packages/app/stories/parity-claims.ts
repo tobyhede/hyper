@@ -360,7 +360,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      "The Graph menu offers Copy link and Copy permanent link, building the current-Diagram address and the Graph's own address respectively.",
+      'The Graph menu offers Copy link to Graph, building the current-Diagram address, and offers no permanent address of its own.',
   },
   {
     id: 'command-dock-recolors-graph-through-swatch-picker',
@@ -642,7 +642,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'Space Thing Diagram and Graph menus share the Dock commands and author the target: Rename, New, Delete, Colour and canonical links, without navigating the containing Space.',
+      "Space Thing Diagram and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link and Delete, grouped and separated the same way — without navigating the containing Space.",
   },
   {
     id: 'open-space-thing-chooses-its-context-on-the-shared-controls',

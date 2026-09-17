@@ -178,23 +178,18 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Diagram owns its Graphs (ADR 0040), so a Graph row always has both forms:
-   * the address within the Diagram drawing it, and the address that opens it
-   * wherever it is drawn.
+   * A Diagram owns its Graphs (ADR 0040), so a Graph row always has the
+   * address within the Diagram drawing it. A Graph's own permanent address is
+   * no longer offered from any menu (`.scratch/dock-menu-reorganisation/issues/01`).
    */
-  it('offers a Graph both link forms, the Diagram one first', () => {
+  it('offers a Graph its within-Diagram address and no permanent one', () => {
     const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, diagram: DIAGRAM };
 
-    expect(labels(build()(entity))).toEqual(['Rename', 'Copy link', 'Copy permanent link']);
+    expect(labels(build()(entity))).toEqual(['Rename', 'Copy link']);
     expect(copied(entity, 'Copy link')).toEqual({
       kind: 'diagram-graph',
       spaceId: SPACE_ID,
       diagramId: DIAGRAM_ID,
-      graphId: GRAPH_ID,
-    });
-    expect(copied(entity, 'Copy permanent link')).toEqual({
-      kind: 'graph',
-      spaceId: SPACE_ID,
       graphId: GRAPH_ID,
     });
   });
@@ -260,9 +255,9 @@ describe('spaceEntityActions', () => {
 
   /** Every address command confirms in place, which is what holds the menu open. */
   it('confirms every copy without a subtitle', () => {
-    const copies = commands(build()({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM })).filter(
-      (action) => action.label.startsWith('Copy'),
-    );
+    const copies = commands(
+      build()({ kind: 'thing', thing: thing(PLACED_THING_ID, 'A'), diagram: DIAGRAM }),
+    ).filter((action) => action.label.startsWith('Copy'));
 
     expect(copies).toHaveLength(2);
     for (const action of copies) {

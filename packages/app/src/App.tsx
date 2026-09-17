@@ -53,7 +53,6 @@ import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
   COPY_LINK_ACTION_ID,
-  COPY_PERMANENT_LINK_ACTION_ID,
   DELETE_DIAGRAM_ACTION_ID,
   spaceEntityActions,
   type EntityCommandId,
@@ -1695,10 +1694,6 @@ export const createApp = (
               onCopyLink: runEntityCommand(
                 { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
                 COPY_LINK_ACTION_ID,
-              ),
-              onCopyPermanentLink: runEntityCommand(
-                { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
-                COPY_PERMANENT_LINK_ACTION_ID,
               ),
               presenting,
               onPresent: present,

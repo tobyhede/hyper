@@ -282,11 +282,6 @@ function SpaceThingSelector({
                 onReport(commands.onRecolor(color));
                 setMenuOpen(false);
               }}
-              onCopyPermanentLink={() => {
-                void commands
-                  .onCopyPermanentLink()
-                  .then((refusal) => onReport(refusal ?? 'Link copied.'));
-              }}
             />
           ) : (
             <DiagramMenuActions {...commonCommands} createDisabled={disabled} />

@@ -470,16 +470,15 @@ export interface DockGraph {
    */
   readonly editsDisabled: boolean;
   /**
-   * The two addresses a Graph always has, and why both are offered.
+   * Copy this Graph's within-Diagram address — "Copy link to Graph" reproduces
+   * what is on screen, so a recipient lands where the sender was.
    *
-   * A Diagram **owns** its Graphs (ADR 0040), so a Graph always has a
-   * within-Diagram address as well as its own. "Copy link" reproduces what is on
-   * screen — this Graph inside this Diagram, so a recipient lands where the
-   * sender was — and "Copy permanent link" is the Graph's own address, which
-   * survives the sender's Diagram being renamed, redrawn or deleted.
+   * A Diagram **owns** its Graphs (ADR 0040) and a Graph also has its own
+   * permanent address, but the Graph menu offers only this one address now:
+   * "Copy permanent link" is gone from it
+   * (`.scratch/dock-menu-reorganisation/issues/01`).
    */
   readonly onCopyLink: () => void;
-  readonly onCopyPermanentLink: () => void;
   readonly presenting: boolean;
   readonly onPresent: () => void;
   /**
@@ -1165,7 +1164,6 @@ function GraphIdentityMenu({
         }}
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
-        onCopyPermanentLink={graph.onCopyPermanentLink}
         onDelete={() => graph.onDelete(graph.active.id)}
       />
     </ChoiceMenu>

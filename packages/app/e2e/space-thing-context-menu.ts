@@ -23,10 +23,16 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
     await trigger.focus();
     await trigger.press('Enter');
   };
+  // One grouping grammar (`.scratch/dock-menu-reorganisation/issues/01`): the
+  // Diagram list, New Diagram on its own, Rename beside Copy link to
+  // Diagram, then Delete — one separator between each group.
   await openMenu('diagram');
   await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Copy link', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('menuitem', { name: 'Copy link to Diagram', exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole('menuitem', { name: /^Delete / })).toBeVisible();
+  await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(3);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).fill('Target context');
   await page.getByRole('textbox', { name: 'Diagram name', exact: true }).press('Enter');
@@ -40,16 +46,20 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toHaveCount(0);
   await expect(canvas).toBeFocused();
   await openMenu('diagram');
-  await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Copy link to Diagram', exact: true }).click();
   await expect(thing.getByRole('status')).toHaveText('Link copied.');
   const diagramLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(new URL(diagramLink).pathname).toMatch(/^\/spaces\/[^/]+\/diagrams\/[^/]+$/);
 
+  // Same grammar, with Colour… standing alone immediately after the list —
+  // and no permanent address offered any more.
   await openMenu('graph');
   await expect(page.getByRole('menuitem', { name: 'Colour…', exact: true })).toBeVisible();
   await expect(
-    page.getByRole('menuitem', { name: 'Copy permanent link', exact: true }),
+    page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
+  await expect(page.getByRole('menu').getByRole('separator')).toHaveCount(4);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill('Target path');
   await page.getByRole('textbox', { name: 'Graph name', exact: true }).press('Enter');
@@ -68,14 +78,9 @@ export async function exerciseSpaceThingContextMenus(page: Page, thing: Locator)
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
   const graphLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(graphLink).toContain(diagramLink);
-  await openMenu('graph');
-  await page.getByRole('menuitem', { name: 'Copy permanent link', exact: true }).click();
-  const permanent = await page.evaluate(() => navigator.clipboard.readText());
-  expect(permanent).not.toBe(graphLink);
-  expect(new URL(permanent).pathname).toMatch(/^\/spaces\/[^/]+\/graphs\/[^/]+$/);
 
   await openMenu('graph');
   await expect(

@@ -132,6 +132,29 @@ test(
 );
 
 /**
+ * The Diagram menu's one grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/01`): the Diagram list, New
+ * Diagram on its own, Rename beside Copy link to Diagram, then Delete — one
+ * separator between each group.
+ */
+test('the Diagram menu groups New Diagram, Rename with Copy link, then Delete', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  const menu = await disclose(page, 'Diagram: Collection 1');
+  await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+    'Collection 1',
+    'Collection 2',
+    'New Diagram',
+    'Rename',
+    'Copy link to Diagram',
+    'Delete Collection 1',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(3);
+});
+
+/**
  * New Graph is in the Graph menu, beside the list it adds to, and it appends,
  * colours and activates one empty Graph in one Edit (ADR 0040).
  */
@@ -206,13 +229,15 @@ test(
 );
 
 /**
- * The two addresses a Graph has, from the Graph's own menu.
- *
- * The application writes the real product URL to the clipboard. Both addresses
- * are asserted against the shared destination contract.
+ * The Graph menu's one grouping grammar and its one address
+ * (`.scratch/dock-menu-reorganisation/issues/01`): the Graph list, Colour…
+ * on its own immediately after it, New Graph, Rename beside Copy link to
+ * Graph, then Delete — one separator between each group. The application
+ * writes the real within-Diagram product URL to the clipboard, and offers no
+ * permanent address of the Graph's own.
  */
 test(
-  'the Graph menu builds the Diagram address and the Graph address separately',
+  'the Graph menu groups its commands and copies only its within-Diagram address',
   { tag: '@parity:command-dock-copies-graph-destinations' },
   async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -222,19 +247,24 @@ test(
     if (diagram === undefined || graph === undefined) throw new Error('Missing fixture Graph');
 
     const menu = await disclose(page, 'Active Graph: Long');
-    await menu.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+    await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
+    await expect(menu.locator('[role^="menuitem"]')).toHaveText([
+      'Long',
+      'Mid',
+      'Short',
+      'Colour…',
+      'New Graph',
+      'Rename',
+      'Copy link to Graph',
+      'Delete Long',
+    ]);
+    await expect(menu.getByRole('separator')).toHaveCount(4);
+
+    await menu.getByRole('menuitem', { name: 'Copy link to Graph', exact: true }).click();
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
         `https://example.test${productDestinationPath({ kind: 'diagram-graph', spaceId: commandDockSnapshot.id, diagramId: diagram.id, graphId: graph.id })}`,
-      );
-
-    const reopened = await disclose(page, 'Active Graph: Long');
-    await reopened.getByRole('menuitem', { name: 'Copy permanent link' }).click();
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(
-        `https://example.test${productDestinationPath({ kind: 'graph', spaceId: commandDockSnapshot.id, graphId: graph.id })}`,
       );
   },
 );

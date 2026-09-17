@@ -24,7 +24,6 @@ export interface CanvasSpaceThingGraphCommands extends CanvasSpaceThingCommands 
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
-  readonly onCopyPermanentLink: () => Promise<string | null>;
 }
 
 /**

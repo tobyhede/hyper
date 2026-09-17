@@ -147,20 +147,22 @@ export interface SpaceEntityActionsOptions {
 }
 
 /**
- * The two link forms, named the way a reader without the domain model reads
- * them (`.scratch/link-ux/issues/01`, Terminology).
+ * The link forms, named the way a reader without the domain model reads them
+ * (`.scratch/link-ux/issues/01`, Terminology).
  *
  * **"Copy link" is whichever address reproduces what is on screen** — the one
  * within the drawing Diagram where that address exists, the entity's own where
- * it does not — and **"Copy permanent link" is offered only when it differs**.
- * Neither label says "canonical" or "contextual"; those words stay in the code
- * and out of the product.
+ * it does not — and a second, more durable form is offered only where it
+ * differs and only under its own name (a Thing's "Copy link to Thing").
+ * Neither label says "canonical", "contextual" or "permanent"; those words
+ * stay in the code and out of the product. A Graph's own durable address is no
+ * longer offered from any menu at all
+ * (`.scratch/dock-menu-reorganisation/issues/01`).
  *
  * The `space` branch below is the one place this rule is not followed, and it
  * says why there.
  */
 const COPY_LINK = 'Copy link';
-const COPY_PERMANENT_LINK = 'Copy permanent link';
 const THING_COPY_LINK_IN_DIAGRAM = 'Copy link to Thing in Diagram';
 const THING_COPY_LINK = 'Copy link to Thing';
 const COPY_SPACE_LINK = 'Copy link to Space';
@@ -244,12 +246,12 @@ export function spaceEntityActions({
       // departs from the rule above, so it is written down rather than left to
       // be discovered. An address that reproduces what is on screen does exist:
       // the drawing Diagram's. Copying that here would hand a recipient the
-      // Collection the reader is looking at, and would give this menu the
-      // second form ("Copy permanent link") it has never had. It would also
-      // stop the Space's link meaning the Space. Which of the two a Space title
-      // means is a product decision `.scratch/link-ux` has not taken, so the
-      // behaviour stands and the item's own sentence says plainly where it
-      // lands rather than implying the screen.
+      // Collection the reader is looking at, and would give this menu a second
+      // address it has never had. It would also stop the Space's link meaning
+      // the Space. Which of the two a Space title means is a product decision
+      // `.scratch/link-ux` has not taken, so the behaviour stands and the
+      // item's own sentence says plainly where it lands rather than implying
+      // the screen.
       return [[], [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'space', spaceId }, onCopy)], []];
     }
 
@@ -282,7 +284,10 @@ export function spaceEntityActions({
 
     if (entity.kind === 'graph') {
       // A Diagram **owns** its Graphs (ADR 0040), so a Graph row always has a
-      // within-Diagram address and both link forms are always offered here.
+      // within-Diagram address. A Graph's own permanent address is no longer
+      // offered here — the Graph menu dropped it
+      // (`.scratch/dock-menu-reorganisation/issues/01`), and nothing else asks
+      // for it by id.
       const { graph, diagram } = entity;
       return [
         renameAction({ kind: 'graph', id: graph.id }, graph.title),
@@ -291,12 +296,6 @@ export function spaceEntityActions({
             COPY_LINK_ACTION_ID,
             COPY_LINK,
             { kind: 'diagram-graph', spaceId, diagramId: diagram.id, graphId: graph.id },
-            onCopy,
-          ),
-          copy(
-            COPY_PERMANENT_LINK_ACTION_ID,
-            COPY_PERMANENT_LINK,
-            { kind: 'graph', spaceId, graphId: graph.id },
             onCopy,
           ),
         ],

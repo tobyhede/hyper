@@ -4,7 +4,6 @@ import { CommandName } from './CommandSurface';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -33,7 +32,15 @@ export interface ChoiceMenuProps<Id extends string> {
   readonly onChoose: (id: Id) => void;
   /** The control this list hangs off, drawn by the caller. */
   readonly trigger: ReactNode;
-  /** Commands on the named thing, drawn below the set behind a rule. */
+  /**
+   * Commands on the named thing, drawn below the set behind a rule.
+   *
+   * The one separator between the set and this content is this component's;
+   * any further groups and separators within it are the caller's own —
+   * `DiagramMenuActions` and `GraphMenuActions` draw several groups rather
+   * than one, so this does not additionally wrap the whole of `children` in a
+   * second enclosing group.
+   */
   readonly children?: ReactNode;
   /** Controlled disclosure, for a surface that allows one open list at a time. */
   readonly open?: boolean;
@@ -136,7 +143,7 @@ export function ChoiceMenu<Id extends string>({
         {Children.toArray(children).length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>{children}</DropdownMenuGroup>
+            {children}
           </>
         )}
       </DropdownMenuContent>

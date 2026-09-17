@@ -165,4 +165,93 @@ describe('SpaceThingRailClusters', () => {
     expect(graph).toHaveAttribute('aria-disabled', 'true');
     expect(graph).toHaveTextContent('No Graph');
   });
+
+  /**
+   * This Thing's Diagram and Graph menus match the Dock's own grouping
+   * grammar (`.scratch/dock-menu-reorganisation/issues/01`): the direct
+   * children of the popup alternate group/separator, one separator between
+   * each group, and the items inside read in the documented order.
+   */
+  const topLevelRoles = (menu: HTMLElement): readonly (string | null)[] =>
+    Array.from(menu.children).map((child) => child.getAttribute('role'));
+
+  const itemLabels = (menu: HTMLElement): readonly string[] =>
+    Array.from(menu.querySelectorAll('[role="menuitemradio"], [role="menuitem"]')).map((item) =>
+      item.textContent.trim(),
+    );
+
+  it('groups the Diagram menu into New Diagram, Rename with Copy link, then Delete', () => {
+    mount(
+      clusters({
+        diagramCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(null),
+          onDelete: () => Promise.resolve(null),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-thing-diagram'));
+    const menu = screen.getByRole('menu');
+
+    expect(topLevelRoles(menu)).toEqual([
+      'group',
+      'separator',
+      'group',
+      'separator',
+      'group',
+      'separator',
+      'group',
+    ]);
+    expect(itemLabels(menu)).toEqual([
+      'Collection 1',
+      'Collection 2',
+      'New Diagram',
+      'Rename',
+      'Copy link to Diagram',
+      'Delete Collection 1',
+    ]);
+    expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
+  });
+
+  it('groups the Graph menu into Colour…, New Graph, Rename with Copy link, then Delete', () => {
+    mount(
+      clusters({
+        graphCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(null),
+          onDelete: () => Promise.resolve(null),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+          color: '#1f77b4',
+          colors: [{ color: '#1f77b4', label: 'Blue' }],
+          onRecolor: () => null,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-thing-graph'));
+    const menu = screen.getByRole('menu');
+
+    expect(topLevelRoles(menu)).toEqual([
+      'group',
+      'separator',
+      'group',
+      'separator',
+      'group',
+      'separator',
+      'group',
+      'separator',
+      'group',
+    ]);
+    expect(itemLabels(menu)).toEqual([
+      'Long',
+      'Colour…',
+      'New Graph',
+      'Rename',
+      'Copy link to Graph',
+      'Delete Long',
+    ]);
+    expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
+  });
 });

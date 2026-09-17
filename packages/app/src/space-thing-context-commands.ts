@@ -142,8 +142,6 @@ export function spaceThingContextCommands(
       },
       onCopyLink: () =>
         copyLink(location.href({ kind: 'diagram-graph', spaceId: entry.id, diagramId, graphId })),
-      onCopyPermanentLink: () =>
-        copyLink(location.href({ kind: 'graph', spaceId: entry.id, graphId })),
     },
   };
 }
