@@ -13,12 +13,17 @@
  * Thing, and it is the one kind that needs no second decision — so the most
  * common command in the product pays for a choice it never makes.
  *
- * **The asymmetry the options are weighed against, because it is real and it is
- * in the code.** `App.tsx` spends the three kinds two different ways:
+ * **The asymmetry the options were weighed against, because it was real and it
+ * was in the code then.** `App.tsx` spent the three kinds two different ways:
  *
- *   markdown  `addThing()`              — one activation completes an Edit
- *   reference     `thingCreation.open()`    — opens a modal pane (a Target is required)
- *   space     `thingCreation.open()`    — opens a modal pane (a Space is required)
+ *   markdown  `addThing()`              — one activation completed an Edit
+ *   reference     `thingCreation.open()`    — opened a modal pane (a Target was required)
+ *   space     `thingCreation.open()`    — opened a modal pane (a Space was required)
+ *
+ * ADR 0089 has since deleted `thingCreation` outright: every kind now completes
+ * on activation, and Reference Thing creation left this cluster for a `Create
+ * Reference` row on the Thing it targets. The table above is the asymmetry this
+ * review found, not what `App.tsx` does today.
  *
  * So the menu was not one command disclosed three ways. It was one command that
  * completes, sitting behind the same trigger as two commands that were always
@@ -75,16 +80,19 @@ import './create-thing-peer-row.css';
 
 export default { title: 'Review/Create Thing' };
 
-/** The three kinds, in the order `CreateMenu` lists them today. */
+/** The three kinds, in the order `CreateMenu` once listed them. */
 const THING_KINDS = ['markdown', 'space', 'reference'] as const;
 
 type ThingKind = (typeof THING_KINDS)[number];
 
 /**
- * What one activation of one kind actually does, which is what the log reports.
+ * What one activation of one kind did, which is what the log reports.
  *
- * Read off `App.tsx`'s own `onCreate`, so the sheet cannot advertise a cost the
- * application does not pay.
+ * Read off `App.tsx`'s own `onCreate` as it stood during this review, so the
+ * sheet did not advertise a cost the application was not then paying. ADR 0089
+ * has since made every kind complete on activation and moved Reference Thing
+ * creation onto the Thing it targets — these outcomes are the review's record,
+ * not current behaviour.
  */
 const KIND_OUTCOME = {
   markdown: 'Edit completed — the Thing is on the canvas',

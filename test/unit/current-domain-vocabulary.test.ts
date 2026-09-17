@@ -2373,7 +2373,7 @@ describe('aggregate names one thing (ADR 0088)', () => {
  *
  * **What needs a file exemption is what this ADR's own body predicts.** The
  * retired word already collides with ordinary English for pointing, and with
- * three kinds of foreign contract this rename is not the one to touch:
+ * two kinds of foreign contract this rename is not the one to touch:
  *
  *  - a TypeScript type alias, the vocabulary the vendored anti-slop rule set
  *    is written in throughout — none of it ours to sweep;
@@ -2381,17 +2381,19 @@ describe('aggregate names one thing (ADR 0088)', () => {
  *    `@project/*` path table (see `docs/agents/build-tooling.md`), the three
  *    Vite/Vitest configs that spend `resolve.alias`, and the shadcn CLI's own
  *    generated config and vendored guidance about it — none of it a name our
- *    code chose;
- *  - `CONTEXT.md` itself, whose `_Avoid_` line under **Reference Thing** has
- *    to keep saying the retired word to retire it, exactly as the Space
- *    block's retirement notices do.
+ *    code chose.
  *
  * Each is a whole-file exemption rather than a masked spelling, because every
  * one of these files is *entirely* the foreign sense — unlike the shadcn
  * registry component the Card block had to mask spelling-by-spelling inside a
  * barrel that also carried domain names, nothing here mixes the two senses in
- * one file. A few structural spellings straddle a file that is not otherwise
- * exempt and are masked instead: two root tool configs and an agent-facing
+ * one file. **`CONTEXT.md` is not one of them**: only its `_Avoid_` line under
+ * **Reference Thing** has to keep saying the retired word to retire it, and
+ * the rest of the glossary is ours to govern like any other document, so that
+ * one line is masked by its exact spelling — the `RETIREMENT_NOTICES` idiom
+ * the Space block above already uses — rather than the whole file exempted. A
+ * few more structural spellings straddle a file that is not otherwise exempt
+ * and are masked the same way: two root tool configs and an agent-facing
  * document cite the anti-slop rule id, `AGENTS.md` cites the path-alias
  * module and the Vite config key it explains, and a dictionary-type test
  * names a TypeScript alias-consumer test double. Ordinary lowercase prose
@@ -2500,7 +2502,6 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'vitest.integration.config.ts',
   'packages/app/components.json',
   'packages/ui/components.json',
-  'CONTEXT.md',
   'test/unit/current-domain-vocabulary.test.ts',
   // Reads the path-alias build config's real, excluded `resolve.alias` output
   // — a type annotation, an optional-chained read and an object-entries loop,
@@ -2545,6 +2546,20 @@ const withoutQualifiedAliasSpellings = (source: string): string =>
     source.replace(CITED_PATH, 'path'),
   );
 
+/**
+ * `CONTEXT.md`'s own retirement notice: the `_Avoid_` line under **Reference
+ * Thing** has to name the word it retires, exactly as the Space block's
+ * `RETIREMENT_NOTICES` and the aggregate block's `AGGREGATE_RETIREMENT_NOTICE`
+ * do for theirs. Masked by its exact spelling — not the whole file exempted —
+ * so a retired usage added anywhere else in the glossary is still reported,
+ * and asserted below to still be earning itself.
+ */
+const REFERENCE_THING_RETIREMENT_NOTICE =
+  '_Avoid_: alias, link (as a name for the Thing; Copy link is a command), copy, transclusion, mirror, and Reference as a family Space Thing belongs to (a Space Thing references a Space; it is not a Reference Thing).';
+
+const withoutReferenceThingRetirementNotice = (source: string): string =>
+  source.split(REFERENCE_THING_RETIREMENT_NOTICE).join('retired');
+
 describe('a Reference Thing is named once (ADR 0092)', () => {
   const scanned = scannableFiles().filter((file) => !FOREIGN_ALIAS_FILES.includes(file));
 
@@ -2555,6 +2570,9 @@ describe('a Reference Thing is named once (ADR 0092)', () => {
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).toContain('packages/ui/src/ThingKindIcon.tsx');
     expect(scanned).toContain('AGENTS.md');
+    // No longer a whole-file exemption: the glossary is scanned like any other
+    // document, with only its own retirement notice masked.
+    expect(scanned).toContain('CONTEXT.md');
     expect(scanned.filter((file) => file.endsWith('.md')).length).toBeGreaterThan(0);
   });
 
@@ -2562,9 +2580,10 @@ describe('a Reference Thing is named once (ADR 0092)', () => {
     const found = scanned.flatMap((file) => {
       const source = readTracked(file);
       if (source === null) return [];
-      return hits(withoutQualifiedAliasSpellings(source), RETIRED_ALIAS_NAME).map(
-        (hit) => `${file}:${hit}`,
-      );
+      return hits(
+        withoutReferenceThingRetirementNotice(withoutQualifiedAliasSpellings(source)),
+        RETIRED_ALIAS_NAME,
+      ).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -2575,9 +2594,10 @@ describe('a Reference Thing is named once (ADR 0092)', () => {
       const source = readTracked(file);
       return source === null
         ? []
-        : hits(withoutQualifiedAliasSpellings(source), RETIRED_ALIAS_BARE).map(
-            (hit) => `${file}:${hit}`,
-          );
+        : hits(
+            withoutReferenceThingRetirementNotice(withoutQualifiedAliasSpellings(source)),
+            RETIRED_ALIAS_BARE,
+          ).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -2595,6 +2615,11 @@ describe('a Reference Thing is named once (ADR 0092)', () => {
       const stillWritten = scannableFiles().some((file) => readTracked(file)?.includes(spelling));
       expect(stillWritten, `${spelling} is masked but no longer written anywhere`).toBe(true);
     }
+
+    expect(
+      readTracked('CONTEXT.md')?.includes(REFERENCE_THING_RETIREMENT_NOTICE),
+      'CONTEXT.md no longer carries the Reference Thing retirement notice',
+    ).toBe(true);
   });
 
   it('reports the retired name in every shape it was written in', () => {

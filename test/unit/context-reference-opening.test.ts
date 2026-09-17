@@ -67,8 +67,29 @@ const referenceClause = (definition: string): string => {
  * — one source of truth, appearing again elsewhere — which is true, live, and
  * the whole point of the kind. A marker that cannot tell showing from
  * authoring fails the correct document.
+ *
+ * A third pattern closes a real gap the first two leave open: neither
+ * "content surface" nor "delegat" appears if the withdrawn model resurfaces
+ * paraphrased, as "opening a Reference Thing opens its Target's content for
+ * authoring". That phrase cannot be banned by "opens … Target's content"
+ * alone, because that is also exactly how the live text describes the correct
+ * model — "A Reference Thing opens on its own Title and its immutable
+ * Target's content read-only" is `opens … Target's content` in one breath
+ * too. What tells them apart is whether an authoring purpose sits in the same
+ * clause as "Target's content": the live text never puts one there — its
+ * "read-only" ends the clause at a comma, and its "opened explicitly to
+ * author" is a separate clause about the Target, not the Reference Thing's
+ * own opening. So the third pattern matches "Target's content" only when
+ * followed, before the next comma, period or semicolon, by "to author" or
+ * "for authoring". Checked against the live document (both the Opening
+ * definition's reference clause and the Reference Thing definition) so this
+ * note asserts an absence actually confirmed, not assumed.
  */
-const DELEGATED_CONTENT = [/content surface/i, /delegat/i];
+const DELEGATED_CONTENT = [
+  /content surface/i,
+  /delegat/i,
+  /target's content[^,.;]*\b(?:to author|for authoring)\b/i,
+];
 
 /**
  * ADR 0049's model, read as the shape both clauses actually share rather than
