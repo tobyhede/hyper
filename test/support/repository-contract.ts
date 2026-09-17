@@ -37,6 +37,11 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  *  - **Transactional isolation.** The concurrent-insert race and the
  *    one-statement aggregate read are PostgreSQL behaviour a `Map` cannot have,
  *    and they stay in the integration suite.
+ *
+ * `excludes: 'replacement-and-export'` skips only the cases that call
+ * `replaceAggregate` or `markExported`, and runs every initialization, read and
+ * commit case. SQLite uses that until those two land (ticket 17). Memory and
+ * PostgreSQL keep the default `'nothing'` and run every case.
  */
 /** The contract's Meta Space, and the first Space every case imports. */
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
@@ -191,6 +196,7 @@ const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revi
 export const spaceRepositoryContract = (
   name: string,
   createHarness: () => Promise<RepositoryHarness>,
+  excludes: 'nothing' | 'replacement-and-export' = 'nothing',
 ): void => {
   const withHarness = async (body: (repository: SpaceRepository) => Promise<void>) => {
     const harness = await createHarness();
@@ -209,37 +215,46 @@ export const spaceRepositoryContract = (
     return result.aggregate.spaces;
   };
 
-  it(`${name} initializes and replaces only through explicit Meta-rooted aggregates`, async () => {
-    await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
-      await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
-      await expect(
-        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
-      ).resolves.toEqual({
-        kind: 'initialized',
-        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
-      });
-      await expect(
-        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [structuredClone(first)] }),
-      ).resolves.toMatchObject({ kind: 'existing' });
+  /** A case that calls `replaceAggregate` or `markExported`. */
+  const itReplacingOrExporting = it.skipIf(excludes === 'replacement-and-export');
 
-      const replacement = retitled(first, 'Replacement');
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: SPACE_ID, spaces: [replacement] },
-          OTHER_SPACE_ID,
-        ),
-      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
-      await expect(
-        repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, SPACE_ID),
-      ).resolves.toEqual({
-        kind: 'replaced',
-        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(replacement, 0n, null)] },
-      });
-    });
-  });
+  itReplacingOrExporting(
+    `${name} initializes and replaces only through explicit Meta-rooted aggregates`,
+    async () => {
+      await withHarness(async (repository) => {
+        const first = space(SPACE_ID, 'One', [THING_ID]);
+        await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+        await expect(
+          repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+        ).resolves.toEqual({
+          kind: 'initialized',
+          aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
+        });
+        await expect(
+          repository.initializeAggregate({
+            metaSpaceId: SPACE_ID,
+            spaces: [structuredClone(first)],
+          }),
+        ).resolves.toMatchObject({ kind: 'existing' });
 
-  it(`${name} classifies canonical initialization and invalid lifecycle proposals`, async () => {
+        const replacement = retitled(first, 'Replacement');
+        await expect(
+          repository.replaceAggregate(
+            { metaSpaceId: SPACE_ID, spaces: [replacement] },
+            OTHER_SPACE_ID,
+          ),
+        ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
+        await expect(
+          repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, SPACE_ID),
+        ).resolves.toEqual({
+          kind: 'replaced',
+          aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+        });
+      });
+    },
+  );
+
+  it(`${name} classifies canonical and different initialization proposals`, async () => {
     await withHarness(async (repository) => {
       const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
       const meta = {
@@ -262,14 +277,32 @@ export const spaceRepositoryContract = (
           spaces: [retitled(meta, 'Different'), child],
         }),
       ).resolves.toMatchObject({ kind: 'already-initialized' });
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: MISSING_SPACE_ID, spaces: [meta, child] },
-          SPACE_ID,
-        ),
-      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
     });
   });
+
+  itReplacingOrExporting(
+    `${name} refuses a replacement proposal naming a Meta Space it does not hold`,
+    async () => {
+      await withHarness(async (repository) => {
+        const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+        const meta = {
+          ...space(SPACE_ID, 'Meta', [THING_ID]),
+          things: [
+            thing(THING_ID, 'Meta thing'),
+            spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+          ],
+        };
+        await seed(repository, meta, child);
+
+        await expect(
+          repository.replaceAggregate(
+            { metaSpaceId: MISSING_SPACE_ID, spaces: [meta, child] },
+            SPACE_ID,
+          ),
+        ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      });
+    },
+  );
 
   it(`${name} ignores object-key insertion order when classifying initialization`, async () => {
     await withHarness(async (repository) => {
@@ -319,7 +352,7 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} rolls back a refused replacement`, async () => {
+  itReplacingOrExporting(`${name} rolls back a refused replacement`, async () => {
     await withHarness(async (repository) => {
       const initial = space(SPACE_ID, 'Initial', [THING_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
@@ -336,7 +369,7 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses replacement before initialization`, async () => {
+  itReplacingOrExporting(`${name} refuses replacement before initialization`, async () => {
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [THING_ID]);
       await expect(
@@ -346,36 +379,42 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses a replacement authorized against a superseded Meta identity`, async () => {
-    await withHarness(async (repository) => {
-      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
-      const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_THING_ID]);
-      const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_THING_ID]);
-      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+  itReplacingOrExporting(
+    `${name} refuses a replacement authorized against a superseded Meta identity`,
+    async () => {
+      await withHarness(async (repository) => {
+        const initial = space(SPACE_ID, 'Initial', [THING_ID]);
+        const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_THING_ID]);
+        const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_THING_ID]);
+        await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
 
-      await expect(
-        repository.replaceAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [first] }, SPACE_ID),
-      ).resolves.toMatchObject({ kind: 'replaced' });
-      /*
-       * A replacement names the Meta identity it read, and the first one
-       * retired SPACE_ID. So the second is authorized against an aggregate that
-       * no longer exists and is refused, whatever it proposes.
-       *
-       * Deliberately sequential. What two *overlapping* replacements do is
-       * PostgreSQL's Meta row lock deciding which is granted it last, which is
-       * transactional isolation a `Map` cannot have -- it is forced with a
-       * barrier and asserted in the integration suite, and stating it here made
-       * the contract read as though call order settled the winner.
-       */
-      await expect(
-        repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
-      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
-      await expect(repository.loadAggregate()).resolves.toEqual({
-        kind: 'loaded',
-        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
+        await expect(
+          repository.replaceAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [first] }, SPACE_ID),
+        ).resolves.toMatchObject({ kind: 'replaced' });
+        /*
+         * A replacement names the Meta identity it read, and the first one
+         * retired SPACE_ID. So the second is authorized against an aggregate that
+         * no longer exists and is refused, whatever it proposes.
+         *
+         * Deliberately sequential. What two *overlapping* replacements do is
+         * PostgreSQL's Meta row lock deciding which is granted it last, which is
+         * transactional isolation a `Map` cannot have -- it is forced with a
+         * barrier and asserted in the integration suite, and stating it here made
+         * the contract read as though call order settled the winner.
+         */
+        await expect(
+          repository.replaceAggregate(
+            { metaSpaceId: MISSING_SPACE_ID, spaces: [second] },
+            SPACE_ID,
+          ),
+        ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
+        await expect(repository.loadAggregate()).resolves.toEqual({
+          kind: 'loaded',
+          aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
+        });
       });
-    });
-  });
+    },
+  );
 
   /*
    * The migration that adds the singleton Meta row deliberately leaves it empty
@@ -897,28 +936,34 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} records an exported revision and carries it across later commits`, async () => {
-    await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
-      await seed(repository, first);
+  itReplacingOrExporting(
+    `${name} records an exported revision and carries it across later commits`,
+    async () => {
+      await withHarness(async (repository) => {
+        const first = space(SPACE_ID, 'One', [THING_ID]);
+        await seed(repository, first);
 
-      await repository.markExported(SPACE_ID, 0n);
-      const changed = retitled(first, 'Edited after export');
-      await expect(commitUpdate(repository, changed, 0n)).resolves.toMatchObject({
-        kind: 'committed',
+        await repository.markExported(SPACE_ID, 0n);
+        const changed = retitled(first, 'Edited after export');
+        await expect(commitUpdate(repository, changed, 0n)).resolves.toMatchObject({
+          kind: 'committed',
+        });
+
+        await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, 0n));
       });
+    },
+  );
 
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, 0n));
-    });
-  });
-
-  it(`${name} refuses to record an exported revision for a Space it does not store`, async () => {
-    await withHarness(async (repository) => {
-      await expect(repository.markExported(MISSING_SPACE_ID, 0n)).rejects.toThrow(
-        `Space ${MISSING_SPACE_ID} does not exist`,
-      );
-    });
-  });
+  itReplacingOrExporting(
+    `${name} refuses to record an exported revision for a Space it does not store`,
+    async () => {
+      await withHarness(async (repository) => {
+        await expect(repository.markExported(MISSING_SPACE_ID, 0n)).rejects.toThrow(
+          `Space ${MISSING_SPACE_ID} does not exist`,
+        );
+      });
+    },
+  );
 
   it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
@@ -984,24 +1029,27 @@ export const spaceRepositoryContract = (
    * which is what taking the aggregate entire buys over inserting into whatever
    * is already there.
    */
-  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
-    await withHarness(async (repository) => {
-      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
-      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
+  itReplacingOrExporting(
+    `${name} replaces everything stored, freeing the Thing ids it clears`,
+    async () => {
+      await withHarness(async (repository) => {
+        await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
+        const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
 
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
-          SPACE_ID,
-        ),
-      ).resolves.toEqual({
-        kind: 'replaced',
-        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+        await expect(
+          repository.replaceAggregate(
+            { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
+            SPACE_ID,
+          ),
+        ).resolves.toEqual({
+          kind: 'replaced',
+          aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+        });
+        await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
+        expect(new Set(await repository.listSpaces())).toEqual(
+          new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
+        );
       });
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-      expect(new Set(await repository.listSpaces())).toEqual(
-        new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
-      );
-    });
-  });
+    },
+  );
 };

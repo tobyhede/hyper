@@ -13,11 +13,17 @@ import {
   type LoadedSpace,
   type RepositoryCommitResult,
   type SpaceCommit,
-  type SpaceConflict,
   type SpaceSummary,
 } from '@project/persistence';
 import { db } from '../prisma/db';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
+import {
+  commitIdentityRefusal,
+  committedRevision,
+  decideAggregateCommit,
+  decideTopologyPreservingUpdate,
+  topologyPreservingCandidate,
+} from './commit-decision';
 import type {
   AggregateInput,
   InitializeAggregateResult,
@@ -313,45 +319,18 @@ const replaceStoredSpace = async (
   }
 };
 
-const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
-  if (current.document.defaultDiagram !== next.document.defaultDiagram) return false;
-  if (
-    JSON.stringify(current.document.diagrams ?? []) !== JSON.stringify(next.document.diagrams ?? [])
-  ) {
-    return false;
-  }
-  if (current.things.length !== next.things.length) return false;
-  const currentById = new Map(current.things.map((thing) => [thing.id, thing]));
-  return next.things.every((thing) => {
-    const previous = currentById.get(thing.id);
-    if (previous?.document.kind !== thing.document.kind) return false;
-    if (thing.document.kind !== 'space' || previous.document.kind !== 'space') return true;
-    return (
-      previous.document.spaceId === thing.document.spaceId &&
-      previous.document.diagram === thing.document.diagram &&
-      previous.document.graph === thing.document.graph
-    );
-  });
-};
-
 const commitTopologyPreservingUpdate = async (
   orm: Orm,
   request: SpaceCommit,
 ): Promise<RepositoryCommitResult | undefined> => {
-  const [change] = request.changes;
-  if (request.changes.length !== 1 || change.kind !== 'update') return undefined;
-  const current = await loadStoredSpace(orm, change.spaceId);
-  if (current?.revision !== change.expectedRevision) {
-    return { kind: 'conflict', conflicts: [{ spaceId: change.spaceId, current }] };
-  }
-  const intake = loadSpaceSnapshot(change.snapshot);
-  if (!intake.ok) {
-    return {
-      kind: 'aggregate-refused',
-      errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intake.errors }],
-    };
-  }
-  if (!preservesSnapshotBoundary(current.snapshot, change.snapshot)) return undefined;
+  const change = topologyPreservingCandidate(request);
+  if (change === undefined) return undefined;
+  const decision = decideTopologyPreservingUpdate(
+    change,
+    await loadStoredSpace(orm, change.spaceId),
+  );
+  if (decision.kind === 'aggregate-path') return undefined;
+  if (decision.kind === 'answer') return decision.result;
 
   // Past this point the snapshot boundary is settled and this path commits, so
   // the write below is the first one and every earlier return has written
@@ -359,18 +338,13 @@ const commitTopologyPreservingUpdate = async (
   // trusted from the read above, because this path deliberately holds no
   // singleton lock: another commit — fast or slow — can move the row in
   // between, and the conflict it then raises rolls this transaction back.
-  const revision = change.expectedRevision + 1n;
   const locked = await writeSpaceDocumentUnderLock(orm, change.snapshot);
   if (locked !== change.expectedRevision) throw new StaleSpaceRevisionError(change.spaceId);
   await orm.public.Space.where({ id: change.spaceId }).update({
-    revision: toDatabaseRevision(revision),
+    revision: toDatabaseRevision(committedRevision(change)),
   });
   await upsertThings(orm, change.snapshot);
-  return {
-    kind: 'committed',
-    revisions: [{ spaceId: change.spaceId, revision }],
-    deletedSpaceIds: [],
-  };
+  return decision.result;
 };
 
 const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
@@ -380,18 +354,6 @@ const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<voi
     revision: 0,
   });
   await importThings(orm, snapshot);
-};
-
-const commitIdentityRefusal = (request: SpaceCommit): string | undefined => {
-  const ids = new Set<UUID>();
-  for (const change of request.changes) {
-    if (ids.has(change.spaceId)) return `Space ${change.spaceId} is named more than once`;
-    ids.add(change.spaceId);
-    if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
-      return `Change Space id ${change.spaceId} does not match its snapshot`;
-    }
-  }
-  return undefined;
 };
 
 const upsertThings = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
@@ -593,8 +555,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
   async commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
     const refusal = commitIdentityRefusal(request);
-    if (refusal !== undefined)
-      return { kind: 'rejected', code: 'invalid-commit', message: refusal };
+    if (refusal !== undefined) return refusal;
 
     try {
       return await this.#commitInTransaction(request);
@@ -631,119 +592,27 @@ export class PostgresSpaceRepository implements SpaceRepository {
       const topologyPreserving = await commitTopologyPreservingUpdate(orm, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
       const metaSpaceId = await lockMetaIdentity(orm);
-      const stored = await loadEverySpace(orm);
-      const byId = new Map(stored.map((space) => [space.snapshot.id, space]));
-      const baseline =
-        metaSpaceId === undefined
-          ? undefined
-          : loadSpaceAggregate({
-              metaSpaceId,
-              snapshots: stored.map(({ snapshot }) => snapshot),
-            });
-      const baselineUnreferenced = new Set(
-        baseline?.ok === false
-          ? baseline.errors.flatMap((error) =>
-              error.kind === 'ordinary-space-unreferenced' ? [error.spaceId] : [],
-            )
-          : [],
-      );
-      const conflicts: SpaceConflict[] = [];
-      for (const change of request.changes) {
-        const current = byId.get(change.spaceId);
-        const stale =
-          change.kind === 'create'
-            ? current !== undefined
-            : current?.revision !== change.expectedRevision;
-        if (stale) conflicts.push({ spaceId: change.spaceId, current });
-      }
-      if (conflicts.length > 0) return { kind: 'conflict', conflicts };
+      const decision = decideAggregateCommit(request, metaSpaceId, await loadEverySpace(orm));
+      if (decision.kind === 'answer') return decision.result;
 
-      const candidate = new Map(byId);
-      for (const change of request.changes) {
-        if (change.kind === 'delete') candidate.delete(change.spaceId);
-        else {
-          candidate.set(change.spaceId, {
-            snapshot: structuredClone(change.snapshot),
-            revision: change.kind === 'create' ? 0n : change.expectedRevision + 1n,
-            exportedRevision: byId.get(change.spaceId)?.exportedRevision ?? null,
-          });
-        }
-      }
-      // Answered after the conflicts, exactly as `MemorySpaceRepository` does:
-      // a change set naming a Space the store does not hold is a conflict
-      // whether or not Meta has been established, and only what follows needs a
-      // complete aggregate to check.
-      if (metaSpaceId === undefined) {
-        return {
-          kind: 'rejected',
-          code: 'invalid-commit',
-          message: 'The repository has no Meta Space',
-        };
-      }
-      /*
-       * Only a reference the caller did not submit is authoritative state, and
-       * only that makes an incomplete deletion a conflict it can resolve by
-       * reloading. A reference the caller kept in its own change set is its own
-       * proposal, and answering `conflict` for it cannot be recovered from: the
-       * reload returns the target at the revision the caller already holds, so
-       * the identical change set conflicts again, forever. That falls through
-       * to complete intake below and is refused. `memory.ts` draws the same
-       * line, and `repository-contract.ts` holds both to it.
-       */
-      const aggregate = loadSpaceAggregate({
-        metaSpaceId,
-        snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
-      });
-      const deletedIds = new Set(
-        request.changes.flatMap((change) => (change.kind === 'delete' ? [change.spaceId] : [])),
-      );
-      const changedIds = new Set(request.changes.map((change) => change.spaceId));
-      const incompleteDeleteIds = new Set(
-        aggregate.ok
-          ? []
-          : aggregate.errors.flatMap((error) =>
-              error.kind === 'space-thing-target-missing' &&
-              deletedIds.has(error.targetSpaceId) &&
-              !changedIds.has(error.spaceId)
-                ? [error.targetSpaceId]
-                : [],
-            ),
-      );
-      const incompleteDeletes = [...incompleteDeleteIds].map((spaceId) => ({
-        spaceId,
-        current: byId.get(spaceId),
-      }));
-      if (incompleteDeletes.length > 0) {
-        return { kind: 'conflict', conflicts: incompleteDeletes };
-      }
-      if (!aggregate.ok) {
-        const errors = aggregate.errors.filter(
-          (error) =>
-            error.kind !== 'ordinary-space-unreferenced' ||
-            !baselineUnreferenced.has(error.spaceId),
-        );
-        if (errors.length > 0) return { kind: 'aggregate-refused', errors };
-      }
-
-      const revisions: { spaceId: UUID; revision: bigint }[] = [];
-      const deletedSpaceIds: UUID[] = [];
       for (const change of request.changes) {
         if (change.kind === 'delete') {
           await orm.public.Thing.where({ spaceId: change.spaceId }).deleteAll();
           const deleted = await orm.public.Space.where({ id: change.spaceId }).delete();
           if (deleted === null)
             throw new Error(`Space ${change.spaceId} disappeared during commit`);
-          deletedSpaceIds.push(change.spaceId);
         } else if (change.kind === 'create') {
           await createStoredSpace(orm, change.snapshot);
-          revisions.push({ spaceId: change.spaceId, revision: 0n });
         } else {
-          const revision = change.expectedRevision + 1n;
-          await replaceStoredSpace(orm, change.snapshot, change.expectedRevision, revision);
-          revisions.push({ spaceId: change.spaceId, revision });
+          await replaceStoredSpace(
+            orm,
+            change.snapshot,
+            change.expectedRevision,
+            committedRevision(change),
+          );
         }
       }
-      return { kind: 'committed', revisions, deletedSpaceIds };
+      return decision.result;
     });
   }
 }

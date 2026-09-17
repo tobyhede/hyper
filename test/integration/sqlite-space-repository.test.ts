@@ -2,7 +2,17 @@ import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
+import { spaceRepositoryContract } from '../support/repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
+
+spaceRepositoryContract(
+  'SqliteSpaceRepository',
+  async () => {
+    const harness = await openSqliteRepository();
+    return { repository: harness.repository, close: harness.close };
+  },
+  'replacement-and-export',
+);
 
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000002');
@@ -13,6 +23,7 @@ const OTHER_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
 const DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
 const MISSING_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
+const LINK_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
 
 const thing = (id: UUID, title: string) => ({
   id,
@@ -23,6 +34,34 @@ const space = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapsho
   id,
   document: { version: 1, title },
   things: thingIds.map((thingId) => thing(thingId, `${title} thing`)),
+});
+
+const spaceThing = (
+  id: UUID,
+  target: UUID,
+  selection: { readonly diagram: UUID; readonly graph: UUID },
+) => ({
+  id,
+  document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
+});
+
+const targetSpace = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
+  ...space(id, title, thingIds),
+  document: {
+    version: 1,
+    title,
+    defaultDiagram: DIAGRAM_ID,
+    diagrams: [
+      {
+        id: DIAGRAM_ID,
+        title: 'Diagram 1',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+        activeGraph: GRAPH_ID,
+      },
+    ],
+  },
 });
 
 const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSnapshot => ({
@@ -193,6 +232,249 @@ describe('SqliteSpaceRepository', () => {
       stored(first, 2n ** 63n - 1n, 0n),
     );
   });
+
+  it('commits a topology-preserving update and reloads it', async () => {
+    const { repository } = await opened();
+    const first = space(SPACE_ID, 'One', [THING_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const changed = retitled(first, 'Changed');
+
+    await expect(
+      repository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: changed,
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+      deletedSpaceIds: [],
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
+  });
+
+  // The pinned driver opens a new database handle for every transaction, so two
+  // overlapping transactions through this one client are two SQLite connections
+  // on one file. Neither case below may wait out the driver's 5000ms busy_timeout.
+  const WELL_UNDER_BUSY_TIMEOUT_MS = 1_000;
+
+  it('serves two overlapping aggregate reads through one client without waiting on each other', async () => {
+    const { repository } = await opened();
+    const first = space(SPACE_ID, 'One', [THING_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const loaded = {
+      kind: 'loaded',
+      aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
+    };
+
+    const started = performance.now();
+    const results = await Promise.allSettled([
+      repository.loadAggregate(),
+      repository.loadAggregate(),
+    ]);
+    const elapsed = performance.now() - started;
+
+    expect(results).toEqual([
+      { status: 'fulfilled', value: loaded },
+      { status: 'fulfilled', value: loaded },
+    ]);
+    expect(elapsed).toBeLessThan(WELL_UNDER_BUSY_TIMEOUT_MS);
+  });
+
+  it('settles two overlapping first initializations through one client as initialized and existing', async () => {
+    const { repository } = await opened();
+    const first = space(SPACE_ID, 'One', [THING_ID]);
+
+    const started = performance.now();
+    const results = await Promise.allSettled([
+      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [structuredClone(first)] }),
+    ]);
+    const elapsed = performance.now() - started;
+
+    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+    expect(
+      results.flatMap((result) => (result.status === 'fulfilled' ? [result.value.kind] : [])),
+    ).toEqual(expect.arrayContaining(['initialized', 'existing']));
+    expect(elapsed).toBeLessThan(WELL_UNDER_BUSY_TIMEOUT_MS);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+  });
+
+  it('commits and reloads revisions above Number.MAX_SAFE_INTEGER as canonical decimal text', async () => {
+    const { repository, database } = await opened();
+    const first = space(SPACE_ID, 'One', [THING_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const aboveSafe = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+    await database.orm.Space.where({ id: SPACE_ID }).update({
+      revision: aboveSafe.toString(),
+    });
+    const changed = retitled(first, 'Above safe');
+
+    await expect(
+      repository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: changed,
+            expectedRevision: aboveSafe,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      kind: 'committed',
+      revisions: [{ spaceId: SPACE_ID, revision: aboveSafe + 1n }],
+      deletedSpaceIds: [],
+    });
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
+      stored(changed, aboveSafe + 1n, null),
+    );
+    const row = await database.orm.Space.where({ id: SPACE_ID }).first();
+    expect(row?.revision).toBe((aboveSafe + 1n).toString());
+  });
+
+  it('serialises overlapping in-process commits at different Spaces well under the busy timeout', async () => {
+    const { repository } = await opened();
+    const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+    const meta = {
+      ...space(SPACE_ID, 'Meta', [THING_ID]),
+      things: [
+        thing(THING_ID, 'Meta thing'),
+        spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+      ],
+    };
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [meta, child] });
+
+    const started = Date.now();
+    const results = await Promise.all([
+      repository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: retitled(meta, 'Meta edited'),
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+      repository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: OTHER_SPACE_ID,
+            snapshot: retitled(child, 'Child edited'),
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    ]);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(results.map(({ kind }) => kind).sort()).toEqual(['committed', 'committed']);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Meta edited' } },
+      revision: 1n,
+    });
+    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toMatchObject({
+      snapshot: { document: { title: 'Child edited' } },
+      revision: 1n,
+    });
+  });
+
+  /*
+   * A read and a commit through one client are two SQLite handles on one file.
+   * Both orderings, and both commit paths — the multi-Space one that locks the
+   * Meta identity row and the topology-preserving one that does not. The store
+   * holds enough Spaces that `listSpaces` yields between rows, so a read is
+   * still holding its statement open when the commit reaches COMMIT.
+   */
+  const COMMIT_KINDS = ['multi-Space', 'topology-preserving'] as const;
+  const ORDERINGS = ['commit first', 'reads first'] as const;
+  const LINKED_SPACES = 300;
+  const TURNS_BETWEEN_READS = 500;
+  const linkedSpaceId = (index: number) =>
+    uuidSchema.parse(`d0000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`);
+  const linkThingId = (index: number) =>
+    uuidSchema.parse(`e0000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`);
+
+  for (const commitKind of COMMIT_KINDS) {
+    for (const ordering of ORDERINGS) {
+      it(`serves loadSpace and listSpaces overlapping a ${commitKind} commit (${ordering}) well under the busy timeout`, async () => {
+        const { repository } = await opened();
+        const linkedSpaces = Array.from({ length: LINKED_SPACES }, (_, index) =>
+          targetSpace(linkedSpaceId(index), `Linked ${index}`, []),
+        );
+        const meta: SpaceSnapshot = {
+          ...space(SPACE_ID, 'Meta', [THING_ID, SECOND_THING_ID]),
+          things: [
+            thing(THING_ID, 'Meta thing'),
+            thing(SECOND_THING_ID, 'Second meta thing'),
+            ...linkedSpaces.map(({ id }, index) =>
+              spaceThing(linkThingId(index), id, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+            ),
+          ],
+        };
+        await expect(
+          repository.initializeAggregate({
+            metaSpaceId: SPACE_ID,
+            spaces: [meta, ...linkedSpaces],
+          }),
+        ).resolves.toMatchObject({ kind: 'initialized' });
+        const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+        const linked: SpaceSnapshot = {
+          ...retitled(meta, 'Meta linked'),
+          things: [
+            ...meta.things,
+            spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+          ],
+        };
+        const commit = () =>
+          commitKind === 'multi-Space'
+            ? repository.commit({
+                changes: [
+                  { kind: 'create', spaceId: OTHER_SPACE_ID, snapshot: child },
+                  { kind: 'update', spaceId: SPACE_ID, snapshot: linked, expectedRevision: 0n },
+                ],
+              })
+            : repository.commit({
+                changes: [
+                  {
+                    kind: 'update',
+                    spaceId: SPACE_ID,
+                    snapshot: retitled(meta, 'Meta edited'),
+                    expectedRevision: 0n,
+                  },
+                ],
+              });
+        const reads = () => [repository.loadSpace(SPACE_ID), repository.listSpaces()];
+
+        const settled: Promise<unknown>[] = ordering === 'reads first' ? reads() : [];
+        const started = performance.now();
+        let commitElapsed: number | undefined;
+        const committed = commit().finally(() => {
+          commitElapsed = performance.now() - started;
+        });
+        // Keep reads arriving for as long as the commit is open. Every step of
+        // either side is synchronous SQLite work between promise turns, so a
+        // steady stream is what puts a read in the middle of its statement when
+        // the commit reaches COMMIT.
+        while (commitElapsed === undefined) {
+          settled.push(...reads());
+          for (let turn = 0; turn < TURNS_BETWEEN_READS; turn += 1) await Promise.resolve();
+        }
+        const results = await Promise.allSettled([committed, ...settled]);
+
+        expect(results.filter(({ status }) => status === 'rejected')).toEqual([]);
+        expect(results[0]).toMatchObject({ status: 'fulfilled', value: { kind: 'committed' } });
+        expect(commitElapsed).toBeLessThan(WELL_UNDER_BUSY_TIMEOUT_MS);
+        await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({ revision: 1n });
+      });
+    }
+  }
 
   it('still shows the established aggregate after close and reopen against the same file', async () => {
     const harness = await opened();

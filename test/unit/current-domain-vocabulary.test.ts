@@ -769,8 +769,8 @@ const isAuthoredSource = (file: string): boolean =>
   (!file.includes('/') && file.endsWith('.ts'));
 
 /**
- * The five modules that are pnpm's vocabulary rather than ours: the alias
- * table, the two Vite configs that import it, and the toolchain check that
+ * The modules that are pnpm's vocabulary rather than ours: the alias
+ * table, the Vite configs that import it, and the toolchain check that
  * reads the package list plus its test. Composed from the fragment above for
  * the same reason every retired name in this file is — written out, this file
  * would hold the word it bans, and it is scanned now that `test/` is in scope.
@@ -778,6 +778,7 @@ const isAuthoredSource = (file: string): boolean =>
 const MONOREPO_VOCABULARY: readonly string[] = [
   `packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`,
   'packages/app/vite.config.ts',
+  'packages/app/vite.sqlite.config.ts',
   'packages/app/http-server-build.config.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',
