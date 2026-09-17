@@ -305,10 +305,11 @@ export const parityClaims: readonly ParityClaim[] = [
    * claim below states one obligation in the Dock's own words, so a reader
    * comparing them to the old set reads two surfaces rather than one renamed.
    *
-   * **Two obligations left rather than moved.** A Thing's Copy link, Copy
-   * permanent link and Delete belong to the Thing rail (ADR 0073) and not to
-   * this surface — the Dock's organising rule is that a Thing's own commands are
-   * absent — so `space-sidebar-copies-thing-destinations` and
+   * **Two obligations left rather than moved.** A Thing's Copy link to Thing
+   * in Diagram, Copy link to Thing and Delete from Space belong to the Thing
+   * rail (ADR 0073) and not to this surface — the Dock's organising rule is
+   * that a Thing's own commands are absent — so
+   * `space-sidebar-copies-thing-destinations` and
    * `space-sidebar-entity-actions-menu` have no successor here. They keep their
    * browser evidence in `space-routing.spec.ts` and `link-actions.spec.ts`
    * untagged, and they gain a claim of their own when the rail's story sheet
@@ -642,7 +643,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      "Space Thing Diagram and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link and Delete, grouped and separated the same way — without navigating the containing Space.",
+      "Space Thing Diagram and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link to Diagram or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
   },
   {
     id: 'open-space-thing-chooses-its-context-on-the-shared-controls',

@@ -87,9 +87,9 @@ export interface GraphMenuActionsProps extends Omit<DiagramMenuActionsProps, 'cr
  * The same grouping grammar as {@link DiagramMenuActions}, with one group
  * ahead of it: Colour… stands alone immediately after the selection list,
  * because it is the one command a Graph carries that a Diagram does not.
- * "Copy permanent link" is gone — the Graph's own address is no longer
- * offered from this menu, only the within-Diagram one Copy link to Graph has
- * always copied (`.scratch/dock-menu-reorganisation/issues/01`).
+ * Copy link to Graph copies the within-Diagram address; this menu offers no
+ * separate permanent address for the Graph itself
+ * (`.scratch/dock-menu-reorganisation/issues/01`).
  */
 export function GraphMenuActions({
   title,

@@ -837,7 +837,7 @@ const SPENT: readonly {
   {
     name: 'copy',
     icon: 'CopyIcon',
-    means: 'Copy link and Copy permanent link',
+    means: 'Copy link, including a Thing’s within-Diagram and permanent forms',
     rulesOut: 'any two-overlapping-sheets Reference Thing — copy itself, and files is close',
   },
   { name: 'link', icon: 'LinkActionsIcon', means: 'the link actions control', rulesOut: 'link-2' },

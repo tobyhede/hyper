@@ -150,6 +150,15 @@ export async function exerciseSpaceThingEntityMenu(page: Page, thing: Locator): 
   await title.press('Enter');
   await expect(thingNode.getByRole('heading', { name: 'Space Thing', exact: true })).toBeVisible();
   await menu();
+  // No Delete from Space here: `thingNode` is Open — both callers reach it
+  // through `openSpaceThingOnItsDiagram`, which presses Enter on it so its
+  // Diagram and Graph menus have something to exercise — and Delete from
+  // Space is withdrawn while any Thing on the Diagram is Open
+  // (`authoring-availability.ts`'s `deleteThing`), so that Open state cannot
+  // outlive the Thing it names. Delete from Space's presence and effect on a
+  // closed Space Thing are covered by `space-thing.spec.ts`'s "deleting the
+  // last Space Thing deletes the Space it referenced" and "removing a Space
+  // Thing from the Diagram leaves the Thing and its target Space intact".
   await expect(page.getByRole('menuitem')).toHaveText([
     'Create Reference',
     'Enter',

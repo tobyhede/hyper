@@ -1144,9 +1144,8 @@ export const createApp = (
             : []),
         ];
         if (thing.kind === 'space') {
-          // No Rename: the Title still edits in place on the Thing front, and
-          // this menu neither renames the Thing nor the target Space
-          // (`.scratch/dock-menu-reorganisation/issues/04`).
+          // The Title edits in place on the Thing front; this menu authors
+          // neither the Thing's name nor the target Space's.
           const links = addresses.flat();
           const enter: EntityActionGroup =
             spaces === null
@@ -1166,9 +1165,10 @@ export const createApp = (
             reference.flat(),
             [...enter, ...links.filter((action) => action.id === 'open-independently')],
             links.filter((action) => action.id !== 'open-independently'),
-            leaving.filter(
-              (action) => action.id === 'remove-from-diagram' || action.id === 'delete-thing',
-            ),
+            // `leaving` already holds only `remove-from-diagram` and
+            // `delete-thing`, whichever of the two is available, so it is
+            // passed through rather than filtered a second time.
+            leaving,
           ];
         }
         // Create Reference leads (`.scratch/dock-menu-reorganisation/issues/03`):

@@ -474,8 +474,7 @@ export interface DockGraph {
    * what is on screen, so a recipient lands where the sender was.
    *
    * A Diagram **owns** its Graphs (ADR 0040) and a Graph also has its own
-   * permanent address, but the Graph menu offers only this one address now:
-   * "Copy permanent link" is gone from it
+   * permanent address, but the Graph menu offers only this one
    * (`.scratch/dock-menu-reorganisation/issues/01`).
    */
   readonly onCopyLink: () => void;
@@ -1601,10 +1600,9 @@ function ThingsControl({
  * **Exit is the one command the Open Spaces menu made necessary.** While pressing an
  * ancestor was Exit, leaving and closing were the same gesture and neither
  * needed a name; now that moving closes nothing, the open set only grows unless
- * something takes from it. It sits in its own trailing group for the reason
- * Delete does on the other two menus — the commands above it make something and
- * this one takes something away — and it is disabled on the meta Space, which
- * cannot be exited.
+ * something takes from it. It sits in its own trailing group, separated by a
+ * rule — the same position Delete holds on the Diagram and Graph menus — and
+ * it is disabled on the meta Space, which cannot be exited.
  *
  * **It is `openSpaces.exit`'s rules and not this module's.** `CONTEXT.md`'s Exit
  * — wait on an in-flight commit, refuse for `failed` and `conflicted` naming the
@@ -1646,14 +1644,14 @@ function SpaceMenu({
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          {/* Its own trailing group, like Delete on the Diagram and Graph
-              menus: the commands above make something, this one takes
-              something away. It is **not** destructive though, and does not
-              draw as it — exiting a Space discards a session's place in it,
-              not the Space, and re-entering costs one press on a Thing. Meta
-              cannot be exited, so there the row is present and unavailable
-              rather than gone — and that is the *only* case, which
-              `exitDisabled` is named for and `space.parent` was not.
+          {/* Its own trailing group, separated by a rule — the same position
+              Delete holds on the Diagram and Graph menus. It is **not**
+              destructive though, and does not draw as it — exiting a Space
+              discards a session's place in it, not the Space, and
+              re-entering costs one press on a Thing. Meta cannot be exited,
+              so there the row is present and unavailable rather than gone —
+              and that is the *only* case, which `exitDisabled` is named for
+              and `space.parent` was not.
 
               **Exit, because the glossary says Exit.** `CONTEXT.md` gives the
               word to the one action that closes an entered Space, and

@@ -284,10 +284,8 @@ export function spaceEntityActions({
 
     if (entity.kind === 'graph') {
       // A Diagram **owns** its Graphs (ADR 0040), so a Graph row always has a
-      // within-Diagram address. A Graph's own permanent address is no longer
-      // offered here — the Graph menu dropped it
-      // (`.scratch/dock-menu-reorganisation/issues/01`), and nothing else asks
-      // for it by id.
+      // within-Diagram address, which is the only address this menu offers
+      // (`.scratch/dock-menu-reorganisation/issues/01`).
       const { graph, diagram } = entity;
       return [
         renameAction({ kind: 'graph', id: graph.id }, graph.title),
@@ -326,10 +324,11 @@ export function spaceEntityActions({
     /**
      * The Space this Thing shows, at that Space's own address.
      *
-     * Copy link / Copy permanent link still name the Thing. Independently
-     * opening the target is a third destination: no containing Diagram, no
-     * presentation, and not this Space (ADR 0068, ADR 0069). Offered only on a
-     * Space Thing — a Markdown Thing has no target Space to address.
+     * Copy link to Thing in Diagram and Copy link to Thing still name the
+     * Thing. Independently opening the target is a third destination: no
+     * containing Diagram, no presentation, and not this Space (ADR 0068, ADR
+     * 0069). Offered only on a Space Thing — a Markdown Thing has no target
+     * Space to address.
      */
     const targetSpaceAddress: readonly EntityAction[] =
       thing.kind !== 'space'
