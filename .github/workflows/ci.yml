@@ -273,6 +273,29 @@ jobs:
       - name: Verify live database contract
         run: pnpm exec prisma-next db verify --config prisma-next.config.sqlite.ts
 
+      # No `--with-deps`, for the reason the `postgres` job's own Chromium
+      # install step records: on `ubuntu-latest` it finds every shared library
+      # already present and would only fetch font packages neither proof's
+      # screenshot-free run can see.
+      - name: Install Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Prove a SQLite edit survives a fresh host
+        run: pnpm e2e:sqlite
+
+      # Its own artifact name, for the reason the `e2e` job below records:
+      # `upload-artifact` refuses a second upload under a name already claimed in
+      # the same run, and this job's proof can fail in the same run as the
+      # `postgres` job's.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-sqlite
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
       - name: Remove the SQLite directory
         if: always() && steps.sqlite-env.outcome == 'success'
         run: rm -rf "$SQLITE_DIR"
