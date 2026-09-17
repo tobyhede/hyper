@@ -258,8 +258,8 @@ describe('the story Spaces', () => {
       (thing) => diagram?.positions[thing.id] === undefined,
     );
 
-    expect(kinds(placed)).toEqual(['alias', 'markdown', 'space']);
-    expect(kinds(unplaced)).toEqual(['alias', 'markdown', 'space']);
+    expect(kinds(placed)).toEqual(['markdown', 'reference', 'space']);
+    expect(kinds(unplaced)).toEqual(['markdown', 'reference', 'space']);
   });
 
   /**

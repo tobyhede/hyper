@@ -37,7 +37,7 @@ The fixture's shape exists to exercise the behaviours the e2e suite covers:
   Thing declares four shared anchors, one on each side — graph-independent
   (ADR 0087) — so overlapping Graphs stay told apart by colour.
 - **Independent collections.** Two bands, no Edge between them.
-- **Aliases on a Graph (ADR 0009).** An Alias shows its Target's content under
+- **Reference Things on a Graph (ADR 0009).** A Reference Thing shows its Target's content under
   its own Title at a distinct position, keeping the fixture acyclic. Graphs
   themselves may contain cycles.
 - **Open shows source (ADR 0011).** A body carries a Markdown marker so opening

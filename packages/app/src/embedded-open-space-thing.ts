@@ -117,7 +117,7 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
     if (parent.data.expanded !== true) continue;
     const document = parent.data.spaceContent;
     if (document === undefined) continue;
-    const readOnly = item.readOnly || parent.data.kind === 'alias';
+    const readOnly = item.readOnly || parent.data.kind === 'reference';
     const crossing = `${document.spaceId}:${document.diagram}`;
     if (path.has(crossing)) continue;
     const crossed = new Set(path).add(crossing);

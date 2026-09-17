@@ -76,12 +76,12 @@ export const markdownThingFrontmatterSchema = z.object({
   kind: z.literal('markdown'),
 });
 
-/** The frontmatter of an alias thing file — a pointer to the thing whose content it shows. */
-export const aliasThingFrontmatterSchema = z.object({
+/** The frontmatter of a reference thing file — a pointer to the thing whose content it shows. */
+export const referenceThingFrontmatterSchema = z.object({
   id: idSchema,
   title: thingTitleSchema,
-  kind: z.literal('alias'),
-  /** The id of the thing this alias shows. Referential checks live in `@project/graph`. */
+  kind: z.literal('reference'),
+  /** The id of the thing this reference shows. Referential checks live in `@project/graph`. */
   target: idSchema,
 });
 
@@ -139,7 +139,7 @@ export const thingFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
     markdownThingFrontmatterSchema,
-    aliasThingFrontmatterSchema,
+    referenceThingFrontmatterSchema,
     spaceThingFrontmatterSchema,
   ]),
 );
@@ -147,7 +147,7 @@ export const thingFrontmatterSchema = z.preprocess(
 export const importMarkdownThingFrontmatterSchema = markdownThingFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importAliasThingFrontmatterSchema = aliasThingFrontmatterSchema.extend({
+export const importReferenceThingFrontmatterSchema = referenceThingFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
 export const importSpaceThingFrontmatterSchema = spaceThingFrontmatterSchema.extend({
@@ -157,7 +157,7 @@ export const importThingFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
     importMarkdownThingFrontmatterSchema,
-    importAliasThingFrontmatterSchema,
+    importReferenceThingFrontmatterSchema,
     importSpaceThingFrontmatterSchema,
   ]),
 );
@@ -166,20 +166,20 @@ export const importThingFrontmatterSchema = z.preprocess(
 export const markdownThingSchema = markdownThingFrontmatterSchema.extend({ body: z.string() });
 
 /** A thing that shows its target's content at a second position (ADR 0009). */
-export const aliasThingSchema = aliasThingFrontmatterSchema;
+export const referenceThingSchema = referenceThingFrontmatterSchema;
 
 /** A thing that embeds one selected view of another Space (ADR 0068). */
 export const spaceThingSchema = spaceThingFrontmatterSchema;
 
 /**
  * A thing parsed from its file (ADR 0020). A markdown thing carries the file body
- * that stores its content; an alias carries only the pointer to its target's
+ * that stores its content; a reference thing carries only the pointer to its target's
  * content (ADR 0009). No default for `kind` here — by the time a thing exists
  * its frontmatter has been parsed, and that is where the default was applied.
  */
 export const thingSchema = z.discriminatedUnion('kind', [
   markdownThingSchema,
-  aliasThingSchema,
+  referenceThingSchema,
   spaceThingSchema,
 ]);
 
@@ -372,11 +372,11 @@ export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
 /** The JSONB document stored beside a thing's relational UUID. */
 export const markdownThingDocumentSchema = markdownThingSchema.omit({ id: true });
-export const aliasThingDocumentSchema = aliasThingSchema.omit({ id: true });
+export const referenceThingDocumentSchema = referenceThingSchema.omit({ id: true });
 export const spaceThingDocumentSchema = spaceThingSchema.omit({ id: true });
 export const thingDocumentSchema = z.discriminatedUnion('kind', [
   markdownThingDocumentSchema,
-  aliasThingDocumentSchema,
+  referenceThingDocumentSchema,
   spaceThingDocumentSchema,
 ]);
 

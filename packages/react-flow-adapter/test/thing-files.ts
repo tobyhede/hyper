@@ -16,9 +16,9 @@ function defaultTitle(id: string): string {
   return DEFAULT_TITLES.get(id) ?? id.toUpperCase();
 }
 
-export function aliasFile(id: string, title: string, target: string): ThingFile {
+export function referenceFile(id: string, title: string, target: string): ThingFile {
   return {
     path: `things/${id}.md`,
-    text: `---\nid: ${id}\ntitle: ${title}\nkind: alias\ntarget: ${target}\n---\n`,
+    text: `---\nid: ${id}\ntitle: ${title}\nkind: reference\ntarget: ${target}\n---\n`,
   };
 }

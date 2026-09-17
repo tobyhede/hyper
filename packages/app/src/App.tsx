@@ -101,17 +101,17 @@ const noOpenSpaces = (): OpenSpacesState => NO_OPEN_SPACES;
 const noOpenSpacesChanges = (): (() => void) => () => undefined;
 
 /**
- * How far a new Alias steps from the Thing it was created from, as a fraction of
+ * How far a new Reference Thing steps from the Thing it was created from, as a fraction of
  * its collapsed size on both axes, plus any room its Open Target holds.
  *
  * Overlap is authored rather than avoided — a free-position search is a placement
  * algorithm, and ADR 0086 keeps those behind an Edit — so this is deliberately
  * less than a whole step. It is more than half a step because at exactly half the
- * new Alias's centre lands on the Target's bottom-right corner, and the Target
+ * new Reference Thing's centre lands on the Target's bottom-right corner, and the Target
  * takes the pointer there: three quarters leaves a quarter-Thing corner of
  * overlap and a centre the author can reach.
  */
-const ALIAS_OFFSET_RATIO = 0.75;
+const REFERENCE_OFFSET_RATIO = 0.75;
 
 export const createApp = (
   { app: composition, session: spaceSession, spaceThings }: OpenSpace,
@@ -309,7 +309,7 @@ export const createApp = (
      * Where a Thing created from a control rather than a pointer goes.
      *
      * Read at the gesture, never captured earlier: an author who pans between
-     * opening the Alias picker and choosing a Target is looking somewhere else
+     * opening the Reference Thing picker and choosing a Target is looking somewhere else
      * by the time the Thing is placed, and the whole point of the visible centre
      * is that it is where they are looking now.
      */
@@ -474,16 +474,16 @@ export const createApp = (
     const [spaceThingRefusal, setSpaceThingRefusal] = useState<string | null>(null);
 
     /**
-     * The Alias creation that refused, said in one sentence.
+     * The Reference Thing creation that refused, said in one sentence.
      *
      * **Beside `spaceThingRefusal`, for the reason that one exists.** Create
-     * Alias completes on activation and closes the menu it was pressed in
+     * Reference Thing completes on activation and closes the menu it was pressed in
      * (ADR 0089), so it has no field and no row of its own to hold a failure
      * against — the surface that owns the command is the Space chrome, and this
      * is its channel. The rows that can refuse by kind are drawn unavailable, so
      * what lands here is a Target that went between the draw and the press.
      */
-    const [aliasRefusal, setAliasRefusal] = useState<string | null>(null);
+    const [referenceRefusal, setReferenceRefusal] = useState<string | null>(null);
 
     const [creatingSpaceThing, setCreatingSpaceThing] = useState(false);
 
@@ -587,7 +587,7 @@ export const createApp = (
       thingsDrag.current = null;
     }, [selectedDiagramId, presenting, authoringState.replacementEpoch]);
     // There is a Thing to go back to only once a traversal has left its first, and only
-    // presenting has Traversal history at all — the same narrowing the alias above already
+    // presenting has Traversal history at all — the same narrowing the reference above already
     // makes, spent here on the value behind it rather than on the mode.
     const selectBranch = navigation.selectBranch;
     const activeThingId = navigation.activeThingId();
@@ -679,7 +679,7 @@ export const createApp = (
     // A withdrawn list takes its outstanding request with it. Closing is the
     // Dock's, from the same `disabled` answer that withdraws the trigger; what
     // has to be dropped here is a request that would otherwise reopen the list
-    // the moment authoring came back — presenting and creating an Alias both
+    // the moment authoring came back — presenting and creating a Reference Thing both
     // pass through here, and a list that reopened itself on the way back would
     // take focus with it, landing the reader in the Things rather than on the
     // canvas they returned to.
@@ -954,34 +954,34 @@ export const createApp = (
      * addresses exist is decided from the Diagram by the builder above.
      */
     /**
-     * Create Alias, from the Thing it points at (ADR 0089).
+     * Create Reference, from the Thing it points at (ADR 0089).
      *
      * **The gesture supplies the Target, so nothing is chosen first.** An author
-     * creating an Alias is looking at the Thing they want to alias, which is why
+     * creating a Reference Thing is looking at the Thing they want to reference, which is why
      * this is a row on that Thing's own command menu rather than a peer in the
      * Dock — a Target picker was answering a question the press had already
      * answered.
      *
      * **The Title is the Target's, copied once** and independent thereafter.
      * ADR 0083 keeps the Target's name off the Thing front, so without this the
-     * author has no on-canvas indication of what the Alias points at beyond the
+     * author has no on-canvas indication of what the Reference Thing points at beyond the
      * dotted border; copying it once keeps the two the ordinary two stored
      * values that agree at creation and diverge freely, which is the rule the
      * Space and Space Thing pair already follows. Titles need not be unique.
      *
-     * **Placement is a fixed offset from the source**, so the Alias lands where
+     * **Placement is a fixed offset from the source**, so the Reference Thing lands where
      * the author is looking. A free-position search would be a placement
      * algorithm, and ADR 0086 put automatic arrangement behind an Edit and out
      * of the render path deliberately — the overlap is authored and the author
      * drags it off. A Thing this Diagram does not place has no offset to take,
-     * so its Alias lands at the visible centre like any other creation.
+     * so its Reference Thing lands at the visible centre like any other creation.
      *
      * **The offset leaves a fixed corner overlap before and after Close.**
      * An Open Target holds room that Close reclaims from every Thing beyond it
-     * (ADR 0084), including this new Alias. Add that growth to the collapsed
-     * offset so reclaiming it leaves the Alias's centre clear of the Target.
+     * (ADR 0084), including this new Reference Thing. Add that growth to the collapsed
+     * offset so reclaiming it leaves the Reference Thing's centre clear of the Target.
      */
-    const createAliasFrom = useCallback(
+    const createReferenceFrom = useCallback(
       (thing: Thing): EntityActionOutcome => {
         const at = selectedDiagram.diagram.positions[thing.id];
         const growth = at?.open === true ? Placement.growth(at.openSize) : { width: 0, height: 0 };
@@ -989,11 +989,11 @@ export const createApp = (
           at === undefined
             ? centreAnchor()
             : {
-                x: at.x + growth.width + Math.round(THING_WIDTH * ALIAS_OFFSET_RATIO),
-                y: at.y + growth.height + Math.round(THING_HEIGHT * ALIAS_OFFSET_RATIO),
+                x: at.x + growth.width + Math.round(THING_WIDTH * REFERENCE_OFFSET_RATIO),
+                y: at.y + growth.height + Math.round(THING_HEIGHT * REFERENCE_OFFSET_RATIO),
               };
         const created = authoring.complete({
-          kind: 'created-alias',
+          kind: 'created-reference',
           target: thing.id,
           title: thing.title,
           anchor,
@@ -1008,10 +1008,10 @@ export const createApp = (
         // above, so what reaches here is a Target that went between the draw and
         // the press — which is why it is worth a sentence rather than silence.
         if (created.kind === 'refused') {
-          setAliasRefusal(describeAuthoringRefusal(created.refusal));
+          setReferenceRefusal(describeAuthoringRefusal(created.refusal));
           return 'failed';
         }
-        setAliasRefusal(null);
+        setReferenceRefusal(null);
         if (created.kind === 'queued') return 'done';
         if (created.kind === 'unchanged') return 'done';
         if (created.createdThingId === undefined) return 'done';
@@ -1051,23 +1051,24 @@ export const createApp = (
         // longer has. No commands rather than commands that name nothing.
         if (thing === undefined) return [];
         const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
-        const terminal = thing.kind === 'alias' ? 'An Alias cannot be aliased.' : null;
-        const alias: readonly EntityActionGroup[] = availability.addThing
+        const terminal =
+          thing.kind === 'reference' ? 'A Reference Thing cannot be referenced.' : null;
+        const reference: readonly EntityActionGroup[] = availability.addThing
           ? [
               [
                 {
-                  id: 'create-alias',
-                  // "Create Alias", matching the vocabulary the other creations
-                  // use. `Create Alias of <title>` is the shape `Delete Thing`
+                  id: 'create-reference',
+                  // "Create Reference", matching the vocabulary the other creations
+                  // use. `Create Reference of <title>` is the shape `Delete Thing`
                   // already rejected, the menu being named for its Thing.
-                  label: 'Create Alias',
+                  label: 'Create Reference',
                   disabled: terminal !== null,
                   description: terminal ?? undefined,
-                  icon: <ThingKindIcon kind="alias" decorative />,
+                  icon: <ThingKindIcon kind="reference" decorative />,
                   // **No `report`, and that is what closes the menu.** A
                   // reporting item is held open to show its word
                   // (`EntityActionsMenu`), and this command puts the caret in
-                  // the new Alias's Title editor on the canvas — so the menu it
+                  // the new Reference Thing's Title editor on the canvas — so the menu it
                   // was pressed in stayed up with its Base UI backdrop
                   // intercepting every pointer event, over an editor the author
                   // could not click into. The creation says itself: a Thing
@@ -1075,7 +1076,7 @@ export const createApp = (
                   // report in a menu that has gone, so it takes the standing
                   // notice below, which is where ADR 0089 puts the outcome of a
                   // creation that completes on activation.
-                  onSelect: () => createAliasFrom(thing),
+                  onSelect: () => createReferenceFrom(thing),
                 },
               ],
             ]
@@ -1176,7 +1177,7 @@ export const createApp = (
                   },
                 ];
           return [
-            [...rename, ...alias.flat()],
+            [...rename, ...reference.flat()],
             [...enter, ...links.filter((action) => action.id === 'open-independently')],
             links.filter((action) => action.id !== 'open-independently'),
             leaving.filter(
@@ -1184,7 +1185,7 @@ export const createApp = (
             ),
           ];
         }
-        return [...addresses, ...alias, ...(leaving.length > 0 ? [leaving] : [])];
+        return [...addresses, ...reference, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
         renderedSpace,
@@ -1194,7 +1195,7 @@ export const createApp = (
         availability.authorOnCanvas,
         availability.deleteThing,
         editingThingBody,
-        createAliasFrom,
+        createReferenceFrom,
         spaces,
         enterSpaceThing,
       ],
@@ -1297,7 +1298,7 @@ export const createApp = (
      * **This is the one operation whose refusal no surface shows, and that is a
      * decision rather than an oversight.** A refusal carries a sentence for the
      * author (ADR 0042), which is worth showing exactly where the author can act
-     * on it. Every other creation has somewhere: `createAliasFrom` and
+     * on it. Every other creation has somewhere: `createReferenceFrom` and
      * `createSpaceThing` both complete on activation and both close or leave the
      * surface that ran them, so each reports through a standing notice on the
      * Space chrome. Add Thing takes no input at all, cannot refuse against a
@@ -1826,15 +1827,15 @@ export const createApp = (
                 {spaceThingRefusal}
               </ShellNotice>
             )}
-            {aliasRefusal === null ? null : (
+            {referenceRefusal === null ? null : (
               <ShellNotice
                 /* It names what was not made. The menu the command was pressed
                    in has closed by the time this can be shown, so this is the
                    only place the author learns the press did nothing. */
-                title="Alias not created"
-                onDismiss={() => setAliasRefusal(null)}
+                title="Reference Thing not created"
+                onDismiss={() => setReferenceRefusal(null)}
               >
-                {aliasRefusal}
+                {referenceRefusal}
               </ShellNotice>
             )}
             {spaceCommandBreak === null ? null : (

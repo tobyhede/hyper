@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { ZodIssue, ZodType, ZodTypeDef } from 'zod';
 import {
   THING_TITLE_REQUIRED,
-  aliasThingFrontmatterSchema,
+  referenceThingFrontmatterSchema,
   thingDocumentSchema,
   thingFrontmatterSchema,
   thingSchema,
   graphSchema,
-  importAliasThingFrontmatterSchema,
+  importReferenceThingFrontmatterSchema,
   importThingFrontmatterSchema,
   importMarkdownThingFrontmatterSchema,
   importSpaceThingFrontmatterSchema,
@@ -45,10 +45,10 @@ const markdownFrontmatter = (title: string) => ({
   kind: 'markdown',
   body: '',
 });
-const aliasFrontmatter = (title: string) => ({
+const referenceFrontmatter = (title: string) => ({
   id: THING_ID,
   title,
-  kind: 'alias',
+  kind: 'reference',
   target: TARGET_ID,
 });
 const spaceFrontmatter = (title: string) => ({
@@ -71,7 +71,11 @@ const kindSchemas: readonly {
     schema: markdownThingFrontmatterSchema,
     frontmatter: markdownFrontmatter,
   },
-  { label: 'alias thing', schema: aliasThingFrontmatterSchema, frontmatter: aliasFrontmatter },
+  {
+    label: 'reference thing',
+    schema: referenceThingFrontmatterSchema,
+    frontmatter: referenceFrontmatter,
+  },
   { label: 'space thing', schema: spaceThingFrontmatterSchema, frontmatter: spaceFrontmatter },
   {
     label: 'imported markdown thing',
@@ -79,9 +83,9 @@ const kindSchemas: readonly {
     frontmatter: markdownFrontmatter,
   },
   {
-    label: 'imported alias thing',
-    schema: importAliasThingFrontmatterSchema,
-    frontmatter: aliasFrontmatter,
+    label: 'imported reference thing',
+    schema: importReferenceThingFrontmatterSchema,
+    frontmatter: referenceFrontmatter,
   },
   {
     label: 'imported space thing',
@@ -119,7 +123,7 @@ const titleCases = (
     value: frontmatter(title),
   })),
   ...unionSchemas.flatMap(({ label, schema }) =>
-    [markdownFrontmatter, aliasFrontmatter, spaceFrontmatter].map((frontmatter) => ({
+    [markdownFrontmatter, referenceFrontmatter, spaceFrontmatter].map((frontmatter) => ({
       label,
       schema,
       value: frontmatter(title),

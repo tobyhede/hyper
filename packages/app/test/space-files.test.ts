@@ -158,7 +158,7 @@ describe.each([
     const result = loadSpace(json, thingFiles(name));
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.things).toHaveLength(expected.things);
-    // An alias shows its target's content, so it has no body of its own (ADR
+    // A reference thing shows its target's content, so it has no body of its own (ADR
     // 0009); every markdown thing carries one.
     for (const thing of result.space.things) {
       if (thing.kind !== 'markdown') expect('body' in thing).toBe(false);

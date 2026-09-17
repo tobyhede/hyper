@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const openCloseStory = '/?story=components--thing--open-and-close&mode=preview';
 const markdownStory = '/?story=components--thing--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--thing--resize-control&mode=preview';
-const openAliasStory = '/?story=components--thing--open-alias&mode=preview';
+const openReferenceStory = '/?story=components--thing--open-reference&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);
@@ -13,27 +13,28 @@ const open = async (page: Page, story: string): Promise<void> => {
 };
 
 test(
-  'Open Alias story renders Target Markdown read-only under the Alias Title',
-  { tag: '@parity:open-alias-shows-target-markdown-read-only' },
+  'Open Reference Thing story renders Target Markdown read-only under the Reference Thing Title',
+  { tag: '@parity:open-reference-shows-target-markdown-read-only' },
   async ({ page }) => {
-    await page.goto(openAliasStory);
-    const alias = page.getByRole('article', { name: 'Strategy overview' });
-    await expect(alias.getByRole('heading', { name: 'Strategy overview' })).toBeVisible();
+    await page.goto(openReferenceStory);
+    const reference = page.getByRole('article', { name: 'Strategy overview' });
+    await expect(reference.getByRole('heading', { name: 'Strategy overview' })).toBeVisible();
     // Exact, both of them. The Target's source has to reach the renderer as real
     // Markdown: a body carrying literal escapes draws one run-on heading that a
     // substring match still finds, which is the claim passing on the wrong page.
-    await expect(alias.getByRole('heading', { name: 'Strategies', exact: true })).toBeVisible();
-    await expect(alias.getByText('No strategy is privileged.', { exact: true })).toBeVisible();
-    await expect(alias.getByRole('textbox')).toHaveCount(0);
-    await expect(alias.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
+    await expect(reference.getByRole('heading', { name: 'Strategies', exact: true })).toBeVisible();
+    await expect(reference.getByText('No strategy is privileged.', { exact: true })).toBeVisible();
+    await expect(reference.getByRole('textbox')).toHaveCount(0);
+    await expect(reference.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
     await expect(
-      alias.getByRole('button', { name: 'Close Thing Strategy overview' }),
+      reference.getByRole('button', { name: 'Close Thing Strategy overview' }),
     ).toBeVisible();
-    // The Target's content is the Open Thing's top passenger and the Alias Title
+    // The Target's content is the Open Thing's top passenger and the Reference Thing Title
     // its bottom one, the same treatment an Open Markdown Thing draws (ADR 0070).
-    const contentBox = await alias.locator('.canvas-thing__content').boundingBox();
-    const titleBox = await alias.locator('.canvas-thing__body').boundingBox();
-    if (contentBox === null || titleBox === null) throw new Error('Open Alias drew no content');
+    const contentBox = await reference.locator('.canvas-thing__content').boundingBox();
+    const titleBox = await reference.locator('.canvas-thing__body').boundingBox();
+    if (contentBox === null || titleBox === null)
+      throw new Error('Open Reference Thing drew no content');
     expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(titleBox.y + 1);
   },
 );

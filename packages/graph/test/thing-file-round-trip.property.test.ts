@@ -48,7 +48,7 @@ const thingArb: fc.Arbitrary<Thing> = fc.oneof(
   fc.record({
     id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: line,
-    kind: fc.constant('alias' as const),
+    kind: fc.constant('reference' as const),
     target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   }),
   // Every field of a Space Thing is always written, its selection included: a

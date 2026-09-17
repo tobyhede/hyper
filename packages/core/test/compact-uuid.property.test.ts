@@ -42,14 +42,14 @@ describe('compact UUID route codec', () => {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
     fc.assert(
-      fc.property(uuid, fc.integer({ min: 1, max: 15 }), (id, aliasBits) => {
+      fc.property(uuid, fc.integer({ min: 1, max: 15 }), (id, referenceBits) => {
         const encoded = encodeCompactUuid(id);
         const final = encoded.at(-1);
         if (final === undefined) throw new Error('A compact UUID has no final digit');
         const canonicalIndex = alphabet.indexOf(final);
-        const alias = `${encoded.slice(0, -1)}${alphabet[(canonicalIndex & 0b110000) | aliasBits]}`;
+        const reference = `${encoded.slice(0, -1)}${alphabet[(canonicalIndex & 0b110000) | referenceBits]}`;
 
-        expect(decodeCompactUuid(alias)).toBeUndefined();
+        expect(decodeCompactUuid(reference)).toBeUndefined();
       }),
     );
   });

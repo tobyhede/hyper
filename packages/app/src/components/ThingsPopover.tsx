@@ -14,7 +14,7 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
-  AliasIcon,
+  ReferenceIcon,
   ThingKindIcon,
   InputGroup,
   InputGroupAddon,
@@ -68,7 +68,7 @@ const everyFilter = <const T extends readonly ThingsFilter[]>(
   filters: T & (ThingsFilter extends T[number] ? unknown : never),
 ): T => filters;
 
-const FILTERS = everyFilter(['markdown', 'alias', 'space', 'spaces']);
+const FILTERS = everyFilter(['markdown', 'reference', 'space', 'spaces']);
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas
@@ -86,7 +86,7 @@ export interface ThingsPopoverSpace {
 
 const FILTER_NAMES = {
   markdown: 'Markdown Things',
-  alias: 'Aliases',
+  reference: 'Reference Things',
   space: 'Space Things in this Space',
   spaces: 'Spaces in this Meta Space',
 } as const satisfies Record<ThingsFilter, string>;
@@ -99,7 +99,7 @@ const FILTER_NAMES = {
  */
 const FILTER_GLYPHS = {
   markdown: MarkdownIcon,
-  alias: AliasIcon,
+  reference: ReferenceIcon,
   space: SpaceThingIcon,
   spaces: ParentIcon,
 } satisfies Record<ThingsFilter, ComponentType>;
@@ -162,8 +162,8 @@ export interface ThingsPopoverProps {
   /**
    * The Title of every Space a Space Thing in this list references.
    *
-   * Supplied rather than derived, for the reason the Alias titles beside it are
-   * derived: an Alias's Target is a Thing of *this* Space and `allThings` holds
+   * Supplied rather than derived, for the reason the Reference Thing titles beside it are
+   * derived: a Reference Thing's Target is a Thing of *this* Space and `allThings` holds
    * it, while a Space Thing's target is a different Space this surface cannot
    * read. A Space missing from the map is one the composition has not read yet.
    */
@@ -200,9 +200,9 @@ export interface ThingsPopoverProps {
  */
 const FilterToggle = ToggleGroupItem<ThingsFilter>;
 
-/** An Alias's Target title, `''` for the intake-guaranteed-unreachable case a Target does not resolve — the same convention `ThingNode` draws (ADR 0009). */
+/** A Reference Thing's Target title, `''` for the intake-guaranteed-unreachable case a Target does not resolve — the same convention `ThingNode` draws (ADR 0009). */
 const targetTitle = (thing: Thing, titleById: ReadonlyMap<ThingId, string>): string =>
-  thing.kind === 'alias' ? (titleById.get(thing.target) ?? '') : '';
+  thing.kind === 'reference' ? (titleById.get(thing.target) ?? '') : '';
 
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ThingsPopoverSpace[] = [];
@@ -223,7 +223,7 @@ const searchableText = (
   titleById: ReadonlyMap<ThingId, string>,
   spaceTitleById: ReadonlyMap<UUID, string>,
 ): string => {
-  if (thing.kind === 'alias') return `${thing.title} ${targetTitle(thing, titleById)}`;
+  if (thing.kind === 'reference') return `${thing.title} ${targetTitle(thing, titleById)}`;
   if (thing.kind === 'space') return `${thing.title} ${spaceTitleById.get(thing.spaceId) ?? ''}`;
   return thing.title;
 };
@@ -436,7 +436,7 @@ export function ThingsPopover({
       ).length;
     return {
       markdown: ofKind('markdown'),
-      alias: ofKind('alias'),
+      reference: ofKind('reference'),
       space: ofKind('space'),
       spaces: spaces.filter((space) => matched(space.title)).length,
     } satisfies Record<ThingsFilter, number>;

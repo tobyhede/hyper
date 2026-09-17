@@ -9,11 +9,11 @@ export type VisibleCentre = () => DiagramPosition;
 /**
  * Reports where the middle of the visible canvas currently is.
  *
- * Add Thing and Add Alias place at the centre of what the author is looking at,
+ * Add Thing and Add Reference Thing place at the centre of what the author is looking at,
  * and neither is invoked from inside the flow: one is a toolbar control and the
  * other a pane over the graph. So the answer has to be *readable* from outside,
  * and it has to be read at the moment of the gesture rather than at any earlier
- * render — an author who panned after opening the Alias picker is looking
+ * render — an author who panned after opening the Reference Thing picker is looking
  * somewhere else by the time they choose a Target.
  *
  * Hence a getter handed upwards rather than a value: this component subscribes
@@ -58,7 +58,7 @@ export function CanvasCentre({ report }: { report: (centre: VisibleCentre | null
     // Withdrawn on the way out, because the reader outlives the reporter. This
     // component is inside the canvas's `things` branch — it needs React Flow's store —
     // and both controls that read the centre are outside it: the toolbar's Add
-    // Thing, and the Alias creation pane. A placement failure or a Space replaced
+    // Thing, and the Reference Thing creation pane. A placement failure or a Space replaced
     // under the canvas unmounts this and leaves them holding a getter closed over
     // an unmounted provider's store, which is not a viewport and must not answer
     // as one. `App` falls back to the origin, exactly as it does before the first

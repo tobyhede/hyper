@@ -25,7 +25,7 @@ import type { AuthoringCompletion, AuthoringResult } from '../src/space-authorin
  *
  * 1. The working Space always passes normal domain intake. A completed Edit
  *    derives and validates the whole next Space before a collaborator moves, so
- *    an Edit that would break Diagram membership, Edge closure, Alias resolution
+ *    an Edit that would break Diagram membership, Edge closure, Reference Thing resolution
  *    or Graph ownership is refused rather than stored — and the sequence keeps
  *    going afterwards.
  * 2. An operation that is not an Edit changes nothing. `unchanged` and `refused`
@@ -52,7 +52,7 @@ const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 
 /**
- * Two Diagrams, an Alias, a Thing one Diagram omits and a Graph in each — the
+ * Two Diagrams, a Reference Thing, a Thing one Diagram omits and a Graph in each — the
  * smallest Space in which every rule under test has something to bite on.
  */
 const start: SpaceSnapshot = {
@@ -96,7 +96,7 @@ const start: SpaceSnapshot = {
   things: [
     { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
     { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: THING_C, document: { title: 'A again', kind: 'alias', target: THING_A } },
+    { id: THING_C, document: { title: 'A again', kind: 'reference', target: THING_A } },
   ],
 };
 
@@ -116,9 +116,9 @@ const anchor = fc.record({
  */
 const operation = fc.oneof(
   fc.record({ op: fc.constant('created-thing' as const), anchor }),
-  fc.record({ op: fc.constant('created-alias' as const), thing: index, anchor }),
+  fc.record({ op: fc.constant('created-reference' as const), thing: index, anchor }),
   /**
-   * Thing editing includes attempts to change an Alias's immutable Target. The
+   * Thing editing includes attempts to change a Reference Thing's immutable Target. The
    * title is generated blank sometimes on purpose: an empty one must refuse
    * rather than reach intake.
    */
@@ -160,18 +160,21 @@ const NOTHING = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 
 const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
 
-it('keeps an existing Alias Target immutable while accepting Title edits', () => {
+it('keeps an existing Reference Thing Target immutable while accepting Title edits', () => {
   fc.assert(
     fc.property(
       fc.constantFrom(THING_A, THING_B),
       fc.oneof(
-        fc.constant('Alias'),
+        fc.constant('Reference Thing'),
         // Normalized, not trimmed: the write path stores what the schema would
         // mint, and the two disagree about a line's leading whitespace and
         // about trailing whitespace on any line but the last (ADR 0083).
         fc
           .string({ minLength: 1, maxLength: 8 })
-          .filter((title) => normalizeTitle(title).length > 0 && normalizeTitle(title) !== 'Alias'),
+          .filter(
+            (title) =>
+              normalizeTitle(title).length > 0 && normalizeTitle(title) !== 'Reference Thing',
+          ),
       ),
       (target, proposedTitle) => {
         const alternativeTarget = target === THING_A ? THING_B : THING_A;
@@ -179,7 +182,7 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
           ...start,
           things: start.things.map((thing) =>
             thing.id === THING_C
-              ? { id: THING_C, document: { title: 'Alias', kind: 'alias', target } }
+              ? { id: THING_C, document: { title: 'Reference Thing', kind: 'reference', target } }
               : thing,
           ),
         };
@@ -190,25 +193,27 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
           selection: OTHER_DIAGRAM_ID,
           initialPlacement: null,
         });
-        const aliasDiagram = snapshot.document.diagrams?.find(
+        const referenceDiagram = snapshot.document.diagrams?.find(
           (diagram) => diagram.id === OTHER_DIAGRAM_ID,
         );
-        if (aliasDiagram === undefined)
-          throw new Error('property fixture must include the Alias Diagram');
-        authoring.replacePlacement(Placement.fromDiagram(aliasDiagram));
+        if (referenceDiagram === undefined)
+          throw new Error('property fixture must include the Reference Thing Diagram');
+        authoring.replacePlacement(Placement.fromDiagram(referenceDiagram));
 
         expect(
           authoring.complete({
             kind: 'edited-thing',
             thingId: THING_C,
-            document: { title: proposedTitle, kind: 'alias', target },
+            document: { title: proposedTitle, kind: 'reference', target },
           }),
         ).toEqual(
-          normalizeTitle(proposedTitle) === 'Alias' ? { kind: 'unchanged' } : { kind: 'completed' },
+          normalizeTitle(proposedTitle) === 'Reference Thing'
+            ? { kind: 'unchanged' }
+            : { kind: 'completed' },
         );
         expect(session.getState().working.things).toContainEqual({
           id: THING_C,
-          document: { title: normalizeTitle(proposedTitle), kind: 'alias', target },
+          document: { title: normalizeTitle(proposedTitle), kind: 'reference', target },
         });
 
         const beforeRetarget = session.getState().working;
@@ -216,9 +221,9 @@ it('keeps an existing Alias Target immutable while accepting Title edits', () =>
           authoring.complete({
             kind: 'edited-thing',
             thingId: THING_C,
-            document: { title: proposedTitle, kind: 'alias', target: alternativeTarget },
+            document: { title: proposedTitle, kind: 'reference', target: alternativeTarget },
           }),
-        ).toEqual({ kind: 'refused', refusal: { code: 'alias-target-immutable' } });
+        ).toEqual({ kind: 'refused', refusal: { code: 'reference-target-immutable' } });
         expect(session.getState().working).toBe(beforeRetarget);
       },
     ),
@@ -315,7 +320,7 @@ function resolve(
         kind: 'edited-thing',
         thingId: thing.id,
         document:
-          document.kind === 'alias'
+          document.kind === 'reference'
             ? {
                 ...document,
                 title: generated.title,
@@ -326,8 +331,8 @@ function resolve(
     }
     case 'created-thing':
       return { kind: 'created-thing', anchor: generated.anchor };
-    case 'created-alias':
-      return { kind: 'created-alias', target: thingId, anchor: generated.anchor };
+    case 'created-reference':
+      return { kind: 'created-reference', target: thingId, anchor: generated.anchor };
     case 'added-thing-to-diagram':
       return { kind: 'added-thing-to-diagram', thingId, anchor: generated.anchor };
     case 'removed-thing-from-diagram':

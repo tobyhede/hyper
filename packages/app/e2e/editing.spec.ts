@@ -468,12 +468,12 @@ test('the Markdown editor code loads only when a Markdown Thing opens', async ({
   await settled(page);
   expect(editorRequests).toEqual([]);
 
-  const alias = nodeByTitle(page, 'A′').first();
-  await openThing(alias, 'A′');
-  await expect(alias).toContainText('entry point');
-  await expect(alias.getByRole('textbox')).toHaveCount(0);
+  const reference = nodeByTitle(page, 'A′').first();
+  await openThing(reference, 'A′');
+  await expect(reference).toContainText('entry point');
+  await expect(reference.getByRole('textbox')).toHaveCount(0);
   expect(editorRequests).toEqual([]);
-  await alias.getByRole('button', { name: 'Close Thing A′' }).click();
+  await reference.getByRole('button', { name: 'Close Thing A′' }).click();
 
   await openThing(thing, 'A');
   expect(editorRequests).toEqual([]);
@@ -1763,10 +1763,14 @@ test(
 
     // Narrowed to the one kind the count is read against, because the claim is
     // that the number agrees with the rows *under it* — and the rows are four
-    // sources interleaved, this Space leaving an Alias unplaced beside its
+    // sources interleaved, this Space leaving a Reference Thing unplaced beside its
     // Markdown Things. Turning the other three off is also the gesture that
     // proves a switch narrows the list at all.
-    for (const other of ['Aliases', 'Space Things in this Space', 'Spaces in this Meta Space']) {
+    for (const other of [
+      'Reference Things',
+      'Space Things in this Space',
+      'Spaces in this Meta Space',
+    ]) {
       await page.getByRole('button', { name: new RegExp(`^${other}, \\d+$`) }).click();
     }
 
@@ -3352,15 +3356,15 @@ test('Add Thing names the new Thing in place in the selected Diagram', async ({ 
 });
 
 /**
- * Create Alias is a command on the Thing it points at (ADR 0089).
+ * Create Reference is a command on the Thing it points at (ADR 0089).
  *
  * The gesture supplies the Target, so there is no picker, no pane and nothing to
- * cancel: one row, one press, and the Alias exists. The Title is the Target's,
+ * cancel: one row, one press, and the Reference Thing exists. The Title is the Target's,
  * copied once, with the caret in it — which is the only thing on the canvas that
- * says what the Alias points at, ADR 0083 keeping the Target's name off the
+ * says what the Reference Thing points at, ADR 0083 keeping the Target's name off the
  * Thing front.
  */
-test('Create Alias on a Thing makes an Alias of it and names it after its Target', async ({
+test('Create Reference on a Thing makes a Reference Thing of it and names it after its Target', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3370,14 +3374,14 @@ test('Create Alias on a Thing makes an Alias of it and names it after its Target
   const nodes = await page.locator('.react-flow__node').count();
 
   const menu = await thingActions(page, 'B');
-  await menu.getByRole('menuitem', { name: 'Create Alias' }).click();
+  await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
 
   const title = page.getByRole('textbox', { name: 'Thing title' });
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('B');
   await title.press('Escape');
 
-  // Two Things called B now, and the second is the Alias: the Title is copied
+  // Two Things called B now, and the second is the Reference Thing: the Title is copied
   // once and the two are independent afterwards, so nothing here is a link.
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);
@@ -3386,20 +3390,22 @@ test('Create Alias on a Thing makes an Alias of it and names it after its Target
 });
 
 /**
- * The whole gesture: the Alias is renamed by the editor its creation opens, and
+ * The whole gesture: the Reference Thing is renamed by the editor its creation opens, and
  * the Target keeps its own name.
  *
  * The Titles agree at creation and diverge freely afterwards, which is the same
  * rule the Space and Space Thing pair follows.
  */
-test('an Alias is renamed by the shared Title editor creation begins', async ({ page }) => {
+test('a Reference Thing is renamed by the shared Title editor creation begins', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
   const menu = await thingActions(page, 'B');
-  await menu.getByRole('menuitem', { name: 'Create Alias' }).click();
+  await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
 
   const title = page.getByRole('textbox', { name: 'Thing title' });
   await expect(title).toHaveValue('B');
@@ -3423,19 +3429,21 @@ test('an Alias is renamed by the shared Title editor creation begins', async ({ 
  * The rename is a pending field, so Escape discards it — one press, no field
  * intercepting it (ADR 0048).
  *
- * The Alias itself is *not* a pending field and does not go with it: it was
+ * The Reference Thing itself is *not* a pending field and does not go with it: it was
  * created on the press, one revision earlier, and Escape here discards a draft
  * rather than undoing an Edit. That is the whole point of the test — the two are
  * told apart, and only one of them is a draft.
  */
-test('Escape discards an Alias rename without undoing the Alias', async ({ page }) => {
+test('Escape discards a Reference Thing rename without undoing the Reference Thing', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
   const menu = await thingActions(page, 'B');
-  await menu.getByRole('menuitem', { name: 'Create Alias' }).click();
+  await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
   const title = page.getByRole('textbox', { name: 'Thing title' });
   await title.fill('Recap');
 
@@ -3448,27 +3456,27 @@ test('Escape discards an Alias rename without undoing the Alias', async ({ page 
 });
 
 /**
- * **Present and unavailable on an Alias, not absent.**
+ * **Present and unavailable on a Reference Thing, not absent.**
  *
- * ADR 0070 forbids an Alias of an Alias, and an Alias is otherwise a regular
+ * ADR 0070 forbids a Reference Thing of a Reference Thing, and a Reference Thing is otherwise a regular
  * Thing — so the menu stays consistent with every other Thing's, and the greyed
- * row is where the product says that aliasing terminates.
+ * row is where the product says that referencing terminates.
  */
-test('Create Alias is drawn unavailable on an Alias', async ({ page }) => {
+test('Create Reference is drawn unavailable on a Reference Thing', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
   const first = await thingActions(page, 'B');
-  await first.getByRole('menuitem', { name: 'Create Alias' }).click();
+  await first.getByRole('menuitem', { name: 'Create Reference' }).click();
   const title = page.getByRole('textbox', { name: 'Thing title' });
-  await title.fill('Alias of B');
+  await title.fill('Reference Thing of B');
   await title.press('Enter');
   await settled(page);
 
-  const menu = await thingActions(page, 'Alias of B');
-  const row = menu.getByRole('menuitem', { name: /^Create Alias/ });
+  const menu = await thingActions(page, 'Reference Thing of B');
+  const row = menu.getByRole('menuitem', { name: /^Create Reference/ });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-disabled', 'true');
 });

@@ -15,7 +15,7 @@ test(
     await expect(page.getByRole('button', { name: /^Add .* to Diagram$/ })).toHaveCount(5);
     await expect(page.locator('.react-flow__handle')).toHaveCount(0);
 
-    // Every kind starts shown, so narrowing to Aliases means pressing the
+    // Every kind starts shown, so narrowing to Reference Things means pressing the
     // other three off rather than choosing one. Each names the count it is
     // contributing, which is what the glyph alone could not say.
     for (const name of [
@@ -83,7 +83,7 @@ test(
     // The count answers the search, not the Space. A number beside a name that
     // disagrees with the rows under it is worse than no number.
     await expect(page.getByRole('button', { name: 'Markdown Things, 1' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Aliases, 0' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reference Things, 0' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Add .* to Diagram$/ })).toHaveCount(1);
   },
 );

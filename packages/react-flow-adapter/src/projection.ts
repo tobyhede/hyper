@@ -43,7 +43,7 @@ export type ThingTitleEditor = {
   onCancel: () => void;
 };
 
-/** Data carried by each custom thing node. Kept as a type alias so it satisfies
+/** Data carried by each custom thing node. Kept as a type reference so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ThingNodeData = {
   /** Reports rendered title geometry by placement, including embedded placements. */
@@ -68,9 +68,9 @@ export type ThingNodeData = {
    * Whether Thing-level authoring is offered here: this Thing is in the working
    * Space and the canvas is authorable.
    *
-   * **Not "owns content to edit"**, which is what it meant while an Alias had no
-   * Open front. It gates `onEditThing`, and an Alias Opens and Closes through
-   * that same operation (ADR 0070), so an Alias sets it exactly as a Markdown
+   * **Not "owns content to edit"**, which is what it meant while a Reference Thing had no
+   * Open front. It gates `onEditThing`, and a Reference Thing Opens and Closes through
+   * that same operation (ADR 0070), so a Reference Thing sets it exactly as a Markdown
    * Thing does. What separates the kinds is `onBeginBodyEditing`, which the
    * application withholds from everything but `markdown`.
    */
@@ -99,7 +99,7 @@ export type ThingNodeData = {
    * follows from it rather than the other way round. The adapter cannot read it
    * off the geometry — a Thing is not Open just because it is large.
    *
-   * An Open Alias draws its immutable Target's content through the same front.
+   * An Open Reference Thing draws its immutable Target's content through the same front.
    */
   expanded?: boolean;
   /** Present only when activating the Open body may place a caret. */
@@ -197,7 +197,7 @@ export type ThingNodeData = {
    * leaves the alert region unmounted.
    */
   contextNotice?: string | null;
-  /** The resolved content kind, including a Space Thing reached through an Alias. */
+  /** The resolved content kind, including a Space Thing reached through a Reference Thing. */
   spaceContent?: Extract<Thing, { kind: 'space' }>;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
@@ -208,7 +208,7 @@ export type ThingNodeData = {
    * 0027). Set on the active thing alone, never on the whole graph.
    */
   showContent: boolean;
-  /** The Markdown to draw when `showContent`, resolved through an alias to its
+  /** The Markdown to draw when `showContent`, resolved through a reference thing to its
    *  target's body. Absent otherwise — content is not embedded in every node
    *  (ADR 0006), which is the constraint that made this per-thing.
    *
@@ -329,7 +329,7 @@ export function projectThingNodes(
     // only thing standing between a stored Open state and the Thing that state
     // is about.
     const open = options.openThingIds?.has(thing.id) === true;
-    // An alias shows its target's content under its own title (ADR 0009).
+    // A reference thing shows its target's content under its own title (ADR 0009).
     const content = resolveContentThing(space, thing.id);
     const body =
       showContent || open ? (content?.kind === 'markdown' ? content.body : '') : undefined;

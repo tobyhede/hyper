@@ -139,7 +139,7 @@ import './command-dock.css';
 /**
  * The two kinds Create offers, in the order the cluster draws them.
  *
- * **`alias` left, and it left the Dock rather than the list.** An Alias is
+ * **`reference` left, and it left the Dock rather than the list.** A Reference Thing is
  * always created *from* the Thing it points at, which supplies the Target
  * (ADR 0089), so the gesture is a row in that Thing's own command menu and
  * there is nothing here for it to be a peer of.
@@ -507,7 +507,7 @@ export interface DockGraph {
 export interface DockThingsList {
   /** The Things this Diagram does not place — what the list offers. */
   readonly things: readonly Thing[];
-  /** Every Thing in the Space, for resolving an Alias row's Target Title. */
+  /** Every Thing in the Space, for resolving a Reference Thing row's Target Title. */
   readonly allThings: readonly Thing[];
   /** The Title of every Space a Space Thing in the list references. */
   readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
@@ -1181,10 +1181,10 @@ function GraphIdentityMenu({
  * of the three is the default. That reasoning is kept whole here. What is
  * dropped is the disclosure around them, which cost a press on *every*
  * creation, including the one kind that then needed no second decision:
- * `markdown` completed its Edit on activation, while `alias` and `space` opened
+ * `markdown` completed its Edit on activation, while `reference` and `space` opened
  * a pane because a Target and a target Space were still owed. So the menu
  * charged the cheapest command for a choice it never makes. ADR 0089 has since
- * made every kind complete on activation and taken `alias` out of this cluster
+ * made every kind complete on activation and taken `reference` out of this cluster
  * altogether, which makes the argument stronger rather than weaker.
  *
  * The other half of that recorded design is untouched and still load-bearing:
@@ -1495,7 +1495,7 @@ function ThingsList({ list, side }: { readonly list: DockThingsList; readonly si
   const triggerId = useId();
 
   // Withdrawing the list *closes* it rather than leaving it open behind a
-  // disabled trigger. Presenting and creating an Alias both pass through here,
+  // disabled trigger. Presenting and creating a Reference Thing both pass through here,
   // and a list that reopened itself on the way back would take focus with it,
   // landing the reader in the Things rather than on the canvas they returned to.
   useEffect(() => {

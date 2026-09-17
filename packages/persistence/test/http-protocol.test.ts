@@ -198,10 +198,10 @@ describe('aggregate wire protocol', () => {
       { kind: 'graph-edge-thing-outside-diagram', ...described },
       { kind: 'unresolved-default-diagram', ...described },
       { kind: 'duplicate-graph-edge', ...described },
-      { kind: 'unresolved-alias-target', ...described },
-      { kind: 'alias-self-reference', ...described },
-      { kind: 'alias-targets-alias', ...described },
-      { kind: 'alias-target-must-own-content', ...described },
+      { kind: 'unresolved-reference-target', ...described },
+      { kind: 'reference-self-reference', ...described },
+      { kind: 'reference-targets-reference', ...described },
+      { kind: 'reference-target-must-own-content', ...described },
       { kind: 'space-thing-reference-cycle', ...described },
     ];
     const location = { spaceId: SPACE_ID, thingId: THING_ID, targetSpaceId: secondId };

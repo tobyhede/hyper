@@ -29,7 +29,7 @@ const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
 type ThingKind = Thing['kind'];
 
-const EVERY_KIND: readonly ThingKind[] = ['markdown', 'alias', 'space'];
+const EVERY_KIND: readonly ThingKind[] = ['markdown', 'reference', 'space'];
 
 /**
  * The same Title on each Thing kind. Every kind writes its Title through the one
@@ -41,7 +41,7 @@ function thingOf(kind: ThingKind, title: string): Thing {
   switch (kind) {
     case 'markdown':
       return { id: ID, title, kind, body: 'The body, which is not the Title.\n' };
-    case 'alias':
+    case 'reference':
       return { id: ID, title, kind, target: TARGET };
     case 'space':
       return { id: ID, title, kind, spaceId: SPACE_ID, diagram: DIAGRAM_ID, graph: GRAPH_ID };

@@ -64,7 +64,7 @@ function contrast(foreground: string, background: string): number {
 /** Every text role the Thing draws on one of its own faces. */
 const TEXT_ON_THING = [
   { role: 'title', token: '--canvas-thing-title-color' },
-  { role: 'Alias Target line', token: '--canvas-thing-muted-color' },
+  { role: 'Reference Thing Target line', token: '--canvas-thing-muted-color' },
   { role: 'title refusal message', token: '--canvas-thing-error-color' },
 ] as const;
 

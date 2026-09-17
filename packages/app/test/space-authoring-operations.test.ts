@@ -732,20 +732,22 @@ describe('Expanded Thing geometry', () => {
   });
 });
 
-describe('Add Alias', () => {
-  it('creates and places an Alias on its Target, minting a neutral title when none was typed', () => {
+describe('Add Reference Thing', () => {
+  it('creates and places a Reference Thing on its Target, minting a neutral title when none was typed', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-alias', target: THING_A, anchor: CENTRE })).toEqual({
+    expect(
+      authoring.complete({ kind: 'created-reference', target: THING_A, anchor: CENTRE }),
+    ).toEqual({
       kind: 'completed',
       createdThingId: MINTED,
     });
 
-    // The Target's own Title is never copied: an Alias that arrived already
+    // The Target's own Title is never copied: a Reference Thing that arrived already
     // named after its Target gave the Space two Things with one name by default.
     expect(session.getState().working.things[2]).toEqual({
       id: MINTED,
-      document: { title: 'Thing 1', kind: 'alias', target: THING_A },
+      document: { title: 'Thing 1', kind: 'reference', target: THING_A },
     });
     expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual(CENTRE);
   });
@@ -763,7 +765,7 @@ describe('Add Alias', () => {
     const { authoring, session } = openPositioned();
 
     authoring.complete({
-      kind: 'created-alias',
+      kind: 'created-reference',
       target: THING_A,
       title: '  Recap  \n  the week  ',
       anchor: CENTRE,
@@ -771,31 +773,33 @@ describe('Add Alias', () => {
 
     expect(session.getState().working.things[2]?.document).toEqual({
       title: '  Recap\n  the week',
-      kind: 'alias',
+      kind: 'reference',
       target: THING_A,
     });
   });
 
-  it('refuses a Target that is itself an Alias, so no chain is ever authored', () => {
-    const aliased: SpaceSnapshot = {
+  it('refuses a Target that is itself a Reference Thing, so no chain is ever authored', () => {
+    const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
         positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
+        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
       ],
     };
-    const { authoring, session } = open(aliased);
+    const { authoring, session } = open(referenced);
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE })).toEqual({
+    expect(
+      authoring.complete({ kind: 'created-reference', target: THING_B, anchor: CENTRE }),
+    ).toEqual({
       kind: 'refused',
-      refusal: { code: 'alias-target-must-own-content', targetId: THING_B },
+      refusal: { code: 'reference-target-must-own-content', targetId: THING_B },
     });
     expect(session.getState().working).toBe(before);
   });
 
-  it('creates an Alias whose Target is a Space Thing', () => {
+  it('creates a Reference Thing whose Target is a Space Thing', () => {
     const withSpaceThing: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
@@ -816,10 +820,10 @@ describe('Add Alias', () => {
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
-      authoring.complete({ kind: 'created-alias', target: THING_B, anchor: CENTRE }).kind,
+      authoring.complete({ kind: 'created-reference', target: THING_B, anchor: CENTRE }).kind,
     ).toBe('completed');
     expect(session.getState().working.things.at(-1)?.document).toMatchObject({
-      kind: 'alias',
+      kind: 'reference',
       target: THING_B,
     });
   });
@@ -828,10 +832,10 @@ describe('Add Alias', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'created-alias', target: UNKNOWN_THING, anchor: CENTRE }),
+      authoring.complete({ kind: 'created-reference', target: UNKNOWN_THING, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'alias-target-not-found', targetId: UNKNOWN_THING },
+      refusal: { code: 'reference-target-not-found', targetId: UNKNOWN_THING },
     });
   });
 });
@@ -1898,23 +1902,23 @@ describe('Delete Thing from Space', () => {
     expect(loadSpaceSnapshot(working).ok).toBe(true);
   });
 
-  it('refuses a Thing its Aliases still point at, naming them', () => {
-    const aliased: SpaceSnapshot = {
+  it('refuses a Thing its Reference Things still point at, naming them', () => {
+    const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
         positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
+        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
       ],
     };
-    const { authoring, session } = open(aliased);
+    const { authoring, session } = open(referenced);
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
       kind: 'refused',
       refusal: {
-        code: 'thing-has-aliases',
-        aliasTitles: ['A again'],
+        code: 'thing-has-references',
+        referenceTitles: ['A again'],
       },
     });
     expect(session.getState().working).toBe(before);
@@ -1956,15 +1960,15 @@ describe('Delete Thing from Space', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('deletes an Alias and leaves its Target untouched', () => {
-    const aliased: SpaceSnapshot = {
+  it('deletes a Reference Thing and leaves its Target untouched', () => {
+    const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
         positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
+        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
       ],
     };
-    const { authoring, session } = open(aliased);
+    const { authoring, session } = open(referenced);
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
@@ -1973,21 +1977,21 @@ describe('Delete Thing from Space', () => {
     expect(session.getState().working.things).toEqual([positionedSnapshot.things[0]]);
   });
 
-  it('removing a Thing from one Diagram is never blocked by an incoming Alias', () => {
-    const aliased: SpaceSnapshot = {
+  it('removing a Thing from one Diagram is never blocked by an incoming Reference Thing', () => {
+    const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
       things: [
         positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'alias', target: THING_A } },
+        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
       ],
     };
-    const { authoring, session } = open(aliased);
+    const { authoring, session } = open(referenced);
     place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    expect(session.getState().working.things).toEqual(aliased.things);
+    expect(session.getState().working.things).toEqual(referenced.things);
   });
 
   it('refuses a Thing the Space no longer holds', () => {

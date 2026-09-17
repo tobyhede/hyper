@@ -20,7 +20,7 @@ const THINGS: readonly Thing[] = [
   {
     id: id('000000000004'),
     title: 'Constraints',
-    kind: 'alias',
+    kind: 'reference',
     target: id('000000000003'),
   },
 ];
@@ -237,7 +237,7 @@ describe('ThingsPopover', () => {
 
     // Everything starts on, so narrowing means pressing the kinds you do not
     // want to see *off*.
-    fireEvent.click(screen.getByRole('button', { name: /^Aliases, \d+$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reference Things, \d+$/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Space Things in this Space, \d+$/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Search things' }), {
@@ -370,7 +370,7 @@ describe('ThingsPopover', () => {
     render(<Fixture />);
     await openList();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Aliases, \d+$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reference Things, \d+$/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Space Things in this Space, \d+$/ }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Search things' }), {
       target: { value: 'zul' },
@@ -401,7 +401,7 @@ describe('ThingsPopover', () => {
     );
     await screen.findByRole('dialog', { name: 'Things' });
 
-    fireEvent.click(screen.getByRole('button', { name: /^Aliases, \d+$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reference Things, \d+$/ }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Search things' }), {
       target: { value: 'zul' },
     });
@@ -462,7 +462,7 @@ describe('ThingsPopover', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('finds an Alias by its Target title', async () => {
+  it('finds a Reference Thing by its Target title', async () => {
     render(<Fixture />);
     await openList();
     fireEvent.change(screen.getByRole('textbox', { name: 'Search things' }), {
@@ -475,13 +475,18 @@ describe('ThingsPopover', () => {
   /**
    * The corpus takes the Target's *whole* Title and not its name, which is the
    * same division the Thing's own Title gets above and the same one
-   * `ThingSearchCombobox` makes (ADR 0083). An Alias is a second position for a
+   * `ThingSearchCombobox` makes (ADR 0083). A Reference Thing is a second position for a
    * Thing, so a reader recalls it by anything that named the Thing it shows.
    */
-  it('finds an Alias by a later line of its Target’s Title', async () => {
+  it('finds a Reference Thing by a later line of its Target’s Title', async () => {
     const laddered: readonly Thing[] = [
       { id: id('000000000003'), title: 'Alpha\nHow a session begins', kind: 'markdown', body: '' },
-      { id: id('000000000004'), title: 'Constraints', kind: 'alias', target: id('000000000003') },
+      {
+        id: id('000000000004'),
+        title: 'Constraints',
+        kind: 'reference',
+        target: id('000000000003'),
+      },
     ];
     render(<Fixture things={laddered} allThings={laddered} />);
     await openList();
@@ -528,7 +533,7 @@ describe('ThingsPopover', () => {
     // contributes nothing to a control that has its own label.
     for (const [name, count] of [
       ['Markdown Things', 2],
-      ['Aliases', 1],
+      ['Reference Things', 1],
       ['Space Things in this Space', 1],
       ['Spaces in this Meta Space', 0],
     ] as const) {
@@ -572,7 +577,7 @@ describe('ThingsPopover', () => {
     // — including the ones that now contribute nothing, because a switch that is
     // off has to say what turning it on would bring back.
     expect(screen.getByRole('button', { name: 'Markdown Things, 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Aliases, 0' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reference Things, 0' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Spaces in this Meta Space, 0' }),
     ).toBeInTheDocument();
@@ -587,9 +592,9 @@ describe('ThingsPopover', () => {
     render(<Fixture />);
     await openList();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Aliases, \d+$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reference Things, \d+$/ }));
 
-    expect(screen.getByRole('button', { name: 'Aliases, 1' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Reference Things, 1' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
@@ -793,9 +798,9 @@ describe('ThingsPopover', () => {
     expect(screen.getByText('No matching Things.')).toBeInTheDocument();
   });
 
-  it('lists an Alias whose Target is absent from allThings', async () => {
+  it('lists a Reference Thing whose Target is absent from allThings', async () => {
     const dangling: readonly Thing[] = [
-      { id: id('000000000005'), title: 'Stray', kind: 'alias', target: id('000000000009') },
+      { id: id('000000000005'), title: 'Stray', kind: 'reference', target: id('000000000009') },
     ];
     render(<Fixture things={dangling} allThings={dangling} />);
     await openList();

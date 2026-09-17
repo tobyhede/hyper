@@ -36,7 +36,7 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
@@ -74,8 +74,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/** The same Space with an Alias of `A` already in it, for the terminal-row case. */
-const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
+/** The same Space with a Reference Thing of `A` already in it, for the terminal-row case. */
+const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
@@ -84,14 +84,14 @@ const withAlias: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.diagrams?.[0],
         positions: {
           ...snapshot.document.diagrams?.[0]?.positions,
-          [ALIAS_ID]: { x: 0, y: 400, open: false },
+          [REFERENCE_ID]: { x: 0, y: 400, open: false },
         },
       },
     ],
   },
   things: [
     ...snapshot.things,
-    { id: ALIAS_ID, document: { title: 'A alias', kind: 'alias', target: THING_ID } },
+    { id: REFERENCE_ID, document: { title: 'A reference', kind: 'reference', target: THING_ID } },
   ],
 });
 
@@ -134,7 +134,7 @@ const runtime = (value: SpaceSnapshot) => {
 function mount(
   opening?: DestinationOpening,
   history?: HistoryApi,
-  /** The Space to mount, for the one case that needs an Alias already in it. */
+  /** The Space to mount, for the one case that needs a Reference Thing already in it. */
   mounted: SpaceSnapshot = snapshot,
 ): SpaceSession {
   const stored = { snapshot: mounted, revision: 0n, exportedRevision: null };
@@ -315,23 +315,23 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
-   * **Create Alias is a command about the Thing, so it lives on the Thing.**
+   * **Create Reference is a command about the Thing, so it lives on the Thing.**
    *
-   * An Alias is always created *from* its Target (ADR 0089), which is what
+   * A Reference Thing is always created *from* its Target (ADR 0089), which is what
    * removes the Target-selection interaction entirely — the gesture is on the
    * Thing, so the Target is the Thing it was invoked on. It inherits this
    * menu's keyboard route rather than needing one invented, which is why it is
    * a row here and not a rail glyph or a bare shortcut.
    */
-  it('creates an Alias of the Thing whose menu ran the command', async () => {
+  it('creates a Reference Thing of the Thing whose menu ran the command', async () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
     await waitFor(() => expect(thingIds(session)).toHaveLength(3));
     const created = session.getState().working.things[2];
-    expect(created?.document).toEqual({ title: 'A', kind: 'alias', target: THING_ID });
+    expect(created?.document).toEqual({ title: 'A', kind: 'reference', target: THING_ID });
     await settled(session);
   });
 
@@ -340,15 +340,15 @@ describe('a Thing’s commands on the canvas rail', () => {
    * caret is in it.
    *
    * ADR 0083 keeps the Target's name off the Thing front, so without the copy
-   * the author has no on-canvas indication of what the Alias points at beyond
+   * the author has no on-canvas indication of what the Reference Thing points at beyond
    * the dotted border. Copying it *once* is what keeps the two ordinary
    * independent Titles afterwards.
    */
-  it('continues in the new Alias’s own Title editor, seeded from its Target', async () => {
+  it('continues in the new Reference Thing’s own Title editor, seeded from its Target', async () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
     const editor = await screen.findByRole('textbox', { name: 'Thing title' });
     expect(editor).toHaveValue('A');
@@ -357,26 +357,26 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   /**
-   * Placed at a fixed offset from the source, so the Alias lands where the
+   * Placed at a fixed offset from the source, so the Reference Thing lands where the
    * author is looking.
    *
    * A free-position search was rejected: that is a placement algorithm, and ADR
    * 0086 put automatic arrangement behind an Edit and out of the render path
    * deliberately. The overlap is authored and the author drags it off.
    */
-  it('places the Alias at a fixed offset from the Thing it was made from', async () => {
+  it('places the Reference Thing at a fixed offset from the Thing it was made from', async () => {
     const session = mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
     await waitFor(() => expect(thingIds(session)).toHaveLength(3));
-    const alias = session.getState().working.things[2]!.id;
+    const reference = session.getState().working.things[2]!.id;
     const positions = session.getState().working.document.diagrams?.[0]?.positions;
-    // Three quarters of a Thing on each axis, not half: at half the new Alias's
+    // Three quarters of a Thing on each axis, not half: at half the new Reference Thing's
     // centre lands exactly on the Target's bottom-right corner and the Target
-    // takes every pointer event aimed at it (`ALIAS_OFFSET_RATIO` in `App.tsx`).
-    expect(positions?.[alias]).toMatchObject({
+    // takes every pointer event aimed at it (`REFERENCE_OFFSET_RATIO` in `App.tsx`).
+    expect(positions?.[reference]).toMatchObject({
       x: Math.round(THING_WIDTH * 0.75),
       y: Math.round(THING_HEIGHT * 0.75),
     });
@@ -384,7 +384,7 @@ describe('a Thing’s commands on the canvas rail', () => {
   });
 
   it.each([4, 6])(
-    'keeps an Alias separated after closing its %s-times-sized Target',
+    'keeps a Reference Thing separated after closing its %s-times-sized Target',
     async (scale) => {
       const opened = spaceSnapshotSchema.parse({
         ...snapshot,
@@ -408,38 +408,38 @@ describe('a Thing’s commands on the canvas rail', () => {
       });
       const session = mount(undefined, undefined, opened);
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A' }));
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Alias' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
       const editor = await screen.findByRole('textbox', { name: 'Thing title' });
       fireEvent.keyDown(editor, { key: 'Escape' });
-      const alias = session.getState().working.things[2]!.id;
+      const reference = session.getState().working.things[2]!.id;
       fireEvent.click(await screen.findByRole('button', { name: 'Close Thing A' }));
       await waitFor(() => {
         const positions = session.getState().working.document.diagrams?.[0]?.positions;
         expect(positions?.[THING_ID]?.open).toBe(false);
         // Same authored offset the closed-Target creation asserts: Close reclaims
-        // the growth that `createAliasFrom` added ahead of the collapsed step, so
-        // the Alias lands back on the rounded 0.75 of each collapsed axis.
-        expect(positions?.[alias]?.x).toBe(Math.round(THING_WIDTH * 0.75));
-        expect(positions?.[alias]?.y).toBe(Math.round(THING_HEIGHT * 0.75));
+        // the growth that `createReferenceFrom` added ahead of the collapsed step, so
+        // the Reference Thing lands back on the rounded 0.75 of each collapsed axis.
+        expect(positions?.[reference]?.x).toBe(Math.round(THING_WIDTH * 0.75));
+        expect(positions?.[reference]?.y).toBe(Math.round(THING_HEIGHT * 0.75));
       });
       await settled(session);
     },
   );
 
   /**
-   * **Present and unavailable on an Alias, not absent.**
+   * **Present and unavailable on a Reference Thing, not absent.**
    *
-   * ADR 0070 forbids an Alias of an Alias, and a row that can never apply would
+   * ADR 0070 forbids a Reference Thing of a Reference Thing, and a row that can never apply would
    * ordinarily not be one of that kind's commands. It is drawn and greyed
-   * anyway, because an Alias is otherwise a regular Thing: this row is where the
-   * product says that aliasing terminates.
+   * anyway, because a Reference Thing is otherwise a regular Thing: this row is where the
+   * product says that referencing terminates.
    */
-  it('offers Create Alias unavailable on an Alias, because aliasing terminates', async () => {
-    const session = mount(undefined, undefined, withAlias);
+  it('offers Create Reference unavailable on a Reference Thing, because referencing terminates', async () => {
+    const session = mount(undefined, undefined, withReference);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A alias' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A reference' }));
 
-    const row = await screen.findByRole('menuitem', { name: /^Create Alias/ });
+    const row = await screen.findByRole('menuitem', { name: /^Create Reference/ });
     expect(row).toHaveAttribute('aria-disabled', 'true');
     expect(thingIds(session)).toHaveLength(3);
     await settled(session);
@@ -479,15 +479,15 @@ describe('a Thing’s commands on the canvas rail', () => {
     open.mockRestore();
   });
 
-  it('creates an Alias from a Space Thing', async () => {
+  it('creates a Reference Thing from a Space Thing', async () => {
     const session = mount(undefined, undefined, withSpaceThing);
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Thing A space' }));
-    const row = await screen.findByRole('menuitem', { name: 'Create Alias' });
+    const row = await screen.findByRole('menuitem', { name: 'Create Reference' });
     expect(row).not.toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(row);
     expect(thingIds(session)).toHaveLength(4);
     expect(session.getState().working.things.at(-1)?.document).toMatchObject({
-      kind: 'alias',
+      kind: 'reference',
       title: 'A space',
     });
     await settled(session);

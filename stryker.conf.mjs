@@ -36,7 +36,7 @@ export default {
   plugins: ['@stryker-mutator/vitest-runner'],
 
   vitest: {
-    // The real root config, consumed as-is. Its `@project/*` aliases resolve
+    // The real root config, consumed as-is. Its `@project/*` references resolve
     // relative to the config file, so they land on the sandbox's own packages
     // and the mutated copy is what the tests import. Nothing extra is needed.
     configFile: 'vitest.config.ts',

@@ -191,13 +191,13 @@ Each authored edge becomes a colored drawn edge. Every thing carries four Edge a
 
 ### Markdown things
 
-A thing is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md), refined by [ADR 0051](docs/adr/0051-card-kinds-own-everything-beyond-the-title.md)). Shared frontmatter carries `id`, `title` and `kind`; an Alias adds its `target`, while everything after a Markdown Thing's fence is its content. A thing can be visited by any number of graphs — that reuse is the whole point. A thing carries the same four Edge anchors however many graphs run through it, so every graph joining one pair of things draws between the same two points, told apart by colour ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md)).
+A thing is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md), refined by [ADR 0051](docs/adr/0051-card-kinds-own-everything-beyond-the-title.md)). Shared frontmatter carries `id`, `title` and `kind`; a Reference Thing adds its `target`, while everything after a Markdown Thing's fence is its content. A thing can be visited by any number of graphs — that reuse is the whole point. A thing carries the same four Edge anchors however many graphs run through it, so every graph joining one pair of things draws between the same two points, told apart by colour ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md)).
 
 A thing's identity is its frontmatter `id`, never its filename, so renaming the file is not a data migration. Since the title lives in the same file as the body, a body may open with a heading — it is just a heading, not a repeat of a title held somewhere else.
 
 The graph draws a closed Thing's **title**, not its body ([ADR 0006](docs/adr/superseded/0006-cards-show-titles-in-the-graph.md)). Opening a Markdown Thing expands it in place and renders its Markdown content on the Thing ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same renderer shows the Active Thing while presenting, so content is not embedded in every closed node.
 
-A thing occupies exactly one position in the graph; there is no placement layer letting the same thing sit in two places. Showing the same content at a second position is the job of an **alias** thing ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
+A thing occupies exactly one position in the graph; there is no placement layer letting the same thing sit in two places. Showing the same content at a second position is the job of a **reference thing** ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
 Validation happens in two layers:
 
@@ -242,7 +242,7 @@ Design rules kept throughout: domain logic stays out of React components, React 
 
 ## Current limitations
 
-- **Thing authoring is intentionally narrow.** Markdown source, Titles and Alias Targets are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Thing, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
+- **Thing authoring is intentionally narrow.** Markdown source, Titles and Reference Thing Targets are editable, while visual editing, freehand drawing and whiteboard shapes are not built. Thing, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
 - **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic aggregate directory from the database and records the revision it projected for each Space.
 - **Overlay legibility.** The graph draws every Graph at once, at the positions the diagram authored. An edge runs backward whenever the author placed its target left of its source — which two graphs disagreeing about the order of things they share will force on one of them — and nothing routes an edge around a thing: every edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Things are a fixed shape.** A thing draws its title, so every thing is the same size — declared once in `packages/app/src/thing.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the thing, not the reverse, which is why a measured DOM size never decides placement.

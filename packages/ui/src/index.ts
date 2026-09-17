@@ -97,7 +97,7 @@ export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   AbandonEditIcon,
   AlertIcon,
-  AliasIcon,
+  ReferenceIcon,
   CheckIcon,
   CommitEditIcon,
   ChevronDownIcon,

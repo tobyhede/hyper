@@ -1,5 +1,5 @@
 import {
-  aliasThingFrontmatterSchema,
+  referenceThingFrontmatterSchema,
   importSpaceSchema,
   markdownThingFrontmatterSchema,
   spaceSnapshotSchema,
@@ -340,6 +340,6 @@ describe('import decoding', () => {
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
     expect(summary).toContain(`'${markdownThingFrontmatterSchema.shape.kind.value}'`);
-    expect(summary).toContain(`'${aliasThingFrontmatterSchema.shape.kind.value}'`);
+    expect(summary).toContain(`'${referenceThingFrontmatterSchema.shape.kind.value}'`);
   });
 });

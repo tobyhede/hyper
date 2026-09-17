@@ -33,7 +33,7 @@ export type ImportSpace = z.infer<typeof importSpaceSchema>;
 
 /**
  * The kind-specific fields stored before a thing file's closing frontmatter
- * fence (ADR 0020). A markdown `Thing` adds its body; an alias `Thing` is already
+ * fence (ADR 0020). A markdown `Thing` adds its body; a reference thing `Thing` is already
  * complete because its content resolves through `target` (ADR 0009).
  */
 export type ThingFrontmatter = z.infer<typeof thingFrontmatterSchema>;

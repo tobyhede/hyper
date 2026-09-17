@@ -3,19 +3,19 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * CONTEXT.md defines the vocabulary twice over for an Alias — once under
- * **Alias**, which says what authoring one changes, and once under **Opening**,
+ * CONTEXT.md defines the vocabulary twice over for a Reference Thing — once under
+ * **Reference Thing**, which says what authoring one changes, and once under **Opening**,
  * which says what bringing one up puts on screen — and the two drifted apart.
- * The Alias definition was moved to ADR 0049's model (an Alias authors its own
+ * The Reference Thing definition was moved to ADR 0049's model (a Reference Thing authors its own
  * Title and Target; the Target is opened explicitly to author its content)
  * while the Opening definition kept ADR 0039/0046's withdrawn one, in which an
- * Alias opened "the same content surface through its target". Both ADRs are
+ * Reference Thing opened "the same content surface through its target". Both ADRs are
  * still `accepted` and carry `Refined by: 0049`, so an ADR status scan cannot
  * see the drift, and neither can `tsc`: a definition is prose, and prose that
  * describes a surface nobody built compiles perfectly.
  *
- * The code is unambiguous about which one is live — `AliasEditorForm` renders a
- * Title input and a Target picker and the props of the Alias branch make a
+ * The code is unambiguous about which one is live — `ReferenceEditorForm` renders a
+ * Title input and a Target picker and the props of the Reference Thing branch make a
  * content field unrepresentable — so this reads the document against the
  * decision rather than against the other document, in the idiom
  * `current-domain-vocabulary.test.ts` and `conflict-markers.test.ts` already
@@ -43,13 +43,15 @@ const definitionOf = (term: string): string => {
 
 /**
  * The Opening definition names each Thing kind in its own semicolon-separated
- * clause. Reading the Alias one alone is what keeps the assertions honest: the
+ * clause. Reading the Reference Thing one alone is what keeps the assertions honest: the
  * Markdown clause beside it legitimately says *title*, so a whole-paragraph
- * match for that word would pass while saying nothing about an Alias at all.
+ * match for that word would pass while saying nothing about a Reference Thing at all.
  */
-const aliasClause = (definition: string): string => {
-  const clauses = definition.split(';').filter((clause) => /alias/i.test(clause));
-  expect(clauses, 'the Opening definition says nothing about an alias').not.toHaveLength(0);
+const referenceClause = (definition: string): string => {
+  const clauses = definition.split(';').filter((clause) => /reference/i.test(clause));
+  expect(clauses, 'the Opening definition says nothing about a reference thing').not.toHaveLength(
+    0,
+  );
   return clauses.join(' ');
 };
 
@@ -60,28 +62,38 @@ const aliasClause = (definition: string): string => {
  * semantic weight instead.
  *
  * A wider one is worse than useless here. "The same content" reads as the
- * withdrawn model in a sentence about opening, but it is also how the **Alias**
- * definition states the domain fact that an Alias *shows* its Target's content
+ * withdrawn model in a sentence about opening, but it is also how the **Reference Thing**
+ * definition states the domain fact that a Reference Thing *shows* its Target's content
  * — one source of truth, appearing again elsewhere — which is true, live, and
  * the whole point of the kind. A marker that cannot tell showing from
  * authoring fails the correct document.
  */
 const DELEGATED_CONTENT = [/content surface/i, /delegat/i];
 
-describe('CONTEXT.md on opening an Alias', () => {
-  it('limits an Alias to its own title and target', () => {
-    const clause = aliasClause(definitionOf('Opening'));
+/**
+ * ADR 0049's model, read as the shape both clauses actually share rather than
+ * as the one adverb, "explicitly", that only the Opening definition still
+ * carries. CONTEXT.md's ADR 0092 rewrite reworded the Reference Thing
+ * definition to "the Target is opened to author that content" — the same
+ * fact, that the Target takes a distinct step to author, stated without that
+ * word. What this guards is the fact, not the adverb.
+ */
+const SEPARATELY_OPENED = /opened[^.]*to author/i;
+
+describe('CONTEXT.md on opening a Reference Thing', () => {
+  it('limits a Reference Thing to its own title and target', () => {
+    const clause = referenceClause(definitionOf('Opening'));
 
     expect(clause).toMatch(/title/i);
     expect(clause).toMatch(/target/i);
   });
 
   it('sends an author to the Target Thing itself to author its content', () => {
-    expect(aliasClause(definitionOf('Opening'))).toMatch(/explicit/i);
+    expect(referenceClause(definitionOf('Opening'))).toMatch(SEPARATELY_OPENED);
   });
 
-  it('does not describe an Alias as opening its Target’s content', () => {
-    const clause = aliasClause(definitionOf('Opening'));
+  it('does not describe a Reference Thing as opening its Target’s content', () => {
+    const clause = referenceClause(definitionOf('Opening'));
 
     for (const withdrawn of DELEGATED_CONTENT) {
       expect(clause, `the Opening definition restates ADR 0039/0046's withdrawn model`).not.toMatch(
@@ -91,19 +103,19 @@ describe('CONTEXT.md on opening an Alias', () => {
   });
 
   /**
-   * The drift this file exists for was between two definitions, so the Alias
+   * The drift this file exists for was between two definitions, so the Reference Thing
    * one is held to the same rule rather than trusted for having been fixed
    * first. It is the definition that states the rule outright, and it is where
    * a future edit would most plausibly reintroduce delegation.
    */
-  it('agrees with the Alias definition', () => {
-    const alias = definitionOf('Alias');
+  it('agrees with the Reference Thing definition', () => {
+    const reference = definitionOf('Reference Thing');
 
-    expect(alias).toMatch(/title/i);
-    expect(alias).toMatch(/target/i);
-    expect(alias).toMatch(/explicit/i);
+    expect(reference).toMatch(/title/i);
+    expect(reference).toMatch(/target/i);
+    expect(reference).toMatch(SEPARATELY_OPENED);
     for (const withdrawn of DELEGATED_CONTENT) {
-      expect(alias).not.toMatch(withdrawn);
+      expect(reference).not.toMatch(withdrawn);
     }
   });
 });

@@ -2331,3 +2331,352 @@ describe('aggregate names one thing (ADR 0088)', () => {
     }
   });
 });
+
+/**
+ * ADR 0092 makes Reference Thing the first-public name for the kind ADR 0009
+ * introduced under a retired name, and states the same completion criterion
+ * ADR 0041 and ADR 0085 do: a repository scan finds the retired word only in
+ * historical records. It does not survive as a synonym, a subtype or a second
+ * document key — the stored `kind` is `reference` and nothing reads the old
+ * one.
+ *
+ * Deliberately undescribed below: this comment, like the block itself, never
+ * spells the retired word, for the reason the Space block's comment above
+ * gives for its own retired word — a literal instance here would be a hit
+ * this scan reports against its own source, and unlike that block's, this
+ * one's compound regex also reads a bare capitalised noun (see below), which
+ * a comment discussing the rename in ordinary prose would trip constantly.
+ * Every fixture that needs the literal spelling builds it the way the
+ * constants below do — by joining fragments — and no comment anywhere in this
+ * block does.
+ *
+ * The shape rule transfers from the Card→Thing block, plural included: the
+ * retired word already ends in `s`, so its plural takes `+es`, not the `+s`
+ * every previous rename's noun took — every arm below carries `(?:es)?` where
+ * the Card block carried a bare `s?`. Nothing else about the shapes differs:
+ * PascalCase compounds, camelCase compounds, screaming-case constants, the
+ * quoted kind literal, the kebab shapes a refusal code, a test id and a CSS
+ * block are written in, and the verb phrases none of these arms reach —
+ * declaration and whole-parameter bindings.
+ *
+ * **One arm is new here and was not needed for Card.** This rename is a
+ * product-vocabulary change, not a code-only one, and authors read the
+ * retired word as a bare capitalised noun far more than they ever wrote
+ * `Card` that way — in running prose, in an accessible name, in a fixture
+ * Title. So this block's compound regex also reads the word capitalised as a
+ * noun, in the idiom the Space block already uses for the same reason (a
+ * `package.json`'s foreign sense forced it there; here it is the prose
+ * itself). The English word is still unambiguous without it: nothing this
+ * rename governs writes the retired word bare and lowercase except a
+ * genuinely foreign sense (below), and the capitalised arm only ever fires on
+ * the retired proper noun.
+ *
+ * **What needs a file exemption is what this ADR's own body predicts.** The
+ * retired word already collides with ordinary English for pointing, and with
+ * three kinds of foreign contract this rename is not the one to touch:
+ *
+ *  - a TypeScript type alias, the vocabulary the vendored anti-slop rule set
+ *    is written in throughout — none of it ours to sweep;
+ *  - a path or import alias — the build-tooling module that names the
+ *    `@project/*` path table (see `docs/agents/build-tooling.md`), the three
+ *    Vite/Vitest configs that spend `resolve.alias`, and the shadcn CLI's own
+ *    generated config and vendored guidance about it — none of it a name our
+ *    code chose;
+ *  - `CONTEXT.md` itself, whose `_Avoid_` line under **Reference Thing** has
+ *    to keep saying the retired word to retire it, exactly as the Space
+ *    block's retirement notices do.
+ *
+ * Each is a whole-file exemption rather than a masked spelling, because every
+ * one of these files is *entirely* the foreign sense — unlike the shadcn
+ * registry component the Card block had to mask spelling-by-spelling inside a
+ * barrel that also carried domain names, nothing here mixes the two senses in
+ * one file. A few structural spellings straddle a file that is not otherwise
+ * exempt and are masked instead: two root tool configs and an agent-facing
+ * document cite the anti-slop rule id, `AGENTS.md` cites the path-alias
+ * module and the Vite config key it explains, and a dictionary-type test
+ * names a TypeScript alias-consumer test double. Ordinary lowercase prose
+ * about a path alias — "path aliases", "an illegal alias unresolvable", "no
+ * alias at all" — needs no exemption at all: every arm below requires either
+ * a capital, a hyphen, an underscore or a trailing colon/equals, and bare
+ * lowercase prose bounded by spaces offers none of the four.
+ *
+ * This file's own guard block is exempted from the codemod that performs the
+ * rename, for the same reason its own text has to keep saying the retired
+ * word (this comment) and the reason above already gives (the bare
+ * capitalised arm this block adds): a blind sweep cannot tell a rename's own
+ * explanation from a leftover instance, and this file also carries the
+ * retired word, as ordinary English for an unrelated import rename, in one
+ * block above. Its own remaining `describe` block, immediately below, is
+ * exactly that usage — read it for what the word means when it is not this
+ * kind.
+ */
+const RETIRED_ALIAS = ['A', 'lias'].join('');
+const retiredAliasLower = RETIRED_ALIAS.toLowerCase();
+const RETIRED_ALIAS_UPPER = RETIRED_ALIAS.toUpperCase();
+
+const RETIRED_ALIAS_NAME = new RegExp(
+  [
+    // PascalCase compounds opening with it: its icon, its option, its mark.
+    `${RETIRED_ALIAS}[A-Z]`,
+    // Compounds ending in it, singular and plural: the incoming ones, the
+    // opening one. `(?:es)?` rather than `s?` — the word already ends `s`.
+    `[A-Za-z]${RETIRED_ALIAS}(?:es)?\\b`,
+    // camelCase compounds opening with it: its offset, its refusal, its of.
+    `\\b${retiredAliasLower}[A-Z]`,
+    // The screaming-case constants: the bare word, its plural, its options.
+    `\\b${RETIRED_ALIAS_UPPER}(?:ES)?\\b`,
+    // Deliberately without a leading `\\b`: `_` is a word character, so a
+    // boundary never lands mid-identifier.
+    `${RETIRED_ALIAS_UPPER}_[A-Z]`,
+    // The retired field or local, in a document, an object literal or a
+    // destructure. `(?<!-)` keeps a kebab compound's second half — read by the
+    // arms below — from also matching here.
+    `(?<!-)\\b${retiredAliasLower}(?:es)?["']?\\s*[:=]`,
+    // ...and read back off a value.
+    `\\.${retiredAliasLower}(?:es)?\\b`,
+    // The retired kind, as a whole quoted string: the schema literal, a JSON
+    // fixture, a frontmatter value, a CSS attribute selector.
+    `["']${retiredAliasLower}(?:es)?["']`,
+    // The kebab-case compounds, which are most of what this rename carried:
+    // refusal codes, completion kinds, test ids, CSS blocks and every `data-`
+    // attribute. A hyphen is not a word character, so every arm above reads
+    // straight past a retired-target refusal code, a retired creation kind
+    // and a retired CSS block.
+    `${retiredAliasLower}-[a-z]`,
+    `[a-z]-${retiredAliasLower}(?:es)?(?![a-z])`,
+    // The optional field, which the key arm cannot cross the `?` to reach.
+    `\\b${retiredAliasLower}(?:es)?\\?\\s*:`,
+    // The binding written as a whole parameter, where no capital follows to
+    // end a compound.
+    `\\(\\s*${retiredAliasLower}(?:es)?\\s*[,)]`,
+    // The declaration binding: a local minted straight off the retired word.
+    `\\b(?:const|let|var)\\s+${retiredAliasLower}(?:es)?\\b`,
+    // The word capitalised as a noun — how the rename is mostly written, in
+    // prose, a JSX string, an accessible name or a fixture Title. Plural and
+    // possessive both close a compound as surely as a capital does, so this
+    // arm carries both suffixes the others don't need to.
+    `\\b${RETIRED_ALIAS}(?:es|'s)?\\b`,
+  ].join('|'),
+);
+
+/**
+ * A bare lowercase retired name, standing alone. Scoped to implementation
+ * source for the same reason the Route, Diagram and Thing bare arms are: the
+ * capitalised arm above already reads prose everywhere, and a lowercase local
+ * or parameter left unrenamed only ever survives inside the code that binds
+ * it.
+ */
+const RETIRED_ALIAS_BARE = new RegExp(`\\b${retiredAliasLower}(?:es)?\\b`);
+
+/**
+ * The path-alias module's own name, composed rather than written out: that
+ * word is itself retired, under this file's own loose-name guard above, and a
+ * bare literal spelling in this authored tree would be a hit against that
+ * scan.
+ */
+const PATH_ALIAS_MODULE = ['work', 'space-aliases'].join('');
+
+/**
+ * Files that are the foreign sense of the word *entirely*, so a whole-file
+ * exemption forgives nothing else, plus this block's own file — see the
+ * block comment above for what each one is and why.
+ */
+const FOREIGN_ALIAS_FILES: readonly string[] = [
+  '.agents/skills/shadcn/SKILL.md',
+  '.agents/skills/shadcn/cli.md',
+  '.agents/skills/shadcn/mcp.md',
+  'tools/oxlint/anti-slop/index.ts',
+  'tools/oxlint/anti-slop/shared/dictionary-types.ts',
+  'tools/oxlint/anti-slop/shared/lexical-type-parameters.ts',
+  'tools/oxlint/anti-slop/rules/no-unknown-type-aliases.ts',
+  'tools/oxlint/anti-slop/rules/no-unknown-returns.ts',
+  'tools/oxlint/anti-slop/rules/no-object-parameters.ts',
+  'tools/oxlint/anti-slop/rules/no-unsafe-dictionary-type.ts',
+  `packages/app/${PATH_ALIAS_MODULE}.ts`,
+  'packages/app/vite.config.ts',
+  'packages/app/http-server-build.config.ts',
+  'packages/app/e2e/space-thing-drag-benchmark-vite.config.ts',
+  'vitest.config.ts',
+  'vitest.integration.config.ts',
+  'packages/app/components.json',
+  'packages/ui/components.json',
+  'CONTEXT.md',
+  'test/unit/current-domain-vocabulary.test.ts',
+  // Reads the path-alias build config's real, excluded `resolve.alias` output
+  // — a type annotation, an optional-chained read and an object-entries loop,
+  // three shapes no single mask reaches at once.
+  'test/unit/http-server-build-config.test.ts',
+];
+
+/**
+ * Structural spellings the kebab, key-value and dotted-read arms above would
+ * otherwise report, inside a file that is not otherwise exempt: two root tool
+ * configs and an agent-facing document cite the anti-slop rule id, `AGENTS.md`
+ * cites the path-alias module and the Vite config key it explains, and a
+ * dictionary-type test names a TypeScript alias-consumer test double. Masked
+ * rather than exempted by file, because each of these files also carries — or
+ * will carry — the domain rename in the same breath.
+ *
+ * `CITED_PATH` is masked here too, shared with the Diagram and Thing blocks
+ * above and for their exact reason: `AGENTS.md`'s ADR 0070 entry cites a
+ * `.scratch/` issue by path, and that tree is historical — `HISTORICAL`
+ * excludes its *contents*, not a live document naming a path into it, so the
+ * citation still spells the retired word and still has to.
+ */
+const QUALIFIED_ALIAS_SPELLINGS: readonly string[] = [
+  'no-unknown-type-aliases',
+  PATH_ALIAS_MODULE,
+  'resolve.alias',
+  'plain-alias-consumer',
+  // AGENTS.md's own sentence, an ordinary colon introducing a clause rather
+  // than an object key — indistinguishable from one by spelling alone.
+  'path aliases:',
+  // The real `typescript` compiler API two tests call by name to find a type
+  // alias declaration's AST shape.
+  'isTypeAliasDeclaration',
+];
+
+const withoutQualifiedAliasSpellings = (source: string): string =>
+  QUALIFIED_ALIAS_SPELLINGS.reduce(
+    (text, spelling) => text.split(spelling).join('qualified'),
+    source.replace(CITED_PATH, 'path'),
+  );
+
+describe('a Reference Thing is named once (ADR 0092)', () => {
+  const scanned = scannableFiles().filter((file) => !FOREIGN_ALIAS_FILES.includes(file));
+
+  it('reaches the kinds of file this rename actually touched', () => {
+    // The domain schema, the agent-facing document that already speaks the new
+    // name, and the vocabulary-bearing accessible-name module. A file list that
+    // quietly stopped resolving would report nothing forever.
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('packages/ui/src/ThingKindIcon.tsx');
+    expect(scanned).toContain('AGENTS.md');
+    expect(scanned.filter((file) => file.endsWith('.md')).length).toBeGreaterThan(0);
+  });
+
+  it('finds no compound of the retired name anywhere it still governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      return hits(withoutQualifiedAliasSpellings(source), RETIRED_ALIAS_NAME).map(
+        (hit) => `${file}:${hit}`,
+      );
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('finds no bare retired local or parameter in implementation source', () => {
+    const found = scanned.filter(isImplementationSource).flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(withoutQualifiedAliasSpellings(source), RETIRED_ALIAS_BARE).map(
+            (hit) => `${file}:${hit}`,
+          );
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no exemption that has stopped earning itself', () => {
+    // A loose, case-insensitive check rather than either structural pattern:
+    // some of these files carry the word only as free-form prose (a doc
+    // table cell, a Tip paragraph), which neither the compound nor the bare
+    // arm can see, and the exemption is earned by the file still needing to
+    // say the word at all — in whatever shape.
+    expectEachExemptionEarned(FOREIGN_ALIAS_FILES, /alias/i);
+
+    for (const spelling of QUALIFIED_ALIAS_SPELLINGS) {
+      const stillWritten = scannableFiles().some((file) => readTracked(file)?.includes(spelling));
+      expect(stillWritten, `${spelling} is masked but no longer written anywhere`).toBe(true);
+    }
+  });
+
+  it('reports the retired name in every shape it was written in', () => {
+    // Composed rather than written out, in this file's usual idiom: spelled
+    // literally, each fixture would be a hit this scan reports against its own
+    // source.
+    const retired = [
+      `export const ${RETIRED_ALIAS}Icon = () => null;`,
+      `readonly ${retiredAliasLower}Of?: ThingBaseKind;`,
+      `const canvas${RETIRED_ALIAS} = space.things[0];`,
+      `const ${retiredAliasLower}Kind = thing.kind;`,
+      `const ${RETIRED_ALIAS_UPPER}_ID = uuidSchema.parse('...');`,
+      `const ${RETIRED_ALIAS_UPPER}_OFFSET_RATIO = 0.75;`,
+      `{ "kind": "${retiredAliasLower}" }`,
+      `kind: z.literal('${retiredAliasLower}'),`,
+      `const chosen = diagram.selected${RETIRED_ALIAS};`,
+      // The kebab-case shapes: refusal codes, completion kinds, test ids and
+      // CSS blocks.
+      `refusal.code = '${retiredAliasLower}-target-immutable';`,
+      `case 'created-${retiredAliasLower}':`,
+      `<article data-testid="canvas-${retiredAliasLower}">`,
+      `.icons__${retiredAliasLower}-mark { display: flex; }`,
+      `'thing-has-${retiredAliasLower}es',`,
+      // The optional field, and the whole-parameter binding.
+      `readonly ${retiredAliasLower}?: ${RETIRED_ALIAS}Target;`,
+      `space.things.map((${retiredAliasLower}) => ${retiredAliasLower}.id)`,
+      `const ${retiredAliasLower} = nodeByTitle(page, 'A′').first();`,
+      // The bare capitalised noun, singular, plural and possessive: prose, an
+      // accessible name, a fixture Title, a button label.
+      `An ${RETIRED_ALIAS} chooses its Target once at creation.`,
+      `screen.getByRole('img', { name: '${RETIRED_ALIAS}' });`,
+      `expect(screen.getByRole('button', { name: '${RETIRED_ALIAS}es, 0' }));`,
+      `the ${RETIRED_ALIAS}'s centre lands on the Target's bottom-right corner`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_ALIAS_NAME.test(line), line).toBe(true);
+    }
+  });
+
+  it('reports the bare retired local standing alone', () => {
+    for (const line of [
+      `const ${retiredAliasLower} = thingNode('A again', ID);`,
+      `expect(${retiredAliasLower}.data.kind).toBe('reference');`,
+    ]) {
+      expect(RETIRED_ALIAS_BARE.test(line), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the foreign sense and on the vocabulary that replaced it', () => {
+    const kept = [
+      // The genuinely foreign sense, bare and lowercase, bounded by spaces
+      // rather than by any of the shapes above — no capital, no hyphen, no
+      // underscore and, for the first, a masked rather than a bare colon.
+      `Cross-package imports use the path ${retiredAliasLower}es: declared in`,
+      `makes an illegal ${retiredAliasLower} unresolvable`,
+      `Vite needs no ${retiredAliasLower} at all`,
+      // The vocabulary this rename arrived at.
+      `const selectedReference = space.things.find((thing) => thing.id === id);`,
+      `export type ReferenceThingId = z.infer<typeof uuidSchema>;`,
+      `kind: z.literal('reference'),`,
+      `A Reference Thing is a reference to another Thing.`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_ALIAS_NAME.test(withoutQualifiedAliasSpellings(line)), line).toBe(false);
+    }
+  });
+});
+
+/**
+ * Both patterns above are only as sharp as what they match, and one that
+ * silently stopped matching would pass every file forever.
+ */
+describe('the vocabulary the Reference Thing guard reads', () => {
+  it('reports the retired name in every shape it was written in, and stays silent on the foreign one', () => {
+    expect(RETIRED_ALIAS_NAME.test(`export const ${RETIRED_ALIAS}Icon = () => null;`)).toBe(true);
+    expect(RETIRED_ALIAS_NAME.test(`\`no-unknown-type-${retiredAliasLower}es\``)).toBe(true);
+    expect(
+      RETIRED_ALIAS_NAME.test(
+        withoutQualifiedAliasSpellings(`\`no-unknown-type-${retiredAliasLower}es\``),
+      ),
+    ).toBe(false);
+    expect(RETIRED_ALIAS_NAME.test(`the path ${retiredAliasLower}es Vite resolves through`)).toBe(
+      false,
+    );
+  });
+});

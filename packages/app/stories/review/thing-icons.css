@@ -179,28 +179,28 @@ html:has(.icons) {
   white-space: nowrap;
 }
 
-/* The Thing glyph and its Alias badge occupy one box, the badge laid over the
+/* The Thing glyph and its Reference Thing badge occupy one box, the badge laid over the
    base. Absolute rather than an SVG group so the base stays exactly the glyph
    every other row draws — the decoration must not change the thing it
    decorates, which is the whole claim being tested. */
-.icons__alias-mark {
+.icons__reference-mark {
   position: relative;
   display: inline-flex;
   flex: none;
 }
 
-.icons__alias-mark > svg {
+.icons__reference-mark > svg {
   position: absolute;
   inset: 0;
 }
 
 /* The knockout disc is filled and the badge stroked in one subtree, so the
    fill has to be painted before the stroke or it covers the mark it isolates. */
-.icons__alias-badge {
+.icons__reference-badge {
   paint-order: fill stroke markers;
 }
 
-.icons__alias-list {
+.icons__reference-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 12px 20px;
@@ -218,9 +218,9 @@ html:has(.icons) {
 }
 
 /* Four specimens rather than two: each decoration is drawn on the Thing glyph
-   and on the Space glyph, because a Space Thing can be an Alias's Target and a
+   and on the Space glyph, because a Space Thing can be a Reference Thing's Target and a
    decoration that only works on one base has not answered the question. */
-.icons__pair--alias {
+.icons__pair--reference {
   width: 104px;
   gap: 6px;
 }

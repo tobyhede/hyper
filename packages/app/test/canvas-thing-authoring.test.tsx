@@ -20,7 +20,7 @@ const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const ALIAS_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 /**
@@ -43,7 +43,7 @@ const snapshot = spaceSnapshotSchema.parse({
         kind: 'positioned',
         positions: {
           [THING_ID]: { x: 0, y: 0, open: false },
-          [ALIAS_ID]: { x: 300, y: 0, open: false },
+          [REFERENCE_ID]: { x: 300, y: 0, open: false },
           [SPACE_THING_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
@@ -53,7 +53,7 @@ const snapshot = spaceSnapshotSchema.parse({
   },
   things: [
     { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
-    { id: ALIAS_ID, document: { title: 'Return', kind: 'alias', target: THING_ID } },
+    { id: REFERENCE_ID, document: { title: 'Return', kind: 'reference', target: THING_ID } },
     {
       id: SPACE_THING_ID,
       document: {
@@ -89,7 +89,7 @@ const snapshotWithoutThing = spaceSnapshotSchema.parse({
 const node = (
   expanded: boolean,
   thingId = THING_ID,
-  kind: 'markdown' | 'alias' | 'space' = 'markdown',
+  kind: 'markdown' | 'reference' | 'space' = 'markdown',
 ): ThingFlowNode => ({
   id: thingId,
   type: 'thing',
@@ -122,7 +122,7 @@ interface HookProps {
 
 const mountAuthoring = (
   onBodyEditingChange?: (editing: boolean) => void,
-  projectedKind: 'markdown' | 'alias' | 'space' = 'markdown',
+  projectedKind: 'markdown' | 'reference' | 'space' = 'markdown',
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
@@ -201,38 +201,38 @@ describe('canvas Thing authoring', () => {
     expect(result.current.nodes[0]?.data.bodyEditor).toBeDefined();
   });
 
-  it('authors Open for an Alias through the same Thing operation', () => {
-    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'alias');
+  it('authors Open for a Reference Thing through the same Thing operation', () => {
+    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'reference');
     rerender({
       expanded: false,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
-      thingId: ALIAS_ID,
+      thingId: REFERENCE_ID,
     });
 
-    act(() => expect(result.current.openThing(ALIAS_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.diagrams?.[0]?.positions[ALIAS_ID]?.open).toBe(
-      true,
-    );
+    act(() => expect(result.current.openThing(REFERENCE_ID)).toBe('completed'));
+    expect(
+      spaceSession.getState().working.document.diagrams?.[0]?.positions[REFERENCE_ID]?.open,
+    ).toBe(true);
 
     rerender({
       expanded: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
-      thingId: ALIAS_ID,
+      thingId: REFERENCE_ID,
     });
 
-    // Open and read-only are the two halves of ADR 0070, and this Alias is in
+    // Open and read-only are the two halves of ADR 0070, and this Reference Thing is in
     // the working Space, so nothing else is withholding these. Opening keeps
-    // Close and the shared Title interaction; it never hands the Alias the
+    // Close and the shared Title interaction; it never hands the Reference Thing the
     // caret or the editor that would let it author the Target's content.
-    const alias = onlyNode(result.current.nodes);
-    expect(alias.data.onEditThing).toBeDefined();
-    expect(alias.data.titleEditingEnabled).toBe(true);
-    expect(alias.data.onBeginBodyEditing).toBeUndefined();
-    expect(alias.data.bodyEditor).toBeUndefined();
+    const reference = onlyNode(result.current.nodes);
+    expect(reference.data.onEditThing).toBeDefined();
+    expect(reference.data.titleEditingEnabled).toBe(true);
+    expect(reference.data.onBeginBodyEditing).toBeUndefined();
+    expect(reference.data.bodyEditor).toBeUndefined();
   });
 
   /**
@@ -411,7 +411,7 @@ describe('canvas Thing authoring', () => {
     });
   });
 
-  it.each(['markdown', 'alias'] as const)(
+  it.each(['markdown', 'reference'] as const)(
     'floors an Open %s Thing resize at the collapsed size',
     (kind) => {
       const { result, rerender } = mountAuthoring(undefined, kind);
@@ -420,7 +420,7 @@ describe('canvas Thing authoring', () => {
         enabled: true,
         presenting: false,
         nameOnCreation: null,
-        thingId: kind === 'alias' ? ALIAS_ID : THING_ID,
+        thingId: kind === 'reference' ? REFERENCE_ID : THING_ID,
       });
 
       const thing = onlyNode(result.current.nodes);
@@ -429,7 +429,7 @@ describe('canvas Thing authoring', () => {
     },
   );
 
-  it.each(['markdown', 'alias'] as const)(
+  it.each(['markdown', 'reference'] as const)(
     'withholds every authoring control from a projected %s Thing absent from the working Space',
     (kind) => {
       const { result, rerender } = mountAuthoring(undefined, kind);
@@ -596,9 +596,9 @@ describe('canvas Thing authoring Space rail', () => {
 
 describe('canvas Thing authoring decoration identity', () => {
   const markdownNode = node(false, THING_ID, 'markdown');
-  const aliasNode = node(false, ALIAS_ID, 'alias');
+  const referenceNode = node(false, REFERENCE_ID, 'reference');
   const space = node(true, SPACE_THING_ID, 'space');
-  const projection = [markdownNode, aliasNode, space];
+  const projection = [markdownNode, referenceNode, space];
   const target: SpaceThingTarget = {
     id: TARGET_SPACE_ID,
     title: 'Architecture',
@@ -628,7 +628,7 @@ describe('canvas Thing authoring decoration identity', () => {
       document: snapshot.document,
       things: [
         { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'Edited source' } },
-        { id: ALIAS_ID, document: { title: 'Return', kind: 'alias', target: THING_ID } },
+        { id: REFERENCE_ID, document: { title: 'Return', kind: 'reference', target: THING_ID } },
         {
           id: SPACE_THING_ID,
           document: {
@@ -683,10 +683,10 @@ describe('canvas Thing authoring decoration identity', () => {
     return { ...hook, spaceSession };
   };
 
-  it('keeps markdown and Alias node.data when only Space Thing targets change', () => {
+  it('keeps markdown and Reference Thing node.data when only Space Thing targets change', () => {
     const { result, rerender } = mountIdentity();
     const markdownData = dataOf(result.current.nodes, THING_ID);
-    const aliasData = dataOf(result.current.nodes, ALIAS_ID);
+    const referenceData = dataOf(result.current.nodes, REFERENCE_ID);
 
     rerender({
       spaceThingTargets: new Map([[TARGET_SPACE_ID, target]]),
@@ -694,7 +694,7 @@ describe('canvas Thing authoring decoration identity', () => {
     });
 
     expect(dataOf(result.current.nodes, THING_ID)).toBe(markdownData);
-    expect(dataOf(result.current.nodes, ALIAS_ID)).toBe(aliasData);
+    expect(dataOf(result.current.nodes, REFERENCE_ID)).toBe(referenceData);
     expect(dataOf(result.current.nodes, SPACE_THING_ID).spaceRail).toBeDefined();
   });
 
@@ -715,15 +715,15 @@ describe('canvas Thing authoring decoration identity', () => {
     expect(dataOf(result.current.nodes, SPACE_THING_ID).portal?.editing).toBe(true);
   });
 
-  it('keeps markdown and Alias node.data when a body save does not change Thing membership', () => {
+  it('keeps markdown and Reference Thing node.data when a body save does not change Thing membership', () => {
     const { result, spaceSession } = mountIdentity();
     const markdownData = dataOf(result.current.nodes, THING_ID);
-    const aliasData = dataOf(result.current.nodes, ALIAS_ID);
+    const referenceData = dataOf(result.current.nodes, REFERENCE_ID);
 
     act(() => spaceSession.submit(editedBodySnapshot()));
 
     expect(dataOf(result.current.nodes, THING_ID)).toBe(markdownData);
-    expect(dataOf(result.current.nodes, ALIAS_ID)).toBe(aliasData);
+    expect(dataOf(result.current.nodes, REFERENCE_ID)).toBe(referenceData);
   });
 
   it('keeps an Open Space Thing node.data when a markdown body save does not change its document', () => {

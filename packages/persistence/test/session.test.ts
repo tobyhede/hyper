@@ -59,7 +59,7 @@ type UnconflictedKind = Exclude<SpaceSessionState['persistence']['kind'], 'confl
  * One sample of every kind the property below quantifies over, keyed by kind
  * for exhaustive generation.
  *
- * The type alias above derives from `SpaceSessionState`, but a derived union is
+ * The type reference above derives from `SpaceSessionState`, but a derived union is
  * not on its own a guard: neither `fc.constantFrom` nor the `switch` in
  * `openSessionIn` demands that every member be named, so a sixth persistence
  * kind would drop out of the property in silence. `Record<UnconflictedKind, _>`

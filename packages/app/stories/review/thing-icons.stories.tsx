@@ -7,7 +7,7 @@
  *   Thing    sticky-note  a note, not a filed document
  *   Graph   route        a path from a start pin to an end pin
  *   Diagram  layout-grid  placements on a plane
- *   Alias   a corner badge on whichever of those it is an Alias of
+ *   Reference Thing   a corner badge on whichever of those it is a Reference Thing of
  *
  * The four replace `SquareSquare`, `FileText`, `Network` and `PanelsTopLeft`.
  * Two of those described something the product is not: `Network` is a
@@ -16,9 +16,9 @@
  * chrome where a Diagram is authored placement on a plane (ADR 0014 — placement
  * is authored, not computed).
  *
- * **An Alias is not a fifth glyph, and that is the load-bearing decision.** A
- * single Alias mark can say *that* a Thing refers elsewhere but never *what it
- * refers to* — and a Space Thing can be an Alias's Target as much as a Markdown
+ * **A Reference Thing is not a fifth glyph, and that is the load-bearing decision.** A
+ * single Reference Thing mark can say *that* a Thing refers elsewhere but never *what it
+ * refers to* — and a Space Thing can be a Reference Thing's Target as much as a Markdown
  * Thing can, so the two would draw identically. The kind of the Thing on the
  * canvas is exactly what the glyph exists to carry, so the base is kept and a
  * badge is added. It also agrees with what the canvas already does:
@@ -43,11 +43,11 @@
  * symbol name.
  *
  * **This is now built.** `DiagramIcon`, `GraphIcon`, `MarkdownIcon` and
- * `SpaceThingIcon` draw these glyphs, and `AliasIcon` composes the badge over a
- * base rather than being a glyph of its own; `ThingKindIcon` takes `aliasOf` and
+ * `SpaceThingIcon` draw these glyphs, and `ReferenceIcon` composes the badge over a
+ * base rather than being a glyph of its own; `ThingKindIcon` takes `referenceOf` and
  * composes rather than switching on a table. What is *not* built is the
- * plumbing: no call site supplies `aliasOf` yet, because the Target's kind is
- * not on `CanvasThingFront` at all — so every Alias still draws over the
+ * plumbing: no call site supplies `referenceOf` yet, because the Target's kind is
+ * not on `CanvasThingFront` at all — so every Reference Thing still draws over the
  * Markdown base. Carrying the Target's kind to the
  * surface is a change to the front's shape and belongs with the ADR.
  *
@@ -573,7 +573,7 @@ function GlyphNodeElement({
  * `dash` is the one thing here lucide does not ship. There is no
  * `sticky-note-dashed` — the family stops at `-check`, `-plus`, `-x` — so the
  * dashed twin is the same glyph with a dash pattern on its stroke. That is not
- * a liberty: `canvas-thing.css` already draws an Alias with `border-style:
+ * a liberty: `canvas-thing.css` already draws a Reference Thing with `border-style:
  * dotted` and switches it to solid on hover, so a dashed glyph is the icon
  * agreeing with the paper rather than inventing a convention.
  *
@@ -628,7 +628,7 @@ function Glyph({
 interface Candidate {
   readonly name: GlyphName;
   readonly note: string;
-  /** Drawn with the Alias's own dotted stroke rather than lucide's solid one. */
+  /** Drawn with the Reference Thing's own dotted stroke rather than lucide's solid one. */
   readonly dash?: string | undefined;
 }
 
@@ -663,16 +663,16 @@ const SPACE: readonly Candidate[] = [
 ];
 
 /**
- * **An Alias is not a fourth kind; it is another Thing seen from elsewhere.** So
+ * **A Reference Thing is not a fourth kind; it is another Thing seen from elsewhere.** So
  * the base glyph does not change and a decoration is added to it — which is
- * what the domain says (ADR 0070: an Open Alias resolves the immutable Target's
+ * what the domain says (ADR 0070: an Open Reference Thing resolves the immutable Target's
  * Markdown into the same content front a Markdown Thing draws) and what the
  * canvas already does (`canvas-thing.css` keeps the Thing and only changes
  * `border-style` to dotted).
  *
- * **What settles it is that a Space Thing can be an Alias's Target too.** A
- * single Alias glyph can say *that* a Thing refers elsewhere but never *what it
- * refers to*, so an Alias of a Space and an Alias of a Markdown Thing would draw
+ * **What settles it is that a Space Thing can be a Reference Thing's Target too.** A
+ * single Reference Thing glyph can say *that* a Thing refers elsewhere but never *what it
+ * refers to*, so a Reference Thing of a Space and a Reference to a Markdown Thing would draw
  * identically — and the kind of the Thing on the canvas is exactly what the
  * glyph exists to carry. A decoration composes: the base says which kind, the
  * badge says it is a view of one. Every option below is therefore drawn twice,
@@ -688,7 +688,7 @@ const SPACE: readonly Candidate[] = [
  * edge underneath — which is lucide's own idiom for the `sticky-note-check`,
  * `-plus` and `-x` family.
  */
-interface AliasOption {
+interface ReferenceOption {
   readonly title?: string | undefined;
   readonly note?: string | undefined;
   /** A badge glyph laid over the base, or nothing for a stroke-only treatment. */
@@ -704,9 +704,9 @@ interface AliasOption {
  * says Markdown Thing or Space Thing, and the badge says this one is a view of
  * another.
  */
-const ALIAS_BADGE = { mark: 'arrow-up-right' } as const satisfies AliasOption;
+const REFERENCE_BADGE = { mark: 'arrow-up-right' } as const satisfies ReferenceOption;
 
-const ALIAS_OPTIONS: readonly AliasOption[] = [
+const REFERENCE_OPTIONS: readonly ReferenceOption[] = [
   {
     title: 'Edge dotted, corner solid',
     note: "The canvas's own convention, and nothing added. Cheapest, and the only option that needs no second shape — but it is a difference in stroke, which is the first thing a small glyph loses.",
@@ -714,7 +714,7 @@ const ALIAS_OPTIONS: readonly AliasOption[] = [
     dashBodyOnly: true,
   },
   {
-    ...ALIAS_BADGE,
+    ...REFERENCE_BADGE,
     title: 'Corner badge — arrow — CHOSEN',
     note: 'A solid mark at the corner: this Thing points at another. Survives 14px because a filled badge is a shape, not a line weight, and it reads on the Space glyph as well as the Thing one.',
   },
@@ -838,7 +838,7 @@ const SPENT: readonly {
     name: 'copy',
     icon: 'CopyIcon',
     means: 'Copy link and Copy permanent link',
-    rulesOut: 'any two-overlapping-sheets Alias — copy itself, and files is close',
+    rulesOut: 'any two-overlapping-sheets Reference Thing — copy itself, and files is close',
   },
   { name: 'link', icon: 'LinkActionsIcon', means: 'the link actions control', rulesOut: 'link-2' },
   {
@@ -873,7 +873,7 @@ const SPENT: readonly {
  *
  * Four and not three: Graph and Diagram stopped being fixed constraints once
  * `Network` was read as a tree and `PanelsTopLeft` as a web page, so the whole
- * entity vocabulary is one choice. The Alias is not a fifth entry — it is the
+ * entity vocabulary is one choice. The Reference Thing is not a fifth entry — it is the
  * Thing entry with a decoration, which is the point.
  */
 interface EntitySet {
@@ -908,22 +908,22 @@ const ENTITY_SETS: readonly EntitySet[] = [
 
 /**
  * The six marks the chrome draws, in the rows it draws them in. Four entities
- * and the two Aliases — an Alias of a Thing and an Alias of a Space — because
+ * and the two Reference Things — a Reference Thing of a Thing and a Reference Thing of a Space — because
  * the decoration only earns its place if those two are told apart at a glance,
- * which is the thing a single Alias glyph could never do.
+ * which is the thing a single Reference Thing glyph could never do.
  */
 const ENTITY_ROWS = [
   { kind: 'space', label: 'Space', example: 'Rendering' },
   { kind: 'thing', label: 'Thing', example: 'Why authored placement beats a layout engine' },
   { kind: 'graph', label: 'Graph', example: 'Long' },
   { kind: 'diagram', label: 'Diagram', example: 'Collection 1' },
-  { kind: 'thing', label: 'Alias', example: 'Strategy overview', alias: true },
-  { kind: 'space', label: 'Alias', example: 'Rendering overview', alias: true },
+  { kind: 'thing', label: 'Reference Thing', example: 'Strategy overview', reference: true },
+  { kind: 'space', label: 'Reference Thing', example: 'Rendering overview', reference: true },
 ] as const satisfies readonly {
   kind: keyof Omit<EntitySet, 'title' | 'claim'>;
   label: string;
   example: string;
-  alias?: boolean;
+  reference?: boolean;
 }[];
 
 /* ------------------------------------------------------------------ views */
@@ -957,7 +957,7 @@ function CandidateColumn({
 }
 
 /**
- * The Thing glyph with an Alias decoration on it.
+ * The Thing glyph with a Reference Thing decoration on it.
  *
  * The badge is drawn at the bottom-right over a knockout disc painted in the
  * chrome's own paper, so it sits on the Thing rather than tangling with the
@@ -965,23 +965,23 @@ function CandidateColumn({
  * is filled and the badge stroked in the same subtree, and the fill has to land
  * before the stroke or the knockout covers the mark it exists to isolate.
  */
-function AliasMark({
+function ReferenceMark({
   option,
   base,
   size,
 }: {
-  readonly option: AliasOption;
+  readonly option: ReferenceOption;
   /** The glyph being decorated — a Markdown Thing's or a Space Thing's. */
   readonly base: GlyphName;
   readonly size: number;
 }) {
   return (
-    <span className="icons__alias-mark" style={{ width: size, height: size }}>
+    <span className="icons__reference-mark" style={{ width: size, height: size }}>
       <Glyph name={base} size={size} dash={option.dash} dashBodyOnly={option.dashBodyOnly} />
       {option.mark === undefined ? null : (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="icons__alias-badge"
+          className="icons__reference-badge"
           width={size}
           height={size}
           viewBox="0 0 24 24"
@@ -1016,8 +1016,8 @@ function EntitySetPanel({ set }: { readonly set: EntitySet }) {
         {ENTITY_ROWS.map((row) => (
           <li key={`${row.kind}${row.label}`} className="icons__row">
             <span className="icons__row-glyph">
-              {'alias' in row ? (
-                <AliasMark option={ALIAS_BADGE} base={set[row.kind]} size={14} />
+              {'reference' in row ? (
+                <ReferenceMark option={REFERENCE_BADGE} base={set[row.kind]} size={14} />
               ) : (
                 <Glyph name={set[row.kind]} size={14} />
               )}
@@ -1047,16 +1047,16 @@ export const Default: Story = () => (
 
     <section className="icons__collisions">
       <h2 className="icons__heading">
-        An Alias decorates the glyph it is an Alias of — Thing, then Space
+        A Reference Thing decorates the glyph it is a Reference Thing of — Thing, then Space
       </h2>
-      <ul className="icons__alias-list">
-        {ALIAS_OPTIONS.map((option) => (
+      <ul className="icons__reference-list">
+        {REFERENCE_OPTIONS.map((option) => (
           <li key={option.title ?? ''} className="icons__candidate">
-            <span className="icons__pair icons__pair--alias">
-              <AliasMark option={option} base="sticky-note" size={14} />
-              <AliasMark option={option} base="sticky-note" size={20} />
-              <AliasMark option={option} base="frame" size={14} />
-              <AliasMark option={option} base="frame" size={20} />
+            <span className="icons__pair icons__pair--reference">
+              <ReferenceMark option={option} base="sticky-note" size={14} />
+              <ReferenceMark option={option} base="sticky-note" size={20} />
+              <ReferenceMark option={option} base="frame" size={14} />
+              <ReferenceMark option={option} base="frame" size={20} />
             </span>
             <span className="icons__body">
               <code className="icons__name">{option.title}</code>
