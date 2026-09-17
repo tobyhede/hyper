@@ -14,8 +14,12 @@ hand-rolling.
 **Blocked by:** None — can start immediately (stories may use a small fixture
 palette until ticket 01 lands).
 
-- [ ] Exported component on `@project/ui` suitable for Graph recolour and other closed palettes later.
-- [ ] Swatch grid shows every supplied colour with its label; the chosen swatch is visibly selected.
-- [ ] Popover opens from a caller-provided trigger; Escape dismisses without leaving a stray focus trap.
-- [ ] Stable Ladle story under `stories/components/` and a matching `pnpm e2e:ladle` behaviour test.
-- [ ] Component recorded in the design-system inventory if required by `pnpm ui:catalog:check`.
+- [x] Exported component on `@project/ui` suitable for Graph recolour and other closed palettes later.
+- [x] Swatch grid shows every supplied colour with its label; the chosen swatch is visibly selected.
+- [x] Popover opens from a caller-provided trigger; Escape dismisses without leaving a stray focus trap.
+- [x] Stable Ladle story under `stories/components/` and a matching `pnpm e2e:ladle` behaviour test.
+- [x] Component recorded in the design-system inventory if required by `pnpm ui:catalog:check`.
+
+## Comments
+
+Resolved on `main` by `b9fe0a0cf` (adopt Tableau 20 and the swatch grid), `47c0f8fce` (picker layout and palette ordering) and `ed18178ae` (parity claims and swatch grid tests).

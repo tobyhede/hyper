@@ -12,8 +12,12 @@ that pin old hex values or six-slot assumptions.
 
 **Blocked by:** None — can start immediately.
 
-- [ ] `GRAPH_PALETTE` holds twenty Tableau 20 hex values with source noted beside the constant.
-- [ ] A single exported name map (or equivalent) pairs every slot with its label; callers do not invent labels locally.
-- [ ] `nextGraphColor`, `graphColorMap`, and `activeGraphColor` rotate and resolve through the expanded set without behaviour regressions.
-- [ ] Unit and property tests that sample or index the palette are updated; `pnpm verify` passes.
-- [ ] Fixture and story data that assumed six palette slots or specific old hex values are updated.
+- [x] `GRAPH_PALETTE` holds twenty Tableau 20 hex values with source noted beside the constant.
+- [x] A single exported name map (or equivalent) pairs every slot with its label; callers do not invent labels locally.
+- [x] `nextGraphColor`, `graphColorMap`, and `activeGraphColor` rotate and resolve through the expanded set without behaviour regressions.
+- [x] Unit and property tests that sample or index the palette are updated; `pnpm verify` passes.
+- [x] Fixture and story data that assumed six palette slots or specific old hex values are updated.
+
+## Comments
+
+Resolved on `main` by `b9fe0a0cf` (adopt Tableau 20 and the swatch grid), `47c0f8fce` (picker layout and palette ordering) and `ed18178ae` (parity claims and swatch grid tests).
