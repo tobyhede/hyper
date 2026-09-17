@@ -2518,11 +2518,13 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
  * rather than exempted by file, because each of these files also carries — or
  * will carry — the domain rename in the same breath.
  *
- * `CITED_PATH` is masked here too, shared with the Diagram and Thing blocks
- * above and for their exact reason: `AGENTS.md`'s ADR 0070 entry cites a
- * `.scratch/` issue by path, and that tree is historical — `HISTORICAL`
- * excludes its *contents*, not a live document naming a path into it, so the
- * citation still spells the retired word and still has to.
+ * Historical-tree citations are masked here too, for the same reason the
+ * Diagram and Thing blocks forgive a cited foreign path: `AGENTS.md`'s ADR
+ * 0070 entry names a `.scratch/` issue, and `HISTORICAL` excludes that tree's
+ * *contents*, not a live document pointing into it. The mask is those three
+ * prefixes only — not `CITED_PATH` — because that pattern also swallows a live
+ * relative import whose last segment is a PascalCase compound of the retired
+ * name, which this rename's scan still has to report.
  */
 const QUALIFIED_ALIAS_SPELLINGS: readonly string[] = [
   'no-unknown-type-aliases',
@@ -2540,10 +2542,12 @@ const QUALIFIED_ALIAS_SPELLINGS: readonly string[] = [
   'narrowing the alias above',
 ];
 
+const CITED_HISTORICAL_PATH = /(?:docs\/adr\/|docs\/superpowers\/|\.scratch\/)\S*/g;
+
 const withoutQualifiedAliasSpellings = (source: string): string =>
   QUALIFIED_ALIAS_SPELLINGS.reduce(
     (text, spelling) => text.split(spelling).join('qualified'),
-    source.replace(CITED_PATH, 'path'),
+    source.replace(CITED_HISTORICAL_PATH, 'path'),
   );
 
 /**
@@ -2687,6 +2691,18 @@ describe('a Reference Thing is named once (ADR 0092)', () => {
     for (const line of kept) {
       expect(RETIRED_ALIAS_NAME.test(withoutQualifiedAliasSpellings(line)), line).toBe(false);
     }
+  });
+
+  it('does not forgive a live path that still spells the retired name', () => {
+    const livePath = `./${RETIRED_ALIAS}Thing`;
+    expect(RETIRED_ALIAS_NAME.test(livePath), livePath).toBe(true);
+    expect(RETIRED_ALIAS_NAME.test(withoutQualifiedAliasSpellings(livePath)), livePath).toBe(true);
+
+    const historical = `.scratch/${retiredAliasLower}-cards/issues/05-jump-to-${retiredAliasLower}-target.md`;
+    expect(RETIRED_ALIAS_NAME.test(historical), historical).toBe(true);
+    expect(RETIRED_ALIAS_NAME.test(withoutQualifiedAliasSpellings(historical)), historical).toBe(
+      false,
+    );
   });
 });
 

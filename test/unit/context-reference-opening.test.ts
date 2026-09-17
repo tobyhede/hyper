@@ -97,9 +97,12 @@ const DELEGATED_CONTENT = [
  * carries. CONTEXT.md's ADR 0092 rewrite reworded the Reference Thing
  * definition to "the Target is opened to author that content" — the same
  * fact, that the Target takes a distinct step to author, stated without that
- * word. What this guards is the fact, not the adverb.
+ * word. What this guards is the fact, not the adverb: `target` has to be the
+ * subject of `opened`, so a sentence that opens the Reference Thing and only
+ * mentions its Target later does not count. `must` is left off for the same
+ * reason as `explicitly` — the Reference Thing definition does not use it.
  */
-const SEPARATELY_OPENED = /opened[^.]*to author/i;
+const SEPARATELY_OPENED = /target[^.;]*opened[^.;]*to author/i;
 
 describe('CONTEXT.md on opening a Reference Thing', () => {
   it('limits a Reference Thing to its own title and target', () => {
@@ -111,6 +114,8 @@ describe('CONTEXT.md on opening a Reference Thing', () => {
 
   it('sends an author to the Target Thing itself to author its content', () => {
     expect(referenceClause(definitionOf('Opening'))).toMatch(SEPARATELY_OPENED);
+    expect('A Reference Thing is opened to author its Title').not.toMatch(SEPARATELY_OPENED);
+    expect('the Target is opened to author that content').toMatch(SEPARATELY_OPENED);
   });
 
   it('does not describe a Reference Thing as opening its Target’s content', () => {
