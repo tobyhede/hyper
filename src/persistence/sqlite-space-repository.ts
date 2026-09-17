@@ -18,6 +18,13 @@ import {
 } from '@project/persistence';
 import type { SqliteDatabase } from '../sqlite/db';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
+import {
+  commitIdentityRefusal,
+  committedRevision,
+  decideAggregateCommit,
+  decideTopologyPreservingUpdate,
+  topologyPreservingCandidate,
+} from './commit-decision';
 import type {
   AggregateInput,
   InitializeAggregateResult,
@@ -32,6 +39,23 @@ type JsonValue =
 class SnapshotValidationError extends Error {}
 
 class ThingOwnershipError extends Error {}
+
+/**
+ * A Space row moved between this transaction's conflict check and its write.
+ *
+ * Thrown rather than returned because the write loop has already replaced
+ * earlier Spaces in the change set by the time it can be detected. Returning a
+ * conflict from inside the transaction callback would commit those writes
+ * beside it; escaping the callback is what rolls the whole change set back.
+ */
+class StaleSpaceRevisionError extends Error {
+  readonly spaceId: UUID;
+
+  constructor(spaceId: UUID) {
+    super(`Space ${spaceId} changed during commit`);
+    this.spaceId = spaceId;
+  }
+}
 
 interface SqlPrimaryKeyConflictFields {
   readonly kind?: unknown;
@@ -227,27 +251,125 @@ const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<Loaded
   return authoritativeAggregate(orm, input.metaSpaceId);
 };
 
+const writeSpaceDocumentUnderLock = async (
+  orm: Orm,
+  snapshot: SpaceSnapshot,
+): Promise<bigint | undefined> => {
+  const locked = await orm.Space.where({ id: snapshot.id }).update({
+    document: toJsonValue(snapshot.document),
+  });
+  return locked === null ? undefined : toRevision(locked.revision);
+};
+
+const upsertThings = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
+  for (const thing of snapshot.things) {
+    const stored = await orm.Thing.upsert({
+      create: {
+        id: thing.id,
+        spaceId: snapshot.id,
+        document: toJsonValue(thing.document),
+      },
+      update: {
+        document: toJsonValue(thing.document),
+      },
+    });
+    if (stored.spaceId !== snapshot.id) {
+      throw new ThingOwnershipError(
+        `Thing ${thing.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+      );
+    }
+  }
+};
+
+const replaceStoredSpace = async (
+  orm: Orm,
+  snapshot: SpaceSnapshot,
+  expectedRevision: bigint,
+  revision: bigint,
+): Promise<void> => {
+  const locked = await writeSpaceDocumentUnderLock(orm, snapshot);
+  if (locked !== expectedRevision) throw new StaleSpaceRevisionError(snapshot.id);
+  await orm.Space.where({ id: snapshot.id }).update({
+    revision: toDatabaseRevision(revision),
+  });
+  await upsertThings(orm, snapshot);
+  const ownedThings = orm.Thing.where({ spaceId: snapshot.id });
+  if (snapshot.things.length === 0) await ownedThings.deleteAll();
+  else {
+    await ownedThings
+      .where((thing) => thing.id.notIn(snapshot.things.map(({ id }) => id)))
+      .deleteAll();
+  }
+};
+
+const commitTopologyPreservingUpdate = async (
+  orm: Orm,
+  request: SpaceCommit,
+): Promise<RepositoryCommitResult | undefined> => {
+  const change = topologyPreservingCandidate(request);
+  if (change === undefined) return undefined;
+  const decision = decideTopologyPreservingUpdate(
+    change,
+    await loadStoredSpace(orm, change.spaceId),
+  );
+  if (decision.kind === 'aggregate-path') return undefined;
+  if (decision.kind === 'answer') return decision.result;
+
+  const locked = await writeSpaceDocumentUnderLock(orm, change.snapshot);
+  if (locked !== change.expectedRevision) throw new StaleSpaceRevisionError(change.spaceId);
+  await orm.Space.where({ id: change.spaceId }).update({
+    revision: toDatabaseRevision(committedRevision(change)),
+  });
+  await upsertThings(orm, change.snapshot);
+  return decision.result;
+};
+
 export class SqliteSpaceRepository implements SpaceRepository {
   readonly #database: SqliteDatabase;
+  #queue: Promise<void> = Promise.resolve();
 
   constructor(database: SqliteDatabase) {
     this.#database = database;
   }
 
-  async listSpaces(): Promise<readonly SpaceSummary[]> {
-    const spaces = await this.#database.orm.Space.orderBy((space) => space.id.asc()).all();
+  /**
+   * One in-process database operation at a time, reads included. The driver
+   * opens a handle per operation, so overlapping transactions would both sit in
+   * a deferred BEGIN, and an auto-commit read holding its statement open across
+   * a promise turn makes an overlapping commit's COMMIT wait out the busy
+   * timeout synchronously and fail (`test/integration/sqlite-space-repository.test.ts`
+   * overlapping reads, initializations, different-Space commits, and reads
+   * overlapping a commit).
+   */
+  #serialise<T>(operation: () => Promise<T>): Promise<T> {
+    const run = this.#queue.then(operation, operation);
+    this.#queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
 
-    return spaces.map((space) => ({
-      id: uuidSchema.parse(space.id),
-      title: spaceDocumentSchema.parse(storedJson(space.document)).title,
-    }));
+  listSpaces(): Promise<readonly SpaceSummary[]> {
+    return this.#serialise(async () => {
+      const spaces = await this.#database.orm.Space.orderBy((space) => space.id.asc()).all();
+
+      return spaces.map((space) => ({
+        id: uuidSchema.parse(space.id),
+        title: spaceDocumentSchema.parse(storedJson(space.document)).title,
+      }));
+    });
   }
 
   loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    return loadStoredSpace(this.#database.orm, id);
+    return this.#serialise(() => loadStoredSpace(this.#database.orm, id));
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {
+    return this.#serialise(() => this.#loadAggregateUnserialised());
+  }
+
+  #loadAggregateUnserialised(): Promise<AggregateLoadResult> {
     return this.#database.transaction(async ({ orm }) => {
       const metaSpaceId = await lockMetaIdentity(orm);
       if (metaSpaceId === undefined) {
@@ -258,7 +380,11 @@ export class SqliteSpaceRepository implements SpaceRepository {
     });
   }
 
-  async initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
+  initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
+    return this.#serialise(() => this.#initializeUnserialised(input));
+  }
+
+  async #initializeUnserialised(input: AggregateInput): Promise<InitializeAggregateResult> {
     const intake = loadSpaceAggregate({
       metaSpaceId: input.metaSpaceId,
       snapshots: input.spaces,
@@ -282,7 +408,7 @@ export class SqliteSpaceRepository implements SpaceRepository {
       if (!(error instanceof ThingOwnershipError) && !isUniqueViolation(error)) {
         throw error;
       }
-      const result = await this.loadAggregate();
+      const result = await this.#loadAggregateUnserialised();
       if (result.kind === 'uninitialized') throw error;
       return classifyInitializedAggregate(input, result.aggregate);
     }
@@ -299,11 +425,61 @@ export class SqliteSpaceRepository implements SpaceRepository {
     return Promise.reject(new Error('SQLite markExported is not implemented'));
   }
 
-  commit(_request: SpaceCommit): Promise<RepositoryCommitResult> {
-    return Promise.resolve({
-      kind: 'rejected',
-      code: 'invalid-commit',
-      message: 'SQLite writes are not implemented',
+  commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    return this.#serialise(() => this.#commitUnserialised(request));
+  }
+
+  async #commitUnserialised(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    const refusal = commitIdentityRefusal(request);
+    if (refusal !== undefined) return refusal;
+
+    try {
+      return await this.#commitInTransaction(request);
+    } catch (error) {
+      if (error instanceof ThingOwnershipError) {
+        return { kind: 'rejected', code: 'invalid-commit', message: error.message };
+      }
+      if (error instanceof StaleSpaceRevisionError) {
+        return {
+          kind: 'conflict',
+          conflicts: [
+            {
+              spaceId: error.spaceId,
+              current: await loadStoredSpace(this.#database.orm, error.spaceId),
+            },
+          ],
+        };
+      }
+      throw error;
+    }
+  }
+
+  #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    return this.#database.transaction(async ({ orm }) => {
+      const topologyPreserving = await commitTopologyPreservingUpdate(orm, request);
+      if (topologyPreserving !== undefined) return topologyPreserving;
+      const metaSpaceId = await lockMetaIdentity(orm);
+      const decision = decideAggregateCommit(request, metaSpaceId, await loadEverySpace(orm));
+      if (decision.kind === 'answer') return decision.result;
+
+      for (const change of request.changes) {
+        if (change.kind === 'delete') {
+          await orm.Thing.where({ spaceId: change.spaceId }).deleteAll();
+          const deleted = await orm.Space.where({ id: change.spaceId }).delete();
+          if (deleted === null)
+            throw new Error(`Space ${change.spaceId} disappeared during commit`);
+        } else if (change.kind === 'create') {
+          await createStoredSpace(orm, change.snapshot);
+        } else {
+          await replaceStoredSpace(
+            orm,
+            change.snapshot,
+            change.expectedRevision,
+            committedRevision(change),
+          );
+        }
+      }
+      return decision.result;
     });
   }
 }

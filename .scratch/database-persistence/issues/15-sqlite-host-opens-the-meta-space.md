@@ -8,6 +8,8 @@
 
 Ticket 14's composition constraint is in force from this ticket, not deferred to 18: **one SQLite runtime per process**, constructed once at composition the way PostgreSQL already is. Do not open a second independent client against the same live file from inside the host (tests, CLI helpers, or a second `sqlite()` call). Overlapping writers and two-process contention are 16 and 18.
 
+**Correction (review of 14, 2026-09-16):** one runtime is necessary but not sufficient. The pinned driver opens a new `DatabaseSync` handle for every `transaction()`, so two overlapping transactions through this one client are two SQLite connections on the file. Measured against this ticket's committed `SqliteSpaceRepository`: two overlapping `loadAggregate`s, and two overlapping first `initializeAggregate`s, each lost one side to an immediate `SqlConnectionError: database is locked` (2–9ms). `loadAggregate` is a write transaction here because `lockMetaIdentity` issues a dummy `UPDATE`. In-process serialisation of repository transactions (16) is what closes that, not the one-runtime rule.
+
 - [x] A separate SQLite contract, generated artifacts, migration history, and runtime exist beside PostgreSQL. Generated contracts are not shared or made conditional; they encode target codecs.
 - [x] `revision` and `exported_revision` are canonical non-negative decimal TEXT. Application code continues to speak `bigint`; conversion to and from the decimal string happens only at the SQLite adapter boundary. INTEGER / `BigInt` columns are not used.
 - [x] Space and Thing ids are minted with the process `newId` already injected at composition. The contract has no database-side UUID default.
