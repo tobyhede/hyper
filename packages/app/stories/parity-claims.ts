@@ -211,6 +211,13 @@ export const parityClaims: readonly ParityClaim[] = [
       "A Thing's revealed commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Thing's authoring handles and its Edges keep that colour.",
   },
   {
+    id: 'dragged-thing-returns-its-chrome-to-rest',
+    storyFile: 'components/thing.stories.tsx',
+    storyExport: 'Drag',
+    claim:
+      'A Thing being moved draws as dragging and reveals none of its hover chrome — no rail actions and no Edge handles — though the pointer is still on it and the drag has Selected it; hovering it after release reveals them again.',
+  },
+  {
     id: 'canvas-thing-hover-reveals-actions-and-handles-together',
     storyFile: 'components/thing.stories.tsx',
     storyExport: 'Hover',

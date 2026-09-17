@@ -238,19 +238,31 @@ body {
    Pointer focus alone must not keep the control up after Open/Close and departure.
    Hover and focus are read off `.react-flow__node`, the element React Flow
    itself makes hoverable and focusable; Selected is read off `data-selected`,
-   which only `.rf-thing-node__inner` carries. */
-.react-flow__node:hover .react-flow__resize-control.rf-thing-node__resize-control,
-.rf-thing-node__inner[data-selected='true']
+   which only `.rf-thing-node__inner` carries.
+
+   Every one of the three is gated on `data-dragging`, for the reason the anchors
+   below are: moving a Thing satisfies all three at once — the pointer stays on
+   the Thing it carries and React Flow Selects it — so a Thing being carried
+   would otherwise offer the corner that resizes it. Stating the condition on
+   each arm keeps it where the reveal is decided rather than in a second rule
+   racing this one on specificity, as `data-resizing` already is. */
+.react-flow__node:hover
+  .rf-thing-node__inner[data-dragging='false']
+  .react-flow__resize-control.rf-thing-node__resize-control,
+.rf-thing-node__inner[data-selected='true'][data-dragging='false']
   .react-flow__resize-control.rf-thing-node__resize-control,
 .react-flow__node:is(:focus-visible, :has(:focus-visible))
+  .rf-thing-node__inner[data-dragging='false']
   .react-flow__resize-control.rf-thing-node__resize-control {
   opacity: 1;
   pointer-events: auto;
 }
 
-.react-flow__node:hover .rf-thing-node__resize-mark,
-.rf-thing-node__inner[data-selected='true'] .rf-thing-node__resize-mark,
-.react-flow__node:is(:focus-visible, :has(:focus-visible)) .rf-thing-node__resize-mark {
+.react-flow__node:hover .rf-thing-node__inner[data-dragging='false'] .rf-thing-node__resize-mark,
+.rf-thing-node__inner[data-selected='true'][data-dragging='false'] .rf-thing-node__resize-mark,
+.react-flow__node:is(:focus-visible, :has(:focus-visible))
+  .rf-thing-node__inner[data-dragging='false']
+  .rf-thing-node__resize-mark {
   opacity: 1;
 }
 
@@ -297,11 +309,19 @@ body {
    every Thing: an Edge attaches to one, and React Flow draws no Edge at all for
    a Thing whose handles it cannot resolve (ADR 0087). A Read embedding keeps
    the anchors and withholds the gesture; Edit publishes the same affordance
-   the host canvas does. */
+   the host canvas does.
+
+   The two idle arms are gated on `data-dragging` as well, because a Thing being
+   moved has one gesture and offering the start of another is not part of it: a
+   drag keeps the pointer on the Thing and Selects it, so both idle reveals would
+   otherwise fire for the    whole of it. The two seeking arms are deliberately
+   ungated: they are what a *neighbour* offers the drag that is drawing an Edge,
+   which is a different gesture from carrying a Thing, and nothing about it
+   changes here. */
 .react-flow__node:hover
-  .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-in-progress='false']
+  .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-selected='true'][data-connection-in-progress='false']
+.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-selected='true'][data-connection-in-progress='false']
   .rf-thing-node__authoring-handle--source,
 .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='target']
   .rf-thing-node__authoring-handle--target,

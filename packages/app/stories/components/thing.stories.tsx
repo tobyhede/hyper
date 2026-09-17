@@ -205,6 +205,30 @@ export const Hover: Story = () => (
 );
 Hover.meta = { iframed: true };
 
+/**
+ * The same reveal, seen from the other side: a Thing being moved has no hover
+ * chrome, although a drag satisfies every condition the chrome is revealed by —
+ * the pointer stays on the Thing it is carrying, and React Flow Selects it as
+ * the gesture begins. So this is a live drag of the real production `ThingNode`
+ * rather than the static dragging treatment `States` draws, and what it shows is
+ * the withdrawal and its return on release.
+ */
+export const Drag: Story = () => (
+  <div className="inv inv-sheet" style={thingSizeVars}>
+    <CatalogueSection
+      title="Drag"
+      note="Press the Thing and move it: the rail actions and the Edge handles both return to rest for the gesture, and hovering the Thing after release reveals them again."
+    >
+      <div className="inv-row">
+        <Specimen label="drag to return the chrome to rest">
+          <CanvasThingNodeSpecimen draggable />
+        </Specimen>
+      </div>
+    </CatalogueSection>
+  </div>
+);
+Drag.meta = { iframed: true };
+
 /** A specimen that keeps its own size in state, so a real drag on the real
  *  production control actually grows the real node — the round trip
  *  `SpaceCanvas` makes through Space Authoring, condensed to local state. */

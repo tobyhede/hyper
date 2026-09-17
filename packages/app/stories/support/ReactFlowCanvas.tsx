@@ -150,6 +150,18 @@ export interface StoryCanvasProps {
   readonly maxZoom?: number;
   /** Production Things only: connect-by-drag and the same ceiling `SpaceCanvas` uses. */
   readonly interactive?: boolean;
+  /**
+   * Whether a Thing on this canvas can be moved by a pointer.
+   *
+   * A story that asks for it hands its nodes over as `defaultNodes`, because
+   * React Flow drops every change — the position, the Selection and the
+   * `dragging` flag alike — when `nodes` is controlled and no `onNodesChange`
+   * answers it, and a story that cannot report a drag cannot be dragged. So an
+   * uncontrolled canvas is the price of a real gesture, and the cost is that
+   * later prop updates no longer reach the flow: a story that drives a node from
+   * its own state stays controlled and is not draggable.
+   */
+  readonly draggable?: boolean;
   /** The mount's own size and stage dressing; the surrounding frame is `StoryCanvasFrame`'s. */
   readonly className: string;
   readonly children?: ReactNode;
@@ -176,6 +188,7 @@ export function StoryCanvas({
   minZoom = 0.2,
   maxZoom = MAX_ZOOM,
   interactive = false,
+  draggable = false,
   className,
   children,
 }: StoryCanvasProps) {
@@ -187,7 +200,7 @@ export function StoryCanvas({
     <div className={className} style={thingSizeVars}>
       <ReactFlowProvider>
         <ReactFlow
-          nodes={[...nodes]}
+          {...(draggable ? { defaultNodes: [...nodes] } : { nodes: [...nodes] })}
           edges={[...edges]}
           {...typeProps}
           {...(viewport.fit
@@ -196,7 +209,7 @@ export function StoryCanvas({
           minZoom={minZoom}
           maxZoom={maxZoom}
           nodesConnectable={interactive}
-          nodesDraggable={false}
+          nodesDraggable={draggable}
           zoomOnDoubleClick={false}
           proOptions={{ hideAttribution: true }}
         >
@@ -246,12 +259,14 @@ function RealReactFlow({
   edges,
   className,
   controls = false,
+  draggable = false,
   viewport = { fit: true },
 }: {
   readonly nodes: readonly ThingFlowNode[];
   readonly edges: readonly Edge[];
   readonly className: string;
   readonly controls?: boolean;
+  readonly draggable?: boolean;
   readonly viewport?: StoryCanvasViewport;
 }) {
   return (
@@ -263,6 +278,7 @@ function RealReactFlow({
       viewport={viewport}
       maxZoom={MAX_ZOOM}
       interactive
+      draggable={draggable}
       className={className}
     >
       {controls && <ZoomSlider />}
@@ -361,6 +377,8 @@ export interface CanvasThingNodeSpecimenProps {
   readonly title?: string;
   readonly body?: string;
   readonly readOnly?: boolean;
+  /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
+  readonly draggable?: boolean;
 }
 
 /**
@@ -382,6 +400,7 @@ export function CanvasThingNodeSpecimen({
   title,
   body,
   readOnly = false,
+  draggable = false,
 }: CanvasThingNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
@@ -449,6 +468,7 @@ export function CanvasThingNodeSpecimen({
       className={`inv-thing-node-stage ${stageClassName}`}
       nodes={[node]}
       edges={[]}
+      draggable={draggable}
       viewport={zoom === undefined ? { fit: true } : { fit: false, x: 0, y: 0, zoom }}
     />
   );

@@ -424,6 +424,12 @@ export function ThingNode({
       // `styles.css` reads before showing one to a pointer (ADR 0087).
       data-connection-authoring={connectionAuthoring}
       data-resizing={resizeActive}
+      // Whether this Thing is the one being moved. A drag satisfies every
+      // condition the hover chrome is revealed by — the pointer is on the Thing
+      // it carries, and React Flow Selects it — so the reveal in `styles.css`
+      // reads this to withhold the anchors and the resize control for the
+      // gesture, exactly as it reads `data-resizing` for the other one.
+      data-dragging={dragging}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
       // element's parent, so an Expanded Thing only reaches its own rect if this
       // one stops declaring the collapsed constant — which `styles.css` does
