@@ -238,6 +238,198 @@ describe('Space session registry', () => {
     });
   });
 
+  it('chooses a different replacement Graph when the preferred one goes during the wait', async () => {
+    const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000100');
+    const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000101');
+    const DELETED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000102');
+    const PREFERRED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000103');
+
+    const target = {
+      snapshot: {
+        id: TARGET_ID,
+        document: {
+          version: 1 as const,
+          title: 'Target',
+          defaultDiagram: DIAGRAM,
+          diagrams: [
+            {
+              id: DIAGRAM,
+              title: 'Diagram 1',
+              kind: 'positioned' as const,
+              positions: {},
+              activeGraph: DELETED_GRAPH,
+              graphs: [
+                { id: KEEP_GRAPH, title: 'Keep', edges: [] },
+                { id: DELETED_GRAPH, title: 'Deleted', edges: [] },
+                { id: PREFERRED_GRAPH, title: 'Preferred', edges: [] },
+              ],
+            },
+          ],
+        },
+        things: [],
+      },
+      revision: 3n,
+      exportedRevision: null,
+    };
+    const backend = new MemorySpaceBackend(TARGET_ID, [target]);
+    const registry = createSpaceSessionRegistry(backend);
+    const targetSession = registry.open(target);
+
+    // The coordination reads the aggregate exactly once, right before it
+    // plans the successor. The preferred replacement Graph is removed from
+    // the target's own live session during that one read — an ordinary Edit
+    // landing in the same window ticket 05 used for a deleted Diagram.
+    const loadAggregate = backend.loadAggregate.bind(backend);
+    let reads = 0;
+    backend.loadAggregate = async () => {
+      reads += 1;
+      if (reads === 1) {
+        const working = targetSession.getState().working;
+        targetSession.submit({
+          ...working,
+          document: {
+            ...working.document,
+            diagrams: (working.document.diagrams ?? []).map((diagram) =>
+              diagram.id === DIAGRAM
+                ? { ...diagram, graphs: diagram.graphs.filter(({ id }) => id !== PREFERRED_GRAPH) }
+                : diagram,
+            ),
+          },
+        });
+      }
+      return loadAggregate();
+    };
+
+    const deletion = registry
+      .spaceThings(() => THING_ID)
+      .deleteGraph({
+        targetSpaceId: TARGET_ID,
+        diagramId: DIAGRAM,
+        graphId: DELETED_GRAPH,
+        preferredGraphId: PREFERRED_GRAPH,
+      });
+
+    await expect(deletion).resolves.toEqual({
+      kind: 'completed',
+      diagramId: DIAGRAM,
+      graphId: KEEP_GRAPH,
+    });
+    expect(reads).toBe(1);
+
+    // The coordinated commit installs the target's fully merged next state —
+    // the injected mid-wait removal of the preferred Graph, and the
+    // coordinated removal of the deleted one — into the session's own
+    // `working` synchronously, the moment `deleteGraph` resolves (ADR 0030),
+    // well before the backend round trip completes. Asserting here, rather
+    // than on the eventual settled/stored value, is deliberate: the target's
+    // session also still holds the injected Edit's own local commit queued
+    // (`waiting`, `session.ts`) from before the coordination claimed it, and
+    // that queued commit later replays over the coordinated one once the
+    // barrier lifts — an existing interaction between a plain queued Edit and
+    // a coordinated commit landing on the same session, unrelated to and out
+    // of scope for this ticket, which this test therefore does not depend on.
+    expect(
+      targetSession.getState().working.document.diagrams?.[0]?.graphs.map(({ id }) => id),
+    ).toEqual([KEEP_GRAPH]);
+    expect(targetSession.getState().working.document.diagrams?.[0]?.activeGraph).toEqual(
+      KEEP_GRAPH,
+    );
+  });
+
+  it('chooses a different replacement Diagram when the preferred one goes during the wait', async () => {
+    const DELETED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000110');
+    const PREFERRED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000111');
+    const KEEP_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000112');
+    const DELETED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000113');
+    const PREFERRED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000114');
+    const KEEP_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000115');
+
+    const target = {
+      snapshot: {
+        id: TARGET_ID,
+        document: {
+          version: 1 as const,
+          title: 'Target',
+          defaultDiagram: DELETED_DIAGRAM,
+          diagrams: [
+            {
+              id: DELETED_DIAGRAM,
+              title: 'Deleted',
+              kind: 'positioned' as const,
+              positions: {},
+              graphs: [{ id: DELETED_GRAPH, title: 'Graph 1', edges: [] }],
+            },
+            {
+              id: PREFERRED_DIAGRAM,
+              title: 'Preferred',
+              kind: 'positioned' as const,
+              positions: {},
+              graphs: [{ id: PREFERRED_GRAPH, title: 'Graph 1', edges: [] }],
+            },
+            {
+              id: KEEP_DIAGRAM,
+              title: 'Keep',
+              kind: 'positioned' as const,
+              positions: {},
+              graphs: [{ id: KEEP_GRAPH, title: 'Graph 1', edges: [] }],
+            },
+          ],
+        },
+        things: [],
+      },
+      revision: 3n,
+      exportedRevision: null,
+    };
+    const backend = new MemorySpaceBackend(TARGET_ID, [target]);
+    const registry = createSpaceSessionRegistry(backend);
+    const targetSession = registry.open(target);
+
+    // Same shape as the Graph case above: the preferred replacement Diagram
+    // is removed from the target's own live session during the coordination's
+    // one aggregate read.
+    const loadAggregate = backend.loadAggregate.bind(backend);
+    let reads = 0;
+    backend.loadAggregate = async () => {
+      reads += 1;
+      if (reads === 1) {
+        const working = targetSession.getState().working;
+        targetSession.submit({
+          ...working,
+          document: {
+            ...working.document,
+            diagrams: (working.document.diagrams ?? []).filter(
+              (diagram) => diagram.id !== PREFERRED_DIAGRAM,
+            ),
+          },
+        });
+      }
+      return loadAggregate();
+    };
+
+    const deletion = registry
+      .spaceThings(() => THING_ID)
+      .deleteDiagram({
+        targetSpaceId: TARGET_ID,
+        diagramId: DELETED_DIAGRAM,
+        preferredDiagramId: PREFERRED_DIAGRAM,
+      });
+
+    await expect(deletion).resolves.toEqual({
+      kind: 'completed',
+      diagramId: KEEP_DIAGRAM,
+      graphId: KEEP_GRAPH,
+    });
+    expect(reads).toBe(1);
+
+    // Same reasoning as the Graph case above: assert the session's own
+    // `working`, installed synchronously by the coordinated commit, rather
+    // than the eventual settled/stored value — see the comment there.
+    expect(targetSession.getState().working.document.diagrams?.map(({ id }) => id)).toEqual([
+      KEEP_DIAGRAM,
+    ]);
+    expect(targetSession.getState().working.document.defaultDiagram).toEqual(KEEP_DIAGRAM);
+  });
+
   it('owns one live session for each Space id', () => {
     const registry = createSpaceSessionRegistry(new MemorySpaceBackend(SPACE_ID, [loaded]));
     expect(registry.entry(SPACE_ID)).toBeUndefined();

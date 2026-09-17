@@ -90,7 +90,7 @@ Reproduced by `refuses to delete a Space Thing an Alias came to target while the
 | [03 — Space Authoring edits snapshots through `SnapshotEdit`](issues/03-authoring-edits-through-snapshot-edit.md) | 01, 02, 05 | needs-triage |
 | [04 — A Space Thing deletion refuses when an Alias arrives during its wait](issues/04-deletion-decides-after-its-last-wait.md) | none | done |
 | [05 — Space Thing creation and linking refuse when their Diagram goes during the wait](issues/05-creation-decides-after-its-last-wait.md) | 04 | done |
-| [06 — Diagram and Graph deletion refuse when their successor goes during the wait](issues/06-context-deletion-decides-after-its-last-wait.md) | 04 | ready-for-agent |
+| [06 — Diagram and Graph deletion decide their successor after their last wait](issues/06-context-deletion-decides-after-its-last-wait.md) | 04 | done |
 | [07 — The coordination has one shape](issues/07-one-coordination-shape.md) | 05, 06 | ready-for-agent |
 
 04 opens with the red test already in the registry suite. 05 and 06 touch different operations and may run in parallel. 01 and 02 touch disjoint modules (`graph` + `persistence`, and `app`'s Authoring + render adapter) and may run in parallel.
