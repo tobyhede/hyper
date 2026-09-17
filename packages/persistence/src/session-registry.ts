@@ -13,7 +13,6 @@ import {
   SnapshotEdit,
   type Space,
   type SpaceAggregateError,
-  type SnapshotEditOutcome,
 } from '@project/graph';
 import { createWorkingSpaceLoader } from './working-space';
 import type {
@@ -33,18 +32,15 @@ import {
 type SpaceThingLifecycleChange =
   | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
   /**
-   * An update is a rebase, not a snapshot, because lifecycle coordination waits for every
-   * participant's in-flight commit before it begins. Edits made during that
-   * wait commit through the ordinary path first, so a snapshot the caller
-   * derived beforehand would be stored over them and silently lose them. The
-   * edit is applied to the participant's working snapshot as it stands when the
-   * wait ends, and it must be pure — it can run against a Space that moved.
+   * `update`'s snapshot is the participant's whole next value, not a delta to
+   * apply later. Every `plan` decides it against the Spaces its own wait
+   * produced (`SpaceThingCoordinatedOperation`), with nothing suspending
+   * before the coordination installs the result, so there is nothing left to
+   * recompute at commit time — unlike an earlier shape, this one carries the
+   * value rather than a closure that would derive it again from whatever the
+   * participant's working snapshot happens to be when the closure runs.
    */
-  | {
-      readonly kind: 'update';
-      readonly spaceId: UUID;
-      readonly edit: (current: SpaceSnapshot) => SpaceSnapshot;
-    }
+  | { readonly kind: 'update'; readonly spaceId: UUID; readonly snapshot: SpaceSnapshot }
   | { readonly kind: 'delete'; readonly spaceId: UUID };
 
 /**
@@ -80,10 +76,11 @@ type SpaceThingPreparationOutcome =
  * a Promise, so nothing can suspend between the decision and the coordination
  * installing it.
  *
- * Beside the existing `derive` shape, not replacing it (ticket 07 unifies
- * the two): create, link, Space Thing deletion and Diagram/Graph deletion
- * have all moved here (tickets 04, 05, 06); `derive` now serves only the
- * coordinated-recovery retry path in `startRecovery`.
+ * The only shape a coordinated operation is authored in (ticket 07 deleted
+ * the earlier `derive` shape this used to sit beside): create, link, Space
+ * Thing deletion and Diagram/Graph deletion (tickets 04, 05, 06) and a
+ * coordinated recovery retry's replay (`startRecovery`, below) all reach the
+ * coordination through this.
  */
 interface SpaceThingCoordinatedOperation {
   readonly prepare: () => Promise<SpaceThingPreparationOutcome>;
@@ -93,21 +90,10 @@ interface SpaceThingCoordinatedOperation {
   ) => SpaceThingPlanOutcome;
 }
 
-/** Which shape a coordinated operation is authored in — see {@link SpaceThingCoordinatedOperation}. */
-type SpaceThingCoordinationSource =
-  | {
-      readonly kind: 'derive';
-      readonly derive: () =>
-        | readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]]
-        | undefined
-        | Promise<readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]] | undefined>;
-    }
-  | ({ readonly kind: 'plan' } & SpaceThingCoordinatedOperation);
-
 type SpaceThingCoordinationResult =
   | CommitResult
   | { readonly kind: 'persistence-read-failed' }
-  /** A refusal `plan` (not `derive`) answered, installed the same way as the other two. */
+  /** A refusal `plan` answered, installed the same way as the other two. */
   | SpaceThingRefused;
 
 export interface ProvisionalSpaceSession {
@@ -330,9 +316,8 @@ const selectionOfLoaded = (space: Space): TargetSelection => {
 const clone = <T>(value: T): T => structuredClone(value);
 const completed = { kind: 'completed' } as const;
 /**
- * The refused arm on its own: the shape `derive`-shaped bodies build early and
- * capture in a closure variable, and the shape a `plan` answers as a value
- * instead (`SpaceThingPlanOutcome`, `SpaceThingPreparationOutcome`,
+ * The refused arm on its own: the shape a `prepare` or `plan` answers as a
+ * value (`SpaceThingPlanOutcome`, `SpaceThingPreparationOutcome`,
  * `SpaceThingCoordinationResult`).
  */
 type SpaceThingRefused = { readonly kind: 'refused'; readonly refusal: SpaceThingRefusal };
@@ -363,30 +348,6 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
     things: space.things.map(({ id, ...thingDocument }) => ({ id, document: thingDocument })),
   };
 };
-/**
- * The snapshot a `SnapshotEdit` operation produced, or a thrown invariant
- * violation for anything else.
- *
- * Every `plan`-shaped body (create, link, Space Thing deletion) calls the
- * relevant `SnapshotEdit` operation once *inside* `plan`, against the Spaces
- * the coordination's own aggregate read just produced, mapping a domain
- * `refused` there into a `SpaceThingRefusal` value rather than reaching this;
- * only a `plan` that already answered `completed` two lines above builds an
- * `edit` closure that calls this a second time, at commit time, safe because
- * nothing suspends between `plan` deciding and that closure's commit-time
- * re-run seeing the same Spaces (`SpaceThingLifecycleChange`'s own contract).
- * `deleteContext` (Diagram/Graph deletion) builds its own document directly
- * rather than through a `SnapshotEdit` operation and never calls this.
- * Meeting `refused` or `unchanged` here is a broken invariant, not a domain
- * refusal with anywhere left to go (ADR 0057).
- */
-const completedSnapshot = (outcome: SnapshotEditOutcome, label: string): SpaceSnapshot => {
-  if (outcome.kind !== 'completed') {
-    throw new Error(`${label} through SnapshotEdit answered '${outcome.kind}'`);
-  }
-  return outcome.snapshot;
-};
-
 const replaceSpaceThingSelection = (
   snapshot: SpaceSnapshot,
   targetSpaceId: UUID,
@@ -451,11 +412,10 @@ export function createSpaceSessionRegistry(
   };
 
   /**
-   * The read both coordination sources need before their decision: a fresh
-   * aggregate, and every live session's own working state laid over it. Not
-   * `source`-specific — the `derive` shape calls this once its changes are
-   * already known, and the `plan` shape calls it once, before `plan` runs, so
-   * that call is "the coordination's own aggregate read" the spec names.
+   * The read every coordinated operation needs before its decision: a fresh
+   * aggregate, and every live session's own working state laid over it.
+   * Called once, before `plan` runs, so that call is "the coordination's own
+   * aggregate read" the spec names.
    */
   const loadCoordinationCandidate = async (): Promise<
     | {
@@ -486,7 +446,7 @@ export function createSpaceSessionRegistry(
   };
 
   const runSpaceThingCoordination = async (
-    source: SpaceThingCoordinationSource,
+    operation: SpaceThingCoordinatedOperation,
     installed: (result?: SpaceThingCoordinationResult) => void,
   ): Promise<SpaceThingCoordinationResult> => {
     const previous = lifecycleTail;
@@ -501,54 +461,35 @@ export function createSpaceSessionRegistry(
     try {
       await Promise.all([...sessions.values()].map((managed) => managed.waitForIdle()));
 
-      let changes: readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]];
-      let aggregate: LoadedAggregate;
-      let candidate: Map<UUID, SpaceSnapshot>;
-      if (source.kind === 'derive') {
-        const derived = await source.derive();
-        if (derived === undefined) {
-          installed();
-          return { kind: 'committed', revisions: [], deletedSpaceIds: [] };
-        }
-        const loaded = await loadCoordinationCandidate();
-        if (loaded.kind === 'read-failed') {
-          installed({ kind: 'persistence-read-failed' });
-          return protocolFailure(`The coordinated persistence read threw: ${loaded.message}`);
-        }
-        changes = derived;
-        aggregate = loaded.aggregate;
-        candidate = loaded.candidate;
-      } else {
-        const prepared = await source.prepare();
-        if (prepared.kind === 'unchanged') {
-          installed();
-          return { kind: 'committed', revisions: [], deletedSpaceIds: [] };
-        }
-        if (prepared.kind === 'refused') {
-          installed(prepared);
-          return prepared;
-        }
-        const loaded = await loadCoordinationCandidate();
-        if (loaded.kind === 'read-failed') {
-          installed({ kind: 'persistence-read-failed' });
-          return protocolFailure(`The coordinated persistence read threw: ${loaded.message}`);
-        }
-        // Nothing suspends between this and installing `planned`'s result: the
-        // rest of this function, down to `installed(...)` below, runs to
-        // completion without an `await` standing between them.
-        const planned = source.plan(loaded.candidate, loaded.aggregate);
-        if (planned.kind === 'unchanged') {
-          installed();
-          return { kind: 'committed', revisions: [], deletedSpaceIds: [] };
-        }
-        if (planned.kind === 'refused') {
-          installed(planned);
-          return planned;
-        }
-        changes = planned.changes;
-        aggregate = loaded.aggregate;
-        candidate = loaded.candidate;
+      const prepared = await operation.prepare();
+      if (prepared.kind === 'unchanged') {
+        installed();
+        return { kind: 'committed', revisions: [], deletedSpaceIds: [] };
       }
+      if (prepared.kind === 'refused') {
+        installed(prepared);
+        return prepared;
+      }
+      const loaded = await loadCoordinationCandidate();
+      if (loaded.kind === 'read-failed') {
+        installed({ kind: 'persistence-read-failed' });
+        return protocolFailure(`The coordinated persistence read threw: ${loaded.message}`);
+      }
+      // Nothing suspends between this and installing `planned`'s result: the
+      // rest of this function, down to `installed(...)` below, runs to
+      // completion without an `await` standing between them.
+      const planned = operation.plan(loaded.candidate, loaded.aggregate);
+      if (planned.kind === 'unchanged') {
+        installed();
+        return { kind: 'committed', revisions: [], deletedSpaceIds: [] };
+      }
+      if (planned.kind === 'refused') {
+        installed(planned);
+        return planned;
+      }
+      const changes = planned.changes;
+      const aggregate = loaded.aggregate;
+      const candidate = loaded.candidate;
 
       const ids = changes.map((change) =>
         change.kind === 'create' ? change.snapshot.id : change.spaceId,
@@ -593,12 +534,7 @@ export function createSpaceSessionRegistry(
           const current = participants.get(change.snapshot.id)?.session.getState().working;
           candidate.set(change.snapshot.id, clone(current ?? change.snapshot));
         } else if (change.kind === 'delete') candidate.delete(change.spaceId);
-        else {
-          const current = participants.get(change.spaceId)?.session.getState().working;
-          if (current === undefined)
-            throw new Error(`Space ${change.spaceId} lost its live session`);
-          candidate.set(change.spaceId, change.edit(current));
-        }
+        else candidate.set(change.spaceId, clone(change.snapshot));
       }
       const intake = loadSpaceAggregate({
         metaSpaceId: aggregate.metaSpaceId,
@@ -621,20 +557,34 @@ export function createSpaceSessionRegistry(
           ];
         }),
       );
-      const identityChange = (change: SpaceThingLifecycleChange): SpaceThingLifecycleChange =>
-        change.kind === 'update' ? { ...change, edit: (current) => current } : change;
+      /**
+       * What a coordinated retry replays for one participant, decided once
+       * when recovery starts (`startRecovery`, below). `create` and `delete`
+       * already carry everything the retried commit needs; `update` names
+       * only the participant, because "commit this Space's current working
+       * snapshot" only becomes true once the retried coordination's own
+       * aggregate read has produced it — so the retry's own `plan` resolves
+       * the value below, rather than this recipe carrying a value or a
+       * closure that would derive one.
+       */
+      type SpaceThingRetryItem =
+        | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
+        | { readonly kind: 'update'; readonly spaceId: UUID }
+        | { readonly kind: 'delete'; readonly spaceId: UUID };
+      const toRetryItem = (change: SpaceThingLifecycleChange): SpaceThingRetryItem =>
+        change.kind === 'update' ? { kind: 'update', spaceId: change.spaceId } : change;
       let conflictCurrents = new Map<UUID, LoadedSpace | undefined>();
       let recoveryStarted = false;
       const startRecovery = (recoverConflict: boolean): void => {
         if (recoveryStarted) return;
         recoveryStarted = true;
-        const retryChanges = changes.flatMap((change): SpaceThingLifecycleChange[] => {
-          if (!recoverConflict) return [identityChange(change)];
+        const retryItems = changes.flatMap((change): SpaceThingRetryItem[] => {
+          if (!recoverConflict) return [toRetryItem(change)];
           const id = change.kind === 'create' ? change.snapshot.id : change.spaceId;
-          if (!conflictCurrents.has(id)) return [identityChange(change)];
+          if (!conflictCurrents.has(id)) return [toRetryItem(change)];
           const current = conflictCurrents.get(id);
           if (change.kind === 'create' && current !== undefined) {
-            return [{ kind: 'update', spaceId: id, edit: (working) => working }];
+            return [{ kind: 'update', spaceId: id }];
           }
           if (change.kind === 'update' && current === undefined) {
             const snapshot = participants.get(id)?.session.getState().working;
@@ -647,11 +597,32 @@ export function createSpaceSessionRegistry(
             sessions.delete(id);
             return [];
           }
-          return [identityChange(change)];
+          return [toRetryItem(change)];
         });
-        const [first, ...remaining] = retryChanges;
-        if (first === undefined) return;
-        void coordinateSpaceThingLifecycle(() => [first, ...remaining]);
+        const [firstItem, ...remainingItems] = retryItems;
+        if (firstItem === undefined) return;
+        void coordinateSpaceThingPlan({
+          // No wait of its own: every retried item was already decided above,
+          // synchronously, from the failed attempt's own state. Only `update`
+          // has anything left to resolve, and `plan` resolves it against the
+          // Spaces the *retried* coordination's own aggregate read produces —
+          // the same timing the old rebase closure ran at, just without a
+          // closure to carry it there.
+          prepare: () => Promise.resolve({ kind: 'proceed' } as const),
+          plan: (spaces) => {
+            const resolve = (item: SpaceThingRetryItem): SpaceThingLifecycleChange => {
+              if (item.kind !== 'update') return item;
+              const snapshot = spaces.get(item.spaceId);
+              if (snapshot === undefined)
+                throw new Error(`Space ${item.spaceId} lost its live session`);
+              return { kind: 'update', spaceId: item.spaceId, snapshot };
+            };
+            return {
+              kind: 'changes',
+              changes: [resolve(firstItem), ...remainingItems.map(resolve)],
+            };
+          },
+        });
       };
       const recovery = {
         retry: (): void => {
@@ -727,7 +698,7 @@ export function createSpaceSessionRegistry(
           if (managed === undefined) continue;
           managed.prepareCoordinatedCommit(
             change.kind === 'update'
-              ? change.edit(managed.session.getState().working)
+              ? change.snapshot
               : change.kind === 'create'
                 ? managed.session.getState().working
                 : undefined,
@@ -864,33 +835,18 @@ export function createSpaceSessionRegistry(
     }
   };
 
-  const coordinateSpaceThingLifecycle = async (
-    derive: () =>
-      | readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]]
-      | undefined
-      | Promise<readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]] | undefined>,
-  ): Promise<SpaceThingCoordinationResult> => {
-    const installation = Promise.withResolvers<SpaceThingCoordinationResult>();
-    void runSpaceThingCoordination({ kind: 'derive', derive }, (result) =>
-      installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
-    ).catch(installation.reject);
-    return installation.promise;
-  };
-
   /**
    * Run a coordinated operation in the `prepare`/`plan` shape (see
-   * {@link SpaceThingCoordinatedOperation}). Space Thing create, link,
-   * deletion and Diagram/Graph deletion all call this now (tickets 04, 05,
-   * 06); {@link coordinateSpaceThingLifecycle} survives only for the
-   * coordinated-recovery retry path in `startRecovery`, which replays an
-   * already-decided change list rather than deciding one, and ticket 07 folds
-   * the two into one function.
+   * {@link SpaceThingCoordinatedOperation}) — the only shape there is
+   * (ticket 07). Space Thing create, link, deletion, Diagram/Graph deletion
+   * and a coordinated recovery retry's replay (`startRecovery`) all call
+   * this.
    */
   const coordinateSpaceThingPlan = async (
     operation: SpaceThingCoordinatedOperation,
   ): Promise<SpaceThingCoordinationResult> => {
     const installation = Promise.withResolvers<SpaceThingCoordinationResult>();
-    void runSpaceThingCoordination({ kind: 'plan', ...operation }, (result) =>
+    void runSpaceThingCoordination(operation, (result) =>
       installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
     ).catch(installation.reject);
     return installation.promise;
@@ -901,7 +857,7 @@ export function createSpaceSessionRegistry(
     /**
      * Make the target working, then read the selection it opens on.
      *
-     * **Inside `derive`, and after the containing Space's own checks.** Those
+     * **Inside `prepare`, and after the containing Space's own checks.** Those
      * two placements are the whole of what keeps this honest: a turn is claimed
      * synchronously by the call this sits in, so a Space cannot be released out
      * from under the Edit, and an Edit the containing Space has already refused
@@ -914,12 +870,12 @@ export function createSpaceSessionRegistry(
      * topology Edit; this commit belongs to a Space with no live session to
      * pause, since opening a Space is the working load that initializes it and
      * a live session is read from its own working state above. The coordination
-     * reads the aggregate after `derive` returns, so it sees the initialized
+     * reads the aggregate after `prepare` returns, so it sees the initialized
      * target and spends its revision rather than a stale one.
      *
      * **A failure after this point leaves the target initialized and makes no
      * Thing, and that is accepted rather than repaired.** An aggregate refusal,
-     * a conflict or a commit failure all land after `derive` has returned, so
+     * a conflict or a commit failure all land after `prepare` has returned, so
      * the Diagram and Graph minted here outlive the Edit that asked for them.
      * What is left behind is not debris: ADR 0079 already has a Space gain its
      * Diagram the first time anything works with it, so this is the state the
@@ -1081,26 +1037,14 @@ export function createSpaceSessionRegistry(
               refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
             };
           }
+          if (created.kind !== 'completed') {
+            throw new Error(`Space Thing creation through SnapshotEdit answered '${created.kind}'`);
+          }
           completion = { kind: 'completed', thingId: data.thingId };
           return {
             kind: 'changes',
             changes: [
-              {
-                kind: 'update',
-                spaceId: input.containingSpaceId,
-                edit: (current) =>
-                  completedSnapshot(
-                    SnapshotEdit.createInDiagram(
-                      current,
-                      input.diagramId,
-                      data.thingId,
-                      document,
-                      input.position,
-                      'avoidingOverlap',
-                    ),
-                    'Space Thing creation',
-                  ),
-              },
+              { kind: 'update', spaceId: input.containingSpaceId, snapshot: created.snapshot },
             ],
           };
         },
@@ -1202,50 +1146,47 @@ export function createSpaceSessionRegistry(
               open(loaded);
             }
           }
+          const targetDocument = {
+            ...target.document,
+            diagrams: (target.document.diagrams ?? [])
+              .filter(({ id }) => !deletingDiagram || id !== input.diagramId)
+              .map((diagram) =>
+                !deletingDiagram && diagram.id === input.diagramId
+                  ? {
+                      ...diagram,
+                      activeGraph:
+                        diagram.activeGraph === input.graphId
+                          ? replacementGraph.id
+                          : diagram.activeGraph,
+                      graphs: diagram.graphs.filter(({ id }) => id !== input.graphId),
+                    }
+                  : diagram,
+              ),
+          };
+          if (deletingDiagram && target.document.defaultDiagram === input.diagramId) {
+            targetDocument.defaultDiagram = replacementDiagram.id;
+          }
           const targetChange: SpaceThingLifecycleChange = {
             kind: 'update',
             spaceId: input.targetSpaceId,
-            edit: (current) => {
-              const document = {
-                ...current.document,
-                diagrams: (current.document.diagrams ?? [])
-                  .filter(({ id }) => !deletingDiagram || id !== input.diagramId)
-                  .map((diagram) =>
-                    !deletingDiagram && diagram.id === input.diagramId
-                      ? {
-                          ...diagram,
-                          activeGraph:
-                            diagram.activeGraph === input.graphId
-                              ? replacementGraph.id
-                              : diagram.activeGraph,
-                          graphs: diagram.graphs.filter(({ id }) => id !== input.graphId),
-                        }
-                      : diagram,
-                  ),
-              };
-              if (deletingDiagram && current.document.defaultDiagram === input.diagramId) {
-                document.defaultDiagram = replacementDiagram.id;
-              }
-              return { ...current, document };
-            },
+            snapshot: { ...target, document: targetDocument },
           };
           const referenceChanges = affected
-            .filter(({ id }) => id !== input.targetSpaceId)
-            .map(({ id }): SpaceThingLifecycleChange => ({
+            .filter((snapshot) => snapshot.id !== input.targetSpaceId)
+            .map((snapshot): SpaceThingLifecycleChange => ({
               kind: 'update',
-              spaceId: id,
-              edit: (current) =>
-                replaceSpaceThingSelection(
-                  current,
-                  input.targetSpaceId,
-                  (document) =>
-                    deletingDiagram
-                      ? document.diagram === input.diagramId
-                      : document.diagram === input.diagramId && document.graph === input.graphId,
-                  replacementDiagram.id,
-                  replacementGraph.id,
-                  deletingDiagram,
-                ),
+              spaceId: snapshot.id,
+              snapshot: replaceSpaceThingSelection(
+                snapshot,
+                input.targetSpaceId,
+                (document) =>
+                  deletingDiagram
+                    ? document.diagram === input.diagramId
+                    : document.diagram === input.diagramId && document.graph === input.graphId,
+                replacementDiagram.id,
+                replacementGraph.id,
+                deletingDiagram,
+              ),
             }));
           selection = { diagramId: replacementDiagram.id, graphId: replacementGraph.id };
           return { kind: 'changes', changes: [targetChange, ...referenceChanges] };
@@ -1344,26 +1285,16 @@ export function createSpaceSessionRegistry(
                 refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
               };
             }
+            if (created.kind !== 'completed') {
+              throw new Error(
+                `Space Thing creation through SnapshotEdit answered '${created.kind}'`,
+              );
+            }
             completion = { kind: 'completed', thingId: data.thingId };
             return {
               kind: 'changes',
               changes: [
-                {
-                  kind: 'update',
-                  spaceId: input.containingSpaceId,
-                  edit: (current) =>
-                    completedSnapshot(
-                      SnapshotEdit.createInDiagram(
-                        current,
-                        input.diagramId,
-                        data.thingId,
-                        document,
-                        input.position,
-                        'avoidingOverlap',
-                      ),
-                      'Space Thing creation',
-                    ),
-                },
+                { kind: 'update', spaceId: input.containingSpaceId, snapshot: created.snapshot },
                 { kind: 'create', snapshot: data.target },
               ],
             };
@@ -1429,11 +1360,13 @@ export function createSpaceSessionRegistry(
               }
               return { kind: 'refused', refusal: deletion.refusal };
             }
+            if (deletion.kind !== 'completed') {
+              throw new Error(
+                `Space Thing deletion through SnapshotEdit answered '${deletion.kind}'`,
+              );
+            }
             const snapshots = new Map(spaces);
-            snapshots.set(
-              input.containingSpaceId,
-              completedSnapshot(deletion, 'Space Thing deletion'),
-            );
+            snapshots.set(input.containingSpaceId, deletion.snapshot);
             const inbound = new Map<UUID, number>();
             for (const snapshot of snapshots.values()) inbound.set(snapshot.id, 0);
             for (const snapshot of snapshots.values())
@@ -1481,11 +1414,7 @@ export function createSpaceSessionRegistry(
                 {
                   kind: 'update',
                   spaceId: input.containingSpaceId,
-                  edit: (current) =>
-                    completedSnapshot(
-                      SnapshotEdit.deleteFromSpace(current, input.thingId),
-                      'Space Thing deletion',
-                    ),
+                  snapshot: deletion.snapshot,
                 },
                 ...deleted.map((spaceId) => ({ kind: 'delete' as const, spaceId })),
               ],
