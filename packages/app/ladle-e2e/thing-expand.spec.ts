@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const openCloseStory = '/?story=components--thing--open-and-close&mode=preview';
 const markdownStory = '/?story=components--thing--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--thing--resize-control&mode=preview';
-const openReferenceStory = '/?story=components--thing--open-reference&mode=preview';
+const openReferenceStory = '/?story=components--thing--open-reference-thing&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
   await page.goto(story);

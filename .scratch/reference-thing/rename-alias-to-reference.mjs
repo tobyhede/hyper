@@ -182,6 +182,9 @@ const EXCLUDED_PATHS = [
  */
 const PRE_REWRITES = [
   ['Create Alias', 'Create Reference'],
+  // Ladle derives a story id from its `storyName`, which the standalone rule
+  // expands to `Open Reference Thing`; the spec's URL has to follow it.
+  ['thing--open-alias&', 'thing--open-reference-thing&'],
   // Longest first, for the reason `an alias thing`/`an Alias Thing` are below:
   // the bare phrase rows leave a preceding `an` standing, and it needs `a`
   // once `Alias` becomes `Reference`.
