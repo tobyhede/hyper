@@ -2534,6 +2534,9 @@ const QUALIFIED_ALIAS_SPELLINGS: readonly string[] = [
   // The real `typescript` compiler API two tests call by name to find a type
   // alias declaration's AST shape.
   'isTypeAliasDeclaration',
+  // A TypeScript type alias and a local binding, named in two source comments.
+  'Kept as a type alias',
+  'narrowing the alias above',
 ];
 
 const withoutQualifiedAliasSpellings = (source: string): string =>

@@ -43,7 +43,7 @@ export type ThingTitleEditor = {
   onCancel: () => void;
 };
 
-/** Data carried by each custom thing node. Kept as a type reference so it satisfies
+/** Data carried by each custom thing node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ThingNodeData = {
   /** Reports rendered title geometry by placement, including embedded placements. */

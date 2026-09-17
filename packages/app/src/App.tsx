@@ -587,7 +587,7 @@ export const createApp = (
       thingsDrag.current = null;
     }, [selectedDiagramId, presenting, authoringState.replacementEpoch]);
     // There is a Thing to go back to only once a traversal has left its first, and only
-    // presenting has Traversal history at all — the same narrowing the reference above already
+    // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
     const selectBranch = navigation.selectBranch;
     const activeThingId = navigation.activeThingId();

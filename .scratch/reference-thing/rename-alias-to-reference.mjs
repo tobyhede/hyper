@@ -276,6 +276,10 @@ const PROTECTED = [
   'bans the alias',
   '.scratch/alias-cards/issues/05-jump-to-alias-target.md',
   'isTypeAliasDeclaration',
+  // TypeScript's and the language's own senses, written in source comments.
+  'Kept as a type alias',
+  'The type alias above',
+  'the alias above already',
 ];
 
 /**
@@ -297,10 +301,10 @@ const PROTECTED = [
  * capitalise the kind the way a proper reference to it does.
  */
 const rewriteAnAlias = (text) =>
-  text.replace(/\b([Aa])n ([Aa])lias('s)?\b/g, (_match, article, aliasCase, possessive) => {
+  text.replace(/\b([Aa])n(\s+(?:\*\s+|\/\/\s+)?)([Aa])lias('s)?\b/g, (_match, article, gap, aliasCase, possessive) => {
     const a = article === 'A' ? 'A' : 'a';
     const noun = aliasCase === 'A' ? 'Reference Thing' : 'reference thing';
-    return `${a} ${noun}${possessive ?? ''}`;
+    return `${a}${gap}${noun}${possessive ?? ''}`;
   });
 
 /**

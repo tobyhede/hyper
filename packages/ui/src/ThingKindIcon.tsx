@@ -4,7 +4,7 @@ import { ReferenceIcon, BASE_GLYPHS, type ThingBaseKind } from './icons';
 /**
  * What kind of Thing this is, drawn rather than described.
  *
- * Persistent, not a hover affordance: a Thing's kind is a fact about it, and an
+ * Persistent, not a hover affordance: a Thing's kind is a fact about it, and a
  * Reference Thing that only announces itself under the pointer is one an author has to
  * hunt for. It is the same glyph wherever a Thing appears — on its Front, and in
  * the Target picker's results — so recognising one teaches the other.

@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  * which says what bringing one up puts on screen — and the two drifted apart.
  * The Reference Thing definition was moved to ADR 0049's model (a Reference Thing authors its own
  * Title and Target; the Target is opened explicitly to author its content)
- * while the Opening definition kept ADR 0039/0046's withdrawn one, in which an
+ * while the Opening definition kept ADR 0039/0046's withdrawn one, in which a
  * Reference Thing opened "the same content surface through its target". Both ADRs are
  * still `accepted` and carry `Refined by: 0049`, so an ADR status scan cannot
  * see the drift, and neither can `tsc`: a definition is prose, and prose that
