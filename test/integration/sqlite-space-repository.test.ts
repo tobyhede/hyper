@@ -1,18 +1,15 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { AggregateInvariantError } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
 import { spaceRepositoryContract } from '../support/repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
-spaceRepositoryContract(
-  'SqliteSpaceRepository',
-  async () => {
-    const harness = await openSqliteRepository();
-    return { repository: harness.repository, close: harness.close };
-  },
-  'replacement-and-export',
-);
+spaceRepositoryContract('SqliteSpaceRepository', async () => {
+  const harness = await openSqliteRepository();
+  return { repository: harness.repository, close: harness.close };
+});
 
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000002');
@@ -475,6 +472,71 @@ describe('SqliteSpaceRepository', () => {
       });
     }
   }
+
+  /*
+   * Stored state that is not an aggregate cannot be written through either
+   * lifecycle door, so these cases write rows directly. Each door must fail it
+   * as an invariant, and neither may treat it as empty or overwrite it.
+   */
+  const storedRow = (id: UUID, title: string) => ({
+    id,
+    document: { version: 1, title },
+    revision: '0',
+  });
+
+  const expectEveryDoorRefuses = async (
+    repository: SqliteSpaceRepository,
+    expectedMetaSpaceId: UUID,
+  ): Promise<void> => {
+    const proposal = { metaSpaceId: SPACE_ID, spaces: [space(SPACE_ID, 'Proposal', [])] };
+    await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+    await expect(repository.initializeAggregate(proposal)).rejects.toThrow(AggregateInvariantError);
+    await expect(repository.replaceAggregate(proposal, expectedMetaSpaceId)).rejects.toThrow(
+      AggregateInvariantError,
+    );
+  };
+
+  it('refuses Spaces stored without a Meta Space through every door and keeps them', async () => {
+    const { repository, database } = await opened();
+    await database.orm.Space.create(storedRow(OTHER_SPACE_ID, 'Orphan'));
+
+    await expectEveryDoorRefuses(repository, OTHER_SPACE_ID);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: OTHER_SPACE_ID, title: 'Orphan' },
+    ]);
+  });
+
+  it('refuses a stored aggregate that fails complete intake through every door and keeps it', async () => {
+    const { repository, database } = await opened();
+    await database.transaction(async ({ orm }) => {
+      await orm.Space.create(storedRow(SPACE_ID, 'Meta'));
+      await orm.Space.create(storedRow(OTHER_SPACE_ID, 'Unreferenced'));
+      await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
+    });
+
+    await expectEveryDoorRefuses(repository, SPACE_ID);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: SPACE_ID, title: 'Meta' },
+      { id: OTHER_SPACE_ID, title: 'Unreferenced' },
+    ]);
+  });
+
+  it('refuses a Meta identity naming a Space the file does not store', async () => {
+    const { repository, database } = await opened();
+
+    await expect(
+      database.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: MISSING_SPACE_ID }),
+    ).rejects.toThrow();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'Meta', [])],
+    });
+    await expect(database.orm.Space.where({ id: SPACE_ID }).delete()).rejects.toThrow();
+    await expect(repository.loadAggregate()).resolves.toMatchObject({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: SPACE_ID },
+    });
+  });
 
   it('still shows the established aggregate after close and reopen against the same file', async () => {
     const harness = await opened();

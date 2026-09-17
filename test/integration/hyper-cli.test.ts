@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +11,7 @@ import {
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
+import { runHyperScript } from '../support/hyper-command';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
 const MALFORMED_SPACE_ID = uuidSchema.parse('d2222222-2222-4222-8222-222222222222');
@@ -24,62 +24,7 @@ const TARGET_DIAGRAM_ID = uuidSchema.parse('d8888888-8888-4888-8888-888888888888
 const TARGET_GRAPH_ID = uuidSchema.parse('d9999999-9999-4999-8999-999999999999');
 const LINK_THING_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab');
 
-interface CommandResult {
-  status: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-const CLI_PROCESS_TIMEOUT_MS = 10_000;
-
-const runHyperCommand = (args: readonly string[]): Promise<CommandResult> =>
-  new Promise((resolve, reject) => {
-    const child = spawn('pnpm', ['--silent', 'hyper', '--', ...args], {
-      cwd: process.cwd(),
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let settled = false;
-    const settle = (complete: () => void): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      child.stdout.removeListener('data', captureStdout);
-      child.stderr.removeListener('data', captureStderr);
-      child.removeListener('error', handleError);
-      child.removeListener('close', handleClose);
-      complete();
-    };
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    const timeoutError = new Error(`hyper CLI command timed out after ${CLI_PROCESS_TIMEOUT_MS}ms`);
-    const captureStdout = (chunk: string): void => {
-      stdout += chunk;
-    };
-    const captureStderr = (chunk: string): void => {
-      stderr += chunk;
-    };
-    const handleError = (error: Error): void => {
-      settle(() => reject(timedOut ? timeoutError : error));
-    };
-    const handleClose = (status: number | null): void => {
-      settle(() => {
-        if (timedOut) reject(timeoutError);
-        else resolve({ status, stdout, stderr });
-      });
-    };
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', captureStdout);
-    child.stderr.on('data', captureStderr);
-    child.once('error', handleError);
-    child.once('close', handleClose);
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGKILL');
-    }, CLI_PROCESS_TIMEOUT_MS);
-  });
+const runHyperCommand = (args: readonly string[]) => runHyperScript('hyper', args);
 
 /**
  * The Space the Meta below points at, carrying the Diagram and Graph that Space

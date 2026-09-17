@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { newUuid } from '@project/core';
 import { SqliteSpaceRepository } from '../persistence/sqlite-space-repository';
-import { createSqliteDatabase, type SqliteDatabase } from '../sqlite/db';
+import { configuredSqlitePath, createSqliteDatabase, type SqliteDatabase } from '../sqlite/db';
 import { establishMetaSpace, retryMetaSpaceEstablishment } from '../startup/database-startup';
 import { createSpaceHost, type SpaceHostApplication } from './space-host';
 
@@ -32,12 +32,6 @@ export interface SqliteHttpRuntimeOptions {
   database?: SqliteDatabase;
 }
 
-const hostedSqlitePath = (): string | undefined => {
-  const configured = process.env['SQLITE_PATH']?.trim();
-  if (configured === undefined || configured === '') return undefined;
-  return configured;
-};
-
 /**
  * Compose the opt-in SQLite runtime before exposing browser-safe HTTP
  * resources. PostgreSQL remains the default host; this module is loaded only by
@@ -46,7 +40,7 @@ const hostedSqlitePath = (): string | undefined => {
 export const createApp = async ({
   wait = (milliseconds) => sleep(milliseconds, undefined, { ref: false }),
   report = reportEstablishmentFailure,
-  database = createSqliteDatabase(hostedSqlitePath()),
+  database = createSqliteDatabase(configuredSqlitePath()),
 }: SqliteHttpRuntimeOptions = {}): Promise<SpaceHostApplication> => {
   const repository = new SqliteSpaceRepository(database);
   try {

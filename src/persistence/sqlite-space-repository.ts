@@ -415,14 +415,47 @@ export class SqliteSpaceRepository implements SpaceRepository {
   }
 
   replaceAggregate(
-    _input: AggregateInput,
-    _expectedMetaSpaceId: UUID,
+    input: AggregateInput,
+    expectedMetaSpaceId: UUID,
   ): Promise<ReplaceAggregateResult> {
-    return Promise.reject(new Error('SQLite replaceAggregate is not implemented'));
+    return this.#serialise(() => this.#replaceUnserialised(input, expectedMetaSpaceId));
   }
 
-  markExported(_id: UUID, _revision: bigint): Promise<void> {
-    return Promise.reject(new Error('SQLite markExported is not implemented'));
+  async #replaceUnserialised(
+    input: AggregateInput,
+    expectedMetaSpaceId: UUID,
+  ): Promise<ReplaceAggregateResult> {
+    const intake = loadSpaceAggregate({
+      metaSpaceId: input.metaSpaceId,
+      snapshots: input.spaces,
+    });
+    if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
+    return this.#database.transaction(async ({ orm }) => {
+      const metaSpaceId = await lockMetaIdentity(orm);
+      if (metaSpaceId === undefined) {
+        if ((await loadEverySpace(orm)).length > 0) {
+          throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
+        }
+        return { kind: 'uninitialized' };
+      }
+      if (metaSpaceId !== expectedMetaSpaceId) {
+        return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
+      }
+      // Replacement is not a repair: stored state that is not an aggregate
+      // fails here exactly as it fails a read, before anything is deleted
+      // (`test/integration/sqlite-space-repository.test.ts` invariant cases).
+      await authoritativeAggregate(orm, metaSpaceId);
+      return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
+    });
+  }
+
+  markExported(id: UUID, revision: bigint): Promise<void> {
+    return this.#serialise(async () => {
+      const updated = await this.#database.orm.Space.where({ id }).update({
+        exportedRevision: toDatabaseRevision(revision),
+      });
+      if (updated === null) throw new Error(`Space ${id} does not exist`);
+    });
   }
 
   commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
