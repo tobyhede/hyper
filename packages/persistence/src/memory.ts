@@ -1,6 +1,7 @@
 import { uuidSchema, type UUID } from '@project/core';
-import { loadSpaceAggregate } from '@project/graph';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceCommit, SpaceSummary } from './backend';
+import { committedRevision, decideCommit } from './commit-decision';
+import type { RepositoryCommitResult } from './repository';
 
 const clone = <T>(value: T): T => structuredClone(value);
 const isLoadedSpaceCollection = (
@@ -63,11 +64,11 @@ export class MemorySpaceBackendTestControl {
   }
 }
 
-const invalidCommit = (message: string): CommitResult => ({
-  kind: 'permanent-failure',
-  code: 'invalid-commit',
-  message,
-});
+/** A repository's permanent rejection is what the browser's transport calls a permanent failure. */
+const backendResult = (result: RepositoryCommitResult): CommitResult =>
+  result.kind === 'rejected'
+    ? { kind: 'permanent-failure', code: result.code, message: result.message }
+    : result;
 
 /** Browser-safe asynchronous adapter used for development and behavioral tests. */
 export class MemorySpaceBackend implements SpaceBackend {
@@ -123,19 +124,6 @@ export class MemorySpaceBackend implements SpaceBackend {
   }
 
   async commit(request: SpaceCommit): Promise<CommitResult> {
-    if (request.changes.length === 0) return invalidCommit('A commit requires at least one change');
-
-    const named = new Set<UUID>();
-    for (const change of request.changes) {
-      if (named.has(change.spaceId)) {
-        return invalidCommit(`Space ${change.spaceId} is named more than once`);
-      }
-      named.add(change.spaceId);
-      if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
-        return invalidCommit(`Change Space id ${change.spaceId} does not match its snapshot`);
-      }
-    }
-
     this.#testControl?.record(request);
     await this.#testControl?.waitForCommit();
     const testError = this.#testControl?.nextError();
@@ -143,89 +131,23 @@ export class MemorySpaceBackend implements SpaceBackend {
     const injected = this.#testControl?.nextResult();
     if (injected !== undefined) return clone(injected);
 
-    const conflicts = request.changes.flatMap((change) => {
-      const current = this.#spaces.get(change.spaceId);
-      const conflictsWithCurrent =
-        change.kind === 'create'
-          ? current !== undefined
-          : current?.revision !== change.expectedRevision;
-      return conflictsWithCurrent
-        ? [{ spaceId: change.spaceId, current: current === undefined ? undefined : clone(current) }]
-        : [];
-    });
-    if (conflicts.length > 0) return { kind: 'conflict', conflicts };
-
-    const baseline = loadSpaceAggregate({
-      metaSpaceId: this.#metaSpaceId,
-      snapshots: [...this.#spaces.values()].map(({ snapshot }) => snapshot),
-    });
-    const baselineUnreferenced = new Set(
-      baseline.ok
-        ? []
-        : baseline.errors.flatMap((error) =>
-            error.kind === 'ordinary-space-unreferenced' ? [error.spaceId] : [],
-          ),
+    const decision = decideCommit(
+      request,
+      this.#metaSpaceId,
+      [...this.#spaces.values()].map(clone),
     );
-    const candidate = new Map(this.#spaces);
+    if (decision.kind === 'answer') return backendResult(decision.result);
     for (const change of request.changes) {
       if (change.kind === 'delete') {
-        candidate.delete(change.spaceId);
+        this.#spaces.delete(change.spaceId);
         continue;
       }
-      const current = candidate.get(change.spaceId);
-      candidate.set(change.spaceId, {
+      this.#spaces.set(change.spaceId, {
         snapshot: clone(change.snapshot),
-        revision: current === undefined ? 0n : current.revision + 1n,
-        exportedRevision: current?.exportedRevision ?? null,
+        revision: committedRevision(change),
+        exportedRevision: this.#spaces.get(change.spaceId)?.exportedRevision ?? null,
       });
     }
-
-    const intake = loadSpaceAggregate({
-      metaSpaceId: this.#metaSpaceId,
-      snapshots: [...candidate.values()].map(({ snapshot }) => snapshot),
-    });
-    if (!intake.ok) {
-      const deleted = new Set(
-        request.changes.flatMap((change) => (change.kind === 'delete' ? [change.spaceId] : [])),
-      );
-      const changed = new Set(request.changes.map(({ spaceId }) => spaceId));
-      const incompleteDeletionIds = new Set(
-        intake.errors.flatMap((error) =>
-          error.kind === 'space-thing-target-missing' &&
-          deleted.has(error.targetSpaceId) &&
-          !changed.has(error.spaceId)
-            ? [error.targetSpaceId]
-            : [],
-        ),
-      );
-      if (incompleteDeletionIds.size > 0) {
-        return {
-          kind: 'conflict',
-          conflicts: [...incompleteDeletionIds].map((spaceId) => ({
-            spaceId,
-            current: clone(this.#spaces.get(spaceId)),
-          })),
-        };
-      }
-      const errors = intake.errors.filter(
-        (error) =>
-          error.kind !== 'ordinary-space-unreferenced' || !baselineUnreferenced.has(error.spaceId),
-      );
-      if (errors.length > 0) return { kind: 'aggregate-refused', errors: clone(errors) };
-    }
-
-    const revisions = request.changes.flatMap((change) => {
-      if (change.kind === 'delete') return [];
-      const stored = candidate.get(change.spaceId);
-      if (stored === undefined) throw new Error('Candidate commit omitted a changed Space');
-      return [{ spaceId: change.spaceId, revision: stored.revision }];
-    });
-    const deletedSpaceIds = request.changes.flatMap((change) =>
-      change.kind === 'delete' ? [change.spaceId] : [],
-    );
-
-    this.#spaces.clear();
-    for (const [id, loaded] of candidate) this.#spaces.set(id, loaded);
-    return { kind: 'committed', revisions, deletedSpaceIds };
+    return backendResult(decision.result);
   }
 }

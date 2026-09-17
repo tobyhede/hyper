@@ -1,4 +1,5 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { loadSpaceAggregate } from '@project/graph';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -6,11 +7,11 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  * The behaviour every `SpaceRepository` owes its callers, run against each
  * implementation rather than restated per adapter.
  *
- * `MemorySpaceRepository` is a hand-written parallel implementation of
- * production classification policy, maintained by reading the PostgreSQL
- * adapter. That is exactly the arrangement a shared suite exists to replace:
- * whatever the two disagree about, they now disagree in front of the same
- * assertions.
+ * Every implementation judges a commit through `decideCommit` in
+ * `@project/persistence` (ADR 0093), so what this suite catches is where they
+ * differ around it — what they read, in what order, what they write and what
+ * they classify from their own storage. Whatever they disagree about, they
+ * disagree in front of the same assertions.
  *
  * It sits here rather than behind `@project/persistence/test-support`, where the
  * `SpaceBackend` contract lives, because `SpaceRepository` is declared in `src/`
@@ -836,6 +837,71 @@ export const spaceRepositoryContract = (
         }),
       ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+    });
+  });
+
+  it(`${name} refuses an update whose snapshot names another stored Space at a matching revision`, async () => {
+    await withHarness(async (repository) => {
+      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
+      const linkedMeta: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Meta', [THING_ID]),
+        things: [
+          thing(THING_ID, 'Meta thing'),
+          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
+      };
+      await seed(repository, linkedMeta, target);
+
+      // Both Spaces stand at revision 0, so a path that checked the revision of
+      // the Space `spaceId` names and wrote the one the snapshot names would
+      // overwrite the target.
+      await expect(
+        repository.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: retitled(target, 'Overwritten'),
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(linkedMeta, 0n, null));
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(target, 0n, null));
+    });
+  });
+
+  it(`${name} places a single update's failed intake at its Space's position in the aggregate`, async () => {
+    await withHarness(async (repository) => {
+      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
+      const linkedMeta: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Meta', [THING_ID]),
+        things: [
+          thing(THING_ID, 'Meta thing'),
+          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
+      };
+      await seed(repository, linkedMeta, target);
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Target', OTHER_THING_ID);
+
+      // The refusal the complete-aggregate decision gives: the Target is the
+      // second stored Space by id, so its snapshot is refused at index 1 rather
+      // than at the 0 a decision over that Space alone would name.
+      const complete = loadSpaceAggregate({
+        metaSpaceId: SPACE_ID,
+        snapshots: [linkedMeta, dangling],
+      });
+      if (complete.ok) throw new Error('The dangling Target must fail complete intake');
+      expect(complete.errors).toContainEqual(
+        expect.objectContaining({ kind: 'invalid-space-snapshot', snapshotIndex: 1 }),
+      );
+
+      await expect(commitUpdate(repository, dangling, 0n)).resolves.toEqual({
+        kind: 'aggregate-refused',
+        errors: complete.errors,
+      });
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(target, 0n, null));
     });
   });
 

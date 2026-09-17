@@ -9,6 +9,9 @@ import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
   CANONICAL_DECIMAL,
+  commitIdentityRefusal,
+  committedRevision,
+  decideCommit,
   type AggregateLoadResult,
   type LoadedAggregate,
   type LoadedSpace,
@@ -19,12 +22,9 @@ import {
 import type { SqliteDatabase } from '../sqlite/db';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
 import {
-  commitIdentityRefusal,
-  committedRevision,
-  decideAggregateCommit,
   decideTopologyPreservingUpdate,
   topologyPreservingCandidate,
-} from './commit-decision';
+} from './topology-preserving-update';
 import type {
   AggregateInput,
   InitializeAggregateResult,
@@ -467,6 +467,9 @@ export class SqliteSpaceRepository implements SpaceRepository {
   }
 
   async #commitUnserialised(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    // `decideCommit` runs this too, but the fast path below never reaches it: it
+    // reads the Space `change.spaceId` names and writes the one `snapshot.id`
+    // names, so a change pairing one with the other must be refused first.
     const refusal = commitIdentityRefusal(request);
     if (refusal !== undefined) return refusal;
 
@@ -496,7 +499,7 @@ export class SqliteSpaceRepository implements SpaceRepository {
       const topologyPreserving = await commitTopologyPreservingUpdate(orm, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
       const metaSpaceId = await lockMetaIdentity(orm);
-      const decision = decideAggregateCommit(request, metaSpaceId, await loadEverySpace(orm));
+      const decision = decideCommit(request, metaSpaceId, await loadEverySpace(orm));
       if (decision.kind === 'answer') return decision.result;
 
       for (const change of request.changes) {

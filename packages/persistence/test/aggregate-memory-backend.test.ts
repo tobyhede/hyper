@@ -114,10 +114,9 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     });
   });
 
-  it('rejects an empty, duplicate, or mismatched change set as one invalid commit', async () => {
+  it('rejects a duplicate or mismatched change set as one invalid commit', async () => {
     const backend = new MemorySpaceBackend(META_ID, [loaded()]);
     const invalidRequests: unknown[] = [
-      { changes: [] },
       {
         changes: [
           { kind: 'delete', spaceId: META_ID, expectedRevision: 3n },
