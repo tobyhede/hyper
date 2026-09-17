@@ -1,0 +1,79 @@
+import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { encodeCompactUuid, type UUID } from '@project/core';
+import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
+
+/**
+ * The drag-and-read-back steps a browser durability proof spends against a
+ * fresh Vite host, shared between `test/e2e/postgres-persistence.spec.ts` and
+ * `test/e2e/sqlite-persistence.spec.ts` so a change to the Space's chrome
+ * breaks both proofs at once rather than only the one a reviewer remembered to
+ * update.
+ */
+
+export interface OpenedStoredSpace {
+  readonly context: BrowserContext;
+  readonly page: Page;
+}
+
+/**
+ * Open a Space already stored at `spaceId`, and wait for the Dock to name it.
+ *
+ * **The Space's name is a label, not a heading** (ADR 0082). The Space
+ * Sidebar drew it as an `h1`; the Command Dock draws it through the same
+ * `IdentityName` the Diagram and Graph use, and a name with no rename Edit
+ * behind it renders as a `span` rather than as a button or a heading —
+ * renaming a Space is not built (`.scratch/command-dock/issues/09`). So the
+ * slot is addressed the way every other spec addresses it, and the visible
+ * filter is the open-Spaces rule: every open Space stays mounted, and only
+ * the one on the canvas is showing.
+ * `toContainText`, which is the matcher `space-thing.spec.ts` spends on this
+ * same locator and the one actually proven green against the Dock. The title
+ * carries the Space's own UUID, so containment is unambiguous here.
+ */
+export async function openStoredSpace(
+  browser: Browser,
+  baseURL: string,
+  spaceId: UUID,
+  title: string,
+): Promise<OpenedStoredSpace> {
+  const context = await browser.newContext({ baseURL });
+  const page = await context.newPage();
+  await page.goto(`/spaces/${encodeCompactUuid(spaceId)}`);
+  await expect(page.locator('[data-testid="space-title"]:visible')).toContainText(title);
+  return { context, page };
+}
+
+/**
+ * Drag the named Thing by a flow-space delta, wait for the commit to reach
+ * `revision`, and answer where React Flow actually put it.
+ */
+export async function dragThingAndCapturePosition(
+  page: Page,
+  title: string,
+  dx: number,
+  dy: number,
+  revision: string,
+): Promise<{ x: number; y: number }> {
+  const thing = nodeByTitle(page, title);
+  await settled(page);
+  await dragBy(page, thing, dx, dy);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', revision);
+  return positionOf(thing);
+}
+
+/**
+ * Assert the named Thing reappears at `position` on a freshly opened host,
+ * once it reports `revision`.
+ */
+export async function expectThingRestoredAt(
+  page: Page,
+  title: string,
+  position: { x: number; y: number },
+  revision: string,
+): Promise<void> {
+  const reloaded = nodeByTitle(page, title);
+  await expect(reloaded).toBeVisible();
+  await settled(page);
+  expect(await positionOf(reloaded)).toEqual(position);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', revision);
+}

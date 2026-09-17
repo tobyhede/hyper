@@ -1,0 +1,205 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, test, type BrowserContext } from '@playwright/test';
+import { newUuid } from '@project/core';
+import { createServer, type ViteDevServer } from 'vite';
+import { exportAggregate } from '../../src/export/export-aggregate';
+import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
+import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
+import { createSqliteDatabase, requireConfiguredSqlitePath } from '../../src/sqlite/db';
+import { clearSqliteContent } from '../support/clear-sqlite-content';
+import {
+  dragThingAndCapturePosition,
+  expectThingRestoredAt,
+  openStoredSpace,
+} from '../support/restart-proof';
+import { SQLITE_E2E_PORT } from '../../packages/app/e2e/projects';
+
+const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
+const configFile = fileURLToPath(
+  new URL('../../packages/app/vite.sqlite.config.ts', import.meta.url),
+);
+
+const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> => {
+  const server = await createServer({
+    root: appRoot,
+    configFile,
+    // Below the default suite's `E2E_PORT_BASE + workerIndex` range and
+    // distinct from the PostgreSQL proof's own fixed port, so this project can
+    // run beside `pnpm e2e` and `pnpm e2e:postgres`. `strictPort` turns any
+    // overlap into a failure that blames the wrong thing.
+    server: { host: '127.0.0.1', port: SQLITE_E2E_PORT, strictPort: true },
+  });
+  try {
+    await server.listen();
+    const baseURL = server.resolvedUrls?.local[0];
+    if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');
+    return { server, baseURL };
+  } catch (error) {
+    // The caller only learns of a server it can close on success, so a failure
+    // between here and the return would strand one holding the fixed port —
+    // and the retry of a `strictPort` host then fails for the wrong reason.
+    await server.close();
+    throw error;
+  }
+};
+
+test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
+  // `SQLITE_PATH` as the job (or a developer's own export) provides it —
+  // already migrated, by `test:integration:sqlite` in CI or by
+  // `pnpm db:migrate:sqlite` locally. `requireConfiguredSqlitePath` is the one
+  // message a host and this proof both report for an unset path.
+  const path = requireConfiguredSqlitePath();
+  const spaceId = newUuid();
+  const thingId = newUuid();
+  const diagramId = newUuid();
+  const graphId = newUuid();
+  const title = `SQLite restart ${spaceId}`;
+  let firstHost: ViteDevServer | undefined;
+  let secondHost: ViteDevServer | undefined;
+  let firstContext: BrowserContext | undefined;
+  let secondContext: BrowserContext | undefined;
+  let exportDirectory: string | undefined;
+  let spaceRemains: boolean | undefined;
+
+  try {
+    // Seeded through a connection of its own, closed before either host opens
+    // the same file: ticket 18 found a second live writer against one SQLite
+    // file unsupported, so this proof never holds more than one connection to
+    // it open at a time rather than trusting two to coexist.
+    const seedDatabase = createSqliteDatabase(path);
+    try {
+      const seedRepository = new SqliteSpaceRepository(seedDatabase);
+      // The Diagram is part of the fixture, and has to be — see the matching
+      // comment in `postgres-persistence.spec.ts`, which this mirrors exactly:
+      // a diagramless Space's first working load would mint an *empty*
+      // Diagram (ADR 0079), stranding the fixture's Thing off every canvas.
+      const initialized = await seedRepository.initializeAggregate({
+        metaSpaceId: spaceId,
+        spaces: [
+          {
+            id: spaceId,
+            document: {
+              version: 1,
+              title,
+              diagrams: [
+                {
+                  id: diagramId,
+                  title: 'Diagram 1',
+                  kind: 'positioned',
+                  positions: { [thingId]: { x: 0, y: 0, open: false } },
+                  graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+                  activeGraph: graphId,
+                },
+              ],
+              defaultDiagram: diagramId,
+            },
+            things: [
+              {
+                id: thingId,
+                document: { title: 'Restart thing', kind: 'markdown', body: 'Durable.' },
+              },
+            ],
+          },
+        ],
+      });
+      if (initialized.kind !== 'initialized') {
+        throw new Error(`The fixture aggregate was not established: ${initialized.kind}`);
+      }
+    } finally {
+      await seedDatabase.close();
+    }
+
+    const first = await startHost();
+    firstHost = first.server;
+    const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
+    firstContext = openedFirst.context;
+    const durablePosition = await dragThingAndCapturePosition(
+      openedFirst.page,
+      'Restart thing',
+      0,
+      220,
+      '1',
+    );
+
+    await firstContext.close();
+    firstContext = undefined;
+    await firstHost.close();
+    firstHost = undefined;
+
+    // The two hosts run in sequence, never together. Closing the first Vite
+    // server does not close its SQLite runtime's database — neither
+    // `sqlite-http-runtime.ts` nor `vite-space-http-plugin.ts` has a close
+    // hook — so what keeps this safe is that no request is in flight, not that
+    // the handle is gone.
+    const afterFirstDatabase = createSqliteDatabase(path);
+    try {
+      const stored = await new SqliteSpaceRepository(afterFirstDatabase).loadSpace(spaceId);
+      expect(stored?.revision).toBe(1n);
+    } finally {
+      await afterFirstDatabase.close();
+    }
+
+    const second = await startHost();
+    secondHost = second.server;
+    const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
+    secondContext = openedSecond.context;
+    await expectThingRestoredAt(openedSecond.page, 'Restart thing', durablePosition, '1');
+
+    await secondContext.close();
+    secondContext = undefined;
+    await secondHost.close();
+    secondHost = undefined;
+
+    // Durability is only half of what the aggregate owes; the other half is
+    // that it can leave again, at the revision the drag actually reached. An
+    // export taken at revision 0 would still write a directory that reads back
+    // and still record *something*, so the assertion that matters is the
+    // projected revision: `markExported` runs after the bytes land, and 1n is
+    // what says it recorded the edit rather than the fixture.
+    const exportDatabase = createSqliteDatabase(path);
+    try {
+      const exportRepository = new SqliteSpaceRepository(exportDatabase);
+      exportDirectory = await mkdtemp(join(tmpdir(), 'hyper-sqlite-e2e-export-'));
+      const exported = await exportAggregate(exportRepository, exportDirectory);
+      expect(exported.kind).toBe('exported');
+      const aggregateFile: unknown = JSON.parse(
+        await readFile(join(exportDirectory, AGGREGATE_FILE_NAME), 'utf8'),
+      );
+      expect(aggregateFile).toEqual({ version: 1, metaSpaceId: spaceId });
+      // The Space directory is named for the Space, which is where an
+      // aggregate writes every Space Id down (ADR 0078) — so its presence
+      // under this name is the check, not a search for a file called
+      // `space.json` somewhere.
+      const spaceFile: unknown = JSON.parse(
+        await readFile(join(exportDirectory, spaceId, 'space.json'), 'utf8'),
+      );
+      expect(spaceFile).toMatchObject({ id: spaceId, title });
+      await expect(exportRepository.loadSpace(spaceId)).resolves.toMatchObject({
+        revision: 1n,
+        exportedRevision: 1n,
+      });
+
+      // Clean up the Space and Thing this proof minted, as the PostgreSQL
+      // proof does — so a rerun against the same `SQLITE_PATH` (a developer
+      // iterating without re-migrating) meets an empty file rather than an
+      // already-initialized one.
+      await clearSqliteContent(exportDatabase);
+      spaceRemains = (await exportRepository.loadSpace(spaceId)) !== undefined;
+    } finally {
+      await exportDatabase.close();
+    }
+  } finally {
+    await secondContext?.close();
+    await firstContext?.close();
+    await secondHost?.close();
+    await firstHost?.close();
+    if (exportDirectory !== undefined) {
+      await rm(exportDirectory, { recursive: true, force: true });
+    }
+  }
+
+  expect(spaceRemains).toBe(false);
+});

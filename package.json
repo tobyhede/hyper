@@ -49,6 +49,7 @@
     "ui:catalog": "tsx scripts/ui-catalog.ts",
     "ui:catalog:check": "tsx scripts/ui-catalog.ts --check",
     "e2e:postgres": "playwright test --config playwright.postgres.config.ts",
+    "e2e:sqlite": "playwright test --config playwright.sqlite.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
     "test:integration:sqlite": "pnpm contract:emit:sqlite && pnpm db:migrate:sqlite && vitest run --config vitest.sqlite.config.ts",
     "dev:sqlite": "mkdir -p .scratch/sqlite && export SQLITE_PATH=\"${SQLITE_PATH:-$PWD/.scratch/sqlite/hyper.db}\" && case \"$SQLITE_PATH\" in /*) ;; *) echo \"SQLITE_PATH must be an absolute path: $SQLITE_PATH\" >&2; exit 1;; esac && pnpm db:migrate:sqlite && pnpm --filter @project/app dev:sqlite",

@@ -2,15 +2,19 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
-import { encodeCompactUuid, newUuid, type UUID } from '@project/core';
+import { expect, test, type BrowserContext } from '@playwright/test';
+import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
-import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
+import {
+  dragThingAndCapturePosition,
+  expectThingRestoredAt,
+  openStoredSpace,
+} from '../support/restart-proof';
 import { POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
 
 const appRoot = fileURLToPath(new URL('../../packages/app', import.meta.url));
@@ -39,30 +43,6 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     await server.close();
     throw error;
   }
-};
-
-const openStoredSpace = async (
-  browser: Browser,
-  baseURL: string,
-  spaceId: UUID,
-  title: string,
-): Promise<{ context: BrowserContext; page: Page }> => {
-  const context = await browser.newContext({ baseURL });
-  const page = await context.newPage();
-  await page.goto(`/spaces/${encodeCompactUuid(spaceId)}`);
-  // **The Space's name is a label, not a heading** (ADR 0082). The Space
-  // Sidebar drew it as an `h1`; the Command Dock draws it through the same
-  // `IdentityName` the Diagram and Graph use, and a name with no rename Edit
-  // behind it renders as a `span` rather than as a button or a heading —
-  // renaming a Space is not built (`.scratch/command-dock/issues/09`). So the
-  // slot is addressed the way every other spec addresses it, and the visible
-  // filter is the open-Spaces rule: every open Space stays mounted, and only
-  // the one on the canvas is showing.
-  // `toContainText`, which is the matcher `space-thing.spec.ts` spends on this
-  // same locator and the one actually proven green against the Dock. The title
-  // carries the Space's own UUID, so containment is unambiguous here.
-  await expect(page.locator('[data-testid="space-title"]:visible')).toContainText(title);
-  return { context, page };
 };
 
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
@@ -141,14 +121,13 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     firstHost = first.server;
     const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
-    const thing = nodeByTitle(openedFirst.page, 'Restart thing');
-    await settled(openedFirst.page);
-    await dragBy(openedFirst.page, thing, 0, 220);
-    await expect(openedFirst.page.getByTestId('persistence-status')).toHaveAttribute(
-      'data-revision',
+    const durablePosition = await dragThingAndCapturePosition(
+      openedFirst.page,
+      'Restart thing',
+      0,
+      220,
       '1',
     );
-    const durablePosition = await positionOf(thing);
 
     await firstContext.close();
     firstContext = undefined;
@@ -162,14 +141,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     secondHost = second.server;
     const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
-    const reloaded = nodeByTitle(openedSecond.page, 'Restart thing');
-    await expect(reloaded).toBeVisible();
-    await settled(openedSecond.page);
-    expect(await positionOf(reloaded)).toEqual(durablePosition);
-    await expect(openedSecond.page.getByTestId('persistence-status')).toHaveAttribute(
-      'data-revision',
-      '1',
-    );
+    await expectThingRestoredAt(openedSecond.page, 'Restart thing', durablePosition, '1');
 
     // Durability is only half of what the aggregate owes; the other half is
     // that it can leave again, at the revision the drag actually reached. An
