@@ -475,50 +475,77 @@ describe('SqliteSpaceRepository', () => {
 
   /*
    * Stored state that is not an aggregate cannot be written through either
-   * lifecycle door, so these cases write rows directly. Each door must fail it
-   * as an invariant, and neither may treat it as empty or overwrite it.
+   * lifecycle door, so these cases write rows directly. Reading and
+   * initializing fail it as an invariant and leave it alone; replacement
+   * truncates it (ADR 0092), still authorized by the Meta identity it read.
    */
-  const storedRow = (id: UUID, title: string) => ({
+  const storedRow = (id: UUID, document: Readonly<Record<string, string | number>>) => ({
     id,
-    document: { version: 1, title },
+    document,
     revision: '0',
   });
 
-  const expectEveryDoorRefuses = async (
+  const proposed = space(SPACE_ID, 'Proposal', [THING_ID]);
+  const proposal = { metaSpaceId: SPACE_ID, spaces: [proposed] };
+
+  const expectReadAndInitializeRefuse = async (
     repository: SqliteSpaceRepository,
-    expectedMetaSpaceId: UUID,
   ): Promise<void> => {
-    const proposal = { metaSpaceId: SPACE_ID, spaces: [space(SPACE_ID, 'Proposal', [])] };
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     await expect(repository.initializeAggregate(proposal)).rejects.toThrow(AggregateInvariantError);
-    await expect(repository.replaceAggregate(proposal, expectedMetaSpaceId)).rejects.toThrow(
-      AggregateInvariantError,
-    );
   };
 
-  it('refuses Spaces stored without a Meta Space through every door and keeps them', async () => {
-    const { repository, database } = await opened();
-    await database.orm.Space.create(storedRow(OTHER_SPACE_ID, 'Orphan'));
+  const expectTruncatedTo = async (repository: SqliteSpaceRepository): Promise<void> => {
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(proposed, 0n, null)] },
+    });
+  };
 
-    await expectEveryDoorRefuses(repository, OTHER_SPACE_ID);
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: OTHER_SPACE_ID, title: 'Orphan' },
-    ]);
+  it('truncates Spaces stored without a Meta identity, and only when it expected none', async () => {
+    const { repository, database } = await opened();
+    await database.orm.Space.create(storedRow(OTHER_SPACE_ID, { version: 1, title: 'Orphan' }));
+
+    await expectReadAndInitializeRefuse(repository);
+    await expect(repository.loadMetaSpaceId()).resolves.toBeUndefined();
+    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toEqual({
+      kind: 'conflict',
+      currentMetaSpaceId: undefined,
+    });
+    await expect(repository.replaceAggregate(proposal, undefined)).resolves.toMatchObject({
+      kind: 'replaced',
+    });
+    await expectTruncatedTo(repository);
   });
 
-  it('refuses a stored aggregate that fails complete intake through every door and keeps it', async () => {
+  it('truncates a stored aggregate that fails complete intake', async () => {
     const { repository, database } = await opened();
     await database.transaction(async ({ orm }) => {
-      await orm.Space.create(storedRow(SPACE_ID, 'Meta'));
-      await orm.Space.create(storedRow(OTHER_SPACE_ID, 'Unreferenced'));
+      await orm.Space.create(storedRow(SPACE_ID, { version: 1, title: 'Meta' }));
+      await orm.Space.create(storedRow(OTHER_SPACE_ID, { version: 1, title: 'Unreferenced' }));
       await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
     });
 
-    await expectEveryDoorRefuses(repository, SPACE_ID);
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Meta' },
-      { id: OTHER_SPACE_ID, title: 'Unreferenced' },
-    ]);
+    await expectReadAndInitializeRefuse(repository);
+    await expect(repository.replaceAggregate(proposal, SPACE_ID)).resolves.toMatchObject({
+      kind: 'replaced',
+    });
+    await expectTruncatedTo(repository);
+  });
+
+  it('truncates a stored Space whose document does not parse', async () => {
+    const { repository, database } = await opened();
+    await database.transaction(async ({ orm }) => {
+      // `title` is required, so this row is JSON that fails Space intake.
+      await orm.Space.create(storedRow(OTHER_SPACE_ID, { version: 1 }));
+      await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+    });
+
+    await expectReadAndInitializeRefuse(repository);
+    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
+      kind: 'replaced',
+    });
+    await expectTruncatedTo(repository);
   });
 
   it('refuses a Meta identity naming a Space the file does not store', async () => {

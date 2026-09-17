@@ -74,12 +74,9 @@ const reportImportResult = (result: AggregateImportResult, io: CliIo): number =>
       return 1;
     case 'conflict':
       io.stderr(
-        `The Meta Space changed to ${result.currentMetaSpaceId} during replacement. Nothing was written; run the command again.\n`,
-      );
-      return 1;
-    case 'uninitialized':
-      io.stderr(
-        'The repository emptied during replacement. Nothing was written; run the command again.\n',
+        result.currentMetaSpaceId === undefined
+          ? 'The Meta Space was removed during replacement. Nothing was written; run the command again.\n'
+          : `The Meta Space changed to ${result.currentMetaSpaceId} during replacement. Nothing was written; run the command again.\n`,
       );
       return 1;
     case 'aggregate-refused':

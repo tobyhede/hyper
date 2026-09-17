@@ -197,7 +197,7 @@ describe('hyper:sqlite CLI', () => {
    * A stale Meta identity needs another writer between the command's read and
    * its replacement, which two processes cannot be made to interleave on cue.
    * So the command runs in this process, over a real SQLite repository whose
-   * `loadAggregate` lets that writer in straight after answering.
+   * `loadMetaSpaceId` lets that writer in straight after answering.
    */
   it('answers a replacement authorized against a superseded Meta identity as a conflict', async () => {
     const path = await migratedFile();
@@ -211,19 +211,18 @@ describe('hyper:sqlite CLI', () => {
         repository: {
           listSpaces: () => repository.listSpaces(),
           loadSpace: (id) => repository.loadSpace(id),
+          loadAggregate: () => repository.loadAggregate(),
           initializeAggregate: (input) => repository.initializeAggregate(input),
           replaceAggregate: (input, expected) => repository.replaceAggregate(input, expected),
           markExported: (id, revision) => repository.markExported(id, revision),
           commit: (request) => repository.commit(request),
-          loadAggregate: async () => {
-            const loaded = await repository.loadAggregate();
-            if (loaded.kind === 'loaded') {
-              await repository.replaceAggregate(
-                { metaSpaceId: OTHER_META_SPACE_ID, spaces: [otherMeta] },
-                loaded.aggregate.metaSpaceId,
-              );
-            }
-            return loaded;
+          loadMetaSpaceId: async () => {
+            const read = await repository.loadMetaSpaceId();
+            await repository.replaceAggregate(
+              { metaSpaceId: OTHER_META_SPACE_ID, spaces: [otherMeta] },
+              read,
+            );
+            return read;
           },
         },
         io: {
@@ -244,6 +243,56 @@ describe('hyper:sqlite CLI', () => {
       await expect(repository.loadAggregate()).resolves.toMatchObject({
         kind: 'loaded',
         aggregate: { metaSpaceId: OTHER_META_SPACE_ID },
+      });
+    });
+  });
+
+  it('truncates a file holding broken state with --dangerous-truncate, and only with it', async () => {
+    const path = await migratedFile();
+    // Written raw: no lifecycle door stores an aggregate whose Meta Space does
+    // not reach every other Space.
+    const database = createSqliteDatabase(path);
+    try {
+      await database.transaction(async ({ orm }) => {
+        await orm.Space.create({
+          id: OTHER_META_SPACE_ID,
+          document: { version: 1, title: 'Broken Meta' },
+          revision: '0',
+        });
+        await orm.Space.create({
+          id: TARGET_SPACE_ID,
+          document: { version: 1, title: 'Unreachable' },
+          revision: '0',
+        });
+        await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_META_SPACE_ID });
+      });
+    } finally {
+      await database.close();
+    }
+    const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
+
+    const refused = await hyper(path, [linked]);
+    expect(refused.status).toBe(1);
+    expect(refused.stdout).toBe('');
+
+    await expect(hyper(path, [linked, '--dangerous-truncate'])).resolves.toEqual({
+      status: 0,
+      stdout:
+        'Imported the aggregate\n' +
+        `Imported space ${META_SPACE_ID} at revision 0\n` +
+        `Imported space ${TARGET_SPACE_ID} at revision 0\n`,
+      stderr: '',
+    });
+    await withRepository(path, async (repository) => {
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: META_SPACE_ID,
+          spaces: [
+            { snapshot: metaSpace, revision: 0n, exportedRevision: null },
+            { snapshot: targetSpace, revision: 0n, exportedRevision: null },
+          ],
+        },
       });
     });
   });

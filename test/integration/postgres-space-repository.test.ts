@@ -35,6 +35,7 @@ spaceRepositoryContract('PostgresSpaceRepository', async () => {
     listSpaces: () => repository.listSpaces(),
     loadSpace: (id) => repository.loadSpace(id),
     loadAggregate: () => repository.loadAggregate(),
+    loadMetaSpaceId: () => repository.loadMetaSpaceId(),
     initializeAggregate: (input) => repository.initializeAggregate(input),
     replaceAggregate: (input, expectedMetaSpaceId) =>
       repository.replaceAggregate(input, expectedMetaSpaceId),
@@ -250,6 +251,152 @@ describe('PostgresSpaceRepository', () => {
     });
 
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+  });
+
+  /*
+   * Replacement truncates stored state whether or not it is an aggregate
+   * (ADR 0092), still authorized by the Meta identity it read. Each state is
+   * written raw because no lifecycle door stores it.
+   */
+  describe('truncating stored state that is not an aggregate', () => {
+    const replacement: SpaceSnapshot = {
+      id: SPACE_ID,
+      document: { version: 1, title: 'Replacement' },
+      things: [],
+    };
+
+    const expectReplacedBy = async (expectedMetaSpaceId: UUID | undefined) => {
+      createdSpaceIds.add(SPACE_ID);
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: SPACE_ID, spaces: [replacement] },
+          expectedMetaSpaceId,
+        ),
+      ).resolves.toMatchObject({ kind: 'replaced' });
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: {
+          metaSpaceId: SPACE_ID,
+          spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
+        },
+      });
+    };
+
+    it('truncates a stored document that cannot be parsed', async () => {
+      createdSpaceIds.add(OTHER_SPACE_ID);
+      await db.transaction(async ({ orm }) => {
+        await orm.public.Space.create({
+          id: OTHER_SPACE_ID,
+          document: { version: 1 },
+          revision: 0,
+        });
+        await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+      });
+
+      await expectReplacedBy(OTHER_SPACE_ID);
+    });
+
+    it('truncates a stored aggregate that fails complete intake', async () => {
+      createdSpaceIds.add(OTHER_SPACE_ID);
+      createdSpaceIds.add(CONCURRENT_SPACE_ID);
+      await db.transaction(async ({ orm }) => {
+        await orm.public.Space.create({
+          id: OTHER_SPACE_ID,
+          document: { version: 1, title: 'Meta' },
+          revision: 0,
+        });
+        await orm.public.Space.create({
+          id: CONCURRENT_SPACE_ID,
+          document: { version: 1, title: 'Unreferenced' },
+          revision: 0,
+        });
+        await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+      });
+
+      await expectReplacedBy(OTHER_SPACE_ID);
+    });
+
+    /*
+     * With no Meta row there is no singleton lock to queue two truncations on,
+     * so the Space row locks are all that serialise them. The blocking
+     * transaction holds one so both replacements have read before either
+     * writes. Each must settle as a result, never as a raw unique-key or
+     * deadlock error, and the store must hold one proposal whole.
+     */
+    it('settles two overlapping truncations of Spaces stored without Meta as results', async () => {
+      createdSpaceIds.add(OTHER_SPACE_ID);
+      createdSpaceIds.add(CONCURRENT_SPACE_ID);
+      await db.orm.public.Space.create({
+        id: CONCURRENT_SPACE_ID,
+        document: { version: 1, title: 'Orphan' },
+        revision: 0,
+      });
+
+      const rowLockHeld = Promise.withResolvers<undefined>();
+      const releaseRowLock = Promise.withResolvers<undefined>();
+      const blocking = db.transaction(async ({ orm }) => {
+        await orm.public.Space.where({ id: CONCURRENT_SPACE_ID }).update({
+          document: { version: 1, title: 'Orphan' },
+        });
+        rowLockHeld.resolve(undefined);
+        await releaseRowLock.promise;
+      });
+      await rowLockHeld.promise;
+
+      const first = repository.replaceAggregate(
+        { metaSpaceId: SPACE_ID, spaces: [replacement] },
+        undefined,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const second = repository.replaceAggregate(
+        { metaSpaceId: OTHER_SPACE_ID, spaces: [otherSnapshot] },
+        undefined,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      releaseRowLock.resolve(undefined);
+      await blocking;
+
+      const results = await Promise.allSettled([first, second]);
+      expect(results.map(({ status }) => status)).toEqual(['fulfilled', 'fulfilled']);
+      expect(
+        results.map((result) => (result.status === 'fulfilled' ? result.value.kind : undefined)),
+      ).toContain('replaced');
+      const loaded = await repository.loadAggregate();
+      expect([
+        {
+          kind: 'loaded',
+          aggregate: {
+            metaSpaceId: SPACE_ID,
+            spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
+          },
+        },
+        {
+          kind: 'loaded',
+          aggregate: {
+            metaSpaceId: OTHER_SPACE_ID,
+            spaces: [{ snapshot: otherSnapshot, revision: 0n, exportedRevision: null }],
+          },
+        },
+      ]).toContainEqual(loaded);
+    });
+
+    it('truncates Spaces stored without a Meta identity only when it expected none', async () => {
+      createdSpaceIds.add(OTHER_SPACE_ID);
+      await db.orm.public.Space.create({
+        id: OTHER_SPACE_ID,
+        document: { version: 1, title: 'Orphan' },
+        revision: 0,
+      });
+
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: SPACE_ID, spaces: [replacement] },
+          OTHER_SPACE_ID,
+        ),
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: undefined });
+      await expectReplacedBy(undefined);
+    });
   });
 
   it('initializes a completely identified aggregate and exposes it through load and list', async () => {

@@ -436,8 +436,8 @@ const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<Loaded
  * migration deliberately creates the table empty — a migration has no Space to
  * name. So a write path is what establishes it, and `initializeAggregate` is
  * the only one: ADR 0078 leaves exactly two lifecycle doors, and the other,
- * `replaceAggregate`, refuses a repository that has no Meta identity to
- * replace. Nothing establishes it as a side effect of storing a Space.
+ * `replaceAggregate`, answers an empty repository `uninitialized` rather than
+ * establishing first state. Nothing establishes it as a side effect of storing a Space.
  */
 export class PostgresSpaceRepository implements SpaceRepository {
   readonly #database: typeof db;
@@ -507,9 +507,14 @@ export class PostgresSpaceRepository implements SpaceRepository {
     }
   }
 
+  async loadMetaSpaceId(): Promise<UUID | undefined> {
+    const state = await this.#database.orm.public.RepositoryState.where({ singletonId: 1 }).first();
+    return state === null ? undefined : uuidSchema.parse(state.metaSpaceId);
+  }
+
   async replaceAggregate(
     input: AggregateInput,
-    expectedMetaSpaceId: UUID,
+    expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult> {
     const intake = loadSpaceAggregate({
       metaSpaceId: input.metaSpaceId,
@@ -519,30 +524,37 @@ export class PostgresSpaceRepository implements SpaceRepository {
     try {
       return await this.#database.transaction(async ({ orm }) => {
         const metaSpaceId = await lockMetaIdentity(orm);
-        if (metaSpaceId === undefined) {
-          if ((await loadEverySpace(orm)).length > 0)
-            throw new AggregateInvariantError('Stored Spaces exist without Meta');
+        // Rows are read raw rather than through `loadEverySpace`: truncation
+        // replaces stored state whether or not it parses (ADR 0092).
+        // In id order, so two overlapping replacements take the row locks below
+        // in the same order: the later waits on the earlier rather than
+        // deadlocking with it. Where no Meta row exists to lock, those row locks
+        // are all that serialises them.
+        const storedRows = await orm.public.Space.orderBy((space) => space.id.asc()).all();
+        if (metaSpaceId === undefined && storedRows.length === 0) {
           return { kind: 'uninitialized' };
         }
         if (metaSpaceId !== expectedMetaSpaceId) {
           return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
         }
         // The baseline read is lock-free so topology-preserving commits retain
-        // their fast path. Compare each revision again after taking its row lock:
-        // a commit that won in between must conflict rather than be overwritten.
-        for (const space of await loadEverySpace(orm)) {
-          const lockedRevision = await writeSpaceDocumentUnderLock(orm, space.snapshot);
-          if (lockedRevision !== space.revision)
-            throw new StaleSpaceRevisionError(space.snapshot.id);
+        // their fast path. Compare each revision again after taking its row lock
+        // — rewriting the document it already holds, so a row that does not
+        // parse locks too: a commit that won in between must conflict rather
+        // than be overwritten.
+        for (const row of storedRows) {
+          const locked = await orm.public.Space.where({ id: row.id }).update({
+            document: toJsonValue(row.document),
+          });
+          if (locked === null || toRevision(locked.revision) !== toRevision(row.revision)) {
+            throw new StaleSpaceRevisionError(uuidSchema.parse(row.id));
+          }
         }
         return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
       });
     } catch (error) {
       if (!(error instanceof StaleSpaceRevisionError)) throw error;
-      const current = await this.loadAggregate();
-      return current.kind === 'uninitialized'
-        ? current
-        : { kind: 'conflict', currentMetaSpaceId: current.aggregate.metaSpaceId };
+      return { kind: 'conflict', currentMetaSpaceId: await this.loadMetaSpaceId() };
     }
   }
 

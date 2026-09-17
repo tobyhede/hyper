@@ -17,8 +17,8 @@ export type AggregateImportResult =
   | { kind: 'imported'; spaces: readonly LoadedSpace[] }
   | { kind: 'unchanged'; spaces: readonly LoadedSpace[] }
   | { kind: 'already-initialized'; currentMetaSpaceId: UUID }
-  | { kind: 'conflict'; currentMetaSpaceId: UUID }
-  | { kind: 'uninitialized' }
+  /** `undefined` when the Meta identity read was removed rather than replaced. */
+  | { kind: 'conflict'; currentMetaSpaceId: UUID | undefined }
   /**
    * The Spaces travel with the errors because intake reports a bad Space by its
    * position in the collection it was handed, and a position means nothing to
@@ -66,7 +66,7 @@ const initialize = async (
  * was lost rather than an overwrite was refused.
  *
  * The operator passed `--dangerous-truncate`; the repository held nothing when
- * `loadAggregate` read it and holds a Meta Space by the time this writes,
+ * replacement found it empty and holds a Meta Space by the time this writes,
  * because something else established one in between — `pnpm dev`'s startup, or a
  * concurrent `hyper`. Answering `already-initialized` would tell them to re-run
  * with the flag they just passed. It is the conflict outcome, whose sentence
@@ -88,12 +88,13 @@ const initializeUnderTruncate = async (
  * Two doors, never a mode parameter on one (ADR 0078). Without
  * `--dangerous-truncate` this initializes a repository that has none, and an
  * initialized repository is left exactly as it is — an import that would have
- * overwritten authored state says so instead of doing it. With it, the stored
- * aggregate and its Meta identity are replaced atomically, authorized by the
- * identity `loadAggregate` just reported rather than by one the caller supplies:
- * a Meta identity that moved in between is a conflict, and the replacement
- * rolls back rather than landing on a repository the operator was not looking
- * at.
+ * overwritten authored state says so instead of doing it. With it, whatever is
+ * stored is truncated and the aggregate written in its place, atomically,
+ * whether or not the stored state is a valid aggregate (ADR 0092). The Meta
+ * identity `loadMetaSpaceId` just read is what authorizes that, rather than one
+ * the caller supplies: an identity that moved in between is a conflict, and the
+ * replacement rolls back rather than destroying a repository the operator was
+ * not looking at.
  *
  * There is deliberately **no merge**. Import does not update, reconcile or add
  * to stored content; the aggregate on disk becomes the whole of the aggregate
@@ -108,25 +109,16 @@ export const importAggregate = async (
 
   if (!truncate) return initialize(repository, input);
 
-  // Replacement needs the identity it is replacing, and `replaceAggregate`
-  // refuses to establish first state, so an empty repository takes the
-  // initializing door even under `--dangerous-truncate`: there is nothing to
-  // truncate, and the flag is permission to destroy rather than a demand that
-  // something be destroyed.
-  const loaded = await repository.loadAggregate();
-  if (loaded.kind === 'uninitialized') return initializeUnderTruncate(repository, input);
-
-  const replaced = await repository.replaceAggregate(input, loaded.aggregate.metaSpaceId);
+  const replaced = await repository.replaceAggregate(input, await repository.loadMetaSpaceId());
   switch (replaced.kind) {
     case 'replaced':
       return { kind: 'imported', spaces: replaced.aggregate.spaces };
     case 'conflict':
       return { kind: 'conflict', currentMetaSpaceId: replaced.currentMetaSpaceId };
-    // The repository emptied between the read above and the replacement. The
-    // replacement rolled back, so nothing was written and running the command
-    // again finds the initializing door.
+    // `replaceAggregate` refuses to establish first state, so an empty
+    // repository takes the initializing door: there is nothing to truncate.
     case 'uninitialized':
-      return { kind: 'uninitialized' };
+      return initializeUnderTruncate(repository, input);
     case 'aggregate-refused':
       return { kind: 'aggregate-refused', errors: replaced.errors, spaces: input.spaces };
   }

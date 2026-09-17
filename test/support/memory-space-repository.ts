@@ -149,15 +149,17 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve({ kind: 'initialized', aggregate });
   }
 
+  loadMetaSpaceId(): Promise<UUID | undefined> {
+    return Promise.resolve(this.#metaSpaceId);
+  }
+
   replaceAggregate(
     input: AggregateInput,
-    expectedMetaSpaceId: UUID,
+    expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult> {
     const intake = loadSpaceAggregate({ metaSpaceId: input.metaSpaceId, snapshots: input.spaces });
     if (!intake.ok) return Promise.resolve({ kind: 'aggregate-refused', errors: intake.errors });
-    if (this.#metaSpaceId === undefined) {
-      if (this.#spaces.size > 0)
-        return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
+    if (this.#metaSpaceId === undefined && this.#spaces.size === 0) {
       return Promise.resolve({ kind: 'uninitialized' });
     }
     if (this.#metaSpaceId !== expectedMetaSpaceId) {

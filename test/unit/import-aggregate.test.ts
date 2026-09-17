@@ -39,7 +39,7 @@ const DIAGRAM_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
  * "the repository was never touched" is stated — an assertion about stored state
  * would pass just as well for an import that wrote and rolled back.
  */
-type SeamCall = 'loadAggregate' | 'initializeAggregate' | 'replaceAggregate';
+type SeamCall = 'loadAggregate' | 'loadMetaSpaceId' | 'initializeAggregate' | 'replaceAggregate';
 
 class RecordingRepository implements SpaceRepository {
   readonly calls: SeamCall[] = [];
@@ -70,6 +70,11 @@ class RecordingRepository implements SpaceRepository {
     return this.#stored.loadAggregate();
   }
 
+  loadMetaSpaceId(): Promise<UUID | undefined> {
+    this.calls.push('loadMetaSpaceId');
+    return this.#stored.loadMetaSpaceId();
+  }
+
   initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
     this.calls.push('initializeAggregate');
     return this.#stored.initializeAggregate(input);
@@ -77,7 +82,7 @@ class RecordingRepository implements SpaceRepository {
 
   replaceAggregate(
     input: AggregateInput,
-    expectedMetaSpaceId: UUID,
+    expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult> {
     this.calls.push('replaceAggregate');
     return this.#stored.replaceAggregate(input, expectedMetaSpaceId);
@@ -276,9 +281,13 @@ describe('importAggregate', () => {
     expect(result.kind).toBe('imported');
     if (result.kind !== 'imported') return;
     expect(result.spaces.map(({ snapshot }) => snapshot.id)).toEqual([OTHER_META_ID]);
-    // The identity `loadAggregate` just reported is what authorizes the
+    // The identity `loadMetaSpaceId` just reported is what authorizes the
     // replacement, so the read is part of the door rather than a courtesy.
-    expect(repository.calls).toEqual(['initializeAggregate', 'loadAggregate', 'replaceAggregate']);
+    expect(repository.calls).toEqual([
+      'initializeAggregate',
+      'loadMetaSpaceId',
+      'replaceAggregate',
+    ]);
     await expect(storedMetaSpaceId(repository)).resolves.toBe(OTHER_META_ID);
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: OTHER_META_ID, title: 'Replacement' },
@@ -287,9 +296,8 @@ describe('importAggregate', () => {
 
   /*
    * `replaceAggregate` refuses to establish first state, so an empty repository
-   * takes the initializing door even under the flag: there is nothing to
-   * truncate, and `--dangerous-truncate` is permission to destroy rather than a
-   * demand that something be destroyed.
+   * takes the initializing door once replacement says so: there is nothing to
+   * truncate, and the flag does not turn a first import into anything else.
    */
   it('initializes rather than replaces an empty repository under truncate', async () => {
     const root = await writeMetaOnlyAggregate();
@@ -298,17 +306,20 @@ describe('importAggregate', () => {
     const result = await importFrom(root, repository, true);
 
     expect(result.kind).toBe('imported');
-    expect(repository.calls).toEqual(['loadAggregate', 'initializeAggregate']);
+    expect(repository.calls).toEqual([
+      'loadMetaSpaceId',
+      'replaceAggregate',
+      'initializeAggregate',
+    ]);
     await expect(storedMetaSpaceId(repository)).resolves.toBe(META_SPACE_ID);
   });
 
   /*
-   * The gap between the `loadAggregate` that found nothing and the
-   * `initializeAggregate` that follows it is real: `pnpm dev`'s startup, or a
-   * second `hyper`, can establish the Meta Space in between. What comes back is
-   * `already-initialized`, whose sentence tells the operator to re-run with
-   * `--dangerous-truncate` — the flag they just passed. It is a lost race, so it
-   * is reported as the conflict it is, and the advice becomes "run it again".
+   * The gap between the `loadMetaSpaceId` that found nothing and the write that
+   * follows it is real: `pnpm dev`'s startup, or a second `hyper`, can establish
+   * the Meta Space in between. The operator authorized destroying what they
+   * read, not what arrived afterwards, so it is reported as the conflict it is,
+   * and the advice becomes "run it again".
    */
   it('reports a Meta Space established during the truncate race as a conflict', async () => {
     const stored = new MemorySpaceRepository();
@@ -320,7 +331,7 @@ describe('importAggregate', () => {
     // The repository was empty when it was read, and holds a Meta Space by the
     // time the import writes — which is exactly what the losing side of the race
     // observes.
-    repository.loadAggregate = () => Promise.resolve({ kind: 'uninitialized' });
+    repository.loadMetaSpaceId = () => Promise.resolve(undefined);
 
     const result = await importFrom(
       await writeMetaOnlyAggregate(OTHER_META_ID, 'Replacement'),
@@ -332,6 +343,74 @@ describe('importAggregate', () => {
     if (result.kind !== 'conflict') return;
     expect(result.currentMetaSpaceId).toBe(META_SPACE_ID);
     await expect(storedMetaSpaceId(stored)).resolves.toBe(META_SPACE_ID);
+  });
+
+  /*
+   * `--dangerous-truncate` truncates. Stored state `loadAggregate` refuses to
+   * read is still stored state, and the flag replaces it rather than stopping
+   * at the read (ADR 0092).
+   */
+  it('truncates Spaces stored without a Meta identity and imports in their place', async () => {
+    const stored = MemorySpaceRepository.withoutMetaIdentity([
+      {
+        snapshot: { id: ORDINARY_SPACE_ID, document: { version: 1, title: 'Orphan' }, things: [] },
+        revision: 0n,
+        exportedRevision: null,
+      },
+    ]);
+    const repository = new RecordingRepository(stored);
+
+    const result = await importFrom(await writeMetaOnlyAggregate(), repository, true);
+
+    expect(result.kind).toBe('imported');
+    expect(repository.calls).toEqual(['loadMetaSpaceId', 'replaceAggregate']);
+    await expect(storedMetaSpaceId(repository)).resolves.toBe(META_SPACE_ID);
+    await expect(repository.listSpaces()).resolves.toEqual([{ id: META_SPACE_ID, title: 'Meta' }]);
+  });
+
+  it('truncates a stored aggregate that fails intake and imports in its place', async () => {
+    const stored = new MemorySpaceRepository(
+      [
+        {
+          snapshot: { id: OTHER_META_ID, document: { version: 1, title: 'Meta' }, things: [] },
+          revision: 0n,
+          exportedRevision: null,
+        },
+        {
+          snapshot: {
+            id: ORDINARY_SPACE_ID,
+            document: { version: 1, title: 'Unreferenced' },
+            things: [],
+          },
+          revision: 0n,
+          exportedRevision: null,
+        },
+      ],
+      OTHER_META_ID,
+    );
+    const repository = new RecordingRepository(stored);
+    await expect(repository.loadAggregate()).rejects.toThrow();
+
+    const result = await importFrom(await writeMetaOnlyAggregate(), repository, true);
+
+    expect(result.kind).toBe('imported');
+    await expect(storedMetaSpaceId(repository)).resolves.toBe(META_SPACE_ID);
+    await expect(repository.listSpaces()).resolves.toEqual([{ id: META_SPACE_ID, title: 'Meta' }]);
+  });
+
+  it('conflicts rather than truncating when the Meta identity moved after it was read', async () => {
+    const repository = new RecordingRepository();
+    await importFrom(await writeMetaOnlyAggregate(META_SPACE_ID, 'Stored'), repository);
+    repository.loadMetaSpaceId = () => Promise.resolve(OTHER_META_ID);
+
+    const result = await importFrom(
+      await writeMetaOnlyAggregate(OTHER_META_ID, 'Replacement'),
+      repository,
+      true,
+    );
+
+    expect(result).toEqual({ kind: 'conflict', currentMetaSpaceId: META_SPACE_ID });
+    await expect(storedMetaSpaceId(repository)).resolves.toBe(META_SPACE_ID);
   });
 
   /*
