@@ -21,7 +21,8 @@ export const migrateSqliteFile = (path: string): void => {
   );
   if (command.status !== 0) {
     throw new Error(
-      `SQLite migrate failed\nstatus: ${command.status ?? 'not launched'}\nstdout: ${command.stdout || '<empty>'}\nstderr: ${command.stderr || '<empty>'}`,
+      `SQLite migrate failed\nstatus: ${command.status ?? 'not launched'}\nsignal: ${command.signal ?? 'none'}\nerror: ${command.error?.message ?? 'none'}\nstdout: ${command.stdout || '<empty>'}\nstderr: ${command.stderr || '<empty>'}`,
+      { cause: command.error },
     );
   }
 };

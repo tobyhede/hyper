@@ -67,6 +67,28 @@ describe('runCommand', () => {
     }
   };
 
+  const GRANDCHILD_EXIT_POLL_MS = 25;
+  const GRANDCHILD_EXIT_DEADLINE_MS = 2_000;
+
+  /**
+   * `runCommand` settles once it has sent SIGKILL to the whole process group
+   * and observed the direct child's own exit — it does not wait on the
+   * grandchild's exit specifically (see `runCommand`'s doc comment). Both
+   * processes are signalled together, but the OS gives no ordering guarantee
+   * between the direct child's exit notification and the grandchild's actual
+   * termination, so an immediate `isProcessAlive` check right after the
+   * promise settles races that gap. Poll with a bounded deadline instead of
+   * asserting immediately.
+   */
+  const waitForProcessExit = async (pid: number, deadlineMs: number): Promise<boolean> => {
+    const deadline = Date.now() + deadlineMs;
+    while (isProcessAlive(pid)) {
+      if (Date.now() >= deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, GRANDCHILD_EXIT_POLL_MS));
+    }
+    return true;
+  };
+
   it('rejects with a timeout error and leaves no grandchild running', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'hyper-command-'));
     const pidFile = join(workdir, 'grandchild.pid');
@@ -89,6 +111,12 @@ describe('runCommand', () => {
     const pidText = await readFile(pidFile, 'utf8');
     const grandchildPid = Number.parseInt(pidText.trim(), 10);
     expect(Number.isInteger(grandchildPid)).toBe(true);
-    expect(isProcessAlive(grandchildPid)).toBe(false);
+
+    const exited = await waitForProcessExit(grandchildPid, GRANDCHILD_EXIT_DEADLINE_MS);
+    if (!exited) {
+      throw new Error(
+        `grandchild pid ${grandchildPid} was still alive ${GRANDCHILD_EXIT_DEADLINE_MS}ms after runCommand settled`,
+      );
+    }
   });
 });

@@ -1,6 +1,6 @@
 # 17 — SQLite CLI import, replace, and export
 
-**What to build:** `hyper <aggregate>` and `hyper export` against SQLite have the same lifecycle outcomes as PostgreSQL. An empty file initializes; `--dangerous-truncate` replaces under the expected Meta identity; a stale replace conflicts; a successful export records `markExported` at the projected revision. The canonical directory format does not change.
+**What to build:** `hyper <aggregate>` and `hyper export` against SQLite have the same lifecycle outcomes as PostgreSQL. An empty, already-migrated SQLite database (the existing `SQLITE_PATH` precondition) initializes; `--dangerous-truncate` replaces under the expected Meta identity; a stale replace conflicts; a successful export records `markExported` at the projected revision. The canonical directory format does not change.
 
 **Blocked by:** 16 — SQLite persists authored Edits.
 

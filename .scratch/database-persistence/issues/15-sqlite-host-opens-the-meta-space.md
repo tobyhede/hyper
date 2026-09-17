@@ -17,7 +17,7 @@ Ticket 14's composition constraint is in force from this ticket, not deferred to
 - [x] The SQLite adapter implements `initializeAggregate`, `loadAggregate`, `listSpaces`, and `loadSpace` with the same observable outcomes the shared `SpaceRepository` suite already requires of those operations. `commit`, `replaceAggregate`, and `markExported` may still refuse; startup and ordinary GET of Default Content must not need them.
 - [x] Host composition runs the existing Meta establishment before serving. An uninitialized file becomes the Default Content Meta Space; an already-initialized file is left alone.
 - [x] `GET` of the Space collection and `GET` of that Meta Space return the established aggregate. A normal close, process exit, and reopen against the same file still shows it.
-- [x] The file lives at a stable application-owned local path. A missing or unwritable parent fails clearly. The runtime is closed on CLI/server shutdown and before test cleanup.
+- [x] The file lives at a stable application-owned local path. A missing or unwritable parent fails clearly. The runtime is closed on CLI shutdown and before test cleanup; the Vite host registers no close hook of its own (see the Answer below and ticket 19, which found two sequential in-process Vite hosts against one file safe without one).
 - [x] CI (or a local command the later SQLite job will run) emits/checks the SQLite contract, applies committed migrations, runs this ticket's tests against a temp file, verifies the live database, closes every handle, and removes the directory. PostgreSQL CI is unchanged.
 - [x] No browser/WASM SQLite, no network filesystem, and no live PostgreSQL↔SQLite migration.
 
