@@ -1,34 +1,26 @@
-import type { SpaceSnapshot, UUID } from '@project/core';
-import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
-import type {
-  LoadedSpace,
-  RepositoryCommitResult,
-  SpaceChange,
-  SpaceCommit,
-  SpaceConflict,
-} from '@project/persistence';
+import type { UUID } from '@project/core';
+import { loadSpaceAggregate } from '@project/graph';
+import type { LoadedSpace, SpaceChange, SpaceCommit, SpaceConflict } from './backend';
+import type { RepositoryCommitResult } from './repository';
 
 /*
- * What a commit means, decided once for every database adapter.
+ * What a commit means, decided once for every implementation (ADR 0093).
  *
- * Each function here takes what an adapter has already read and answers what
- * the adapter must do next — answer the caller, or write — before any write
- * happens. The adapters keep their own reads, writes, locking and driver error
- * classification; nothing here names a database. `memory.ts` in
- * `@project/persistence` draws the same lines by hand, and
- * `test/support/repository-contract.ts` holds all three to them.
+ * `decideCommit` takes what an implementation has already read and answers what
+ * it must do next — answer the caller, or write — before any write happens. The
+ * implementations keep their own reads, writes, locking and error
+ * classification; nothing here names a store. Both database adapters,
+ * `MemorySpaceRepository` and `MemorySpaceBackend` call it, and
+ * `test/support/repository-contract.ts` holds the repositories to what it
+ * decides.
  */
 
 type WrittenChange = Exclude<SpaceChange, { kind: 'delete' }>;
-type UpdateChange = Extract<SpaceChange, { kind: 'update' }>;
 
-/** What an adapter does next: answer the caller now, or write and then answer. */
-export type CommitDecision =
+/** What an implementation does next: answer the caller now, or write and then answer. */
+type CommitDecision =
   | { readonly kind: 'answer'; readonly result: RepositoryCommitResult }
   | { readonly kind: 'write'; readonly result: RepositoryCommitResult };
-
-/** The fast path's decision, which may also hand the commit to the aggregate path. */
-export type TopologyPreservingDecision = CommitDecision | { readonly kind: 'aggregate-path' };
 
 /** The revision a created or updated Space carries once the commit lands. */
 export const committedRevision = (change: WrittenChange): bigint =>
@@ -72,74 +64,23 @@ const committed = (request: SpaceCommit): RepositoryCommitResult => ({
   ),
 });
 
-const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
-  if (current.document.defaultDiagram !== next.document.defaultDiagram) return false;
-  if (
-    JSON.stringify(current.document.diagrams ?? []) !== JSON.stringify(next.document.diagrams ?? [])
-  ) {
-    return false;
-  }
-  if (current.things.length !== next.things.length) return false;
-  const currentById = new Map(current.things.map((thing) => [thing.id, thing]));
-  return next.things.every((thing) => {
-    const previous = currentById.get(thing.id);
-    if (previous?.document.kind !== thing.document.kind) return false;
-    if (thing.document.kind !== 'space' || previous.document.kind !== 'space') return true;
-    return (
-      previous.document.spaceId === thing.document.spaceId &&
-      previous.document.diagram === thing.document.diagram &&
-      previous.document.graph === thing.document.graph
-    );
-  });
-};
-
-/** The one update a fast-path candidate consists of, or `undefined` for any other change set. */
-export const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undefined => {
-  const [change] = request.changes;
-  return request.changes.length === 1 && change.kind === 'update' ? change : undefined;
-};
-
-/**
- * Decide a single update against the stored Space it names, without the
- * complete aggregate. A change that moves the snapshot boundary — structure,
- * membership, a Thing's kind, or a Space Thing's selection — goes to the
- * aggregate path instead.
- */
-export const decideTopologyPreservingUpdate = (
-  change: UpdateChange,
-  current: LoadedSpace | undefined,
-): TopologyPreservingDecision => {
-  if (current?.revision !== change.expectedRevision) {
-    return {
-      kind: 'answer',
-      result: { kind: 'conflict', conflicts: [{ spaceId: change.spaceId, current }] },
-    };
-  }
-  const intake = loadSpaceSnapshot(change.snapshot);
-  if (!intake.ok) {
-    return {
-      kind: 'answer',
-      result: {
-        kind: 'aggregate-refused',
-        errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intake.errors }],
-      },
-    };
-  }
-  if (!preservesSnapshotBoundary(current.snapshot, change.snapshot)) {
-    return { kind: 'aggregate-path' };
-  }
-  return { kind: 'write', result: committed({ changes: [change] }) };
-};
-
 /**
  * Decide a change set against every stored Space and the Meta identity, by
  * validating the complete candidate aggregate it would produce.
+ *
+ * `stored` is every stored Space in the order the implementation reads them —
+ * ascending by id — because an `invalid-space-snapshot` refusal names its Space
+ * by that position. A `conflict` names the `LoadedSpace` values it was given, so
+ * an implementation that must not hand out its own state passes copies.
  */
-export const decideAggregateCommit = (
+export const decideCommit = (
   request: SpaceCommit,
   metaSpaceId: UUID | undefined,
   stored: readonly LoadedSpace[],
 ): CommitDecision => {
+  const refusal = commitIdentityRefusal(request);
+  if (refusal !== undefined) return { kind: 'answer', result: refusal };
+
   const byId = new Map(stored.map((space) => [space.snapshot.id, space]));
   const baseline =
     metaSpaceId === undefined
@@ -177,10 +118,9 @@ export const decideAggregateCommit = (
       });
     }
   }
-  // Answered after the conflicts, exactly as `MemorySpaceRepository` does:
-  // a change set naming a Space the store does not hold is a conflict
-  // whether or not Meta has been established, and only what follows needs a
-  // complete aggregate to check.
+  // Answered after the conflicts: a change set naming a Space the store does
+  // not hold is a conflict whether or not Meta has been established, and only
+  // what follows needs a complete aggregate to check.
   if (metaSpaceId === undefined) {
     return {
       kind: 'answer',
@@ -198,8 +138,7 @@ export const decideAggregateCommit = (
    * proposal, and answering `conflict` for it cannot be recovered from: the
    * reload returns the target at the revision the caller already holds, so
    * the identical change set conflicts again, forever. That falls through
-   * to complete intake below and is refused. `memory.ts` draws the same
-   * line, and `repository-contract.ts` holds both to it.
+   * to complete intake below and is refused.
    */
   const aggregate = loadSpaceAggregate({
     metaSpaceId,
