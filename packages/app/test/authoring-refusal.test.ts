@@ -18,7 +18,6 @@ const WIRE = 'the transport said this';
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
-  'placement-pending': { code: 'placement-pending' },
   'diagram-not-found': { code: 'diagram-not-found' },
   'diagram-required': { code: 'diagram-required', operation: 'added-thing-to-diagram' },
   'thing-not-found': { code: 'thing-not-found' },

@@ -240,34 +240,29 @@ describe('An embedded Edit in an unselected Diagram leaves no stale member (tick
   };
 
   /**
-   * The ticket's suspected cause names `deleted-thing` specifically: "a
+   * The ticket's suspected cause named `deleted-thing` specifically: "a
    * `deleted-thing` cascade can leave a stale member that the next Edit writes
-   * into the snapshot, where intake refuses the reference."
+   * into the snapshot, where intake refuses the reference." That exact shape
+   * could not be reproduced through any typed call: `SpaceAuthoring.completeInDiagram`'s
+   * parameter type (`EmbeddedThingCompletion | EmbeddedContextCompletion`)
+   * excludes `deleted-thing`, and `thing-deletion.ts`, the only production
+   * caller of a `deleted-thing` completion, always calls the top-level
+   * `authoring.complete` rather than `completeInDiagram`.
    *
-   * That exact shape could not be reproduced through any typed call. A
-   * `deleted-thing` completion is the only completion kind that removes a
-   * Thing from the Space's `things` array — every other embedded-reachable
-   * kind only changes one Diagram's own positions or graphs — and
-   * `SpaceAuthoring.completeInDiagram`'s own parameter type
-   * (`EmbeddedThingCompletion | EmbeddedContextCompletion`) excludes
-   * `deleted-thing`. `thing-deletion.ts` is the only production caller of a
-   * `deleted-thing` completion, and it always calls the top-level
-   * `authoring.complete` (no `embeddedDiagramId`) — never `completeInDiagram`.
-   * `embedded-authoring.test.ts`'s "reports rather than forwards" coverage
-   * confirms the canvas-facing wrapper refuses to forward `deleted-thing` to
-   * an embedded Diagram at all. So `space-authoring.ts`'s embedded branch
-   * (`performCompletion`, the `install(derived.edit.placement)` gated on
-   * `navigation.getState().selectedDiagramId === reported.embeddedDiagramId`)
-   * never sees a `deleted-thing` completion in production, and a test cannot
-   * reach it without an unsafe type assertion — which ADR 0062 forbids adding.
+   * With Authoring's own placement copy gone, the suspected *mechanism* — a
+   * copy left stale because reconciliation was gated by `installing` — is gone
+   * with it: an embedded Edit now writes straight into the session's snapshot,
+   * exactly as a top-level one does, and every later read derives its
+   * placement fresh from that same snapshot. There is no second store left to
+   * go stale, for `deleted-thing` or any other kind.
    *
-   * What follows instead exercises the same gate (no install, reconciliation
-   * skipped because `installing !== 0`) with the closest reachable kind that
-   * changes an unselected Diagram's own content, `deleted-graph`, called
-   * directly through `completeInDiagram` exactly as
-   * `space-authoring-operations.test.ts` already does to reach this same
-   * primitive outside its production callers. It passes today: not reproduced,
-   * for the reason above rather than because the suspected mechanism is sound.
+   * The test stays as a guard on the surrounding behaviour: an embedded Edit
+   * on a Diagram other than the one selected still has to produce a snapshot
+   * intake accepts, and a later top-level Edit still has to see it — exercised
+   * with `deleted-graph`, the closest reachable kind that changes an
+   * unselected Diagram's own content, called directly through
+   * `completeInDiagram` exactly as `space-authoring-operations.test.ts` does
+   * to reach this same primitive outside its production callers.
    */
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
     const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
@@ -276,9 +271,7 @@ describe('An embedded Edit in an unselected Diagram leaves no stale member (tick
     expect(app.navigation.getState().selectedDiagramId).toBe(TOP_DIAGRAM_ID);
 
     // An embedded Edit against a Diagram other than the one selected at the
-    // top level — the gate at `space-authoring.ts:1868` skips `install` and
-    // the next session notification skips reconciliation, both because this
-    // runs inside the embedded branch's own `installTogether`.
+    // top level.
     const embedded = app.authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
       kind: 'deleted-graph',
       graphId: OTHER_GRAPH_TO_DELETE_ID,

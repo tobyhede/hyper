@@ -10,7 +10,7 @@ import {
   type DiagramId,
   type SpaceSnapshot,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
@@ -110,9 +110,12 @@ const anchor = fc.record({
 /**
  * A generated operation, still holding indices rather than identities.
  *
- * `settled-thing-movement` and the two connect gestures are absent because they
- * carry rendered geometry a pointer produces; their eligibility is pinned in
- * `space-authoring.test.ts` against the real report.
+ * `settled-thing-movement` is absent because it carries the moved Things' own
+ * drop points, which only a real pointer gesture produces; its eligibility and
+ * derivation are pinned in `space-authoring-operations.test.ts` and
+ * `displacement.property.test.ts` against real geometry. The two connect
+ * gestures are covered there too, over the Edge-specific fixtures their
+ * eligibility rules need.
  */
 const operation = fc.oneof(
   fc.record({ op: fc.constant('created-thing' as const), anchor }),
@@ -188,17 +191,7 @@ it('keeps an existing Reference Thing Target immutable while accepting Title edi
         };
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-        const { authoring } = composeApp({
-          spaceSession: session,
-          selection: OTHER_DIAGRAM_ID,
-          initialPlacement: null,
-        });
-        const referenceDiagram = snapshot.document.diagrams?.find(
-          (diagram) => diagram.id === OTHER_DIAGRAM_ID,
-        );
-        if (referenceDiagram === undefined)
-          throw new Error('property fixture must include the Reference Thing Diagram');
-        authoring.replacePlacement(Placement.fromDiagram(referenceDiagram));
+        const { authoring } = composeApp({ spaceSession: session, selection: OTHER_DIAGRAM_ID });
 
         expect(
           authoring.complete({
@@ -242,28 +235,12 @@ it('keeps the working Space loadable through any sequence of semantic operations
         const { currentSpace, navigation, authoring } = composeApp({
           spaceSession: session,
           selection: diagramId,
-          // Deterministic, so a shrunk counterexample replays: creating this
-          // Space's Diagram creation mints one Graph, and the rest of the
-          // block is the margin that makes an exhaustion a real signal.
-          // These cases install the geometry the canvas would have reported by
-          // now, immediately below.
-          initialPlacement: null,
         });
         // The authored geometry available when an author reaches these controls.
         const selectedDiagram = (): Diagram | undefined => {
           const selected = navigation.getState().selectedDiagramId;
           return currentSpace().lookup.diagram(selected)?.diagram;
         };
-        const opened = selectedDiagram();
-        authoring.replacePlacement(
-          opened === undefined
-            ? Placement.fromEntries([
-                [THING_A, { x: 10, y: 20, open: false }],
-                [THING_B, { x: 300, y: 40, open: false }],
-                [THING_C, { x: 600, y: 40, open: false }],
-              ])
-            : Placement.fromDiagram(opened),
-        );
 
         for (const generated of operations) {
           const space = currentSpace();

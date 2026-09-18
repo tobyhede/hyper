@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { chromeControlStaysOwed, staysOwed, type PendingContinuation } from '../src/continuation';
@@ -48,11 +47,6 @@ const snapshot: SpaceSnapshot = {
   ],
 };
 
-const placement = Placement.fromEntries([
-  [THING_A, { x: 10, y: 20, open: false }],
-  [THING_B, { x: 300, y: 40, open: false }],
-]);
-
 function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([{ snapshot: stored, revision, exportedRevision: null }]);
@@ -60,7 +54,6 @@ function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const { authoring, navigation, continuation } = composeApp({
     spaceSession: session,
     selection: DIAGRAM_ID,
-    initialPlacement: placement,
   });
   return { session, authoring, navigation, continuation };
 }

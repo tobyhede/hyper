@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { graphRenderEdgeId, Placement } from '@project/graph';
+import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { Toolbar, ToolbarButton } from '@project/ui';
@@ -189,16 +189,7 @@ function compose({
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const composed = composeApp({
-    spaceSession: session,
-    selection,
-    initialPlacement: Placement.fromEntries([
-      [THING_A, { x: 0, y: 0, open: false }],
-      [THING_B, { x: 400, y: 0, open: false }],
-      [THING_C, { x: 800, y: 0, open: false }],
-    ]),
-    connections,
-  });
+  const composed = composeApp({ spaceSession: session, selection, connections });
   composed.adapter.getState().syncProjection(NODES, EDGES);
   return { session, ...composed };
 }

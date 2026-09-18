@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { Placement } from '@project/graph';
 import { MemorySpaceBackend, type ObserverErrorReporter } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createEmbeddedAuthoring } from '../src/embedded-authoring';
@@ -136,17 +135,12 @@ describe('a completion an embedded Diagram does not support', () => {
 
   it('forwards a connection into the Graph the embedding is showing', () => {
     const { composition, reported } = embedded();
-    const rendered = Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: false }],
-      [THING_B, { x: 300, y: 40, open: false }],
-    ]);
 
     expect(
       composition.authoring.complete({
         kind: 'connected-things',
         from: THING_A,
         to: THING_B,
-        rendered,
         graphId: GRAPH_ID,
       }),
     ).toEqual({ kind: 'completed' });

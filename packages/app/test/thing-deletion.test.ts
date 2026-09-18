@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot, type Thing } from '@project/core';
-import { Placement } from '@project/graph';
 import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
@@ -42,23 +41,13 @@ const snapshot: SpaceSnapshot = {
   ],
 };
 
-const placement = Placement.fromEntries([
-  [THING_A, { x: 10, y: 20, open: false }],
-  [THING_B, { x: 300, y: 40, open: false }],
-]);
-
 function open(stored: SpaceSnapshot = snapshot, storedRevision = 0n) {
   const loaded = { snapshot: stored, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([
     { snapshot: stored, revision: storedRevision, exportedRevision: null },
   ]);
   const { spaceSession: session, spaceThings } = openTestSpace(backend, loaded);
-  const composed = composeApp({
-    spaceSession: session,
-    selection: DIAGRAM_ID,
-    initialPlacement: placement,
-    spaceThings,
-  });
+  const composed = composeApp({ spaceSession: session, selection: DIAGRAM_ID, spaceThings });
   return { session, spaceThings, ...composed };
 }
 

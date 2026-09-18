@@ -2,7 +2,6 @@ import { act, render } from '@testing-library/react';
 import { useRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ChromeContinuation } from '../src/components/ChromeContinuation';
 import { composeApp, type ComposedApp } from '../src/compose-app';
@@ -37,11 +36,7 @@ function open(): ComposedApp['continuation'] {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = new MemorySpaceBackend([loaded]);
   const session = openSpaceSession(backend, loaded);
-  return composeApp({
-    spaceSession: session,
-    selection: DIAGRAM_ID,
-    initialPlacement: Placement.fromEntries([[THING_A, { x: 10, y: 20, open: false }]]),
-  }).continuation;
+  return composeApp({ spaceSession: session, selection: DIAGRAM_ID }).continuation;
 }
 
 function Harness({

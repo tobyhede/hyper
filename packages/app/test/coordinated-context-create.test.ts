@@ -31,7 +31,7 @@ describe('coordinated context create', () => {
   it('maps an authoring refusal into the author-facing sentence', async () => {
     let hooked = false;
     const result = await coordinatedContextCreate({
-      create: () => ({ kind: 'refused', refusal: { code: 'placement-pending' } }),
+      create: () => ({ kind: 'refused', refusal: { code: 'diagram-not-found' } }),
       createdOf: () => ({ created, active: GRAPH }),
       afterCreated: () => {
         hooked = true;
@@ -39,9 +39,7 @@ describe('coordinated context create', () => {
       },
     });
     expect(hooked).toBe(false);
-    expect(result).toBe(
-      'This view has not finished placing its Things, so there is nowhere to write yet.',
-    );
+    expect(result).toBe('This Diagram is no longer part of the Space.');
   });
 
   it('answers the persistence error and does not hook when the created Diagram has not persisted', async () => {
