@@ -111,6 +111,7 @@ describe('embedded open Space Thing discovery', () => {
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { diagramId: DIAGRAM, nodes: [nested] }]]),
       bodyHeights: new Map(),
+      draggingIds: new Set<string>(),
     });
     expect(requests.map((request) => request.parent.id)).toEqual([HOST]);
   });
@@ -127,6 +128,7 @@ describe('embedded open Space Thing discovery', () => {
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { diagramId: DIAGRAM, nodes: [nested] }]]),
       bodyHeights: new Map(),
+      draggingIds: new Set<string>(),
     });
     expect(requests.map((request) => request.parent.id)).toEqual([HOST, NESTED]);
     expect(requests[1]?.absolute).toEqual({ x: 150, y: 260 });
@@ -136,6 +138,43 @@ describe('embedded open Space Thing discovery', () => {
       right: 384,
       bottom: 196,
     });
+  });
+
+  it('leans every embedding under a dragged Thing about that Thing, not about its own parent', () => {
+    const parent = openSpaceThing(HOST, { spaceId: TARGET, diagram: DIAGRAM });
+    const nested = openSpaceThing(
+      NESTED,
+      { spaceId: TARGET, diagram: OTHER_DIAGRAM },
+      { position: { x: 50, y: 60 }, width: 400, height: 300 },
+    );
+    const requests = discoverEmbeddedOpenSpaceThings({
+      nodes: [parent],
+      entries: [{ id: TARGET }],
+      publications: new Map([[HOST, { diagramId: DIAGRAM, nodes: [nested] }]]),
+      bodyHeights: new Map(),
+      // The render adapter's record of the gesture, not `node.dragging`: the
+      // projection republishes during a drag and wipes that flag.
+      draggingIds: new Set<string>([HOST]),
+    });
+    // The dragged Thing's own centre: (100, 200) plus half of 700x500. The
+    // nested embedding is at (150, 260) with a centre of its own, and takes
+    // this one — anything else leans it twice and slides it out of the frame.
+    expect(requests.map((request) => request.tiltCenter)).toEqual([
+      { x: 450, y: 450 },
+      { x: 450, y: 450 },
+    ]);
+  });
+
+  it('leans nothing while no Thing is being moved', () => {
+    const parent = openSpaceThing(HOST, { spaceId: TARGET, diagram: DIAGRAM });
+    const requests = discoverEmbeddedOpenSpaceThings({
+      nodes: [parent],
+      entries: [{ id: TARGET }],
+      publications: new Map(),
+      bodyHeights: new Map(),
+      draggingIds: new Set<string>(),
+    });
+    expect(requests.map((request) => request.tiltCenter)).toEqual([undefined]);
   });
 
   it('marks a Reference Thing embedding and everything nested under it read-only', () => {
@@ -154,6 +193,7 @@ describe('embedded open Space Thing discovery', () => {
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { diagramId: DIAGRAM, nodes: [nested] }]]),
       bodyHeights: new Map(),
+      draggingIds: new Set<string>(),
     });
     expect(requests.map((request) => request.readOnly)).toEqual([true, true]);
   });
@@ -184,6 +224,7 @@ describe('embedded open Space Thing discovery', () => {
         entries: [],
         publications: new Map(),
         bodyHeights: new Map(),
+        draggingIds: new Set<string>(),
       }),
     ).toEqual([]);
   });

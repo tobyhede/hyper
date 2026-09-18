@@ -6,6 +6,7 @@ import {
   type ThingId,
 } from '@project/core';
 import { AUTHORING_HANDLE_DIAMETER, type ThingFlowNode } from '@project/react-flow-adapter';
+import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
 import type { CanvasNodesAndEdges } from './canvas-projection';
 
 /** A placement identity: the same target Thing can appear through several Space Things. */
@@ -79,6 +80,20 @@ export interface EmbeddedParentProjection {
   readonly zIndex?: number | undefined;
 }
 
+/**
+ * The lean an embedded canvas is carried through while a Thing framing it moves.
+ *
+ * Both points are canvas coordinates. `center` is the dragged Thing's centre —
+ * the one point every rotation turns about — and `parentAbsolute` is the
+ * containing Thing's own top-left, which is what turns a child's position here
+ * (relative to that Thing) into the offset a `transform-origin` in the child's
+ * own box needs.
+ */
+export interface EmbeddedTilt {
+  readonly center: DiagramPosition;
+  readonly parentAbsolute: DiagramPosition;
+}
+
 export interface EmbeddedDiagramRequest {
   readonly parent: EmbeddedParentProjection;
   readonly projection: CanvasNodesAndEdges;
@@ -86,6 +101,7 @@ export interface EmbeddedDiagramRequest {
   readonly zoom?: number;
   readonly enabled: boolean;
   readonly bounds?: EmbeddedBounds;
+  readonly tilt?: EmbeddedTilt | undefined;
 }
 
 /**
@@ -153,6 +169,43 @@ export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): T
   };
 }
 
+const TILT_RADIANS = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
+
+/**
+ * Where a Thing is drawn once the Thing framing it has leaned.
+ *
+ * Turning a rect about a distant point is the same rigid motion as moving its
+ * centre along that rotation and turning it in place, and this is the first
+ * half — `ThingNode` draws the second. Splitting it this way is what lets React
+ * Flow keep drawing the Edges: an endpoint is its node's `positionAbsolute`
+ * plus a handle offset measured once (`@xyflow/system`'s `getEdgePosition`), so
+ * an Edge follows a moved position exactly and would ignore a CSS rotation
+ * entirely.
+ *
+ * Positions here are relative to the containing Thing, so the centre is brought
+ * into that frame first. A Thing React Flow has not measured has no size to
+ * find a centre in and turns about its top-left, which is where it is drawn
+ * until the first measurement anyway.
+ */
+const tiltedPosition = (
+  tilt: EmbeddedTilt,
+  position: DiagramPosition,
+  size: { readonly width?: number | undefined; readonly height?: number | undefined },
+): DiagramPosition => {
+  const half = { x: (size.width ?? 0) / 2, y: (size.height ?? 0) / 2 };
+  const centre = {
+    x: tilt.center.x - tilt.parentAbsolute.x,
+    y: tilt.center.y - tilt.parentAbsolute.y,
+  };
+  const from = { x: position.x + half.x - centre.x, y: position.y + half.y - centre.y };
+  const cos = Math.cos(TILT_RADIANS);
+  const sin = Math.sin(TILT_RADIANS);
+  return {
+    x: centre.x + from.x * cos - from.y * sin - half.x,
+    y: centre.y + from.x * sin + from.y * cos - half.y,
+  };
+};
+
 /** Reparent the production projection, clipping partial Things instead of dropping them. */
 export function embeddedDiagram({
   parent,
@@ -161,6 +214,7 @@ export function embeddedDiagram({
   zoom = 1,
   enabled,
   bounds,
+  tilt,
 }: EmbeddedDiagramRequest): CanvasNodesAndEdges {
   const nodes = projection.nodes.map((node): ThingFlowNode => {
     const position = { x: node.position.x * zoom + offset.x, y: node.position.y * zoom + offset.y };
@@ -170,7 +224,7 @@ export function embeddedDiagram({
       parentId: parent.id,
       position,
       connectable: enabled,
-      data: { ...node.data, connectionAuthoringEnabled: enabled },
+      data: { ...node.data, connectionAuthoringEnabled: enabled, dragTilted: tilt !== undefined },
       draggable: enabled,
       selectable: enabled,
       focusable: enabled,
@@ -187,20 +241,28 @@ export function embeddedDiagram({
         bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
       },
     );
-    const style = {
-      ...clipped.style,
-      transition: 'none',
-    };
+    const style = { ...clipped.style, transition: 'none' };
+    // Leaned *after* clipping, never before: the drawn window leans with the
+    // Thing, so the two stay in the same frame and the inset is the one the
+    // unleaned geometry gives. Clipping against a leaned position would cut
+    // each Thing on a line the frame is no longer on.
+    const placed =
+      tilt === undefined
+        ? clipped
+        : { ...clipped, position: tiltedPosition(tilt, position, clipped) };
     return enabled
-      ? { ...clipped, style }
+      ? { ...placed, style }
       : {
-          ...clipped,
+          ...placed,
           style: { ...style, pointerEvents: 'none' },
         };
   });
   const ids = new Map(
     projection.nodes.map((node) => [node.id, embeddedNodeId(parent.id, node.id)]),
   );
+  // Nothing here leans. React Flow derives each endpoint from its node's
+  // position, which `tiltedPosition` has already moved, so the Edges follow the
+  // Things they connect without this module drawing anything.
   const edges = projection.edges.flatMap((edge): Edge[] => {
     const source = ids.get(edge.source);
     const target = ids.get(edge.target);

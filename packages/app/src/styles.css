@@ -149,6 +149,29 @@ body {
   transition: none;
 }
 
+/* The other half of that same sibling fact. A Thing leans one degree as it is
+   dragged (`canvas-thing.css`), and a transform reaches only its own
+   descendants — which its embedded canvas is not, those Things being React Flow
+   sub-flow children drawn as siblings of this wrapper. So they stayed upright
+   inside a frame that turned, about ten pixels out of it at the corners of a
+   large Space Thing.
+
+   The lean is given to them as a rigid motion in two halves: `embedded-diagram.ts`
+   has already rotated each one's *position* about the dragged Thing's centre,
+   and this turns it in place by the same angle. Together those are the one
+   motion, and splitting it that way is what lets React Flow draw the Edges —
+   an endpoint is its node's position plus a handle offset, so an Edge follows a
+   moved position and would ignore a transform.
+
+   It leans the Thing and deliberately not `.rf-thing-node__inner`. The four
+   authoring handles are the Thing's *siblings* inside that element, and React
+   Flow measures each one with `getBoundingClientRect`, which a transform on any
+   ancestor pollutes — silently and lastingly, because it re-measures only when
+   `offsetWidth`/`offsetHeight` change and a transform never changes those. */
+.rf-thing-node__inner[data-drag-tilted='true'] > .canvas-thing {
+  transform: rotate(var(--canvas-thing-drag-tilt));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .graph-area {
     --thing-placement-duration: 1ms;

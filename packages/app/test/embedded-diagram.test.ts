@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SPACE_THING_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
 import { AUTHORING_HANDLE_DIAMETER, type ThingFlowNode } from '@project/react-flow-adapter';
+import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
 import { canvasProjection } from '../src/canvas-projection';
 import {
   canvasNodeConnection,
@@ -11,6 +12,7 @@ import {
   embeddedNodeId,
   parseEmbeddedNodeId,
   type EmbeddedParentProjection,
+  type EmbeddedTilt,
 } from '../src/embedded-diagram';
 import { resolveDiagram } from '../src/diagram-resolution';
 
@@ -132,6 +134,26 @@ const drawFrom = (
     bounds,
   });
 
+/** The same drawing as `draw`, carried through a lean the containing Thing is being dragged into. */
+async function drawLeaning(tilt: EmbeddedTilt) {
+  const projected = await projection();
+  const first = projected.nodes[0];
+  if (first === undefined) throw new Error('No fixture Thing');
+  return embeddedDiagram({
+    parent: projectionParent(parent(first)),
+    projection: projected,
+    offset: { x: 16, y: 42 },
+    enabled: true,
+    tilt,
+  });
+}
+
+/** The containing Thing is at (800, 900) and 1000 square, so its centre is here. */
+const CENTRE: EmbeddedTilt = {
+  center: { x: 1300, y: 1400 },
+  parentAbsolute: { x: 800, y: 900 },
+};
+
 describe('an embedded production projection', () => {
   it('does not reparent from the containing Thing canvas position', async () => {
     const { parent: initial, projected } = await draw();
@@ -185,6 +207,59 @@ describe('an embedded production projection', () => {
       x: 400,
       y: 0,
     });
+  });
+
+  it('moves each embedded Thing rigidly about the dragged Thing rather than turning it in place', async () => {
+    // The containing Thing's centre is (1300, 1400) and the drawn positions are
+    // relative to its top-left, so the lean is about (500, 500) here. The test
+    // is the rigid motion itself rather than two magic coordinates: every
+    // Thing's centre keeps its distance from that point and its bearing turns
+    // by exactly the one angle, which is what "the embedding turns as one
+    // piece" means and what a wrong origin or a stale centre would break.
+    const { drawn: upright } = await draw();
+    const leaning = await drawLeaning(CENTRE);
+    const pivot = {
+      x: CENTRE.center.x - CENTRE.parentAbsolute.x,
+      y: CENTRE.center.y - CENTRE.parentAbsolute.y,
+    };
+    const centreOf = (node: ThingFlowNode) => ({
+      x: node.position.x + (node.width ?? 0) / 2 - pivot.x,
+      y: node.position.y + (node.height ?? 0) / 2 - pivot.y,
+    });
+    for (const thingId of [A, B]) {
+      const before = centreOf(embedded(upright.nodes, thingId));
+      const after = centreOf(embedded(leaning.nodes, thingId));
+      expect(Math.hypot(after.x, after.y)).toBeCloseTo(Math.hypot(before.x, before.y), 9);
+      const turned =
+        ((Math.atan2(after.y, after.x) - Math.atan2(before.y, before.x)) * 180) / Math.PI;
+      expect(turned).toBeCloseTo(CANVAS_THING_DRAG_TILT_DEGREES, 9);
+      // And it really moved, so the two assertions above are not both trivially
+      // true of a Thing left where it was.
+      expect(embedded(leaning.nodes, thingId).position).not.toEqual(
+        embedded(upright.nodes, thingId).position,
+      );
+    }
+  });
+
+  it('leaves the Edges to React Flow, which draws them from the positions that moved', async () => {
+    // An endpoint is its node's `positionAbsolute` plus a handle offset measured
+    // once, so a moved position carries the Edge with it. A transform here would
+    // be a second opinion about where the same Edge is.
+    const leaning = await drawLeaning(CENTRE);
+    expect(leaning.edges[0]?.style).not.toHaveProperty('transform');
+    expect(leaning.edges[0]?.style).not.toHaveProperty('transformOrigin');
+  });
+
+  it('turns each leaning Thing in place as well, which is the other half of the same motion', async () => {
+    const leaning = await drawLeaning(CENTRE);
+    expect(embedded(leaning.nodes, A).data.dragTilted).toBe(true);
+  });
+
+  it('leans nothing, and moves nothing, while no Thing is being dragged', async () => {
+    const { drawn } = await draw();
+    expect(embedded(drawn.nodes, A).data.dragTilted).toBe(false);
+    expect(embedded(drawn.nodes, A).position).toEqual({ x: 16, y: 42 });
+    expect(drawn.edges[0]?.style).not.toHaveProperty('transform');
   });
 
   it('draws a Thing beyond the containing bounds where it was authored, clipped rather than moved', async () => {

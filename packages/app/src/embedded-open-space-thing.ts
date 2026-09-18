@@ -34,6 +34,18 @@ export interface DiscoverEmbeddedOpenSpaceThingsInput<Entry extends { readonly i
   readonly entries: readonly Entry[];
   readonly publications: ReadonlyMap<string, EmbeddedPublicationSnapshot>;
   readonly bodyHeights: ReadonlyMap<string, number>;
+  /**
+   * Which Things a gesture is currently moving, from the render adapter's
+   * `dragOrigins`.
+   *
+   * **Not `node.dragging`.** React Flow sets that on the node it hands back
+   * through `onNodesChange`, but the adapter republishes the projection from
+   * `canvasProjection` and splices only the live *position* into it
+   * (`reconcile`), so the flag is wiped on the next publish — which during a
+   * drag is most frames. `dragOrigins` exists precisely to retain the gesture
+   * across that reconciliation, and it is the only durable answer here.
+   */
+  readonly draggingIds: ReadonlySet<string>;
 }
 
 export interface EmbeddedOpenSpaceThingRequest<Entry extends { readonly id: ThingId }> {
@@ -45,6 +57,19 @@ export interface EmbeddedOpenSpaceThingRequest<Entry extends { readonly id: Thin
   readonly absolute: DiagramPosition;
   readonly bounds: EmbeddedBounds;
   readonly readOnly: boolean;
+  /**
+   * The point this embedding leans about while a Thing framing it is moved, in
+   * canvas coordinates, or `undefined` when none is.
+   *
+   * A Thing tilts as it is dragged, and its embedded canvas is not inside it to
+   * tilt with it — React Flow draws sub-flow children as siblings of their
+   * parent's wrapper. So the centre of whichever ancestor is being moved is
+   * carried down here, and the canvas rotates the children, their Edges and
+   * this embedding's clip about it. It is the *dragged ancestor's* centre and
+   * not this parent's, which is what keeps a nested embedding rigid with the
+   * Thing actually under the pointer rather than leaning twice.
+   */
+  readonly tiltCenter: DiagramPosition | undefined;
 }
 
 interface EmbedWindow {
@@ -105,12 +130,14 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
     clip: EmbeddedBounds | null;
     path: ReadonlySet<string>;
     readOnly: boolean;
+    tiltCenter: DiagramPosition | undefined;
   }[] = input.nodes.map((parent) => ({
     parent,
     origin: { x: 0, y: 0 },
     clip: null,
     path: new Set<string>(),
     readOnly: false,
+    tiltCenter: undefined,
   }));
   for (const item of queue) {
     const { parent, origin, clip, path } = item;
@@ -122,6 +149,17 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
     if (path.has(crossing)) continue;
     const crossed = new Set(path).add(crossing);
     const window = embedBounds(parent, origin, clip, input.bodyHeights.get(parent.id));
+    // A Thing being moved is the one everything below it leans about. An
+    // ancestor already leaning wins, because React Flow moves one Thing at a
+    // time and a descendant of the dragged Thing is carried, not dragged.
+    const tiltCenter =
+      item.tiltCenter ??
+      (input.draggingIds.has(parent.id)
+        ? {
+            x: window.absolute.x + (parent.width ?? 0) / 2,
+            y: window.absolute.y + (parent.height ?? 0) / 2,
+          }
+        : undefined);
     requests.push({
       parent,
       readOnly,
@@ -131,6 +169,7 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
       entry: input.entries.find((entry) => entry.id === document.spaceId),
       absolute: window.absolute,
       bounds: window.bounds,
+      tiltCenter,
     });
     const published = input.publications.get(parent.id);
     if (published?.diagramId === document.diagram) {
@@ -141,6 +180,7 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
           clip: window.intersection,
           path: crossed,
           readOnly,
+          tiltCenter,
         });
     }
   }

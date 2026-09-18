@@ -52,6 +52,7 @@ export interface EmbeddedOpenSpaceThings {
 export function useEmbeddedOpenSpaceThings(
   nodes: readonly ThingFlowNode[],
   spaces: EmbeddedTargetReader | null,
+  draggingIds: ReadonlySet<string>,
 ): EmbeddedOpenSpaceThings {
   const getEntries = useCallback(() => spaces?.getState().entries ?? EMPTY_ENTRIES, [spaces]);
   const entries = useSyncExternalStore(spaces?.subscribe ?? emptySubscription, getEntries);
@@ -102,8 +103,9 @@ export function useEmbeddedOpenSpaceThings(
         entries,
         publications: embeddedPublications,
         bodyHeights,
+        draggingIds,
       }),
-    [nodes, entries, embeddedPublications, bodyHeights],
+    [nodes, entries, embeddedPublications, bodyHeights, draggingIds],
   );
   /**
    * A read outlives its embedding only while the *target* is gone.

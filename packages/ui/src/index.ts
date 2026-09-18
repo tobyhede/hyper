@@ -10,7 +10,7 @@ export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { ThingContent } from './ThingContent';
 export type { ThingContentProps } from './ThingContent';
-export { CanvasThing } from './CanvasThing';
+export { CanvasThing, CANVAS_THING_DRAG_TILT_DEGREES } from './CanvasThing';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
 export type {
