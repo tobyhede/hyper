@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
+import { coordinatedDiagramDelete } from '../src/coordinated-context-delete';
+import { createOpenSpaces } from '../src/open-spaces';
+import { recordingHistory } from './browser-history';
+import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
 
 /**
- * Coverage for `.scratch/snapshot-edits/issues/02-remove-authorings-placement-copy.md`,
- * "Red first" — items 3 and 4, both green against `main`. Items 1 and 2 (red)
- * land in a follow-up commit, with the reasons in that commit's message.
+ * Red-first coverage for `.scratch/snapshot-edits/issues/02-remove-authorings-placement-copy.md`,
+ * "Red first". Each `describe` below is one of the ticket's four suspected
+ * defects, named the way the ticket names it.
  *
- * Neither test below calls `authoredPlacement`, `reportRendered`,
+ * None of these tests calls `authoredPlacement`, `reportRendered`,
  * `replacePlacement` or `initialPlacement` — the members the ticket deletes —
  * on purpose: every assertion reads the session's own written snapshot or the
  * render adapter's own drawn projection, so the tests stay meaningful once the
@@ -19,6 +23,179 @@ import { node, settled } from './render-adapter-fixtures';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
+
+describe('Diagram delete draws the right geometry (ticket 02, item 1)', () => {
+  const SPACE_ID = id('1');
+  const DELETED_DIAGRAM_ID = id('2');
+  const SURVIVING_DIAGRAM_ID = id('3');
+  const DELETED_GRAPH_ID = id('4');
+  const SURVIVING_GRAPH_ID = id('5');
+  const SHARED_THING_ID = id('6');
+
+  /**
+   * One Thing placed in both Diagrams, at two different points — the shape the
+   * ticket names: "a Thing in both the deleted Diagram and the newly selected
+   * one".
+   */
+  const snapshot: SpaceSnapshot = {
+    id: SPACE_ID,
+    document: {
+      version: 1,
+      title: 'Space',
+      defaultDiagram: DELETED_DIAGRAM_ID,
+      diagrams: [
+        {
+          id: DELETED_DIAGRAM_ID,
+          title: 'Deleted',
+          kind: 'positioned',
+          positions: { [SHARED_THING_ID]: { x: 10, y: 20, open: false } },
+          graphs: [{ id: DELETED_GRAPH_ID, title: 'Deleted Graph', edges: [] }],
+        },
+        {
+          id: SURVIVING_DIAGRAM_ID,
+          title: 'Surviving',
+          kind: 'positioned',
+          positions: { [SHARED_THING_ID]: { x: 500, y: 600, open: false } },
+          graphs: [{ id: SURVIVING_GRAPH_ID, title: 'Surviving Graph', edges: [] }],
+        },
+      ],
+    },
+    things: [{ id: SHARED_THING_ID, document: { title: 'Shared', kind: 'markdown', body: '' } }],
+  };
+
+  it('writes the surviving Diagram’s own position for a Thing both Diagrams place, not the deleted Diagram’s', async () => {
+    const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
+    const { spaceSession: session, spaceThings } = openTestSpace(backend, {
+      snapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+    const app = composeApp({ spaceSession: session });
+    expect(app.navigation.getState().selectedDiagramId).toBe(DELETED_DIAGRAM_ID);
+
+    // What `App.tsx`'s Dock entity command does (`onDeleteDiagram`): coordinate
+    // the delete, then select and activate whatever it answers.
+    const result = await coordinatedDiagramDelete(spaceThings.deleteDiagram, {
+      targetSpaceId: SPACE_ID,
+      diagramId: DELETED_DIAGRAM_ID,
+      preferredDiagramId: null,
+    });
+    if (result.kind !== 'completed')
+      throw new Error(`Expected a completed delete, got ${result.kind}`);
+    expect(result.diagramId).toBe(SURVIVING_DIAGRAM_ID);
+    app.navigation.selectDiagram(result.diagramId);
+    app.navigation.activateGraph(result.graphId);
+    expect(app.navigation.getState().selectedDiagramId).toBe(SURVIVING_DIAGRAM_ID);
+
+    // An Edit that touches no position — renaming the surviving Diagram's own
+    // Graph — still writes the whole placement into the Diagram
+    // (`updatePositionedDiagram`). The correct source for that write is the
+    // surviving Diagram's own authored position for the shared Thing.
+    const renamed = app.authoring.complete({
+      kind: 'renamed-graph',
+      graphId: SURVIVING_GRAPH_ID,
+      title: 'Renamed Graph',
+    });
+    expect(renamed.kind).toBe('completed');
+
+    const written = session
+      .getState()
+      .working.document.diagrams?.find((diagram) => diagram.id === SURVIVING_DIAGRAM_ID);
+    expect(written?.positions[SHARED_THING_ID]).toEqual({ x: 500, y: 600, open: false });
+  });
+});
+
+describe('Entering draws the entered Diagram’s geometry (ticket 02, item 2)', () => {
+  const META_ID = id('10');
+  const OTHER_ID = id('11');
+  const DEFAULT_DIAGRAM_ID = id('12');
+  const ENTERED_DIAGRAM_ID = id('13');
+  const DEFAULT_GRAPH_ID = id('14');
+  const ENTERED_GRAPH_ID = id('15');
+  const SHARED_THING_ID = id('16');
+  const META_THING_ID = id('17');
+  const META_DIAGRAM_ID = id('18');
+  const META_GRAPH_ID = id('19');
+
+  const metaSnapshot: SpaceSnapshot = {
+    id: META_ID,
+    document: {
+      version: 1,
+      title: 'Meta',
+      defaultDiagram: META_DIAGRAM_ID,
+      diagrams: [
+        {
+          id: META_DIAGRAM_ID,
+          title: 'Meta Diagram',
+          kind: 'positioned',
+          positions: { [META_THING_ID]: { x: 0, y: 0, open: false } },
+          graphs: [{ id: META_GRAPH_ID, title: 'Meta Graph', edges: [] }],
+        },
+      ],
+    },
+    things: [{ id: META_THING_ID, document: { title: 'Meta Thing', kind: 'markdown', body: '' } }],
+  };
+
+  /**
+   * The Space Enter opens: a Space-default Diagram, and a second one that
+   * places the same Thing at a different point — the shape a Space Thing
+   * entered at a non-default Diagram/Graph makes real (ADR 0079).
+   */
+  const otherSnapshot: SpaceSnapshot = {
+    id: OTHER_ID,
+    document: {
+      version: 1,
+      title: 'Other',
+      defaultDiagram: DEFAULT_DIAGRAM_ID,
+      diagrams: [
+        {
+          id: DEFAULT_DIAGRAM_ID,
+          title: 'Default',
+          kind: 'positioned',
+          positions: { [SHARED_THING_ID]: { x: 10, y: 20, open: false } },
+          graphs: [{ id: DEFAULT_GRAPH_ID, title: 'Default Graph', edges: [] }],
+        },
+        {
+          id: ENTERED_DIAGRAM_ID,
+          title: 'Entered',
+          kind: 'positioned',
+          positions: { [SHARED_THING_ID]: { x: 500, y: 600, open: false } },
+          graphs: [{ id: ENTERED_GRAPH_ID, title: 'Entered Graph', edges: [] }],
+        },
+      ],
+    },
+    things: [{ id: SHARED_THING_ID, document: { title: 'Shared', kind: 'markdown', body: '' } }],
+  };
+
+  it('writes the entered Diagram’s own position for a Thing both Diagrams place, not the Space default one', async () => {
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: metaSnapshot, revision: 0n, exportedRevision: null },
+      { snapshot: otherSnapshot, revision: 0n, exportedRevision: null },
+    ]);
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      newId: newUuid,
+      history: recordingHistory(),
+    });
+    await spaces.open(META_ID);
+    const entered = await spaces.enter(OTHER_ID, ENTERED_DIAGRAM_ID, ENTERED_GRAPH_ID);
+    expect(entered.app.navigation.getState().selectedDiagramId).toBe(ENTERED_DIAGRAM_ID);
+
+    // Again, an Edit that touches no position.
+    const renamed = entered.app.authoring.complete({
+      kind: 'renamed-graph',
+      graphId: ENTERED_GRAPH_ID,
+      title: 'Renamed Graph',
+    });
+    expect(renamed.kind).toBe('completed');
+
+    const written = entered.session
+      .getState()
+      .working.document.diagrams?.find((diagram) => diagram.id === ENTERED_DIAGRAM_ID);
+    expect(written?.positions[SHARED_THING_ID]).toEqual({ x: 500, y: 600, open: false });
+  });
+});
 
 describe('An embedded Edit in an unselected Diagram leaves no stale member (ticket 02, item 3)', () => {
   const SPACE_ID = id('30');
