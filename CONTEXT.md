@@ -156,7 +156,7 @@ The on-disk form Exporting projects and Importing replaces: a directory holding 
 _Avoid_: catalog, bundle, export root as a second name for the same artifact.
 
 **Importing**:
-Taking a complete aggregate from outside Hyper and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
+Taking a complete aggregate from outside Hyper and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright, whatever is stored and whether or not it is a valid aggregate (ADR 0094) — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
 _Avoid_: loading, restoring, syncing; merging.
 
 **Opening**:

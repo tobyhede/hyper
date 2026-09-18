@@ -16,7 +16,8 @@ export type InitializeAggregateResult =
 export type ReplaceAggregateResult =
   | { kind: 'replaced'; aggregate: LoadedAggregate }
   | { kind: 'uninitialized' }
-  | { kind: 'conflict'; currentMetaSpaceId: UUID }
+  /** `undefined` when Spaces are stored with no Meta identity at all. */
+  | { kind: 'conflict'; currentMetaSpaceId: UUID | undefined }
   | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] };
 
 /**
@@ -41,9 +42,21 @@ export type ReplaceAggregateResult =
  */
 export interface SpaceRepository extends SpaceResourceRepository {
   initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult>;
+  /**
+   * The stored Meta identity, read without validating the aggregate around it,
+   * or `undefined` when none is stored. It is what authorizes a replacement of
+   * stored state `loadAggregate` refuses to read (ADR 0094).
+   */
+  loadMetaSpaceId(): Promise<UUID | undefined>;
+  /**
+   * Truncate whatever is stored, valid or not, and write `input` in its place
+   * (ADR 0094). `expectedMetaSpaceId` is the identity `loadMetaSpaceId` read;
+   * a different one stored by now is a `conflict`, and an empty repository is
+   * `uninitialized`, because first state is `initializeAggregate`'s.
+   */
   replaceAggregate(
     input: AggregateInput,
-    expectedMetaSpaceId: UUID,
+    expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult>;
   /** Records the revision projected by a completed external export. */
   markExported(id: UUID, revision: bigint): Promise<void>;

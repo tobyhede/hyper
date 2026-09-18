@@ -242,6 +242,64 @@ jobs:
         if: always() && steps.postgres-env.outcome == 'success'
         run: pnpm postgres:down
 
+  sqlite:
+    needs: reuse-pr-ci
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Configure ephemeral SQLite
+        id: sqlite-env
+        run: |
+          dir="$(mktemp -d)"
+          echo "SQLITE_DIR=$dir" >> "$GITHUB_ENV"
+          echo "SQLITE_PATH=$dir/hyper.db" >> "$GITHUB_ENV"
+
+      - name: Check SQLite contract
+        run: pnpm contract:check:sqlite
+
+      - name: Run SQLite integration suite
+        run: pnpm test:integration:sqlite
+
+      - name: Verify live database contract
+        run: pnpm exec prisma-next db verify --config prisma-next.config.sqlite.ts
+
+      # No `--with-deps`, for the reason the `postgres` job's own Chromium
+      # install step records: on `ubuntu-latest` it finds every shared library
+      # already present and would only fetch font packages neither proof's
+      # screenshot-free run can see.
+      - name: Install Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: Prove a SQLite edit survives a fresh host
+        run: pnpm e2e:sqlite
+
+      # Its own artifact name, for the reason the `e2e` job below records:
+      # `upload-artifact` refuses a second upload under a name already claimed in
+      # the same run, and this job's proof can fail in the same run as the
+      # `postgres` job's.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-sqlite
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Remove the SQLite directory
+        if: always() && steps.sqlite-env.outcome == 'success'
+        run: rm -rf "$SQLITE_DIR"
+
   e2e:
     needs: reuse-pr-ci
     if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
@@ -477,7 +535,7 @@ jobs:
 
   ci:
     name: CI passed
-    needs: [reuse-pr-ci, static-checks, coverage, postgres, e2e, ladle]
+    needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -502,6 +560,7 @@ jobs:
           STATIC_CHECKS: ${{ needs.static-checks.result }}
           COVERAGE: ${{ needs.coverage.result }}
           POSTGRES: ${{ needs.postgres.result }}
+          SQLITE: ${{ needs.sqlite.result }}
           E2E: ${{ needs.e2e.result }}
           LADLE: ${{ needs.ladle.result }}
         run: |
@@ -510,7 +569,7 @@ jobs:
             exit 0
           fi
 
-          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$E2E" "$LADLE"; do
+          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE"; do
             if [ "$result" != "success" ]; then
               echo "A required CI job did not succeed: $result"
               exit 1

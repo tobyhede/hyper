@@ -79,6 +79,23 @@ deployed environments should inject `DATABASE_URL` through their secret
 manager. `pnpm postgres:down` keeps the named data volume. To delete local
 database state, run the destructive reset `docker compose down --volumes`.
 
+### Local SQLite
+
+SQLite is an opt-in development host beside PostgreSQL, not a replacement for it:
+
+```sh
+pnpm dev:sqlite                                   # app at http://localhost:5177, file at .scratch/sqlite/hyper.db
+SQLITE_PATH=/absolute/path/hyper.db pnpm test:integration:sqlite
+```
+
+`SQLITE_PATH` names the file for the host and the CLI. The integration suite needs it set but does not test against it: `pnpm test:integration:sqlite` runs `pnpm db:migrate:sqlite` first, which fails with `PN-CLI-4005` when the variable is absent because `prisma-next.config.sqlite.ts` then declares no `db.connection`, while the cases themselves each mint and remove a fresh temp file through `openSqliteRepository`. So the value the suite is given is migrated and then left alone.
+
+Use a stable absolute path in a local directory the application owns. The host and CLI both refuse to start when `SQLITE_PATH` is unset or blank, or when its parent directory is missing or not writable, and the CLI also refuses a file that does not exist, since SQLite would otherwise create an empty unmigrated one and fail on a missing table. **A relative value is refused by the host but not by the CLI.** `pnpm db:migrate:sqlite` runs from the repository root while the host runs from `packages/app`, so a relative value would migrate one file and open another: `pnpm dev:sqlite` refuses one before migrating, so nothing under the repository root is touched, and the host checks again at composition, so a relative path reaching it by another route is still refused. `pnpm hyper:sqlite` has no such check and will act on whatever that relative path names from its own working directory — pass it an absolute one. A network filesystem, a file shared between hosts and a hosted SQLite service are not supported deployments.
+
+**One Hyper process per file.** Inside that process every repository operation is serialised, so overlapping Edits answer as they would on PostgreSQL: a stale revision is a conflict, and nothing waits on SQLite. A second process on the same live file — `pnpm hyper:sqlite` against a file `pnpm dev:sqlite` holds, or two hosts — is unsupported. SQLite locks the whole file, so when the two meet, an operation either fails at once, waits out the driver's fixed 5 second busy timeout and then fails, or waits and succeeds if the other process's lock clears before that timeout. A second process that is only reading is enough: a commit here cannot finish while that read's transaction is open. The wait is synchronous, so the host answers nothing else for those seconds. A failure either way answers `503 persistence-unavailable`, which the browser retries, never a `409`, and no partial write or stuck lock is left behind (`test/integration/sqlite-contention.test.ts`).
+
+The file uses SQLite's default rollback journal (`journal_mode=delete`) with `synchronous=FULL`; WAL is not enabled. To back it up, stop the host (or anything else writing the file) and copy the file, or use SQLite's own backup API (`sqlite3 hyper.db ".backup copy.db"`). Do not copy the file while a writer has it open: a copy taken mid-transaction need not be a consistent database.
+
 ## The space format
 
 A space is a **space directory**: a space file (`space.json`) plus one Markdown file per thing. Things are not listed anywhere — a thing exists because its file does ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)), and they are discovered by scanning two locations **non-recursively**: `*.md` beside the space file, and `things/*.md`. The bundled example lives in [`packages/app/example`](packages/app/example).
@@ -112,9 +129,16 @@ pnpm hyper ./my-aggregate                  # initialize an empty repository from
 pnpm hyper ./my-aggregate --dangerous-truncate   # replace the stored aggregate outright
 ```
 
-Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, the stored aggregate and its Meta identity are replaced atomically, authorized by the identity the repository just reported. There is no merge mode.
+Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, whatever is stored — a valid aggregate or state the repository refuses to read — is truncated and replaced atomically, authorized by the Meta identity the repository just reported ([ADR 0094](docs/adr/0094-dangerous-truncate-replaces-whatever-is-stored.md)). There is no merge mode.
 
 The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
+
+The same commands run against a SQLite file through `pnpm hyper:sqlite`, which requires `SQLITE_PATH` to name an already-migrated file (`pnpm db:migrate:sqlite`). The script, not an argument or the environment's contents, picks the database, so `pnpm hyper` stays PostgreSQL even when `.env` names both. Run it only against a file no host has open — stop `pnpm dev:sqlite` first, or point it at a different file. An exported directory is the only way to move an aggregate between the two databases:
+
+```sh
+pnpm hyper export ./my-aggregate                               # from PostgreSQL
+SQLITE_PATH=/absolute/path/hyper.db pnpm hyper:sqlite ./my-aggregate   # into an empty SQLite file
+```
 
 ### Durable URLs and HTTP resources
 

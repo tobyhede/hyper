@@ -769,11 +769,14 @@ const isAuthoredSource = (file: string): boolean =>
   (!file.includes('/') && file.endsWith('.ts'));
 
 /**
- * The five modules that are pnpm's vocabulary rather than ours: the alias
- * table, the two Vite configs that import it, and the toolchain check that
- * reads the package list plus its test. Composed from the fragment above for
- * the same reason every retired name in this file is — written out, this file
- * would hold the word it bans, and it is scanned now that `test/` is in scope.
+ * The modules that are pnpm's vocabulary rather than ours: the alias
+ * table, the Vite configs that import it, and the toolchain check that
+ * reads the package list plus its test. `vite.sqlite.config.ts` reuses
+ * `vite.config.ts`'s already-resolved aliases rather than importing the
+ * alias table a second time, so it carries no hit and is not listed here.
+ * Composed from the fragment above for the same reason every retired name in
+ * this file is — written out, this file would hold the word it bans, and it
+ * is scanned now that `test/` is in scope.
  */
 const MONOREPO_VOCABULARY: readonly string[] = [
   `packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`,
@@ -2496,10 +2499,12 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'tools/oxlint/anti-slop/rules/no-unsafe-dictionary-type.ts',
   `packages/app/${PATH_ALIAS_MODULE}.ts`,
   'packages/app/vite.config.ts',
+  'packages/app/vite.sqlite.config.ts',
   'packages/app/http-server-build.config.ts',
   'packages/app/e2e/space-thing-drag-benchmark-vite.config.ts',
   'vitest.config.ts',
   'vitest.integration.config.ts',
+  'vitest.sqlite.config.ts',
   'packages/app/components.json',
   'packages/ui/components.json',
   'test/unit/current-domain-vocabulary.test.ts',

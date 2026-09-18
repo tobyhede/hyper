@@ -73,13 +73,18 @@ const reportImportResult = (result: AggregateImportResult, io: CliIo): number =>
       );
       return 1;
     case 'conflict':
+      // A conflict here does not always mean the Meta identity itself moved —
+      // PostgreSQL also answers it when a stored Space changes mid-replacement,
+      // reporting back the same id the command already expected
+      // (`PostgresSpaceRepository.replaceAggregate`'s `StaleSpaceRevisionError`
+      // path). So the sentence states what is currently stored as a fact
+      // rather than claiming the id is new; the same-id case is held by
+      // `test/unit/hyper-cli.test.ts`'s "does not claim the Meta identity
+      // moved ..." test.
       io.stderr(
-        `The Meta Space changed to ${result.currentMetaSpaceId} during replacement. Nothing was written; run the command again.\n`,
-      );
-      return 1;
-    case 'uninitialized':
-      io.stderr(
-        'The repository emptied during replacement. Nothing was written; run the command again.\n',
+        result.currentMetaSpaceId === undefined
+          ? 'The repository changed during replacement, and no Meta Space is stored now. Nothing was written; run the command again.\n'
+          : `The repository changed during replacement; it now holds Meta Space ${result.currentMetaSpaceId}. Nothing was written; run the command again.\n`,
       );
       return 1;
     case 'aggregate-refused':

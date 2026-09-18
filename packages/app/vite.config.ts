@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { spaceHttpPlugin, type SpaceHttpPluginOptions } from './vite-space-http-plugin';
 import { workspaceAliases } from './workspace-aliases';
 
+/**
+ * The package alias map as a ready `resolve` config, exported so
+ * `vite.sqlite.config.ts` can reuse this file's aliases directly rather than
+ * importing `./workspace-aliases` a second time.
+ */
+export const resolveAliases = { alias: workspaceAliases() };
+
 export default defineConfig(({ mode }) => {
   const repositoryFile = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
   const memoryCatalog =
@@ -32,7 +39,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    resolve: { alias: workspaceAliases() },
+    resolve: resolveAliases,
     plugins: [react(), tailwindcss(), spaceHttpPlugin(spaceHttpOptions)],
     server: {
       port: 5173,

@@ -49,4 +49,12 @@ export function workerScopedViteCacheDir(appRoot: string, workerIndex: number): 
 
 /** The opt-in PostgreSQL project's fixed Vite host port. */
 export const POSTGRES_E2E_PORT = 5280;
+
+/**
+ * The opt-in SQLite project's fixed Vite host port.
+ *
+ * Distinct from `POSTGRES_E2E_PORT` so the two restart proofs can run beside
+ * each other, and still below `E2E_PORT_BASE` for the reason that one is.
+ */
+export const SQLITE_E2E_PORT = 5281;
 import path from 'node:path';

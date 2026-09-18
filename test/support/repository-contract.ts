@@ -220,7 +220,10 @@ export const spaceRepositoryContract = (
         aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
       });
       await expect(
-        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [structuredClone(first)] }),
+        repository.initializeAggregate({
+          metaSpaceId: SPACE_ID,
+          spaces: [structuredClone(first)],
+        }),
       ).resolves.toMatchObject({ kind: 'existing' });
 
       const replacement = retitled(first, 'Replacement');
@@ -239,7 +242,7 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} classifies canonical initialization and invalid lifecycle proposals`, async () => {
+  it(`${name} classifies canonical and different initialization proposals`, async () => {
     await withHarness(async (repository) => {
       const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
       const meta = {
@@ -262,6 +265,21 @@ export const spaceRepositoryContract = (
           spaces: [retitled(meta, 'Different'), child],
         }),
       ).resolves.toMatchObject({ kind: 'already-initialized' });
+    });
+  });
+
+  it(`${name} refuses a replacement proposal naming a Meta Space it does not hold`, async () => {
+    await withHarness(async (repository) => {
+      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+      const meta = {
+        ...space(SPACE_ID, 'Meta', [THING_ID]),
+        things: [
+          thing(THING_ID, 'Meta thing'),
+          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ],
+      };
+      await seed(repository, meta, child);
+
       await expect(
         repository.replaceAggregate(
           { metaSpaceId: MISSING_SPACE_ID, spaces: [meta, child] },
@@ -339,10 +357,43 @@ export const spaceRepositoryContract = (
   it(`${name} refuses replacement before initialization`, async () => {
     await withHarness(async (repository) => {
       const meta = space(SPACE_ID, 'Meta', [THING_ID]);
-      await expect(
-        repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, SPACE_ID),
-      ).resolves.toEqual({ kind: 'uninitialized' });
+      for (const expected of [SPACE_ID, undefined]) {
+        await expect(
+          repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, expected),
+        ).resolves.toEqual({ kind: 'uninitialized' });
+      }
       await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+    });
+  });
+
+  it(`${name} reads the stored Meta identity as each lifecycle door leaves it`, async () => {
+    await withHarness(async (repository) => {
+      await expect(repository.loadMetaSpaceId()).resolves.toBeUndefined();
+      await repository.initializeAggregate({
+        metaSpaceId: SPACE_ID,
+        spaces: [space(SPACE_ID, 'Meta', [THING_ID])],
+      });
+      await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
+      await repository.replaceAggregate(
+        { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'Other', [])] },
+        SPACE_ID,
+      );
+      await expect(repository.loadMetaSpaceId()).resolves.toBe(OTHER_SPACE_ID);
+    });
+  });
+
+  it(`${name} refuses a replacement expecting no Meta identity where one is stored`, async () => {
+    await withHarness(async (repository) => {
+      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'Other', [])] },
+          undefined,
+        ),
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
+      await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
     });
   });
 

@@ -22,7 +22,8 @@
     "ladle": "ladle serve",
     "ladle:build": "ladle build",
     "test": "vitest run --root ../.. packages/app/test",
-    "dev:new": "vite --mode e2e-empty --port 5174 --strictPort"
+    "dev:new": "vite --mode e2e-empty --port 5174 --strictPort",
+    "dev:sqlite": "vite --config vite.sqlite.config.ts --port 5177 --strictPort"
   },
   "dependencies": {
     "@project/core": "workspace:*",
