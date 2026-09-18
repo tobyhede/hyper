@@ -557,11 +557,11 @@ type Extent = { readonly width: number; readonly height: number };
  * of a shrinking Resize. It is **not** the involution the Open/Close pair is,
  * and the bound `Placement.growth` documents does not extend to it: a negative
  * room reverses a growth only for the Things that growth was applied to, and a
- * Thing the author placed beyond the subject *after* the Open was never one of
- * them. Such a Thing can be carried back across the subject — subject Open at
- * `x = 0`, a Thing dropped at `x = 1`, a shrink of 200 — and growing back skips
- * it as no longer beyond, so it keeps the 200. That is the same memorylessness
- * ADR 0084 chose for Close, which reclaims from every Thing currently beyond the
+ * Thing the author placed clear of the subject *after* the Open was never one of
+ * them. Such a Thing can be carried back inside the subject — subject Open at
+ * `x = 0`, a Thing dropped at `x = 260`, a shrink of 200 — and growing back skips
+ * it as no longer clear, so it keeps the 200. That is the same memorylessness
+ * ADR 0084 chose for Close, which reclaims from every Thing currently clear of the
  * closing Thing including the ones the author moved there; remembering which
  * Things a growth actually pushed is the per-Thing history the ADR rejected.
  */
@@ -1474,7 +1474,7 @@ export function createSpaceAuthoring({
       if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
       if (!at.open) return UNCHANGED;
       // Read as the Diagram stands, with no record of who this Thing's Open
-      // pushed: everything currently beyond it moves back, the Things the author
+      // pushed: everything currently clear of it moves back, the Things the author
       // dragged there while it was open included (ADR 0084).
       completedPlacement = closedThing(completedPlacement, completion.thingId, at);
     } else if (completion.kind === 'resized-thing') {

@@ -118,7 +118,7 @@ export const handRolledStyles = [
   {
     block: 'canvas-thing',
     reason:
-      'One rule only: React Flow\'s "this is the actively presented Thing" fact, which is adapter and application state. `CanvasThing`\'s own appearance is in `packages/ui/src/canvas-thing.css`, beside the component.',
+      "Two rules, both adapter and application state rather than appearance: React Flow's \"this is the actively presented Thing\" fact, and the lean an embedded Thing is given while the Thing framing it is dragged — which is the application's, because only it knows which Thing frames which. `CanvasThing`'s own appearance is in `packages/ui/src/canvas-thing.css`, beside the component.",
   },
   {
     block: 'graph-area',

@@ -11,6 +11,9 @@ import {
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-things';
 
+/** No gesture in flight: the lean is a drag's, and these tests run none. */
+const NO_DRAG: ReadonlySet<string> = new Set();
+
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
 
@@ -65,9 +68,12 @@ describe('useEmbeddedOpenSpaceThings', () => {
       asked.push(spaceId);
       return Promise.resolve(undefined);
     });
-    const { rerender } = renderHook(({ nodes }) => useEmbeddedOpenSpaceThings(nodes, spaces), {
-      initialProps: { nodes: [spaceThing(HOST, DIAGRAM)] },
-    });
+    const { rerender } = renderHook(
+      ({ nodes }) => useEmbeddedOpenSpaceThings(nodes, spaces, NO_DRAG),
+      {
+        initialProps: { nodes: [spaceThing(HOST, DIAGRAM)] },
+      },
+    );
     await waitFor(() => expect(asked).toEqual([TARGET]));
     rerender({ nodes: [spaceThing(HOST, DIAGRAM)] });
     await act(async () => {
@@ -85,7 +91,7 @@ describe('useEmbeddedOpenSpaceThings', () => {
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceThings([spaceThing(HOST, DIAGRAM)], spaces),
+      useEmbeddedOpenSpaceThings([spaceThing(HOST, DIAGRAM)], spaces, NO_DRAG),
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
     fail = false;
@@ -98,7 +104,7 @@ describe('useEmbeddedOpenSpaceThings', () => {
   it('drops a failure whose embedding is no longer standing', async () => {
     const spaces = reader(() => Promise.reject(new Error('Target missing')));
     const { result, rerender } = renderHook(
-      ({ nodes }) => useEmbeddedOpenSpaceThings(nodes, spaces),
+      ({ nodes }) => useEmbeddedOpenSpaceThings(nodes, spaces, NO_DRAG),
       { initialProps: { nodes: [spaceThing(HOST, DIAGRAM)] } },
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
@@ -109,7 +115,7 @@ describe('useEmbeddedOpenSpaceThings', () => {
   it('measures the title footer into embed bounds', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceThings([spaceThing(HOST, DIAGRAM)], spaces),
+      useEmbeddedOpenSpaceThings([spaceThing(HOST, DIAGRAM)], spaces, NO_DRAG),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(396);
@@ -122,7 +128,7 @@ describe('useEmbeddedOpenSpaceThings', () => {
   it('owns portal Edit membership and the in-flight framing draft', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceThings([spaceThing(HOST, DIAGRAM)], spaces),
+      useEmbeddedOpenSpaceThings([spaceThing(HOST, DIAGRAM)], spaces, NO_DRAG),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     const framing: SpaceThingFraming = { centreX: 200, centreY: 100, zoom: 2 };

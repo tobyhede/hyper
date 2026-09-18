@@ -173,14 +173,28 @@ export type CanvasThingProps = CanvasThingCommonProps &
   );
 
 /**
- * The one CSS custom property this Thing publishes to `canvas-thing.css`.
+ * How far a Thing leans while it is being moved.
+ *
+ * The number lives here and nowhere else. CSS reads it as
+ * `--canvas-thing-drag-tilt`, published below. The canvas reads the same
+ * number for an embedded canvas this element cannot carry — React Flow
+ * renders sub-flow children as DOM siblings of their parent's wrapper.
+ * `embedded-diagram.test.ts` holds that motion as a rigid one.
+ */
+export const CANVAS_THING_DRAG_TILT_DEGREES = -1;
+
+/**
+ * The CSS custom properties this Thing publishes to `canvas-thing.css`.
  *
  * `CSSProperties` does not type CSS custom properties (`--*`), so the style
  * object is *declared* as the intersection it is actually built as rather than
  * asserted into `CSSProperties` after the fact — the fact is true by
  * construction and needs no claim the compiler cannot check (ADR 0062).
  */
-type CanvasThingStyle = CSSProperties & { readonly '--canvas-thing-graph': string };
+type CanvasThingStyle = CSSProperties & {
+  readonly '--canvas-thing-graph': string;
+  readonly '--canvas-thing-drag-tilt': string;
+};
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
@@ -317,7 +331,10 @@ export function CanvasThing(props: CanvasThingProps) {
       onOpenChange !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
-  const style: CanvasThingStyle = { '--canvas-thing-graph': graphColor };
+  const style: CanvasThingStyle = {
+    '--canvas-thing-graph': graphColor,
+    '--canvas-thing-drag-tilt': `${CANVAS_THING_DRAG_TILT_DEGREES}deg`,
+  };
   const markdownBodyProps: Mutable<
     Pick<MarkdownThingBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
   > = {};

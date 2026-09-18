@@ -6,7 +6,9 @@ import {
   type ThingId,
 } from '@project/core';
 import { AUTHORING_HANDLE_DIAMETER, type ThingFlowNode } from '@project/react-flow-adapter';
+
 import type { CanvasNodesAndEdges } from './canvas-projection';
+import { DRAG_TILT_RADIANS, rotateAbout, tiltThingPosition } from './drag-tilt';
 
 /** A placement identity: the same target Thing can appear through several Space Things. */
 export const embeddedNodeId = (parentId: string, thingId: string): string =>
@@ -79,6 +81,27 @@ export interface EmbeddedParentProjection {
   readonly zIndex?: number | undefined;
 }
 
+/**
+ * The lean an embedded canvas is carried through while a Thing framing it moves.
+ *
+ * All three points are canvas coordinates. `center` is the dragged Thing's
+ * centre — the one point every rotation turns about. Children's positions here
+ * are relative to `parentAbsolute`, the containing Thing's authored top-left.
+ * React Flow then parents those children to the containing node as it is
+ * drawn, which a leaned publication has already moved, so `parentDrawn` is
+ * that drawn top-left. `tiltedPosition` converts into it.
+ * `places Things inside a nested window relative to where that window is drawn`
+ * in `embedded-open-space-thing.test.ts` holds the conversion; when the
+ * containing Thing has not been moved the two top-lefts are the same point
+ * and `moves each embedded Thing rigidly about the dragged Thing rather than
+ * turning it in place` in `embedded-diagram.test.ts` still holds.
+ */
+export interface EmbeddedTilt {
+  readonly center: DiagramPosition;
+  readonly parentAbsolute: DiagramPosition;
+  readonly parentDrawn: DiagramPosition;
+}
+
 export interface EmbeddedDiagramRequest {
   readonly parent: EmbeddedParentProjection;
   readonly projection: CanvasNodesAndEdges;
@@ -86,6 +109,7 @@ export interface EmbeddedDiagramRequest {
   readonly zoom?: number;
   readonly enabled: boolean;
   readonly bounds?: EmbeddedBounds;
+  readonly tilt?: EmbeddedTilt | undefined;
 }
 
 /**
@@ -142,16 +166,99 @@ const EMBEDDED_HANDLE_OUTSET = AUTHORING_HANDLE_DIAMETER / 2;
 
 const clipSide = (overflow: number): number => (overflow > 0 ? overflow : -EMBEDDED_HANDLE_OUTSET);
 
-export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): ThingFlowNode {
-  const top = clipSide(Math.max(0, bounds.top - node.position.y));
-  const left = clipSide(Math.max(0, bounds.left - node.position.x));
-  const right = clipSide(Math.max(0, node.position.x + (node.width ?? 0) - bounds.right));
-  const bottom = clipSide(Math.max(0, node.position.y + (node.height ?? 0) - bounds.bottom));
+interface ClipSides {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
+function clipSides(node: ThingFlowNode, bounds: EmbeddedBounds): ClipSides {
   return {
-    ...node,
-    style: { ...node.style, clipPath: `inset(${top}px ${right}px ${bottom}px ${left}px)` },
+    top: clipSide(Math.max(0, bounds.top - node.position.y)),
+    left: clipSide(Math.max(0, bounds.left - node.position.x)),
+    right: clipSide(Math.max(0, node.position.x + (node.width ?? 0) - bounds.right)),
+    bottom: clipSide(Math.max(0, node.position.y + (node.height ?? 0) - bounds.bottom)),
   };
 }
+
+function insetClipPath(sides: ClipSides): string {
+  return `inset(${sides.top}px ${sides.right}px ${sides.bottom}px ${sides.left}px)`;
+}
+
+export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): ThingFlowNode {
+  return {
+    ...node,
+    style: { ...node.style, clipPath: insetClipPath(clipSides(node, bounds)) },
+  };
+}
+
+/**
+ * Where a Thing is drawn once the Thing framing it has leaned.
+ *
+ * Turning a rect about a distant point is the same rigid motion as moving its
+ * centre along that rotation and turning it in place, and this is the first
+ * half — `styles.css` turns the Thing in place off `data-drag-tilted`.
+ * `embedded-diagram.test.ts` holds the motion as a rigid one, and `leaves the
+ * Edges to React Flow, which draws them from the positions that moved` holds
+ * that nothing here transforms an Edge.
+ *
+ * Positions here are relative to the containing Thing's authored top-left, so
+ * the centre is brought into that frame first. React Flow then adds the
+ * containing node's drawn position, which `parentDrawn` names.
+ * A Thing React Flow has not measured has no size to find a centre in and
+ * turns about its top-left, which is where it is drawn until the first
+ * measurement anyway.
+ */
+const tiltedPosition = (
+  tilt: EmbeddedTilt,
+  position: DiagramPosition,
+  size: { readonly width?: number | undefined; readonly height?: number | undefined },
+): DiagramPosition => {
+  const leaned = tiltThingPosition(
+    position,
+    size,
+    {
+      x: tilt.center.x - tilt.parentAbsolute.x,
+      y: tilt.center.y - tilt.parentAbsolute.y,
+    },
+    DRAG_TILT_RADIANS,
+  );
+  return {
+    x: leaned.x + tilt.parentAbsolute.x - tilt.parentDrawn.x,
+    y: leaned.y + tilt.parentAbsolute.y - tilt.parentDrawn.y,
+  };
+};
+
+/**
+ * The overflowing cut, turned in place about the Thing's centre.
+ *
+ * The inset is computed against unleaned geometry and then this polygon takes
+ * the same in-place turn `.canvas-thing` does. Together with `tiltedPosition`
+ * that is the rigid motion the window's SVG clip already performs about the
+ * dragged centre. `turns an overflowing cut about the Thing so it leans with
+ * the window` in `embedded-diagram.test.ts` pins the unleaned inset.
+ */
+const leanedClipPath = (
+  sides: ClipSides,
+  size: { readonly width?: number | undefined; readonly height?: number | undefined },
+): string => {
+  const width = size.width ?? 0;
+  const height = size.height ?? 0;
+  const origin = { x: width / 2, y: height / 2 };
+  const corners = [
+    { x: sides.left, y: sides.top },
+    { x: width - sides.right, y: sides.top },
+    { x: width - sides.right, y: height - sides.bottom },
+    { x: sides.left, y: height - sides.bottom },
+  ];
+  return `polygon(${corners
+    .map((corner) => {
+      const turned = rotateAbout(corner, origin, DRAG_TILT_RADIANS);
+      return `${turned.x}px ${turned.y}px`;
+    })
+    .join(', ')})`;
+};
 
 /** Reparent the production projection, clipping partial Things instead of dropping them. */
 export function embeddedDiagram({
@@ -161,6 +268,7 @@ export function embeddedDiagram({
   zoom = 1,
   enabled,
   bounds,
+  tilt,
 }: EmbeddedDiagramRequest): CanvasNodesAndEdges {
   const nodes = projection.nodes.map((node): ThingFlowNode => {
     const position = { x: node.position.x * zoom + offset.x, y: node.position.y * zoom + offset.y };
@@ -170,7 +278,7 @@ export function embeddedDiagram({
       parentId: parent.id,
       position,
       connectable: enabled,
-      data: { ...node.data, connectionAuthoringEnabled: enabled },
+      data: { ...node.data, connectionAuthoringEnabled: enabled, dragTilted: tilt !== undefined },
       draggable: enabled,
       selectable: enabled,
       focusable: enabled,
@@ -178,29 +286,41 @@ export function embeddedDiagram({
       zIndex: (parent.zIndex ?? 10) + (node.data.expanded === true ? 2 : 1),
     };
     if (!enabled) next.className = 'nopan nowheel nodrag';
-    const clipped = clipEmbeddedNode(
-      next,
-      bounds ?? {
-        top: SPACE_THING_EMBED_INSET.top,
-        left: SPACE_THING_EMBED_INSET.left,
-        right: (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
-        bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
-      },
-    );
-    const style = {
-      ...clipped.style,
-      transition: 'none',
+    const clipBounds = bounds ?? {
+      top: SPACE_THING_EMBED_INSET.top,
+      left: SPACE_THING_EMBED_INSET.left,
+      right: (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
+      bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
     };
+    const clipped = clipEmbeddedNode(next, clipBounds);
+    // After clipping. `turns an overflowing cut about the Thing so it leans
+    // with the window` in `embedded-diagram.test.ts` pins the unleaned inset
+    // (`-12` / `132`) and fails if `clipSides` runs on a leaned position.
+    const placed =
+      tilt === undefined
+        ? clipped
+        : {
+            ...clipped,
+            position: tiltedPosition(tilt, position, clipped),
+            style: {
+              ...clipped.style,
+              clipPath: leanedClipPath(clipSides(next, clipBounds), clipped),
+            },
+          };
+    const style = { ...placed.style, transition: 'none' };
     return enabled
-      ? { ...clipped, style }
+      ? { ...placed, style }
       : {
-          ...clipped,
+          ...placed,
           style: { ...style, pointerEvents: 'none' },
         };
   });
   const ids = new Map(
     projection.nodes.map((node) => [node.id, embeddedNodeId(parent.id, node.id)]),
   );
+  // Nothing here leans. `leaves the Edges to React Flow, which draws them from
+  // the positions that moved` in `embedded-diagram.test.ts` holds that the Edge
+  // list carries no transform.
   const edges = projection.edges.flatMap((edge): Edge[] => {
     const source = ids.get(edge.source);
     const target = ids.get(edge.target);

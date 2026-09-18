@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { NodeChange } from '@xyflow/react';
-import { type ThingId, type GraphId, type DiagramId } from '@project/core';
+import { type ThingId, type GraphId, type DiagramId, type DiagramPosition } from '@project/core';
 import { Placement, positionedStrategy } from '@project/graph';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../authoring-availability';
@@ -12,6 +12,7 @@ import {
   embeddedDiagram,
   type EmbeddedBounds,
   type EmbeddedParentProjection,
+  type EmbeddedTilt,
 } from '../embedded-diagram';
 import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
@@ -36,6 +37,9 @@ export function EmbeddedDiagramAuthoring({
   enabled,
   framing,
   bounds: { left, top, right, bottom },
+  absolute: { x: absoluteX, y: absoluteY },
+  drawnAbsolute: { x: drawnX, y: drawnY },
+  tiltCenter,
   publish,
 }: {
   readonly continuation: Continuation;
@@ -53,6 +57,17 @@ export function EmbeddedDiagramAuthoring({
   readonly enabled: boolean;
   readonly framing: SpaceThingFraming | undefined;
   readonly bounds: EmbeddedBounds;
+  /** This Thing's authored top-left in canvas coordinates. */
+  readonly absolute: DiagramPosition;
+  /**
+   * This Thing's top-left as React Flow draws it, which the lean is measured
+   * from. `places Things inside a nested window relative to where that window
+   * is drawn` in `embedded-open-space-thing.test.ts` holds the split from
+   * `absolute`.
+   */
+  readonly drawnAbsolute: DiagramPosition;
+  /** The centre a dragged ancestor leans about, or `undefined` while none moves. */
+  readonly tiltCenter: DiagramPosition | undefined;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
   const parentId = parent.id;
@@ -170,6 +185,22 @@ export function EmbeddedDiagramAuthoring({
   );
   const offsetX = camera.offset.x;
   const offsetY = camera.offset.y;
+  // Held apart from the request so the projection is rebuilt per pointer frame
+  // of a drag and not per render: the centre moves with the Thing, and these
+  // numbers are the whole of what the lean depends on.
+  const tiltX = tiltCenter?.x;
+  const tiltY = tiltCenter?.y;
+  const tilt = useMemo(
+    (): EmbeddedTilt | undefined =>
+      tiltX === undefined || tiltY === undefined
+        ? undefined
+        : {
+            center: { x: tiltX, y: tiltY },
+            parentAbsolute: { x: absoluteX, y: absoluteY },
+            parentDrawn: { x: drawnX, y: drawnY },
+          },
+    [tiltX, tiltY, absoluteX, absoluteY, drawnX, drawnY],
+  );
   const { nodes, edges } = useMemo(
     () =>
       embeddedDiagram({
@@ -179,6 +210,7 @@ export function EmbeddedDiagramAuthoring({
         zoom: camera.zoom,
         enabled,
         bounds: { left, top, right, bottom },
+        tilt,
       }),
     [
       projectionParent,
@@ -191,6 +223,7 @@ export function EmbeddedDiagramAuthoring({
       top,
       right,
       bottom,
+      tilt,
     ],
   );
   const value = useMemo((): EmbeddedPublication => {

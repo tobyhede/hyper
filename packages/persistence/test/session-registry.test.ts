@@ -701,7 +701,8 @@ describe('Space session registry', () => {
                 positions: {
                   // 400x300 Open against the 260x146 collapsed rect is a growth
                   // of 140x154, already written into the neighbour's coordinates
-                  // by the Open Edit that placed it (ADR 0084) — exactly the
+                  // by the Open Edit that placed it (ADR 0084) — on `x` alone, the
+                  // neighbour being clear of it there (ADR 0093), exactly the
                   // fixture `Placement.reclaim`'s own unit test uses.
                   [OPEN_SPACE_THING_ID]: {
                     x: 0,
@@ -709,7 +710,7 @@ describe('Space session registry', () => {
                     open: true as const,
                     openSize: { width: 400, height: 300 },
                   },
-                  [DISPLACED_THING_ID]: { x: 140, y: 154, open: false as const },
+                  [DISPLACED_THING_ID]: { x: 400, y: 0, open: false as const },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -769,7 +770,7 @@ describe('Space session registry', () => {
       expect(result).toEqual({ kind: 'completed' });
       const stored = await backend.loadSpace(SPACE_ID);
       expect(stored?.snapshot.document.diagrams?.[0]?.positions).toEqual({
-        [DISPLACED_THING_ID]: { x: 0, y: 0, open: false },
+        [DISPLACED_THING_ID]: { x: 260, y: 0, open: false },
       });
     });
 

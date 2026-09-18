@@ -332,9 +332,9 @@ describe('Expanded Thing geometry', () => {
   const GROWTH = { width: 300, height: 274 };
 
   /**
-   * Five Things at every relation to THING_A the per-axis comparison
-   * distinguishes: beyond on `x` and level on `y`, level on `x` and beyond on
-   * `y`, beyond on both, and before on both.
+   * Five Things at every relation to THING_A that deciding a Thing's one room
+   * axis distinguishes (ADR 0093): clear of its collapsed rect on `x` alone, on
+   * `y` alone, on both, and before it on both.
    */
   const displacementSnapshot: SpaceSnapshot = {
     ...positionedSnapshot,
@@ -353,7 +353,7 @@ describe('Expanded Thing geometry', () => {
           kind: 'positioned',
           positions: {
             [THING_A]: { x: 100, y: 100, open: false },
-            [THING_B]: { x: 300, y: 100, open: false },
+            [THING_B]: { x: 400, y: 100, open: false },
             [THING_C]: { x: 100, y: 300, open: false },
             [THING_D]: { x: 500, y: 500, open: false },
             [THING_E]: { x: 40, y: 40, open: false },
@@ -370,7 +370,7 @@ describe('Expanded Thing geometry', () => {
     // The geometry the canvas has reported by now: the Diagram as authored.
     place(opened.authoring, {
       [THING_A]: [100, 100],
-      [THING_B]: [300, 100],
+      [THING_B]: [400, 100],
       [THING_C]: [100, 300],
       [THING_D]: [500, 500],
       [THING_E]: [40, 40],
@@ -478,7 +478,7 @@ describe('Expanded Thing geometry', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves the Things strictly beyond the opening Thing by that axis growth, and nobody else', () => {
+  it('moves the Things clear of the opening Thing by one axis growth, and nobody else', () => {
     const { authoring, session } = openDisplacement();
 
     expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
@@ -488,11 +488,12 @@ describe('Expanded Thing geometry', () => {
     expect(originsOf(session)).toEqual({
       // A Thing does not displace itself.
       [THING_A]: [100, 100],
-      // Beyond on `x` and level on `y`, so it moves right and not down.
-      [THING_B]: [300 + GROWTH.width, 100],
-      // The mirror of it: level on `x` and beyond on `y`.
+      // Clear on `x` and level on `y`, so it moves right and not down.
+      [THING_B]: [400 + GROWTH.width, 100],
+      // The mirror of it: inside the column on `x` and clear on `y`.
       [THING_C]: [100, 300 + GROWTH.height],
-      [THING_D]: [500 + GROWTH.width, 500 + GROWTH.height],
+      // Clear on both, and the width alone takes it clear of the Open rect.
+      [THING_D]: [500 + GROWTH.width, 500],
       // Before the Thing on both axes: the room is made after it, not around it.
       [THING_E]: [40, 40],
     });
@@ -515,7 +516,7 @@ describe('Expanded Thing geometry', () => {
   it('reclaims from a Thing the author moved beyond the Open Thing, which the Open never pushed', () => {
     // ADR 0084: Open and Close each read the Diagram as it is at that moment and
     // remember nothing about who was pushed, so Close reclaims from everything
-    // currently beyond the closing Thing. This is the deliberate memoryless
+    // currently clear of the closing Thing. This is the deliberate memoryless
     // behaviour and not a defect — recording which Things a particular Open moved
     // is the per-Thing history that ADR rejected, because it goes stale the
     // moment the author moves anything and makes two identical Diagrams behave
@@ -525,12 +526,12 @@ describe('Expanded Thing geometry', () => {
     expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
     });
-    // The author drags E from before the Open Thing to beyond it on both axes.
+    // The author drags E from before the Open Thing to clear of it on both axes.
     reportPlacement(authoring, {
       [THING_A]: { x: 100, y: 100, open: true, openSize: DEFAULT_OPEN_SIZE },
-      [THING_B]: { x: 600, y: 100, open: false },
+      [THING_B]: { x: 700, y: 100, open: false },
       [THING_C]: { x: 100, y: 574, open: false },
-      [THING_D]: { x: 800, y: 774, open: false },
+      [THING_D]: { x: 800, y: 500, open: false },
       [THING_E]: { x: 900, y: 900, open: false },
     });
 
@@ -540,11 +541,12 @@ describe('Expanded Thing geometry', () => {
 
     expect(originsOf(session)).toEqual({
       [THING_A]: [100, 100],
-      [THING_B]: [300, 100],
+      [THING_B]: [400, 100],
       [THING_C]: [100, 300],
       [THING_D]: [500, 500],
-      // Never pushed by the Open, and moved back by the Close all the same.
-      [THING_E]: [900 - GROWTH.width, 900 - GROWTH.height],
+      // Never pushed by the Open, and moved back by the Close all the same —
+      // on `x` alone, the one axis it makes room on.
+      [THING_E]: [900 - GROWTH.width, 900],
     });
   });
 
@@ -552,7 +554,7 @@ describe('Expanded Thing geometry', () => {
     const { authoring, session } = openDisplacement();
 
     authoring.complete({ kind: 'opened-thing', thingId: THING_A });
-    // B is at (600, 100) by now, and its own growth is measured from there.
+    // B is at (700, 100) by now, and its own growth is measured from there.
     expect(authoring.complete({ kind: 'opened-thing', thingId: THING_B })).toEqual({
       kind: 'completed',
     });
@@ -560,9 +562,10 @@ describe('Expanded Thing geometry', () => {
     expect(originsOf(session)).toEqual({
       // Level with B on `y` and before it on `x`: A does not move for it.
       [THING_A]: [100, 100],
-      [THING_B]: [600, 100],
+      [THING_B]: [700, 100],
       [THING_C]: [100, 574 + GROWTH.height],
-      [THING_D]: [800 + GROWTH.width, 774 + GROWTH.height],
+      // Inside B's collapsed column now, and clear of it below.
+      [THING_D]: [800, 500 + GROWTH.height],
       [THING_E]: [40, 40],
     });
   });
@@ -598,9 +601,9 @@ describe('Expanded Thing geometry', () => {
     // difference this Edit applies is (300, 300).
     expect(originsOf(session)).toEqual({
       [THING_A]: [100, 100],
-      [THING_B]: [900, 100],
+      [THING_B]: [1000, 100],
       [THING_C]: [100, 874],
-      [THING_D]: [1100, 1074],
+      [THING_D]: [1100, 500],
       [THING_E]: [40, 40],
     });
   });
@@ -618,9 +621,9 @@ describe('Expanded Thing geometry', () => {
 
     expect(originsOf(session)).toEqual({
       [THING_A]: [100, 100],
-      [THING_B]: [700, 100],
+      [THING_B]: [800, 100],
       [THING_C]: [100, 574],
-      [THING_D]: [900, 774],
+      [THING_D]: [900, 500],
       [THING_E]: [40, 40],
     });
   });

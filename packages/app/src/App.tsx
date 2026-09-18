@@ -974,21 +974,25 @@ export const createApp = (
      * drags it off. A Thing this Diagram does not place has no offset to take,
      * so its Reference Thing lands at the visible centre like any other creation.
      *
-     * **The offset leaves a fixed corner overlap before and after Close.**
-     * An Open Target holds room that Close reclaims from every Thing beyond it
-     * (ADR 0084), including this new Reference Thing. Add that growth to the collapsed
-     * offset so reclaiming it leaves the Reference Thing's centre clear of the Target.
+     * **The offset leaves the Reference Thing clear of the Target after Close.**
+     * An Open Target holds room that Close reclaims from every Thing clear of it
+     * (ADR 0084). Placement adds the growth to the collapsed offset and, when the
+     * Target is Open, stays at or past the collapsed rect so Close reclaims the
+     * width alone (ADR 0093). `thing-rail-actions.test.tsx` holds that the
+     * Reference Thing stays separated after Close.
      */
     const createReferenceFrom = useCallback(
       (thing: Thing): EntityActionOutcome => {
         const at = selectedDiagram.diagram.positions[thing.id];
         const growth = at?.open === true ? Placement.growth(at.openSize) : { width: 0, height: 0 };
+        const across = growth.width + Math.round(THING_WIDTH * REFERENCE_OFFSET_RATIO);
+        const down = growth.height + Math.round(THING_HEIGHT * REFERENCE_OFFSET_RATIO);
         const anchor =
           at === undefined
             ? centreAnchor()
             : {
-                x: at.x + growth.width + Math.round(THING_WIDTH * REFERENCE_OFFSET_RATIO),
-                y: at.y + growth.height + Math.round(THING_HEIGHT * REFERENCE_OFFSET_RATIO),
+                x: at.x + (at.open ? Math.max(THING_WIDTH, across) : across),
+                y: at.y + (at.open ? Math.max(THING_HEIGHT, down) : down),
               };
         const created = authoring.complete({
           kind: 'created-reference',

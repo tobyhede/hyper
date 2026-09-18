@@ -313,41 +313,77 @@ describe('Placement.growth', () => {
 describe('Placement.displace', () => {
   const growth = { width: 300, height: 274 };
 
-  it('moves the Things strictly beyond the subject and leaves the rest', () => {
-    // Strict, per axis: a Thing level with the subject on an axis does not move
-    // on that axis, and one unit beyond it does.
+  it('moves the Things clear of the collapsed subject and leaves the rest', () => {
+    // Clear means starting at or past the far edge of the subject's collapsed
+    // rect (ADR 0093): a Thing one unit short of that edge overlaps the subject
+    // and does not move, and one exactly on it does.
+    const { width, height } = COLLAPSED_THING_SIZE;
     const authored = Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: false }],
-      [THING_B, { x: 10, y: 20, open: false }],
-      [THING_C, { x: 11, y: 21, open: false }],
+      [THING_A, { x: 0, y: 0, open: false }],
+      [THING_B, { x: width - 1, y: height - 1, open: false }],
+      [THING_C, { x: width, y: 0, open: false }],
     ]);
 
     expect(asObject(Placement.displace(authored, THING_A, growth))).toEqual({
-      [THING_A]: { x: 10, y: 20, open: false },
-      [THING_B]: { x: 10, y: 20, open: false },
-      [THING_C]: { x: 311, y: 295, open: false },
+      [THING_A]: { x: 0, y: 0, open: false },
+      [THING_B]: { x: width - 1, y: height - 1, open: false },
+      [THING_C]: { x: width + 300, y: 0, open: false },
     });
   });
 
-  it('decides each axis on its own', () => {
-    // A Thing below the subject and level with it moves down and not right, and
-    // the mirror image moves right and not down.
+  it('moves a Thing exactly on the collapsed bottom edge, and leaves one unit short of it', () => {
+    // The y-axis half of "at or past, not strictly past" (ADR 0093). x stays
+    // inside the subject's column so roomAxis takes y rather than x first.
+    const { width, height } = COLLAPSED_THING_SIZE;
+    const authored = Placement.fromEntries([
+      [THING_A, { x: 0, y: 0, open: false }],
+      [THING_B, { x: width - 1, y: height - 1, open: false }],
+      [THING_C, { x: width - 1, y: height, open: false }],
+    ]);
+
+    expect(asObject(Placement.displace(authored, THING_A, growth))).toEqual({
+      [THING_A]: { x: 0, y: 0, open: false },
+      [THING_B]: { x: width - 1, y: height - 1, open: false },
+      [THING_C]: { x: width - 1, y: height + 274, open: false },
+    });
+  });
+
+  it('moves each Thing on one axis, x first', () => {
+    // A Thing below the subject and inside its column moves down; one to its
+    // right moves right; one clear on both moves right and not down. A Thing
+    // beside the subject whose top is lower than the subject's is beside it, not
+    // below it — the half-plane rule ADR 0084 stated moved it down as well.
     const authored = Placement.fromEntries([
       [THING_A, { x: 100, y: 100, open: false }],
       [THING_B, { x: 100, y: 500, open: false }],
-      [THING_C, { x: 500, y: 100, open: false }],
+      [THING_C, { x: 500, y: 500, open: false }],
     ]);
 
     expect(asObject(Placement.displace(authored, THING_A, growth))).toEqual({
       [THING_A]: { x: 100, y: 100, open: false },
       [THING_B]: { x: 100, y: 774, open: false },
-      [THING_C]: { x: 800, y: 100, open: false },
+      [THING_C]: { x: 800, y: 500, open: false },
     });
   });
 
+  it('does not pull a Thing beside the subject up by the height it never took', () => {
+    // The reported jump: a Thing to the right of an Open subject, its top a
+    // little below the subject's, gives back only the width on Close.
+    const authored = Placement.fromEntries([
+      [THING_A, { x: 0, y: 0, open: false }],
+      [THING_B, { x: 931, y: 48, open: false }],
+    ]);
+
+    expect(
+      Placement.displace(authored, THING_A, { width: -growth.width, height: -growth.height }).get(
+        THING_B,
+      ),
+    ).toEqual({ x: 631, y: 48, open: false });
+  });
+
   it('never moves the subject, whatever the growth', () => {
-    // A Thing does not displace itself, and `>` is what says so — the subject is
-    // not strictly beyond its own coordinate on either axis.
+    // A Thing does not displace itself: the subject is never clear of its own
+    // collapsed rect on either axis.
     const authored = Placement.fromEntries([[THING_A, { x: -50, y: -50, open: false }]]);
 
     expect(Placement.displace(authored, THING_A, growth).get(THING_A)).toEqual({
@@ -365,7 +401,7 @@ describe('Placement.displace', () => {
     ]);
     const opened = Placement.displace(authored, THING_A, growth);
 
-    expect(opened.get(THING_B)).toEqual({ x: 700, y: 674, open: false });
+    expect(opened.get(THING_B)).toEqual({ x: 700, y: 400, open: false });
     expect(
       asObject(
         Placement.displace(opened, THING_A, { width: -growth.width, height: -growth.height }),
@@ -375,19 +411,20 @@ describe('Placement.displace', () => {
 
   it('is not an involution when the negative growth is applied first', () => {
     // The counter-example the round-trip property's nonnegative bound names,
-    // made executable so the bound is a fact rather than prose. B at x = 1 is
-    // carried to x = -1 by a width of -2, and the negation that follows skips it
-    // because it is no longer strictly beyond A. Unreachable in the product:
+    // made executable so the bound is a fact rather than prose. B on A's
+    // collapsed edge is carried inside it by a width of -2, and the negation that
+    // follows skips it because it is no longer clear of A. Unreachable in the product:
     // Open floors its growth at zero and Close only negates one already applied.
     const authored = Placement.fromEntries([
       [THING_A, { x: 0, y: 0, open: false }],
-      [THING_B, { x: 1, y: 0, open: false }],
+      [THING_B, { x: COLLAPSED_THING_SIZE.width, y: 0, open: false }],
     ]);
     const shrunk = Placement.displace(authored, THING_A, { width: -2, height: 0 });
     const restored = Placement.displace(shrunk, THING_A, { width: 2, height: 0 });
+    const inside = { x: COLLAPSED_THING_SIZE.width - 2, y: 0, open: false };
 
-    expect(shrunk.get(THING_B)).toEqual({ x: -1, y: 0, open: false });
-    expect(restored.get(THING_B)).toEqual({ x: -1, y: 0, open: false });
+    expect(shrunk.get(THING_B)).toEqual(inside);
+    expect(restored.get(THING_B)).toEqual(inside);
   });
 
   it('carries Open/Closed state and the remembered Open Size through untouched', () => {
@@ -401,8 +438,8 @@ describe('Placement.displace', () => {
 
     expect(asObject(Placement.displace(authored, THING_A, growth))).toEqual({
       [THING_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-      [THING_B]: { x: 700, y: 674, open: true, openSize: { width: 800, height: 600 } },
-      [THING_C]: { x: 700, y: 674, open: false, openSize: { width: 700, height: 500 } },
+      [THING_B]: { x: 700, y: 400, open: true, openSize: { width: 800, height: 600 } },
+      [THING_C]: { x: 700, y: 400, open: false, openSize: { width: 700, height: 500 } },
     });
   });
 
@@ -441,17 +478,18 @@ describe('Placement.displace', () => {
 describe('Placement.reclaim', () => {
   it("gives an Open Thing's room back to the Things beyond it, entry untouched", () => {
     // 400x300 Open against a 260x146 collapsed rect is a growth of 140x154,
-    // already written into THING_B's coordinates by the Open Edit.
+    // already written into THING_B's coordinates by the Open Edit — B is clear
+    // of A on `x`, so the Open took the width alone.
     const authored = Placement.fromEntries([
       [THING_A, { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }],
-      [THING_B, { x: 140, y: 154, open: false }],
+      [THING_B, { x: 400, y: 0, open: false }],
     ]);
 
     expect(asObject(Placement.reclaim(authored, THING_A))).toEqual({
       // Still Open, and still remembering the size: reclaiming is the
       // displacement half alone, and the caller writes the entry it wants.
       [THING_A]: { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } },
-      [THING_B]: { x: 0, y: 0, open: false },
+      [THING_B]: { x: 260, y: 0, open: false },
     });
   });
 
@@ -624,7 +662,7 @@ describe('Placement properties', () => {
     // growth, and deliberately: the counter-example below is executable. It is
     // unreachable in the product because Open always applies a growth floored at
     // zero and Close always applies the negation of a growth already applied, so
-    // every Thing Close must reclaim from is still beyond the subject when it
+    // every Thing Close must reclaim from is still clear of the subject when it
     // runs. The fix is to state the bound, not to clamp the operation or make it
     // remember which Things a particular Open pushed.
     fc.assert(

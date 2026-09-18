@@ -21,6 +21,7 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
   useReactFlow,
+  useStore,
 } from '@xyflow/react';
 import {
   titleName,
@@ -31,7 +32,7 @@ import {
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import type { EntityActionGroup } from '@project/ui';
+import { CANVAS_THING_DRAG_TILT_DEGREES, type EntityActionGroup } from '@project/ui';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -344,6 +345,20 @@ export function SpaceCanvas({
     setSeededOpeningFraming(true);
     setOpeningFraming(readThisCanvasOpeningFraming());
   }
+  /**
+   * The Things a gesture is moving, read from React Flow's `nodeLookup`.
+   */
+  const draggingKey = useStore((flow) =>
+    [...flow.nodeLookup.values()]
+      .filter((node) => node.dragging === true)
+      .map((node) => node.id)
+      .sort()
+      .join(' '),
+  );
+  const draggingIds = useMemo(
+    () => new Set(draggingKey === '' ? [] : draggingKey.split(' ')),
+    [draggingKey],
+  );
   const {
     embeddedRequests,
     embeddedPublications,
@@ -355,7 +370,8 @@ export function SpaceCanvas({
     onPortalEditingChange,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceThings(nodes, spaces);
+  } = useEmbeddedOpenSpaceThings(nodes, spaces, draggingIds);
+
   const editingEmbeddingIds = new Set(
     embeddedRequests.flatMap((request) => {
       const value = embeddedPublications.get(request.parent.id);
@@ -1179,13 +1195,23 @@ export function SpaceCanvas({
       <Background gap={24} />
       <svg aria-hidden="true" width={0} height={0}>
         <defs>
-          {embeddedRequests.map(({ parent, absolute, bounds }) => (
+          {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (
             <clipPath key={parent.id} id={embeddedClipId(parent.id)} clipPathUnits="userSpaceOnUse">
               <rect
                 x={absolute.x + bounds.left}
                 y={absolute.y + bounds.top}
                 width={Math.max(0, bounds.right - bounds.left)}
                 height={Math.max(0, bounds.bottom - bounds.top)}
+                // The window leans with the Thing it is cut out of. Written as
+                // SVG's own `rotate(angle cx cy)`, which carries its centre and
+                // so needs none of the `transform-box` reasoning the Edge layer
+                // does — this `<clipPath>` lives in a 0x0 `<svg>` of its own,
+                // where a view box would mean nothing.
+                transform={
+                  tiltCenter === undefined
+                    ? undefined
+                    : `rotate(${CANVAS_THING_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
+                }
               />
             </clipPath>
           ))}
@@ -1230,6 +1256,9 @@ export function SpaceCanvas({
               request.parent.data.spaceContent?.framing
             }
             bounds={request.bounds}
+            absolute={request.absolute}
+            drawnAbsolute={request.drawnAbsolute}
+            tiltCenter={request.tiltCenter}
             publish={publishEmbedded}
           />
         ),

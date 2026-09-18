@@ -114,6 +114,7 @@ under `superseded/`.
 | [0066](0066-open-size-survives-closing.md) | A Layout keeps the Open Size after a Close. |
 | [0073](0073-a-card-rail-is-a-toolbar.md) | A Card rail is one `role="toolbar"` with roving tabindex. |
 | [0084](0084-displacement-is-applied-by-the-edit-that-causes-it.md) | Opening and closing move their neighbours once, as an Edit. Nothing is derived at render. |
+| [0093](0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md) | A Thing makes room on one axis, `x` first, once clear of the subject's collapsed rect. |
 
 ## Toolchain
 

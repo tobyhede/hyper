@@ -225,6 +225,18 @@ export type ThingNodeData = {
   /** The active Graph's colour, used by graph-independent authoring handles. */
   activeGraphColor: string;
   emphasis: GraphEmphasis;
+  /**
+   * Whether this Thing leans because a Thing framing it is being dragged.
+   *
+   * Only an *embedded* Thing carries it; a Thing dragged directly leans from its
+   * own `state`. The lean is about this Thing's own centre and says nothing
+   * about where the frame is, because the application has already rotated this
+   * Thing's *position* about the dragged Thing's centre (`embedded-diagram.ts`)
+   * — translating a rect along a rotation and then turning it in place is the
+   * same rigid motion as turning it about that distant point, and expressing it
+   * that way is what lets React Flow draw the Edges itself.
+   */
+  dragTilted?: boolean;
 };
 
 export type ThingFlowNode = Node<ThingNodeData, 'thing'>;

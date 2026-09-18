@@ -857,9 +857,9 @@ test('a closed Thing released inside an Open Thing lands at the drop point', asy
 /**
  * Once, and then not again (ADR 0084).
  *
- * Opening writes the room it takes into the Diagram, so the neighbour beyond the
- * subject on both axes moves by the growth and the Thing behind it on both axes
- * does not move at all. From then on those are authored positions like any
+ * Opening writes the room it takes into the Diagram, so the neighbour clear of the
+ * subject on both axes moves by the width growth alone — its one room axis is
+ * `x` (ADR 0093) — and the Thing behind it on both axes does not move at all. From then on those are authored positions like any
  * other: dragging the Open Thing past the neighbour is not a second Open, and the
  * room stays where the Open Edit put it. Under the derived rule the neighbour
  * came back to its authored point the moment the subject was dragged beyond it.
@@ -883,7 +883,7 @@ test('opening a Thing displaces its neighbours once, and dragging it never displ
   expect(at(opened, SUBJECT), 'the opening Thing moved').toEqual(at(closed, SUBJECT));
   expect(at(opened, NEIGHBOUR)).toEqual({
     x: at(closed, NEIGHBOUR).x + OPEN_GROWTH.width,
-    y: at(closed, NEIGHBOUR).y + OPEN_GROWTH.height,
+    y: at(closed, NEIGHBOUR).y,
   });
   // Strictly before the subject on both axes, so it takes no room at all.
   expect(at(opened, BEHIND)).toEqual(at(closed, BEHIND));

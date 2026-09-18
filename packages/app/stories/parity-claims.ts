@@ -623,7 +623,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
     storyExport: 'SelectedDiagram',
     claim:
-      'The Thing dock floats eight pixels inside the border, remains operable above embedded content, and replaces the open kind glyph.',
+      'The Thing dock floats eight pixels inside the border, measured past its cast shadow on the right, remains operable above embedded content, and replaces the open kind glyph.',
   },
   {
     id: 'space-thing-content-sized-footer',

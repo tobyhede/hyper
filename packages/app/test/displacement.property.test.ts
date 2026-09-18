@@ -64,12 +64,11 @@ const RUNS = 200;
 /**
  * The floor every branch clears at {@link SEED}, over {@link RUNS} cases.
  *
- * Measured rather than guessed, and the counts are a fixed fact of the seed:
- * 100 cases with some Thing beyond the subject on `x` only, 106 on `y` only, 73
- * on both, 137 on neither, and the subject arriving Open in 90 of them against
- * Closed in 110. The floor sits well under the smallest of those so that a
- * change to the arbitraries above has to be *large* before it trips — at which
- * point the counts are worth re-measuring rather than the floor worth lowering.
+ * The counts are a fixed fact of the seed, so they are measured by running the
+ * suite rather than stated here. The floor sits well under the smallest of them
+ * so that a change to the arbitraries above has to be *large* before it trips —
+ * at which point the counts are worth re-measuring rather than the floor worth
+ * lowering.
  */
 const COVERAGE_FLOOR = 40;
 
@@ -84,12 +83,13 @@ type GeneratedEntry = {
 };
 
 /**
- * A small grid rather than a wide integer range, because the comparison under
- * test is **strict** — two Things level on an axis is the case a wide range
- * essentially never generates, and it is the one that decides whether a Thing
- * moves at all on that axis.
+ * A handful of values rather than a wide integer range, because what decides
+ * whether a Thing moves is whether it starts **at or past** the subject's
+ * collapsed edge (ADR 0093) — the case a wide range essentially never generates.
+ * Their differences land exactly on both collapsed edges (260 and 146) and one
+ * unit short of each (259 and 145), as well as well inside and well past them.
  */
-const coordinateArb = fc.constantFrom(-200, -100, 0, 100, 200);
+const coordinateArb = fc.constantFrom(-260, -146, 0, 1, 114, 146, 260, 261, 520);
 
 /** An Open Size the schema accepts: never below the collapsed rect on either axis. */
 const openSizeArb = fc.record({
@@ -238,10 +238,10 @@ const renderedWith = (
 };
 
 type CoverageCounts = {
-  beyondOnXOnly: number;
-  beyondOnYOnly: number;
-  beyondOnBoth: number;
-  beyondOnNeither: number;
+  clearOnXOnly: number;
+  clearOnYOnly: number;
+  clearOnBoth: number;
+  clearOnNeither: number;
   subjectOpen: number;
   subjectClosed: number;
 };
@@ -249,18 +249,19 @@ type CoverageCounts = {
 /**
  * What each generated case had in it, so a property cannot pass vacuously.
  *
- * A generator that never placed a Thing strictly beyond the subject on both axes
- * would satisfy every property below while proving nothing about the transform,
- * and nothing in a green run would say so. A case counts toward a branch when
- * **some** non-subject Thing stands in that relation to the subject, so one case
- * can count toward several.
+ * A generator that never placed a Thing clear of the subject on both axes — the
+ * case that moves on `x` alone although it is clear on `y` too — would satisfy
+ * every property below while proving nothing about the transform, and nothing in
+ * a green run would say so. A case counts toward a branch when **some**
+ * non-subject Thing stands in that relation to the subject, so one case can
+ * count toward several.
  */
 const createCoverage = () => {
   const counts: CoverageCounts = {
-    beyondOnXOnly: 0,
-    beyondOnYOnly: 0,
-    beyondOnBoth: 0,
-    beyondOnNeither: 0,
+    clearOnXOnly: 0,
+    clearOnYOnly: 0,
+    clearOnBoth: 0,
+    clearOnNeither: 0,
     subjectOpen: 0,
     subjectClosed: 0,
   };
@@ -270,37 +271,37 @@ const createCoverage = () => {
     const seen = { x: false, y: false, both: false, neither: false };
     entries.forEach((entry, index) => {
       if (index === subjectIndex) return;
-      const beyondX = entry.x > subject.x;
-      const beyondY = entry.y > subject.y;
-      if (beyondX && beyondY) seen.both = true;
-      else if (beyondX) seen.x = true;
-      else if (beyondY) seen.y = true;
+      const clearX = entry.x >= subject.x + COLLAPSED_THING_SIZE.width;
+      const clearY = entry.y >= subject.y + COLLAPSED_THING_SIZE.height;
+      if (clearX && clearY) seen.both = true;
+      else if (clearX) seen.x = true;
+      else if (clearY) seen.y = true;
       else seen.neither = true;
     });
-    if (seen.x) counts.beyondOnXOnly += 1;
-    if (seen.y) counts.beyondOnYOnly += 1;
-    if (seen.both) counts.beyondOnBoth += 1;
-    if (seen.neither) counts.beyondOnNeither += 1;
+    if (seen.x) counts.clearOnXOnly += 1;
+    if (seen.y) counts.clearOnYOnly += 1;
+    if (seen.both) counts.clearOnBoth += 1;
+    if (seen.neither) counts.clearOnNeither += 1;
     if (subject.open) counts.subjectOpen += 1;
     else counts.subjectClosed += 1;
   };
   return { counts, record };
 };
 
-/** The four relations the strict per-axis comparison distinguishes, all present. */
+/** The four relations to the collapsed subject that decide a room axis, all present. */
 const expectEveryRelationGenerated = (counts: CoverageCounts): void => {
-  expect(counts.beyondOnXOnly).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
-  expect(counts.beyondOnYOnly).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
-  expect(counts.beyondOnBoth).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
-  expect(counts.beyondOnNeither).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
+  expect(counts.clearOnXOnly).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
+  expect(counts.clearOnYOnly).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
+  expect(counts.clearOnBoth).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
+  expect(counts.clearOnNeither).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
 };
 
 /**
  * A generated Diagram may hand the pair a subject that is already Open, and the
  * pair's claim does not start there: `displace` is an involution for a
  * **nonnegative** growth applied first, which is the Open. Closing first
- * applies the negation first, and a Thing less than one growth beyond the
- * subject is carried back across it and no longer found — ADR 0084 states that
+ * applies the negation first, and a Thing less than one growth past the
+ * subject's collapsed edge is carried back inside it and no longer found — ADR 0084 states that
  * asymmetry rather than clamping it, and the product never reaches it because
  * Close only ever negates a growth an Open already applied.
  *
@@ -415,11 +416,11 @@ describe('Displacement at the Edit', () => {
     expect(coverage.counts.subjectClosed).toBeGreaterThanOrEqual(COVERAGE_FLOOR);
   });
 
-  it('reclaims from a Thing the author moved beyond the Open Thing, which the Open never pushed', () => {
+  it('reclaims from a Thing the author moved beside the Open Thing, which the Open never pushed, on x alone', () => {
     // ADR 0084, "Closing reclaims from where things are now": Open and Close
     // each read the Diagram as it is at that moment and remember nothing about
     // how it got there, so a Thing dragged beyond the Open Thing *while it is
-    // open* moves back with everything else beyond it. That is deliberate and
+    // open* moves back with everything else clear of it. That is deliberate and
     // it is what makes the pair memoryless. The alternative the ADR rejects is
     // recording which Things a particular Open pushed and by how much: it is
     // per-open-Thing stored state, it goes stale the moment the author moves
@@ -427,9 +428,15 @@ describe('Displacement at the Edit', () => {
     // differently because of history neither of them shows.
     //
     // A dedicated arbitrary here rather than a counter: the witness is placed
-    // strictly *before* the subject on both axes and dragged to strictly beyond
-    // it on both, so "was never pushed" and "is reclaimed from" are properties
-    // of the generator rather than branches it might miss.
+    // strictly *before* the subject on both axes and dragged to clear of its
+    // collapsed rect on `x`, anywhere on `y` from level with it to well below, so
+    // "was never pushed" and "is reclaimed from" are properties of the generator
+    // rather than branches it might miss.
+    //
+    // And it gives back the width **alone** (ADR 0093). Under the half-plane
+    // rule ADR 0084 stated, a witness dropped beside the Open Thing one unit
+    // lower than its top was pulled up by the whole height growth on Close —
+    // room the Open never took from it.
     fc.assert(
       fc.property(
         entriesArb,
@@ -445,7 +452,13 @@ describe('Displacement at the Edit', () => {
           }),
         }),
         fc.record({ x: fc.integer({ min: 1, max: 400 }), y: fc.integer({ min: 1, max: 400 }) }),
-        fc.record({ x: fc.integer({ min: 1, max: 400 }), y: fc.integer({ min: 1, max: 400 }) }),
+        fc.record({
+          x: fc.integer({
+            min: COLLAPSED_THING_SIZE.width,
+            max: COLLAPSED_THING_SIZE.width + 400,
+          }),
+          y: fc.integer({ min: 0, max: 400 }),
+        }),
         (generated, subjectIndex, openSize, before, beyond) => {
           const subjectIn = generated[subjectIndex];
           const subjectId = THING_IDS[subjectIndex];
@@ -489,7 +502,7 @@ describe('Displacement at the Edit', () => {
           const growth = Placement.growth(openSize);
           expect(originsOf(session)[witnessId]).toEqual([
             destination.x - growth.width,
-            destination.y - growth.height,
+            destination.y,
           ]);
         },
       ),
