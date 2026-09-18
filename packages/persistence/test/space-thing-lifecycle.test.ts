@@ -19,6 +19,7 @@ const CHILD_LINK_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000018');
 const CHILD_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000019');
 const CHILD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001a');
 const SECOND_TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001b');
+const DANGLING_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001c');
 
 class ThrowingAggregateBackend extends MemorySpaceBackend {
   throwNextLoad = true;
@@ -285,38 +286,61 @@ describe('Space Thing lifecycle', () => {
     await vi.waitFor(() => expect(control.requests).toHaveLength(2));
   });
 
-  it('validates against the latest working snapshot of every open Space', async () => {
+  it("does not judge a link that changes only Meta against a non-participant's refused local work", async () => {
+    const childSnapshot: SpaceSnapshot = {
+      id: CHILD_ID,
+      document: {
+        version: 1,
+        title: 'Child',
+        defaultDiagram: CHILD_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: CHILD_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: { [CHILD_THING_ID]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: CHILD_GRAPH_ID,
+          },
+        ],
+      },
+      things: [{ id: CHILD_THING_ID, document: { title: 'Child', kind: 'markdown', body: '' } }],
+    };
     const backend = new MemorySpaceBackend(META_ID, [
       { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
       { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      { snapshot: childSnapshot, revision: 2n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
     const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
-    const target = registry.open({
-      snapshot: targetSnapshot,
-      revision: 7n,
+    const child = registry.open({
+      snapshot: childSnapshot,
+      revision: 2n,
       exportedRevision: null,
     });
-    target.submit({
-      ...target.getState().working,
+    // Child's own local Edit points at a Space nothing names, so its own
+    // ordinary commit is refused and it is left `refused` — local work on a
+    // Space the link below never touches.
+    child.submit({
+      ...child.getState().working,
       things: [
-        ...target.getState().working.things,
+        ...child.getState().working.things,
         {
           id: CHILD_LINK_ID,
           document: {
             title: 'Unsaved child',
             kind: 'space',
-            spaceId: CHILD_ID,
+            spaceId: DANGLING_TARGET_ID,
             diagram: CHILD_DIAGRAM_ID,
             graph: CHILD_GRAPH_ID,
           },
         },
       ],
     });
-    // The target's own commit is refused by aggregate intake (`ordinary Space
-    // unreferenced` for the unsaved child), which is `refused` rather than
-    // `rejected` (`v1-release/17`).
-    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('refused'));
+    // Its commit is refused by aggregate intake — a Space Thing whose target
+    // does not exist — which is `refused` rather than `rejected`
+    // (`v1-release/17`).
+    await vi.waitFor(() => expect(child.getState().persistence.kind).toBe('refused'));
     const lifecycle = registry.spaceThings(idSource([SPACE_THING_ID]));
 
     await expect(
@@ -327,14 +351,14 @@ describe('Space Thing lifecycle', () => {
         title: 'Link',
         position: { x: 240, y: 80 },
       }),
-    ).resolves.toMatchObject({
-      kind: 'refused',
-      refusal: {
-        code: 'aggregate-refused',
-        errors: [{ kind: 'space-thing-target-missing' }],
-      },
-    });
-    expect(meta.getState().working).toEqual(metaSnapshot);
+    ).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
+    expect(meta.getState().working.things).toHaveLength(2);
+    // Child's refused local work is neither consulted nor disturbed by an
+    // Edit it does not participate in.
+    expect(child.getState().persistence.kind).toBe('refused');
+    expect(child.getState().working.things).toContainEqual(
+      expect.objectContaining({ id: CHILD_LINK_ID }),
+    );
   });
 
   it('pauses a session opened while a coordinated repository request is in flight', async () => {
@@ -1630,7 +1654,21 @@ describe('Space Thing lifecycle', () => {
     expect(control.requests).toHaveLength(0);
   });
 
-  it('keeps a target referenced by an uncommitted sibling session', async () => {
+  // Renamed twice, from "keeps a target referenced by an uncommitted
+  // sibling session" then "does not let an uncommitted sibling reference
+  // save a target from a cascading deletion": neither survives ADR 0099's
+  // one recovery rule. Target's stored inbound count is genuinely zero —
+  // Sibling's reference lives only in its own uncommitted, `failed`
+  // working Space, so it must not be read as a *stored* reference that
+  // would save Target from the cascade (that mismatch between what the
+  // browser decides and what the repository would accept is exactly what
+  // `decideCommit`'s `ordinary-space-unreferenced` check would catch) —
+  // but Sibling needing recovery, with that same working Space pointing at
+  // Target (the "add" direction: the reference exists only in working, not
+  // storage), is reason enough to refuse the whole deletion until Sibling
+  // is recovered, rather than strand its own retry with a dangling
+  // reference by deleting the Space out from under it.
+  it('refuses a cascading deletion that would delete a target a failed sibling still references in its working Space', async () => {
     const linkedMeta: SpaceSnapshot = {
       ...metaSnapshot,
       things: [
@@ -1692,7 +1730,11 @@ describe('Space Thing lifecycle', () => {
       control,
     );
     const registry = createSpaceSessionRegistry(backend);
-    registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+    const metaSession = registry.open({
+      snapshot: linkedMeta,
+      revision: 3n,
+      exportedRevision: null,
+    });
     const siblingSession = registry.open({
       snapshot: sibling,
       revision: 2n,
@@ -1717,13 +1759,28 @@ describe('Space Thing lifecycle', () => {
     });
     await vi.waitFor(() => expect(siblingSession.getState().persistence.kind).toBe('failed'));
     const lifecycle = registry.spaceThings(idSource([]));
+    const requestsBefore = control.requests.length;
+    const metaBefore = structuredClone(metaSession.getState());
 
     await expect(
       lifecycle.delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID }),
-    ).resolves.toEqual({ kind: 'completed' });
+    ).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', spaceId: CHILD_ID, recovery: 'retry' },
+    });
 
-    expect(await backend.loadSpace(TARGET_ID)).toMatchObject({ revision: 7n });
+    // Refused, not cascaded: Sibling's own retry still needs Target, and
+    // deleting it here would strand that retry with a dangling reference
+    // forever. Nothing installed, nothing committed.
+    expect(await backend.loadSpace(TARGET_ID)).toEqual({
+      snapshot: targetSnapshot,
+      revision: 7n,
+      exportedRevision: null,
+    });
     expect(registry.session(TARGET_ID)).toBeUndefined();
+    expect(metaSession.getState()).toEqual(metaBefore);
+    expect(siblingSession.getState().persistence.kind).toBe('failed');
+    expect(control.requests).toHaveLength(requestsBefore);
   });
 
   it.each(['link', 'create'] as const)(
@@ -1774,5 +1831,406 @@ describe('Space Thing lifecycle', () => {
       kind: 'refused',
       refusal: { code: 'space-thing-not-found', thingId: META_THING_ID },
     });
+  });
+
+  // The barrier waits only for a target's in-flight commit, not for local
+  // work still queued behind it (ADR 0076/0095: queued work commits after
+  // this turn, not during it) — so a link reads whatever is currently
+  // stored, never a session's own queued-but-uncommitted Graph.
+  it("links against a target Space's stored selection, not a Graph still queued behind an in-flight commit", async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const target = registry.open({
+      snapshot: targetSnapshot,
+      revision: 7n,
+      exportedRevision: null,
+    });
+    const release = control.deferNextCommit();
+    // In flight, deferred by the control.
+    target.submit(target.getState().working);
+    // Queued behind it: local work the barrier does not wait for. A second
+    // Graph, made Active, so reading it (which would be a defect) is
+    // observable.
+    const withNewGraph: SpaceSnapshot = {
+      ...targetSnapshot,
+      document: {
+        ...targetSnapshot.document,
+        diagrams: targetSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          graphs: [...diagram.graphs, { id: SECOND_TARGET_GRAPH_ID, title: 'Graph 2', edges: [] }],
+          activeGraph: SECOND_TARGET_GRAPH_ID,
+        })),
+      },
+    };
+    target.submit(withNewGraph);
+    const lifecycle = registry.spaceThings(idSource([SPACE_THING_ID]));
+
+    // The barrier's one wait is for this in-flight commit, and only it —
+    // releasing it is what lets the turn proceed.
+    const link = lifecycle.link({
+      containingSpaceId: META_ID,
+      diagramId: META_DIAGRAM_ID,
+      targetSpaceId: TARGET_ID,
+      title: 'Link',
+      position: { x: 240, y: 80 },
+    });
+    release();
+
+    await expect(link).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
+    const storedMeta = await backend.loadSpace(META_ID);
+    expect(storedMeta?.snapshot.things).toContainEqual({
+      id: SPACE_THING_ID,
+      document: {
+        title: 'Link',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        diagram: TARGET_DIAGRAM_ID,
+        graph: TARGET_GRAPH_ID,
+      },
+    });
+    // The queued Graph never got a chance to commit during this turn — it
+    // starts only once the barrier drops, in `resumePersistence`.
+    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('settled'));
+    expect(target.getState().working.document.diagrams?.[0]?.activeGraph).toBe(
+      SECOND_TARGET_GRAPH_ID,
+    );
+  });
+
+  it.each([
+    {
+      result: { kind: 'retryable-failure', code: 'network', message: 'offline' } as const,
+      persistence: 'failed',
+      recovery: 'retry',
+    },
+    {
+      result: {
+        kind: 'conflict',
+        conflicts: [
+          {
+            spaceId: TARGET_ID,
+            current: { snapshot: targetSnapshot, revision: 9n, exportedRevision: null },
+          },
+        ],
+      } as const,
+      persistence: 'conflicted',
+      recovery: 'resolve-conflict',
+    },
+  ])(
+    'refuses a link whose target is $persistence, naming the target, and installs nothing',
+    async ({ result, persistence, recovery }) => {
+      const control = new MemorySpaceBackendTestControl();
+      control.queueResult(result);
+      const backend = new MemorySpaceBackend(
+        META_ID,
+        [
+          { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+          { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+        ],
+        control,
+      );
+      const registry = createSpaceSessionRegistry(backend);
+      const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+      const target = registry.open({
+        snapshot: targetSnapshot,
+        revision: 7n,
+        exportedRevision: null,
+      });
+      target.submit(target.getState().working);
+      await vi.waitFor(() => expect(target.getState().persistence.kind).toBe(persistence));
+      const before = structuredClone(meta.getState());
+      const lifecycle = registry.spaceThings(idSource([]));
+
+      await expect(
+        lifecycle.link({
+          containingSpaceId: META_ID,
+          diagramId: META_DIAGRAM_ID,
+          targetSpaceId: TARGET_ID,
+          title: 'Blocked link',
+          position: { x: 240, y: 80 },
+        }),
+      ).resolves.toEqual({
+        kind: 'refused',
+        refusal: { code: 'persistence-recovery-required', spaceId: TARGET_ID, recovery },
+      });
+      expect(meta.getState()).toEqual(before);
+      expect(control.requests).toHaveLength(1);
+    },
+  );
+
+  it('does not cascade a deletion through a target another Space still references in storage after a transient failure elsewhere', async () => {
+    const linkedMeta: SpaceSnapshot = {
+      ...metaSnapshot,
+      things: [
+        ...metaSnapshot.things,
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
+      ],
+      document: {
+        ...metaSnapshot.document,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          positions: {
+            ...diagram.positions,
+            [SPACE_THING_ID]: { x: 240, y: 80, open: false },
+          },
+        })),
+      },
+    };
+    const siblingWithReference: SpaceSnapshot = {
+      id: CHILD_ID,
+      document: {
+        version: 1,
+        title: 'Sibling',
+        defaultDiagram: CHILD_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: CHILD_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: {
+              [CHILD_THING_ID]: { x: 0, y: 0, open: false },
+              [CHILD_LINK_ID]: { x: 240, y: 80, open: false },
+            },
+            graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: CHILD_GRAPH_ID,
+          },
+        ],
+      },
+      things: [
+        { id: CHILD_THING_ID, document: { title: 'Sibling', kind: 'markdown', body: '' } },
+        {
+          id: CHILD_LINK_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
+      ],
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+        { snapshot: siblingWithReference, revision: 2n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+    const sibling = registry.open({
+      snapshot: siblingWithReference,
+      revision: 2n,
+      exportedRevision: null,
+    });
+    const siblingLifecycle = registry.spaceThings(idSource([]));
+    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+
+    // Sibling's own attempt to remove its reference to Target is installed
+    // locally (ADR 0076: the operation answers `completed` once installed)
+    // and then fails to commit, transiently — its working state no longer
+    // names Target, but storage still does.
+    await expect(
+      siblingLifecycle.delete({ containingSpaceId: CHILD_ID, thingId: CHILD_LINK_ID }),
+    ).resolves.toEqual({ kind: 'completed' });
+    await vi.waitFor(() => expect(sibling.getState().persistence.kind).toBe('failed'));
+    expect(sibling.getState().working.things).not.toContainEqual(
+      expect.objectContaining({ id: CHILD_LINK_ID }),
+    );
+    const storedSibling = await backend.loadSpace(CHILD_ID);
+    expect(storedSibling?.snapshot.things.some(({ id }) => id === CHILD_LINK_ID)).toBe(true);
+
+    const metaLifecycle = registry.spaceThings(idSource([]));
+    await expect(
+      metaLifecycle.delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID }),
+    ).resolves.toEqual({ kind: 'completed' });
+
+    // Target survives: storage still names Sibling as a reference, even
+    // though Sibling's own uncommitted working state no longer does.
+    expect(await backend.loadSpace(TARGET_ID)).toMatchObject({ revision: 7n });
+    expect(registry.session(TARGET_ID)).toBeUndefined();
+  });
+
+  // The one recovery rule names a session only when it references a Space
+  // this deletion would remove, or selects the Diagram or Graph it deletes
+  // — a `failed` Space with neither is not a reason to refuse.
+  it('does not refuse an ordinary deletion because an unrelated Space needs recovery', async () => {
+    const linkedMeta: SpaceSnapshot = {
+      ...metaSnapshot,
+      things: [
+        ...metaSnapshot.things,
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
+      ],
+      document: {
+        ...metaSnapshot.document,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          positions: {
+            ...diagram.positions,
+            [SPACE_THING_ID]: { x: 240, y: 80, open: false },
+          },
+        })),
+      },
+    };
+    const unrelated: SpaceSnapshot = {
+      id: CHILD_ID,
+      document: { version: 1, title: 'Unrelated' },
+      things: [
+        { id: CHILD_THING_ID, document: { title: 'Unrelated', kind: 'markdown', body: '' } },
+      ],
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+        { snapshot: unrelated, revision: 1n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+    const unrelatedSession = registry.open({
+      snapshot: unrelated,
+      revision: 1n,
+      exportedRevision: null,
+    });
+    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    unrelatedSession.submit({ ...unrelated, document: { version: 1, title: 'Unrelated 2' } });
+    await vi.waitFor(() => expect(unrelatedSession.getState().persistence.kind).toBe('failed'));
+    const lifecycle = registry.spaceThings(idSource([]));
+
+    await expect(
+      lifecycle.delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID }),
+    ).resolves.toEqual({ kind: 'completed' });
+
+    // Target is genuinely cascaded away, and Unrelated's own failure is
+    // left exactly as it was — neither consulted nor disturbed.
+    expect(registry.session(TARGET_ID)).toBeUndefined();
+    expect(unrelatedSession.getState().persistence.kind).toBe('failed');
+  });
+
+  it('forgives a Space already unreferenced in storage when the pre-check judges an unrelated Edit', async () => {
+    const orphan: SpaceSnapshot = {
+      id: CHILD_ID,
+      document: {
+        version: 1,
+        title: 'Orphan',
+        defaultDiagram: CHILD_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: CHILD_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: { [CHILD_THING_ID]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: CHILD_GRAPH_ID,
+          },
+        ],
+      },
+      things: [{ id: CHILD_THING_ID, document: { title: 'Orphan', kind: 'markdown', body: '' } }],
+    };
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+      { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      { snapshot: orphan, revision: 1n, exportedRevision: null },
+    ]);
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceThings(idSource([SPACE_THING_ID]));
+
+    // Storage already holds an ordinary Space nothing references — a baseline
+    // `decideCommit` forgives (ADR 0095) — and this link never touches it.
+    // The old manual intake check had no such forgiveness and refused every
+    // Edit while that baseline stood.
+    await expect(
+      lifecycle.link({
+        containingSpaceId: META_ID,
+        diagramId: META_DIAGRAM_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Architecture',
+        position: { x: 240, y: 80 },
+      }),
+    ).resolves.toEqual({ kind: 'completed', thingId: SPACE_THING_ID });
+  });
+
+  it('reads the aggregate once per coordination turn for a cascading delete', async () => {
+    class CountingAggregateBackend extends MemorySpaceBackend {
+      loadAggregateCalls = 0;
+      override loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
+        this.loadAggregateCalls += 1;
+        return super.loadAggregate();
+      }
+    }
+    const linkedMeta: SpaceSnapshot = {
+      ...metaSnapshot,
+      things: [
+        ...metaSnapshot.things,
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Target',
+            kind: 'space',
+            spaceId: TARGET_ID,
+            diagram: TARGET_DIAGRAM_ID,
+            graph: TARGET_GRAPH_ID,
+          },
+        },
+      ],
+      document: {
+        ...metaSnapshot.document,
+        diagrams: metaSnapshot.document.diagrams?.map((diagram) => ({
+          ...diagram,
+          positions: {
+            ...diagram.positions,
+            [SPACE_THING_ID]: { x: 240, y: 80, open: false },
+          },
+        })),
+      },
+    };
+    const backend = new CountingAggregateBackend(META_ID, [
+      { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+      { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+    ]);
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceThings(idSource([]));
+
+    await expect(
+      lifecycle.delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID }),
+    ).resolves.toEqual({ kind: 'completed' });
+
+    expect(backend.loadAggregateCalls).toBe(1);
   });
 });

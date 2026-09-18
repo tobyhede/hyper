@@ -2,7 +2,7 @@ import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type {
   AggregateLoadResult,
-  CommitResult,
+  CommitOutcome,
   LoadedSpace,
   SpaceChange,
   SpaceCommit,
@@ -335,15 +335,10 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
   });
   const [first, ...rest] = changes;
   if (first === undefined) throw new Error('commit changes must be non-empty');
-  const named = new Set<UUID>();
-  for (const change of changes) {
-    if (named.has(change.spaceId))
-      throw new Error(`Space ${change.spaceId} is named more than once`);
-    named.add(change.spaceId);
-    if (change.kind !== 'delete' && change.snapshot.id !== change.spaceId) {
-      throw new Error(`Change Space id ${change.spaceId} does not match its snapshot`);
-    }
-  }
+  // Shape only. Whether the change set names one Space twice, or disagrees with
+  // its own snapshot about which Space it is, is what a commit *means*, and that
+  // is `commitRequestRefusal`'s, decided once for every implementation (ADR
+  // 0095, ADR 0098).
   return { changes: [first, ...rest] };
 };
 
@@ -383,9 +378,9 @@ export const decodeLoadedAggregate = (value: unknown): AggregateLoadResult => {
   };
 };
 
-type Committed = Extract<CommitResult, { kind: 'committed' }>;
-type Conflict = Extract<CommitResult, { kind: 'conflict' }>;
-type AggregateRefused = Extract<CommitResult, { kind: 'aggregate-refused' }>;
+type Committed = Extract<CommitOutcome, { kind: 'committed' }>;
+type Conflict = Extract<CommitOutcome, { kind: 'conflict' }>;
+type AggregateRefused = Extract<CommitOutcome, { kind: 'aggregate-refused' }>;
 
 export interface CommitResponseBody {
   readonly revisions: readonly { readonly spaceId: string; readonly revision: string }[];
@@ -694,6 +689,44 @@ export const decodeCommitRefusal = (value: unknown): AggregateRefused => {
   }
   return { kind: 'aggregate-refused', errors: record['errors'].map(decodeAggregateError) };
 };
+
+/**
+ * The status each commit outcome crosses HTTP as, and the codec that reads it
+ * back, written once for both ends of the seam (ADR 0098).
+ *
+ * `satisfies Record<CommitOutcome['kind'], …>` is what makes it exhaustive: an
+ * outcome added to the domain without a status here fails to compile, rather
+ * than reaching a route that answers it as something else.
+ *
+ * The encoders are not in the table, and the route calls them itself. Hono
+ * infers the typed client's per-status response bodies from the literal types at
+ * each `context.json(body, status)` call, so a body and a status that reach it
+ * as two separately-typed values — however correlated they were a line earlier —
+ * collapse the whole commit response into one union, and
+ * `space-http-app-types.test.ts` is what says so. The status the route pairs with
+ * each body still comes from here.
+ */
+export const COMMIT_OUTCOME_WIRE = {
+  committed: { status: 200, decode: decodeCommitResponse },
+  conflict: { status: 409, decode: decodeCommitConflict },
+  'aggregate-refused': { status: 422, decode: decodeCommitRefusal },
+} as const satisfies Record<
+  CommitOutcome['kind'],
+  { status: number; decode: (value: unknown) => CommitOutcome }
+>;
+
+/**
+ * The decoder for a response status that carries an outcome, or `undefined` for
+ * one that does not.
+ *
+ * A decoder rather than a decoded outcome, because the caller holds a `Response`
+ * whose body may be read only once: a status this table does not know carries
+ * Problem Details instead, and the transport must be free to read it as that.
+ */
+export const commitOutcomeDecoder = (
+  status: number,
+): ((value: unknown) => CommitOutcome) | undefined =>
+  Object.values(COMMIT_OUTCOME_WIRE).find((entry) => entry.status === status)?.decode;
 
 export const decodeSpaceSummaries = (value: unknown): readonly SpaceSummary[] => {
   if (!Array.isArray(value)) throw new Error('space summaries must be an array');

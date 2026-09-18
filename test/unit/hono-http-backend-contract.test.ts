@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   encodeCommitRequest,
-  MemorySpaceBackend,
   type LoadedSpace,
   type SpaceResourceRepository,
 } from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
+import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { THING_ID, SPACE_ID, oneThingSnapshot as snapshot } from '../support/space-fixtures';
 
 const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -67,36 +67,26 @@ const appFetch =
       ),
     );
 
-spaceBackendContract('Hono HttpSpaceBackend', (initial) => {
-  const memory = new MemorySpaceBackend(initial);
-  const app = createSpaceHttpApp({
-    listSpaces: () => memory.listSpaces(),
-    loadSpace: (id) => memory.loadSpace(id),
-    loadAggregate: () => memory.loadAggregate(),
-    commit: async (request) => {
-      const result = await memory.commit(request);
-      if (
-        result.kind === 'committed' ||
-        result.kind === 'conflict' ||
-        result.kind === 'aggregate-refused'
-      ) {
-        return result;
-      }
-      // `SpaceResourceRepository` declares one rejection code; `CommitResult`
-      // also carries transport failures. Collapsing those into `invalid-commit` would let a
-      // transport or authorization failure reach the contract disguised as a
-      // domain rejection, and the assertions downstream would still pass.
-      if (result.kind !== 'permanent-failure' || result.code !== 'invalid-commit') {
-        throw new Error(`Unmapped commit failure in contract harness: ${result.code}`);
-      }
-      return { kind: 'rejected', code: result.code, message: result.message };
-    },
-  });
-  return Promise.resolve({
-    backend: new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) }),
+/**
+ * The application is composed over a real `SpaceRepository`, which is what it is
+ * given in every runtime. It used to be handed `MemorySpaceBackend` wrapped in a
+ * repository-shaped adapter that mapped each browser-side result back to a
+ * stored one and threw on the arms it could not represent — so the HTTP path was
+ * exercised over the less faithful of the two doubles, through a mapping no
+ * production code performs (ADR 0096).
+ *
+ * The contract names the Meta identity it seeds under, which is what lets
+ * `MemorySpaceRepository`'s overloads be satisfied honestly rather than by
+ * reading it off the first element.
+ */
+spaceBackendContract('Hono HttpSpaceBackend', ({ spaces, metaSpaceId }) =>
+  Promise.resolve({
+    backend: new HttpSpaceBackend('http://hyper.test', {
+      fetch: appFetch(createSpaceHttpApp(new MemorySpaceRepository(spaces, metaSpaceId))),
+    }),
     close: () => Promise.resolve(),
-  });
-});
+  }),
+);
 
 describe('HttpSpaceBackend', () => {
   it('lists spaces through the typed Hono application contract', async () => {

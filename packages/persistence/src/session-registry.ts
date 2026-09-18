@@ -9,12 +9,12 @@ import {
 import {
   initializeSpace,
   loadSpace,
-  loadSpaceAggregate,
   loadSpaceSnapshot,
   SnapshotEdit,
   type Space,
   type SpaceAggregateError,
 } from '@project/graph';
+import { decideCommit } from './commit-decision';
 import { createWorkingSpaceLoader } from './working-space';
 import type {
   CommitResult,
@@ -542,6 +542,25 @@ export function createSpaceSessionRegistry(
   const runSpaceThingCoordination = async <P>(
     operation: SpaceThingCoordinatedOperation<P>,
     installed: (result?: SpaceThingCoordinationResult) => void,
+    /**
+     * Whether this turn is `recovery.retry`/`keepLocal` resubmitting a change
+     * set an earlier turn already decided and pre-checked, rather than a fresh
+     * Space Thing lifecycle operation.
+     *
+     * A retry still reads the aggregate — the barrier still waits, and a read
+     * failure still answers `persistence-read-failed` — it skips only
+     * `decideCommit`. A retry replays an earlier turn's already-decided change
+     * set — no new target selection, no new reference count, nothing the
+     * pre-check exists to catch — so running it buys nothing and, against
+     * `MemorySpaceBackend`'s test double, actively costs: a queued
+     * `conflict`/failure result installs the acknowledged revision `session.ts`
+     * recorded onto the *session*, but never writes it into the backend's own
+     * stored copy, so this turn's read would return the original revision and
+     * the pre-check would answer a conflict of its own. The real backend
+     * already re-validates every commit, retry or not (ADR 0095), so skipping
+     * this turn's redundant pre-check loses no safety.
+     */
+    isRetry = false,
   ): Promise<SpaceThingCoordinationResult> => {
     const previous = lifecycleTail;
     let releaseTurn = (): void => undefined;
@@ -553,6 +572,12 @@ export function createSpaceSessionRegistry(
     persistenceBarrier = true;
     for (const managed of sessions.values()) managed.pausePersistence();
     try {
+      // The barrier waits only for whatever is already in flight (ADR
+      // 0099): pausing before this wait is what bounds it — a commit that
+      // completes with further queued work settles to idle instead of
+      // chaining into the next one (session.ts), so local work queued once
+      // the barrier is up stays queued for after this turn rather than
+      // being drained into it.
       await Promise.all([...sessions.values()].map((managed) => managed.waitForIdle()));
 
       const prepared = await operation.prepare();
@@ -628,21 +653,80 @@ export function createSpaceSessionRegistry(
         }
       };
 
-      for (const change of changes) {
+      /**
+       * The exact request this turn sends — computed once, synchronously,
+       * before anything below touches a participant's session, and spent
+       * twice: as the pre-check's `request` and, unchanged, as the actual
+       * `backend.commit` request. An `update` carries `plan`'s decided
+       * snapshot, which is also what `prepareCoordinatedCommit` installs as
+       * the participant's working Space, so the two cannot disagree. Building
+       * it before {@link ensureCreateParticipants} runs is safe because a
+       * `create` participant with no session yet falls back to the planned
+       * snapshot either way.
+       */
+      const backendChange = (change: SpaceThingLifecycleChange): SpaceChange => {
         if (change.kind === 'create') {
-          const current = participants.get(change.snapshot.id)?.session.getState().working;
-          candidate.set(change.snapshot.id, clone(current ?? change.snapshot));
-        } else if (change.kind === 'delete') candidate.delete(change.spaceId);
-        else candidate.set(change.spaceId, clone(change.snapshot));
-      }
-      const intake = loadSpaceAggregate({
-        metaSpaceId: aggregate.metaSpaceId,
-        snapshots: [...candidate.values()],
-      });
-      if (!intake.ok) {
-        const refusal = { kind: 'aggregate-refused', errors: intake.errors } as const;
+          const managed = participants.get(change.snapshot.id);
+          return {
+            kind: 'create',
+            spaceId: change.snapshot.id,
+            snapshot: clone(managed?.session.getState().working ?? change.snapshot),
+          };
+        }
+        const { spaceId } = change;
+        const managed = participants.get(spaceId);
+        if (managed === undefined) throw new Error(`Space ${spaceId} lost its live session`);
+        const state = managed.session.getState();
+        return change.kind === 'delete'
+          ? { kind: 'delete', spaceId, expectedRevision: state.acknowledgedRevision }
+          : {
+              kind: 'update',
+              spaceId,
+              snapshot: clone(change.snapshot),
+              expectedRevision: state.acknowledgedRevision,
+            };
+      };
+      const [firstChange, ...remainingChanges] = changes;
+      const backendChanges: [SpaceChange, ...SpaceChange[]] = [
+        backendChange(firstChange),
+        ...remainingChanges.map(backendChange),
+      ];
+
+      /*
+       * The pre-commit verdict is the same judge the repository runs (ADR
+       * 0095, ADR 0097): `stored` is this turn's one aggregate read, sorted
+       * the way every backend's own `commit` sorts it, so an
+       * `invalid-space-snapshot` refusal would name the same Space either way.
+       * Spaces the Edit does not change are therefore judged as stored and
+       * participants as what the commit sends — never a non-participant's
+       * uncommitted working Space, which the repository will not see.
+       *
+       * Skipped on a retry — see {@link isRetry}.
+       */
+      const preCheck = isRetry
+        ? undefined
+        : decideCommit(
+            { changes: backendChanges },
+            aggregate.metaSpaceId,
+            [...aggregate.spaces].sort((left, right) =>
+              left.snapshot.id < right.snapshot.id ? -1 : 1,
+            ),
+          );
+      if (preCheck?.kind === 'answer' && preCheck.result.kind === 'aggregate-refused') {
+        const refusal = { kind: 'aggregate-refused', errors: preCheck.result.errors } as const;
         installed(refusal);
         return refusal;
+      }
+      if (preCheck?.kind === 'answer' && preCheck.result.kind === 'rejected') {
+        // Unreachable through this registry: the duplicate-naming check above
+        // and `backendChange`'s own construction already guarantee a
+        // self-consistent request, and `aggregate.metaSpaceId` is always
+        // defined once `loadAggregate` answers `loaded` — decideCommit's
+        // remaining `rejected` reasons (a repeated Space, a mismatched
+        // snapshot, or no Meta) cannot fire from a request built this way.
+        throw new Error(
+          `decideCommit rejected a well-formed coordinated commit: ${preCheck.result.message}`,
+        );
       }
 
       ensureCreateParticipants();
@@ -700,26 +784,29 @@ export function createSpaceSessionRegistry(
         });
         const [firstItem, ...remainingItems] = retryItems;
         if (firstItem === undefined) return;
-        void coordinateSpaceThing({
-          // No wait of its own: every retried item was already decided above,
-          // synchronously, from the failed attempt's own state. Only `update`
-          // has anything left to resolve, and `plan` resolves it against the
-          // Spaces the *retried* coordination's own aggregate read produces.
-          prepare: () => Promise.resolve({ kind: 'proceed', prepared: undefined } as const),
-          plan: (spaces) => {
-            const resolve = (item: SpaceThingRetryItem): SpaceThingLifecycleChange => {
-              if (item.kind !== 'update') return item;
-              const snapshot = spaces.get(item.spaceId);
-              if (snapshot === undefined)
-                throw new Error(`Space ${item.spaceId} lost its live session`);
-              return { kind: 'update', spaceId: item.spaceId, snapshot };
-            };
-            return {
-              kind: 'changes',
-              changes: [resolve(firstItem), ...remainingItems.map(resolve)],
-            };
+        void coordinateSpaceThing(
+          {
+            // No wait of its own: every retried item was already decided above,
+            // synchronously, from the failed attempt's own state. Only `update`
+            // has anything left to resolve, and `plan` resolves it against the
+            // Spaces the *retried* coordination's own aggregate read produces.
+            prepare: () => Promise.resolve({ kind: 'proceed', prepared: undefined } as const),
+            plan: (spaces) => {
+              const resolve = (item: SpaceThingRetryItem): SpaceThingLifecycleChange => {
+                if (item.kind !== 'update') return item;
+                const snapshot = spaces.get(item.spaceId);
+                if (snapshot === undefined)
+                  throw new Error(`Space ${item.spaceId} lost its live session`);
+                return { kind: 'update', spaceId: item.spaceId, snapshot };
+              };
+              return {
+                kind: 'changes',
+                changes: [resolve(firstItem), ...remainingItems.map(resolve)],
+              };
+            },
           },
-        });
+          true,
+        );
       };
       const recovery = {
         retry: (): void => {
@@ -809,34 +896,11 @@ export function createSpaceSessionRegistry(
         throw error;
       }
 
-      const backendChange = (change: SpaceThingLifecycleChange): SpaceChange => {
-        if (change.kind === 'create') {
-          const managed = participants.get(change.snapshot.id);
-          return {
-            kind: 'create',
-            spaceId: change.snapshot.id,
-            snapshot: clone(managed?.session.getState().working ?? change.snapshot),
-          };
-        }
-        const { spaceId } = change;
-        const managed = participants.get(spaceId);
-        if (managed === undefined) throw new Error(`Space ${spaceId} lost its live session`);
-        const state = managed.session.getState();
-        return change.kind === 'delete'
-          ? { kind: 'delete', spaceId, expectedRevision: state.acknowledgedRevision }
-          : {
-              kind: 'update',
-              spaceId,
-              snapshot: clone(state.working),
-              expectedRevision: state.acknowledgedRevision,
-            };
-      };
-      const [firstChange, ...remainingChanges] = changes;
-      const backendChanges: [SpaceChange, ...SpaceChange[]] = [
-        backendChange(firstChange),
-        ...remainingChanges.map(backendChange),
-      ];
-
+      // The pre-check acts only on `aggregate-refused`, above (and the
+      // unreachable `rejected` throw, also above); a `conflict` or `write`
+      // verdict still reaches the backend as normal, so it is the
+      // repository's own answer — not the pre-check's guess at it — that
+      // carries the current state a conflict names.
       let result: CommitResult;
       try {
         result = await backend.commit({ changes: backendChanges });
@@ -940,10 +1004,14 @@ export function createSpaceSessionRegistry(
    */
   const coordinateSpaceThing = async <P>(
     operation: SpaceThingCoordinatedOperation<P>,
+    isRetry = false,
   ): Promise<SpaceThingCoordinationResult> => {
     const installation = Promise.withResolvers<SpaceThingCoordinationResult>();
-    void runSpaceThingCoordination(operation, (result) =>
-      installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
+    void runSpaceThingCoordination(
+      operation,
+      (result) =>
+        installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
+      isRetry,
     ).catch(installation.reject);
     return installation.promise;
   };
@@ -964,10 +1032,13 @@ export function createSpaceSessionRegistry(
      * coordination's barrier is raised, and that is deliberate rather than a
      * leak through it. The barrier stops a *session* committing over the
      * topology Edit; this commit belongs to a Space with no live session to
-     * pause, since opening a Space is the working load that initializes it and
-     * a live session is read from its own working state above. The coordination
-     * reads the aggregate after `prepare` returns, so it sees the initialized
-     * target and spends its revision rather than a stale one.
+     * pause, since opening a Space is the working load that initializes it.
+     * The target is never a participant of the Edit this prepares (ADR 0097):
+     * it supplies a selection to read, not content to write, so its own
+     * initializing commit — landing before the coordination's one aggregate
+     * read — is not a second write this coordination's own commit could race.
+     * That read comes after `prepare` returns, so it sees the initialized
+     * target, and `plan` reads the selection from it rather than from here.
      *
      * **A failure after this point leaves the target initialized and makes no
      * Thing, and that is accepted rather than repaired.** An aggregate refusal,
@@ -996,13 +1067,18 @@ export function createSpaceSessionRegistry(
      * needs to: the selection is validated against the whole aggregate inside
      * the coordination, so a Diagram deleted in the gap is refused as
      * `space-thing-diagram-missing` rather than stored.
+     *
+     * **Read as stored, even for an open target session (ADR 0097).** The
+     * target is not a participant of this Edit, so its selection is read from
+     * storage — never from a live session's `working`, which can name a
+     * Graph or Diagram that never committed, or that a failed attempt already
+     * withdrew. `recoveryRefusal` on the target, called by `link` before
+     * this, is what a `failed`/`conflicted` target answers instead; a
+     * `rejected`, `refused` or merely divergent one still reads its last-stored
+     * selection here; either way this Edit never adopts content the
+     * repository has not actually accepted.
      */
     const workingTargetSelection = async (targetSpaceId: UUID): Promise<TargetSelection> => {
-      const live = sessions.get(targetSpaceId)?.session.getState().working;
-      if (live !== undefined) {
-        const loaded = loadSpaceSnapshot(live);
-        return loaded.ok ? selectionOfLoaded(loaded.space) : unavailableTarget('unreadable');
-      }
       let stored: LoadedSpace | undefined;
       try {
         stored = await loadWorkingSpace(targetSpaceId);
@@ -1055,6 +1131,41 @@ export function createSpaceSessionRegistry(
       return undefined;
     };
     /**
+     * The one recovery rule for both cascading operations (ADR 0099): a
+     * non-participant session that needs recovery blocks a Space Thing
+     * delete, or a Diagram/Graph delete, when it — in either its stored
+     * snapshot or its working Space — references a Space the deletion
+     * would remove, or holds a Space Thing selecting the Diagram or Graph
+     * being deleted. Neither reading alone is trustworthy on its own: a
+     * `failed` edit that added the reference or selection has not reached
+     * storage, and one that removed it has not left storage either —
+     * either way, that session's own eventual retry or conflict resolution
+     * resubmits whichever of the two turns out to be its true next
+     * attempt, and a deletion that cannot see it can delete the Space, or
+     * the Diagram or Graph, that attempt still needs. `recoveryRefusal`
+     * answers `undefined` for a `rejected` or `refused` session, so it is not checked
+     * here — its work is already permanently refused, and this deletion
+     * strands nothing further from it.
+     */
+    const recoveryBlockedBy = (
+      aggregate: LoadedAggregate,
+      exempt: ReadonlySet<UUID>,
+      affects: (snapshot: SpaceSnapshot) => boolean,
+    ): SpaceThingRefused | undefined => {
+      for (const [id, managed] of sessions) {
+        if (exempt.has(id)) continue;
+        const recovery = recoveryRefusal(id);
+        if (recovery === undefined) continue;
+        const stored = aggregate.spaces.find(({ snapshot }) => snapshot.id === id)?.snapshot;
+        if (
+          (stored !== undefined && affects(stored)) ||
+          affects(managed.session.getState().working)
+        )
+          return recovery;
+      }
+      return undefined;
+    };
+    /**
      * `prepare` holds the containing Diagram's early-exit check — which must
      * run, and refuse, before the target is made working or any id is minted
      * (ADR 0079) — and every wait this operation needs: making the target
@@ -1067,7 +1178,7 @@ export function createSpaceSessionRegistry(
      */
     const link = async (input: LinkSpaceThingInput): Promise<SpaceThingCreationResult> => {
       let completion: SpaceThingCreationResult | undefined;
-      type LinkPrepared = { readonly selection: SpaceThingSelection; readonly thingId: UUID };
+      type LinkPrepared = { readonly thingId: UUID };
       const result = await coordinateSpaceThing<LinkPrepared>({
         prepare: async (): Promise<SpaceThingPreparationOutcome<LinkPrepared>> => {
           const recovery = recoveryRefusal(input.containingSpaceId);
@@ -1079,6 +1190,15 @@ export function createSpaceSessionRegistry(
               refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
             };
           }
+          // The target itself, next and still before initialization: the Space
+          // this Edit takes content from must not need recovery either (ADR
+          // 0095) — a `failed` or `conflicted` target answers here, by name,
+          // rather than by whatever its last-good stored selection happens to
+          // be. A merely `rejected`, `refused` or divergent target is not refused here —
+          // ADR 0076 lets it keep participating in *its own* Edits, and this
+          // one only reads its stored selection rather than writing it.
+          const targetRecovery = recoveryRefusal(input.targetSpaceId);
+          if (targetRecovery !== undefined) return targetRecovery;
           // Last, and deliberately: an Edit the containing Space has already
           // refused must not initialize the Space it was pointed at, and must
           // not mint the two identities doing so would spend.
@@ -1093,12 +1213,35 @@ export function createSpaceSessionRegistry(
               },
             };
           }
-          return { kind: 'proceed', prepared: { selection: target.selection, thingId: newId() } };
+          return { kind: 'proceed', prepared: { thingId: newId() } };
         },
-        plan: (spaces, _aggregate, data) => {
+        plan: (spaces, aggregate, data) => {
           const source = spaces.get(input.containingSpaceId);
           if (source === undefined) {
             throw new Error(`Space ${input.containingSpaceId} has no live session`);
+          }
+          // The selection `prepare` read, read again from the coordination's one
+          // aggregate read — the same stored view the pre-check judges — so a
+          // selection that moved between the two is the one this Edit records.
+          const stored = aggregate.spaces.find(
+            ({ snapshot }) => snapshot.id === input.targetSpaceId,
+          );
+          const reloaded = stored === undefined ? undefined : loadSpaceSnapshot(stored.snapshot);
+          const target: TargetSelection =
+            reloaded === undefined
+              ? unavailableTarget('missing')
+              : reloaded.ok
+                ? selectionOfLoaded(reloaded.space)
+                : unavailableTarget('unreadable');
+          if (target.kind === 'unavailable') {
+            return {
+              kind: 'refused',
+              refusal: {
+                code: 'space-thing-target-unavailable',
+                spaceId: input.targetSpaceId,
+                reason: target.reason,
+              },
+            };
           }
           const created = planSpaceThingCreation(
             source,
@@ -1106,7 +1249,7 @@ export function createSpaceSessionRegistry(
             data.thingId,
             input.targetSpaceId,
             input.title,
-            data.selection,
+            target.selection,
             input.position,
           );
           if (created.kind === 'refused') return created;
@@ -1179,25 +1322,46 @@ export function createSpaceSessionRegistry(
           if (replacementDiagram === undefined || replacementGraph === undefined)
             return { kind: 'unchanged' };
 
-          const affected = [...spaces.values()].filter((snapshot) =>
-            snapshot.things.some(
-              ({ document }) =>
-                document.kind === 'space' &&
-                document.spaceId === input.targetSpaceId &&
-                (deletingDiagram
-                  ? document.diagram === input.diagramId
-                  : document.diagram === input.diagramId && document.graph === input.graphId),
-            ),
-          );
+          // Every *other* Space that selects this target's Diagram/Graph is
+          // read as stored (ADR 0097): it is not yet a known participant, and
+          // if a live session's own uncommitted Edit already moved its
+          // selection away, that Edit's own future commit is what reconciles
+          // it — this scan only avoids leaving a *stored* reference dangling.
+          // The target itself is `spaces`' reading, its working Space when a
+          // live session holds it, since its own structure is what this Edit
+          // changes.
+          const selectsDeletedContext = (document: ThingDocument): boolean =>
+            document.kind === 'space' &&
+            document.spaceId === input.targetSpaceId &&
+            (deletingDiagram
+              ? document.diagram === input.diagramId
+              : document.diagram === input.diagramId && document.graph === input.graphId);
+          const affected = aggregate.spaces
+            .map(({ snapshot }) => snapshot)
+            .filter((snapshot) =>
+              snapshot.things.some(({ document }) => selectsDeletedContext(document)),
+            );
           const participantIds = new Set([input.targetSpaceId, ...affected.map(({ id }) => id)]);
-          // Every participant's recovery state is checked before any of them
-          // is opened, so a later refusal never leaves an earlier
-          // participant's session open as a side effect of a plan that goes
-          // on to refuse.
+          // Every participant's own recovery is checked, and the one shared
+          // rule below is run, before any of them is opened: a refusal from
+          // either must leave no new session behind it in the registry.
           for (const id of participantIds) {
             const recovery = recoveryRefusal(id);
             if (recovery !== undefined) return recovery;
           }
+          // The one recovery rule (ADR 0099), shared with `delete`'s cascade:
+          // a non-participant session that needs recovery is not made a
+          // participant here either, and blocks the deletion when either its
+          // stored snapshot or its working Space still selects the Diagram
+          // or Graph being deleted — its own eventual retry or conflict
+          // resolution resubmits one of the two, and deleting the context
+          // out from under it would strand that attempt forever, refused
+          // with `space-thing-diagram-missing`/`space-thing-graph-missing`
+          // naming a context that no longer exists.
+          const recoveryBlock = recoveryBlockedBy(aggregate, participantIds, (snapshot) =>
+            snapshot.things.some(({ document }) => selectsDeletedContext(document)),
+          );
+          if (recoveryBlock !== undefined) return recoveryBlock;
           for (const id of participantIds) {
             if (sessions.has(id)) continue;
             const loaded = aggregate.spaces.find(({ snapshot }) => snapshot.id === id);
@@ -1231,18 +1395,18 @@ export function createSpaceSessionRegistry(
             spaceId: input.targetSpaceId,
             snapshot: { ...target, document: targetDocument },
           };
+          // A participant commits its working Space, so the rewrite applies to
+          // that reading — `spaces` holds it for a live session and the stored
+          // snapshot for one opened just above.
           const referenceChanges = affected
             .filter((snapshot) => snapshot.id !== input.targetSpaceId)
             .map((snapshot): SpaceThingLifecycleChange => ({
               kind: 'update',
               spaceId: snapshot.id,
               snapshot: replaceSpaceThingSelection(
-                snapshot,
+                spaces.get(snapshot.id) ?? snapshot,
                 input.targetSpaceId,
-                (document) =>
-                  deletingDiagram
-                    ? document.diagram === input.diagramId
-                    : document.diagram === input.diagramId && document.graph === input.graphId,
+                selectsDeletedContext,
                 replacementDiagram.id,
                 replacementGraph.id,
                 deletingDiagram,
@@ -1385,18 +1549,45 @@ export function createSpaceSessionRegistry(
                 `Space Thing deletion through SnapshotEdit answered '${deletion.kind}'`,
               );
             }
-            const snapshots = new Map(spaces);
-            snapshots.set(input.containingSpaceId, deletion.snapshot);
-            const inbound = new Map<UUID, number>();
-            for (const snapshot of snapshots.values()) inbound.set(snapshot.id, 0);
-            for (const snapshot of snapshots.values())
+            /**
+             * The reference edges a deletion cascade walks: the containing
+             * Space read as its one edited working Space (the definite
+             * participant, ADR 0097); every other Space read as **stored** —
+             * the coordination's one aggregate read, never a live session's
+             * working Space.
+             *
+             * A Space's own uncommitted local Edit is not yet what the
+             * repository will judge this commit against (`decideCommit`, over
+             * `stored` and only the participants' changes), so counting it here
+             * would decide the cascade against a candidate this Edit does not
+             * actually produce. Reading stored is what keeps the two judges
+             * agreeing: a reference-removing Edit that is `failed` and
+             * uncommitted still leaves the reference in storage, so a sibling
+             * delete correctly finds one remaining reference and does not
+             * cascade through it; a reference-*adding* Edit that has not yet
+             * committed is, by the same reading, not yet a reference either, so
+             * it does not save a target this Edit's own commit would otherwise
+             * leave unreferenced — `decideCommit`'s own
+             * `ordinary-space-unreferenced` check would refuse that outcome
+             * regardless of what this cascade decided.
+             */
+            const spaceThingEdges = (snapshot: SpaceSnapshot): ReadonlyMap<UUID, UUID> => {
+              const edges = new Map<UUID, UUID>();
               for (const candidate of snapshot.things) {
                 if (candidate.document.kind === 'space')
-                  inbound.set(
-                    candidate.document.spaceId,
-                    (inbound.get(candidate.document.spaceId) ?? 0) + 1,
-                  );
+                  edges.set(candidate.id, candidate.document.spaceId);
               }
+              return edges;
+            };
+            const edgesById = new Map<UUID, ReadonlyMap<UUID, UUID>>(
+              aggregate.spaces.map(({ snapshot }) => [snapshot.id, spaceThingEdges(snapshot)]),
+            );
+            edgesById.set(input.containingSpaceId, spaceThingEdges(deletion.snapshot));
+            const inbound = new Map<UUID, number>();
+            for (const id of edgesById.keys()) inbound.set(id, 0);
+            for (const edges of edgesById.values())
+              for (const targetSpaceId of edges.values())
+                inbound.set(targetSpaceId, (inbound.get(targetSpaceId) ?? 0) + 1);
             const deleted: UUID[] = [];
             const pending: UUID[] =
               thing.document.spaceId === aggregate.metaSpaceId ||
@@ -1405,21 +1596,37 @@ export function createSpaceSessionRegistry(
                 : [thing.document.spaceId];
             for (const id of pending) {
               if (deleted.includes(id)) continue;
-              const snapshot = snapshots.get(id);
-              if (snapshot === undefined) continue;
+              const edges = edgesById.get(id);
+              if (edges === undefined) continue;
               deleted.push(id);
-              for (const child of snapshot.things)
-                if (child.document.kind === 'space') {
-                  const count = (inbound.get(child.document.spaceId) ?? 0) - 1;
-                  inbound.set(child.document.spaceId, count);
-                  if (child.document.spaceId !== aggregate.metaSpaceId && count === 0)
-                    pending.push(child.document.spaceId);
-                }
+              for (const childSpaceId of edges.values()) {
+                const count = (inbound.get(childSpaceId) ?? 0) - 1;
+                inbound.set(childSpaceId, count);
+                if (childSpaceId !== aggregate.metaSpaceId && count === 0)
+                  pending.push(childSpaceId);
+              }
             }
             for (const id of deleted) {
               const recovery = recoveryRefusal(id);
               if (recovery !== undefined) return recovery;
             }
+            // The one recovery rule (ADR 0099), shared with `deleteContext`:
+            // a non-participant session that needs recovery blocks the
+            // deletion when either its stored snapshot or its working Space
+            // still references a Space this cascade would delete — its own
+            // eventual retry or conflict resolution resubmits one of the
+            // two, and deleting the target out from under it would strand
+            // that attempt with a dangling reference forever.
+            const deletedIds = new Set(deleted);
+            const recoveryBlock = recoveryBlockedBy(
+              aggregate,
+              new Set([input.containingSpaceId, ...deleted]),
+              (snapshot) =>
+                [...spaceThingEdges(snapshot).values()].some((targetId) =>
+                  deletedIds.has(targetId),
+                ),
+            );
+            if (recoveryBlock !== undefined) return recoveryBlock;
             // A live session for every cascade target, so the participants
             // step right after `plan` returns finds one instead of throwing
             // `has no live session`.

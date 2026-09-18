@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { createSpaceSessionRegistry } from '../src/session-registry';
@@ -40,6 +40,9 @@ const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const OTHER_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const OTHER_REFERENCE = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const SIBLING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
+const SIBLING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
+const SIBLING_LINK_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000015');
 
 const loaded = {
   snapshot: {
@@ -607,6 +610,249 @@ describe('Space session registry', () => {
     // whether *it* held up the deletion — must not linger: nothing here ever
     // needed it once a later participant already refused.
     expect(registry.session(META_ID)).toBeUndefined();
+  });
+
+  // The "add" direction of the one recovery rule (ADR 0099): Sibling's
+  // selection of the doomed Graph exists only in its own uncommitted,
+  // `failed` working Space — never reflected in storage, because the Edit
+  // that added it is exactly what failed. Deleting the Graph anyway would
+  // relocate every *stored* reference and leave Sibling's own eventual
+  // retry pointing at a Graph that no longer exists, refused forever.
+  it('refuses to delete a Graph a failed sibling selects only in its working Space', async () => {
+    const source = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        things: [
+          {
+            id: THING_ID,
+            document: {
+              title: 'Target',
+              kind: 'space' as const,
+              spaceId: TARGET_ID,
+              diagram: FIRST_DIAGRAM,
+              graph: FIRST_GRAPH,
+            },
+          },
+        ],
+      },
+    };
+    const target = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        id: TARGET_ID,
+        things: [],
+        document: {
+          version: 1 as const,
+          title: 'Target',
+          defaultDiagram: FIRST_DIAGRAM,
+          diagrams: [
+            {
+              id: FIRST_DIAGRAM,
+              title: 'First',
+              kind: 'positioned' as const,
+              positions: {},
+              activeGraph: FIRST_GRAPH,
+              graphs: [
+                { id: FIRST_GRAPH, title: 'First', edges: [] },
+                { id: SECOND_GRAPH, title: 'Second', edges: [] },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const sibling = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        id: SIBLING_ID,
+        things: [
+          {
+            id: SIBLING_THING_ID,
+            document: { title: 'Sibling', kind: 'markdown' as const, body: '' },
+          },
+        ],
+        document: { version: 1 as const, title: 'Sibling' },
+      },
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(SPACE_ID, [source, target, sibling], control);
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open(source);
+    registry.open(target);
+    const siblingSession = registry.open(sibling);
+
+    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    siblingSession.submit({
+      ...sibling.snapshot,
+      things: [
+        ...sibling.snapshot.things,
+        {
+          id: SIBLING_LINK_ID,
+          document: {
+            title: 'Target',
+            kind: 'space' as const,
+            spaceId: TARGET_ID,
+            diagram: FIRST_DIAGRAM,
+            graph: FIRST_GRAPH,
+          },
+        },
+      ],
+    });
+    await vi.waitFor(() => expect(siblingSession.getState().persistence.kind).toBe('failed'));
+    const requestsBefore = control.requests.length;
+
+    const result = await registry
+      .spaceThings(() => THING_ID)
+      .deleteGraph({
+        targetSpaceId: TARGET_ID,
+        diagramId: FIRST_DIAGRAM,
+        graphId: FIRST_GRAPH,
+        preferredGraphId: SECOND_GRAPH,
+      });
+
+    expect(result).toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', spaceId: SIBLING_ID, recovery: 'retry' },
+    });
+    // Refused, not relocated: Target's Graph is untouched, and nothing
+    // committed for this Edit.
+    expect(
+      (await backend.loadSpace(TARGET_ID))?.snapshot.document.diagrams?.[0]?.graphs,
+    ).toHaveLength(2);
+    expect(control.requests).toHaveLength(requestsBefore);
+  });
+
+  // The "remove" direction of the same rule: Sibling's *stored* snapshot
+  // selects the doomed Graph (a real, previously committed selection), and
+  // Sibling's own edit moving it away failed transiently, so its working
+  // Space no longer selects it — but storage still does, and that alone is
+  // enough to refuse, naming Sibling, before anything is relocated.
+  it('refuses to delete a Graph a failed sibling still selects in storage', async () => {
+    const source = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        things: [
+          {
+            id: THING_ID,
+            document: {
+              title: 'Target',
+              kind: 'space' as const,
+              spaceId: TARGET_ID,
+              diagram: FIRST_DIAGRAM,
+              graph: FIRST_GRAPH,
+            },
+          },
+        ],
+      },
+    };
+    const target = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        id: TARGET_ID,
+        things: [],
+        document: {
+          version: 1 as const,
+          title: 'Target',
+          defaultDiagram: FIRST_DIAGRAM,
+          diagrams: [
+            {
+              id: FIRST_DIAGRAM,
+              title: 'First',
+              kind: 'positioned' as const,
+              positions: {},
+              activeGraph: FIRST_GRAPH,
+              graphs: [
+                { id: FIRST_GRAPH, title: 'First', edges: [] },
+                { id: SECOND_GRAPH, title: 'Second', edges: [] },
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const sibling = {
+      ...loaded,
+      snapshot: {
+        ...loaded.snapshot,
+        id: SIBLING_ID,
+        things: [
+          {
+            id: SIBLING_THING_ID,
+            document: { title: 'Sibling', kind: 'markdown' as const, body: '' },
+          },
+          {
+            id: SIBLING_LINK_ID,
+            document: {
+              title: 'Target',
+              kind: 'space' as const,
+              spaceId: TARGET_ID,
+              diagram: FIRST_DIAGRAM,
+              graph: FIRST_GRAPH,
+            },
+          },
+        ],
+        document: { version: 1 as const, title: 'Sibling' },
+      },
+    };
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(SPACE_ID, [source, target, sibling], control);
+    const registry = createSpaceSessionRegistry(backend);
+    registry.open(source);
+    registry.open(target);
+    const siblingSession = registry.open(sibling);
+
+    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    // Sibling's own edit moves its Space Thing away from the Graph this
+    // Edit is about to delete, but the commit fails transiently: storage
+    // still selects the doomed Graph, even though Sibling's working no
+    // longer does.
+    siblingSession.submit({
+      ...sibling.snapshot,
+      things: [
+        {
+          id: SIBLING_THING_ID,
+          document: { title: 'Sibling', kind: 'markdown' as const, body: '' },
+        },
+        {
+          id: SIBLING_LINK_ID,
+          document: {
+            title: 'Target',
+            kind: 'space' as const,
+            spaceId: TARGET_ID,
+            diagram: FIRST_DIAGRAM,
+            graph: SECOND_GRAPH,
+          },
+        },
+      ],
+    });
+    await vi.waitFor(() => expect(siblingSession.getState().persistence.kind).toBe('failed'));
+    const requestsBefore = control.requests.length;
+
+    const result = await registry
+      .spaceThings(() => THING_ID)
+      .deleteGraph({
+        targetSpaceId: TARGET_ID,
+        diagramId: FIRST_DIAGRAM,
+        graphId: FIRST_GRAPH,
+        preferredGraphId: SECOND_GRAPH,
+      });
+
+    expect(result).toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', spaceId: SIBLING_ID, recovery: 'retry' },
+    });
+    // Refused, not relocated: Target's Graph is untouched, and nothing
+    // committed for this Edit. No new session was opened for Sibling
+    // either, since it already had one.
+    expect(
+      (await backend.loadSpace(TARGET_ID))?.snapshot.document.diagrams?.[0]?.graphs,
+    ).toHaveLength(2);
+    expect(control.requests).toHaveLength(requestsBefore);
   });
 
   it('owns one live session for each Space id', () => {
