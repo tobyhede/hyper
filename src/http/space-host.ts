@@ -138,14 +138,16 @@ export const createSpaceHost = (
         // carries and no retry cures, so it is a 500. Anything else is the
         // database being unreachable, which is temporary, and 503 says so.
         //
-        // `GET /api/aggregate` answers 503 for the unreachable arm too, and the
-        // two halves agree there and only there: that handler answers 503 for
-        // *every* throw out of `loadAggregate`, an invariant violation included,
-        // because it classifies nothing (`packages/http/src/index.ts`). So it is
-        // not the precedent for this branch — it is the half that still cannot
-        // say a stored aggregate is broken, and fixing it is not this ticket's.
-        // The identity it would need is now on the shared seam and reachable
-        // from there, which is the half of it this ticket could settle.
+        // `GET /api/aggregate` (`packages/http/src/index.ts`) now does the same
+        // thing on the same rule, independently, because `@project/http` cannot
+        // import this module: it re-reads once on an invariant failure — the
+        // package boundary means it re-implements `readAggregate` above rather
+        // than sharing it — answers 200 if the retry succeeds, and otherwise
+        // classifies whichever error it is left with exactly as this branch
+        // does. `space-http-app.test.ts`'s "re-reads once on an invariant
+        // failure and answers 200 when the retry succeeds" and the two
+        // `internal-error`/`persistence-unavailable` aggregate cases beside it
+        // hold that half; this branch is held by `vite-hono-host.test.ts`.
         return isAggregateInvariant(error)
           ? problem('internal-error', 'Stored repository state is not usable.', accept)
           : problem('persistence-unavailable', 'Try the request again later.', accept);
