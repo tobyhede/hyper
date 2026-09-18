@@ -4,7 +4,7 @@ Status: open
 Tags: Defect
 Blocked by: None — can start immediately.
 
-Surfaced by: tightening a bare `rejects.toThrow()` while landing ticket 26's truncation fix (18 September 2026). The assertion was hiding it.
+Surfaced by: tightening a bare `rejects.toThrow()` while landing the SQLite truncation fix under ticket 17 and ADR 0094 (18 September 2026). The assertion was hiding it.
 
 ## The defect
 
