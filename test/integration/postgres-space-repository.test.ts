@@ -253,6 +253,35 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
   });
 
+  // PostgreSQL's `document` column is `jsonb`, so it refuses text that is not
+  // JSON before it is ever stored — unlike SQLite's TEXT column, which stores
+  // anything (`sqlite-space-repository.test.ts`'s "truncates a stored Space
+  // whose document is not JSON"). This is what ticket 27's Decided section
+  // means by PostgreSQL keeping this case out of reach: the database itself is
+  // the guard, not `loadEverySpace`. `db.sql` (the low-level row builder) is
+  // used rather than `orm.public.Space`, because the ORM would JSON-encode a
+  // JS string into a valid JSON *string value* rather than writing raw text —
+  // and `update` rather than `insert`, because only `update`'s
+  // expression-callback overload can carry a raw column override; `insert`
+  // accepts only plain typed values.
+  it('refuses a write of text that is not JSON into spaces.document', async () => {
+    createdSpaceIds.add(OTHER_SPACE_ID);
+    await db.transaction(async ({ orm }) => {
+      await orm.public.Space.create({
+        id: OTHER_SPACE_ID,
+        document: { version: 1, title: 'Corruptible' },
+        revision: 0,
+      });
+    });
+
+    const corrupt = db.sql.public.spaces
+      .update(() => ({ document: db.raw`'not json'`.returns('pg/jsonb@1') }))
+      .where((fields, fns) => fns.eq(fields.id, OTHER_SPACE_ID))
+      .build();
+
+    await expect(db.runtime().execute(corrupt)).rejects.toThrow();
+  });
+
   /*
    * Replacement truncates stored state whether or not it is an aggregate
    * (ADR 0094), still authorized by the Meta identity it read. Each state is
