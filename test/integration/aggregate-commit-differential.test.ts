@@ -14,6 +14,14 @@ import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-re
 import { db } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
 
+/*
+ * Memory and PostgreSQL run the same commit decision, `decideCommit` in
+ * `@project/persistence` (ADR 0095), so this no longer proves two sets of rules
+ * agree. It proves storage agrees: that what each reads, in what order, and
+ * what each writes and answers around that one decision come out the same over
+ * generated aggregates.
+ */
+
 const scenarios = [
   'topology-preserving-update',
   'create-ordinary-space',

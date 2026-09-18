@@ -1,4 +1,7 @@
 export * from './backend';
+/* The rules a commit is judged by, decided once for every implementation
+ * (ADR 0095). The rest of the module is private to it. */
+export { commitIdentityRefusal, committedRevision, decideCommit } from './commit-decision';
 /* The wire contract's two ends live in different processes. These are the
  * codecs the portable HTTP package reads the wire through; the legacy Node host
  * that used to share them is gone. `CANONICAL_DECIMAL` belongs with them because

@@ -75,6 +75,8 @@ under `superseded/`.
 | [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate that CLI hard reset restores. |
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 | [0094](0094-dangerous-truncate-replaces-whatever-is-stored.md) | `--dangerous-truncate` replaces whatever is stored, valid or not, still authorized by the Meta identity it read. |
+| [0095](0095-sql-databases-share-one-space-repository.md) | PostgreSQL and SQLite share one Space repository and differ only through a small `SqlStore`; revisions are decimal TEXT on both. |
+| [0096](0096-the-aggregate-lifecycle-decision-stays-inside-each-repository.md) | Initialization and replacement decide their outcome inside each repository; there is no pure lifecycle decision beside `decideCommit`. |
 | [0088](0088-aggregate-names-the-meta-rooted-collection.md) | Aggregate names the complete Meta-rooted collection of Spaces. One Space plus its Things is a snapshot. |
 
 ## HTTP

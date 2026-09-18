@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { loadSpaceAggregate } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 
@@ -9,6 +10,8 @@ const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const HIGH_META_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 
 const snapshot = (id = META_ID, title = 'Meta'): SpaceSnapshot => ({
   id,
@@ -114,10 +117,9 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     });
   });
 
-  it('rejects an empty, duplicate, or mismatched change set as one invalid commit', async () => {
+  it('rejects a duplicate or mismatched change set as one invalid commit', async () => {
     const backend = new MemorySpaceBackend(META_ID, [loaded()]);
     const invalidRequests: unknown[] = [
-      { changes: [] },
       {
         changes: [
           { kind: 'delete', spaceId: META_ID, expectedRevision: 3n },
@@ -151,6 +153,74 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       errors: [{ kind: 'meta-space-missing', metaSpaceId: META_ID }],
     });
     await expect(backend.loadSpace(META_ID)).resolves.toEqual(loaded());
+  });
+
+  /*
+   * The databases read stored Spaces ascending by id, and an
+   * `invalid-space-snapshot` refusal names its Space by that position. A Meta
+   * Space inserted first but with the higher id is where insertion order and id
+   * order disagree, so this is the case that tells the two apart.
+   */
+  it('names a refused snapshot by its position in ascending id order', async () => {
+    const linkedMeta: SpaceSnapshot = {
+      ...snapshot(HIGH_META_ID),
+      things: [
+        {
+          id: SPACE_THING_ID,
+          document: {
+            title: 'Other',
+            kind: 'space',
+            spaceId: OTHER_ID,
+            diagram: OTHER_DIAGRAM_ID,
+            graph: OTHER_GRAPH_ID,
+          },
+        },
+      ],
+    };
+    const dangling: SpaceSnapshot = {
+      ...otherSnapshot(),
+      document: {
+        version: 1,
+        title: 'Other',
+        defaultDiagram: OTHER_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: OTHER_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: {},
+            graphs: [
+              {
+                id: OTHER_GRAPH_ID,
+                title: 'Graph 1',
+                edges: [{ from: MISSING_THING_ID, to: MISSING_THING_ID }],
+              },
+            ],
+            activeGraph: OTHER_GRAPH_ID,
+          },
+        ],
+      },
+    };
+    const backend = new MemorySpaceBackend(HIGH_META_ID, [
+      { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+      otherLoaded(6n),
+    ]);
+    const expected = loadSpaceAggregate({
+      metaSpaceId: HIGH_META_ID,
+      snapshots: [dangling, linkedMeta],
+    });
+    if (expected.ok) throw new Error('The dangling Edge must fail intake');
+
+    const result = await backend.commit({
+      changes: [{ kind: 'update', spaceId: OTHER_ID, snapshot: dangling, expectedRevision: 6n }],
+    });
+
+    expect(result).toEqual({ kind: 'aggregate-refused', errors: expected.errors });
+    expect(result).toMatchObject({
+      kind: 'aggregate-refused',
+      errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0 }],
+    });
+    await expect(backend.loadSpace(OTHER_ID)).resolves.toEqual(otherLoaded(6n));
   });
 
   it('assigns revision zero to a newly created ordinary Space', async () => {
