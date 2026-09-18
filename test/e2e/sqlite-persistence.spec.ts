@@ -63,6 +63,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
   let secondContext: BrowserContext | undefined;
   let exportDirectory: string | undefined;
   let spaceRemains: boolean | undefined;
+  let seeded = false;
 
   try {
     // Seeded through a connection of its own, closed before either host opens
@@ -116,6 +117,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
       if (initialized.kind !== 'initialized') {
         throw new Error(`The fixture aggregate was not established: ${initialized.kind}`);
       }
+      seeded = true;
     } finally {
       await seedDatabase.close();
     }
@@ -189,13 +191,6 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
         revision: 1n,
         exportedRevision: 1n,
       });
-
-      // Clean up the Space and Thing this proof minted, as the PostgreSQL
-      // proof does — so a rerun against the same `SQLITE_PATH` (a developer
-      // iterating without re-migrating) meets an empty file rather than an
-      // already-initialized one.
-      await clearSqliteContent(exportDatabase);
-      spaceRemains = (await exportRepository.loadSpace(spaceId)) !== undefined;
     } finally {
       await exportDatabase.close();
     }
@@ -206,6 +201,21 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     await firstHost?.close();
     if (exportDirectory !== undefined) {
       await rm(exportDirectory, { recursive: true, force: true });
+    }
+    // Clean up the Space and Thing this proof minted, as the PostgreSQL proof
+    // does — so a rerun against the same `SQLITE_PATH` (a developer iterating
+    // without re-migrating) meets an empty file rather than an
+    // already-initialized one. Here, after every host and connection above has
+    // closed, so a failed durability or export step still cleans up.
+    if (seeded) {
+      const cleanupDatabase = createSqliteDatabase(path);
+      try {
+        await clearSqliteContent(cleanupDatabase);
+        spaceRemains =
+          (await new SqliteSpaceRepository(cleanupDatabase).loadSpace(spaceId)) !== undefined;
+      } finally {
+        await cleanupDatabase.close();
+      }
     }
   }
 
