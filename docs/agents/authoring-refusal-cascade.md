@@ -26,14 +26,13 @@ truth for it — update it in the same commit as any change to
 `deriveCompletedEdit`'s cascade, or delete the stale row rather than leave it
 disagreeing with the function.
 
-## Universal guards
+## Universal guard
 
-Every action asks the applicable guards before its own checks:
+Every action but the three below asks this guard before its own checks:
 
-1. Placement reported? → `placement-pending`
-2. Does the selected Diagram still exist? → `diagram-not-found`
+1. Does the selected Diagram still exist? → `diagram-not-found`
 
-Three actions are derived **above** the placement gate and so ask neither:
+Three actions are derived **above** it and so ask nothing universal:
 `created-diagram`, `deleted-diagram` and `renamed-space` write keys of
 `document` rather than anything inside a Diagram, read the working snapshot
 direct, and answer their own placement. The last two still resolve a Diagram —
@@ -124,9 +123,9 @@ Edit that holds no Diagram say it needed one.
 | --- | --- |
 | `settled-thing-movement` | none → completed |
 
-## The 25 codes
+## The 24 codes
 
-2 contextual (`placement-pending`, `diagram-not-found`) plus 23 action-specific —
+1 contextual (`diagram-not-found`) plus 23 action-specific —
 none is produced anywhere else. 22 of those 23 are tabulated above;
 `diagram-required` is declared and presented but currently raised nowhere, so it
 appears in no row.
