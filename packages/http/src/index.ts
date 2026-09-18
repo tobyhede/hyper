@@ -9,6 +9,7 @@ import {
   encodeProblemDetails,
   encodeLoadedSpace,
   createWorkingSpaceLoader,
+  isAggregateInvariant,
   problemCatalogue,
   type HyperProblemCode,
   type ProblemError,
@@ -411,6 +412,14 @@ export const createSpaceHttpApp = (
         return context.json(encodeLoadedAggregate(await repository.loadAggregate()), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to load the Space aggregate', error);
+        // Ticket 27: broken stored state and an unreachable database are told
+        // apart by type (`isAggregateInvariant`, which walks the cause chain
+        // the driver wraps a failed rollback in), the way `src/http/space-host.ts`
+        // already does for `GET /`. An invariant failure is a permanent defect
+        // no retry cures; everything else is temporary.
+        if (isAggregateInvariant(error)) {
+          return problem(context, 'internal-error', 'Stored repository state is not usable.');
+        }
         return problem(context, 'persistence-unavailable', 'Try the request again later.');
       }
     })

@@ -1,5 +1,6 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import {
+  AggregateInvariantError,
   decodeProblemDetails,
   encodeCommitRequest,
   problemCatalogue,
@@ -443,6 +444,36 @@ describe('Space HTTP reads', () => {
 
     await expectProblem(response, 'persistence-unavailable');
     expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', failure);
+  });
+
+  // Ticket 27: broken stored state and an unreachable database are told apart
+  // by type (`isAggregateInvariant`, which walks the cause chain), the way
+  // `src/http/space-host.ts` already does for `GET /` — an invariant failure
+  // is a permanent defect no retry cures (500), everything else is temporary
+  // (503). The second case is carried only on `cause`, because the driver
+  // does not always rethrow what a transaction callback threw.
+  it.each([
+    { failure: 'a direct invariant failure', error: new AggregateInvariantError('broken') },
+    {
+      failure: 'an invariant failure carried only on cause',
+      error: new Error('transaction rollback failed', {
+        cause: new AggregateInvariantError('broken'),
+      }),
+    },
+  ])('answers 500 internal-error for $failure', async ({ error }) => {
+    const response = await createSpaceHttpApp(
+      repository({ loadAggregate: () => Promise.reject(error) }),
+    ).request('/api/aggregate');
+
+    await expectProblem(response, 'internal-error');
+  });
+
+  it('answers 503 persistence-unavailable for an aggregate failure that is not an invariant', async () => {
+    const response = await createSpaceHttpApp(
+      repository({ loadAggregate: () => Promise.reject(new Error('connect ECONNREFUSED')) }),
+    ).request('/api/aggregate');
+
+    await expectProblem(response, 'persistence-unavailable');
   });
 
   it('hides and logs collection and lazy-resource repository failures', async () => {
