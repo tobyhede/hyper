@@ -43,4 +43,6 @@ The control shows the check can fail. It is a one-off verification, not a commit
 
 Review finding, fixed. The score steps pipe into `tee`, and a step with no `shell:` runs as `bash -e`, which has no `pipefail`. A crashed scorer (a failed `pipx` fetch, an unreadable baseline) would have left the step green with an empty report. Both score steps now declare `shell: bash`, which GitHub runs with `-o pipefail`. Control, run locally: `{ echo x; false; } | tee` exits 0 under `bash -e` and 1 under `bash -eo pipefail`. The dry run above set `pipefail` by hand, so its exit codes stand.
 
-Remaining: the real PR run. It needs this branch pushed and a PR opened, which is outward-facing and waits for the author.
+First real run: PR #231, https://github.com/tobyhede/hyper/actions/runs/35303231917. Green. Both score steps ran under `bash --noprofile --norc -e -o pipefail`, and each wrote its labelled heading to the summary followed by `**impact-gate:** no source changes to score.` That is correct: the PR changes only YAML and Markdown, which ImpactGate does not score.
+
+Remaining: a run on a PR that changes source, to show both reports with content. The workflow runs only where it exists, so that is the first source-changing PR opened or updated after this merges.

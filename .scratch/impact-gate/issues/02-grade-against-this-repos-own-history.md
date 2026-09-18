@@ -18,7 +18,7 @@ Choose on measured cost, and record the measurement and method in this ticket, n
 - [x] Both reports grade against a project baseline, and the report says so (not "seed only").
 - [x] The without-tests grade uses a baseline built with the same measure config as its score.
 - [x] The baseline decision and its measured cost are recorded in this ticket.
-- [ ] If rebuilt in CI, the job stays within its timeout with margin, and the measured time is recorded.
+- [x] If rebuilt in CI, the job stays within its timeout with margin, and the measured time is recorded.
 - [x] If committed, the file's refresh trigger is automated or named, and a stale baseline cannot fail a PR. (Not committed; see the Answer.)
 - [x] Enforcement stays `warn`.
 
@@ -33,7 +33,7 @@ Why not rebuild on every PR: measured locally on an Apple M2 (8 cores) with `imp
 | with tests | 399 | 78.2s |
 | without tests | 362 | 32.7s |
 
-That is 111s together. At the 2.8x laptop-to-CI ratio `ci.yml` records for `verify`, it is roughly 5 minutes per PR, grows with history, and buys nothing a baseline a few merges old does not also give. A baseline is a sample of the per-change distribution, and a few new observations barely move its percentiles.
+That is 111s together, and 141s measured on CI (below). Paid on every PR, it grows with history, and buys nothing a baseline a few merges old does not also give. A baseline is a sample of the per-change distribution, and a few new observations barely move its percentiles.
 
 Why not commit it: it is generated state that disagrees with `main` from the next merge, which the repo rules out (ADR 0054, ADR 0056), and it would need a bot or a human to refresh it.
 
@@ -50,7 +50,9 @@ The grade now separates the two branches. On the seed alone both were p99.5.
 
 Checked locally: `baseline --base-ref` accepts both a commit SHA (the push path) and `origin/main` (the PR fallback path).
 
-Remaining: the CI wall time of the baseline build and of a cache-hit PR run, from the first real runs. The job's `timeout-minutes` is 20, against an estimated 5-minute build.
+CI measurement, from PR #231's run (https://github.com/tobyhede/hyper/actions/runs/35303231917), which found no cache and built its own pair: the Build baselines step ran 141s (03:26:54Z to 03:29:15Z) on `ubuntu-latest` and wrote 399 and 362 observations, matching the local run. The job took 2m25s end to end, against a `timeout-minutes` of 20. The 2.8x ratio borrowed from `verify` overstated this; the walk ran about 1.3x the laptop time. So a PR that misses the cache pays about two and a half minutes, not five.
+
+Remaining: a push to `main` saving the pair, and a PR run restoring it. Both happen only after this merges.
 
 Known limits, not addressed here:
 
