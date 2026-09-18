@@ -81,9 +81,11 @@ describe('graph viewport', () => {
   it('keeps a finite scale when accepted remote placement replaces live nodes', async () => {
     const local = snapshot('Local space', 'Local thing', 10, 20);
     const remote = snapshot('Remote space', 'Remote thing', 900, 700);
-    const backend = new MemorySpaceBackend([
-      { snapshot: remote, revision: 4n, exportedRevision: null },
-    ]);
+    const backend = MemorySpaceBackend.asMeta({
+      snapshot: remote,
+      revision: 4n,
+      exportedRevision: null,
+    });
     const { spaceSession: session, spaceThings } = openTestSpace(backend, {
       snapshot: local,
       revision: 3n,

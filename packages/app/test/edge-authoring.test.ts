@@ -96,7 +96,7 @@ function open(
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring } = composeApp({
     spaceSession: session,
     selection: diagramId,
@@ -345,9 +345,11 @@ describe('draft invalidation', () => {
       document: { ...positionedSnapshot.document, title: 'Stored' },
     };
     const loaded = { snapshot: positionedSnapshot, revision: 0n, exportedRevision: null };
-    const backend = new MemorySpaceBackend([
-      { snapshot: stored, revision: 1n, exportedRevision: null },
-    ]);
+    const backend = MemorySpaceBackend.asMeta({
+      snapshot: stored,
+      revision: 1n,
+      exportedRevision: null,
+    });
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
       spaceSession: session,

@@ -50,7 +50,7 @@ const snapshot: SpaceSnapshot = {
 
 const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const opened = openTestSpace(new MemorySpaceBackend([loaded]), loaded);
+  const opened = openTestSpace(MemorySpaceBackend.asMeta(loaded), loaded);
   return {
     id: SPACE_ID,
     session: opened.spaceSession,

@@ -116,9 +116,9 @@ function sessionBackedAdapter(
   newId?: () => UUID,
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const backend = new MemorySpaceBackend([
+  const backend = MemorySpaceBackend.asMeta(
     stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
-  ]);
+  );
   const session = openSpaceSession(backend, loaded);
   const { authoring, adapter } = composeApp({ spaceSession: session, selection: diagramId, newId });
   return { session, authoring, store: adapter };

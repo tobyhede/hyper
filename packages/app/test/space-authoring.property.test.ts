@@ -190,7 +190,7 @@ it('keeps an existing Reference Thing Target immutable while accepting Title edi
           ),
         };
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
-        const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+        const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { authoring } = composeApp({ spaceSession: session, selection: OTHER_DIAGRAM_ID });
 
         expect(
@@ -231,7 +231,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
       fc.constantFrom<DiagramId>(DIAGRAM_ID, OTHER_DIAGRAM_ID, DIAGRAM_ID),
       (operations, diagramId) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
-        const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+        const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
           spaceSession: session,
           selection: diagramId,

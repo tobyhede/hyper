@@ -47,7 +47,7 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
-  const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
+  const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: SPACE_ID,

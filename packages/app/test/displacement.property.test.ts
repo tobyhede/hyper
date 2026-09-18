@@ -188,7 +188,7 @@ const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
 const openAuthoring = (entries: readonly GeneratedEntry[]) => {
   const snapshot = snapshotOf(entries);
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { authoring } = composeApp({ spaceSession: session, selection: DIAGRAM_ID });
   return { session, authoring };
 };

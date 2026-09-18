@@ -108,7 +108,7 @@ function ThingsPopoverFixture({
 function RefusedAdd() {
   const session = useMemo(() => {
     const stored = { snapshot: sparseAuthoredSnapshot, revision: 0n, exportedRevision: null };
-    return openSpaceSession(new MemorySpaceBackend([stored]), stored);
+    return openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
   }, []);
   const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
   useSyncExternalStore(session.subscribe, session.getState);

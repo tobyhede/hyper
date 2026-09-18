@@ -49,7 +49,7 @@ const snapshot: SpaceSnapshot = {
 
 function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const backend = new MemorySpaceBackend([{ snapshot: stored, revision, exportedRevision: null }]);
+  const backend = MemorySpaceBackend.asMeta({ snapshot: stored, revision, exportedRevision: null });
   const session = openSpaceSession(backend, loaded);
   const { authoring, navigation, continuation } = composeApp({
     spaceSession: session,

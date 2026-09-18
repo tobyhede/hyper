@@ -73,7 +73,7 @@ const refuseFirstGraphDelete = (spaceThings: SpaceThingAuthoring): SpaceThingAut
 function mount(): SpaceSession {
   const stored = { snapshot: twoGraphs, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceThings } = openTestSpace(
-    new MemorySpaceBackend([stored]),
+    MemorySpaceBackend.asMeta(stored),
     stored,
   );
   const wrapped = refuseFirstGraphDelete(spaceThings);

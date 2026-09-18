@@ -34,7 +34,7 @@ const snapshot: SpaceSnapshot = {
 
 function open(): ComposedApp['continuation'] {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const backend = new MemorySpaceBackend([loaded]);
+  const backend = MemorySpaceBackend.asMeta(loaded);
   const session = openSpaceSession(backend, loaded);
   return composeApp({ spaceSession: session, selection: DIAGRAM_ID }).continuation;
 }

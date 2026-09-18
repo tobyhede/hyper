@@ -107,7 +107,7 @@ function open(
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring } = composeApp({
     spaceSession: session,
     selection: diagramId,
@@ -1089,7 +1089,7 @@ describe('Rename Space', () => {
    */
   it('survives a commit and a reload', async () => {
     const loaded = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
       spaceSession: session,
@@ -1854,9 +1854,11 @@ describe('Keep local', () => {
       ...positionedSnapshot,
       document: { ...positionedSnapshot.document, title: 'Stored' },
     };
-    const backend = new MemorySpaceBackend([
-      { snapshot: remote, revision: 4n, exportedRevision: null },
-    ]);
+    const backend = MemorySpaceBackend.asMeta({
+      snapshot: remote,
+      revision: 4n,
+      exportedRevision: null,
+    });
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
     const { authoring } = composeApp({ spaceSession: session, selection: DIAGRAM_ID });
