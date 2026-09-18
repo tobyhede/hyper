@@ -152,6 +152,7 @@ async function drawLeaning(tilt: EmbeddedTilt) {
 const CENTRE: EmbeddedTilt = {
   center: { x: 1300, y: 1400 },
   parentAbsolute: { x: 800, y: 900 },
+  parentDrawn: { x: 800, y: 900 },
 };
 
 describe('an embedded production projection', () => {

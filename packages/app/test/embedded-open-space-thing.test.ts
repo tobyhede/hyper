@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Thing } from '@project/core';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { DRAG_TILT_RADIANS, tiltThingPosition } from '../src/drag-tilt';
+import { embeddedDiagram } from '../src/embedded-diagram';
 import {
   discoverEmbeddedOpenSpaceThings,
   embedBounds,
@@ -181,6 +182,7 @@ describe('embedded open Space Thing discovery', () => {
       { x: 450, y: 450 },
       { x: 450, y: 450 },
     ]);
+    expect(requests[0]?.drawnAbsolute).toEqual(requests[0]?.absolute);
   });
 
   it('builds a nested window from the authored origin when the publication has already leaned', () => {
@@ -221,6 +223,101 @@ describe('embedded open Space Thing discovery', () => {
       right: 384,
       bottom: 196,
     });
+  });
+
+  it('places Things inside a nested window relative to where that window is drawn', () => {
+    const parent = openSpaceThing(HOST, { spaceId: TARGET, diagram: DIAGRAM });
+    const authored = { x: 50, y: 60 };
+    const size = { width: 400, height: 300 };
+    const hostTilt = {
+      center: { x: 450, y: 450 },
+      parentAbsolute: { x: 100, y: 200 },
+    };
+    const nestedLeaned = lean(authored, size, hostTilt);
+    const nested = openSpaceThing(
+      NESTED,
+      { spaceId: TARGET, diagram: OTHER_DIAGRAM },
+      {
+        position: nestedLeaned,
+        width: size.width,
+        height: size.height,
+      },
+    );
+    const requests = discoverEmbeddedOpenSpaceThings({
+      nodes: [parent],
+      entries: [{ id: TARGET }],
+      publications: new Map([
+        [
+          HOST,
+          {
+            diagramId: DIAGRAM,
+            nodes: [{ ...nested, data: { ...nested.data, dragTilted: true } }],
+          },
+        ],
+      ]),
+      bodyHeights: new Map(),
+      draggingIds: new Set<string>([HOST]),
+    });
+    const nestedRequest = requests[1];
+    const tiltCenter = nestedRequest?.tiltCenter;
+    if (nestedRequest === undefined || tiltCenter === undefined) {
+      throw new Error('Expected a nested embedding under the dragged Thing');
+    }
+    expect(nestedRequest.absolute).toEqual({ x: 150, y: 260 });
+    const nestedDrawn = { x: 100 + nestedLeaned.x, y: 200 + nestedLeaned.y };
+    expect(nestedRequest.drawnAbsolute.x).toBeCloseTo(nestedDrawn.x, 9);
+    expect(nestedRequest.drawnAbsolute.y).toBeCloseTo(nestedDrawn.y, 9);
+
+    const innerAuthored = { x: 20, y: 30 };
+    const innerSize = { width: 260, height: 146 };
+    const inner: ThingFlowNode = {
+      id: CHILD_THING,
+      type: 'thing',
+      position: innerAuthored,
+      width: innerSize.width,
+      height: innerSize.height,
+      data: {
+        thingId: CHILD_THING,
+        title: 'Note',
+        readOnly: false,
+        kind: 'markdown',
+        expanded: false,
+        active: false,
+        selectedForAuthoring: false,
+        showContent: false,
+        activeGraphId: null,
+        activeGraphColor: '#8a94a6',
+        emphasis: 'equal',
+      },
+    };
+    const drawn = embeddedDiagram({
+      parent: { id: NESTED, width: size.width, height: size.height },
+      projection: { nodes: [inner], edges: [] },
+      offset: { x: 0, y: 0 },
+      enabled: false,
+      tilt: {
+        center: tiltCenter,
+        parentAbsolute: nestedRequest.absolute,
+        parentDrawn: nestedRequest.drawnAbsolute,
+      },
+    });
+    const placed = drawn.nodes[0];
+    if (placed === undefined) throw new Error('Expected the inner Thing to be drawn');
+    const canvas = {
+      x: nestedDrawn.x + placed.position.x,
+      y: nestedDrawn.y + placed.position.y,
+    };
+    const desired = tiltThingPosition(
+      {
+        x: nestedRequest.absolute.x + innerAuthored.x,
+        y: nestedRequest.absolute.y + innerAuthored.y,
+      },
+      innerSize,
+      tiltCenter,
+      DRAG_TILT_RADIANS,
+    );
+    expect(canvas.x).toBeCloseTo(desired.x, 9);
+    expect(canvas.y).toBeCloseTo(desired.y, 9);
   });
 
   it('leans nothing while no Thing is being moved', () => {

@@ -84,15 +84,22 @@ export interface EmbeddedParentProjection {
 /**
  * The lean an embedded canvas is carried through while a Thing framing it moves.
  *
- * Both points are canvas coordinates. `center` is the dragged Thing's centre —
- * the one point every rotation turns about — and `parentAbsolute` is the
- * containing Thing's own top-left, which is what turns a child's position here
- * (relative to that Thing) into the offset a `transform-origin` in the child's
- * own box needs.
+ * All three points are canvas coordinates. `center` is the dragged Thing's
+ * centre — the one point every rotation turns about. Children's positions here
+ * are relative to `parentAbsolute`, the containing Thing's authored top-left.
+ * React Flow then parents those children to the containing node as it is
+ * drawn, which a leaned publication has already moved, so `parentDrawn` is
+ * that drawn top-left. `tiltedPosition` converts into it.
+ * `places Things inside a nested window relative to where that window is drawn`
+ * in `embedded-open-space-thing.test.ts` holds the conversion; when the
+ * containing Thing has not been moved the two top-lefts are the same point
+ * and `moves each embedded Thing rigidly about the dragged Thing rather than
+ * turning it in place` in `embedded-diagram.test.ts` still holds.
  */
 export interface EmbeddedTilt {
   readonly center: DiagramPosition;
   readonly parentAbsolute: DiagramPosition;
+  readonly parentDrawn: DiagramPosition;
 }
 
 export interface EmbeddedDiagramRequest {
@@ -196,17 +203,19 @@ export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): T
  * Edges to React Flow, which draws them from the positions that moved` holds
  * that nothing here transforms an Edge.
  *
- * Positions here are relative to the containing Thing, so the centre is brought
- * into that frame first. A Thing React Flow has not measured has no size to
- * find a centre in and turns about its top-left, which is where it is drawn
- * until the first measurement anyway.
+ * Positions here are relative to the containing Thing's authored top-left, so
+ * the centre is brought into that frame first. React Flow then adds the
+ * containing node's drawn position, which `parentDrawn` names.
+ * A Thing React Flow has not measured has no size to find a centre in and
+ * turns about its top-left, which is where it is drawn until the first
+ * measurement anyway.
  */
 const tiltedPosition = (
   tilt: EmbeddedTilt,
   position: DiagramPosition,
   size: { readonly width?: number | undefined; readonly height?: number | undefined },
-): DiagramPosition =>
-  tiltThingPosition(
+): DiagramPosition => {
+  const leaned = tiltThingPosition(
     position,
     size,
     {
@@ -215,6 +224,11 @@ const tiltedPosition = (
     },
     DRAG_TILT_RADIANS,
   );
+  return {
+    x: leaned.x + tilt.parentAbsolute.x - tilt.parentDrawn.x,
+    y: leaned.y + tilt.parentAbsolute.y - tilt.parentDrawn.y,
+  };
+};
 
 /**
  * The overflowing cut, turned in place about the Thing's centre.

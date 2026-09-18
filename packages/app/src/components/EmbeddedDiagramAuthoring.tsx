@@ -38,6 +38,7 @@ export function EmbeddedDiagramAuthoring({
   framing,
   bounds: { left, top, right, bottom },
   absolute: { x: absoluteX, y: absoluteY },
+  drawnAbsolute: { x: drawnX, y: drawnY },
   tiltCenter,
   publish,
 }: {
@@ -56,8 +57,15 @@ export function EmbeddedDiagramAuthoring({
   readonly enabled: boolean;
   readonly framing: SpaceThingFraming | undefined;
   readonly bounds: EmbeddedBounds;
-  /** This Thing's own top-left in canvas coordinates, which the lean is measured from. */
+  /** This Thing's authored top-left in canvas coordinates. */
   readonly absolute: DiagramPosition;
+  /**
+   * This Thing's top-left as React Flow draws it, which the lean is measured
+   * from. `places Things inside a nested window relative to where that window
+   * is drawn` in `embedded-open-space-thing.test.ts` holds the split from
+   * `absolute`.
+   */
+  readonly drawnAbsolute: DiagramPosition;
   /** The centre a dragged ancestor leans about, or `undefined` while none moves. */
   readonly tiltCenter: DiagramPosition | undefined;
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
@@ -179,15 +187,19 @@ export function EmbeddedDiagramAuthoring({
   const offsetY = camera.offset.y;
   // Held apart from the request so the projection is rebuilt per pointer frame
   // of a drag and not per render: the centre moves with the Thing, and these
-  // four numbers are the whole of what the lean depends on.
+  // numbers are the whole of what the lean depends on.
   const tiltX = tiltCenter?.x;
   const tiltY = tiltCenter?.y;
   const tilt = useMemo(
     (): EmbeddedTilt | undefined =>
       tiltX === undefined || tiltY === undefined
         ? undefined
-        : { center: { x: tiltX, y: tiltY }, parentAbsolute: { x: absoluteX, y: absoluteY } },
-    [tiltX, tiltY, absoluteX, absoluteY],
+        : {
+            center: { x: tiltX, y: tiltY },
+            parentAbsolute: { x: absoluteX, y: absoluteY },
+            parentDrawn: { x: drawnX, y: drawnY },
+          },
+    [tiltX, tiltY, absoluteX, absoluteY, drawnX, drawnY],
   );
   const { nodes, edges } = useMemo(
     () =>

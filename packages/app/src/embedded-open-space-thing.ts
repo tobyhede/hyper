@@ -54,6 +54,19 @@ export interface EmbeddedOpenSpaceThingRequest<Entry extends { readonly id: Thin
   readonly graphId: GraphId;
   readonly entry: Entry | undefined;
   readonly absolute: DiagramPosition;
+  /**
+   * The containing Thing's top-left as React Flow draws it.
+   *
+   * `absolute` is the authored window origin the clip is built from. A leaned
+   * publication has already moved this Thing, and its children are parented
+   * to that drawn node, so the lean is measured from here rather than from
+   * `absolute`. They are the same point when the containing Thing has not
+   * been moved. `places Things inside a nested window relative to where that
+   * window is drawn` in `embedded-open-space-thing.test.ts` holds the split;
+   * `builds a nested window from the authored origin when the publication has
+   * already leaned` holds that `absolute` stays the authored origin.
+   */
+  readonly drawnAbsolute: DiagramPosition;
   readonly bounds: EmbeddedBounds;
   readonly readOnly: boolean;
   /**
@@ -85,19 +98,25 @@ const FOOTER_BORDER = 4;
 /**
  * The containing-relative position a nested window is built from.
  *
- * A leaned publication has already rotated this child about `tiltCenter`.
- * Reverse the rotation before `embedBounds` reads the position.
+ * A leaned publication has already rotated this child about `tiltCenter`, and
+ * `embeddedDiagram` then expresses that position relative to the containing
+ * node as it is drawn. Bring the position back into the authored frame and
+ * reverse the rotation before `embedBounds` reads it.
  * `builds a nested window from the authored origin when the publication has
  * already leaned` in `embedded-open-space-thing.test.ts` holds the recovery.
  */
 const untiltedPosition = (
   child: ThingFlowNode,
   origin: DiagramPosition,
+  containingDrawn: DiagramPosition,
   tiltCenter: DiagramPosition | undefined,
 ): DiagramPosition => {
   if (tiltCenter === undefined || child.data.dragTilted !== true) return child.position;
   return tiltThingPosition(
-    child.position,
+    {
+      x: child.position.x + origin.x - containingDrawn.x,
+      y: child.position.y + origin.y - containingDrawn.y,
+    },
     child,
     { x: tiltCenter.x - origin.x, y: tiltCenter.y - origin.y },
     -DRAG_TILT_RADIANS,
@@ -150,6 +169,7 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
   const queue: {
     parent: ThingFlowNode;
     origin: DiagramPosition;
+    containingDrawn: DiagramPosition;
     clip: EmbeddedBounds | null;
     path: ReadonlySet<string>;
     readOnly: boolean;
@@ -157,13 +177,14 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
   }[] = input.nodes.map((parent) => ({
     parent,
     origin: { x: 0, y: 0 },
+    containingDrawn: { x: 0, y: 0 },
     clip: null,
     path: new Set<string>(),
     readOnly: false,
     tiltCenter: undefined,
   }));
   for (const item of queue) {
-    const { parent, origin, clip, path } = item;
+    const { parent, origin, containingDrawn, clip, path } = item;
     if (parent.data.expanded !== true) continue;
     const document = parent.data.spaceContent;
     if (document === undefined) continue;
@@ -171,7 +192,17 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
     const crossing = `${document.spaceId}:${document.diagram}`;
     if (path.has(crossing)) continue;
     const crossed = new Set(path).add(crossing);
-    const window = embedBounds(parent, origin, clip, input.bodyHeights.get(parent.id));
+    const authoredPosition = untiltedPosition(parent, origin, containingDrawn, item.tiltCenter);
+    const window = embedBounds(
+      { ...parent, position: authoredPosition },
+      origin,
+      clip,
+      input.bodyHeights.get(parent.id),
+    );
+    const drawnAbsolute = {
+      x: containingDrawn.x + parent.position.x,
+      y: containingDrawn.y + parent.position.y,
+    };
     // A Thing being moved is the one everything below it leans about. An
     // ancestor already leaning wins, because React Flow moves one Thing at a
     // time and a descendant of the dragged Thing is carried, not dragged.
@@ -184,13 +215,14 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
           }
         : undefined);
     requests.push({
-      parent,
+      parent: { ...parent, position: authoredPosition },
       readOnly,
       spaceId: document.spaceId,
       diagramId: document.diagram,
       graphId: document.graph,
       entry: input.entries.find((entry) => entry.id === document.spaceId),
       absolute: window.absolute,
+      drawnAbsolute,
       bounds: window.bounds,
       tiltCenter,
     });
@@ -198,8 +230,9 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
     if (published?.diagramId === document.diagram) {
       for (const child of published.nodes)
         queue.push({
-          parent: { ...child, position: untiltedPosition(child, window.absolute, tiltCenter) },
+          parent: child,
           origin: window.absolute,
+          containingDrawn: drawnAbsolute,
           clip: window.intersection,
           path: crossed,
           readOnly,

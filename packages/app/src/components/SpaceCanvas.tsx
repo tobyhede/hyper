@@ -1257,6 +1257,7 @@ export function SpaceCanvas({
             }
             bounds={request.bounds}
             absolute={request.absolute}
+            drawnAbsolute={request.drawnAbsolute}
             tiltCenter={request.tiltCenter}
             publish={publishEmbedded}
           />
