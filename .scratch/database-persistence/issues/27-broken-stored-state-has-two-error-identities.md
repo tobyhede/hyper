@@ -1,6 +1,6 @@
 # Broken stored state has two error identities, and only one is classified
 
-Status: open
+Status: resolved
 Tags: Defect
 Blocked by: None — can start immediately.
 
@@ -31,7 +31,7 @@ Not checked on PostgreSQL — see the Decided section's PostgreSQL bullet.
 ## Acceptance
 
 - [x] Red first. SQLite repository: `truncates a stored Space whose document is not JSON`'s pin (`isAggregateInvariant(readFailure) === false`) becomes the `rejects.toThrow(AggregateInvariantError)` its siblings assert, with sibling cases for a non-JSON Thing document and a non-canonical stored revision.
-- [ ] PostgreSQL integration: a raw insert of text that is not JSON into `spaces.document` is refused by the database. Written and typechecks (`refuses a write of text that is not JSON into spaces.document`, `test/integration/postgres-space-repository.test.ts`); not run — no Docker available in this environment.
+- [x] PostgreSQL integration: a raw insert of text that is not JSON into `spaces.document` is refused by the database (`refuses a write of text that is not JSON into spaces.document`, `test/integration/postgres-space-repository.test.ts`). First run in CI's `postgres` job on PR #239, green at `c1fd145c` (run 35407122087).
 - [x] `@project/http`: `GET /api/aggregate` answers 500 `internal-error` for an invariant failure, including one carried only on `cause`, and 503 `persistence-unavailable` for any other throw.
 - [x] SQLite HTTP runtime: with a non-JSON Space document stored, `GET /` answers `internal-error` and start-up gives up rather than spending its retry budget — the host's two `isAggregateInvariant` calls exercised for this flavour.
 - [x] SQLite's aggregate read decodes the Space document itself; no catch surrounds a query.
