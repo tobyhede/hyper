@@ -1380,14 +1380,20 @@ export const createApp = (
     const openSpaceRows = useMemo(
       () =>
         openTree(
-          openSpacesState.entries.map((entry) => ({
-            spaceId: entry.id,
-            title: entry.session.getState().working.document.title,
-            from: openSpacesState.openedFrom.get(entry.id) ?? null,
-            persistence: entry.session.getState().persistence,
-          })),
+          // Meta first, so its row tops the Open Spaces menu whenever it is open.
+          [...openSpacesState.entries]
+            .sort(
+              (left, right) =>
+                Number(right.id === spaces?.metaSpaceId) - Number(left.id === spaces?.metaSpaceId),
+            )
+            .map((entry) => ({
+              spaceId: entry.id,
+              title: entry.session.getState().working.document.title,
+              from: openSpacesState.openedFrom.get(entry.id) ?? null,
+              persistence: entry.session.getState().persistence,
+            })),
         ),
-      [openSpacesState],
+      [openSpacesState, spaces],
     );
     const openerId = openSpacesState.openedFrom.get(renderedSpace.id) ?? null;
     const parentSpace = useMemo(() => {
@@ -1397,6 +1403,19 @@ export const createApp = (
         ? null
         : { spaceId: openerId, title: entry.session.getState().working.document.title };
     }, [openerId, openSpacesState]);
+    /**
+     * The Meta Space, named by its own title whether or not it is open: an open
+     * Meta's row says it, and a closed one is among `metaSpaces`, which lists
+     * every Space bar the one being drawn. `null` until either can say it.
+     */
+    const metaStep = useMemo(() => {
+      if (spaces === null) return null;
+      const spaceId = spaces.metaSpaceId;
+      const title =
+        openSpaceRows.find((row) => row.spaceId === spaceId)?.title ??
+        metaSpaces.find((summary) => summary.id === spaceId)?.title;
+      return title === undefined ? null : { spaceId, title };
+    }, [spaces, openSpaceRows, metaSpaces]);
 
     /**
      * The one Diagram refusal there is anywhere to put, now that Add Diagram and
@@ -1535,7 +1554,7 @@ export const createApp = (
             space: {
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,
-              isMeta: renderedSpace.id === spaces?.metaSpaceId,
+              meta: metaStep,
               parent: parentSpace,
               openSpaces: openSpaceRows,
               // Behind `chromeTitleEdit` exactly as the Diagram and Graph names
@@ -1551,12 +1570,15 @@ export const createApp = (
               onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
               onSwitchTo: (spaceId) => {
                 if (spaces === null) return;
-                const title =
-                  spaces.entry(spaceId)?.session.getState().working.document.title ?? 'That Space';
+                const entry = spaces.entry(spaceId);
+                const title = entry?.session.getState().working.document.title ?? 'That Space';
                 setSpaceCommandBreak(null);
                 void (async () => {
                   try {
-                    await spaces.switchTo(spaceId);
+                    // The Open Spaces menu lists Meta whether or not it is open.
+                    // Choosing it from the menu is not a crossing, so a Meta
+                    // that is not open yet is opened directly, with no Opener.
+                    await (entry === undefined ? spaces.open(spaceId) : spaces.switchTo(spaceId));
                   } catch (failure) {
                     reportBreak(failure);
                     setSpaceCommandBreak(`${title} could not be opened.`);

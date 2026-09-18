@@ -483,12 +483,10 @@ describe('an unwell Space the reader is not in', () => {
    * cannot stage: the catalogue's session is five Spaces deep so the Open Spaces
    * menu is drawn whatever the persistence says.
    *
-   * Two Spaces open and the reader in the child. The bar names the parent, so
-   * the width rule had the Open Spaces menu withheld as redundant — and the
-   * parent step draws a name and never a state, so a parent whose commit had
-   * failed showed nothing on the bar and had no chevron to be found behind
-   * either. `trailControls` now yields to the report while one stands
-   * (`dock-trail.test.ts` holds the rule; this holds the surface to it).
+   * Two Spaces open and the reader in the child. The bar names the parent, and
+   * the parent step draws a name and never a state. The Open Spaces menu was
+   * once withheld here as redundant, which left a parent whose commit had
+   * failed reported nowhere; it is always drawn now, so its trigger reports it.
    *
    * Assembled here rather than added to the stable sheet: it is the same
    * production `CommandDock` over the same fixture, with the one thing the
@@ -496,15 +494,15 @@ describe('an unwell Space the reader is not in', () => {
    * export owes a parity claim and two suites (ADR 0052), and what is under
    * test is a derivation, not a treatment.
    */
-  it('discloses the set when the only other open Space is the unwell one', async () => {
+  it('reports the unwell parent when it is the only other open Space', async () => {
     await renderDock(<TwoSpacesWithAnUnwellParent />);
 
     const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
     expect(trigger).toHaveAccessibleName(/needs attention/i);
     expect(trigger.querySelector('[data-unwell]')).not.toBeNull();
 
-    // And the disclosure it restores still names *which* Space, which is the
-    // other half of what ADR 0082 binds.
+    // And the disclosure still names *which* Space, which is the other half of
+    // what ADR 0082 binds.
     fireEvent.click(trigger);
     expect(screen.getByRole('menuitemradio', { name: /Design system/ })).toHaveTextContent(
       /could not be saved|not saved|failed/i,

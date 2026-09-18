@@ -820,10 +820,13 @@ test(
 
     await expect(showingSpace(page)).toContainText('Diagram fixture');
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
-    await expect(showingSpace(page).locator('[data-icon="parent"]')).toHaveAttribute(
-      'viewBox',
-      '0 0 16 16',
-    );
+    // Meta is the Space you are in, so it draws the cube; the OPEN mark is the
+    // Spaces trigger's.
+    await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    await expect(showingSpace(page).locator('[data-icon="parent"]')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).locator('[data-icon="parent"]'),
+    ).toBeVisible();
 
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
@@ -837,6 +840,38 @@ test(
     await page.goto(ordinarySpaceUrl);
     await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+  },
+);
+
+/**
+ * Meta is always one choice away, from every Space.
+ *
+ * A Space reached by its own address has no parent step, and after a reload
+ * Meta is not open at all. The Open Spaces menu is drawn anyway, lists Meta
+ * first by its own title, and choosing it opens Meta.
+ */
+test(
+  'the Open Spaces menu lists Meta first and opens it from a Space opened by its own address',
+  { tag: '@parity:command-dock-always-reaches-meta' },
+  async ({ page }) => {
+    await openSpaceThingOnItsDiagram(page);
+    await switchToSpace(page, 'Space 1');
+    await page.goto(page.url());
+    await expect(showingSpace(page)).toContainText('Space 1');
+    await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Spaces. 1 open.' }).click({ delay: 120 });
+    const rows = page.getByRole('menu').getByRole('menuitemradio');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toHaveAccessibleName('Diagram fixture');
+    await expect(rows.first().locator('svg[data-icon="parent"]')).toBeVisible();
+    await expect(rows.nth(1)).toHaveAccessibleName('Space 1');
+    await expect(rows.nth(1).locator('svg[data-icon="space"]')).toBeVisible();
+
+    await rows.first().click();
+    await expect(showingSpace(page)).toContainText('Diagram fixture');
+    await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Spaces. 2 open.' })).toBeVisible();
   },
 );
 

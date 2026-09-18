@@ -488,6 +488,30 @@ test(
       await expect(
         menu.getByRole('menuitemradio', { name: new RegExp(`^${title}`) }),
       ).toBeVisible();
+    // Meta first, with the OPEN mark, and the tree the crossings make below it:
+    // one drawn guide per crossing.
+    await expect(menu.getByRole('menuitemradio').first()).toHaveAccessibleName('Meta Space');
+    await expect(
+      menu.getByRole('menuitemradio').first().locator('[data-icon="parent"]'),
+    ).toBeVisible();
+    for (const title of ['Platform', 'Design system', 'Rendering', 'Traversal'])
+      await expect(
+        menu
+          .getByRole('menuitemradio', { name: new RegExp(`^${title}`) })
+          .locator('[data-icon="space"]'),
+      ).toBeVisible();
+    for (const [title, depth] of [
+      ['Meta Space', 0],
+      ['Platform', 1],
+      ['Design system', 2],
+      ['Rendering', 3],
+      ['Traversal', 1],
+    ] as const)
+      await expect(
+        menu
+          .getByRole('menuitemradio', { name: new RegExp(`^${title}`) })
+          .locator('.command-dock__guide'),
+      ).toHaveCount(depth);
 
     await menu.getByRole('menuitemradio', { name: /^Traversal/ }).click();
     await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
@@ -497,7 +521,15 @@ test(
     await openSpaces.getByRole('menuitemradio', { name: /^Meta Space/ }).click();
     const metaTitle = page.getByTestId('space-title').filter({ visible: true });
     await expect(metaTitle).toContainText('Meta Space');
-    await expect(metaTitle.locator('[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
+    // The Space you are in draws the cube, Meta included; the OPEN mark is the
+    // Spaces trigger's.
+    await expect(metaTitle.locator('[data-icon="space"]')).toBeVisible();
+    await expect(metaTitle.locator('[data-icon="parent"]')).toHaveCount(0);
+    await expect(
+      surface(page)
+        .getByRole('button', { name: 'Spaces. 5 open.' })
+        .locator('[data-icon="parent"]'),
+    ).toBeVisible();
   },
 );
 
@@ -612,10 +644,44 @@ test(
       'aria-disabled',
       'true',
     );
-    // Opened directly and never crossed out of, so the bar carries neither the
-    // parent step nor the Open Spaces menu.
+    // Opened directly, so there is no parent step.
     await expect(surface(page).getByRole('button', { name: /^Go to / })).toHaveCount(0);
-    await expect(surface(page).getByRole('button', { name: /open\.$/ })).toHaveCount(0);
+  },
+);
+
+/**
+ * Meta is always one choice away, from every Space.
+ *
+ * The new Space is opened by its own address and Meta is not open. The bar is
+ * `[∞ Spaces ⌄] [□ New space ⌄]`, and the menu still lists Meta first, by its
+ * own title; choosing it opens Meta.
+ */
+test(
+  'the Open Spaces menu lists Meta first and opens it from a Space opened directly',
+  { tag: '@parity:command-dock-always-reaches-meta' },
+  async ({ page }) => {
+    await page.goto(story('new-space'));
+    const spaceName = page.getByTestId('space-title').filter({ visible: true });
+    await expect(spaceName).toContainText('New space');
+    await expect(spaceName.locator('[data-icon="space"]')).toBeVisible();
+    await expect(
+      surface(page)
+        .getByRole('button', { name: 'Spaces. 1 open.' })
+        .locator('[data-icon="parent"]'),
+    ).toBeVisible();
+
+    const menu = await disclose(page, 'Spaces. 1 open.');
+    const rows = menu.getByRole('menuitemradio');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toHaveAccessibleName('Meta Space');
+    await expect(rows.first().locator('[data-icon="parent"]')).toBeVisible();
+    await expect(rows.nth(1)).toHaveAccessibleName('New space');
+    await expect(rows.nth(1).locator('[data-icon="space"]')).toBeVisible();
+
+    await rows.first().click();
+    await expect(spaceName).toContainText('Meta Space');
+    await expect(spaceName.locator('[data-icon="space"]')).toBeVisible();
+    await expect(surface(page).getByRole('button', { name: 'Spaces. 2 open.' })).toBeVisible();
   },
 );
 

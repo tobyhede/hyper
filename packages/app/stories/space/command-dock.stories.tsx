@@ -17,7 +17,8 @@ export default { title: 'Space/Command Dock' };
  * The whole command set at rest: which Space, which Diagram and which Graph, each
  * naming the current one, disclosing the set and promoting at most one verb —
  * then the Things. The parent step names one Space back and the Open Spaces menu
- * holds the rest. Parent/Meta draws the OPEN mark; regular Spaces draw cubes.
+ * holds the rest, Meta first. The Spaces trigger and Meta's row draw the OPEN
+ * mark; the Space you are in draws a cube.
  *
  * Drag a Thing out of the Things popover onto the canvas, or press the row where
  * it stands. Both are real and both are the same Edit: the Thing joins the
@@ -36,9 +37,9 @@ DockedLeft.meta = { iframed: true };
  *
  * Two obligations in one situation. ADR 0079 and ADR 0080 make a new Space
  * complete — one Diagram, one empty Active Graph — and the Dock has to name both
- * rather than leave a cluster blank; and a session that has never crossed is the
- * one shape where the bar carries neither a parent step nor a Open Spaces menu,
- * so the Space cluster stands alone with no divider in front of it.
+ * rather than leave a cluster blank; and a Space opened by its own address has
+ * no parent step, so the Open Spaces menu is its one way to Meta. Meta is not
+ * open here, and the menu still lists it first.
  *
  * Present is unavailable, because an empty Graph has nothing to traverse.
  */
