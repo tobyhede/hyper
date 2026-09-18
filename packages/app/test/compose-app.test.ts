@@ -50,7 +50,7 @@ const snapshot: SpaceSnapshot = {
 
 const openSession = (opened: SpaceSnapshot = snapshot) => {
   const loaded = { snapshot: opened, revision: 0n, exportedRevision: null };
-  return openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  return openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
 };
 
 describe('the composed working Space', () => {

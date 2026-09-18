@@ -170,9 +170,11 @@ const runtime = (value: SpaceSnapshot) => {
  * mounted already-conflicted has no reachable Thing to open a draft on.
  */
 async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSession> {
-  const backend = new MemorySpaceBackend([
-    { snapshot: REMOTE, revision: 4n, exportedRevision: null },
-  ]);
+  const backend = MemorySpaceBackend.asMeta({
+    snapshot: REMOTE,
+    revision: 4n,
+    exportedRevision: null,
+  });
   const { spaceSession: session, spaceThings } = openTestSpace(backend, {
     snapshot: local,
     revision: 3n,

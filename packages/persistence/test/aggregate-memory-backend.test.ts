@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
-import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
+import { MemorySpaceBackend } from '../src/memory';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -12,6 +12,8 @@ const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005'
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const HIGH_META_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
+const THING_ONE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const THING_TWO_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 const snapshot = (id = META_ID, title = 'Meta'): SpaceSnapshot => ({
   id,
@@ -69,22 +71,110 @@ describe('MemorySpaceBackend aggregate persistence', () => {
   });
 
   /*
-   * The constructor's own types admit a control in the second position, so a
-   * caller that writes one there has every reason to expect it honoured. Reading
-   * it from the third argument regardless leaves the injection silently inert
-   * and the test passing for the wrong reason.
+   * `asMeta` is not a guess: in a one-Space aggregate that Space is the only
+   * valid Meta, so naming it explicitly and deriving it from the one Space
+   * given answer the same aggregate.
    */
-  it('honours a test control given in place of the initial Spaces', async () => {
-    const control = new MemorySpaceBackendTestControl();
-    const backend = new MemorySpaceBackend(META_ID, control);
-    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'injected' });
+  it('asMeta makes the one Space given its own Meta', async () => {
+    const backend = MemorySpaceBackend.asMeta(loaded());
+
+    await expect(backend.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: META_ID, spaces: [loaded()] },
+    });
+  });
+
+  it('answers listSpaces and loadAggregate in ascending id order regardless of seed order', async () => {
+    const backend = new MemorySpaceBackend(META_ID, [otherLoaded(6n), loaded()]);
+
+    await expect(backend.listSpaces()).resolves.toEqual([
+      { id: META_ID, title: 'Meta' },
+      { id: OTHER_ID, title: 'Other' },
+    ]);
+    await expect(backend.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: { metaSpaceId: META_ID, spaces: [loaded(), otherLoaded(6n)] },
+    });
+  });
+
+  it('answers loadSpace and loadAggregate with a snapshot’s Things in ascending id order', async () => {
+    const unordered: SpaceSnapshot = {
+      ...snapshot(),
+      things: [
+        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+      ],
+    };
+    const ordered: SpaceSnapshot = {
+      ...unordered,
+      things: [
+        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+      ],
+    };
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: unordered, revision: 3n, exportedRevision: null },
+    ]);
+
+    await expect(backend.loadSpace(META_ID)).resolves.toEqual({
+      snapshot: ordered,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    await expect(backend.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: META_ID,
+        spaces: [{ snapshot: ordered, revision: 3n, exportedRevision: null }],
+      },
+    });
+  });
+
+  /*
+   * A conflict's `current` is a stored Space too, and every other read answers
+   * its Things ascending by id (ADR 0078) — the SQL adapters read `current` off
+   * the same `orderBy(thing.id.asc())` query as every other read, so a conflict
+   * is not a second, unsorted path to the same Space.
+   */
+  it('answers a conflict’s current Space with its Things in ascending id order too', async () => {
+    const unordered: SpaceSnapshot = {
+      ...snapshot(),
+      things: [
+        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+      ],
+    };
+    const ordered: SpaceSnapshot = {
+      ...unordered,
+      things: [
+        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+      ],
+    };
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: unordered, revision: 3n, exportedRevision: null },
+    ]);
 
     await expect(
       backend.commit({
-        changes: [{ kind: 'create', spaceId: OTHER_ID, snapshot: snapshot(OTHER_ID, 'Other') }],
+        changes: [
+          {
+            kind: 'update',
+            spaceId: META_ID,
+            snapshot: snapshot(META_ID, 'Changed'),
+            expectedRevision: 0n,
+          },
+        ],
       }),
-    ).resolves.toEqual({ kind: 'permanent-failure', code: 'forbidden', message: 'injected' });
-    expect(control.requests).toHaveLength(1);
+    ).resolves.toEqual({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: META_ID,
+          current: { snapshot: ordered, revision: 3n, exportedRevision: null },
+        },
+      ],
+    });
   });
 
   it('reports every create, update, and delete conflict without changing anything', async () => {

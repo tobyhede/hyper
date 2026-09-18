@@ -140,7 +140,7 @@ function mount(
 ): SpaceSession {
   const stored = { snapshot: mounted, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceThings } = openTestSpace(
-    new MemorySpaceBackend([
+    new MemorySpaceBackend(SPACE_ID, [
       stored,
       ...(mounted.things.some((thing) => thing.document.kind === 'space')
         ? [

@@ -95,7 +95,7 @@ const selfEdge: SpaceSnapshot = {
 
 const compose = (opened: SpaceSnapshot = snapshot) => {
   const loaded = { snapshot: opened, revision: 0n, exportedRevision: null };
-  return composeApp({ spaceSession: openSpaceSession(new MemorySpaceBackend([loaded]), loaded) });
+  return composeApp({ spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded) });
 };
 
 const diagramPath = (diagramId: DiagramId): string =>

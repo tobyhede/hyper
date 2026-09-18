@@ -936,11 +936,17 @@ describe('referencing an existing Space', () => {
     await settled(session);
 
     const stored = await backend.loadSpace(HOME_ID);
-    expect(
-      stored?.snapshot.things.flatMap((thing) =>
-        thing.document.kind === 'space' ? [thing.document] : [],
-      ),
-    ).toEqual(spaceThingsOf(session).map((thing) => thing.document));
+    const storedSpaceThings = (stored?.snapshot.things ?? []).flatMap((thing) =>
+      thing.document.kind === 'space' ? [{ id: thing.id, document: thing.document }] : [],
+    );
+    // The backend answers Things in ascending id order (ticket 30), which need
+    // not match Space Authoring's own authored order, so the two sides are
+    // matched by id rather than by position before comparing what landed. The
+    // ids stay in the comparison: dropping them would pass just as happily on a
+    // document that landed on the wrong Thing.
+    const ascendingById = <T extends { id: UUID }>(entries: readonly T[]): T[] =>
+      [...entries].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+    expect(ascendingById(storedSpaceThings)).toEqual(ascendingById(spaceThingsOf(session)));
   });
 
   /**

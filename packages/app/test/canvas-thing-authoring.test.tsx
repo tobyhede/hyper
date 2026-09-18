@@ -125,7 +125,7 @@ const mountAuthoring = (
   projectedKind: 'markdown' | 'reference' | 'space' = 'markdown',
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { authoring, adapter } = composeApp({ spaceSession });
   const initialProps: HookProps = {
     expanded: false,
@@ -541,7 +541,7 @@ describe('canvas Thing authoring Space rail', () => {
 
   const mountRail = (expanded: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
-    const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter } = composeApp({ spaceSession });
     return renderHook(() =>
       useCanvasThingAuthoring({
@@ -644,7 +644,7 @@ describe('canvas Thing authoring decoration identity', () => {
 
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
-    const spaceSession = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+    const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter } = composeApp({ spaceSession });
     const onSelectThing = () => undefined;
     const onPortalEditingChange = () => undefined;

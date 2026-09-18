@@ -2,7 +2,9 @@ import type { UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
+  ascendingById,
   decideCommit,
+  readInIdOrder as read,
   type AggregateLoadResult,
   type LoadedAggregate,
   type LoadedSpace,
@@ -20,30 +22,10 @@ import { classifyInitializedAggregate } from '../../src/persistence/aggregate-li
 
 const clone = <T>(value: T): T => structuredClone(value);
 
-const ascendingById = (left: { readonly id: UUID }, right: { readonly id: UUID }): number => {
-  if (left.id === right.id) return 0;
-  return left.id < right.id ? -1 : 1;
-};
-
-/**
- * PostgreSQL orders the aggregate's things on read — `loadSpaceAggregate` sorts
- * `thing.id.asc()`, on the read inside an import transaction and on the one
- * outside it alike — so every `LoadedSpace` this double hands back has to be
- * ordered the same way. The shared contract compares whole snapshots, and
- * `toEqual` is order-sensitive on arrays, so insertion order here would be a
- * divergence the suite asserts.
- *
- * Codepoint order, not `localeCompare`: over canonical lowercase UUID text it is
- * byte order over the `uuid` value PostgreSQL compares, so the two agree by
- * construction rather than by a property of ICU collation. `listSpaces` below
- * still sorts by collation, and its order stays outside the contract for exactly
- * that reason.
- */
-const read = (loaded: LoadedSpace): LoadedSpace =>
-  clone({
-    ...loaded,
-    snapshot: { ...loaded.snapshot, things: [...loaded.snapshot.things].sort(ascendingById) },
-  });
+/* `readInIdOrder` and its ordering rule are `@project/persistence`'s, shared
+ * with `MemorySpaceBackend` so the two doubles cannot drift apart from each
+ * other or from the SQL adapters. `listSpaces` below still sorts by collation,
+ * and its order stays outside the contract for the reason stated there. */
 
 const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): LoadedAggregate => ({
   metaSpaceId,

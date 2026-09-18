@@ -188,7 +188,7 @@ function compose({
   selection?: typeof DIAGRAM_ID | undefined;
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
-  const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
+  const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const composed = composeApp({ spaceSession: session, selection, connections });
   composed.adapter.getState().syncProjection(NODES, EDGES);
   return { session, ...composed };

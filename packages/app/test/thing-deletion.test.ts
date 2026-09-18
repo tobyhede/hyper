@@ -43,9 +43,11 @@ const snapshot: SpaceSnapshot = {
 
 function open(stored: SpaceSnapshot = snapshot, storedRevision = 0n) {
   const loaded = { snapshot: stored, revision: 0n, exportedRevision: null };
-  const backend = new MemorySpaceBackend([
-    { snapshot: stored, revision: storedRevision, exportedRevision: null },
-  ]);
+  const backend = MemorySpaceBackend.asMeta({
+    snapshot: stored,
+    revision: storedRevision,
+    exportedRevision: null,
+  });
   const { spaceSession: session, spaceThings } = openTestSpace(backend, loaded);
   const composed = composeApp({ spaceSession: session, selection: DIAGRAM_ID, spaceThings });
   return { session, spaceThings, ...composed };

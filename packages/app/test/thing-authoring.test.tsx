@@ -161,7 +161,7 @@ const runtime = (value: SpaceSnapshot) => {
 function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSession {
   const stored = { snapshot: value, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceThings } = openTestSpace(
-    new MemorySpaceBackend([stored]),
+    MemorySpaceBackend.asMeta(stored),
     stored,
   );
   let view: RenderResult | undefined;

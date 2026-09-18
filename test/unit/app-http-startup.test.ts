@@ -96,9 +96,11 @@ const startupFor = (metaSpaceId: UUID, ...snapshots: SpaceSnapshot[]) => {
 
 describe('HTTP space startup composition', () => {
   it('initializes a diagramless Space through an injected memory backend before opening it', async () => {
-    const backend = new MemorySpaceBackend([
-      { snapshot: snapshot(), revision: 0n, exportedRevision: null },
-    ]);
+    const backend = MemorySpaceBackend.asMeta({
+      snapshot: snapshot(),
+      revision: 0n,
+      exportedRevision: null,
+    });
     const ids = [DIAGRAM_ID, GRAPH_ID];
     const startup = startupOver(backend, () => {
       const id = ids.shift();
@@ -209,7 +211,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = MemorySpaceBackend.asMeta(loaded);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
     const startup = startupOver(backend);
 
@@ -229,7 +231,7 @@ describe('HTTP space startup composition', () => {
 
   it('reuses the live Space session when the runtime reopens the same Space', async () => {
     const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
-    const backend = new MemorySpaceBackend([loaded]);
+    const backend = MemorySpaceBackend.asMeta(loaded);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
     const startup = startupOver(backend);
     const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
@@ -264,7 +266,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID }),
@@ -308,7 +310,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -353,7 +355,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -408,7 +410,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(new MemorySpaceBackend([loaded]));
+    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: omittedId }),

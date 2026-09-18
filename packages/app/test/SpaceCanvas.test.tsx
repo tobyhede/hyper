@@ -143,7 +143,7 @@ function mountGraph(
   const edgeAuthoring = inertEdgeAuthoring();
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
-  const spaceSession = openSpaceSession(new MemorySpaceBackend([stored]), stored);
+  const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
   const { authoring, continuation } = composeApp({ spaceSession });
   const testedAuthoring = {
     ...authoring,

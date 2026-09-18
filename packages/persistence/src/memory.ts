@@ -1,12 +1,10 @@
-import { uuidSchema, type UUID } from '@project/core';
+import type { UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceCommit, SpaceSummary } from './backend';
 import { decideCommit } from './commit-decision';
+import { ascendingById, readInIdOrder as read } from './read-order';
 import type { RepositoryCommitResult } from './repository';
 
 const clone = <T>(value: T): T => structuredClone(value);
-const isLoadedSpaceCollection = (
-  value: UUID | readonly LoadedSpace[],
-): value is readonly LoadedSpace[] => Array.isArray(value);
 
 export interface MemoryCommitAttempt {
   snapshot: LoadedSpace['snapshot'];
@@ -76,41 +74,38 @@ export class MemorySpaceBackend implements SpaceBackend {
   readonly #spaces = new Map<UUID, LoadedSpace>();
   readonly #testControl: MemorySpaceBackendTestControl | undefined;
 
+  /**
+   * The Meta id is required, never guessed: ADR 0078 forbids inferring Meta
+   * from where a Space sits in its seed, and the same Spaces seeded in another
+   * order must behave identically. `asMeta` below is the one deliberate way to
+   * derive it, for the one aggregate shape where deriving it is not a guess.
+   */
   constructor(
-    metaSpaceIdOrInitial: UUID | readonly LoadedSpace[] = [],
-    initialOrControl: readonly LoadedSpace[] | MemorySpaceBackendTestControl = [],
+    metaSpaceId: UUID,
+    spaces: readonly LoadedSpace[] = [],
     testControl?: MemorySpaceBackendTestControl,
   ) {
-    const explicitMeta = !isLoadedSpaceCollection(metaSpaceIdOrInitial);
-    // The control is legal in either trailing position, because the Meta id is
-    // optional ahead of it. Reading it only from the third argument silently
-    // discards one written in the second, which the types permit — a dropped
-    // injection is a test that passes without exercising what it names.
-    const secondIsControl = initialOrControl instanceof MemorySpaceBackendTestControl;
-    const initial: readonly LoadedSpace[] = isLoadedSpaceCollection(metaSpaceIdOrInitial)
-      ? metaSpaceIdOrInitial
-      : secondIsControl
-        ? []
-        : initialOrControl;
-    this.#metaSpaceId = explicitMeta
-      ? uuidSchema.parse(metaSpaceIdOrInitial)
-      : (initial[0]?.snapshot.id ?? uuidSchema.parse('00000000-0000-4000-8000-000000000000'));
-    this.#testControl = secondIsControl ? initialOrControl : testControl;
-    for (const loaded of initial) this.#spaces.set(loaded.snapshot.id, clone(loaded));
+    this.#metaSpaceId = metaSpaceId;
+    this.#testControl = testControl;
+    for (const loaded of spaces) this.#spaces.set(loaded.snapshot.id, clone(loaded));
+  }
+
+  /** A one-Space aggregate has exactly one valid Meta: the Space given. */
+  static asMeta(loaded: LoadedSpace, control?: MemorySpaceBackendTestControl): MemorySpaceBackend {
+    return new MemorySpaceBackend(loaded.snapshot.id, [loaded], control);
   }
 
   listSpaces(): Promise<readonly SpaceSummary[]> {
     return Promise.resolve(
-      [...this.#spaces.values()].map(({ snapshot }) => ({
-        id: snapshot.id,
-        title: snapshot.document.title,
-      })),
+      [...this.#spaces.values()]
+        .map(({ snapshot }) => ({ id: snapshot.id, title: snapshot.document.title }))
+        .sort(ascendingById),
     );
   }
 
   loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
     const loaded = this.#spaces.get(id);
-    return Promise.resolve(loaded === undefined ? undefined : clone(loaded));
+    return Promise.resolve(loaded === undefined ? undefined : read(loaded));
   }
 
   loadAggregate(): ReturnType<SpaceBackend['loadAggregate']> {
@@ -118,7 +113,9 @@ export class MemorySpaceBackend implements SpaceBackend {
       kind: 'loaded',
       aggregate: {
         metaSpaceId: this.#metaSpaceId,
-        spaces: [...this.#spaces.values()].map(clone),
+        spaces: [...this.#spaces.values()]
+          .map(read)
+          .sort((left, right) => ascendingById(left.snapshot, right.snapshot)),
       },
     });
   }
@@ -131,11 +128,11 @@ export class MemorySpaceBackend implements SpaceBackend {
     const injected = this.#testControl?.nextResult();
     if (injected !== undefined) return clone(injected);
 
-    const decision = decideCommit(
-      request,
-      this.#metaSpaceId,
-      [...this.#spaces.values()].map(clone),
-    );
+    // Read, not `clone`: a conflict answers `current` the way a load would, in
+    // id order, as the SQL adapters do off their own ordered query. The write
+    // decision carries those same copies back into `#spaces` below, so the
+    // stored order converges on id order too — harmless, every read sorts.
+    const decision = decideCommit(request, this.#metaSpaceId, [...this.#spaces.values()].map(read));
     if (decision.kind === 'answer') return backendResult(decision.result);
     this.#spaces.clear();
     for (const space of decision.spaces) this.#spaces.set(space.snapshot.id, clone(space));
