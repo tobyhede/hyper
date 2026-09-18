@@ -338,7 +338,7 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
   // Shape only. Whether the change set names one Space twice, or disagrees with
   // its own snapshot about which Space it is, is what a commit *means*, and that
   // is `commitRequestRefusal`'s, decided once for every implementation (ADR
-  // 0093, ADR 0098).
+  // 0095, ADR 0098).
   return { changes: [first, ...rest] };
 };
 

@@ -4,7 +4,7 @@ Status: resolved
 Tags: Improvement
 Blocked by: None — can start immediately.
 
-Surfaced by: the 17 September 2026 architecture review of the database-persistence branch, candidate 2, then settled by a grilling loop and recorded as ADR 0098. Candidate 1 of the same review was rejected as ADR 0094; candidate 3 is ticket 24 and ADR 0095.
+Surfaced by: the 17 September 2026 architecture review of the database-persistence branch, candidate 2, then settled by a grilling loop and recorded as ADR 0098. Candidate 1 of the same review was rejected as ADR 0094; candidate 3 is ticket 24 and ADR 0097.
 
 ## The defect
 
