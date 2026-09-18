@@ -71,6 +71,14 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     // it open at a time rather than trusting two to coexist.
     const seedDatabase = createSqliteDatabase(path);
     try {
+      // Before the fixture, not only after it — as the PostgreSQL proof does,
+      // and for its reason: `initializeAggregate` leaves an initialized
+      // repository exactly as it is (ADR 0078), so a file still holding a Space
+      // from a run that failed before its own cleanup would answer
+      // `already-initialized`, write nothing, and send the drag below looking
+      // for a Thing that was never stored. Clearing only at the end makes the
+      // *next* run pay for this one's failure.
+      await clearSqliteContent(seedDatabase);
       const seedRepository = new SqliteSpaceRepository(seedDatabase);
       // The Diagram is part of the fixture, and has to be — see the matching
       // comment in `postgres-persistence.spec.ts`, which this mirrors exactly:

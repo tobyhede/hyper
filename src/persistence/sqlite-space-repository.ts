@@ -223,12 +223,21 @@ const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<voi
   await importThings(orm, snapshot);
 };
 
+/**
+ * Truncation never decodes a stored document: a row read or returned whole goes
+ * through the json codec, which throws on text that is not JSON, and ADR 0092
+ * truncates whatever is stored, valid or not. So it reads ids and deletes by
+ * count — neither touches a `document` column. `truncates a stored Space whose
+ * document is not JSON` in `test/integration/sqlite-space-repository.test.ts` is
+ * what holds it: written back the decoding way, it fails with the codec's own
+ * `Cannot read properties of undefined (reading 'codecId')`.
+ */
 const truncateHyperContent = async (orm: Orm): Promise<void> => {
   await orm.RepositoryState.where({ singletonId: 1 }).delete();
-  const spaces = await orm.Space.all();
+  const spaces = await orm.Space.select('id').all();
   for (const space of spaces) {
-    await orm.Thing.where({ spaceId: space.id }).deleteAll();
-    await orm.Space.where({ id: space.id }).delete();
+    await orm.Thing.where({ spaceId: space.id }).deleteCount();
+    await orm.Space.where({ id: space.id }).deleteCount();
   }
 };
 
@@ -443,7 +452,7 @@ export class SqliteSpaceRepository implements SpaceRepository {
       // Read raw rather than through `loadEverySpace`: truncation replaces
       // stored state whether or not it parses (ADR 0094).
       const metaSpaceId = await lockMetaIdentity(orm);
-      if (metaSpaceId === undefined && (await orm.Space.first()) === null) {
+      if (metaSpaceId === undefined && (await orm.Space.select('id').first()) === null) {
         return { kind: 'uninitialized' };
       }
       if (metaSpaceId !== expectedMetaSpaceId) {

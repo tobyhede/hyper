@@ -1,5 +1,5 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { AggregateInvariantError } from '@project/persistence';
+import { AggregateInvariantError, isAggregateInvariant } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
@@ -542,6 +542,45 @@ describe('SqliteSpaceRepository', () => {
     });
 
     await expectReadAndInitializeRefuse(repository);
+    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
+      kind: 'replaced',
+    });
+    await expectTruncatedTo(repository);
+  });
+
+  it('truncates a stored Space whose document is not JSON', async () => {
+    const { path, repository } = await opened();
+    // The ORM encodes `document` as JSON, so only a raw write can store text
+    // that is not; the TEXT column carries no `json_valid` check to refuse it.
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+    const connection = new DatabaseSync(path);
+    try {
+      connection
+        .prepare("INSERT INTO spaces (id, document, updated_at) VALUES (?, ?, datetime('now'))")
+        .run(OTHER_SPACE_ID, 'not json');
+      connection
+        .prepare(
+          "INSERT INTO things (id, space_id, document, updated_at) VALUES (?, ?, ?, datetime('now'))",
+        )
+        .run(OTHER_THING_ID, OTHER_SPACE_ID, 'not json either');
+      connection
+        .prepare('INSERT INTO repository_state (singleton_id, meta_space_id) VALUES (1, ?)')
+        .run(OTHER_SPACE_ID);
+    } finally {
+      connection.close();
+    }
+
+    // Both reads fail, and — unlike every sibling above — *not* as
+    // `AggregateInvariantError`: the row fails inside the driver's json codec,
+    // before any intake of ours runs. That is pinned rather than left to a bare
+    // `toThrow()`, which would pass on any throw at all and hide the difference.
+    // The difference matters: `space-host.ts` asks `isAggregateInvariant` to
+    // tell broken stored state from an unreachable database, so this defect is
+    // answered `persistence-unavailable` — try again later — and no retry cures
+    // it. See `.scratch/database-persistence/issues/27`.
+    await expect(repository.loadAggregate()).rejects.toBeInstanceOf(Error);
+    await expect(repository.loadAggregate()).rejects.not.toSatisfy(isAggregateInvariant);
+    await expect(repository.initializeAggregate(proposal)).rejects.toThrow();
     await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
       kind: 'replaced',
     });

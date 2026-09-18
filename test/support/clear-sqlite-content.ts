@@ -8,8 +8,12 @@ import type { SqliteDatabase } from '../../src/sqlite/db';
  */
 export const clearSqliteContent = async (database: SqliteDatabase): Promise<void> => {
   await database.orm.RepositoryState.where({ singletonId: 1 }).delete();
-  for (const space of await database.orm.Space.all()) {
-    await database.orm.Thing.where({ spaceId: space.id }).deleteAll();
-    await database.orm.Space.where({ id: space.id }).delete();
+  // Ids and counts, never a whole row, for the reason `truncateHyperContent` in
+  // `src/persistence/sqlite-space-repository.ts` reads that way: a row read or
+  // returned whole goes through the json codec, which throws on a `document`
+  // that is not JSON — and a file left holding one is exactly what this is for.
+  for (const space of await database.orm.Space.select('id').all()) {
+    await database.orm.Thing.where({ spaceId: space.id }).deleteCount();
+    await database.orm.Space.where({ id: space.id }).deleteCount();
   }
 };
