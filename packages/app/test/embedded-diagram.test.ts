@@ -327,6 +327,57 @@ describe('an embedded production projection', () => {
     );
   });
 
+  it('turns an overflowing cut about the Thing so it leans with the window', async () => {
+    // The inset lives on the React Flow node, which does not rotate; only
+    // `.canvas-thing` does. An upright `inset(...)` therefore cuts a leaned
+    // Thing on a vertical line while the window's SVG clip has already turned.
+    // The overflowing edge must take the same in-place turn as the Thing.
+    const projected = await projection();
+    const first = projected.nodes[0];
+    if (first === undefined) throw new Error('No fixture Thing');
+    const containing = parent(first, 560, 420);
+    const request = {
+      parent: projectionParent(containing),
+      projection: projected,
+      offset: { x: 16, y: 42 },
+      enabled: true,
+      bounds: view(containing),
+    };
+    const upright = embedded(embeddedDiagram(request).nodes, B);
+    const leaning = embedded(embeddedDiagram({ ...request, tilt: CENTRE }).nodes, B);
+    const clipPath = leaning.style?.clipPath;
+    if (clipPath === undefined) throw new Error('No clip-path');
+    expect(clipPath).toMatch(/^polygon\(/);
+
+    const width = upright.width ?? 0;
+    const height = upright.height ?? 0;
+    const unleaned = [
+      { x: -12, y: -12 },
+      { x: width - 132, y: -12 },
+      { x: width - 132, y: height + 12 },
+      { x: -12, y: height + 12 },
+    ];
+    const body = clipPath.slice('polygon('.length, -1);
+    const leaned = body.split(',').map((pair) => {
+      const parts = pair.trim().split(/\s+/);
+      const x = parts[0];
+      const y = parts[1];
+      if (x === undefined || y === undefined) throw new Error(`Unpaired clip vertex: ${pair}`);
+      return { x: Number.parseFloat(x), y: Number.parseFloat(y) };
+    });
+    expect(leaned).toHaveLength(4);
+    const pivot = { x: width / 2, y: height / 2 };
+    for (const [index, before] of unleaned.entries()) {
+      const after = leaned[index];
+      if (after === undefined) throw new Error(`Missing leaned clip vertex ${index}`);
+      const from = { x: before.x - pivot.x, y: before.y - pivot.y };
+      const to = { x: after.x - pivot.x, y: after.y - pivot.y };
+      expect(Math.hypot(to.x, to.y)).toBeCloseTo(Math.hypot(from.x, from.y), 9);
+      const turned = ((Math.atan2(to.y, to.x) - Math.atan2(from.y, from.x)) * 180) / Math.PI;
+      expect(turned).toBeCloseTo(CANVAS_THING_DRAG_TILT_DEGREES, 9);
+    }
+  });
+
   it('uses the target projection for Open Reference Thing content and its authored placement', async () => {
     const { drawn } = await draw(true);
     expect(drawn.nodes.find((node) => node.data.thingId === REFERENCE)).toMatchObject({

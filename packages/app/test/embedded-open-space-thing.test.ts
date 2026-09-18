@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Thing } from '@project/core';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
+import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
 import {
   discoverEmbeddedOpenSpaceThings,
   embedBounds,
@@ -20,6 +21,33 @@ const GRAPH = id(4);
 const NESTED = id(5);
 const OTHER_DIAGRAM = id(6);
 const CHILD_THING = id(7);
+
+/**
+ * Rotate a child's centre about the dragged Thing. `embedded-diagram.test.ts`
+ * holds this as the motion a leaned publication already carries.
+ */
+const lean = (
+  position: { readonly x: number; readonly y: number },
+  size: { readonly width: number; readonly height: number },
+  tilt: {
+    readonly center: { readonly x: number; readonly y: number };
+    readonly parentAbsolute: { readonly x: number; readonly y: number };
+  },
+) => {
+  const radians = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
+  const half = { x: size.width / 2, y: size.height / 2 };
+  const centre = {
+    x: tilt.center.x - tilt.parentAbsolute.x,
+    y: tilt.center.y - tilt.parentAbsolute.y,
+  };
+  const from = { x: position.x + half.x - centre.x, y: position.y + half.y - centre.y };
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return {
+    x: centre.x + from.x * cos - from.y * sin - half.x,
+    y: centre.y + from.x * sin + from.y * cos - half.y,
+  };
+};
 
 const spaceContent = (
   thingId: typeof HOST,
@@ -152,8 +180,8 @@ describe('embedded open Space Thing discovery', () => {
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { diagramId: DIAGRAM, nodes: [nested] }]]),
       bodyHeights: new Map(),
-      // The render adapter's record of the gesture, not `node.dragging`: the
-      // projection republishes during a drag and wipes that flag.
+      // React Flow's nodeLookup, not the adapter's dragOrigins: that record
+      // lags one frame behind the store the moving Thing is drawn from.
       draggingIds: new Set<string>([HOST]),
     });
     // The dragged Thing's own centre: (100, 200) plus half of 700x500. The
@@ -163,6 +191,46 @@ describe('embedded open Space Thing discovery', () => {
       { x: 450, y: 450 },
       { x: 450, y: 450 },
     ]);
+  });
+
+  it('builds a nested window from the authored origin when the publication has already leaned', () => {
+    const parent = openSpaceThing(HOST, { spaceId: TARGET, diagram: DIAGRAM });
+    const authored = { x: 50, y: 60 };
+    const size = { width: 400, height: 300 };
+    const nested = openSpaceThing(
+      NESTED,
+      { spaceId: TARGET, diagram: OTHER_DIAGRAM },
+      {
+        position: lean(authored, size, {
+          center: { x: 450, y: 450 },
+          parentAbsolute: { x: 100, y: 200 },
+        }),
+        width: size.width,
+        height: size.height,
+      },
+    );
+    const requests = discoverEmbeddedOpenSpaceThings({
+      nodes: [parent],
+      entries: [{ id: TARGET }],
+      publications: new Map([
+        [
+          HOST,
+          {
+            diagramId: DIAGRAM,
+            nodes: [{ ...nested, data: { ...nested.data, dragTilted: true } }],
+          },
+        ],
+      ]),
+      bodyHeights: new Map(),
+      draggingIds: new Set<string>([HOST]),
+    });
+    expect(requests[1]?.absolute).toEqual({ x: 150, y: 260 });
+    expect(requests[1]?.bounds).toEqual({
+      left: 16,
+      top: 16,
+      right: 384,
+      bottom: 196,
+    });
   });
 
   it('leans nothing while no Thing is being moved', () => {

@@ -158,18 +158,45 @@ const EMBEDDED_HANDLE_OUTSET = AUTHORING_HANDLE_DIAMETER / 2;
 
 const clipSide = (overflow: number): number => (overflow > 0 ? overflow : -EMBEDDED_HANDLE_OUTSET);
 
+interface ClipSides {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+}
+
+function clipSides(node: ThingFlowNode, bounds: EmbeddedBounds): ClipSides {
+  return {
+    top: clipSide(Math.max(0, bounds.top - node.position.y)),
+    left: clipSide(Math.max(0, bounds.left - node.position.x)),
+    right: clipSide(Math.max(0, node.position.x + (node.width ?? 0) - bounds.right)),
+    bottom: clipSide(Math.max(0, node.position.y + (node.height ?? 0) - bounds.bottom)),
+  };
+}
+
+function insetClipPath(sides: ClipSides): string {
+  return `inset(${sides.top}px ${sides.right}px ${sides.bottom}px ${sides.left}px)`;
+}
+
 export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): ThingFlowNode {
-  const top = clipSide(Math.max(0, bounds.top - node.position.y));
-  const left = clipSide(Math.max(0, bounds.left - node.position.x));
-  const right = clipSide(Math.max(0, node.position.x + (node.width ?? 0) - bounds.right));
-  const bottom = clipSide(Math.max(0, node.position.y + (node.height ?? 0) - bounds.bottom));
   return {
     ...node,
-    style: { ...node.style, clipPath: `inset(${top}px ${right}px ${bottom}px ${left}px)` },
+    style: { ...node.style, clipPath: insetClipPath(clipSides(node, bounds)) },
   };
 }
 
 const TILT_RADIANS = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
+
+const rotateAbout = (point: DiagramPosition, origin: DiagramPosition): DiagramPosition => {
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const cos = Math.cos(TILT_RADIANS);
+  const sin = Math.sin(TILT_RADIANS);
+  return {
+    x: origin.x + dx * cos - dy * sin,
+    y: origin.y + dx * sin + dy * cos,
+  };
+};
 
 /**
  * Where a Thing is drawn once the Thing framing it has leaned.
@@ -197,13 +224,39 @@ const tiltedPosition = (
     x: tilt.center.x - tilt.parentAbsolute.x,
     y: tilt.center.y - tilt.parentAbsolute.y,
   };
-  const from = { x: position.x + half.x - centre.x, y: position.y + half.y - centre.y };
-  const cos = Math.cos(TILT_RADIANS);
-  const sin = Math.sin(TILT_RADIANS);
-  return {
-    x: centre.x + from.x * cos - from.y * sin - half.x,
-    y: centre.y + from.x * sin + from.y * cos - half.y,
-  };
+  const turned = rotateAbout({ x: position.x + half.x, y: position.y + half.y }, centre);
+  return { x: turned.x - half.x, y: turned.y - half.y };
+};
+
+/**
+ * The overflowing cut, turned in place about the Thing's centre.
+ *
+ * The inset is computed against unleaned geometry and then this polygon takes
+ * the same in-place turn `.canvas-thing` does. Together with `tiltedPosition`
+ * that is the rigid motion the window's SVG clip already performs about the
+ * dragged centre, so the cut stays on the window. The React Flow node itself
+ * never rotates — a transform there would pollute handle bounds — which is why
+ * an `inset(...)` left on it would stay upright.
+ */
+const leanedClipPath = (
+  sides: ClipSides,
+  size: { readonly width?: number | undefined; readonly height?: number | undefined },
+): string => {
+  const width = size.width ?? 0;
+  const height = size.height ?? 0;
+  const origin = { x: width / 2, y: height / 2 };
+  const corners = [
+    { x: sides.left, y: sides.top },
+    { x: width - sides.right, y: sides.top },
+    { x: width - sides.right, y: height - sides.bottom },
+    { x: sides.left, y: height - sides.bottom },
+  ];
+  return `polygon(${corners
+    .map((corner) => {
+      const turned = rotateAbout(corner, origin);
+      return `${turned.x}px ${turned.y}px`;
+    })
+    .join(', ')})`;
 };
 
 /** Reparent the production projection, clipping partial Things instead of dropping them. */
@@ -232,24 +285,30 @@ export function embeddedDiagram({
       zIndex: (parent.zIndex ?? 10) + (node.data.expanded === true ? 2 : 1),
     };
     if (!enabled) next.className = 'nopan nowheel nodrag';
-    const clipped = clipEmbeddedNode(
-      next,
-      bounds ?? {
-        top: SPACE_THING_EMBED_INSET.top,
-        left: SPACE_THING_EMBED_INSET.left,
-        right: (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
-        bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
-      },
-    );
-    const style = { ...clipped.style, transition: 'none' };
-    // Leaned *after* clipping, never before: the drawn window leans with the
-    // Thing, so the two stay in the same frame and the inset is the one the
-    // unleaned geometry gives. Clipping against a leaned position would cut
-    // each Thing on a line the frame is no longer on.
+    const clipBounds = bounds ?? {
+      top: SPACE_THING_EMBED_INSET.top,
+      left: SPACE_THING_EMBED_INSET.left,
+      right: (parent.width ?? 0) - SPACE_THING_EMBED_INSET.right,
+      bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
+    };
+    const clipped = clipEmbeddedNode(next, clipBounds);
+    // Leaned *after* clipping, never before: the inset is the one the unleaned
+    // geometry gives, then the overflowing cut turns in place about the Thing
+    // so it stays on the window the SVG clip has already turned. Clipping
+    // against a leaned position would still be an upright inset on a line the
+    // frame has left.
     const placed =
       tilt === undefined
         ? clipped
-        : { ...clipped, position: tiltedPosition(tilt, position, clipped) };
+        : {
+            ...clipped,
+            position: tiltedPosition(tilt, position, clipped),
+            style: {
+              ...clipped.style,
+              clipPath: leanedClipPath(clipSides(next, clipBounds), clipped),
+            },
+          };
+    const style = { ...placed.style, transition: 'none' };
     return enabled
       ? { ...placed, style }
       : {

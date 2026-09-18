@@ -6,6 +6,7 @@ import {
   type ThingId,
 } from '@project/core';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
+import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
 import type { EmbeddedBounds } from './embedded-diagram';
 
 /**
@@ -35,15 +36,17 @@ export interface DiscoverEmbeddedOpenSpaceThingsInput<Entry extends { readonly i
   readonly publications: ReadonlyMap<string, EmbeddedPublicationSnapshot>;
   readonly bodyHeights: ReadonlyMap<string, number>;
   /**
-   * Which Things a gesture is currently moving, from the render adapter's
-   * `dragOrigins`.
+   * Which Things a gesture is currently moving, from React Flow's own store
+   * (`nodeLookup` in SpaceCanvas).
    *
-   * **Not `node.dragging`.** React Flow sets that on the node it hands back
-   * through `onNodesChange`, but the adapter republishes the projection from
-   * `canvasProjection` and splices only the live *position* into it
-   * (`reconcile`), so the flag is wiped on the next publish — which during a
-   * drag is most frames. `dragOrigins` exists precisely to retain the gesture
-   * across that reconciliation, and it is the only durable answer here.
+   * **Not a projection node's `dragging` flag, and not the adapter's
+   * `dragOrigins`.** The flag is wiped whenever the adapter republishes —
+   * `reconcile` rebuilds each node from `canvasProjection` and splices back
+   * only the live position — so it is absent for most frames of a drag.
+   * `dragOrigins` is durable but is filled from the first `position` change
+   * React Flow reports, which arrives a frame after React Flow has already
+   * moved the Thing. SpaceCanvas reads `nodeLookup` because that is the store
+   * the moving Thing is drawn from.
    */
   readonly draggingIds: ReadonlySet<string>;
 }
@@ -80,6 +83,36 @@ interface EmbedWindow {
 
 /** Title-footer border, added to a measured footer in place of the reserved inset. */
 const FOOTER_BORDER = 4;
+
+const TILT_RADIANS = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
+
+/**
+ * The containing-relative position a nested window is built from.
+ *
+ * A leaned publication has already rotated this child about `tiltCenter`.
+ * The nested window stays in the unleaned frame — clip and grandchildren
+ * lean after that — so walk the rotation back before `embedBounds` reads
+ * the position. `embedded-open-space-thing.test.ts` holds the recovery.
+ */
+const untiltedPosition = (
+  child: ThingFlowNode,
+  origin: DiagramPosition,
+  tiltCenter: DiagramPosition | undefined,
+): DiagramPosition => {
+  if (tiltCenter === undefined || child.data.dragTilted !== true) return child.position;
+  const half = { x: (child.width ?? 0) / 2, y: (child.height ?? 0) / 2 };
+  const centre = { x: tiltCenter.x - origin.x, y: tiltCenter.y - origin.y };
+  const from = {
+    x: child.position.x + half.x - centre.x,
+    y: child.position.y + half.y - centre.y,
+  };
+  const cos = Math.cos(TILT_RADIANS);
+  const sin = Math.sin(TILT_RADIANS);
+  return {
+    x: centre.x + from.x * cos + from.y * sin - half.x,
+    y: centre.y - from.x * sin + from.y * cos - half.y,
+  };
+};
 
 /**
  * The window an Open Space Thing draws into: its box less rail/border inset,
@@ -175,7 +208,7 @@ export function discoverEmbeddedOpenSpaceThings<Entry extends { readonly id: Thi
     if (published?.diagramId === document.diagram) {
       for (const child of published.nodes)
         queue.push({
-          parent: child,
+          parent: { ...child, position: untiltedPosition(child, window.absolute, tiltCenter) },
           origin: window.absolute,
           clip: window.intersection,
           path: crossed,
