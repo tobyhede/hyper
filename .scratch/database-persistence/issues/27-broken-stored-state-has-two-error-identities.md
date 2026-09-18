@@ -17,16 +17,23 @@ A stored `document` that is **not JSON at all** does not reach that identity. It
 
 A document that **is** JSON but fails Space intake raises `AggregateInvariantError` correctly, so the two flavours of the same category — stored state no aggregate can be read from — are classified differently. Verified on SQLite: `truncates a stored Space whose document is not JSON` in `test/integration/sqlite-space-repository.test.ts` pins `isAggregateInvariant(readFailure) === false`, and asserting `AggregateInvariantError` there fails with `expected error to be instance of AggregateInvariantError`.
 
-Not checked on PostgreSQL. `repository.ts` says every implementation of the seam raises the identity "or a memory-backed test proves nothing about the database", so the same question is owed of `PostgresSpaceRepository` before anything is decided.
+Not checked on PostgreSQL — see the Decided section's PostgreSQL bullet.
 
-## To decide
+## Decided (2026-09-18)
 
-- Where a codec failure is wrapped. Inside each repository's read, or once at a shared boundary. ADR 0095 plans one SQL repository over a per-database `SqlStore`, so there may come to be one place; today the two adapters are separate and `SqlStore` appears in no source file.
-- Whether every throw out of a read is broken stored state by default, with the unreachable-database arm named explicitly instead — the inverse of the current classification, and possibly the honest one, since a driver that cannot decode what it stored is not a connectivity problem.
-- What `GET /api/aggregate` should answer. `packages/http/src/index.ts` answers 503 for *every* throw out of `loadAggregate` and classifies nothing; `space-host.ts:134-148` already records that this is the half that cannot say a stored aggregate is broken, and that fixing it was not that ticket's. The identity is on the shared seam and reachable from there.
+- **What counts.** On an aggregate read (`loadEverySpace`, and so `loadAggregate`, `initializeAggregate`'s existing-state read, and replacement's authorisation), *every* failure to decode a stored row is broken stored state and raises `AggregateInvariantError`, with the original on `cause`: text that is not JSON, a revision that is not canonical, and a document that fails its schema. Only the last is wrapped today.
+- **Where it is caught.** SQLite reads the Space `document` as text — as Things' documents already arrive through `include`/`select` — so every decode happens in the adapter's own per-row step, and only that step's failures are wrapped. The query itself is never wrapped, so a connection failure cannot be misread as broken state, and nothing matches the driver codec's `TypeError` by message. This is the SQLite `readDocument` ticket 22 later lifts into `SqlStore`. If the ORM cannot select the Space document as text in the same one-statement `include` read (ticket 14 §4), stop and report: neither a second query nor matching the codec error is taken without a decision.
+- **PostgreSQL.** Its `document` column is `jsonb`, so it cannot hold text that is not JSON; the database refuses the write. An integration test proves that rather than this ticket asserting it. A non-canonical revision cannot arise there either while revisions are `int8` (ticket 22 moves them to TEXT and its codec owns that case).
+- **`loadSpace` and `listSpaces` are out of scope.** PostgreSQL keeps the narrower error deliberately — one Space failing is that resource's answer, not evidence the aggregate cannot be read (`postgres-space-repository.ts`, `loadEverySpace`'s comment). SQLite gains the same comment; it states nothing today.
+- **The classification default does not flip.** Every other throw stays "not an invariant". Inverting it would answer SQLite BUSY/LOCKED as broken state, because nothing in production names the unavailable arm; ticket 31 (architecture review candidate 3, to be written once this lands) names it first, and any flip waits on that.
+- **`GET /api/aggregate`** answers 500 `internal-error` for an `AggregateInvariantError` on the cause chain and 503 `persistence-unavailable` otherwise, as `space-host.ts` already does for `GET /`. The browser treats both alike today (`createSpaceStartup` rejects on either), so nothing it does changes.
 
 ## Acceptance
 
-- [ ] A stored document that is not JSON reaches the reader as `AggregateInvariantError`, on both SQL adapters, proven by an integration test on each.
-- [ ] `test/integration/sqlite-space-repository.test.ts`'s pin is replaced by the assertion its siblings make.
-- [ ] The host's two `isAggregateInvariant` calls are exercised for this flavour, not only for the intake one.
+- [ ] Red first. SQLite repository: `truncates a stored Space whose document is not JSON`'s pin (`isAggregateInvariant(readFailure) === false`) becomes the `rejects.toThrow(AggregateInvariantError)` its siblings assert, with sibling cases for a non-JSON Thing document and a non-canonical stored revision.
+- [ ] PostgreSQL integration: a raw insert of text that is not JSON into `spaces.document` is refused by the database.
+- [ ] `@project/http`: `GET /api/aggregate` answers 500 `internal-error` for an invariant failure, including one carried only on `cause`, and 503 `persistence-unavailable` for any other throw.
+- [ ] SQLite HTTP runtime: with a non-JSON Space document stored, `GET /` answers `internal-error` and start-up gives up rather than spending its retry budget — the host's two `isAggregateInvariant` calls exercised for this flavour.
+- [ ] SQLite's aggregate read decodes the Space document itself; no catch surrounds a query.
+- [ ] SQLite's `loadSpace`/`listSpaces` carry PostgreSQL's comment on keeping the narrower error.
+- [ ] `pnpm verify` and `pnpm test:integration:sqlite` are green. `pnpm test:integration:postgres` and `pnpm e2e:sqlite` are run or named as skipped with the reason. `pnpm e2e` is inapplicable.
