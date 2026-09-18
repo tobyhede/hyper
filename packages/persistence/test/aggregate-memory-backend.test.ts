@@ -130,6 +130,53 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     });
   });
 
+  /*
+   * A conflict's `current` is a stored Space too, and every other read answers
+   * its Things ascending by id (ADR 0078) — the SQL adapters read `current` off
+   * the same `orderBy(thing.id.asc())` query as every other read, so a conflict
+   * is not a second, unsorted path to the same Space.
+   */
+  it('answers a conflict’s current Space with its Things in ascending id order too', async () => {
+    const unordered: SpaceSnapshot = {
+      ...snapshot(),
+      things: [
+        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+      ],
+    };
+    const ordered: SpaceSnapshot = {
+      ...unordered,
+      things: [
+        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+      ],
+    };
+    const backend = new MemorySpaceBackend(META_ID, [
+      { snapshot: unordered, revision: 3n, exportedRevision: null },
+    ]);
+
+    await expect(
+      backend.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: META_ID,
+            snapshot: snapshot(META_ID, 'Changed'),
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: META_ID,
+          current: { snapshot: ordered, revision: 3n, exportedRevision: null },
+        },
+      ],
+    });
+  });
+
   it('reports every create, update, and delete conflict without changing anything', async () => {
     const backend = new MemorySpaceBackend(META_ID, [loaded()]);
 

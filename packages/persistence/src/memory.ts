@@ -147,11 +147,7 @@ export class MemorySpaceBackend implements SpaceBackend {
     const injected = this.#testControl?.nextResult();
     if (injected !== undefined) return clone(injected);
 
-    const decision = decideCommit(
-      request,
-      this.#metaSpaceId,
-      [...this.#spaces.values()].map(clone),
-    );
+    const decision = decideCommit(request, this.#metaSpaceId, [...this.#spaces.values()].map(read));
     if (decision.kind === 'answer') return backendResult(decision.result);
     this.#spaces.clear();
     for (const space of decision.spaces) this.#spaces.set(space.snapshot.id, clone(space));
