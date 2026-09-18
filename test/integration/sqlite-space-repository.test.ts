@@ -477,7 +477,7 @@ describe('SqliteSpaceRepository', () => {
    * Stored state that is not an aggregate cannot be written through either
    * lifecycle door, so these cases write rows directly. Reading and
    * initializing fail it as an invariant and leave it alone; replacement
-   * truncates it (ADR 0092), still authorized by the Meta identity it read.
+   * truncates it (ADR 0094), still authorized by the Meta identity it read.
    */
   const storedRow = (id: UUID, document: Readonly<Record<string, string | number>>) => ({
     id,

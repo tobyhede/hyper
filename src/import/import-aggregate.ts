@@ -90,7 +90,7 @@ const initializeUnderTruncate = async (
  * initialized repository is left exactly as it is — an import that would have
  * overwritten authored state says so instead of doing it. With it, whatever is
  * stored is truncated and the aggregate written in its place, atomically,
- * whether or not the stored state is a valid aggregate (ADR 0092). The Meta
+ * whether or not the stored state is a valid aggregate (ADR 0094). The Meta
  * identity `loadMetaSpaceId` just read is what authorizes that, rather than one
  * the caller supplies: an identity that moved in between is a conflict, and the
  * replacement rolls back rather than destroying a repository the operator was

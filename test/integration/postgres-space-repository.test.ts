@@ -255,7 +255,7 @@ describe('PostgresSpaceRepository', () => {
 
   /*
    * Replacement truncates stored state whether or not it is an aggregate
-   * (ADR 0092), still authorized by the Meta identity it read. Each state is
+   * (ADR 0094), still authorized by the Meta identity it read. Each state is
    * written raw because no lifecycle door stores it.
    */
   describe('truncating stored state that is not an aggregate', () => {

@@ -45,12 +45,12 @@ export interface SpaceRepository extends SpaceResourceRepository {
   /**
    * The stored Meta identity, read without validating the aggregate around it,
    * or `undefined` when none is stored. It is what authorizes a replacement of
-   * stored state `loadAggregate` refuses to read (ADR 0092).
+   * stored state `loadAggregate` refuses to read (ADR 0094).
    */
   loadMetaSpaceId(): Promise<UUID | undefined>;
   /**
    * Truncate whatever is stored, valid or not, and write `input` in its place
-   * (ADR 0092). `expectedMetaSpaceId` is the identity `loadMetaSpaceId` read;
+   * (ADR 0094). `expectedMetaSpaceId` is the identity `loadMetaSpaceId` read;
    * a different one stored by now is a `conflict`, and an empty repository is
    * `uninitialized`, because first state is `initializeAggregate`'s.
    */

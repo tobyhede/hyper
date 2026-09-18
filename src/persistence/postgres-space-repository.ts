@@ -525,7 +525,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
       return await this.#database.transaction(async ({ orm }) => {
         const metaSpaceId = await lockMetaIdentity(orm);
         // Rows are read raw rather than through `loadEverySpace`: truncation
-        // replaces stored state whether or not it parses (ADR 0092).
+        // replaces stored state whether or not it parses (ADR 0094).
         // In id order, so two overlapping replacements take the row locks below
         // in the same order: the later waits on the earlier rather than
         // deadlocking with it. Where no Meta row exists to lock, those row locks

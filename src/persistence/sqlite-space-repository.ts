@@ -441,7 +441,7 @@ export class SqliteSpaceRepository implements SpaceRepository {
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     return this.#database.transaction(async ({ orm }) => {
       // Read raw rather than through `loadEverySpace`: truncation replaces
-      // stored state whether or not it parses (ADR 0092).
+      // stored state whether or not it parses (ADR 0094).
       const metaSpaceId = await lockMetaIdentity(orm);
       if (metaSpaceId === undefined && (await orm.Space.first()) === null) {
         return { kind: 'uninitialized' };

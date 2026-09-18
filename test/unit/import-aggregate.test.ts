@@ -348,7 +348,7 @@ describe('importAggregate', () => {
   /*
    * `--dangerous-truncate` truncates. Stored state `loadAggregate` refuses to
    * read is still stored state, and the flag replaces it rather than stopping
-   * at the read (ADR 0092).
+   * at the read (ADR 0094).
    */
   it('truncates Spaces stored without a Meta identity and imports in their place', async () => {
     const stored = MemorySpaceRepository.withoutMetaIdentity([
