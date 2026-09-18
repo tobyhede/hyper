@@ -1,6 +1,6 @@
 import { uuidSchema, type UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceCommit, SpaceSummary } from './backend';
-import { committedRevision, decideCommit } from './commit-decision';
+import { decideCommit } from './commit-decision';
 import type { RepositoryCommitResult } from './repository';
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -134,22 +134,11 @@ export class MemorySpaceBackend implements SpaceBackend {
     const decision = decideCommit(
       request,
       this.#metaSpaceId,
-      [...this.#spaces.values()]
-        .map(clone)
-        .sort((left, right) => (left.snapshot.id < right.snapshot.id ? -1 : 1)),
+      [...this.#spaces.values()].map(clone),
     );
     if (decision.kind === 'answer') return backendResult(decision.result);
-    for (const change of request.changes) {
-      if (change.kind === 'delete') {
-        this.#spaces.delete(change.spaceId);
-        continue;
-      }
-      this.#spaces.set(change.spaceId, {
-        snapshot: clone(change.snapshot),
-        revision: committedRevision(change),
-        exportedRevision: this.#spaces.get(change.spaceId)?.exportedRevision ?? null,
-      });
-    }
+    this.#spaces.clear();
+    for (const space of decision.spaces) this.#spaces.set(space.snapshot.id, clone(space));
     return backendResult(decision.result);
   }
 }

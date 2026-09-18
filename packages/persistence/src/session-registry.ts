@@ -694,10 +694,8 @@ export function createSpaceSessionRegistry(
 
       /*
        * The pre-commit verdict is the same judge the repository runs (ADR
-       * 0095, ADR 0097): `stored` is this turn's one aggregate read, sorted
-       * the way every backend's own `commit` sorts it, so an
-       * `invalid-space-snapshot` refusal would name the same Space either way.
-       * Spaces the Edit does not change are therefore judged as stored and
+       * 0095, ADR 0097): `stored` is this turn's one aggregate read. Spaces
+       * the Edit does not change are therefore judged as stored and
        * participants as what the commit sends — never a non-participant's
        * uncommitted working Space, which the repository will not see.
        *
@@ -705,13 +703,7 @@ export function createSpaceSessionRegistry(
        */
       const preCheck = isRetry
         ? undefined
-        : decideCommit(
-            { changes: backendChanges },
-            aggregate.metaSpaceId,
-            [...aggregate.spaces].sort((left, right) =>
-              left.snapshot.id < right.snapshot.id ? -1 : 1,
-            ),
-          );
+        : decideCommit({ changes: backendChanges }, aggregate.metaSpaceId, aggregate.spaces);
       if (preCheck?.kind === 'answer' && preCheck.result.kind === 'aggregate-refused') {
         const refusal = { kind: 'aggregate-refused', errors: preCheck.result.errors } as const;
         installed(refusal);

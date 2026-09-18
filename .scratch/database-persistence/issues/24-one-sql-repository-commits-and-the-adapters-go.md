@@ -19,3 +19,5 @@
 - [ ] `AGENTS.md` and `docs/agents/editing-and-persistence.md` name the one repository where they named either adapter.
 
 Out of scope: moving per-database tests into the contract (25); host composition (26); naming database contention as its own outcome.
+
+Note (ticket 28): `decideCommit`'s `write` decision now also carries `spaces` — every stored Space the commit produces, ascending by id. The one SQL repository this ticket builds writes rows and deliberately ignores it, the same as both adapters do today.
