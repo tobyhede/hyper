@@ -21,34 +21,34 @@ function toError(reason: unknown): Error {
   return reason instanceof Error ? reason : new Error(String(reason));
 }
 
+/**
+ * Resolve a Diagram's positioned strategy over its own placement.
+ *
+ * `placement` is the one source of geometry — the selected Diagram's own
+ * positions, or a resize draft's rect layered over them — and the positioned
+ * strategy is built from it here rather than taken as a second argument: a
+ * caller that also built one from the same placement could only agree with
+ * this or be stale. Keyed on `placement`'s identity, which every caller
+ * memoises on the selected Diagram, so an ordinary drag frame — which moves
+ * nothing in the working snapshot until it settles — does not rebuild the
+ * strategy and does not re-run layout.
+ */
 export function usePlacementRendering(
   strategyGraph: LayoutStrategyGraph,
-  strategy: LayoutStrategy,
-  authoredPlacement: Placement | null,
+  placement: Placement,
 ): PlacementRenderingState {
   const [result, setResult] = useState<PlacementRenderingResult | null>(null);
-  // Split from the fallback so authored placement does not depend on `strategy`:
-  // a new automatic strategy identity would otherwise rebuild the positioned one
-  // and re-run layout, discarding a settled authored render for an identical result.
-  //
-  // Keyed on the Placement's identity, which Space Authoring keeps stable while
-  // the value is unchanged — so a projection reporting the geometry already on
-  // screen does not re-run layout over a settled render.
-  const authoredStrategy = useMemo<LayoutStrategy | null>(
-    () => (authoredPlacement === null ? null : positionedStrategy(authoredPlacement)),
-    [authoredPlacement],
-  );
-  const renderingStrategy = authoredStrategy ?? strategy;
+  const strategy = useMemo(() => positionedStrategy(placement), [placement]);
 
   useEffect(() => {
     let current = true;
     void Promise.resolve()
-      .then(() => renderingStrategy(strategyGraph))
+      .then(() => strategy(strategyGraph))
       .then((placed) => {
         if (current) {
           setResult({
             input: strategyGraph,
-            strategy: renderingStrategy,
+            strategy,
             state: { kind: 'ready', strategyGraph: placed },
           });
         }
@@ -57,7 +57,7 @@ export function usePlacementRendering(
         if (current) {
           setResult({
             input: strategyGraph,
-            strategy: renderingStrategy,
+            strategy,
             state: { kind: 'failed', error: toError(reason) },
           });
         }
@@ -65,9 +65,9 @@ export function usePlacementRendering(
     return () => {
       current = false;
     };
-  }, [strategyGraph, renderingStrategy]);
+  }, [strategyGraph, strategy]);
 
-  return result?.input === strategyGraph && result.strategy === renderingStrategy
+  return result?.input === strategyGraph && result.strategy === strategy
     ? result.state
     : { kind: 'pending' };
 }

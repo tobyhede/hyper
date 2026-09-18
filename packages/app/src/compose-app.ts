@@ -1,5 +1,5 @@
 import { newUuid, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
-import { Placement, type ResolvedDiagram, type Space } from '@project/graph';
+import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createContinuation, type Continuation } from './continuation';
@@ -8,16 +8,16 @@ import { createThingDeletion, type ThingDeletion } from './thing-deletion';
 import type { SpaceThingAuthoring } from './space-thing-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
-import { requireDefaultDiagram, resolveDiagram } from './diagram-resolution';
+import { requireDefaultDiagram } from './diagram-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
 
 /**
  * What an opened Space is composed of.
  *
- * The order below is not free — the opening Diagram resolves before Navigation
- * and before the opening placement, Authoring before the render adapter, and
- * both before Edge Authoring — and every collaborator closes over
+ * The order below is not free — the opening Diagram resolves before
+ * Navigation, Authoring before the render adapter, and both before Edge
+ * Authoring — and every collaborator closes over
  * **one** {@link createWorkingSpaceReader}, which is what gives them a single
  * `Space` identity to share. Written out at a call site, that is ten statements
  * whose ordering and shared reader nothing checks; written here, a caller
@@ -60,13 +60,6 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * the composition always says where an Edit's identities came from.
    */
   readonly newId?: (() => UUID) | undefined;
-  /**
-   * The placement the Space opens on.
-   *
-   * Absent, the opening Diagram supplies its already-authored, possibly sparse
-   * map. An explicit `null` says "none", which is not the same statement.
-   */
-  readonly initialPlacement?: Placement | null | undefined;
   /**
    * Where this composition reports an observer failure the work it describes
    * must survive.
@@ -151,16 +144,6 @@ export interface ComposedApp extends AppCore {
 }
 
 /**
- * The placement a resolved Diagram opens on (ADR 0025).
- *
- * Exported because selecting a Diagram asks the same question again
- * (`App.tsx`), and a Space that opens on one placement while re-selecting the
- * same Diagram installs another is two sources of truth for one rule.
- */
-export const openingPlacement = (resolved: ResolvedDiagram): Placement | null =>
-  Placement.fromDiagram(resolved.diagram);
-
-/**
  * Navigation and everything it needs, over one working-space reader.
  *
  * Stops here because a test that wraps Navigation before handing it to
@@ -186,25 +169,16 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const {
     spaceSession,
     newId = newUuid,
-    initialPlacement,
     reportObserverError,
     connections,
     spaceThings,
   } = dependencies;
   const core = composeCore(dependencies);
-  const { currentSpace, navigation, openingSelection } = core;
-  // Live nodes hold whichever positions are on screen. Absent an argument, the
-  // Diagram the composition opened in answers what they start as; an explicit
-  // one — `null` included — is the caller's own statement and stands.
-  const placement =
-    initialPlacement === undefined
-      ? openingPlacement(resolveDiagram(currentSpace(), openingSelection))
-      : initialPlacement;
+  const { currentSpace, navigation } = core;
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
     currentSpace,
-    initialPlacement: placement,
     newId,
     reportObserverError,
   });

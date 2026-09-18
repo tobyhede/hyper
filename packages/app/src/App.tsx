@@ -24,7 +24,7 @@ import {
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import { createNonThrowingReporter, type SpaceSummary } from '@project/persistence';
-import { graphThingIds, Placement, positionedStrategy } from '@project/graph';
+import { graphThingIds, Placement } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
 import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
@@ -556,10 +556,12 @@ export const createApp = (
       () => resolveDiagram(renderedSpace, selectedDiagramId),
       [renderedSpace, selectedDiagramId],
     );
-    // The positioned strategy that draws this Diagram, built where it is used:
-    // its one consumer is the placement rendering below (ADR 0025, ADR 0041).
-    const strategy = useMemo(
-      () => positionedStrategy(Placement.fromDiagram(selectedDiagram.diagram)),
+    // This Diagram's own placement, memoised on `selectedDiagram` alone. A drag
+    // frame does not change `selectedDiagram`'s identity, so it does not change
+    // this either, which is what keeps `usePlacementRendering` below from
+    // rebuilding its strategy and re-running layout mid-drag.
+    const diagramPlacement = useMemo(
+      () => Placement.fromDiagram(selectedDiagram.diagram),
       [selectedDiagram],
     );
     // The Things this Diagram places. Memoized on the same two values the Diagram
@@ -603,15 +605,6 @@ export const createApp = (
     // filter and a map over one Graph's Edges, or nothing at all outside presentation.
     const moves = navigation.moves();
 
-    // Read at the point of use, like `moves` above and for the same reason: the
-    // placement is not published state, and subscribing to it through the
-    // render adapter — a store that knows nothing about either the placement or
-    // the selected Diagram — only worked because every install happened to be
-    // followed by an unrelated notification. This component already re-renders
-    // on both stores, and a render-time read cannot be stale at the render that
-    // uses it. `replacePlacement` keeps the map's identity when the value is
-    // unchanged, so this does not defeat the memo below.
-    const authoredPositions = authoring.authoredPlacement();
     const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
     const selection = useRenderAdapter((s) => s.selection);
     const selectedThingId = selectedThingOf(selection);
@@ -717,8 +710,7 @@ export const createApp = (
     }
     const placement = usePlacementRendering(
       projection.strategyGraph,
-      strategy,
-      resizeDraft?.placement ?? authoredPositions,
+      resizeDraft?.placement ?? diagramPlacement,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
@@ -1656,11 +1648,10 @@ export const createApp = (
                 : null,
               // **Answered, not swallowed** — the same shape the Diagram arm
               // above spends, and for the same reason. A Graph Edit can be
-              // refused for reasons no surface can see coming (`placement-pending`
-              // before the canvas has reported, `graph-not-owned` for a Graph a
-              // second Diagram owns), and a command that discards that answer
-              // closes its menu having changed nothing, said nothing and logged
-              // nothing.
+              // refused for reasons no surface can see coming (`graph-not-owned`
+              // for a Graph a second Diagram owns), and a command that discards
+              // that answer closes its menu having changed nothing, said nothing
+              // and logged nothing.
               onRecolor: (graphId, color) => {
                 reportGraphEdit(authoring.complete({ kind: 'recolored-graph', graphId, color }));
               },

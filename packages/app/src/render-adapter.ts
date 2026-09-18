@@ -14,7 +14,8 @@ import type { SpaceAuthoring } from './space-authoring';
 
 /**
  * The render adapter owns React Flow's transient projection. Space Authoring
- * owns the completed on-screen placement.
+ * derives the Diagram's completed placement fresh, on demand, rather than
+ * holding one.
  *
  * Live nodes absorb every intermediate React Flow change so controlled dragging
  * follows the pointer, and they are published together with the Graph Edges
@@ -217,10 +218,11 @@ export interface RenderAdapterState {
   /** Publish projected Thing nodes, their declared handles and Graph Edges together. */
   syncProjection: (nodes: readonly ThingFlowNode[], edges: readonly Edge[]) => void;
   /**
-   * Navigate to another Diagram. The replacement placement will arrive via
-   * `syncProjection`; Diagram selection itself is not an edit.
+   * Navigate to another Diagram: reset this canvas's projection and drag
+   * state. The new Diagram's geometry arrives via the next `syncProjection`;
+   * Diagram selection itself is not an Edit.
    */
-  selectDiagram: (placement: Placement | null) => void;
+  selectDiagram: () => void;
   /** Apply React Flow's own changes (drag, measure, select). */
   changeNodes: (changes: NodeChange<ThingFlowNode>[]) => void;
   /**
@@ -256,19 +258,18 @@ export interface RenderAdapterState {
    * The Placement the live nodes are currently drawn at, or `null` before the
    * first placement resolves.
    *
-   * What a pointer gesture reports to Authoring: a completion is the only thing
-   * that knows where React Flow has actually put the Things, and this is that
-   * reading. It is a report and not an authorship claim — `Placement.next`
-   * decides which of these positions become authored.
+   * The one caller is Edge Authoring's connection completion, asked ahead of
+   * completing a connect or create-and-connect: `null` means nothing has
+   * rendered yet, so there is nothing on screen to draw the new Edge against.
    */
   renderedPlacement: () => Placement | null;
   /**
    * Fold a freshly projected node list into the live one, so an Edit's own Edge
    * draws without waiting for a strategy to resolve.
    *
-   * Separate from `syncProjection` because it reports nothing back to Authoring:
-   * the completion that calls it has already installed the placement it wrote,
-   * and a second report of the same geometry could only disagree with it.
+   * Separate from `syncProjection` because the completion that calls it has
+   * already written its own geometry into the Diagram, and this is the render
+   * path catching up to it rather than the render path publishing something new.
    */
   mergeProjected: (projected: readonly ThingFlowNode[]) => void;
 }
@@ -276,14 +277,14 @@ export interface RenderAdapterState {
 export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
 
 /**
- * Reduce React Flow's widened node ids and positions to the Placement Authoring
- * owns. Whether that geometry is a rendered report or part of a completed
- * authoring fact is decided at each call site below.
+ * Reduce React Flow's widened node ids and positions to a `Placement` of what
+ * is currently drawn. Read by `renderedPlacement`, the "is anything on screen
+ * yet" question Edge Authoring asks before completing a connection.
  */
 function placementFromNodes(nodes: readonly ThingFlowNode[]): Placement {
   // SAFETY: a node id is the Thing id it was projected from, widened to
   // `string` by React Flow's `Node` type — the same erasure
-  // `consumeSettledMovedIds` repairs below.
+  // `consumeSettledMoves` repairs below.
   return Placement.fromEntries(nodes.map((node) => [node.id as ThingId, node.position]));
 }
 
@@ -299,14 +300,21 @@ function trackDragOrigins(
   }
 }
 
-function consumeSettledMovedIds(
+/**
+ * The moved Things' own drop points, exactly: which settled changes actually
+ * ended somewhere other than where the drag began, and where.
+ *
+ * Answers the drop points directly rather than a list of ids — Authoring now
+ * merges these over the Diagram's own positions at derivation, so there is no
+ * second lookup back into `nodes` for a caller to get wrong.
+ */
+function consumeSettledMoves(
   settled: readonly NodePositionChange[],
   dragOrigins: Map<string, DiagramPosition>,
   beforeById: ReadonlyMap<string, DiagramPosition>,
   afterById: ReadonlyMap<string, DiagramPosition>,
-): ThingId[] {
-  // The same `Node.id` erasure `placementFromNodes` repairs above.
-  const movedIds: ThingId[] = [];
+): ReadonlyMap<ThingId, DiagramPosition> {
+  const moved = new Map<ThingId, DiagramPosition>();
   for (const change of settled) {
     const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
     const after = afterById.get(change.id);
@@ -316,11 +324,11 @@ function consumeSettledMovedIds(
       after !== undefined &&
       (origin.x !== after.x || origin.y !== after.y)
     ) {
-      // SAFETY: same `Node.id` erasure as `placementFromNodes` above.
-      movedIds.push(change.id as ThingId);
+      // SAFETY: same `Node.id` erasure `placementFromNodes` repairs above.
+      moved.set(change.id as ThingId, after);
     }
   }
-  return movedIds;
+  return moved;
 }
 
 /**
@@ -417,12 +425,7 @@ function selecting(
 
 export type RenderAdapterAuthoring = Pick<
   SpaceAuthoring,
-  | 'authoredPlacement'
-  | 'complete'
-  | 'reportRendered'
-  | 'replacePlacement'
-  | 'getState'
-  | 'subscribe'
+  'diagramPlacement' | 'complete' | 'getState' | 'subscribe'
 >;
 
 export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAdapter {
@@ -437,16 +440,10 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
     // partial, so this reference is what the canvas keeps holding.
     thingResize: {
       beginResize: (thingId) => {
-        const authored = authoring.authoredPlacement();
-        const at = authored?.get(thingId);
-        if (authored === null || at?.open !== true) return;
-        set({
-          resizeDraft: {
-            thingId,
-            size: at.openSize,
-            placement: authored,
-          },
-        });
+        const placement = authoring.diagramPlacement();
+        const at = placement.get(thingId);
+        if (at?.open !== true) return;
+        set({ resizeDraft: { thingId, size: at.openSize, placement } });
       },
 
       previewResize: (thingId, size) => {
@@ -479,11 +476,6 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       },
     },
 
-    // Compute, publish, then tell Authoring where the things ended up — the same
-    // order as `changeNodes` and `connectThings` below. Installing from inside
-    // the `set` updater put the cross-store write before the state it describes
-    // was committed, so this store still held the previous projection at the
-    // moment anything downstream was told about the new one.
     syncProjection: (nodes, edges) => {
       const current = get().projection;
       // The empty list rather than a separate branch for the first projection:
@@ -509,19 +501,15 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         state.selection,
       );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
-      // Reporting geometry, not authoring it: only Things the selected Diagram
-      // draws can contribute placement.
-      authoring.reportRendered(placementFromNodes(reconciled));
     },
 
-    selectDiagram: (placement) => {
+    selectDiagram: () => {
       set({
         projection: null,
         dragOrigins: new Map(),
         selection: NO_SELECTION,
         resizeDraft: null,
       });
-      authoring.replacePlacement(placement);
     },
 
     reportEmbeddedDiagramEditing: (editing) => {
@@ -618,9 +606,9 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Only a settled drag compares its last position to the gesture origin.
       // Intermediate pointer frames publish above without paying for this map.
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
-      const movedIds = consumeSettledMovedIds(settled, dragOrigins, beforeById, afterById);
+      const moved = consumeSettledMoves(settled, dragOrigins, beforeById, afterById);
 
-      if (movedIds.length === 0) {
+      if (moved.size === 0) {
         set({ projection: { ...projection, nodes }, dragOrigins, selection });
         return;
       }
@@ -630,13 +618,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
         dragOrigins,
         selection,
       });
-      authoring.complete({
-        kind: 'settled-thing-movement',
-        rendered: placementFromNodes(nodes),
-        // The gesture placed exactly `movedIds`; every other Thing keeps
-        // whatever authorship it already had.
-        placed: movedIds,
-      });
+      authoring.complete({ kind: 'settled-thing-movement', moved });
     },
 
     changeEdges: (changes) => {

@@ -99,17 +99,24 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
  *
  * Identities and the settled value, never a plan: the interaction says what it
  * finished, and every read of current state, every eligibility question and the
- * whole derivation of the next Space happen on this side of the seam. Three
- * kinds carry `rendered` because a pointer gesture is the only thing that knows
- * where React Flow has drawn the Things; the rest are written into the placement
- * already installed.
+ * whole derivation of the next Space happen on this side of the seam.
+ * `settled-thing-movement` alone carries geometry — the moved Things' own drop
+ * points — because a pointer gesture is the only thing that knows where React
+ * Flow drew them; every other kind is written against the Diagram the Edit
+ * derives against.
  */
 export type AuthoringCompletion =
   | { readonly kind: 'created-diagram' }
   | {
       readonly kind: 'settled-thing-movement';
-      readonly rendered: Placement;
-      readonly placed: readonly ThingId[];
+      /**
+       * The moved Things' drop points, exactly. Applied over the Diagram's own
+       * positions at derivation — drain time for a queued completion — rather
+       * than merged here, so a drag that queues behind another Edit lands
+       * against the Diagram as it stands when it is finally derived, not the
+       * one that was current when the gesture settled.
+       */
+      readonly moved: ReadonlyMap<ThingId, DiagramPosition>;
     }
   | { readonly kind: 'opened-thing'; readonly thingId: ThingId }
   | { readonly kind: 'closed-thing'; readonly thingId: ThingId }
@@ -122,7 +129,6 @@ export type AuthoringCompletion =
       readonly kind: 'connected-things';
       readonly from: ThingId;
       readonly to: ThingId;
-      readonly rendered: Placement;
       /**
        * The Graph this Edge joins. Host canvas omits it and writes the Active
        * Graph. A Space Thing names the Graph it is showing.
@@ -138,7 +144,6 @@ export type AuthoringCompletion =
       readonly kind: 'create-and-connect';
       readonly from: ThingId;
       readonly position: DiagramPosition;
-      readonly rendered: Placement;
     }
   /** Add Thing: a detached Markdown Thing at the visible centre, neutrally titled. */
   | { readonly kind: 'created-thing'; readonly anchor: DiagramPosition }
@@ -175,22 +180,15 @@ export type AuthoringCompletion =
    * 0083 keeps the target's name off the Thing's front, so nothing in another
    * Space draws what this writes.
    *
-   * Derived in the region above the `placement-pending` gate, beside
-   * `created-diagram` and `deleted-diagram`, because that is already the region
-   * for Edits on the document rather than inside a Diagram: all three write keys
-   * of `document`, read `session.getState().working` direct, and answer their own
-   * placement. This one reuses `Placement.fromDiagram` over the Diagram it does
-   * not change, which loses nothing — under ADR 0084 the Diagram *is* the
-   * authority for what the canvas draws, so re-deriving the placement from it is
-   * an identity on the one already installed.
+   * Derived beside `created-diagram` and `deleted-diagram`, ahead of the general
+   * per-Diagram path below: all three write keys of `document` directly, read
+   * `session.getState().working` themselves, and still owe `CompletedEdit` a
+   * Diagram and Active Graph to continue in even though this one changes
+   * neither. It resolves the selected Diagram only for that pair.
    *
-   * Two shapes were rejected for it. Below the gate, parallel to
-   * `renamed-diagram`, is the smaller change and gives the Edit a
-   * `placement-pending` refusal plus an answer to whether it is a
-   * `DiagramRequiredOperation` — two sentences that are simply wrong about an
-   * Edit holding no Diagram. Making `placement` and `nextDiagramId` optional on
-   * `CompletedEdit` names the class honestly and weakens, for one member, a type
-   * whose whole promise is that nothing is left to decide.
+   * The shape rejected for it was parallel to `renamed-diagram`, below the
+   * general path: a `DiagramRequiredOperation` answer and a Diagram lookup for
+   * an Edit that touches no Diagram, both wrong about what this Edit is.
    */
   | { readonly kind: 'renamed-space'; readonly title: string }
   | { readonly kind: 'added-graph' }
@@ -264,7 +262,6 @@ export type StoredSpaceRefusal =
 
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
-  | { readonly code: 'placement-pending' }
   | { readonly code: 'diagram-not-found' }
   | { readonly code: 'diagram-required'; readonly operation: DiagramRequiredOperation }
   | { readonly code: 'thing-not-found' }
@@ -305,11 +302,10 @@ export type AuthoringRefusal =
  * The published state: what the collaborators say, plus the one thing only
  * Authoring knows — that a replacement Space has been opened over them.
  *
- * The on-screen placement is deliberately absent. It is an *input* the canvas
- * pushes in on every projection and pointer frame, not something Authoring
- * publishes, and a copy carried here could only disagree with the value
- * `authoredPlacement` answers — installing a placement is not a publication.
- * One accessor, read when it is needed.
+ * Placement is absent because Authoring holds none: every Edit derives it
+ * fresh, from the Diagram it is writing, at the moment it derives. A caller
+ * that wants the selected Diagram's current placement reads it the same way —
+ * `Placement.fromDiagram` over the Diagram Navigation names.
  */
 export interface SpaceAuthoringState {
   /**
@@ -329,18 +325,16 @@ export interface SpaceAuthoringState {
 
 export interface SpaceAuthoring {
   readonly getState: () => SpaceAuthoringState;
-  /**
-   * The selected Diagram's installed placement.
-   *
-   * Read at the point of use rather than subscribed to. Every path that
-   * installs a placement is paired with a publication from this store or from
-   * the render adapter, so a reader that re-reads on notification from either
-   * always sees the current value.
-   */
-  readonly authoredPlacement: () => Placement | null;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly reportRendered: (rendered: Placement) => void;
-  readonly replacePlacement: (placement: Placement | null) => void;
+  /**
+   * The selected Diagram's own placement, derived fresh from the working
+   * snapshot.
+   *
+   * Not published state — every reader that wants it asks at the point of use,
+   * the same way a completed Edit derives its own. The render adapter's resize
+   * seed is the one caller outside this module.
+   */
+  readonly diagramPlacement: () => Placement;
   /**
    * Whether an Edge gesture may be offered as things stand, and why not.
    *
@@ -398,7 +392,6 @@ export interface SpaceAuthoring {
  */
 interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
-  readonly placement: Placement;
   /** The Diagram this Edit wrote, which Navigation continues in. */
   readonly nextDiagramId: DiagramId;
   /**
@@ -438,7 +431,6 @@ const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refus
  */
 interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
-  readonly placement: Placement | null;
   readonly embeddedDiagramId?: UUID | undefined;
 }
 
@@ -484,7 +476,6 @@ interface SpaceAuthoringDependencies {
    * Space's own `lookup`.
    */
   readonly currentSpace: () => Space;
-  readonly initialPlacement?: Placement | null;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
    * Mints the identity of every Thing, Diagram and Graph a completed Edit creates.
@@ -829,36 +820,17 @@ export function createSpaceAuthoring({
   session,
   navigation,
   currentSpace,
-  initialPlacement = null,
   reportObserverError = (error) => console.error('SpaceAuthoring observer failed', error),
   newId,
 }: SpaceAuthoringDependencies): SpaceAuthoring {
-  let placement: Placement | null = initialPlacement;
   let replacementEpoch = 0;
   let installing = 0;
-
-  // The one way placement is written — every path goes through here, including
-  // Edit completion and accepting a stored Space.
-  //
-  // Identity is load-bearing, not just the value: `usePlacementRendering`
-  // rebuilds the positioned strategy whenever this changes identity and re-runs
-  // diagram, so an equal placement pushed in by a projection must keep the one it
-  // already has or every projection would re-arrange a settled graph. A
-  // completed Edit needs no help getting its re-layout — it replaces the working
-  // snapshot, and the `LayoutStrategyGraph` derived from it re-fires the same effect.
-  const install = (nextPlacement: Placement | null): void => {
-    if (Placement.equals(placement, nextPlacement)) return;
-    placement = nextPlacement;
-  };
 
   const selectedResolvedDiagram = (): ResolvedDiagram =>
     resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
 
-  const mergeBase = (): Placement | null => placement;
-
-  const reportRendered = (rendered: Placement): void => {
-    install(Placement.next(mergeBase(), rendered, []));
-  };
+  const diagramPlacement = (): Placement =>
+    Placement.fromDiagram(selectedResolvedDiagram().diagram);
 
   const snapshotState = (): SpaceAuthoringState => ({
     replacementEpoch,
@@ -910,95 +882,14 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * Bring the placement back in step with a working snapshot this module did
-   * not write.
-   *
-   * Space Authoring installs the placement for every Edit it completes, so this
-   * is about the Edits it does not: a Space Thing lifecycle operation is one
-   * atomic Edit across several Spaces and installs the containing Space's
-   * snapshot through the session directly (ADR 0076). The Diagram it wrote then
-   * holds a Thing this placement has never heard of, and every operation keyed on
-   * placement membership — Opening it, resizing it, removing it from the Diagram
-   * — refuses `thing-not-in-diagram` for a Thing plainly on the canvas. Read the
-   * other way, a Thing the cascade deleted would linger as a position naming no
-   * Thing, which is a reference error the next Edit's intake would throw on.
-   *
-   * **Membership only.** A Thing the Diagram has gained takes the position the
-   * Diagram authored for it, one it has lost is dropped, and every Thing both
-   * still hold keeps the value the placement holds — which is what stops a
-   * reconciliation discarding a live drag, an Open state or a resize the stored
-   * snapshot has not caught up with.
-   */
-  const reconcilePlacement = (): void => {
-    /**
-     * A snapshot that no longer passes intake has no Diagram to reconcile
-     * against, and saying so is not this function's job.
-     *
-     * `selectedResolvedDiagram` resolves against `currentSpace()`, which throws
-     * for exactly that snapshot — and this runs inside a session observer,
-     * which `SpaceSession` contains by design. A throw here would therefore
-     * never reach anyone: it would go to the observer sink and take the
-     * publication below with it, leaving the canvas drawing a stale Space with
-     * nothing on screen to say why. Returning instead lets the publication
-     * happen, `App` re-derive the same aggregate on the next render, and
-     * `SpaceAppFailure` report the throw with its diagnostic — which is where an
-     * unloadable snapshot is supposed to surface (`SpaceApp.tsx`).
-     */
-    let resolved: ResolvedDiagram;
-    try {
-      resolved = selectedResolvedDiagram();
-    } catch {
-      return;
-    }
-    const authored = Placement.fromDiagram(resolved.diagram);
-    /**
-     * Nothing installed is nothing to merge, so the Diagram's own map is what
-     * there is to adopt.
-     *
-     * This does not overrule `composeApp`'s "an explicit `null` — is the
-     * caller's own statement and stands". That statement is about the placement
-     * a Space *opens* on, and every later install writes over the opening value
-     * as a matter of course: a rendered report, a completed Edit, a re-selected
-     * Diagram. What is adopted here is the same value the composition would have
-     * opened on had the caller said nothing at all, so a placement that was
-     * pending ends on geometry the Diagram already holds rather than on geometry
-     * this module invented — which is the sense in which this is still
-     * membership only.
-     *
-     * No production composition reaches it, and since ADR 0082 retired the
-     * Space Sidebar nothing outside `packages/app/test` does either.
-     * `composeApp` derives its opening placement from the Diagram it opened in
-     * and `Placement.fromDiagram` is total, so the only `null` placements are the
-     * ones a caller states — and every caller that states one is now a test
-     * arranging the geometry the case is about, rather than opening on the
-     * Diagram's own map: `space-authoring-operations.test.ts`,
-     * `space-authoring.property.test.ts` and `render-adapter.test.ts`'s
-     * session-backed adapter. The one non-test statement there used to be came
-     * from a story fixture of the retired surface, and it stated `null` for
-     * exactly the Diagram that does not resolve — so even that one died on the
-     * `catch` above rather than here. What is left is a branch production cannot
-     * enter and a test suite can.
-     */
-    if (placement === null) {
-      install(authored);
-      return;
-    }
-    let merged = placement;
-    for (const [thingId, at] of authored) {
-      if (!merged.has(thingId)) merged = Placement.place(merged, thingId, at);
-    }
-    for (const thingId of [...merged.keys()]) {
-      if (!authored.has(thingId)) merged = Placement.remove(merged, thingId);
-    }
-    install(merged);
-  };
-
-  /**
    * Bring Navigation back in step with a working snapshot this module did not
    * write.
    *
-   * The sibling of `reconcilePlacement`, and owed for the same reason. Every
-   * other replacement of the working snapshot answers the selection as it
+   * Placement needs no sibling repair: it is derived fresh from the Diagram at
+   * every read, so a snapshot this module did not write already answers it.
+   * Navigation's own selection, though, is state that has to be moved back in
+   * step deliberately. Every other replacement of the working snapshot answers
+   * the selection as it
    * installs — a completed Edit resolves the Diagram and its Active Graph before
    * `continueInDiagram`, and `acceptStoredSpace` re-opens Navigation on the
    * Space it accepted. The coordinated Space Thing lifecycle is the exception:
@@ -1065,24 +956,18 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * One publication for both reconciliations, and Navigation first.
+   * One publication for a working snapshot this module did not write.
    *
-   * The order is load-bearing: `reconcilePlacement` resolves the selected
-   * Diagram, so a selection this repairs has to be repaired before it asks —
-   * otherwise the placement silently keeps the geometry of a Diagram that is
-   * gone while the canvas draws another.
-   *
-   * `reconcilePlacement` writes through `install`, which does not publish, so
-   * this used to publish itself. `reconcileNavigation` writes through Navigation,
-   * whose own notification would publish a second time — with an Active Graph
-   * reconciled and a placement not yet, which is the part-way state
-   * `installTogether` exists to keep nobody reading.
+   * `reconcileNavigation` writes through Navigation, whose own subscription
+   * would otherwise publish on its own — `installTogether` is what keeps that
+   * suppressed and answers with exactly one publication regardless of whether
+   * a repair actually ran, since the session changed either way and every
+   * subscriber reads `SpaceAuthoringState.session` off this publication too.
    */
   const unsubscribeSession = session.subscribe(() => {
     if (installing !== 0) return;
     installTogether(() => {
       reconcileNavigation();
-      reconcilePlacement();
     });
   });
 
@@ -1131,14 +1016,13 @@ export function createSpaceAuthoring({
    * query. Refusing here keeps the interaction boundary closed over the Diagram
    * even if a stale caller names a Thing outside it.
    *
-   * Reading the installed placement rather than the stored Diagram is deliberate.
-   * It is the same value the completion reports, so the preview and the
-   * completion cannot disagree.
+   * `members` is the Diagram's own placement, and every caller reads it fresh —
+   * so a preview and the completed Edit it previews can still disagree when the
+   * Space changed between them, which is why completion asks this again rather
+   * than trusting the preview's answer.
    */
-  const connectable = (thingId: ThingId, members: Placement | null = placement): boolean =>
-    members !== null &&
-    members.has(thingId) &&
-    session.getState().working.things.some((thing) => thing.id === thingId);
+  const connectable = (thingId: ThingId, members: Placement): boolean =>
+    members.has(thingId) && session.getState().working.things.some((thing) => thing.id === thingId);
 
   /**
    * Why an Edge this gesture would author cannot be authored, or `null`.
@@ -1153,14 +1037,17 @@ export function createSpaceAuthoring({
    * can only be a duplicate of an Edge in the Graph the Edge is about to join.
    * A created Thing cannot duplicate anything, which is why the callers differ.
    *
-   * `members` and `graph` are the Diagram and Graph this Edit writes. The host
-   * canvas omits them and uses the installed placement and the Active Graph. A
-   * Space Thing names the Diagram it draws and the Graph it is showing.
+   * `members` and `graph` are the Diagram and Graph this Edit writes, and every
+   * caller supplies `members` explicitly — the selected Diagram's own placement
+   * for a preview, the in-progress `completedPlacement` for an Edit already
+   * assembling one. `graph` alone keeps a default, the Active Graph through
+   * `targetGraph()`, because the host canvas is the one caller that never names
+   * a Graph of its own; a Space Thing names the Graph it is showing.
    */
   const connectRefusal = (
     from: ThingId,
     to: ThingId | null,
-    members: Placement | null = placement,
+    members: Placement,
     graph: Graph | null = targetGraph(),
   ): AuthoringRefusal | null => {
     if (!connectable(from, members) || (to !== null && !connectable(to, members))) {
@@ -1183,20 +1070,19 @@ export function createSpaceAuthoring({
    * still change before the completion asks again.
    */
   const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
+    // The selected Diagram's own placement, read fresh — both branches ask
+    // about a Graph `ownedGraph`/`targetGraph` already scope to that Diagram,
+    // so this is the one Diagram either question could mean.
+    const members = diagramPlacement();
     if (proposal.kind !== 'reconnect') {
       const refusal = connectRefusal(
         proposal.from,
         proposal.kind === 'connect' ? proposal.to : null,
+        members,
       );
       return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
     }
-    if (placement === null) {
-      return {
-        kind: 'refused',
-        refusal: { code: 'placement-pending' },
-      };
-    }
-    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, placement, (thingId) =>
+    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, members, (thingId) =>
       session.getState().working.things.some((thing) => thing.id === thingId),
     );
     return outcome.kind === 'refused' ? outcome : ELIGIBLE;
@@ -1219,7 +1105,6 @@ export function createSpaceAuthoring({
    */
   const deriveCompletedEdit = ({
     completion,
-    placement: reportedPlacement,
     embeddedDiagramId,
   }: ReportedCompletion): DerivedCompletion => {
     const selection = embeddedDiagramId ?? navigation.getState().selectedDiagramId;
@@ -1247,7 +1132,6 @@ export function createSpaceAuthoring({
         kind: 'completed',
         edit: {
           snapshot: next,
-          placement: emptyPlacement,
           nextActiveGraphId: graphId,
           nextDiagramId: diagramId,
         },
@@ -1283,7 +1167,6 @@ export function createSpaceAuthoring({
         kind: 'completed',
         edit: {
           snapshot: next,
-          placement: Placement.fromDiagram(nextDiagram),
           nextActiveGraphId: nextDiagram.activeGraph ?? nextDiagram.graphs[0]?.id ?? null,
           nextDiagramId: nextDiagram.id,
         },
@@ -1306,9 +1189,9 @@ export function createSpaceAuthoring({
       // fact about the author's own keystrokes.
       //
       // `diagram-not-found` rather than a code of its own, and no
-      // `placement-pending` or `diagram-required` arm: the refusal is the one
-      // the chosen shape already raises, and inventing a second would make an
-      // Edit that holds no Diagram say it needed one.
+      // `diagram-required` arm: the refusal is the one the chosen shape
+      // already raises, and inventing a second would make an Edit that holds
+      // no Diagram say it needed one.
       const diagram = (snapshot.document.diagrams ?? []).find(
         (candidate) => candidate.id === selection,
       );
@@ -1319,20 +1202,6 @@ export function createSpaceAuthoring({
         kind: 'completed',
         edit: {
           snapshot: next,
-          // **The placement already installed, carried forward.** This is what
-          // every other Edit does — the general path below spends
-          // `reportedPlacement` as its `completedPlacement` — and an Edit that
-          // re-derived through `Placement.fromDiagram` instead would be a second
-          // answer to a question the union answers once. The two agree in the
-          // steady state and do not agree while the canvas holds geometry no
-          // Edit has authored, and there a re-derivation snaps every Thing back
-          // to its stored position for a change that wrote `document.title`.
-          //
-          // `Placement.fromDiagram` is the fallback and not the rule, for the
-          // case that keeps this Edit above the `placement-pending` gate: the
-          // canvas may have reported nothing at all, and a Space's name is not
-          // written into a Diagram, so there is no geometry to wait on.
-          placement: reportedPlacement ?? Placement.fromDiagram(diagram),
           // **Navigation's Active Graph, not the Diagram's stored one.**
           //
           // Activating a Graph is not an Edit (ADR 0028), so the emphasised
@@ -1365,9 +1234,6 @@ export function createSpaceAuthoring({
         },
       };
     }
-    if (reportedPlacement === null) {
-      return refuse({ code: 'placement-pending' });
-    }
     let snapshot = session.getState().working;
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
@@ -1395,7 +1261,12 @@ export function createSpaceAuthoring({
     let unplacedThingId: ThingId | undefined;
     let deletedThingId: ThingId | undefined;
     let connection: GraphEdge | null = null;
-    let completedPlacement = reportedPlacement;
+    // The Diagram's own placement, read fresh at derivation — the one source of
+    // geometry this Edit starts from. A queued completion derives against this
+    // too, at drain time rather than at the moment it was requested, which is
+    // what keeps a settled drag from landing against a Diagram that has since
+    // moved on.
+    let completedPlacement = Placement.fromDiagram(resolved.diagram);
     // The one way a Thing is added: mint it, place it at a free anchor, append it.
     // Add Thing and Add Reference Thing differ in the document they carry and in nothing
     // else — neither creates an Edge, and neither adds a Graph to a Diagram that
@@ -1587,7 +1458,7 @@ export function createSpaceAuthoring({
         things: snapshot.things.filter((thing) => thing.id !== completion.thingId),
       };
     } else if (completion.kind === 'create-and-connect') {
-      const refusal = connectRefusal(completion.from, null);
+      const refusal = connectRefusal(completion.from, null, completedPlacement);
       if (refusal !== null) return refuse(refusal);
       // The drop point is aimed at, so it is kept exactly: the gesture only
       // offers an empty-canvas release, and stepping off it would move the Thing
@@ -1614,9 +1485,18 @@ export function createSpaceAuthoring({
           : fallbackId === undefined
             ? null
             : (resolved.diagram.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
-      const refusal = connectRefusal(completion.from, completion.to, reportedPlacement, graph);
+      const refusal = connectRefusal(completion.from, completion.to, completedPlacement, graph);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
+    } else if (completion.kind === 'settled-thing-movement') {
+      // The moved Things' drop points, merged over the Diagram's own positions
+      // this Edit already started from — `Placement.next` is what keeps each
+      // Thing's Open/Closed state and Open Size while overwriting `x`/`y`.
+      completedPlacement = Placement.next(
+        completedPlacement,
+        Placement.fromEntries(completion.moved),
+        [...completion.moved.keys()],
+      );
     }
     // Which Diagram this Edit writes, and what it owns afterwards.
     const diagramId: UUID = resolved.diagram.id;
@@ -1787,7 +1667,6 @@ export function createSpaceAuthoring({
       kind: 'completed',
       edit: {
         snapshot: next,
-        placement: completedPlacement,
         nextActiveGraphId: activeGraphId,
         nextDiagramId: diagramId,
         ...created,
@@ -1796,54 +1675,36 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * Install a derived Edit: one fallible step, and then three that refuse
+   * Install a derived Edit: one fallible step, and then one that refuses
    * nothing this Edit produces.
    *
-   * `session.submit` has to come first. Both Navigation calls resolve the Graph
+   * `session.submit` has to come first. `continueInDiagram` resolves the Graph
    * and the Diagram against `currentSpace()`, which reads the working snapshot
-   * `submit` installs synchronously — before it, neither exists yet and both
+   * `submit` installs synchronously — before it, neither exists yet and it
    * would refuse. So the order is forced, and the useful consequence is that
-   * the only statement here that can *fail* is also the first: no later failure
-   * exists to invalidate an earlier success, and a `submit` that throws leaves
-   * the other three untouched rather than half-applied.
+   * the only statement here that can *fail* is also the first: a `submit` that
+   * throws leaves Navigation untouched rather than half-applied.
    *
-   * That leaves exactly one failure shape — the session ahead of the placement
-   * and Navigation — and it is the recoverable one. The snapshot the session
-   * took already carries `completedPlacement` inside its Diagram, so the local
-   * placement is merely stale and the next projection re-derives it; installing
-   * first would instead leave the placement describing an Edit the session
-   * never took, and for a created Thing, a position for a Thing that does not
-   * exist. That is the strand `b091623` inverted this order to close.
+   * **The Diagram is adopted with the Active Graph that belongs to it**, in one
+   * call. The Graph is resolved against the Diagram *this Edit produced* rather
+   * than the one it began in — a Diagram owns its Graphs (ADR 0040), so the
+   * pair is one answer, and an intermediate state where the Diagram has moved
+   * and the Graph has not would name a Diagram beside a Graph some other
+   * Diagram owns, which Navigation refuses.
    *
-   * **The Diagram is adopted with the Active Graph that belongs to it**, and
-   * the ordering that used to be spread over two Navigation calls is now inside
-   * one. It has not been relaxed — the Graph is still resolved against the
-   * Diagram *this Edit produced* rather than the one it began in, which is the
-   * whole of what that ordering bought. What changed is that a Diagram owns its
-   * Graphs (ADR 0040), so the pair is one answer and the intermediate state
-   * where the Diagram has moved and the Graph has not would name a Diagram
-   * beside a Graph some other Diagram owns, which Navigation refuses.
-   *
-   * In that order the three statements below refuse nothing, and each for a
-   * reason this Edit established rather than by having no guard to trip:
-   *
-   * - `install` decides nothing and reads nothing.
-   * - `continueInDiagram` resolves a Diagram `updatePositionedDiagram` wrote into
-   *   the snapshot `submit` just installed, and refuses only a Diagram that does
-   *   not draw the Active Graph handed with it — which is that Diagram's own
-   *   `activeGraph`, in a snapshot `loadSpaceSnapshot` accepted a line earlier,
-   *   and intake is precisely the check that a Diagram's `activeGraph` is one it
-   *   owns. A null Active Graph names nothing and is exempt.
-   *
-   * Re-checking any of that *here* would add a branch that cannot be taken, and
-   * this repo deletes those rather than keeps them. The guards live in
-   * Navigation because they are Navigation's invariant, held against every
-   * caller; this window is simply a caller that satisfies them.
+   * `continueInDiagram` refuses only a Diagram that does not draw the Active
+   * Graph handed with it — which is that Diagram's own `activeGraph`, in a
+   * snapshot `loadSpaceSnapshot` accepted a line earlier, and intake is
+   * precisely the check that a Diagram's `activeGraph` is one it owns. A null
+   * Active Graph names nothing and is exempt. Re-checking any of that *here*
+   * would add a branch that cannot be taken, and this repo deletes those rather
+   * than keeps them: the guard lives in Navigation because it is Navigation's
+   * invariant, held against every caller, and this window is simply a caller
+   * that satisfies it.
    */
   const installCompletedEdit = (edit: CompletedEdit): void => {
     installTogether(() => {
       session.submit(edit.snapshot);
-      install(edit.placement);
       navigation.continueInDiagram(edit.nextDiagramId, edit.nextActiveGraphId);
     });
   };
@@ -1868,7 +1729,6 @@ export function createSpaceAuthoring({
       installTogether(() => {
         session.submit(snapshot);
         if (navigation.getState().selectedDiagramId === reported.embeddedDiagramId) {
-          install(derived.edit.placement);
           // A context menu may delete the Graph the target's own canvas shows.
           // Keep its Diagram, but never leave Navigation naming a removed Graph.
           if (
@@ -1892,33 +1752,13 @@ export function createSpaceAuthoring({
   let completing = false;
   const queued: QueuedCompletion[] = [];
   const complete = (completion: AuthoringCompletion, embeddedDiagramId?: UUID): AuthoringResult => {
-    // A pointer gesture reports where React Flow has drawn the Things, and that
-    // report is merged under `Placement.next`'s rules. Every other operation is
-    // written into the placement already installed — there is no second source
-    // of geometry for a rename or a deletion to disagree with.
-    const embeddedDiagram =
-      embeddedDiagramId === undefined
-        ? undefined
-        : currentSpace().lookup.diagram(embeddedDiagramId);
-    if (embeddedDiagramId !== undefined && embeddedDiagram === undefined) {
+    if (
+      embeddedDiagramId !== undefined &&
+      currentSpace().lookup.diagram(embeddedDiagramId) === undefined
+    ) {
       return { kind: 'refused', refusal: { code: 'diagram-not-found' } };
     }
-    const base =
-      embeddedDiagram === undefined ? placement : Placement.fromDiagram(embeddedDiagram.diagram);
-    const completedPlacement =
-      'rendered' in completion
-        ? Placement.next(
-            embeddedDiagram === undefined ? mergeBase() : base,
-            completion.rendered,
-            completion.kind === 'settled-thing-movement' ? completion.placed : [],
-          )
-        : base;
-    if (embeddedDiagramId === undefined) install(completedPlacement);
-    const reported: ReportedCompletion = {
-      completion,
-      placement: completedPlacement,
-      embeddedDiagramId,
-    };
+    const reported: ReportedCompletion = { completion, embeddedDiagramId };
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
       return { kind: 'queued' };
@@ -1995,10 +1835,9 @@ export function createSpaceAuthoring({
    * shows it; taking the page down over a refusal would remove the author's
    * unsaved work to explain why it could not be replaced.
    *
-   * Accepting is an edit to this Authoring rather than a new one: the session,
-   * the placement and Navigation are all replaced in place, and the replacement
-   * epoch advancing is what tells the canvas its nodes describe a Space that
-   * is gone.
+   * Accepting is an edit to this Authoring rather than a new one: the session
+   * and Navigation are both replaced in place, and the replacement epoch
+   * advancing is what tells the canvas its nodes describe a Space that is gone.
    */
   const acceptStoredSpace = (): StoredSpaceRefusal | null => {
     const { persistence } = session.getState();
@@ -2017,11 +1856,8 @@ export function createSpaceAuthoring({
       return { code: 'stored-space-invalid', errors: accepted.errors };
     }
     const selection = requireDefaultDiagram(accepted.space);
-    const resolved = resolveDiagram(accepted.space, selection);
-    const acceptedPlacement = Placement.fromDiagram(resolved.diagram);
     installTogether(() => {
       session.acceptRemote();
-      install(acceptedPlacement);
       navigation.openFresh(selection);
       replacementEpoch += 1;
     });
@@ -2030,10 +1866,8 @@ export function createSpaceAuthoring({
 
   return {
     getState: observable.getState,
-    authoredPlacement: () => mergeBase(),
     subscribe: observable.subscribe,
-    reportRendered,
-    replacePlacement: install,
+    diagramPlacement,
     edgeEligibility,
     complete,
     completeInDiagram: (diagramId, completion) => complete(completion, diagramId),

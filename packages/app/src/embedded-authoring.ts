@@ -113,14 +113,13 @@ export function createEmbeddedAuthoring(
   const authoring: RenderAdapterAuthoring = {
     getState: entry.app.authoring.getState,
     complete,
-    authoredPlacement: () => {
+    // This Diagram's own placement, not the host canvas's selected one — a
+    // Space Thing embeds a Diagram of the target Space, which need not be the
+    // one either canvas has selected.
+    diagramPlacement: () => {
       const resolved = entry.app.currentSpace().lookup.diagram(diagramId);
-      return resolved === undefined ? null : Placement.fromDiagram(resolved.diagram);
+      return resolved === undefined ? Placement.empty() : Placement.fromDiagram(resolved.diagram);
     },
-    // The embedded projection is derived from this Diagram on every Edit. Its
-    // transient render reports must never replace the full canvas's placement.
-    reportRendered: () => undefined,
-    replacePlacement: () => undefined,
     subscribe: notifications.subscribe,
   };
   const adapter = createRenderAdapter(authoring);

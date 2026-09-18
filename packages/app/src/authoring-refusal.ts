@@ -33,8 +33,6 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
   switch (refusal.code) {
     case 'placement-failed':
       return `This view could not place its Things: ${refusal.error.message}`;
-    case 'placement-pending':
-      return 'This view has not finished placing its Things, so there is nowhere to write yet.';
     case 'diagram-not-found':
       return DIAGRAM_NO_LONGER_IN_SPACE;
     case 'diagram-required':
@@ -117,7 +115,6 @@ type AuthoringRefusalErrors<Field extends string> = {
  * true, so a new refusal has to be decided here before it will compile.
  */
 const correctableByThingChoice = {
-  'placement-pending': false,
   'diagram-not-found': false,
   'diagram-required': false,
   'thing-not-found': false,

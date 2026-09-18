@@ -81,15 +81,13 @@ export function createConnectionCompletion({
   /**
    * Complete, then reconcile — and only when the Space really gained the Edge.
    *
-   * The placement handed to Authoring is read from the **live** nodes while the
-   * list merged back is the **projected** one, deliberately. `renderedPlacement`
-   * reads positions only, and `mergeProjected` takes every surviving Thing's
-   * position from its live node, so the two agree on every Thing already on
-   * screen. They diverge only for a Thing the projection has gained and the live
-   * list has not, which `App` makes reachable by withholding `syncProjection`
-   * until a strategy resolves. That Thing has no resolved position yet, and
-   * authoring the origin it is standing on is exactly what a sparse Diagram
-   * exists to avoid.
+   * `renderedPlacement` is asked first, purely as "has anything rendered yet":
+   * `null` means the canvas has drawn nothing to connect. The Edit itself is
+   * derived against the Diagram, not against what is on screen — Authoring
+   * takes no placement from this module at all. Only the merge-back is the
+   * render path's: `mergeProjected` takes the freshly **projected** list, so
+   * the new Edge and the Thing it may have created draw immediately rather
+   * than waiting for the next full strategy resolution.
    *
    * A completion that has not happened — refused, or thrown on an invalid Space
    * — must not leave a connection drawn for an Edge the Space never gained.
@@ -144,21 +142,19 @@ export function createConnectionCompletion({
 
   return {
     connect: (from, to, projected) => {
-      const rendered = adapter.getState().renderedPlacement();
-      if (rendered === null) return UNAVAILABLE;
+      if (adapter.getState().renderedPlacement() === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'connect', from, to });
       if (refusal !== null) return { kind: 'refused', refusal };
-      return complete({ kind: 'connected-things', from, to, rendered }, projected, () => to);
+      return complete({ kind: 'connected-things', from, to }, projected, () => to);
     },
 
     createAndConnect: (from, position, projected) => {
-      const rendered = adapter.getState().renderedPlacement();
-      if (rendered === null) return UNAVAILABLE;
+      if (adapter.getState().renderedPlacement() === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'create-and-connect', from });
       if (refusal !== null) return { kind: 'refused', refusal };
       // The dropped Thing is placed by `position` inside the completion itself.
       return complete(
-        { kind: 'create-and-connect', from, position, rendered },
+        { kind: 'create-and-connect', from, position },
         projected,
         (result) => result.createdThingId,
       );

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { NodeChange } from '@xyflow/react';
 import { type ThingId, type GraphId, type DiagramId, type DiagramPosition } from '@project/core';
-import { Placement, positionedStrategy } from '@project/graph';
+import { Placement } from '@project/graph';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../authoring-availability';
 import { canvasProjection } from '../canvas-projection';
@@ -88,11 +88,9 @@ export function EmbeddedDiagramAuthoring({
     () => (resolved === undefined ? Placement.empty() : Placement.fromDiagram(resolved.diagram)),
     [resolved],
   );
-  const strategy = useMemo(() => positionedStrategy(authored), [authored]);
   const emptyGraph = useMemo(() => ({ things: [], edges: [] }), []);
   const placement = usePlacementRendering(
     pending?.strategyGraph ?? emptyGraph,
-    strategy,
     state.resizeDraft?.placement ?? authored,
   );
   const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
@@ -260,7 +258,6 @@ export function EmbeddedDiagramAuthoring({
           kind: 'connected-things',
           from,
           to,
-          rendered: Placement.fromDiagram(resolvedDiagram.diagram),
           graphId,
         });
         return result.kind === 'completed';

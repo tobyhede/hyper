@@ -1,7 +1,7 @@
 import type { ThingId, GraphId, DiagramId } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import { openingPlacement, type ComposedApp } from './compose-app';
+import type { ComposedApp } from './compose-app';
 import {
   destinationRestoration,
   destinationSync,
@@ -191,7 +191,8 @@ export function createBrowserLocation(
    * One decision resolved from one Space, applied in an order that cannot leave
    * the two collaborators disagreeing: both steps that may refuse the selection
    * run first — the resolve here and Navigation's own — and the render adapter
-   * update is a plain store write that cannot fail.
+   * update is a plain store write that cannot fail and carries no geometry of
+   * its own to disagree with either.
    *
    * Private, because arriving is not a capability a surface spends: both the
    * reader's Back and their Diagram choice are arrivals, and a third caller
@@ -204,7 +205,10 @@ export function createBrowserLocation(
     // answers it whether or not the choice moves the address — so this
     // belongs to the choice rather than to the history entry it may not earn.
     destinationNotFound = false;
-    const resolved = resolveDiagram(app.currentSpace(), opening.selection);
+    // Resolved for the throw alone: a selection that does not resolve must
+    // leave Navigation untouched rather than moving it to a Diagram this
+    // function is about to fail on.
+    resolveDiagram(app.currentSpace(), opening.selection);
     const changesDiagram = app.navigation.getState().selectedDiagramId !== opening.selection;
     if (opening.graphId === null) app.navigation.selectDiagram(opening.selection);
     else if (opening.presentationThingId === null) {
@@ -222,7 +226,7 @@ export function createBrowserLocation(
     // its pending state. Navigation still receives the choice so it can apply
     // its own same-Diagram semantics.
     if (!changesDiagram) return;
-    app.adapter.getState().selectDiagram(openingPlacement(resolved));
+    app.adapter.getState().selectDiagram();
   };
 
   /**
