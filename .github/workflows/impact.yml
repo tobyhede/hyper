@@ -1,0 +1,99 @@
+# Change impact from ImpactGate (https://github.com/officefloor/ImpactGate),
+# scored twice: once over every changed file and once with tests excluded
+# (`.github/impact-gate/no-tests.yml`). It only reports. Enforcement is `warn`,
+# and the job is kept out of `ci.yml` so the `ci` gate does not depend on it.
+#
+# Each score is graded against a baseline built from main's landed history
+# with the same measure config. Baselines are derived, never committed: a push
+# to main rebuilds both and caches them under that commit, and a pull request
+# restores the newest pair. A pair a few merges old is a sample of the same
+# distribution, so a pull request builds its own only when no cache exists.
+name: Impact
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Reads the repository and writes the job summary. It posts no PR comment,
+# which would need `pull-requests: write`.
+permissions:
+  contents: read
+
+concurrency:
+  group: impact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  impact:
+    name: Change impact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IMPACT_GATE: impact-gate==0.3.2
+      BASELINE_ALL: .impact-baseline/all.json
+      BASELINE_NO_TESTS: .impact-baseline/no-tests.json
+      NO_TESTS: .github/impact-gate/no-tests.yml
+    steps:
+      # Range mode scores merge-base..HEAD and a baseline walks main's
+      # first-parent history, so both need the full history.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Restore baselines
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .impact-baseline
+          key: impact-baseline-${{ hashFiles('.github/impact-gate/**', '.github/workflows/impact.yml') }}-${{ github.event.pull_request.base.sha || github.sha }}
+          restore-keys: impact-baseline-${{ hashFiles('.github/impact-gate/**', '.github/workflows/impact.yml') }}-
+
+      # Main rebuilds whenever its exact key is missing. A pull request takes
+      # any restored pair and rebuilds only when nothing was restored.
+      - name: Build baselines
+        id: build
+        if: github.event_name == 'push' && steps.restore.outputs.cache-hit != 'true' || steps.restore.outputs.cache-matched-key == ''
+        env:
+          BASE_REF: ${{ github.event_name == 'push' && github.sha || format('origin/{0}', github.base_ref) }}
+        run: |
+          mkdir -p "$(dirname "$BASELINE_ALL")"
+          pipx run --spec "$IMPACT_GATE" impact-gate baseline \
+            --base-ref "$BASE_REF" --baseline-file "$BASELINE_ALL"
+          pipx run --spec "$IMPACT_GATE" impact-gate baseline \
+            --base-ref "$BASE_REF" --baseline-file "$BASELINE_NO_TESTS" --measure-config "$NO_TESTS"
+
+      - name: Save baselines
+        if: github.event_name == 'push' && steps.build.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .impact-baseline
+          key: ${{ steps.restore.outputs.cache-primary-key }}
+
+      - name: Score with tests
+        if: github.event_name == 'pull_request'
+        # An explicit bash shell adds pipefail, so a failed score is not hidden
+        # behind `tee`. A high score cannot fail the step: enforcement is warn.
+        shell: bash
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          {
+            echo '# With tests'
+            pipx run --spec "$IMPACT_GATE" impact-gate score \
+              --mode range --base "$BASE" --curve --enforcement warn --format markdown \
+              --baseline-file "$BASELINE_ALL"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Score without tests
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          {
+            echo '# Without tests'
+            pipx run --spec "$IMPACT_GATE" impact-gate score \
+              --mode range --base "$BASE" --curve --enforcement warn --format markdown \
+              --baseline-file "$BASELINE_NO_TESTS" --measure-config "$NO_TESTS"
+          } | tee -a "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,12 @@
+# ImpactGate measure config for the "source only" score. Globs append to the
+# tool's defaults. Its built-in test patterns only mark tests, they do not drop
+# them, and `**/test/**` misses the root `test/` tree, so each test home is
+# named here.
+ignore:
+  - 'test/**'
+  - '**/test/**'
+  - '**/e2e/**'
+  - '**/ladle-e2e/**'
+  - 'tools/typing-fixtures/**'
+  - '**/*.test.*'
+  - '**/*.spec.*'
