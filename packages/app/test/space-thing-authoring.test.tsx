@@ -941,12 +941,12 @@ describe('referencing an existing Space', () => {
     );
     // The backend answers Things in ascending id order (ticket 30), which need
     // not match Space Authoring's own authored order, so the two sides are
-    // matched by id rather than by position before comparing what landed.
+    // matched by id rather than by position before comparing what landed. The
+    // ids stay in the comparison: dropping them would pass just as happily on a
+    // document that landed on the wrong Thing.
     const ascendingById = <T extends { id: UUID }>(entries: readonly T[]): T[] =>
       [...entries].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
-    expect(ascendingById(storedSpaceThings).map((thing) => thing.document)).toEqual(
-      ascendingById(spaceThingsOf(session)).map((thing) => thing.document),
-    );
+    expect(ascendingById(storedSpaceThings)).toEqual(ascendingById(spaceThingsOf(session)));
   });
 
   /**

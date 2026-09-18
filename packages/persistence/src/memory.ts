@@ -1,29 +1,10 @@
-import type { SpaceSnapshot, UUID } from '@project/core';
+import type { UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend, SpaceCommit, SpaceSummary } from './backend';
 import { decideCommit } from './commit-decision';
+import { ascendingById, readInIdOrder as read } from './read-order';
 import type { RepositoryCommitResult } from './repository';
 
 const clone = <T>(value: T): T => structuredClone(value);
-
-const ascendingById = (left: { readonly id: UUID }, right: { readonly id: UUID }): number => {
-  if (left.id === right.id) return 0;
-  return left.id < right.id ? -1 : 1;
-};
-
-/**
- * A stored Space as every read answers it: cloned, and its Things ascending by
- * id regardless of seed or write order — matching `MemorySpaceRepository` and
- * both SQL adapters, which order the same way at the database. Sorting a copy
- * on read, rather than the stored `Map`, keeps `#spaces` in whatever order it
- * was written so a write's own bookkeeping is untouched by a read.
- */
-const read = (loaded: LoadedSpace): LoadedSpace => {
-  const snapshot: SpaceSnapshot = {
-    ...loaded.snapshot,
-    things: [...loaded.snapshot.things].sort(ascendingById),
-  };
-  return clone({ ...loaded, snapshot });
-};
 
 export interface MemoryCommitAttempt {
   snapshot: LoadedSpace['snapshot'];
@@ -147,6 +128,10 @@ export class MemorySpaceBackend implements SpaceBackend {
     const injected = this.#testControl?.nextResult();
     if (injected !== undefined) return clone(injected);
 
+    // Read, not `clone`: a conflict answers `current` the way a load would, in
+    // id order, as the SQL adapters do off their own ordered query. The write
+    // decision carries those same copies back into `#spaces` below, so the
+    // stored order converges on id order too — harmless, every read sorts.
     const decision = decideCommit(request, this.#metaSpaceId, [...this.#spaces.values()].map(read));
     if (decision.kind === 'answer') return backendResult(decision.result);
     this.#spaces.clear();

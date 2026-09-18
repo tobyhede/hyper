@@ -64,7 +64,7 @@ describe('Diagram delete draws the right geometry (ticket 02, item 1)', () => {
   };
 
   it('writes the surviving Diagram’s own position for a Thing both Diagrams place, not the deleted Diagram’s', async () => {
-    const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
+    const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const { spaceSession: session, spaceThings } = openTestSpace(backend, {
       snapshot,
       revision: 0n,
@@ -265,7 +265,7 @@ describe('An embedded Edit in an unselected Diagram leaves no stale member (tick
    * to reach this same primitive outside its production callers.
    */
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
-    const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
+    const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
     const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedDiagramId).toBe(TOP_DIAGRAM_ID);
@@ -343,7 +343,7 @@ describe('A queued drag holds its drop point (ticket 02, item 4 — guards the c
    * "Session notification is non-throwing…").
    */
   it('keeps a moved Thing drawn at its drop point while its completion waits behind an in-flight one', () => {
-    const backend = new MemorySpaceBackend([{ snapshot, revision: 0n, exportedRevision: null }]);
+    const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
     const { authoring, adapter } = composeApp({ spaceSession: session, selection: DIAGRAM_ID });
 

@@ -51,6 +51,11 @@ export type {
  * `./test-support` subpath instead. */
 export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
 export * from './observable-state';
+/* The id order every in-memory double answers reads in, stated once.
+ * `MemorySpaceBackend` above and `MemorySpaceRepository` under `test/support`
+ * both stand in for the SQL adapters, which order at the database; two copies
+ * of the rule would drift the day either was touched. */
+export { ascendingById, readInIdOrder } from './read-order';
 /* The stored side of the seam, declared once for both consumers: the Fetch
  * application in `@project/http` and the PostgreSQL adapter under `src/`. */
 export * from './repository';
