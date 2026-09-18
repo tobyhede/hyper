@@ -56,5 +56,5 @@ Remaining: a push to `main` saving the pair, and a PR run restoring it. Both hap
 
 Known limits, not addressed here:
 
-- Actions evicts a cache unused for 7 days. After a quiet week the first PR builds its own pair (the estimated 5 minutes) until the next push to `main` saves one.
+- Actions evicts a cache unused for 7 days. After a quiet week the first PR builds its own pair (about two and a half minutes, measured above) until the next push to `main` saves one.
 - The build walks all of `main`'s history, so its cost grows with the repo. `--max-commits` caps it if that ever matters.
