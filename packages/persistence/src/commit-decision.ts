@@ -4,7 +4,7 @@ import type { LoadedSpace, SpaceChange, SpaceCommit, SpaceConflict } from './bac
 import type { RepositoryCommitResult } from './repository';
 
 /*
- * What a commit means, decided once for every implementation (ADR 0093).
+ * What a commit means, decided once for every implementation (ADR 0095).
  *
  * `decideCommit` takes what an implementation has already read and answers what
  * it must do next — answer the caller, or write — before any write happens. The

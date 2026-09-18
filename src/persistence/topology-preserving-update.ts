@@ -16,7 +16,7 @@ import {
  * answers only what the complete-aggregate decision would answer the same way —
  * a revision conflict, or a write that moves no snapshot boundary — and hands
  * everything else to that decision. Both adapters import this one copy until
- * ticket 24 absorbs it into the one SQL Space repository (ADR 0093).
+ * ticket 24 absorbs it into the one SQL Space repository (ADR 0095).
  *
  * The caller runs `commitIdentityRefusal` first. This path reads the stored
  * Space by `change.spaceId` and writes to `snapshot.id`, so a change naming one

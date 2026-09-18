@@ -16,7 +16,7 @@ import { clearHyperContent } from '../support/clear-hyper-content';
 
 /*
  * Memory and PostgreSQL run the same commit decision, `decideCommit` in
- * `@project/persistence` (ADR 0093), so this no longer proves two sets of rules
+ * `@project/persistence` (ADR 0095), so this no longer proves two sets of rules
  * agree. It proves storage agrees: that what each reads, in what order, and
  * what each writes and answers around that one decision come out the same over
  * generated aggregates.

@@ -8,7 +8,7 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  * implementation rather than restated per adapter.
  *
  * Every implementation judges a commit through `decideCommit` in
- * `@project/persistence` (ADR 0093), so what this suite catches is where they
+ * `@project/persistence` (ADR 0095), so what this suite catches is where they
  * differ around it — what they read, in what order, what they write and what
  * they classify from their own storage. Whatever they disagree about, they
  * disagree in front of the same assertions.
