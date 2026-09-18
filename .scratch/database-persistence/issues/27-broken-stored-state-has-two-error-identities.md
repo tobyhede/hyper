@@ -30,10 +30,10 @@ Not checked on PostgreSQL — see the Decided section's PostgreSQL bullet.
 
 ## Acceptance
 
-- [ ] Red first. SQLite repository: `truncates a stored Space whose document is not JSON`'s pin (`isAggregateInvariant(readFailure) === false`) becomes the `rejects.toThrow(AggregateInvariantError)` its siblings assert, with sibling cases for a non-JSON Thing document and a non-canonical stored revision.
-- [ ] PostgreSQL integration: a raw insert of text that is not JSON into `spaces.document` is refused by the database.
-- [ ] `@project/http`: `GET /api/aggregate` answers 500 `internal-error` for an invariant failure, including one carried only on `cause`, and 503 `persistence-unavailable` for any other throw.
-- [ ] SQLite HTTP runtime: with a non-JSON Space document stored, `GET /` answers `internal-error` and start-up gives up rather than spending its retry budget — the host's two `isAggregateInvariant` calls exercised for this flavour.
-- [ ] SQLite's aggregate read decodes the Space document itself; no catch surrounds a query.
-- [ ] SQLite's `loadSpace`/`listSpaces` carry PostgreSQL's comment on keeping the narrower error.
-- [ ] `pnpm verify` and `pnpm test:integration:sqlite` are green. `pnpm test:integration:postgres` and `pnpm e2e:sqlite` are run or named as skipped with the reason. `pnpm e2e` is inapplicable.
+- [x] Red first. SQLite repository: `truncates a stored Space whose document is not JSON`'s pin (`isAggregateInvariant(readFailure) === false`) becomes the `rejects.toThrow(AggregateInvariantError)` its siblings assert, with sibling cases for a non-JSON Thing document and a non-canonical stored revision.
+- [ ] PostgreSQL integration: a raw insert of text that is not JSON into `spaces.document` is refused by the database. Written and typechecks (`refuses a write of text that is not JSON into spaces.document`, `test/integration/postgres-space-repository.test.ts`); not run — no Docker available in this environment.
+- [x] `@project/http`: `GET /api/aggregate` answers 500 `internal-error` for an invariant failure, including one carried only on `cause`, and 503 `persistence-unavailable` for any other throw.
+- [x] SQLite HTTP runtime: with a non-JSON Space document stored, `GET /` answers `internal-error` and start-up gives up rather than spending its retry budget — the host's two `isAggregateInvariant` calls exercised for this flavour.
+- [x] SQLite's aggregate read decodes the Space document itself; no catch surrounds a query.
+- [x] SQLite's `loadSpace`/`listSpaces` carry PostgreSQL's comment on keeping the narrower error.
+- [x] `pnpm verify` and `pnpm test:integration:sqlite` are green. `pnpm test:integration:postgres` is named as skipped — no Docker in this environment. `pnpm e2e:sqlite` and `pnpm e2e` are named as skipped — no product surface changed, nothing for either to observe.
