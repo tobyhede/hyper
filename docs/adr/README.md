@@ -42,6 +42,7 @@ under `superseded/`.
 | [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows another Space through the selection it carries; ADR 0079 makes that selection a Layout. |
 | [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. |
 | [0076](0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md) | Multi-Space edits coordinate per-Space sessions behind the Space Card lifecycle. |
+| [0095](0095-a-multi-space-edit-is-judged-against-what-it-commits.md) | A multi-Space Edit is derived and judged with `decideCommit` against the stored Spaces plus its participants, after queued local work commits. |
 
 ## Layout, View and Graph
 
@@ -76,6 +77,7 @@ under `superseded/`.
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 | [0094](0094-dangerous-truncate-replaces-whatever-is-stored.md) | `--dangerous-truncate` replaces whatever is stored, valid or not, still authorized by the Meta identity it read. |
 | [0095](0095-sql-databases-share-one-space-repository.md) | PostgreSQL and SQLite share one Space repository and differ only through a small `SqlStore`; revisions are decimal TEXT on both. |
+| [0096](0096-the-aggregate-lifecycle-decision-stays-inside-each-repository.md) | Initialization and replacement decide their outcome inside each repository; there is no pure lifecycle decision beside `decideCommit`. |
 | [0088](0088-aggregate-names-the-meta-rooted-collection.md) | Aggregate names the complete Meta-rooted collection of Spaces. One Space plus its Things is a snapshot. |
 
 ## HTTP
