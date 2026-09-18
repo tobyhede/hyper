@@ -2,7 +2,6 @@ import type { UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
-  committedRevision,
   decideCommit,
   type AggregateLoadResult,
   type LoadedAggregate,
@@ -187,25 +186,10 @@ export class MemorySpaceRepository implements SpaceRepository {
   }
 
   commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
-    const decision = decideCommit(
-      request,
-      this.#metaSpaceId,
-      [...this.#spaces.values()]
-        .map(read)
-        .sort((left, right) => ascendingById(left.snapshot, right.snapshot)),
-    );
+    const decision = decideCommit(request, this.#metaSpaceId, [...this.#spaces.values()].map(read));
     if (decision.kind === 'write') {
-      for (const change of request.changes) {
-        if (change.kind === 'delete') {
-          this.#spaces.delete(change.spaceId);
-          continue;
-        }
-        this.#spaces.set(change.spaceId, {
-          snapshot: clone(change.snapshot),
-          revision: committedRevision(change),
-          exportedRevision: this.#spaces.get(change.spaceId)?.exportedRevision ?? null,
-        });
-      }
+      this.#spaces.clear();
+      for (const space of decision.spaces) this.#spaces.set(space.snapshot.id, clone(space));
     }
     return Promise.resolve(decision.result);
   }

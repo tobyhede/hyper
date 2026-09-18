@@ -20,11 +20,21 @@ type WrittenChange = Exclude<SpaceChange, { kind: 'delete' }>;
 /** What an implementation does next: answer the caller now, or write and then answer. */
 type CommitDecision =
   | { readonly kind: 'answer'; readonly result: RepositoryCommitResult }
-  | { readonly kind: 'write'; readonly result: RepositoryCommitResult };
+  | {
+      readonly kind: 'write';
+      readonly result: RepositoryCommitResult;
+      /** Every stored Space once the commit lands, ascending by id. */
+      readonly spaces: readonly LoadedSpace[];
+    };
 
 /** The revision a created or updated Space carries once the commit lands. */
 export const committedRevision = (change: WrittenChange): bigint =>
   change.kind === 'create' ? 0n : change.expectedRevision + 1n;
+
+const ascendingById = (left: LoadedSpace, right: LoadedSpace): number => {
+  if (left.snapshot.id === right.snapshot.id) return 0;
+  return left.snapshot.id < right.snapshot.id ? -1 : 1;
+};
 
 /**
  * Refuse a change set the store will not judge: an empty one, one that names a
@@ -86,10 +96,12 @@ const committed = (request: SpaceCommit): RepositoryCommitResult => ({
  * Decide a change set against every stored Space and the Meta identity, by
  * validating the complete candidate aggregate it would produce.
  *
- * `stored` is every stored Space in the order the implementation reads them —
- * ascending by id — because an `invalid-space-snapshot` refusal names its Space
- * by that position. A `conflict` names the `LoadedSpace` values it was given, so
- * an implementation that must not hand out its own state passes copies.
+ * `stored` is every stored Space in whatever order an implementation read
+ * them in; `decideCommit` sorts a copy itself, ascending by id, because an
+ * `invalid-space-snapshot` refusal names its Space by that position. A
+ * `write` decision's `spaces` shares the `LoadedSpace` values it was given,
+ * the same as a `conflict` already does, so an implementation that must not
+ * hand out its own state passes copies.
  */
 export const decideCommit = (
   request: SpaceCommit,
@@ -99,13 +111,14 @@ export const decideCommit = (
   const refusal = commitRequestRefusal(request);
   if (refusal !== undefined) return { kind: 'answer', result: refusal };
 
-  const byId = new Map(stored.map((space) => [space.snapshot.id, space]));
+  const orderedStored = [...stored].sort(ascendingById);
+  const byId = new Map(orderedStored.map((space) => [space.snapshot.id, space]));
   const baseline =
     metaSpaceId === undefined
       ? undefined
       : loadSpaceAggregate({
           metaSpaceId,
-          snapshots: stored.map(({ snapshot }) => snapshot),
+          snapshots: orderedStored.map(({ snapshot }) => snapshot),
         });
   const baselineUnreferenced = new Set(
     baseline?.ok === false
@@ -191,5 +204,9 @@ export const decideCommit = (
     );
     if (errors.length > 0) return { kind: 'answer', result: { kind: 'aggregate-refused', errors } };
   }
-  return { kind: 'write', result: committed(request) };
+  return {
+    kind: 'write',
+    result: committed(request),
+    spaces: [...candidate.values()].sort(ascendingById),
+  };
 };
