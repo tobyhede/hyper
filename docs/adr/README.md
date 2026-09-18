@@ -42,7 +42,6 @@ under `superseded/`.
 | [0068](0068-a-space-card-shows-a-space-view.md) | A Space Card shows another Space through the selection it carries; ADR 0079 makes that selection a Layout. |
 | [0074](0074-space-card-references-own-the-target-space.md) | The Space Cards referencing a Space own its lifetime. Deleting the last one deletes the Space. |
 | [0076](0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md) | Multi-Space edits coordinate per-Space sessions behind the Space Card lifecycle. |
-| [0095](0095-a-multi-space-edit-is-judged-against-what-it-commits.md) | A multi-Space Edit is derived and judged with `decideCommit` against the stored Spaces plus its participants, after queued local work commits. |
 
 ## Layout, View and Graph
 
