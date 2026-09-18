@@ -409,14 +409,29 @@ export const createSpaceHttpApp = (
     )
     .get(SPACE_AGGREGATE_PATH, async (context) => {
       try {
-        return context.json(encodeLoadedAggregate(await repository.loadAggregate()), 200);
+        // One `AggregateInvariantError` is not proof of broken stored state:
+        // on PostgreSQL `loadAggregate` runs at READ COMMITTED in two
+        // statements, so a rival host's commit landing between them can make
+        // a healthy store look like "Spaces without Meta" for an instant. So
+        // it is re-read once before letting an invariant failure stand — the
+        // same rule `src/http/space-host.ts`'s `readAggregate` applies for
+        // `GET /`, mirrored here rather than shared, because `@project/http`
+        // cannot import across the package boundary into `src/`.
+        let loaded;
+        try {
+          loaded = await repository.loadAggregate();
+        } catch (error) {
+          if (!isAggregateInvariant(error)) throw error;
+          loaded = await repository.loadAggregate();
+        }
+        return context.json(encodeLoadedAggregate(loaded), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to load the Space aggregate', error);
-        // Ticket 27: broken stored state and an unreachable database are told
-        // apart by type (`isAggregateInvariant`, which walks the cause chain
-        // the driver wraps a failed rollback in), the way `src/http/space-host.ts`
-        // already does for `GET /`. An invariant failure is a permanent defect
-        // no retry cures; everything else is temporary.
+        // Broken stored state and an unreachable database are told apart by
+        // type (`isAggregateInvariant`, which walks the cause chain the
+        // driver wraps a failed rollback in). An invariant failure that
+        // survives the re-read above is a permanent defect no further retry
+        // cures; everything else is temporary.
         if (isAggregateInvariant(error)) {
           return problem(context, 'internal-error', 'Stored repository state is not usable.');
         }

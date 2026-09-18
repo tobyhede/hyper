@@ -446,12 +446,43 @@ describe('Space HTTP reads', () => {
     expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', failure);
   });
 
-  // Ticket 27: broken stored state and an unreachable database are told apart
-  // by type (`isAggregateInvariant`, which walks the cause chain), the way
+  // Ticket 27: one `AggregateInvariantError` is not proof of broken stored
+  // state, on PostgreSQL — `loadAggregate` runs at READ COMMITTED in two
+  // statements, so a rival host's commit landing between them can make a
+  // healthy store look like "Spaces without Meta" for an instant
+  // (`src/http/space-host.ts`'s `readAggregate`, which this handler mirrors
+  // rather than imports — `@project/http` cannot reach across the package
+  // boundary into `src/`). So a first invariant failure is re-read once
+  // before it answers anything.
+  it('re-reads once on an invariant failure and answers 200 when the retry succeeds', async () => {
+    let calls = 0;
+    const response = await createSpaceHttpApp(
+      repository({
+        loadAggregate: () => {
+          calls += 1;
+          return calls === 1
+            ? Promise.reject(new AggregateInvariantError('transient'))
+            : Promise.resolve({
+                kind: 'loaded' as const,
+                aggregate: { metaSpaceId: SPACE_ID, spaces: [loaded] },
+              });
+        },
+      }),
+    ).request('/api/aggregate');
+
+    expect(response.status).toBe(200);
+    expect(calls).toBe(2);
+  });
+
+  // Broken stored state and an unreachable database are told apart by type
+  // (`isAggregateInvariant`, which walks the cause chain), the way
   // `src/http/space-host.ts` already does for `GET /` — an invariant failure
-  // is a permanent defect no retry cures (500), everything else is temporary
-  // (503). The second case is carried only on `cause`, because the driver
-  // does not always rethrow what a transaction callback threw.
+  // that survives the re-read above is a permanent defect no retry cures
+  // (500), everything else is temporary (503). The second case is carried
+  // only on `cause`, because the driver does not always rethrow what a
+  // transaction callback threw. Both cases here fail identically on every
+  // call, so the re-read changes nothing about their answer — it is exercised
+  // by the case above instead.
   it.each([
     { failure: 'a direct invariant failure', error: new AggregateInvariantError('broken') },
     {
