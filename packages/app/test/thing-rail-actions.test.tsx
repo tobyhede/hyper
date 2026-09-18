@@ -426,9 +426,30 @@ describe('a Thing’s commands on the canvas rail', () => {
     await settled(session);
   });
 
-  it.each([4, 6])(
-    'keeps a Reference Thing separated after closing its %s-times-sized Target',
-    async (scale) => {
+  it.each([
+    {
+      label: '4-times-sized',
+      width: THING_WIDTH * 4,
+      height: THING_HEIGHT * 4,
+      closedX: Math.round(THING_WIDTH * 0.75),
+    },
+    {
+      label: '6-times-sized',
+      width: THING_WIDTH * 6,
+      height: THING_HEIGHT * 6,
+      closedX: Math.round(THING_WIDTH * 0.75),
+    },
+    {
+      label: '300×400',
+      width: 300,
+      height: 400,
+      // At or past the collapsed width at Close (ADR 0093), then Close reclaims
+      // the width growth `300 - THING_WIDTH`.
+      closedX: THING_WIDTH - (300 - THING_WIDTH),
+    },
+  ])(
+    'keeps a Reference Thing separated after closing its $label Target',
+    async ({ width, height, closedX }) => {
       const opened = spaceSnapshotSchema.parse({
         ...snapshot,
         document: {
@@ -442,7 +463,7 @@ describe('a Thing’s commands on the canvas rail', () => {
                   x: 0,
                   y: 0,
                   open: true,
-                  openSize: { width: THING_WIDTH * scale, height: THING_HEIGHT * scale },
+                  openSize: { width, height },
                 },
               },
             },
@@ -461,11 +482,10 @@ describe('a Thing’s commands on the canvas rail', () => {
         expect(positions?.[THING_ID]?.open).toBe(false);
         // Close reclaims the width `createReferenceFrom` added ahead of the
         // collapsed step and nothing else: the Reference Thing is clear of the
-        // Target on `x`, so that is its one room axis (ADR 0093). It lands back on
-        // the rounded 0.75 of the collapsed width, and below the Closed Target by
-        // the height growth it keeps.
-        const heightGrowth = THING_HEIGHT * scale - THING_HEIGHT;
-        expect(positions?.[reference]?.x).toBe(Math.round(THING_WIDTH * 0.75));
+        // Target on `x`, so that is its one room axis (ADR 0093). It stays below
+        // the Closed Target by the height growth it keeps.
+        const heightGrowth = height - THING_HEIGHT;
+        expect(positions?.[reference]?.x).toBe(closedX);
         expect(positions?.[reference]?.y).toBe(Math.round(THING_HEIGHT * 0.75) + heightGrowth);
         expect(positions?.[reference]?.y).toBeGreaterThanOrEqual(THING_HEIGHT);
       });
