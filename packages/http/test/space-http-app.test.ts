@@ -656,16 +656,6 @@ describe('Space HTTP commit request policy', () => {
       /^expectedRevision must be a canonical non-negative decimal string$/,
     ],
     [
-      'a change naming a Space its snapshot does not',
-      { changes: [{ ...encodedChange, spaceId: TARGET_ID }] },
-      /does not match its snapshot$/,
-    ],
-    [
-      'one Space named twice',
-      { changes: [encodedChange, encodedChange] },
-      /is named more than once$/,
-    ],
-    [
       'a schema-invalid snapshot',
       {
         changes: [

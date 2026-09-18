@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
+import type { UUID } from '@project/core';
 import type { LoadedSpace, SpaceBackend } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -37,12 +38,26 @@ interface BackendHarness {
   close(): Promise<void>;
 }
 
+/**
+ * What the harness is seeded with. The Meta identity is named rather than
+ * inferred from the array: "whichever Space happens to be first is Meta" is the
+ * ordering inference ADR 0078 refuses every adapter, and a harness that takes it
+ * decides an aggregate's validity by position — seeded the other way round, the
+ * same two Spaces leave the one Meta does not reach unreferenced.
+ * `MemorySpaceRepository`'s constructor overloads make it unwriteable there; this
+ * is the one call site they cannot police.
+ */
+export interface BackendContractSeed {
+  spaces: readonly LoadedSpace[];
+  metaSpaceId: UUID;
+}
+
 export const spaceBackendContract = (
   name: string,
-  createHarness: (initial: readonly LoadedSpace[]) => Promise<BackendHarness>,
+  createHarness: (seed: BackendContractSeed) => Promise<BackendHarness>,
 ): void => {
   it(`${name} lists, loads, commits, and reports stale conflicts losslessly`, async () => {
-    const harness = await createHarness([contractLoaded]);
+    const harness = await createHarness({ spaces: [contractLoaded], metaSpaceId: SPACE_ID });
     try {
       expect(new Set(await harness.backend.listSpaces())).toEqual(
         new Set([{ id: SPACE_ID, title: 'One' }]),
@@ -107,7 +122,7 @@ export const spaceBackendContract = (
   });
 
   it(`${name} rejects a shape-valid snapshot that fails domain intake`, async () => {
-    const harness = await createHarness([contractLoaded]);
+    const harness = await createHarness({ spaces: [contractLoaded], metaSpaceId: SPACE_ID });
     try {
       // Shape-valid and domain-invalid: a graph reaches intake only through the
       // diagram that owns it now (ADR 0040), and its edge endpoints must be things

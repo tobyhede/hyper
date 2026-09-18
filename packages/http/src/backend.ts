@@ -1,9 +1,7 @@
 import type { UUID } from '@project/core';
 import {
   CANONICAL_DECIMAL,
-  decodeCommitConflict,
-  decodeCommitRefusal,
-  decodeCommitResponse,
+  commitOutcomeDecoder,
   decodeLoadedAggregate,
   decodeProblemDetails,
   decodeSpaceSummaries,
@@ -113,14 +111,12 @@ export class HttpSpaceBackend implements SpaceBackend {
           }),
         async (response, signal): Promise<CommitResult> => {
           try {
-            if (response.status === 200) {
-              return decodeCommitResponse(await response.json());
-            }
-            if (response.status === 409) {
-              return decodeCommitConflict(await response.json());
-            }
-            if (response.status === 422) {
-              return decodeCommitRefusal(await response.json());
+            // The one table the route encodes through (ADR 0098). A decoder
+            // rather than a decoded outcome: a status it does not know carries
+            // Problem Details, and the body below must still be readable as that.
+            const decodeOutcome = commitOutcomeDecoder(response.status);
+            if (decodeOutcome !== undefined) {
+              return decodeOutcome(await response.json());
             }
             if (!hasProblemDetailsMediaType(response)) {
               return protocolFailure('Error response must use application/problem+json');
@@ -197,7 +193,7 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
     case 'invalid-request':
     case 'invalid-snapshot':
       // A 422 carrying `invalid-snapshot` cannot reach this exhaustive mapping:
-      // commit/decodeCommitRefusal rejects a problem whose code mismatches its status.
+      // commit's outcome decoder rejects a problem whose code mismatches its status.
       return { kind: 'permanent-failure', code: 'invalid-commit', message: problem.detail };
     case 'payload-too-large':
       return { kind: 'permanent-failure', code: 'payload-too-large', message: problem.detail };

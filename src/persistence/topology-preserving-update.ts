@@ -18,7 +18,7 @@ import {
  * everything else to that decision. Both adapters import this one copy until
  * ticket 24 absorbs it into the one SQL Space repository (ADR 0095).
  *
- * The caller runs `commitIdentityRefusal` first. This path reads the stored
+ * The caller runs `commitRequestRefusal` first. This path reads the stored
  * Space by `change.spaceId` and writes to `snapshot.id`, so a change naming one
  * Space with another's snapshot must be refused before it gets here.
  */

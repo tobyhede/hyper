@@ -40,14 +40,26 @@ export interface SpaceConflict {
   current: LoadedSpace | undefined;
 }
 
-export type CommitResult =
+/**
+ * What a store decided about a commit, shared by both commit seams (ADR 0098).
+ *
+ * The stored seam adds its own refusal of a request it will not judge, and the
+ * browser's adds the failures only a client can suffer; what a store *decided*
+ * is the same vocabulary on either side, so it is written once here rather than
+ * restated in each. Declared beside the values it is written in terms of, and
+ * below `RepositoryCommitResult` in the import graph, so both can name it.
+ */
+export type CommitOutcome =
   | {
       kind: 'committed';
       revisions: readonly CommittedSpaceRevision[];
       deletedSpaceIds: readonly UUID[];
     }
   | { kind: 'conflict'; conflicts: readonly SpaceConflict[] }
-  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] }
+  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] };
+
+export type CommitResult =
+  | CommitOutcome
   | {
       kind: 'retryable-failure';
       code: 'network' | 'timeout' | 'unavailable' | 'rate-limited';

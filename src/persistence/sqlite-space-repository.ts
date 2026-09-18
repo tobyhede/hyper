@@ -9,7 +9,7 @@ import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
   CANONICAL_DECIMAL,
-  commitIdentityRefusal,
+  commitRequestRefusal,
   committedRevision,
   decideCommit,
   type AggregateLoadResult,
@@ -479,7 +479,7 @@ export class SqliteSpaceRepository implements SpaceRepository {
     // `decideCommit` runs this too, but the fast path below never reaches it: it
     // reads the Space `change.spaceId` names and writes the one `snapshot.id`
     // names, so a change pairing one with the other must be refused first.
-    const refusal = commitIdentityRefusal(request);
+    const refusal = commitRequestRefusal(request);
     if (refusal !== undefined) return refusal;
 
     try {

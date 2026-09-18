@@ -1,13 +1,11 @@
 import type { UUID } from '@project/core';
 import type {
-  CommittedSpaceRevision,
   AggregateLoadResult,
+  CommitOutcome,
   LoadedSpace,
   SpaceCommit,
-  SpaceConflict,
   SpaceSummary,
 } from './backend';
-import type { SpaceAggregateError } from '@project/graph';
 
 /**
  * Stored state no aggregate can be read from: Spaces that no Meta identity
@@ -60,16 +58,12 @@ export const isAggregateInvariant = (cause: unknown): boolean => {
   return false;
 };
 
-/** The store-side result has no transport failures. */
+/**
+ * The store-side result: what the store decided, plus its refusal of a request
+ * it will not judge. No transport failures — nothing here has a client.
+ */
 export type RepositoryCommitResult =
-  | {
-      kind: 'committed';
-      revisions: readonly CommittedSpaceRevision[];
-      deletedSpaceIds: readonly UUID[];
-    }
-  | { kind: 'conflict'; conflicts: readonly SpaceConflict[] }
-  | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] }
-  | { kind: 'rejected'; code: 'invalid-commit'; message: string };
+  CommitOutcome | { kind: 'rejected'; code: 'invalid-commit'; message: string };
 
 /** The narrow stored seam consumed by the Fetch application. */
 export interface SpaceResourceRepository {

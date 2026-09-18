@@ -1,5 +1,6 @@
 import { newUuid, uuidSchema, type UUID } from '@project/core';
 import {
+  COMMIT_OUTCOME_WIRE,
   decodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -366,18 +367,39 @@ export const createSpaceHttpApp = (
         const commit = context.req.valid('json');
         try {
           const result = await repository.commit(commit);
-          if (result.kind === 'committed') {
-            return context.json(encodeCommitResponse(result), 200);
+          // Every status comes from the one table the browser transport decodes
+          // through (ADR 0098), and each body is paired with its status at its
+          // own `context.json` call, because that is what the typed client
+          // infers the per-status response bodies from —
+          // `space-http-app-types.test.ts` holds that.
+          //
+          // An outcome with no case here fails to compile rather than being
+          // answered as something else. There is no `default` arm answering an
+          // impossible `kind` at runtime, and there cannot be: the repo errors
+          // on a `default` under an exhaustive switch, and on the equivalent
+          // final `if` as an always-true comparison. Both rules say the same
+          // thing — a discriminated union is trusted at runtime here.
+          switch (result.kind) {
+            case 'committed':
+              return context.json(
+                encodeCommitResponse(result),
+                COMMIT_OUTCOME_WIRE.committed.status,
+              );
+            case 'conflict':
+              return context.json(
+                encodeCommitConflict(result),
+                COMMIT_OUTCOME_WIRE.conflict.status,
+              );
+            case 'aggregate-refused':
+              return context.json(
+                encodeCommitRefusal(result),
+                COMMIT_OUTCOME_WIRE['aggregate-refused'].status,
+              );
+            case 'rejected':
+              return problem(context, 'invalid-request', result.message, [
+                { code: 'invalid-value', pointer: '' },
+              ]);
           }
-          if (result.kind === 'conflict') {
-            return context.json(encodeCommitConflict(result), 409);
-          }
-          if (result.kind === 'aggregate-refused') {
-            return context.json(encodeCommitRefusal(result), 422);
-          }
-          return problem(context, 'invalid-request', result.message, [
-            { code: 'invalid-value', pointer: '' },
-          ]);
         } catch (error) {
           invokeLogError(logError, 'Failed to commit spaces', error);
           return problem(context, 'persistence-unavailable', 'Try the request again later.');

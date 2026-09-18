@@ -27,10 +27,28 @@ export const committedRevision = (change: WrittenChange): bigint =>
   change.kind === 'create' ? 0n : change.expectedRevision + 1n;
 
 /**
- * Refuse a change set that names one Space twice, or whose change and snapshot
- * disagree about which Space it is. Answered before any read.
+ * Refuse a change set the store will not judge: an empty one, one that names a
+ * Space twice, or one whose change and snapshot disagree about which Space it
+ * is. Answered before any read.
+ *
+ * It takes a plain change list rather than a `SpaceCommit`, which is a non-empty
+ * tuple. Widening the parameter is what lets the empty case be *reached* — by a
+ * test, and by a JavaScript caller the type never constrained — instead of being
+ * a branch no one can enter and no one can cover. Ticket 20 concentrated the
+ * commit rules here and both memory implementations' own empty-set guards went
+ * with them, leaving an empty commit to fall through every implementation as a
+ * `committed` result that wrote nothing.
  */
-export const commitIdentityRefusal = (request: SpaceCommit): RepositoryCommitResult | undefined => {
+export const commitRequestRefusal = (request: {
+  changes: readonly SpaceChange[];
+}): RepositoryCommitResult | undefined => {
+  if (request.changes.length === 0) {
+    return {
+      kind: 'rejected',
+      code: 'invalid-commit',
+      message: 'A commit requires at least one change',
+    };
+  }
   const ids = new Set<UUID>();
   for (const change of request.changes) {
     if (ids.has(change.spaceId)) {
@@ -78,7 +96,7 @@ export const decideCommit = (
   metaSpaceId: UUID | undefined,
   stored: readonly LoadedSpace[],
 ): CommitDecision => {
-  const refusal = commitIdentityRefusal(request);
+  const refusal = commitRequestRefusal(request);
   if (refusal !== undefined) return { kind: 'answer', result: refusal };
 
   const byId = new Map(stored.map((space) => [space.snapshot.id, space]));

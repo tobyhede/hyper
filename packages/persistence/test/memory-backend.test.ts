@@ -1,12 +1,9 @@
-import { uuidSchema } from '@project/core';
 import { MemorySpaceBackend } from '../src/index';
 import { spaceBackendContract } from './backend-contract';
 
-const FALLBACK_META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
-
-spaceBackendContract('MemorySpaceBackend', (initial) =>
+spaceBackendContract('MemorySpaceBackend', ({ spaces, metaSpaceId }) =>
   Promise.resolve({
-    backend: new MemorySpaceBackend(initial[0]?.snapshot.id ?? FALLBACK_META_ID, initial),
+    backend: new MemorySpaceBackend(metaSpaceId, spaces),
     close: () => Promise.resolve(),
   }),
 );

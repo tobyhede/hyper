@@ -4,6 +4,8 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { LoadedSpace } from '../src/backend';
 import {
+  COMMIT_OUTCOME_WIRE,
+  commitOutcomeDecoder,
   decodeCommitConflict,
   decodeCommitRefusal,
   decodeCommitResponse,
@@ -125,21 +127,52 @@ describe('aggregate wire protocol', () => {
     );
   });
 
-  it('strictly rejects empty, duplicate, mismatched, and extra-field changes', () => {
+  /*
+   * The table is exhaustive over the outcome kinds by construction — `satisfies
+   * Record<CommitOutcome['kind'], …>` — but that proves every kind has a status,
+   * not that no two share one, and the browser reads the table in the direction
+   * the guard does not cover: it holds a status and wants the decoder. Two kinds
+   * on one status would compile, and `commitOutcomeDecoder` would hand the
+   * second one the first's decoder, so a new outcome would reach the author as
+   * whichever one happened to be declared first.
+   */
+  it('gives every commit outcome a status of its own, and decodes each by it', () => {
+    const entries = Object.values(COMMIT_OUTCOME_WIRE);
+    expect(new Set(entries.map(({ status }) => status)).size).toBe(entries.length);
+
+    const committed = {
+      kind: 'committed' as const,
+      revisions: [{ spaceId: SPACE_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    };
+    const conflict = {
+      kind: 'conflict' as const,
+      conflicts: [{ spaceId: SPACE_ID, current: undefined }],
+    };
+    const refusal = {
+      kind: 'aggregate-refused' as const,
+      errors: [{ kind: 'ordinary-space-unreferenced' as const, spaceId: SPACE_ID }],
+    };
+
+    expect(
+      commitOutcomeDecoder(COMMIT_OUTCOME_WIRE.committed.status)?.(encodeCommitResponse(committed)),
+    ).toEqual(committed);
+    expect(
+      commitOutcomeDecoder(COMMIT_OUTCOME_WIRE.conflict.status)?.(encodeCommitConflict(conflict)),
+    ).toEqual(conflict);
+    expect(
+      commitOutcomeDecoder(COMMIT_OUTCOME_WIRE['aggregate-refused'].status)?.(
+        encodeCommitRefusal(refusal),
+      ),
+    ).toEqual(refusal);
+    expect(commitOutcomeDecoder(400)).toBeUndefined();
+  });
+
+  // Shape only. One Space named twice, and a change disagreeing with its own
+  // snapshot, are what a commit *means* and are `commitRequestRefusal`'s
+  // (ADR 0096); the repository contract holds every implementation to them.
+  it('strictly rejects empty and extra-field changes', () => {
     expect(() => decodeCommitRequest({ changes: [] })).toThrow('non-empty');
-    expect(() =>
-      decodeCommitRequest({
-        changes: [
-          { kind: 'delete', spaceId: SPACE_ID, expectedRevision: '1' },
-          { kind: 'delete', spaceId: SPACE_ID, expectedRevision: '1' },
-        ],
-      }),
-    ).toThrow('more than once');
-    expect(() =>
-      decodeCommitRequest({
-        changes: [{ kind: 'update', spaceId: secondId, snapshot, expectedRevision: '1' }],
-      }),
-    ).toThrow('does not match');
     expect(() =>
       decodeCommitRequest({
         changes: [{ kind: 'delete', spaceId: SPACE_ID, expectedRevision: '1', extra: 1 }],
