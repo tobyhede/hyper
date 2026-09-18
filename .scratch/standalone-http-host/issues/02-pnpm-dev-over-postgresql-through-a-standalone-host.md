@@ -7,7 +7,8 @@
 **Status:** ready-for-agent
 
 - [ ] One command starts the host and Vite, and stopping it stops both; neither is left running.
-- [ ] The host composes the PostgreSQL target, establishes Meta before serving, keeps the existing establish → retry → give-up behaviour, and closes its database when it stops.
+- [ ] The host composes the PostgreSQL target, attempts to establish Meta once before serving, and closes its database when it stops. It keeps the existing degraded start (`src/http/postgres-http-runtime.ts`): a failed first attempt is reported and the host still starts and serves while the retry continues in the background, and a retry that gives up is reported without stopping the host. Throughout, the root address answers service-unavailable while the repository is unreachable or has no Meta Space.
+- [ ] Tests drive the forwarding middleware against a host started over a database that is down, proving the middleware reaches the host and serves its service-unavailable answer at the root both while the retry is pending and after it has given up.
 - [ ] Through Vite: the Space collection, a Space and a commit behave as before; the root address opens the Meta Space; an unknown entity address is not found; a database that is down answers service-unavailable at the root. Each is covered by a test that drives the forwarding middleware against a real host.
 - [ ] A host that is not reachable gives the browser a clear failure rather than the shell with a silently failing API.
 - [ ] A Vite restart does not re-compose the host or open a second database client.

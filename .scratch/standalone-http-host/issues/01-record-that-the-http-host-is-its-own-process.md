@@ -16,4 +16,5 @@
 
 - [ ] An ADR records the decision above, refining ADR 0034's "selected current Node composition" and stating the rejected alternatives, including hosting the application inside Vite, so a later review does not re-suggest it.
 - [ ] The ADR states how a product address falls back to the shell, and what a browser sees when the host is not reachable.
+- [ ] The ADR states the host's degraded start: a failed first Meta establishment does not stop the host, which serves while the retry continues and keeps serving after the retry gives up, answering service-unavailable at the root until a Meta Space exists — as distinct from the host not being reachable at all.
 - [ ] The ADR index is updated.
