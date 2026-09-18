@@ -114,10 +114,10 @@
 /* The lean is the Thing's own, about its own centre. A Thing framing an
    embedded canvas leans about the same centre but does not carry that canvas
    with it — its children are React Flow sub-flow nodes, drawn as DOM siblings
-   of its wrapper rather than inside this element — so the rotation of those
-   children, of the Edges between them and of the frame's clip is the canvas's,
-   in `packages/app/src/styles.css` and `SpaceCanvas`. All four read the angle
-   `CanvasThing` publishes here, so none of them can drift from the frame. */
+   of its wrapper rather than inside this element — so the canvas moves those
+   children's positions and the frame's clip about this same centre. This rule
+   reads the angle as `--canvas-thing-drag-tilt`, which `CanvasThing` publishes
+   onto the element from `CANVAS_THING_DRAG_TILT_DEGREES`. */
 .canvas-thing[data-state='dragging'] {
   box-shadow: var(--canvas-thing-shadow-dragging);
   transform: rotate(var(--canvas-thing-drag-tilt));

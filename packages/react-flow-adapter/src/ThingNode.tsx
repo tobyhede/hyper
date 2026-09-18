@@ -439,12 +439,8 @@ export function ThingNode({
       // open state for tests and assistive technology, and geometry is never
       // allowed to depend on it.
       data-expanded={expanded}
-      // Read by `styles.css`, which leans the Thing and deliberately not this
-      // element: a transform above a handle corrupts the bounds React Flow
-      // measures for it with `getBoundingClientRect`, and those bounds are
-      // re-measured only when `offsetWidth`/`offsetHeight` change — which a
-      // transform never does — so the damage would be silent and would outlast
-      // the gesture. The Thing is a sibling of the handles, not their ancestor.
+      // Read by `styles.css`, which leans the Thing rather than this element.
+      // The Thing is a sibling of the handles, not their ancestor.
       data-drag-tilted={data.dragTilted === true}
     >
       {/*

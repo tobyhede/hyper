@@ -6,8 +6,9 @@ import {
   type ThingId,
 } from '@project/core';
 import { AUTHORING_HANDLE_DIAMETER, type ThingFlowNode } from '@project/react-flow-adapter';
-import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
+
 import type { CanvasNodesAndEdges } from './canvas-projection';
+import { DRAG_TILT_RADIANS, rotateAbout, tiltThingPosition } from './drag-tilt';
 
 /** A placement identity: the same target Thing can appear through several Space Things. */
 export const embeddedNodeId = (parentId: string, thingId: string): string =>
@@ -185,29 +186,15 @@ export function clipEmbeddedNode(node: ThingFlowNode, bounds: EmbeddedBounds): T
   };
 }
 
-const TILT_RADIANS = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
-
-const rotateAbout = (point: DiagramPosition, origin: DiagramPosition): DiagramPosition => {
-  const dx = point.x - origin.x;
-  const dy = point.y - origin.y;
-  const cos = Math.cos(TILT_RADIANS);
-  const sin = Math.sin(TILT_RADIANS);
-  return {
-    x: origin.x + dx * cos - dy * sin,
-    y: origin.y + dx * sin + dy * cos,
-  };
-};
-
 /**
  * Where a Thing is drawn once the Thing framing it has leaned.
  *
  * Turning a rect about a distant point is the same rigid motion as moving its
  * centre along that rotation and turning it in place, and this is the first
- * half — `ThingNode` draws the second. Splitting it this way is what lets React
- * Flow keep drawing the Edges: an endpoint is its node's `positionAbsolute`
- * plus a handle offset measured once (`@xyflow/system`'s `getEdgePosition`), so
- * an Edge follows a moved position exactly and would ignore a CSS rotation
- * entirely.
+ * half — `styles.css` turns the Thing in place off `data-drag-tilted`.
+ * `embedded-diagram.test.ts` holds the motion as a rigid one, and `leaves the
+ * Edges to React Flow, which draws them from the positions that moved` holds
+ * that nothing here transforms an Edge.
  *
  * Positions here are relative to the containing Thing, so the centre is brought
  * into that frame first. A Thing React Flow has not measured has no size to
@@ -218,15 +205,16 @@ const tiltedPosition = (
   tilt: EmbeddedTilt,
   position: DiagramPosition,
   size: { readonly width?: number | undefined; readonly height?: number | undefined },
-): DiagramPosition => {
-  const half = { x: (size.width ?? 0) / 2, y: (size.height ?? 0) / 2 };
-  const centre = {
-    x: tilt.center.x - tilt.parentAbsolute.x,
-    y: tilt.center.y - tilt.parentAbsolute.y,
-  };
-  const turned = rotateAbout({ x: position.x + half.x, y: position.y + half.y }, centre);
-  return { x: turned.x - half.x, y: turned.y - half.y };
-};
+): DiagramPosition =>
+  tiltThingPosition(
+    position,
+    size,
+    {
+      x: tilt.center.x - tilt.parentAbsolute.x,
+      y: tilt.center.y - tilt.parentAbsolute.y,
+    },
+    DRAG_TILT_RADIANS,
+  );
 
 /**
  * The overflowing cut, turned in place about the Thing's centre.
@@ -234,9 +222,8 @@ const tiltedPosition = (
  * The inset is computed against unleaned geometry and then this polygon takes
  * the same in-place turn `.canvas-thing` does. Together with `tiltedPosition`
  * that is the rigid motion the window's SVG clip already performs about the
- * dragged centre, so the cut stays on the window. The React Flow node itself
- * never rotates — a transform there would pollute handle bounds — which is why
- * an `inset(...)` left on it would stay upright.
+ * dragged centre. `turns an overflowing cut about the Thing so it leans with
+ * the window` in `embedded-diagram.test.ts` pins the unleaned inset.
  */
 const leanedClipPath = (
   sides: ClipSides,
@@ -253,7 +240,7 @@ const leanedClipPath = (
   ];
   return `polygon(${corners
     .map((corner) => {
-      const turned = rotateAbout(corner, origin);
+      const turned = rotateAbout(corner, origin, DRAG_TILT_RADIANS);
       return `${turned.x}px ${turned.y}px`;
     })
     .join(', ')})`;
@@ -292,11 +279,9 @@ export function embeddedDiagram({
       bottom: (parent.height ?? 0) - SPACE_THING_EMBED_INSET.bottom,
     };
     const clipped = clipEmbeddedNode(next, clipBounds);
-    // Leaned *after* clipping, never before: the inset is the one the unleaned
-    // geometry gives, then the overflowing cut turns in place about the Thing
-    // so it stays on the window the SVG clip has already turned. Clipping
-    // against a leaned position would still be an upright inset on a line the
-    // frame has left.
+    // After clipping. `turns an overflowing cut about the Thing so it leans
+    // with the window` in `embedded-diagram.test.ts` pins the unleaned inset
+    // (`-12` / `132`) and fails if `clipSides` runs on a leaned position.
     const placed =
       tilt === undefined
         ? clipped
@@ -319,9 +304,9 @@ export function embeddedDiagram({
   const ids = new Map(
     projection.nodes.map((node) => [node.id, embeddedNodeId(parent.id, node.id)]),
   );
-  // Nothing here leans. React Flow derives each endpoint from its node's
-  // position, which `tiltedPosition` has already moved, so the Edges follow the
-  // Things they connect without this module drawing anything.
+  // Nothing here leans. `leaves the Edges to React Flow, which draws them from
+  // the positions that moved` in `embedded-diagram.test.ts` holds that the Edge
+  // list carries no transform.
   const edges = projection.edges.flatMap((edge): Edge[] => {
     const source = ids.get(edge.source);
     const target = ids.get(edge.target);

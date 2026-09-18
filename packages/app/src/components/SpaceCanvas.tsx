@@ -346,17 +346,7 @@ export function SpaceCanvas({
     setOpeningFraming(readThisCanvasOpeningFraming());
   }
   /**
-   * The Things a gesture is moving, read from React Flow's own store.
-   *
-   * Two other sources look right and are not. A node's `dragging` flag in this
-   * canvas's projection is wiped whenever the adapter republishes — `reconcile`
-   * rebuilds each node from `canvasProjection` and splices back only the live
-   * position — so it is absent for most frames of a drag. The adapter's
-   * `dragOrigins` *is* durable, but it is populated from the first `position`
-   * change React Flow reports, which arrives a frame after React Flow has
-   * already moved the Thing: the frame would lean one frame before the canvas
-   * inside it. This is the same store the moving Thing is drawn from, so the
-   * two cannot disagree.
+   * The Things a gesture is moving, read from React Flow's `nodeLookup`.
    */
   const draggingKey = useStore((flow) =>
     [...flow.nodeLookup.values()]

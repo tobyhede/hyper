@@ -175,15 +175,11 @@ export type CanvasThingProps = CanvasThingCommonProps &
 /**
  * How far a Thing leans while it is being moved.
  *
- * The number lives here and nowhere else. A Thing framing an embedded canvas
- * cannot tilt its contents by tilting itself — React Flow renders sub-flow
- * children as DOM siblings of their parent's wrapper — so the canvas rotates
- * those children, the Edges between them and the frame's own clip about this
- * Thing's centre by the same angle. Four rotations that must agree exactly or
- * the frame slides off what it frames; at 1° about the centre of a Space Thing
- * the size of the fixture's, its far corners are about ten pixels out. CSS
- * reads it as `--canvas-thing-drag-tilt`, published below, and the canvas reads
- * the number itself for the two rotations it writes in SVG.
+ * The number lives here and nowhere else. CSS reads it as
+ * `--canvas-thing-drag-tilt`, published below. The canvas reads the same
+ * number for an embedded canvas this element cannot carry — React Flow
+ * renders sub-flow children as DOM siblings of their parent's wrapper.
+ * `embedded-diagram.test.ts` holds that motion as a rigid one.
  */
 export const CANVAS_THING_DRAG_TILT_DEGREES = -1;
 

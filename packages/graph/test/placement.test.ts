@@ -331,6 +331,23 @@ describe('Placement.displace', () => {
     });
   });
 
+  it('moves a Thing exactly on the collapsed bottom edge, and leaves one unit short of it', () => {
+    // The y-axis half of "at or past, not strictly past" (ADR 0093). x stays
+    // inside the subject's column so roomAxis takes y rather than x first.
+    const { width, height } = COLLAPSED_THING_SIZE;
+    const authored = Placement.fromEntries([
+      [THING_A, { x: 0, y: 0, open: false }],
+      [THING_B, { x: width - 1, y: height - 1, open: false }],
+      [THING_C, { x: width - 1, y: height, open: false }],
+    ]);
+
+    expect(asObject(Placement.displace(authored, THING_A, growth))).toEqual({
+      [THING_A]: { x: 0, y: 0, open: false },
+      [THING_B]: { x: width - 1, y: height - 1, open: false },
+      [THING_C]: { x: width - 1, y: height + 274, open: false },
+    });
+  });
+
   it('moves each Thing on one axis, x first', () => {
     // A Thing below the subject and inside its column moves down; one to its
     // right moves right; one clear on both moves right and not down. A Thing

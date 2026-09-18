@@ -6,7 +6,8 @@ import {
   type ThingId,
 } from '@project/core';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
-import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
+
+import { DRAG_TILT_RADIANS, tiltThingPosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-diagram';
 
 /**
@@ -39,14 +40,9 @@ export interface DiscoverEmbeddedOpenSpaceThingsInput<Entry extends { readonly i
    * Which Things a gesture is currently moving, from React Flow's own store
    * (`nodeLookup` in SpaceCanvas).
    *
-   * **Not a projection node's `dragging` flag, and not the adapter's
-   * `dragOrigins`.** The flag is wiped whenever the adapter republishes —
-   * `reconcile` rebuilds each node from `canvasProjection` and splices back
-   * only the live position — so it is absent for most frames of a drag.
-   * `dragOrigins` is durable but is filled from the first `position` change
-   * React Flow reports, which arrives a frame after React Flow has already
-   * moved the Thing. SpaceCanvas reads `nodeLookup` because that is the store
-   * the moving Thing is drawn from.
+   * `leans every embedding under a dragged Thing about that Thing, not about
+   * its own parent` in `embedded-open-space-thing.test.ts` holds that the ids
+   * named here are the Things everything below them leans about.
    */
   readonly draggingIds: ReadonlySet<string>;
 }
@@ -67,10 +63,12 @@ export interface EmbeddedOpenSpaceThingRequest<Entry extends { readonly id: Thin
    * A Thing tilts as it is dragged, and its embedded canvas is not inside it to
    * tilt with it — React Flow draws sub-flow children as siblings of their
    * parent's wrapper. So the centre of whichever ancestor is being moved is
-   * carried down here, and the canvas rotates the children, their Edges and
-   * this embedding's clip about it. It is the *dragged ancestor's* centre and
-   * not this parent's, which is what keeps a nested embedding rigid with the
-   * Thing actually under the pointer rather than leaning twice.
+   * carried down here, and the canvas moves the children and this embedding's
+   * clip about it. It is the *dragged ancestor's* centre and not this parent's,
+   * which is what keeps a nested embedding rigid with the Thing actually under
+   * the pointer rather than leaning twice.
+   * `leans every embedding under a dragged Thing about that Thing, not about
+   * its own parent` in `embedded-open-space-thing.test.ts` holds that.
    */
   readonly tiltCenter: DiagramPosition | undefined;
 }
@@ -84,15 +82,13 @@ interface EmbedWindow {
 /** Title-footer border, added to a measured footer in place of the reserved inset. */
 const FOOTER_BORDER = 4;
 
-const TILT_RADIANS = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
-
 /**
  * The containing-relative position a nested window is built from.
  *
  * A leaned publication has already rotated this child about `tiltCenter`.
- * The nested window stays in the unleaned frame — clip and grandchildren
- * lean after that — so walk the rotation back before `embedBounds` reads
- * the position. `embedded-open-space-thing.test.ts` holds the recovery.
+ * Reverse the rotation before `embedBounds` reads the position.
+ * `builds a nested window from the authored origin when the publication has
+ * already leaned` in `embedded-open-space-thing.test.ts` holds the recovery.
  */
 const untiltedPosition = (
   child: ThingFlowNode,
@@ -100,18 +96,12 @@ const untiltedPosition = (
   tiltCenter: DiagramPosition | undefined,
 ): DiagramPosition => {
   if (tiltCenter === undefined || child.data.dragTilted !== true) return child.position;
-  const half = { x: (child.width ?? 0) / 2, y: (child.height ?? 0) / 2 };
-  const centre = { x: tiltCenter.x - origin.x, y: tiltCenter.y - origin.y };
-  const from = {
-    x: child.position.x + half.x - centre.x,
-    y: child.position.y + half.y - centre.y,
-  };
-  const cos = Math.cos(TILT_RADIANS);
-  const sin = Math.sin(TILT_RADIANS);
-  return {
-    x: centre.x + from.x * cos + from.y * sin - half.x,
-    y: centre.y - from.x * sin + from.y * cos - half.y,
-  };
+  return tiltThingPosition(
+    child.position,
+    child,
+    { x: tiltCenter.x - origin.x, y: tiltCenter.y - origin.y },
+    -DRAG_TILT_RADIANS,
+  );
 };
 
 /**
