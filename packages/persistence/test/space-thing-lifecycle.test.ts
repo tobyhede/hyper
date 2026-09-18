@@ -1656,7 +1656,7 @@ describe('Space Thing lifecycle', () => {
 
   // Renamed twice, from "keeps a target referenced by an uncommitted
   // sibling session" then "does not let an uncommitted sibling reference
-  // save a target from a cascading deletion": neither survives ADR 0097's
+  // save a target from a cascading deletion": neither survives ADR 0099's
   // one recovery rule. Target's stored inbound count is genuinely zero —
   // Sibling's reference lives only in its own uncommitted, `failed`
   // working Space, so it must not be read as a *stored* reference that

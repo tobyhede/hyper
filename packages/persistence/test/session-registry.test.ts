@@ -612,7 +612,7 @@ describe('Space session registry', () => {
     expect(registry.session(META_ID)).toBeUndefined();
   });
 
-  // The "add" direction of the one recovery rule (ADR 0097): Sibling's
+  // The "add" direction of the one recovery rule (ADR 0099): Sibling's
   // selection of the doomed Graph exists only in its own uncommitted,
   // `failed` working Space — never reflected in storage, because the Edit
   // that added it is exactly what failed. Deleting the Graph anyway would

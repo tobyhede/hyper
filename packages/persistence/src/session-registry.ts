@@ -573,7 +573,7 @@ export function createSpaceSessionRegistry(
     for (const managed of sessions.values()) managed.pausePersistence();
     try {
       // The barrier waits only for whatever is already in flight (ADR
-      // 0076): pausing before this wait is what bounds it — a commit that
+      // 0099): pausing before this wait is what bounds it — a commit that
       // completes with further queued work settles to idle instead of
       // chaining into the next one (session.ts), so local work queued once
       // the barrier is up stays queued for after this turn rather than
@@ -1131,7 +1131,7 @@ export function createSpaceSessionRegistry(
       return undefined;
     };
     /**
-     * The one recovery rule for both cascading operations (ADR 0097): a
+     * The one recovery rule for both cascading operations (ADR 0099): a
      * non-participant session that needs recovery blocks a Space Thing
      * delete, or a Diagram/Graph delete, when it — in either its stored
      * snapshot or its working Space — references a Space the deletion
@@ -1349,7 +1349,7 @@ export function createSpaceSessionRegistry(
             const recovery = recoveryRefusal(id);
             if (recovery !== undefined) return recovery;
           }
-          // The one recovery rule (ADR 0097), shared with `delete`'s cascade:
+          // The one recovery rule (ADR 0099), shared with `delete`'s cascade:
           // a non-participant session that needs recovery is not made a
           // participant here either, and blocks the deletion when either its
           // stored snapshot or its working Space still selects the Diagram
@@ -1610,7 +1610,7 @@ export function createSpaceSessionRegistry(
               const recovery = recoveryRefusal(id);
               if (recovery !== undefined) return recovery;
             }
-            // The one recovery rule (ADR 0097), shared with `deleteContext`:
+            // The one recovery rule (ADR 0099), shared with `deleteContext`:
             // a non-participant session that needs recovery blocks the
             // deletion when either its stored snapshot or its working Space
             // still references a Space this cascade would delete — its own
