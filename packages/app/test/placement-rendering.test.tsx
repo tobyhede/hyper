@@ -1,12 +1,7 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import {
-  gridStrategy,
-  Placement,
-  type LayoutStrategyGraph,
-  type LayoutStrategy,
-} from '@project/graph';
+import { Placement, type LayoutStrategyGraph } from '@project/graph';
 import { usePlacementRendering } from '../src/placement-rendering';
 
 const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -17,38 +12,18 @@ const strategyGraph: LayoutStrategyGraph = {
   edges: [],
 };
 
+/** A `Placement` over the thing/point pairs given, all Closed. */
+const placementOf = (
+  entries: readonly (readonly [typeof THING_A, { readonly x: number; readonly y: number }])[],
+): Placement => Placement.fromEntries(entries.map(([id, at]) => [id, { ...at, open: false }]));
+
 describe('usePlacementRendering', () => {
-  it('is pending until the selected strategy produces the current placement', async () => {
-    const strategy = gridStrategy();
-    const { result } = renderHook(() => usePlacementRendering(strategyGraph, strategy, null));
+  it('is pending until the placement resolves the current strategyGraph', async () => {
+    const placement = placementOf([[THING_A, { x: 80, y: 120 }]]);
+    const { result } = renderHook(() => usePlacementRendering(strategyGraph, placement));
 
     expect(result.current).toEqual({ kind: 'pending' });
     await waitFor(() => expect(result.current.kind).toBe('ready'));
-
-    expect(result.current).toEqual({
-      kind: 'ready',
-      strategyGraph: {
-        things: [{ ...strategyGraph.things[0]!, x: 0, y: 0 }],
-        edges: [],
-      },
-    });
-  });
-
-  it('renders authored positions instead of running the selected automatic strategy', async () => {
-    let automaticCalls = 0;
-    const neverResolves: LayoutStrategy = () => {
-      automaticCalls += 1;
-      return new Promise(() => undefined);
-    };
-    const authoredPositions = Placement.fromEntries([[THING_A, { x: 80, y: 120, open: false }]]);
-    const { result } = renderHook(() =>
-      usePlacementRendering(strategyGraph, neverResolves, authoredPositions),
-    );
-
-    await waitFor(() => expect(result.current.kind).toBe('ready'));
-    // Not implied by the ready state: a placement that ran the automatic strategy
-    // and then discarded its result would still arrive here.
-    expect(automaticCalls).toBe(0);
 
     expect(result.current).toEqual({
       kind: 'ready',
@@ -59,18 +34,17 @@ describe('usePlacementRendering', () => {
     });
   });
 
-  it('re-runs layout for a new strategyGraph while the authored placement keeps its identity', async () => {
+  it('re-runs layout for a new strategyGraph while the placement keeps its identity', async () => {
     // What Edit completion relies on since it stopped forcing a new placement
     // identity to provoke a re-layout: a completed Edit replaces the working
-    // snapshot, and the `LayoutStrategyGraph` derived from it re-fires this effect on
-    // its own. Nothing here touches the placement — the same object is handed
-    // back on every render, so only the strategyGraph half can produce the second
-    // diagram run.
-    const authored = Placement.fromEntries([
-      [THING_A, { x: 80, y: 120, open: false }],
-      [THING_B, { x: 400, y: 260, open: false }],
+    // snapshot, and the `LayoutStrategyGraph` derived from it re-fires this
+    // effect on its own. Nothing here touches the placement — the same object
+    // is handed back on every render, so only the strategyGraph half can
+    // produce the second layout run.
+    const placement = placementOf([
+      [THING_A, { x: 80, y: 120 }],
+      [THING_B, { x: 400, y: 260 }],
     ]);
-    const automatic = gridStrategy();
     const gainedThing: LayoutStrategyGraph = {
       things: [
         { id: THING_A, width: 240, height: 140 },
@@ -79,8 +53,10 @@ describe('usePlacementRendering', () => {
       edges: [],
     };
     const { result, rerender } = renderHook(
-      ({ input }) => usePlacementRendering(input, automatic, authored),
-      { initialProps: { input: strategyGraph } },
+      ({ input }) => usePlacementRendering(input, placement),
+      {
+        initialProps: { input: strategyGraph },
+      },
     );
     await waitFor(() => expect(result.current.kind).toBe('ready'));
 
@@ -100,24 +76,33 @@ describe('usePlacementRendering', () => {
     );
   });
 
-  it('makes the previous placement unavailable while its replacement is pending', async () => {
-    const ready = gridStrategy();
-    const pending: LayoutStrategy = () => new Promise(() => undefined);
+  it('makes the previous result unavailable the instant the placement changes identity', async () => {
+    const first = placementOf([[THING_A, { x: 0, y: 0 }]]);
+    const second = placementOf([[THING_A, { x: 500, y: 500 }]]);
     const { result, rerender } = renderHook(
-      ({ strategy }) => usePlacementRendering(strategyGraph, strategy, null),
-      { initialProps: { strategy: ready } },
+      ({ placement }) => usePlacementRendering(strategyGraph, placement),
+      { initialProps: { placement: first } },
     );
     await waitFor(() => expect(result.current.kind).toBe('ready'));
 
-    rerender({ strategy: pending });
+    rerender({ placement: second });
 
     expect(result.current).toEqual({ kind: 'pending' });
+    await waitFor(() => expect(result.current.kind).toBe('ready'));
+    expect(result.current).toEqual({
+      kind: 'ready',
+      strategyGraph: { things: [{ ...strategyGraph.things[0]!, x: 500, y: 500 }], edges: [] },
+    });
   });
 
-  it('makes a placement unavailable when the same strategy is handed a different strategyGraph', async () => {
-    // The strategy identity never changes here, so only the `input === strategyGraph`
-    // half of the freshness guard can hold the stale placement back.
-    const strategy = gridStrategy();
+  it('makes a result unavailable when the same placement is handed a different strategyGraph', async () => {
+    // The placement identity never changes here, so only the
+    // `input === strategyGraph` half of the freshness guard can hold the
+    // stale result back.
+    const placement = placementOf([
+      [THING_A, { x: 0, y: 0 }],
+      [THING_B, { x: 320, y: 0 }],
+    ]);
     const nextGraph: LayoutStrategyGraph = {
       things: [
         { id: THING_A, width: 240, height: 140 },
@@ -126,8 +111,10 @@ describe('usePlacementRendering', () => {
       edges: [],
     };
     const { result, rerender } = renderHook(
-      ({ input }) => usePlacementRendering(input, strategy, null),
-      { initialProps: { input: strategyGraph } },
+      ({ input }) => usePlacementRendering(input, placement),
+      {
+        initialProps: { input: strategyGraph },
+      },
     );
     await waitFor(() => expect(result.current.kind).toBe('ready'));
 
@@ -135,7 +122,6 @@ describe('usePlacementRendering', () => {
 
     expect(result.current).toEqual({ kind: 'pending' });
     await waitFor(() => expect(result.current.kind).toBe('ready'));
-    // Two 240-wide things in a two-column grid with the default 80 gap.
     expect(result.current).toEqual({
       kind: 'ready',
       strategyGraph: {
@@ -146,85 +132,5 @@ describe('usePlacementRendering', () => {
         edges: [],
       },
     });
-  });
-
-  it('reports a rejected strategy as a visible failure state', async () => {
-    const failure = new Error('Placement failed');
-    const rejected: LayoutStrategy = () => Promise.reject(failure);
-    const { result } = renderHook(() => usePlacementRendering(strategyGraph, rejected, null));
-
-    await waitFor(() => expect(result.current.kind).toBe('failed'));
-
-    expect(result.current).toEqual({ kind: 'failed', error: failure });
-  });
-
-  it('reports a strategy that throws before returning its promise', async () => {
-    const failure = new Error('Placement threw');
-    const throws: LayoutStrategy = () => {
-      throw failure;
-    };
-    const { result } = renderHook(() => usePlacementRendering(strategyGraph, throws, null));
-
-    await waitFor(() => expect(result.current.kind).toBe('failed'));
-
-    expect(result.current).toEqual({ kind: 'failed', error: failure });
-  });
-
-  it('ignores an obsolete result that resolves after a replacement', async () => {
-    let obsoleteCalls = 0;
-    let resolveObsolete: (value: LayoutStrategyGraph) => void = () => undefined;
-    const obsolete: LayoutStrategy = () => {
-      obsoleteCalls += 1;
-      return new Promise((resolve) => {
-        resolveObsolete = resolve;
-      });
-    };
-    const replacement: LayoutStrategy = (input) =>
-      Promise.resolve({
-        ...input,
-        things: input.things.map((thing) => ({ ...thing, x: 40, y: 60 })),
-      });
-    const { result, rerender } = renderHook(
-      ({ strategy }) => usePlacementRendering(strategyGraph, strategy, null),
-      { initialProps: { strategy: obsolete } },
-    );
-
-    // The strategy is invoked from a microtask after the effect, so waiting for
-    // the call is what guarantees this test holds a real resolver. Without it the
-    // resolve below can be a no-op and the assertions pass vacuously.
-    await waitFor(() => expect(obsoleteCalls).toBe(1));
-    rerender({ strategy: replacement });
-    await waitFor(() => expect(result.current.kind).toBe('ready'));
-    expect(result.current).toEqual({
-      kind: 'ready',
-      strategyGraph: { ...strategyGraph, things: [{ ...strategyGraph.things[0]!, x: 40, y: 60 }] },
-    });
-
-    await act(async () => {
-      resolveObsolete({
-        ...strategyGraph,
-        things: [{ ...strategyGraph.things[0]!, x: 900, y: 1000 }],
-      });
-      await Promise.resolve();
-    });
-
-    expect(result.current).toEqual({
-      kind: 'ready',
-      strategyGraph: { ...strategyGraph, things: [{ ...strategyGraph.things[0]!, x: 40, y: 60 }] },
-    });
-  });
-
-  it('recovers when a different strategy replaces a failed one', async () => {
-    const failed: LayoutStrategy = () => Promise.reject(new Error('Placement failed'));
-    const replacement = gridStrategy();
-    const { result, rerender } = renderHook(
-      ({ strategy }) => usePlacementRendering(strategyGraph, strategy, null),
-      { initialProps: { strategy: failed } },
-    );
-    await waitFor(() => expect(result.current.kind).toBe('failed'));
-
-    rerender({ strategy: replacement });
-    expect(result.current).toEqual({ kind: 'pending' });
-    await waitFor(() => expect(result.current.kind).toBe('ready'));
   });
 });

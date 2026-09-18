@@ -86,7 +86,7 @@ Reproduced by `refuses to delete a Space Thing an Alias came to target while the
 | Ticket | Blocked by | Status |
 |---|---|---|
 | [01 — The session registry edits snapshots through `SnapshotEdit`](issues/01-registry-edits-through-snapshot-edit.md) | none | done |
-| [02 — Space Authoring stops keeping its own placement](issues/02-remove-authorings-placement-copy.md) | none | ready-for-agent |
+| [02 — Space Authoring stops keeping its own placement](issues/02-remove-authorings-placement-copy.md) | none | done |
 | [03 — Space Authoring edits snapshots through `SnapshotEdit`](issues/03-authoring-edits-through-snapshot-edit.md) | 01, 02, 05 | needs-triage |
 | [04 — A Space Thing deletion refuses when an Alias arrives during its wait](issues/04-deletion-decides-after-its-last-wait.md) | none | done |
 | [05 — Space Thing creation and linking refuse when their Diagram goes during the wait](issues/05-creation-decides-after-its-last-wait.md) | 04 | done |

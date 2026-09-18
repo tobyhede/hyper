@@ -39,8 +39,8 @@ declare const PLACEMENT: unique symbol;
  *
  * ## Every value here is its caller's alone
  *
- * `SpaceAuthoring.install` retains the Placement it is handed rather than
- * copying it, so no member of this module may mutate an argument or hand back a
+ * A caller keeps whatever `Placement` it derives rather than being handed a
+ * copy, so no member of this module may mutate an argument or hand back a
  * value another caller also holds — `empty` is a function for that reason, and
  * the points are copied on the way in. Reading is closed too: nothing outside
  * this file can construct one, so this invariant only has to hold here.

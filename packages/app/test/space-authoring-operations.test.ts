@@ -4,17 +4,15 @@ import {
   COLLAPSED_THING_SIZE,
   DEFAULT_OPEN_SIZE,
   uuidSchema,
-  type ThingPlacement,
   type Graph,
   type DiagramId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
-import type { SpaceAuthoring } from '../src/space-authoring';
 
 import { mintingIds } from './minting';
 
@@ -114,29 +112,12 @@ function open(
     spaceSession: session,
     selection: diagramId,
     newId,
-    // These cases install whatever geometry they are about through `place`.
-    initialPlacement: null,
   });
   return { session, navigation, authoring };
 }
 
-/** Install the geometry the canvas would have reported by now. */
-const place = (authoring: SpaceAuthoring, entries: Record<string, [number, number]>): void => {
-  authoring.replacePlacement(
-    Placement.fromEntries(
-      Object.entries(entries).map(([id, [x, y]]) => [uuidSchema.parse(id), { x, y }]),
-    ),
-  );
-};
-
-const openPositioned = (newId?: () => UUID) => {
-  const opened = newId === undefined ? open() : open(positionedSnapshot, undefined, newId);
-  place(opened.authoring, {
-    [THING_A]: [10, 20],
-    [THING_B]: [300, 40],
-  });
-  return opened;
-};
+const openPositioned = (newId?: () => UUID) =>
+  newId === undefined ? open() : open(positionedSnapshot, undefined, newId);
 
 describe('Add Diagram', () => {
   it('creates and selects an empty Diagram with one empty Active Graph', () => {
@@ -239,12 +220,6 @@ describe('Add Thing', () => {
       },
     };
     const { authoring, session } = open(expandedSnapshot);
-    authoring.replacePlacement(
-      Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
-        [THING_B, { x: 300, y: 40, open: false }],
-      ]),
-    );
 
     authoring.complete({ kind: 'created-thing', anchor: { x: 500, y: 400 } });
 
@@ -365,18 +340,7 @@ describe('Expanded Thing geometry', () => {
     },
   };
 
-  const openDisplacement = () => {
-    const opened = open(displacementSnapshot);
-    // The geometry the canvas has reported by now: the Diagram as authored.
-    place(opened.authoring, {
-      [THING_A]: [100, 100],
-      [THING_B]: [400, 100],
-      [THING_C]: [100, 300],
-      [THING_D]: [500, 500],
-      [THING_E]: [40, 40],
-    });
-    return opened;
-  };
+  const openDisplacement = () => open(displacementSnapshot);
 
   /** Every origin the Diagram authors, so a whole Diagram can be compared at once. */
   const originsOf = (session: ReturnType<typeof open>['session']) => {
@@ -386,19 +350,6 @@ describe('Expanded Thing geometry', () => {
       if (at !== undefined) origins.set(thingId, [at.x, at.y]);
     }
     return Object.fromEntries(origins);
-  };
-
-  /**
-   * Report canvas geometry that keeps an Open Thing Open, which {@link place}
-   * cannot: it reports plain points, and every one of those is Closed.
-   */
-  const reportPlacement = (
-    authoring: SpaceAuthoring,
-    entries: Record<string, ThingPlacement>,
-  ): void => {
-    authoring.replacePlacement(
-      Placement.fromEntries(Object.entries(entries).map(([id, at]) => [uuidSchema.parse(id), at])),
-    );
   };
 
   it('restores a resized Open Size after Closing and Opening again', () => {
@@ -527,13 +478,12 @@ describe('Expanded Thing geometry', () => {
       kind: 'completed',
     });
     // The author drags E from before the Open Thing to clear of it on both axes.
-    reportPlacement(authoring, {
-      [THING_A]: { x: 100, y: 100, open: true, openSize: DEFAULT_OPEN_SIZE },
-      [THING_B]: { x: 700, y: 100, open: false },
-      [THING_C]: { x: 100, y: 574, open: false },
-      [THING_D]: { x: 800, y: 500, open: false },
-      [THING_E]: { x: 900, y: 900, open: false },
-    });
+    expect(
+      authoring.complete({
+        kind: 'settled-thing-movement',
+        moved: new Map([[THING_E, { x: 900, y: 900 }]]),
+      }),
+    ).toEqual({ kind: 'completed' });
 
     expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
       kind: 'completed',
@@ -790,7 +740,6 @@ describe('Add Reference Thing', () => {
       ],
     };
     const { authoring, session } = open(referenced);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
     expect(
@@ -820,7 +769,6 @@ describe('Add Reference Thing', () => {
       ],
     };
     const { authoring, session } = open(withSpaceThing);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
       authoring.complete({ kind: 'created-reference', target: THING_B, anchor: CENTRE }).kind,
@@ -865,7 +813,6 @@ describe('Add Graph', () => {
       },
     };
     const { authoring, session } = open(snapshot);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'added-graph' })).toEqual({
       kind: 'completed',
@@ -1021,18 +968,6 @@ describe('Rename Diagram', () => {
  * the Edit needs no reported placement, and it moves nothing.
  */
 describe('Rename Space', () => {
-  /** Composed the way the application composes it: the opening placement the Diagram authors. */
-  const openWithOpeningPlacement = (snapshot: SpaceSnapshot) => {
-    const loaded = { snapshot, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-    const { authoring } = composeApp({
-      spaceSession: session,
-      selection: DIAGRAM_ID,
-      newId: mintingIds(MINTED),
-    });
-    return { session, authoring };
-  };
-
   it('trims and replaces only the Space title', () => {
     const { authoring, session } = openPositioned();
 
@@ -1074,7 +1009,6 @@ describe('Rename Space', () => {
       },
     };
     const { authoring, navigation } = open(twoGraphs);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     navigation.activateGraph(OTHER_GRAPH_ID);
 
     expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
@@ -1104,10 +1038,8 @@ describe('Rename Space', () => {
   });
 
   /**
-   * The Edit sits above the `placement-pending` gate, so it is available before
-   * the canvas has reported anything — the same standing Add Diagram and Delete
-   * Diagram have. A Space's name is not written into a Diagram, so there is no
-   * geometry for the Edit to wait on.
+   * A Space's name is not written into a Diagram, so a rename has no geometry
+   * to wait on — the same standing Add Diagram and Delete Diagram have.
    */
   it('does not require the current canvas placement to resolve', () => {
     const { authoring, session } = open();
@@ -1119,44 +1051,10 @@ describe('Rename Space', () => {
   });
 
   /**
-   * The placement the Edit carries is the one that is **installed**, not one
-   * re-derived from the Diagram — which is what every other Edit does, and the
-   * only reason this one has to say so.
-   *
-   * The first version of this test composed the opening placement and reported
-   * nothing further, so `before` and the Edit's derivation were the same
-   * expression over the same Diagram and `toBe` could not fail. It was vacuous,
-   * and it hid a divergence from Rename Diagram: that Edit carries
-   * `reportedPlacement` forward (`deriveCompletedEdit`'s `completedPlacement`),
-   * so an installed placement the Diagram does not match survives it, while an
-   * Edit re-deriving through `Placement.fromDiagram` snapped every Thing back to
-   * its stored position. One Edit in the union answering the question a second
-   * way is the second source of truth the `CompletedEdit` shape exists to
-   * prevent, so this arranges an installed placement that diverges — with
-   * `place`, the same helper the rest of this file installs canvas geometry with
-   * — and holds the rename to leaving it alone.
-   *
-   * `Placement.fromDiagram` is still the answer when nothing is installed at
-   * all, which is what keeps the Edit above the `placement-pending` gate: the
-   * test below this one completes it before any layout.
-   *
-   * An Open Thing carrying an Open Size is in the second fixture deliberately:
-   * those are the fields a derivation through anything narrower than the Diagram
-   * would drop.
+   * The Diagram rides through a rename unchanged — `renamed-space` writes only
+   * `document.title` — so an Open Thing's remembered Open Size survives it too,
+   * with nothing narrower than the whole Diagram in the way to drop it.
    */
-  it('carries the installed placement rather than re-deriving the Diagram', () => {
-    const { authoring } = open();
-    // What the canvas has drawn and no Edit has authored.
-    place(authoring, { [THING_A]: [900, 900], [THING_B]: [950, 950] });
-    const before = authoring.authoredPlacement();
-
-    expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(authoring.authoredPlacement()).toBe(before);
-  });
-
   it('leaves an Open Thing and its remembered Open Size exactly as they were', () => {
     const opened: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -1173,15 +1071,12 @@ describe('Rename Space', () => {
         ],
       },
     };
-    const { authoring, session } = openWithOpeningPlacement(opened);
-    const before = authoring.authoredPlacement();
-    expect(before).not.toBeNull();
+    const { authoring, session } = open(opened);
 
     expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
       kind: 'completed',
     });
 
-    expect(authoring.authoredPlacement()).toBe(before);
     expect(diagramOf(session.getState().working, DIAGRAM_ID)).toEqual(
       diagramOf(opened, DIAGRAM_ID),
     );
@@ -1249,7 +1144,6 @@ describe('Delete Diagram', () => {
 
   it('deletes only the selected Diagram and continues in the first survivor', () => {
     const { authoring, navigation, session } = open(twoDiagrams, OTHER_DIAGRAM_ID);
-    place(authoring, { [THING_B]: [80, 90] });
 
     expect(authoring.complete({ kind: 'deleted-diagram', diagramId: OTHER_DIAGRAM_ID })).toEqual({
       kind: 'completed',
@@ -1261,7 +1155,7 @@ describe('Delete Diagram', () => {
     ]);
     expect(navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    expect(authoring.authoredPlacement()?.get(THING_A)).toEqual({ x: 10, y: 20, open: false });
+    expect(authoring.diagramPlacement().get(THING_A)).toEqual({ x: 10, y: 20, open: false });
   });
 
   it('refuses to delete the last Diagram with a stable identity', () => {
@@ -1293,7 +1187,6 @@ describe('Delete Graph', () => {
 
   it('removes exactly one Graph and activates the first survivor', () => {
     const { authoring, session, navigation } = open(twoGraphs);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
       kind: 'completed',
@@ -1310,7 +1203,6 @@ describe('Delete Graph', () => {
 
   it('keeps the emphasis where it was when another Graph was deleted', () => {
     const { authoring, navigation } = open(twoGraphs);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID });
 
@@ -1346,7 +1238,6 @@ describe('Delete Graph', () => {
       },
     };
     const { authoring } = open(twoDiagrams);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
       kind: 'refused',
@@ -1377,7 +1268,6 @@ describe('Edge lifecycle', () => {
         ],
       },
     });
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40], [THING_C]: [600, 40] });
 
     expect(
       authoring.complete({
@@ -1450,7 +1340,6 @@ describe('Edge lifecycle', () => {
       },
     };
     const { authoring } = open(both);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
       authoring.complete({
@@ -1472,7 +1361,6 @@ describe('Edge lifecycle', () => {
       ],
     };
     const { authoring } = open(sparse);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
       authoring.complete({
@@ -1534,26 +1422,13 @@ describe('Edge eligibility', () => {
     endpoint: 'to',
   } as const;
 
-  /** What a pointer gesture reports: where React Flow has drawn the Diagram's Things. */
-  const RENDERED = Placement.fromEntries([
-    [THING_A, { x: 10, y: 20, open: false }],
-    [THING_B, { x: 300, y: 40, open: false }],
-  ]);
-
   it('offers a connection the completion accepts', () => {
     const { authoring } = openPositioned();
 
     expect(authoring.edgeEligibility({ kind: 'connect', from: THING_B, to: THING_A })).toEqual({
       kind: 'eligible',
     });
-    expect(
-      authoring.complete({
-        kind: 'connected-things',
-        from: THING_B,
-        to: THING_A,
-        rendered: RENDERED,
-      }),
-    ).toEqual({
+    expect(authoring.complete({ kind: 'connected-things', from: THING_B, to: THING_A })).toEqual({
       kind: 'completed',
     });
   });
@@ -1565,14 +1440,9 @@ describe('Edge eligibility', () => {
     expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_B })).toEqual(
       refusal,
     );
-    expect(
-      authoring.complete({
-        kind: 'connected-things',
-        from: THING_A,
-        to: THING_B,
-        rendered: RENDERED,
-      }),
-    ).toEqual(refusal);
+    expect(authoring.complete({ kind: 'connected-things', from: THING_A, to: THING_B })).toEqual(
+      refusal,
+    );
   });
 
   it('offers a self-Edge and a cycle, which are legal authored structure', () => {
@@ -1595,7 +1465,6 @@ describe('Edge eligibility', () => {
       ],
     };
     const { authoring } = open(sparse);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_C })).toEqual({
       kind: 'refused',
@@ -1651,31 +1520,11 @@ describe('Edge eligibility', () => {
       ],
     };
     const { authoring } = open(sparse);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     const refusal = { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
     expect(authoring.edgeEligibility({ ...RECONNECT, thingId: THING_C })).toEqual(refusal);
     expect(
       authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: THING_C }),
-    ).toEqual(refusal);
-  });
-
-  /**
-   * The placement is not the Space. A Thing can be drawn — and so be a position
-   * key — while the Space no longer holds it, and an Edge naming one derives a
-   * snapshot intake rejects, which this derivation answers by throwing. So the
-   * reconnect rule asks the same second question a connection does, and refuses
-   * rather than putting a defect in front of the author as their own mistake.
-   */
-  it('refuses a reconnection onto a Thing the Space no longer holds', () => {
-    const { authoring } = openPositioned();
-    // Placed, so the Diagram would take it — but never a Thing of this Space.
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40], [UNKNOWN_THING]: [600, 40] });
-
-    const refusal = { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
-    expect(authoring.edgeEligibility({ ...RECONNECT, thingId: UNKNOWN_THING })).toEqual(refusal);
-    expect(
-      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: UNKNOWN_THING }),
     ).toEqual(refusal);
   });
 
@@ -1721,7 +1570,6 @@ describe('Diagram membership', () => {
 
   it('adds an absent Space Thing at a deliberate position and infers no Edge', () => {
     const { authoring, session } = open(sparse);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(
       authoring.complete({ kind: 'added-thing-to-diagram', thingId: THING_C, anchor: CENTRE }),
@@ -1752,12 +1600,6 @@ describe('Diagram membership', () => {
       },
     };
     const { authoring, session } = open(expandedSparse);
-    authoring.replacePlacement(
-      Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
-        [THING_B, { x: 300, y: 40, open: false }],
-      ]),
-    );
 
     authoring.complete({
       kind: 'added-thing-to-diagram',
@@ -1820,7 +1662,6 @@ describe('Diagram membership', () => {
       },
     };
     const { authoring, session } = open(twoDiagrams);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_B })).toEqual({
       kind: 'completed',
@@ -1841,7 +1682,6 @@ describe('Diagram membership', () => {
 
   it('refuses removing a Thing the Diagram does not hold', () => {
     const { authoring } = open(sparse);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_C })).toEqual({
       kind: 'refused',
@@ -1882,7 +1722,6 @@ describe('Delete Thing from Space', () => {
 
   it('deletes the Thing and cascades it out of every Diagram at once', () => {
     const { authoring, session } = open(twoDiagrams);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
       kind: 'completed',
@@ -1914,7 +1753,6 @@ describe('Delete Thing from Space', () => {
       ],
     };
     const { authoring, session } = open(referenced);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
@@ -1953,7 +1791,6 @@ describe('Delete Thing from Space', () => {
       ],
     };
     const { authoring, session } = open(linked);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
@@ -1972,7 +1809,6 @@ describe('Delete Thing from Space', () => {
       ],
     };
     const { authoring, session } = open(referenced);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
       kind: 'completed',
@@ -1989,7 +1825,6 @@ describe('Delete Thing from Space', () => {
       ],
     };
     const { authoring, session } = open(referenced);
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
 
     expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
       kind: 'completed',
@@ -2024,12 +1859,7 @@ describe('Keep local', () => {
     ]);
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
-    const { authoring } = composeApp({
-      spaceSession: session,
-      selection: DIAGRAM_ID,
-      initialPlacement: null,
-    });
-    place(authoring, { [THING_A]: [10, 20], [THING_B]: [300, 40] });
+    const { authoring } = composeApp({ spaceSession: session, selection: DIAGRAM_ID });
 
     authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
@@ -2094,17 +1924,8 @@ describe('connecting Things on an embedded Diagram', () => {
       { id: THING_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
     ],
   };
-  const rendered = Placement.fromEntries([
-    [THING_A, { x: 500, y: 600, open: false }],
-    [THING_C, { x: 800, y: 600, open: false }],
-  ]);
-
   it('writes the Edge into the Graph the Space Thing is showing, not the canvas Active Graph', () => {
     const { session, navigation, authoring } = open(withOther);
-    place(authoring, {
-      [THING_A]: [10, 20],
-      [THING_B]: [300, 40],
-    });
     const initialNavigation = navigation.getState();
 
     expect(
@@ -2112,7 +1933,6 @@ describe('connecting Things on an embedded Diagram', () => {
         kind: 'connected-things',
         from: THING_A,
         to: THING_C,
-        rendered,
         graphId: SHOWN_GRAPH_ID,
       }).kind,
     ).toBe('completed');
@@ -2148,17 +1968,12 @@ describe('connecting Things on an embedded Diagram', () => {
         ],
       },
     });
-    place(authoring, {
-      [THING_A]: [10, 20],
-      [THING_B]: [300, 40],
-    });
 
     expect(
       authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
         kind: 'connected-things',
         from: THING_A,
         to: THING_C,
-        rendered,
         graphId: SHOWN_GRAPH_ID,
       }),
     ).toMatchObject({ kind: 'refused', refusal: { code: 'edge-already-exists' } });

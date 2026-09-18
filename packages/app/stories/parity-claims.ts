@@ -524,7 +524,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Placement',
     claim: 'A strategy that cannot produce positions fails placement with its own diagnostic.',
     applicationEvidence:
-      'Selectable V1 Diagrams use the in-process positioned strategy, so a browser cannot deterministically block it. Covered by packages/app/test/placement-rendering.test.tsx.',
+      'Selectable V1 Diagrams use the in-process positioned strategy, which cannot reject, so no application flow reaches a failed placement. The failed state becomes the failure diagnostic in packages/app/test/canvas-content.test.ts.',
   },
   {
     id: 'operational-feedback-placement-pending',

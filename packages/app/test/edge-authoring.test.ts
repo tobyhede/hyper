@@ -1,7 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
-import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { composeApp } from '../src/compose-app';
@@ -102,11 +101,6 @@ function open(
     spaceSession: session,
     selection: diagramId,
     newId,
-    initialPlacement: Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: false }],
-      [THING_B, { x: 300, y: 40, open: false }],
-      [THING_C, { x: 600, y: 40, open: false }],
-    ]),
   });
   adapter.getState().syncProjection(PROJECTED, []);
   return { session, navigation, authoring, adapter, continuation, edges: edgeAuthoring };
@@ -358,11 +352,6 @@ describe('draft invalidation', () => {
     const { authoring, edgeAuthoring: edges } = composeApp({
       spaceSession: session,
       selection: DIAGRAM_ID,
-      initialPlacement: Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: false }],
-        [THING_B, { x: 300, y: 40, open: false }],
-        [THING_C, { x: 600, y: 40, open: false }],
-      ]),
     });
     edges.openEdgeEditor(SUBJECT);
     // Force the conflict the accept resolves.

@@ -102,7 +102,7 @@ describe('what the composition opens on', () => {
   it('opens a selected Diagram on the placement that Diagram already authored', () => {
     const { authoring } = composeApp({ spaceSession: openSession() });
 
-    expect(authoring.authoredPlacement()).toEqual(
+    expect(authoring.diagramPlacement()).toEqual(
       Placement.fromEntries([
         [THING_A, { x: 10, y: 20, open: false }],
         [THING_B, { x: 300, y: 40, open: false }],

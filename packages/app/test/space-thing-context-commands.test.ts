@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot, type ThingDocument } from '@project/core';
-import { Placement } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
 import { createOpenSpaces } from '../src/open-spaces';
@@ -90,9 +89,6 @@ async function setup() {
   });
   const source = await spaces.open(META);
   const entry = await spaces.embed(TARGET);
-  const sourceDiagram = source.app.currentSpace().diagrams[0];
-  if (sourceDiagram === undefined) throw new Error('Source Diagram missing');
-  source.app.authoring.replacePlacement(Placement.fromDiagram(sourceDiagram));
   const commands = spaceThingContextCommands(
     entry,
     spaces,

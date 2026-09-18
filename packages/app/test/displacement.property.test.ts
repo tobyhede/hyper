@@ -184,22 +184,12 @@ const snapshotOf = (entries: readonly GeneratedEntry[]): SpaceSnapshot => {
   };
 };
 
-/**
- * A composed Space over the generated Diagram, with the geometry the canvas
- * would have reported by now already installed.
- */
+/** A composed Space over the generated Diagram, opened on its own geometry. */
 const openAuthoring = (entries: readonly GeneratedEntry[]) => {
   const snapshot = snapshotOf(entries);
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(new MemorySpaceBackend([loaded]), loaded);
-  const { authoring } = composeApp({
-    spaceSession: session,
-    selection: DIAGRAM_ID,
-    initialPlacement: null,
-  });
-  const diagram = snapshot.document.diagrams?.[0];
-  if (diagram === undefined) throw new Error('the generated Space must hold its Diagram');
-  authoring.replacePlacement(Placement.fromDiagram(diagram));
+  const { authoring } = composeApp({ spaceSession: session, selection: DIAGRAM_ID });
   return { session, authoring };
 };
 
@@ -220,22 +210,6 @@ const originsOf = (session: Session) => {
 
 const entryIn = (session: Session, thingId: UUID): ThingPlacement | undefined =>
   diagramIn(session.getState().working)?.positions[thingId];
-
-/** The geometry React Flow would report with one Thing dragged to a new point. */
-const renderedWith = (
-  session: Session,
-  movedId: UUID,
-  to: { readonly x: number; readonly y: number },
-): Placement => {
-  const positions = diagramIn(session.getState().working)?.positions ?? {};
-  return Placement.fromEntries(
-    THING_IDS.flatMap((thingId) => {
-      const at = positions[thingId];
-      if (at === undefined) return [];
-      return [[thingId, thingId === movedId ? to : { x: at.x, y: at.y }] as const];
-    }),
-  );
-};
 
 type CoverageCounts = {
   clearOnXOnly: number;
@@ -483,14 +457,13 @@ describe('Displacement at the Edit', () => {
           expect(originsOf(session)[witnessId]).toEqual([witness.x, witness.y]);
 
           // The author drags it past the Open Thing, through the path a canvas
-          // move really takes: a settled movement reporting what React Flow
-          // draws, merged under `Placement.next`.
+          // move really takes: a settled movement carrying its own drop point,
+          // merged over the Diagram's positions at derivation.
           const destination = { x: subjectIn.x + beyond.x, y: subjectIn.y + beyond.y };
           expect(
             authoring.complete({
               kind: 'settled-thing-movement',
-              rendered: renderedWith(session, witnessId, destination),
-              placed: [witnessId],
+              moved: new Map([[witnessId, destination]]),
             }),
           ).toEqual({ kind: 'completed' });
           expect(originsOf(session)[witnessId]).toEqual([destination.x, destination.y]);

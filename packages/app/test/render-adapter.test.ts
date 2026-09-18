@@ -1,16 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
 
-import {
-  uuidSchema,
-  type DiagramId,
-  type DiagramPosition,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
+import { uuidSchema, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
 import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
 import { mintingIds } from './minting';
 import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
@@ -48,25 +41,19 @@ const EDGE: Edge = {
   data: { graphId: GRAPH_ID },
 };
 
-interface InstallRecord {
-  readonly kind: 'reported' | 'replaced';
-  readonly placement: ReadonlyMap<string, DiagramPosition> | null;
-  /** What the adapter's own state held at the moment the effect ran. */
-  readonly nodesAtCall: readonly ThingFlowNode[] | null;
-}
-
 /** What Authoring answers about an Edge gesture before the coordinator attempts it. */
 interface AuthoringCapabilities {
   /** The proposal kind this Authoring refuses; every other kind is eligible. */
   readonly refusing?: EdgeProposal['kind'];
-  readonly authoredPlacement?: Placement | null;
+  readonly diagramPlacement?: Placement;
 }
 
 /** A Space Authoring that records what it was told, without a session behind it. */
-function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilities = {}) {
-  const installs: InstallRecord[] = [];
+function authoringSpy({
+  refusing,
+  diagramPlacement = Placement.empty(),
+}: AuthoringCapabilities = {}) {
   const completions: unknown[] = [];
-  let adapter: RenderAdapter | null = null;
   const authoring: SpaceAuthoring = {
     completeInDiagram: () => {
       throw new Error('Embedded authoring is outside this adapter test.');
@@ -74,22 +61,8 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
     // SAFETY: `getState` is never read by these tests — the spy only needs to
     // satisfy `SpaceAuthoring`'s shape, not implement a real state.
     getState: () => ({}) as never,
-    authoredPlacement: () => authoredPlacement,
+    diagramPlacement: () => diagramPlacement,
     subscribe: () => () => undefined,
-    reportRendered: (placement: ReadonlyMap<string, DiagramPosition>) => {
-      installs.push({
-        kind: 'reported',
-        placement,
-        nodesAtCall: adapter?.getState().projection?.nodes ?? null,
-      });
-    },
-    replacePlacement: (placement: ReadonlyMap<string, DiagramPosition> | null) => {
-      installs.push({
-        kind: 'replaced',
-        placement,
-        nodesAtCall: adapter?.getState().projection?.nodes ?? null,
-      });
-    },
     edgeEligibility: (proposal: EdgeProposal): EdgeEligibility =>
       proposal.kind === refusing
         ? { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } }
@@ -103,14 +76,7 @@ function authoringSpy({ refusing, authoredPlacement = null }: AuthoringCapabilit
     acceptStoredSpace: () => null,
     dispose: () => undefined,
   };
-  return {
-    authoring,
-    installs,
-    completions,
-    attach: (store: RenderAdapter) => {
-      adapter = store;
-    },
-  };
+  return { authoring, completions };
 }
 
 function adapter(): RenderAdapter {
@@ -137,14 +103,13 @@ function connections(
  * above answers what the adapter was *told*; this answers what a Space ends up
  * holding, so the two are not interchangeable.
  *
- * `initialPlacement` is `null` rather than absent, because these cases install
- * whatever geometry they are about; absent, the composition would open on the
- * selected Diagram's own map (ADR 0025), which is a different starting state.
+ * Opens on the selected Diagram's own map (ADR 0025) — Authoring derives it
+ * fresh rather than holding a copy, so there is no separate starting geometry
+ * to state.
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
   diagramId: DiagramId,
-  initialPlacement: Placement | null = null,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
   /** The ids this Space's Edits mint, supplied rather than mocked. */
@@ -155,12 +120,7 @@ function sessionBackedAdapter(
     stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
   ]);
   const session = openSpaceSession(backend, loaded);
-  const { authoring, adapter } = composeApp({
-    spaceSession: session,
-    selection: diagramId,
-    initialPlacement,
-    newId,
-  });
+  const { authoring, adapter } = composeApp({ spaceSession: session, selection: diagramId, newId });
   return { session, authoring, store: adapter };
 }
 
@@ -212,16 +172,7 @@ function sparsePositionedAdapter(newId?: () => UUID) {
       },
     ],
   };
-  return sessionBackedAdapter(
-    snapshot,
-    DIAGRAM_ID,
-    Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: false }],
-      [THING_B, { x: 300, y: 20, open: false }],
-    ]),
-    undefined,
-    newId,
-  );
+  return sessionBackedAdapter(snapshot, DIAGRAM_ID, undefined, newId);
 }
 
 /** The same Space, with a newer one already stored — so an Edit conflicts. */
@@ -260,15 +211,7 @@ function storedSpaceAdapter() {
     ...snapshot,
     document: { ...snapshot.document, title: 'Stored' },
   };
-  return sessionBackedAdapter(
-    snapshot,
-    DIAGRAM_ID,
-    Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: false }],
-      [THING_B, { x: 300, y: 20, open: false }],
-    ]),
-    stored,
-  );
+  return sessionBackedAdapter(snapshot, DIAGRAM_ID, stored);
 }
 
 describe('render adapter', () => {
@@ -285,20 +228,13 @@ describe('render adapter', () => {
   });
 
   it('drops the published Graph Edges with their nodes when the Diagram changes', () => {
-    const spy = authoringSpy();
-    const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
+    const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
     expect(store.getState().projection?.edges).toEqual([EDGE]);
 
-    store.getState().selectDiagram(null);
+    store.getState().selectDiagram();
 
     expect(store.getState().projection).toBeNull();
-    expect(spy.installs.at(-1)).toEqual({
-      kind: 'replaced',
-      placement: null,
-      nodesAtCall: null,
-    });
   });
 
   it('keeps the published Graph Edges through a change that concerns only nodes', () => {
@@ -519,28 +455,6 @@ describe('render adapter', () => {
     );
   });
 
-  it('publishes the projection before installing the placement it produced', () => {
-    const spy = authoringSpy();
-    const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
-
-    store.getState().syncProjection(PROJECTED, []);
-
-    // Computing inside the `set` updater made the cross-store write land while
-    // the adapter still held its previous state, so anything the effect
-    // notified read the projection from before the one it was told about.
-    expect(spy.installs).toHaveLength(1);
-    expect(spy.installs[0]?.kind).toBe('reported');
-    expect(spy.installs[0]?.nodesAtCall?.map((entry) => entry.id)).toEqual([THING_A, THING_B]);
-    expect(spy.installs[0]?.placement).toEqual(
-      Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: false }],
-        [THING_B, { x: 300, y: 20, open: false }],
-      ]),
-    );
-    expect(store.getState().projection?.nodes.map((entry) => entry.id)).toEqual([THING_A, THING_B]);
-  });
-
   it('keeps the Things on screen when a connection completes with no fresh projection', () => {
     // A Space change starts a replacement placement, so the render path has no
     // projection to hand over — while the canvas deliberately keeps drawing the
@@ -549,7 +463,6 @@ describe('render adapter', () => {
     // would blank the canvas until the strategy resolved.
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
 
     store.getState().syncProjection(PROJECTED, []);
     expect(
@@ -581,7 +494,7 @@ describe('render adapter', () => {
     // The gesture ends where it began, so no Edit completes and nothing reports.
     store.getState().changeNodes(settled(THING_A, 10, 20));
 
-    expect(authoring.authoredPlacement()).toEqual(
+    expect(authoring.diagramPlacement()).toEqual(
       Placement.fromEntries([
         [THING_A, { x: 10, y: 20, open: false }],
         [THING_B, { x: 300, y: 20, open: false }],
@@ -610,17 +523,14 @@ describe('render adapter', () => {
 
   /*
    * Authoring owns eligibility; the coordinator only asks. A refusal has to stop
-   * before the placement install, because installing is what commits an
-   * pending placement into a Diagram — a gesture Authoring rejected
-   * would otherwise still author one as a side effect.
+   * before anything completes — a gesture Authoring rejected would otherwise
+   * still author one as a side effect.
    */
-  it('installs and completes nothing for a connection Authoring refuses', () => {
+  it('completes nothing for a connection Authoring refuses', () => {
     const spy = authoringSpy({ refusing: 'connect' });
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
     store.getState().syncProjection(PROJECTED, []);
     const published = store.getState().projection;
-    const installedBefore = spy.installs.length;
 
     expect(
       connections(store, spy.authoring).connect(
@@ -634,16 +544,13 @@ describe('render adapter', () => {
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
 
     expect(spy.completions).toEqual([]);
-    expect(spy.installs).toHaveLength(installedBefore);
     expect(store.getState().projection).toBe(published);
   });
 
-  it('installs and completes nothing for a created Thing Authoring refuses', () => {
+  it('completes nothing for a created Thing Authoring refuses', () => {
     const spy = authoringSpy({ refusing: 'create-and-connect' });
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
     store.getState().syncProjection(PROJECTED, []);
-    const installedBefore = spy.installs.length;
 
     expect(
       connections(store, spy.authoring).createAndConnect(
@@ -654,13 +561,11 @@ describe('render adapter', () => {
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
 
     expect(spy.completions).toEqual([]);
-    expect(spy.installs).toHaveLength(installedBefore);
   });
 
   it('applies projected rect and stacking to an existing live node', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
 
     const closed = node(THING_A, 10, 20);
     closed.width = 260;
@@ -693,12 +598,11 @@ describe('render adapter', () => {
    */
   it('answers one resize capability across writes resize knows nothing about', () => {
     const spy = authoringSpy({
-      authoredPlacement: Placement.fromEntries([
+      diagramPlacement: Placement.fromEntries([
         [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
     const capability = store.getState().thingResize;
 
     store.getState().syncProjection(PROJECTED, []);
@@ -723,9 +627,8 @@ describe('render adapter', () => {
       [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       [THING_B, { x: 300, y: 200, open: false }],
     ]);
-    const spy = authoringSpy({ authoredPlacement: authored });
+    const spy = authoringSpy({ diagramPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
 
     store.getState().thingResize.beginResize(THING_A);
     store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
@@ -752,7 +655,7 @@ describe('render adapter', () => {
     const authored = Placement.fromEntries([
       [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
-    const spy = authoringSpy({ authoredPlacement: authored });
+    const spy = authoringSpy({ diagramPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
 
     store.getState().thingResize.beginResize(THING_A);
@@ -780,7 +683,7 @@ describe('render adapter', () => {
     const authored = Placement.fromEntries([
       [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
-    const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
+    const store = createRenderAdapter(authoringSpy({ diagramPlacement: authored }).authoring);
 
     store.getState().thingResize.beginResize(THING_A);
     store.getState().thingResize.previewResize(THING_A, { width: 280, height: 240 });
@@ -805,7 +708,7 @@ describe('render adapter', () => {
       [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       [THING_B, { x: 300, y: 200, open: false }],
     ]);
-    const store = createRenderAdapter(authoringSpy({ authoredPlacement: authored }).authoring);
+    const store = createRenderAdapter(authoringSpy({ diagramPlacement: authored }).authoring);
     const open = node(THING_A, 10, 20);
     open.width = 500;
     open.height = 360;
@@ -821,7 +724,7 @@ describe('render adapter', () => {
 
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
-      authoredPlacement: Placement.fromEntries([
+      diagramPlacement: Placement.fromEntries([
         [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
@@ -838,7 +741,6 @@ describe('render adapter', () => {
   it('keeps an in-flight drag position while applying projected expanded geometry', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
 
     store.getState().syncProjection([node(THING_A, 10, 20)], []);
     store.getState().changeNodes(moving(THING_A, 111, 222));
@@ -862,7 +764,6 @@ describe('render adapter', () => {
   it('completes no Edit for a drag that returns to where it began', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
     store.getState().syncProjection([node(THING_A, 10, 20)], []);
 
     // React Flow reports a drag as many moving frames and one settled frame, and
@@ -881,7 +782,6 @@ describe('render adapter', () => {
   it('publishes nothing new for a change aimed at a node it does not own', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
     store.getState().syncProjection([node(THING_A, 10, 20)], []);
     const published = store.getState().projection;
 
@@ -900,7 +800,6 @@ describe('render adapter', () => {
   it('completes a settled-thing-movement Edit for a drag that lands somewhere new', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    spy.attach(store);
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
     completeDrag(store, THING_A, 500, 400);
@@ -908,11 +807,9 @@ describe('render adapter', () => {
     expect(spy.completions).toEqual([
       {
         kind: 'settled-thing-movement',
-        rendered: Placement.fromEntries([
-          [THING_A, { x: 500, y: 400, open: false }],
-          [THING_B, { x: 300, y: 20, open: false }],
-        ]),
-        placed: [THING_A],
+        // Only the moved Thing's own drop point — B never moved, so it is not
+        // carried at all, and Authoring reads its position from the Diagram.
+        moved: new Map([[THING_A, { x: 500, y: 400 }]]),
       },
     ]);
   });
