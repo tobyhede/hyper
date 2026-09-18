@@ -21,7 +21,7 @@ Not checked on PostgreSQL. `repository.ts` says every implementation of the seam
 
 ## To decide
 
-- Where a codec failure is wrapped. Inside each repository's read, or once at a shared boundary. The two SQL adapters share `SqlStore` (ADR 0093), so there may be one place.
+- Where a codec failure is wrapped. Inside each repository's read, or once at a shared boundary. The two SQL adapters share `SqlStore` (ADR 0095), so there may be one place.
 - Whether every throw out of a read is broken stored state by default, with the unreachable-database arm named explicitly instead — the inverse of the current classification, and possibly the honest one, since a driver that cannot decode what it stored is not a connectivity problem.
 - What `GET /api/aggregate` should answer. `packages/http/src/index.ts` answers 503 for *every* throw out of `loadAggregate` and classifies nothing; `space-host.ts:134-148` already records that this is the half that cannot say a stored aggregate is broken, and that fixing it was not that ticket's. The identity is on the shared seam and reachable from there.
 

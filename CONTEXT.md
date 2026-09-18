@@ -28,6 +28,10 @@ The durable UUID that names a referenceable entity — a Space, Thing, Diagram, 
 An author need not supply one when introducing an entity. Anything accepted into Hyper receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
 _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id with a "durable" one.
 
+**Revision**:
+The counter a stored Space is versioned by. A Space is created at revision 0 and each committed change to it advances the revision by one; a change names the revision it was made against, and a stored revision that differs is a conflict answered with the current Space rather than a write. A revision is only ever compared for equality and advanced, never ordered or measured, and it is a non-negative integer no larger than 2^63−1. The **exported revision** is the revision Exporting last captured for that Space, which is how a stored Space that has changed since its export is told apart from one that has not.
+_Avoid_: version, generation, timestamp, replacement epoch (that is the working Space's, and it moves for unrelated reasons).
+
 ## Things
 
 **Thing**:
