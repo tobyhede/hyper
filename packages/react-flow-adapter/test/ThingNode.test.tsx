@@ -197,7 +197,6 @@ function props({
     showContent: false,
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
-    emphasis: 'subtle',
     readOnly,
   };
   if (onEditThing !== undefined)

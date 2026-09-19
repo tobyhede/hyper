@@ -12,7 +12,6 @@ import {
   projectThingNodes,
   projectGraphEdges,
   type ThingFlowNode,
-  type GraphEmphasis,
 } from '@project/react-flow-adapter';
 import { THING_SIZE } from './thing';
 import { activeGraphColor, graphColorMap } from './colors';
@@ -93,9 +92,6 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
     visibleGraphs,
     project: (laidOut, interaction) => {
       const { activeGraphId } = interaction;
-      // Activating a Graph emphasises it; it never hides the rest of the Space.
-      const emphasis: GraphEmphasis = activeGraphId === null ? 'equal' : 'subtle';
-
       return {
         nodes: projectThingNodes(space, {
           readOnly: false,
@@ -104,12 +100,11 @@ export function canvasProjection(space: Space, resolved: ResolvedDiagram): Pendi
           showActiveThingContent: interaction.presenting,
           activeGraphId,
           activeGraphColor: activeGraphColor(colors, activeGraphId),
-          emphasis,
           strategyGraph: laidOut,
           thingIds,
           openThingIds,
         }),
-        edges: projectGraphEdges(edges, colors, { activeGraphId, emphasis }),
+        edges: projectGraphEdges(edges, colors, { activeGraphId }),
       };
     },
   };

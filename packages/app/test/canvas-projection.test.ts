@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type DiagramId } from '@project/core';
 import { loadSpace, Placement, positionedStrategy, type Space } from '@project/graph';
+import { OTHER_GRAPH_OPACITY } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { GRAPH_PALETTE } from '../src/colors';
 import { resolveDiagram } from '../src/diagram-resolution';
@@ -93,8 +94,11 @@ describe('canvasProjection', () => {
     const equal = await projectThrough(space);
     const emphasised = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
 
-    expect(equal.nodes.map((node) => node.data.emphasis)).toEqual(['equal', 'equal']);
-    expect(emphasised.nodes.map((node) => node.data.emphasis)).toEqual(['subtle', 'subtle']);
+    expect(equal.edges.map((edge) => edge.style?.opacity)).toEqual([1, 1]);
+    expect(emphasised.edges.map((edge) => edge.style?.opacity).sort()).toEqual([
+      OTHER_GRAPH_OPACITY,
+      1,
+    ]);
     // Emphasis, not filtering: both Graphs are still drawn (ADR 0026).
     expect(emphasised.edges).toHaveLength(2);
   });

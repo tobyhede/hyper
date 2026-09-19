@@ -3,7 +3,7 @@ import { buildGraphRenderEdges, loadSpace, type Space } from '@project/graph';
 import type { SpaceFile } from '@project/core';
 import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
-import { projectThingNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
+import { projectThingNodes, projectGraphEdges, OTHER_GRAPH_OPACITY } from '../src/index';
 import { referenceFile, thingFile } from './thing-files';
 import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
@@ -316,40 +316,27 @@ describe('projectGraphEdges', () => {
   });
 
   it('draws every graph the same when nothing is emphasised', () => {
-    const edges = projectGraphEdges(graphRenderEdges, colors, { emphasis: 'equal' });
+    const edges = projectGraphEdges(graphRenderEdges, colors, {});
     expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
     expect(edges.every((e) => e.animated)).toBe(true);
   });
 
-  it('recedes the other graphs, never hiding them', () => {
-    const at = (emphasis: GraphEmphasis) => {
-      const edges = projectGraphEdges(graphRenderEdges, colors, {
-        emphasis,
-        activeGraphId: uuid('00000000-0000-4000-8000-000000000004'),
-      });
-      return {
-        '00000000-0000-4000-8000-000000000004': edges.find((e) => e.id === MAIN_EDGE_ID)!,
-        '00000000-0000-4000-8000-000000000030': edges.find((e) => e.id === ALT_EDGE_ID)!,
-        count: edges.length,
-      };
-    };
+  it('recedes the other graphs while one is active, never hiding them', () => {
+    const edges = projectGraphEdges(graphRenderEdges, colors, {
+      activeGraphId: uuid('00000000-0000-4000-8000-000000000004'),
+    });
+    const main = edges.find((e) => e.id === MAIN_EDGE_ID)!;
+    const alt = edges.find((e) => e.id === ALT_EDGE_ID)!;
 
-    const equal = at('equal');
-    const subtle = at('subtle');
+    // The Active Graph is untouched.
+    expect(main.style?.opacity).toBe(1);
+    expect(main.animated).toBe(true);
 
-    // The emphasised graph is untouched at either level.
-    expect(equal['00000000-0000-4000-8000-000000000004'].style?.opacity).toBe(1);
-    expect(subtle['00000000-0000-4000-8000-000000000004'].style?.opacity).toBe(1);
-    expect(subtle['00000000-0000-4000-8000-000000000004'].animated).toBe(true);
-
-    // Others recede but are still drawn, and none are dropped.
-    expect(Number(subtle['00000000-0000-4000-8000-000000000030'].style?.opacity)).toBeLessThan(
-      Number(equal['00000000-0000-4000-8000-000000000030'].style?.opacity),
-    );
-    expect(Number(subtle['00000000-0000-4000-8000-000000000030'].style?.opacity)).toBeGreaterThan(
-      0,
-    );
-    expect(subtle.count).toBe(equal.count);
+    // The others recede but are still drawn, and none are dropped.
+    expect(alt.style?.opacity).toBe(OTHER_GRAPH_OPACITY);
+    expect(OTHER_GRAPH_OPACITY).toBeGreaterThan(0);
+    expect(alt.animated).toBe(false);
+    expect(edges).toHaveLength(graphRenderEdges.length);
   });
 
   describe('Graphs joining the same two Things', () => {
@@ -373,7 +360,6 @@ describe('projectGraphEdges', () => {
     it('puts the Active Graph on the centre, connecting, with the others below it', () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(BLUE!),
-        emphasis: 'subtle',
       });
 
       expect(dataOf(edges, BLUE!)).toMatchObject({ laneOffset: 0, endTrim: 0 });
@@ -390,7 +376,7 @@ describe('projectGraphEdges', () => {
       const edges = projectGraphEdges(
         [edge(RED!, A!, B!), edge(BLUE!, A!, B!), edge(BLUE!, B!, A!)],
         colors,
-        { activeGraphId: uuid(BLUE!), emphasis: 'subtle' },
+        { activeGraphId: uuid(BLUE!) },
       );
       const byId = (source: string, target: string, graphId: string) =>
         edges.find((e) => e.id === `${graphId}::${source}::${target}`)!;
@@ -412,7 +398,6 @@ describe('projectGraphEdges', () => {
     it('draws an arrowhead on the connecting Edge alone', () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(BLUE!),
-        emphasis: 'subtle',
       });
       const markerOf = (graphId: string) => edges.find((e) => e.id.startsWith(graphId))!.markerEnd;
 
@@ -425,7 +410,6 @@ describe('projectGraphEdges', () => {
       const centred = (activeGraphId: string) => {
         const edges = projectGraphEdges(shared, colors, {
           activeGraphId: uuid(activeGraphId),
-          emphasis: 'subtle',
         });
         return [RED!, BLUE!].filter((graphId) => laneOf(edges, graphId) === 0);
       };
@@ -435,14 +419,13 @@ describe('projectGraphEdges', () => {
     });
 
     it('connects every Edge while no Graph is active', () => {
-      const edges = projectGraphEdges(shared, colors, { emphasis: 'equal' });
+      const edges = projectGraphEdges(shared, colors, {});
       expect(edges.map((e) => e.data!.endTrim)).toEqual([0, 0, 0]);
     });
 
     it('draws the Active Graph last, over the lanes it converges with', () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(RED!),
-        emphasis: 'subtle',
       });
 
       expect(edges.map((e) => e.data!.graphId)).toEqual([BLUE, GREEN, RED]);
