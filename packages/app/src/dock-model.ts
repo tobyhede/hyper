@@ -376,11 +376,25 @@ export interface OpenSpaceRow {
  * total: entries begin that way and Open Spaces re-homes the rows below
  * the Space it closes. Without that invariant this drops a Space whose opener
  * exited — still open, and not in the list that is the only way back to it.
+ *
+ * **Meta is the one exception to both rules**: it draws first at the root
+ * whatever opened it, with what was Entered from it beneath. A Space Thing may
+ * target Meta, so Meta can have an Opener, and hung by it Meta drew under that
+ * Space where the menu promises it on top (`dock-open-tree.test.ts`).
  */
-export const openTree = (rows: readonly OpenSpaceRow[]): readonly OpenRow[] => {
+export const openTree = (
+  rows: readonly OpenSpaceRow[],
+  metaSpaceId: UUID | null,
+): readonly OpenRow[] => {
+  const parent = (row: OpenSpaceRow): UUID | null =>
+    row.spaceId === metaSpaceId ? null : row.from;
   const below = (from: UUID | null, depth: number): readonly OpenRow[] =>
     rows
-      .filter((row) => row.from === from)
+      .filter((row) => parent(row) === from)
+      .sort(
+        (left, right) =>
+          Number(right.spaceId === metaSpaceId) - Number(left.spaceId === metaSpaceId),
+      )
       .flatMap((row) => [
         { spaceId: row.spaceId, title: row.title, depth, persistence: row.persistence },
         ...below(row.spaceId, depth + 1),

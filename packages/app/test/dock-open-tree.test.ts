@@ -42,7 +42,7 @@ describe('the open-Spaces tree (ADR 0082)', () => {
       row(TRAVERSAL, 'Traversal', META),
     ];
 
-    expect(openTree(rows).map((each) => [each.title, each.depth])).toEqual([
+    expect(openTree(rows, META).map((each) => [each.title, each.depth])).toEqual([
       ['Meta', 0],
       ['Platform', 1],
       ['Rendering', 2],
@@ -62,7 +62,11 @@ describe('the open-Spaces tree (ADR 0082)', () => {
       row(PLATFORM, 'Platform', META),
     ];
 
-    expect(openTree(rows).map((each) => each.title)).toEqual(['Meta', 'Traversal', 'Platform']);
+    expect(openTree(rows, META).map((each) => each.title)).toEqual([
+      'Meta',
+      'Traversal',
+      'Platform',
+    ]);
   });
 
   /**
@@ -79,15 +83,43 @@ describe('the open-Spaces tree (ADR 0082)', () => {
       row(TRAVERSAL, 'Traversal', META),
     ];
 
-    expect(openTree(rows).map((each) => [each.title, each.depth])).toEqual([
+    expect(openTree(rows, META).map((each) => [each.title, each.depth])).toEqual([
       ['Meta', 0],
       ['Rendering', 1],
       ['Traversal', 1],
     ]);
   });
 
+  /**
+   * **Meta tops the menu whoever opened it.** A Space Thing may target Meta, so
+   * Meta can be Entered from Platform and record Platform as its Opener. Hung
+   * by that Opener it drew under Platform, and a sort among the roots could not
+   * reach it. It draws first at the root instead, with what was Entered from it
+   * beneath, and Platform keeps its place after it.
+   */
+  it('draws Meta first at the root when it was Entered from another Space', () => {
+    const rows = [
+      row(PLATFORM, 'Platform', null),
+      row(META, 'Meta', PLATFORM),
+      row(TRAVERSAL, 'Traversal', META),
+    ];
+
+    expect(openTree(rows, META).map((each) => [each.title, each.depth])).toEqual([
+      ['Meta', 0],
+      ['Traversal', 1],
+      ['Platform', 0],
+    ]);
+  });
+
+  /** Meta first among the roots when it was opened directly after another Space. */
+  it('draws Meta first when it was opened directly after another Space', () => {
+    const rows = [row(PLATFORM, 'Platform', null), row(META, 'Meta', null)];
+
+    expect(openTree(rows, META).map((each) => each.title)).toEqual(['Meta', 'Platform']);
+  });
+
   /** A row whose opener is not in the list is not drawable, and is not drawn. */
   it('draws nothing for a row whose opener is absent', () => {
-    expect(openTree([row(RENDERING, 'Rendering', PLATFORM)])).toEqual([]);
+    expect(openTree([row(RENDERING, 'Rendering', PLATFORM)], META)).toEqual([]);
   });
 });

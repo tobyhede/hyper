@@ -1381,18 +1381,13 @@ export const createApp = (
     const openSpaceRows = useMemo(
       () =>
         openTree(
-          // Meta first, so its row tops the Open Spaces menu whenever it is open.
-          [...openSpacesState.entries]
-            .sort(
-              (left, right) =>
-                Number(right.id === spaces?.metaSpaceId) - Number(left.id === spaces?.metaSpaceId),
-            )
-            .map((entry) => ({
-              spaceId: entry.id,
-              title: entry.session.getState().working.document.title,
-              from: openSpacesState.openedFrom.get(entry.id) ?? null,
-              persistence: entry.session.getState().persistence,
-            })),
+          openSpacesState.entries.map((entry) => ({
+            spaceId: entry.id,
+            title: entry.session.getState().working.document.title,
+            from: openSpacesState.openedFrom.get(entry.id) ?? null,
+            persistence: entry.session.getState().persistence,
+          })),
+          spaces?.metaSpaceId ?? null,
         ),
       [openSpacesState, spaces],
     );
