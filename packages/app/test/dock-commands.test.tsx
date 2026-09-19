@@ -183,7 +183,7 @@ describe("every control's accessible name contains its visible label (WCAG 2.5.3
   it('names the root Open Spaces menu with the word it shows', async () => {
     await renderDock(<Default />);
     // Three crossings in, the Open Spaces menu is a bare chevron; the word is what the
-    // root draws. Walk up to it, which is what the Opener control is for.
+    // root draws. Return to it, which is what the Opener control is for.
     await act(() => {
       fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Design system' }));
       return Promise.resolve();
