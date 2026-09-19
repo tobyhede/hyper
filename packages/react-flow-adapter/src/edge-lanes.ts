@@ -1,5 +1,7 @@
 import { getBezierPath, Position } from '@xyflow/react';
 
+import type { GraphId } from '@project/core';
+
 import type { EdgeAttachment } from './edge-attachment';
 
 /**
@@ -10,29 +12,45 @@ import type { EdgeAttachment } from './edge-attachment';
  */
 export const GRAPH_LANE_SPACING = 8;
 
-/** The one Edge fact lanes are decided from: which Things it joins. */
+/** The Edge facts lanes are decided from: which Things it joins, and for which Graph. */
 export interface LaneEdge {
   readonly id: string;
   readonly source: string;
   readonly target: string;
+  readonly graphId: GraphId;
+}
+
+/** Where an Edge is drawn beside the others joining its pair, and whether it connects. */
+export interface GraphLane {
+  /** How far from the centre line the Edge runs. Zero for a lone Edge. */
+  readonly offset: number;
+  /**
+   * Whether the Edge runs anchor to anchor and carries the arrowhead. The
+   * Active Graph's Edges connect, and while no Graph is active every Edge does;
+   * any other Edge runs beside them and stops short (ADR 0100).
+   */
+  readonly connects: boolean;
 }
 
 /**
- * How far from the centre line each Edge is drawn, keyed by Edge id.
+ * The lane of every Edge, keyed by Edge id.
  *
  * Every Edge joins two Things, and each attaches from where those Things are
  * (ADR 0087) rather than from which Graph it belongs to, so every Graph's Edge
  * between the same pair lands on the same two anchors and draws the same curve.
- * Edges sharing a pair — in either direction — are therefore given lanes in the
- * order they arrive: the first keeps the centre, and each after it runs one
- * spacing further out on the same side. A caller that wants one Edge on the
- * centre — the Active Graph's — puts it first.
+ * Edges sharing a pair — in either direction — are therefore given lanes: the
+ * Active Graph's Edge takes the centre, and each other Edge runs one spacing
+ * further out on the same side, in the order the Edges are given. Where the
+ * Active Graph has no Edge in the pair, the first of the others keeps the
+ * centre.
  *
  * The distance carries no direction: which side is "out" is the screen's, not
  * the Edge's (see `laneBezier`), so an Edge and its reverse stack the same way.
- * A lone Edge's offset is zero.
  */
-export function laneOffsets(edges: readonly LaneEdge[]): Map<string, number> {
+export function graphLanes(
+  edges: readonly LaneEdge[],
+  activeGraphId: GraphId | null,
+): Map<string, GraphLane> {
   const bundles = new Map<string, LaneEdge[]>();
   for (const edge of edges) {
     const key = pairKey(edge);
@@ -41,11 +59,18 @@ export function laneOffsets(edges: readonly LaneEdge[]): Map<string, number> {
     else bundle.push(edge);
   }
 
-  const offsets = new Map<string, number>();
+  const isActive = (edge: LaneEdge) => edge.graphId === activeGraphId;
+  const lanes = new Map<string, GraphLane>();
   for (const bundle of bundles.values()) {
-    bundle.forEach((edge, lane) => offsets.set(edge.id, lane * GRAPH_LANE_SPACING));
+    [...bundle.filter(isActive), ...bundle.filter((edge) => !isActive(edge))].forEach(
+      (edge, lane) =>
+        lanes.set(edge.id, {
+          offset: lane * GRAPH_LANE_SPACING,
+          connects: activeGraphId === null || isActive(edge),
+        }),
+    );
   }
-  return offsets;
+  return lanes;
 }
 
 const pairKey = ({ source, target }: LaneEdge): string =>

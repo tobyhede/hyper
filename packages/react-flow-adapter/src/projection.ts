@@ -16,7 +16,7 @@ import type {
 } from '@project/graph';
 import type { RoutedEdgeData, RoutedFlowEdge } from './RoutedEdge';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
-import { DETACHED_END_TRIM, laneOffsets } from './edge-lanes';
+import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
 
 const FALLBACK_COLOR = '#8a94a6';
 
@@ -416,13 +416,7 @@ export function projectGraphEdges(
   const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
 
-  // The Active Graph's Edges go first, so each takes the centre of its pair and
-  // connects anchor to anchor; the others take the lanes below it.
-  const isActive = (edge: GraphRenderEdge) => edge.graphId === activeGraphId;
-  const lanes = laneOffsets([
-    ...graphRenderEdges.filter(isActive),
-    ...graphRenderEdges.filter((edge) => !isActive(edge)),
-  ]);
+  const lanes = graphLanes(graphRenderEdges, activeGraphId);
 
   // React Flow paints Edges in the order it is given them, so the Active Graph
   // goes last: wherever it crosses another Graph's Edge, its stroke is the one
@@ -431,13 +425,12 @@ export function projectGraphEdges(
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
     const emphasized = isActiveGraph || emphasis === 'equal';
+    const lane = lanes.get(edge.id) ?? { offset: 0, connects: true };
 
     const data: RoutedEdgeData = {
       graphId: edge.graphId,
-      laneOffset: lanes.get(edge.id) ?? 0,
-      // Only once a Graph is active is there one Edge that connects for the
-      // others to stop short beside.
-      endTrim: activeGraphId === null || isActiveGraph ? 0 : DETACHED_END_TRIM,
+      laneOffset: lane.offset,
+      endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
     };
 
     const flowEdge: RoutedFlowEdge = {
@@ -457,7 +450,7 @@ export function projectGraphEdges(
     };
     // The arrowhead says where the Graph goes, so it is the connecting Edge's
     // alone: a Graph running beside the active one stops short and carries none.
-    if (data.endTrim === 0) flowEdge.markerEnd = { type: MarkerType.ArrowClosed, color };
+    if (lane.connects) flowEdge.markerEnd = { type: MarkerType.ArrowClosed, color };
     return { flowEdge, onTop: isActiveGraph };
   });
   return [

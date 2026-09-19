@@ -1,30 +1,67 @@
 import { getBezierPath, Position } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import type { EdgeAttachment } from '../src/edge-attachment';
-import { DETACHED_END_TRIM, GRAPH_LANE_SPACING, laneBezier, laneOffsets } from '../src/edge-lanes';
+import type { GraphId } from '@project/core';
 
-describe('laneOffsets', () => {
+import type { EdgeAttachment } from '../src/edge-attachment';
+import {
+  DETACHED_END_TRIM,
+  GRAPH_LANE_SPACING,
+  graphLanes,
+  laneBezier,
+  type GraphLane,
+} from '../src/edge-lanes';
+import { uuid } from './uuid';
+
+describe('graphLanes', () => {
+  const [RED, BLUE] = ['1', '2'].map((id) => uuid(`00000000-0000-4000-8000-00000000020${id}`));
+  const edge = (graphId: GraphId, source: string, target: string) => ({
+    id: `${graphId}::${source}::${target}`,
+    graphId,
+    source,
+    target,
+  });
+  const offsets = (lanes: Map<string, GraphLane>) => [...lanes.values()].map((l) => l.offset);
+
   it('leaves a lone Edge on the centre line', () => {
-    expect(laneOffsets([{ id: 'x', source: 'a', target: 'b' }])).toEqual(new Map([['x', 0]]));
+    expect(graphLanes([edge(RED!, 'a', 'b')], null)).toEqual(
+      new Map([[`${RED}::a::b`, { offset: 0, connects: true }]]),
+    );
   });
 
   it('keeps the centre for the first of a shared pair and stacks the rest outwards', () => {
-    const offsets = laneOffsets(
-      ['one', 'two', 'three'].map((id) => ({ id, source: 'a', target: 'b' })),
+    const lanes = graphLanes(
+      [RED!, BLUE!, uuid('00000000-0000-4000-8000-000000000203')].map((g) => edge(g, 'a', 'b')),
+      null,
     );
 
-    expect([...offsets.values()]).toEqual([0, GRAPH_LANE_SPACING, 2 * GRAPH_LANE_SPACING]);
+    expect(offsets(lanes)).toEqual([0, GRAPH_LANE_SPACING, 2 * GRAPH_LANE_SPACING]);
   });
 
   it('bundles an Edge with its reverse', () => {
-    const offsets = laneOffsets([
-      { id: 'forward', source: 'a', target: 'b' },
-      { id: 'back', source: 'b', target: 'a' },
-    ]);
+    const lanes = graphLanes([edge(RED!, 'a', 'b'), edge(BLUE!, 'b', 'a')], null);
 
-    expect(offsets.get('forward')).toBe(0);
-    expect(offsets.get('back')).toBe(GRAPH_LANE_SPACING);
+    expect(lanes.get(`${RED}::a::b`)?.offset).toBe(0);
+    expect(lanes.get(`${BLUE}::b::a`)?.offset).toBe(GRAPH_LANE_SPACING);
+  });
+
+  it('puts the Active Graph on the centre whatever order it arrives in', () => {
+    const lanes = graphLanes([edge(RED!, 'a', 'b'), edge(BLUE!, 'a', 'b')], BLUE!);
+
+    expect(lanes.get(`${BLUE}::a::b`)).toEqual({ offset: 0, connects: true });
+    expect(lanes.get(`${RED}::a::b`)).toEqual({ offset: GRAPH_LANE_SPACING, connects: false });
+  });
+
+  it('keeps the centre for another Graph where the Active Graph has no Edge in the pair', () => {
+    const lanes = graphLanes([edge(RED!, 'a', 'b')], BLUE!);
+
+    expect(lanes.get(`${RED}::a::b`)).toEqual({ offset: 0, connects: false });
+  });
+
+  it('connects every Edge while no Graph is active', () => {
+    const lanes = graphLanes([edge(RED!, 'a', 'b'), edge(BLUE!, 'a', 'b')], null);
+
+    expect([...lanes.values()].every((lane) => lane.connects)).toBe(true);
   });
 });
 
