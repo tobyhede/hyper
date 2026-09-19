@@ -34,8 +34,9 @@ export type RoutedEdgeData = {
   graphId: GraphId;
   /**
    * How far below (or right of) where its two anchors put it this Edge is
-   * drawn, whole, so the Edges of several Graphs joining the same two Things
-   * run as parallel lines rather than over each other. Zero for a lone Edge.
+   * drawn, whole — above (or left) when negative — so the Edges of several
+   * Graphs joining the same two Things run as parallel lines rather than over
+   * each other. Zero for a lone Edge.
    */
   laneOffset: number;
   /**

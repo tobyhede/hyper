@@ -22,7 +22,7 @@ export interface LaneEdge {
 
 /** Where an Edge is drawn beside the others joining its pair, and whether it connects. */
 export interface GraphLane {
-  /** How far from the centre line the Edge runs. Zero for a lone Edge. */
+  /** How far from the centre line the Edge runs, and to which side. Zero for a lone Edge. */
   readonly offset: number;
   /**
    * Whether the Edge runs anchor to anchor and carries the arrowhead. The
@@ -38,14 +38,16 @@ export interface GraphLane {
  * Every Edge joins two Things, and each attaches from where those Things are
  * (ADR 0087) rather than from which Graph it belongs to, so every Graph's Edge
  * between the same pair lands on the same two anchors and draws the same curve.
- * Edges sharing a pair — in either direction — are therefore given lanes: the
- * Active Graph's Edge takes the centre, and each other Edge runs one spacing
- * further out on the same side, in the order the Edges are given. Where the
- * Active Graph has no Edge in the pair, the first of the others keeps the
- * centre.
+ * Edges sharing a pair — in either direction — are therefore given lanes. The
+ * Active Graph's Edges are centred on the anchors: its one Edge takes the
+ * centre, and where it holds both directions they sit half a spacing either
+ * side of it, the one whose source sorts first on the negative side. Each other
+ * Edge runs one spacing further out on the positive side, in the order the
+ * Edges are given; where the Active Graph has no Edge in the pair, the first of
+ * them keeps the centre.
  *
- * The distance carries no direction: which side is "out" is the screen's, not
- * the Edge's (see `laneBezier`), so an Edge and its reverse stack the same way.
+ * The offset's sign is the screen's, not the Edge's (see `laneBezier`), so an
+ * Edge and its reverse stack the same way.
  */
 export function graphLanes(
   edges: readonly LaneEdge[],
@@ -62,13 +64,24 @@ export function graphLanes(
   const isActive = (edge: LaneEdge) => edge.graphId === activeGraphId;
   const lanes = new Map<string, GraphLane>();
   for (const bundle of bundles.values()) {
-    [...bundle.filter(isActive), ...bundle.filter((edge) => !isActive(edge))].forEach(
-      (edge, lane) =>
-        lanes.set(edge.id, {
-          offset: lane * GRAPH_LANE_SPACING,
-          connects: activeGraphId === null || isActive(edge),
-        }),
+    // A Graph holds one Edge per direction, so the Active Graph has at most two
+    // here, and they share the centre between them.
+    const active = bundle
+      .filter(isActive)
+      .sort((left, right) => (left.source < right.source ? -1 : 1));
+    const centre = (active.length - 1) / 2;
+    active.forEach((edge, lane) =>
+      lanes.set(edge.id, { offset: (lane - centre) * GRAPH_LANE_SPACING, connects: true }),
     );
+    const outermost = active.length === 0 ? -1 : centre;
+    bundle
+      .filter((edge) => !isActive(edge))
+      .forEach((edge, lane) =>
+        lanes.set(edge.id, {
+          offset: (outermost + 1 + lane) * GRAPH_LANE_SPACING,
+          connects: activeGraphId === null,
+        }),
+      );
   }
   return lanes;
 }
@@ -102,9 +115,9 @@ export const DETACHED_END_TRIM = 0.2;
  * it, and a curved Edge's lanes are the same curve beside it. The arrowheads
  * move with their lanes rather than meeting on one point.
  *
- * A lane runs below an Edge whose sides are left and right, and to the right
- * of one whose sides are top and bottom — along the side the anchors sit on,
- * whichever way the Edge travels. A self-Edge's two sides are on different
+ * A positive offset runs below an Edge whose sides are left and right, and to
+ * the right of one whose sides are top and bottom — along the side the anchors
+ * sit on, whichever way the Edge travels; a negative one runs above or left. A self-Edge's two sides are on different
  * axes, so no one vector keeps both anchors on their sides: each anchor moves
  * along its own side, away from the corner the loop goes round, so an
  * arrowhead still lands on its Thing. The lane is then a loop of its own

@@ -386,6 +386,29 @@ describe('projectGraphEdges', () => {
       expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, endTrim: DETACHED_END_TRIM });
     });
 
+    it('splits the centre between both directions of a pair the Active Graph holds', () => {
+      const edges = projectGraphEdges(
+        [edge(RED!, A!, B!), edge(BLUE!, A!, B!), edge(BLUE!, B!, A!)],
+        colors,
+        { activeGraphId: uuid(BLUE!), emphasis: 'subtle' },
+      );
+      const byId = (source: string, target: string, graphId: string) =>
+        edges.find((e) => e.id === `${graphId}::${source}::${target}`)!;
+      const forward = byId(A!, B!, BLUE!);
+      const back = byId(B!, A!, BLUE!);
+
+      // A sorts before B, so A → B takes the negative side.
+      expect(forward.data).toMatchObject({ laneOffset: -GRAPH_LANE_SPACING / 2, endTrim: 0 });
+      expect(back.data).toMatchObject({ laneOffset: GRAPH_LANE_SPACING / 2, endTrim: 0 });
+      expect(forward.markerEnd).toMatchObject({ type: 'arrowclosed' });
+      expect(back.markerEnd).toMatchObject({ type: 'arrowclosed' });
+      expect(byId(A!, B!, RED!).data).toMatchObject({
+        laneOffset: (3 * GRAPH_LANE_SPACING) / 2,
+        endTrim: DETACHED_END_TRIM,
+      });
+      expect(byId(A!, B!, RED!).markerEnd).toBeUndefined();
+    });
+
     it('draws an arrowhead on the connecting Edge alone', () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(BLUE!),

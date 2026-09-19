@@ -52,6 +52,20 @@ describe('graphLanes', () => {
     expect(lanes.get(`${RED}::a::b`)).toEqual({ offset: GRAPH_LANE_SPACING, connects: false });
   });
 
+  it('splits the centre between both directions of a pair the Active Graph holds', () => {
+    const lanes = graphLanes(
+      [edge(RED!, 'a', 'b'), edge(BLUE!, 'b', 'a'), edge(BLUE!, 'a', 'b')],
+      BLUE!,
+    );
+
+    expect(lanes.get(`${BLUE}::a::b`)).toEqual({ offset: -GRAPH_LANE_SPACING / 2, connects: true });
+    expect(lanes.get(`${BLUE}::b::a`)).toEqual({ offset: GRAPH_LANE_SPACING / 2, connects: true });
+    expect(lanes.get(`${RED}::a::b`)).toEqual({
+      offset: (3 * GRAPH_LANE_SPACING) / 2,
+      connects: false,
+    });
+  });
+
   it('keeps the centre for another Graph where the Active Graph has no Edge in the pair', () => {
     const lanes = graphLanes([edge(RED!, 'a', 'b')], BLUE!);
 
