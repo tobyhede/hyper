@@ -2,12 +2,13 @@ import { existsSync } from 'node:fs';
 import { newUuid } from '@project/core';
 import { runCliMain } from './main';
 import { cliArguments, processIo } from './process';
-import { SqliteSpaceRepository } from '../persistence/sqlite-space-repository';
+import { SqlSpaceRepository } from '../persistence/sql-space-repository';
 import {
   createSqliteDatabase,
   requireConfiguredSqlitePath,
   type SqliteDatabase,
 } from '../sqlite/db';
+import { sqliteSqlStore } from '../sqlite/sql-store';
 
 /**
  * `pnpm hyper:sqlite`: the same commands as `pnpm hyper`, against the SQLite
@@ -52,7 +53,7 @@ process.exitCode =
   database === undefined
     ? 1
     : await runCliMain(cliArguments(), {
-        repository: new SqliteSpaceRepository(database),
+        repository: new SqlSpaceRepository(sqliteSqlStore(database)),
         io: processIo,
         newId: newUuid,
         close: () => database.close(),

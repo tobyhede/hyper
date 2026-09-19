@@ -1,11 +1,16 @@
 import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence';
 import { expectTypeOf, it } from 'vitest';
-import type { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
+import type { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import type { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 
-it('accepts the existing PostgreSQL and E2E repositories without adapters', () => {
-  expectTypeOf<PostgresSpaceRepository>().toExtend<SpaceResourceRepository>();
+// `Handle`/`Order` are the database-specific type parameters `SqlStore`
+// supplies (`src/prisma/sql-store.ts`, `src/sqlite/sql-store.ts`); neither
+// appears in this class's public surface, so `unknown` here proves the same
+// thing a concrete database's own store would, without a runtime import of
+// either.
+it('accepts the one SQL repository and the E2E repository without adapters', () => {
+  expectTypeOf<SqlSpaceRepository<unknown, unknown>>().toExtend<SpaceResourceRepository>();
   expectTypeOf<E2eMemorySpaceRepository>().toExtend<SpaceResourceRepository>();
 });
 

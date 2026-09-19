@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { newUuid } from '@project/core';
-import { PostgresSpaceRepository } from '../persistence/postgres-space-repository';
-import { db } from '../prisma/db';
+import { SqlSpaceRepository } from '../persistence/sql-space-repository';
+import { postgresSqlStore } from '../prisma/sql-store';
 import { establishMetaSpace, retryMetaSpaceEstablishment } from '../startup/database-startup';
 import { createSpaceHost, type SpaceHostApplication } from './space-host';
 
@@ -48,7 +48,7 @@ export const createApp = async ({
   wait = (milliseconds) => sleep(milliseconds, undefined, { ref: false }),
   report = reportEstablishmentFailure,
 }: PostgresHttpRuntimeOptions = {}): Promise<SpaceHostApplication> => {
-  const repository = new PostgresSpaceRepository(db);
+  const repository = new SqlSpaceRepository(postgresSqlStore);
   // The browser cannot initialize a repository, so the server does it before
   // any document is served: `uninitialized` reaching `packages/app` is broken
   // repository state and fails there loudly.

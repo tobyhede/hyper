@@ -5,18 +5,12 @@ import {
   type LoadedSpace,
 } from '@project/persistence';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
-import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import { toJsonValue } from '../../src/persistence/sql-store';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { db } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
-import {
-  spaceRepositoryContract,
-  spaceRepositoryLifecycleContract,
-} from '../support/repository-contract';
-import { sqlReadRepositoryContract } from '../support/sql-read-repository-contract';
+import { spaceRepositoryContract } from '../support/repository-contract';
 import { expectPersisted } from '../support/persistence-contract';
 
 /**
@@ -34,54 +28,14 @@ import { expectPersisted } from '../support/persistence-contract';
 // Deliberately unseeded: a repository has to reach a committable state from an
 // empty store on its own, and every case here begins by establishing the
 // contract's Meta Space through `initializeAggregate`. Seeding it by hand hid
-// that the PostgreSQL adapter could not.
-spaceRepositoryContract('PostgresSpaceRepository', async () => {
-  await clearHyperContent();
-  const repository = new PostgresSpaceRepository(db);
-  const harness: SpaceRepository = {
-    listSpaces: () => repository.listSpaces(),
-    loadSpace: (id) => repository.loadSpace(id),
-    loadAggregate: () => repository.loadAggregate(),
-    loadMetaSpaceId: () => repository.loadMetaSpaceId(),
-    initializeAggregate: (input) => repository.initializeAggregate(input),
-    replaceAggregate: (input, expectedMetaSpaceId) =>
-      repository.replaceAggregate(input, expectedMetaSpaceId),
-    commit: (request) => repository.commit(request),
-    markExported: (id, revision) => repository.markExported(id, revision),
-  };
-  return {
-    repository: harness,
-    close: clearHyperContent,
-    writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
-      if (exportedRevision === undefined) {
-        await db.orm.public.Space.where({ id: spaceId }).update({ revision });
-        return;
-      }
-      await db.orm.public.Space.where({ id: spaceId }).update({ revision, exportedRevision });
-    },
-  };
-});
-
-// The tracer slice (ticket 22): a `SqlSpaceRepository` built over the same
-// `db` handle `PostgresSpaceRepository` seeds through, proving `listSpaces`/
-// `loadSpace` and the `SqlStore` typing on real PostgreSQL rather than merely
-// compiling. `PostgresSpaceRepository` still owns the lifecycle doors here —
-// tickets 23–24 move them onto this repository and delete the adapter.
-sqlReadRepositoryContract('SqlSpaceRepository (PostgreSQL tracer)', async () => {
-  await clearHyperContent();
-  return {
-    seed: new PostgresSpaceRepository(db),
-    read: new SqlSpaceRepository(postgresSqlStore),
-    close: clearHyperContent,
-  };
-});
-
-// Ticket 23: `SqlSpaceRepository` now owns the Meta lifecycle itself, so the
-// lifecycle group runs directly against it -- no seeding through the old
-// adapter, unlike the read tracer above. `commit` stays on
-// `PostgresSpaceRepository` until ticket 24, so this is the lifecycle group
-// rather than the whole `spaceRepositoryContract`.
-spaceRepositoryLifecycleContract('SqlSpaceRepository (PostgreSQL)', async () => {
+// that the SQL repository could not.
+//
+// Ticket 24: `SqlSpaceRepository` now owns `commit` too, so the whole
+// contract -- lifecycle and commit alike -- runs directly against it; the
+// ticket 22/23 tracer and lifecycle-only wiring this block used to carry
+// beside it are gone, superseded by this one call covering everything they
+// each covered separately.
+spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
   await clearHyperContent();
   return {
     repository: new SqlSpaceRepository(postgresSqlStore),
@@ -237,80 +191,17 @@ const linkedSnapshot: SpaceSnapshot = {
   ],
 };
 
-describe('SqlSpaceRepository (PostgreSQL) — Meta-lock retry race', () => {
+// Ticket 24 note: this file used to carry a separate `describe('SqlSpaceRepository
+// (PostgreSQL) -- Meta-lock retry race', ...)` block here, added by ticket 23 to
+// prove the race directly on `SqlSpaceRepository` while `commit` still lived on
+// the now-deleted `PostgresSpaceRepository`. The block below runs on
+// `SqlSpaceRepository` too now, and already carries both halves of that race --
+// "conflicts a replacement authorized against an identity a concurrent
+// replacement retired" and "judges a complete-aggregate commit against an
+// identity a concurrent replacement retired" -- so the separate block was
+// deleted as a literal duplicate rather than kept beside it.
+describe('SqlSpaceRepository (PostgreSQL)', () => {
   const repository = new SqlSpaceRepository(postgresSqlStore);
-
-  afterEach(clearHyperContent);
-
-  /*
-   * Ticket 23: the same race as `PostgresSpaceRepository`'s own version above
-   * (see its doc comment for the full account), run against the one SQL
-   * repository directly -- the fix lives in `SqlSpaceRepository`'s own
-   * `#lockMetaIdentity` (`src/persistence/sql-space-repository.ts`), which
-   * every database now shares, not merely in the adapter ticket 24 deletes.
-   */
-  it('conflicts a replacement authorized against an identity a concurrent replacement retired', async () => {
-    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
-
-    const lockHeld = Promise.withResolvers<undefined>();
-    const releaseLock = Promise.withResolvers<undefined>();
-    const blocker = db.transaction(async ({ orm }) => {
-      // Take the singleton row's write lock exactly where `lockMetaIdentity`'s
-      // own self-update would, so the racing call blocks on this transaction
-      // rather than on a second real replacement's own lock-acquisition timing.
-      await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId: SPACE_ID });
-      lockHeld.resolve(undefined);
-      await releaseLock.promise;
-      // What the held lock stands in for: retire the identity the racing call
-      // already read and establish an entirely different one, before releasing
-      // the lock the racing call's self-update has been waiting on all along.
-      await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
-      await orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
-      await orm.public.Space.where({ id: SPACE_ID }).delete();
-      await orm.public.Space.create({
-        id: OTHER_SPACE_ID,
-        document: toJsonValue(otherSnapshot.document),
-        revision: '0',
-      });
-      for (const thing of otherSnapshot.things) {
-        await orm.public.Thing.create({
-          id: thing.id,
-          spaceId: OTHER_SPACE_ID,
-          document: toJsonValue(thing.document),
-        });
-      }
-      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
-    });
-    await lockHeld.promise;
-
-    const racing = repository.replaceAggregate(
-      {
-        metaSpaceId: SPACE_ID,
-        spaces: [{ ...snapshot, document: { ...snapshot.document, title: 'Must not land' } }],
-      },
-      SPACE_ID,
-    );
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    releaseLock.resolve(undefined);
-    await blocker;
-
-    // The identity `replaceAggregate` was authorized against (`SPACE_ID`) is
-    // gone by the time its write would land -- a conflict naming the identity
-    // now actually stored, never a silent overwrite of the replacement that
-    // retired it.
-    await expect(racing).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
-    await expect(repository.loadAggregate()).resolves.toEqual({
-      kind: 'loaded',
-      aggregate: {
-        metaSpaceId: OTHER_SPACE_ID,
-        spaces: [{ snapshot: otherSnapshot, revision: 0n, exportedRevision: null }],
-      },
-    });
-  });
-});
-
-describe('PostgresSpaceRepository', () => {
-  const repository = new PostgresSpaceRepository(db);
   const createdSpaceIds = new Set<UUID>();
   const commitSpace = (next: SpaceSnapshot, expectedRevision: bigint) =>
     repository.commit({
@@ -948,7 +839,7 @@ describe('PostgresSpaceRepository', () => {
       activeGraph: GRAPH_ID,
     });
 
-    const freshHost = new PostgresSpaceRepository(db);
+    const freshHost = new SqlSpaceRepository(postgresSqlStore);
     await expect(
       createWorkingSpaceLoader(freshHost, () => {
         throw new Error('an initialized Space must not mint identities');
@@ -1380,8 +1271,8 @@ describe('PostgresSpaceRepository', () => {
 
   it('serializes concurrent topology commits so the loser observes the complete winner', async () => {
     await seed(SPACE_ID, [snapshot]);
-    const firstRepository = new PostgresSpaceRepository(db);
-    const secondRepository = new PostgresSpaceRepository(db);
+    const firstRepository = new SqlSpaceRepository(postgresSqlStore);
+    const secondRepository = new SqlSpaceRepository(postgresSqlStore);
     const firstTarget: SpaceSnapshot = {
       id: OTHER_SPACE_ID,
       document: {

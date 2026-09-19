@@ -123,13 +123,35 @@ const listSpaceIds = async (orm: Orm): Promise<readonly string[]> => {
   return rows.map((row) => row.id);
 };
 
-const deleteSpaceById = async (orm: Orm, id: string): Promise<void> => {
-  await orm.Space.where({ id }).delete();
+/**
+ * `deleteCount()` rather than `delete()`: the latter returns the deleted row,
+ * decoded `document` included, and a truncation this answers for (ADR 0094)
+ * deletes whatever is stored whether or not `document` parses -- so this must
+ * never decode it, the same requirement `deleteExcept`/`deleteAllForSpace`
+ * below carry for Things.
+ */
+const deleteSpaceById = async (orm: Orm, id: string): Promise<boolean> => {
+  const deleted = await orm.Space.where({ id }).deleteCount();
+  return deleted > 0;
 };
 
 const setExportedRevision = async (orm: Orm, id: string, revision: string): Promise<boolean> => {
   const updated = await orm.Space.where({ id }).update({ exportedRevision: revision });
   return updated !== null;
+};
+
+/** `SqlTables.Space.writeDocumentUnderLock`'s own doc comment explains the row lock. */
+const writeDocumentUnderLock = async (
+  orm: Orm,
+  id: string,
+  document: unknown,
+): Promise<string | undefined> => {
+  const locked = await orm.Space.where({ id }).update({ document: toJsonValue(document) });
+  return locked === null ? undefined : locked.revision;
+};
+
+const setRevision = async (orm: Orm, id: string, revision: string): Promise<void> => {
+  await orm.Space.where({ id }).update({ revision });
 };
 
 const createThing = async (
@@ -143,8 +165,41 @@ const createThing = async (
   });
 };
 
+/** `SqlTables.Thing.upsert`'s own doc comment explains the ownership answer. */
+const upsertThing = async (
+  orm: Orm,
+  input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
+): Promise<{ readonly spaceId: string }> => {
+  const stored = await orm.Thing.upsert({
+    create: { id: input.id, spaceId: input.spaceId, document: toJsonValue(input.document) },
+    update: { document: toJsonValue(input.document) },
+  });
+  return { spaceId: stored.spaceId };
+};
+
+/**
+ * `deleteCount()` rather than `deleteAll()`, for the same reason
+ * `deleteSpaceById` above does: `#truncateHyperContent` calls this over
+ * stored state it has not validated (ADR 0094), and `deleteAll()` returns the
+ * deleted rows -- decoded `document` included -- which would decode exactly
+ * the broken content truncation exists to remove without reading.
+ */
 const deleteThingsForSpace = async (orm: Orm, spaceId: string): Promise<void> => {
-  await orm.Thing.where({ spaceId }).deleteAll();
+  await orm.Thing.where({ spaceId }).deleteCount();
+};
+
+/** `SqlTables.Thing.deleteExcept`'s own doc comment explains why `keepIds` may be empty. */
+const deleteThingsExcept = async (
+  orm: Orm,
+  spaceId: string,
+  keepIds: readonly string[],
+): Promise<void> => {
+  const owned = orm.Thing.where({ spaceId });
+  if (keepIds.length === 0) {
+    await owned.deleteCount();
+    return;
+  }
+  await owned.where((thing) => thing.id.notIn(keepIds)).deleteCount();
 };
 
 const readRepositoryState = async (orm: Orm): Promise<{ readonly metaSpaceId: string } | null> => {
@@ -181,9 +236,15 @@ export const postgresSqlStore = defineSqlStore({
         deleteById: (id: string) => deleteSpaceById(orm, id),
         setExportedRevision: (id: string, revision: string) =>
           setExportedRevision(orm, id, revision),
+        writeDocumentUnderLock: (id: string, document: unknown) =>
+          writeDocumentUnderLock(orm, id, document),
+        setRevision: (id: string, revision: string) => setRevision(orm, id, revision),
       },
       Thing: {
         create: (input) => createThing(orm, input),
+        upsert: (input) => upsertThing(orm, input),
+        deleteExcept: (spaceId: string, keepIds: readonly string[]) =>
+          deleteThingsExcept(orm, spaceId, keepIds),
         deleteAllForSpace: (spaceId: string) => deleteThingsForSpace(orm, spaceId),
       },
       RepositoryState: {

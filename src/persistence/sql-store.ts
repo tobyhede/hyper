@@ -104,8 +104,8 @@ export interface SqlLoadedSpaceRow {
  * name a concrete stand-in without depending on `@prisma-next/sql-orm-client`
  * internals no package.json lists directly. Composing `.include(...)` inside
  * the database module — ordinary forward-typed code, the same shape
- * `loadStoredSpace` already runs in both existing adapters -- sidesteps the
- * cross-module generic relation entirely; only its *result* crosses this
+ * `loadStoredSpace` already ran in both adapters that existed then -- sidesteps
+ * the cross-module generic relation entirely; only its *result* crosses this
  * interface, typed as the concrete `SqlLoadedSpaceRow`.
  *
  * Ticket 23 grew this the same way, for the Meta lifecycle: every added
@@ -128,6 +128,17 @@ export interface SqlLoadedSpaceRow {
  * per-row classification to parse and catch. That lower-level `execute` is
  * why SQLite's own `Handle` (`src/sqlite/sql-store.ts`) is not the bare `Orm`
  * ticket 22 left it as -- see that module's doc comment.
+ *
+ * Ticket 24 grew this once more, for `commit`: `Space.writeDocumentUnderLock`/
+ * `setRevision`, `Thing.upsert` and `Thing.deleteExcept` are the same kind of
+ * plain, already-composed CRUD ticket 23 added -- no relation, no `Order` --
+ * and `Space.deleteById` gained a `boolean` answer so the write loop can tell
+ * a `delete` change's row was actually there to remove. `commit`'s own write
+ * path is one helper shared by the fast (topology-preserving) path and the
+ * complete-aggregate path, absorbed from the now-deleted
+ * `src/persistence/topology-preserving-update.ts` -- see
+ * `SqlSpaceRepository`'s own doc comment for the write order that helper
+ * keeps.
  */
 export interface SqlTables<Order> {
   readonly Space: {
@@ -157,9 +168,33 @@ export interface SqlTables<Order> {
       readonly revision: string;
     }) => Promise<void>;
     readonly listIds: () => Promise<readonly string[]>;
-    readonly deleteById: (id: string) => Promise<void>;
+    /**
+     * Answers whether the row existed to delete — `commit`'s own `delete`
+     * change needs to know, and `#truncateHyperContent` (ADR 0094) calls this
+     * too, over stored state it has never validated. So this must never
+     * decode `document`: each database module answers it through a
+     * count-only delete rather than one that returns the deleted row, which
+     * a stored document failing even to parse as JSON would otherwise throw
+     * out of on SQLite (`Thing.deleteAllForSpace`'s doc comment carries the
+     * fuller account).
+     */
+    readonly deleteById: (id: string) => Promise<boolean>;
     /** Answers whether the row existed to update. */
     readonly setExportedRevision: (id: string, revision: string) => Promise<boolean>;
+    /**
+     * `commit`'s own row lock (ADR 0095, ticket 24): write one Space's real
+     * document under the row's write lock, and answer the revision the row
+     * carried when that lock was granted — `undefined` when there is no such
+     * row. Leaves `revision` itself untouched, so the caller's comparison
+     * against what this returns cannot go stale; `setRevision` is the second,
+     * separate write once that comparison holds. Distinct from `relock`
+     * above, which never writes a row's real content — a commit's write
+     * genuinely means to replace the document once the lock is confirmed, so
+     * it cannot share `relock`'s placeholder.
+     */
+    readonly writeDocumentUnderLock: (id: string, document: unknown) => Promise<string | undefined>;
+    /** The second write `writeDocumentUnderLock`'s caller makes once its revision comparison holds. */
+    readonly setRevision: (id: string, revision: string) => Promise<void>;
   };
   readonly Thing: {
     readonly create: (input: {
@@ -167,6 +202,39 @@ export interface SqlTables<Order> {
       readonly spaceId: string;
       readonly document: unknown;
     }) => Promise<void>;
+    /**
+     * Create or replace one Thing's document, answering the Space id the row
+     * actually belongs to — which the caller compares against the Space it
+     * meant to write. `commit`'s update path (ticket 24) has no losing insert
+     * to catch the way `create` does: the row already exists, and this
+     * overwrites it, so ownership is read back instead of thrown from a
+     * duplicate key.
+     */
+    readonly upsert: (input: {
+      readonly id: string;
+      readonly spaceId: string;
+      readonly document: unknown;
+    }) => Promise<{ readonly spaceId: string }>;
+    /**
+     * Delete every Thing owned by `spaceId` whose id is not in `keepIds` —
+     * `commit`'s own drop of the Things a snapshot removed (ticket 24). Runs
+     * on both the fast and complete-aggregate write paths through the one
+     * shared write helper; an empty `keepIds` deletes every Thing the Space
+     * owns, and on the fast path `keepIds` is always every Thing already
+     * there, so nothing is ever actually dropped.
+     */
+    readonly deleteExcept: (spaceId: string, keepIds: readonly string[]) => Promise<void>;
+    /**
+     * Delete every Thing `spaceId` owns. `#truncateHyperContent` (ADR 0094)
+     * calls this over stored state it has never validated, so — like
+     * `Space.deleteById` above — this must never decode `document`: on
+     * SQLite, a root-level delete that returns the deleted rows decodes
+     * `document` through the json codec on the way back (`readDocument`'s own
+     * doc comment), which throws on a Thing whose stored text is not even
+     * JSON, exactly the broken content truncation exists to remove without
+     * reading. Each database module answers this through a count-only
+     * delete instead.
+     */
     readonly deleteAllForSpace: (spaceId: string) => Promise<void>;
   };
   readonly RepositoryState: {

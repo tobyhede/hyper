@@ -8,12 +8,18 @@ import {
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
+  commitRequestRefusal,
+  committedRevision,
+  decideCommit,
   decodeStoredRevision,
   encodeStoredRevision,
   RevisionCodecError,
   type AggregateLoadResult,
   type LoadedAggregate,
   type LoadedSpace,
+  type RepositoryCommitResult,
+  type SpaceChange,
+  type SpaceCommit,
   type SpaceSummary,
 } from '@project/persistence';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
@@ -21,6 +27,7 @@ import type {
   AggregateInput,
   InitializeAggregateResult,
   ReplaceAggregateResult,
+  SpaceRepository,
 } from './space-repository';
 import type { SqlStore, SqlTables } from './sql-store';
 
@@ -29,8 +36,8 @@ class SnapshotValidationError extends Error {}
 class ThingOwnershipError extends Error {}
 
 /**
- * A Space row moved between `replaceAggregate`'s conflict check and its
- * write.
+ * A Space row moved between a conflict check and its write -- `replaceAggregate`'s
+ * per-row re-lock, or `#writeUpdate`'s row-lock write on either commit path.
  *
  * Thrown rather than returned because the write loop has already replaced
  * earlier Spaces in the change set by the time it can be detected. Returning
@@ -59,20 +66,108 @@ const ascendingSnapshotId = (left: SpaceSnapshot, right: SpaceSnapshot): number 
   return left.id < right.id ? -1 : 1;
 };
 
+type UpdateChange = Extract<SpaceChange, { kind: 'update' }>;
+
 /**
- * The one SQL Space repository (ADR 0095), serving `listSpaces` and
- * `loadSpace` (ticket 22) plus the Meta lifecycle -- `loadAggregate`,
- * `initializeAggregate`, `loadMetaSpaceId`, `replaceAggregate` and
- * `markExported` (ticket 23) -- for both databases through a database's own
- * `SqlStore` (`src/prisma/sql-store.ts`, `src/sqlite/sql-store.ts`). `commit`
- * stays on `PostgresSpaceRepository`/`SqliteSpaceRepository` until ticket 24
- * moves it here and deletes those two adapters.
+ * `commit`'s fast path's own decision (ADR 0095), which may also hand the
+ * commit to the complete-aggregate decision.
+ */
+type TopologyPreservingDecision =
+  | { readonly kind: 'answer'; readonly result: RepositoryCommitResult }
+  | { readonly kind: 'write'; readonly result: RepositoryCommitResult }
+  | { readonly kind: 'aggregate-path' };
+
+/**
+ * Whether a proposed snapshot keeps the boundary the fast path is allowed to
+ * skip a complete-aggregate read for: the same default Diagram, the same
+ * Diagrams, the same Things by id and kind, and -- for a Space Thing -- the
+ * same selection. Absorbed unchanged (ticket 24) from the now-deleted
+ * `topology-preserving-update.ts`, which both SQL adapters imported one copy
+ * of until this repository replaced them.
+ */
+const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
+  if (current.document.defaultDiagram !== next.document.defaultDiagram) return false;
+  if (
+    JSON.stringify(current.document.diagrams ?? []) !== JSON.stringify(next.document.diagrams ?? [])
+  ) {
+    return false;
+  }
+  if (current.things.length !== next.things.length) return false;
+  const currentById = new Map(current.things.map((thing) => [thing.id, thing]));
+  return next.things.every((thing) => {
+    const previous = currentById.get(thing.id);
+    if (previous?.document.kind !== thing.document.kind) return false;
+    if (thing.document.kind !== 'space' || previous.document.kind !== 'space') return true;
+    return (
+      previous.document.spaceId === thing.document.spaceId &&
+      previous.document.diagram === thing.document.diagram &&
+      previous.document.graph === thing.document.graph
+    );
+  });
+};
+
+/** The one update a fast-path candidate consists of, or `undefined` for any other change set. */
+const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undefined => {
+  const [change] = request.changes;
+  return request.changes.length === 1 && change.kind === 'update' ? change : undefined;
+};
+
+/**
+ * Decide a single update against the stored Space it names. A snapshot that
+ * fails intake, or one that moves the snapshot boundary -- structure,
+ * membership, a Thing's kind, or a Space Thing's selection -- goes to the
+ * complete-aggregate decision, which alone can say where in the aggregate a
+ * refusal sits.
+ *
+ * It is an optimisation of `decideCommit` and never a second set of rules, so
+ * it answers only what the complete-aggregate decision would answer the same
+ * way -- a revision conflict, or a write that moves no snapshot boundary --
+ * and hands everything else to that decision. `#commitTopologyPreservingUpdate`
+ * runs this before `#lockMetaIdentity` is ever called, deliberately: the fast
+ * path holds no singleton lock, and reading the Meta identity here would be
+ * new locking behaviour ticket 24 does not add. Carried over unchanged from
+ * both adapters this repository replaced -- `.scratch/database-persistence/
+ * issues/29` is the known, separately-tracked consequence: a store holding
+ * Space rows with no Meta identity takes this path and commits where the
+ * complete-aggregate decision would refuse.
+ */
+const decideTopologyPreservingUpdate = (
+  change: UpdateChange,
+  current: LoadedSpace | undefined,
+): TopologyPreservingDecision => {
+  if (current?.revision !== change.expectedRevision) {
+    return {
+      kind: 'answer',
+      result: { kind: 'conflict', conflicts: [{ spaceId: change.spaceId, current }] },
+    };
+  }
+  if (!loadSpaceSnapshot(change.snapshot).ok) return { kind: 'aggregate-path' };
+  if (!preservesSnapshotBoundary(current.snapshot, change.snapshot)) {
+    return { kind: 'aggregate-path' };
+  }
+  return {
+    kind: 'write',
+    result: {
+      kind: 'committed',
+      revisions: [{ spaceId: change.spaceId, revision: committedRevision(change) }],
+      deletedSpaceIds: [],
+    },
+  };
+};
+
+/**
+ * The one SQL Space repository (ADR 0095), serving `listSpaces`, `loadSpace`
+ * (ticket 22), the Meta lifecycle -- `loadAggregate`, `initializeAggregate`,
+ * `loadMetaSpaceId`, `replaceAggregate` and `markExported` (ticket 23) -- and
+ * `commit` (ticket 24) for both databases through a database's own `SqlStore`
+ * (`src/prisma/sql-store.ts`, `src/sqlite/sql-store.ts`). `PostgresSpaceRepository`
+ * and `SqliteSpaceRepository`, the two adapters this class replaces, are gone.
  *
  * `Handle` and `Order` come from the `SqlStore` passed to the constructor —
  * whichever database it was built for — so this class itself names no
  * database-specific type.
  */
-export class SqlSpaceRepository<Handle, Order> {
+export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   readonly #store: SqlStore<Handle, Order>;
 
   constructor(store: SqlStore<Handle, Order>) {
@@ -92,27 +187,38 @@ export class SqlSpaceRepository<Handle, Order> {
   }
 
   loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    return this.#store.serialise(async () => {
-      const tables = this.#store.tables(this.#store.orm);
-      const stored = await tables.Space.loadWithThings(id);
-      if (stored === null) return undefined;
+    return this.#store.serialise(() =>
+      this.#loadStoredSpaceRow(this.#store.tables(this.#store.orm), id),
+    );
+  }
 
-      const snapshot = parseSnapshot({
-        id: stored.id,
-        document: spaceDocumentSchema.parse(this.#store.readDocument(stored.document)),
-        things: stored.things.map((thing) => ({
-          id: thing.id,
-          document: thingDocumentSchema.parse(this.#store.readDocument(thing.document)),
-        })),
-      });
+  /**
+   * One Space and its Things, read through `tables` rather than through
+   * `#store.orm`/`#store.serialise` directly -- so it runs equally well
+   * inside a transaction's own `tables(handle)` (the fast path's candidate
+   * read, `commit`'s write loop having nothing to read here) and outside one,
+   * over `#store.tables(#store.orm)` (`loadSpace` above, and the post-conflict
+   * reload `#commitUnserialised` makes after a rolled-back transaction).
+   */
+  async #loadStoredSpaceRow(tables: SqlTables<Order>, id: UUID): Promise<LoadedSpace | undefined> {
+    const stored = await tables.Space.loadWithThings(id);
+    if (stored === null) return undefined;
 
-      return {
-        snapshot,
-        revision: decodeStoredRevision(stored.revision),
-        exportedRevision:
-          stored.exportedRevision === null ? null : decodeStoredRevision(stored.exportedRevision),
-      };
+    const snapshot = parseSnapshot({
+      id: stored.id,
+      document: spaceDocumentSchema.parse(this.#store.readDocument(stored.document)),
+      things: stored.things.map((thing) => ({
+        id: thing.id,
+        document: thingDocumentSchema.parse(this.#store.readDocument(thing.document)),
+      })),
     });
+
+    return {
+      snapshot,
+      revision: decodeStoredRevision(stored.revision),
+      exportedRevision:
+        stored.exportedRevision === null ? null : decodeStoredRevision(stored.exportedRevision),
+    };
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {
@@ -140,6 +246,177 @@ export class SqlSpaceRepository<Handle, Order> {
       const updated = await tables.Space.setExportedRevision(id, encodeStoredRevision(revision));
       if (!updated) throw new Error(`Space ${id} does not exist`);
     });
+  }
+
+  commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    return this.#store.serialise(() => this.#commitUnserialised(request));
+  }
+
+  /**
+   * Identity refusal first, then try the transaction: `commitRequestRefusal`
+   * never touches the database, and the two classifications below only ever
+   * apply to what `#commitInTransaction` throws after its own transaction has
+   * already rolled back.
+   */
+  async #commitUnserialised(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    const refusal = commitRequestRefusal(request);
+    if (refusal !== undefined) return refusal;
+
+    try {
+      return await this.#commitInTransaction(request);
+    } catch (error) {
+      // A Thing the commit writes is still owned by a Space the same commit
+      // did not release. Complete intake cannot see it -- the candidate
+      // aggregate is consistent and the collision only exists in the stored
+      // rows the write loop meets in request order. It is permanent, so it
+      // has to leave here as a rejection: escaping instead becomes 503
+      // `persistence-unavailable`, which the client retries forever.
+      if (error instanceof ThingOwnershipError) {
+        return { kind: 'rejected', code: 'invalid-commit', message: error.message };
+      }
+      // The transaction has rolled back, so the current state is read fresh
+      // outside it, through `#store.tables(#store.orm)` directly rather than
+      // through the public, `serialise`-wrapped `loadSpace` -- this method is
+      // itself already running inside `commit`'s own `serialise` call, and a
+      // second one nested inside it would queue behind its own still-running
+      // caller on SQLite and never resolve. Reading inside the aborted
+      // transaction instead would answer with rows the caller can never
+      // observe.
+      if (error instanceof StaleSpaceRevisionError) {
+        return {
+          kind: 'conflict',
+          conflicts: [
+            {
+              spaceId: error.spaceId,
+              current: await this.#loadStoredSpaceRow(
+                this.#store.tables(this.#store.orm),
+                error.spaceId,
+              ),
+            },
+          ],
+        };
+      }
+      throw error;
+    }
+  }
+
+  #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    return this.#store.transaction(async (handle) => {
+      const tables = this.#store.tables(handle);
+      const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
+      if (topologyPreserving !== undefined) return topologyPreserving;
+      const metaSpaceId = await this.#lockMetaIdentity(tables);
+      const decision = decideCommit(request, metaSpaceId, await this.#loadEverySpace(tables));
+      if (decision.kind === 'answer') return decision.result;
+
+      for (const change of request.changes) {
+        if (change.kind === 'delete') {
+          await tables.Thing.deleteAllForSpace(change.spaceId);
+          const deleted = await tables.Space.deleteById(change.spaceId);
+          if (!deleted) throw new Error(`Space ${change.spaceId} disappeared during commit`);
+        } else if (change.kind === 'create') {
+          await this.#createStoredSpace(tables, change.snapshot);
+        } else {
+          await this.#writeUpdate(
+            tables,
+            change.snapshot,
+            change.expectedRevision,
+            committedRevision(change),
+          );
+        }
+      }
+      return decision.result;
+    });
+  }
+
+  /**
+   * `commit`'s fast path (ADR 0095, absorbed from the now-deleted
+   * `topology-preserving-update.ts`): a single update decided against the one
+   * stored Space it names, never reading the complete aggregate.
+   * `decideTopologyPreservingUpdate`'s own doc comment explains why this never
+   * calls `#lockMetaIdentity` -- carried over unchanged, including the known
+   * consequence `.scratch/database-persistence/issues/29` tracks separately.
+   */
+  async #commitTopologyPreservingUpdate(
+    tables: SqlTables<Order>,
+    request: SpaceCommit,
+  ): Promise<RepositoryCommitResult | undefined> {
+    const change = topologyPreservingCandidate(request);
+    if (change === undefined) return undefined;
+    const decision = decideTopologyPreservingUpdate(
+      change,
+      await this.#loadStoredSpaceRow(tables, change.spaceId),
+    );
+    if (decision.kind === 'aggregate-path') return undefined;
+    if (decision.kind === 'answer') return decision.result;
+
+    // Past this point the snapshot boundary is settled and this path commits,
+    // so the write below is the first one and every earlier return has
+    // written nothing.
+    await this.#writeUpdate(
+      tables,
+      change.snapshot,
+      change.expectedRevision,
+      committedRevision(change),
+    );
+    return decision.result;
+  }
+
+  /**
+   * The one helper both commit paths write an update through (ADR 0095,
+   * ticket 24), keeping the statement order the two adapters this repository
+   * replaced always kept: write the document to take the row lock and answer
+   * the revision the row carried when that lock was granted, compare it
+   * against `expectedRevision`, then write the new revision, then the
+   * Things, then delete the Things the snapshot dropped -- which removes
+   * nothing on the fast path, whose own `preservesSnapshotBoundary` never
+   * lets a changed Thing membership reach here. A single `UPDATE` that set
+   * the revision would return the value it just wrote rather than the one it
+   * replaced, which is why the document and the revision stay two separate
+   * writes rather than one.
+   *
+   * The revision is re-established under the row lock rather than trusted
+   * from an earlier read: the fast path deliberately holds no singleton lock,
+   * so another commit -- fast or slow -- can move the row in between, and the
+   * conflict this then throws rolls the whole transaction back.
+   */
+  async #writeUpdate(
+    tables: SqlTables<Order>,
+    snapshot: SpaceSnapshot,
+    expectedRevision: bigint,
+    newRevision: bigint,
+  ): Promise<void> {
+    const priorRevision = await tables.Space.writeDocumentUnderLock(snapshot.id, snapshot.document);
+    if (priorRevision === undefined || decodeStoredRevision(priorRevision) !== expectedRevision) {
+      throw new StaleSpaceRevisionError(snapshot.id);
+    }
+    await tables.Space.setRevision(snapshot.id, encodeStoredRevision(newRevision));
+    await this.#upsertThings(tables, snapshot);
+    await tables.Thing.deleteExcept(
+      snapshot.id,
+      snapshot.things.map((thing) => thing.id),
+    );
+  }
+
+  /**
+   * `commit`'s own Thing write for an `update` change -- distinct from
+   * `#importThings`, which `create` uses and which throws on a losing insert.
+   * An update's row already exists, so ownership is read back off the upsert
+   * instead (`SqlTables.Thing.upsert`'s own doc comment).
+   */
+  async #upsertThings(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
+    for (const thing of snapshot.things) {
+      const stored = await tables.Thing.upsert({
+        id: thing.id,
+        spaceId: snapshot.id,
+        document: thing.document,
+      });
+      if (stored.spaceId !== snapshot.id) {
+        throw new ThingOwnershipError(
+          `Thing ${thing.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+        );
+      }
+    }
   }
 
   /**

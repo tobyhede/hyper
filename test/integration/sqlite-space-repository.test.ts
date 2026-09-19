@@ -2,57 +2,21 @@ import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { AggregateInvariantError } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
-import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
-import {
-  spaceRepositoryContract,
-  spaceRepositoryLifecycleContract,
-} from '../support/repository-contract';
-import { sqlReadRepositoryContract } from '../support/sql-read-repository-contract';
+import { spaceRepositoryContract } from '../support/repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
-spaceRepositoryContract('SqliteSpaceRepository', async () => {
+// Ticket 24: `SqlSpaceRepository` now owns `commit` too, so the whole
+// contract -- lifecycle and commit alike -- runs directly against it; the
+// ticket 22/23 tracer and lifecycle-only wiring this block used to carry
+// beside it are gone, superseded by this one call covering everything they
+// each covered separately.
+spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
   const harness = await openSqliteRepository();
   return {
     repository: harness.repository,
-    close: harness.close,
-    writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
-      if (exportedRevision === undefined) {
-        await harness.database.orm.Space.where({ id: spaceId }).update({ revision });
-        return;
-      }
-      await harness.database.orm.Space.where({ id: spaceId }).update({
-        revision,
-        exportedRevision,
-      });
-    },
-  };
-});
-
-// The tracer slice (ticket 22): a `SqlSpaceRepository` built over the same
-// file handle `SqliteSpaceRepository` seeds through, proving `listSpaces`/
-// `loadSpace` and the `SqlStore` typing on real SQLite rather than merely
-// compiling. `SqliteSpaceRepository` still owns the lifecycle doors here —
-// tickets 23–24 move them onto this repository and delete the adapter.
-sqlReadRepositoryContract('SqlSpaceRepository (SQLite tracer)', async () => {
-  const harness = await openSqliteRepository();
-  return {
-    seed: harness.repository,
-    read: new SqlSpaceRepository(sqliteSqlStore(harness.database)),
-    close: harness.close,
-  };
-});
-
-// Ticket 23: `SqlSpaceRepository` now owns the Meta lifecycle itself, so the
-// lifecycle group runs directly against it -- no seeding through the old
-// adapter, unlike the read tracer above. `commit` stays on
-// `SqliteSpaceRepository` until ticket 24, so this is the lifecycle group
-// rather than the whole `spaceRepositoryContract`.
-spaceRepositoryLifecycleContract('SqlSpaceRepository (SQLite)', async () => {
-  const harness = await openSqliteRepository();
-  return {
-    repository: new SqlSpaceRepository(sqliteSqlStore(harness.database)),
     close: harness.close,
     writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
       if (exportedRevision === undefined) {
@@ -147,7 +111,7 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
   exportedRevision,
 });
 
-describe('SqliteSpaceRepository', () => {
+describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -354,7 +318,7 @@ describe('SqliteSpaceRepository', () => {
   });
 
   // ADR 0095: the serialise queue orders every repository operation in the
-  // process, over one file handle — not one queue per `SqliteSpaceRepository`
+  // process, over one file handle — not one queue per `SqlSpaceRepository`
   // instance. Two repositories built over the same `SqliteDatabase` (as the
   // HTTP runtime and `test/support/sqlite-harness.ts` each do) share it.
   // Without that, this same shape — two overlapping first initializations —
@@ -366,8 +330,8 @@ describe('SqliteSpaceRepository', () => {
   it('serialises overlapping operations across two repositories over one file handle', async () => {
     const { database } = await opened();
     const first = space(SPACE_ID, 'One', [THING_ID]);
-    const repositoryA = new SqliteSpaceRepository(database);
-    const repositoryB = new SqliteSpaceRepository(database);
+    const repositoryA = new SqlSpaceRepository(sqliteSqlStore(database));
+    const repositoryB = new SqlSpaceRepository(sqliteSqlStore(database));
 
     const started = performance.now();
     const results = await Promise.allSettled([
@@ -542,14 +506,12 @@ describe('SqliteSpaceRepository', () => {
   const proposed = space(SPACE_ID, 'Proposal', [THING_ID]);
   const proposal = { metaSpaceId: SPACE_ID, spaces: [proposed] };
 
-  const expectReadAndInitializeRefuse = async (
-    repository: SqliteSpaceRepository,
-  ): Promise<void> => {
+  const expectReadAndInitializeRefuse = async (repository: SpaceRepository): Promise<void> => {
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     await expect(repository.initializeAggregate(proposal)).rejects.toThrow(AggregateInvariantError);
   };
 
-  const expectTruncatedTo = async (repository: SqliteSpaceRepository): Promise<void> => {
+  const expectTruncatedTo = async (repository: SpaceRepository): Promise<void> => {
     await expect(repository.loadAggregate()).resolves.toEqual({
       kind: 'loaded',
       aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(proposed, 0n, null)] },
@@ -710,7 +672,7 @@ describe('SqliteSpaceRepository', () => {
       await reopened.close();
       await harness.close();
     };
-    const repository = new SqliteSpaceRepository(reopened);
+    const repository = new SqlSpaceRepository(sqliteSqlStore(reopened));
     await expect(repository.loadAggregate()).resolves.toEqual({
       kind: 'loaded',
       aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },

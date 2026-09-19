@@ -710,11 +710,12 @@ describe('runHyper', () => {
   });
 
   /*
-   * PostgreSQL's replacement can conflict on a stored Space that changed mid-
-   * replacement without the Meta identity itself moving at all — the row lock
-   * loop in `PostgresSpaceRepository.replaceAggregate` re-reads the current
-   * Meta identity after rolling back, and that read answers the same id the
-   * command already expected. The sentence must not claim that id is new.
+   * The SQL repository's replacement can conflict on a stored Space that
+   * changed mid-replacement without the Meta identity itself moving at all —
+   * the row lock loop in `SqlSpaceRepository.replaceAggregate` re-reads the
+   * current Meta identity after rolling back, and that read answers the same
+   * id the command already expected. The sentence must not claim that id is
+   * new.
    */
   it('does not claim the Meta identity moved when replacement conflicts with the same id it expected', async () => {
     const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');

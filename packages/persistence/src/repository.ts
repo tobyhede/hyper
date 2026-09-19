@@ -27,9 +27,9 @@ import type {
  * consumers, the way the seam itself is. On the superset, `@project/http` could
  * not name the identity of the error its own repository handed it.
  *
- * Every implementation of the seam raises it — `PostgresSpaceRepository` and
- * the memory double alike — or a memory-backed test proves nothing about the
- * database.
+ * Every implementation of the seam raises it — the one SQL repository
+ * (`SqlSpaceRepository`, ADR 0095) and the memory double alike — or a
+ * memory-backed test proves nothing about the database.
  */
 export class AggregateInvariantError extends Error {}
 

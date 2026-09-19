@@ -8,8 +8,8 @@ import {
   readSingleSpace,
   writeSpaceDirectory as writeLoadedSpaceDirectory,
 } from '../../src/aggregate-directory';
-import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
-import { db } from '../../src/prisma/db';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { runHyperScript } from '../support/hyper-command';
 
@@ -84,7 +84,7 @@ const metaSpaceSnapshot: SpaceSnapshot = {
 const linkedPair = { metaSpaceId: META_SPACE_ID, spaces: [targetSpaceSnapshot, metaSpaceSnapshot] };
 
 describe('hyper CLI', () => {
-  const repository = new PostgresSpaceRepository(db);
+  const repository = new SqlSpaceRepository(postgresSqlStore);
   const temporaryDirectories = new Set<string>();
 
   const temporaryDirectory = async (prefix: string): Promise<string> => {
@@ -156,7 +156,7 @@ describe('hyper CLI', () => {
 
   afterAll(async () => {
     await clearHyperContent();
-    await db.close();
+    await postgresSqlStore.close();
   });
 
   it('imports through the real command and durably reports the stored space', async () => {
