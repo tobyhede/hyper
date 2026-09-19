@@ -499,12 +499,25 @@ describe('Space HTTP reads', () => {
     await expectProblem(response, 'internal-error');
   });
 
-  it('answers 503 persistence-unavailable for an aggregate failure that is not an invariant', async () => {
+  // The negative half of the re-read above: only an invariant failure earns a
+  // second read. A failure that says nothing about stored state — an
+  // unreachable database is the case here — is answered from the first one, so
+  // the call count is what holds the guard in place. Without it every
+  // aggregate failure costs two full reads against a database that is already
+  // not answering.
+  it('answers 503 persistence-unavailable for an aggregate failure that is not an invariant, without re-reading', async () => {
+    let calls = 0;
     const response = await createSpaceHttpApp(
-      repository({ loadAggregate: () => Promise.reject(new Error('connect ECONNREFUSED')) }),
+      repository({
+        loadAggregate: () => {
+          calls += 1;
+          return Promise.reject(new Error('connect ECONNREFUSED'));
+        },
+      }),
     ).request('/api/aggregate');
 
     await expectProblem(response, 'persistence-unavailable');
+    expect(calls).toBe(1);
   });
 
   it('hides and logs collection and lazy-resource repository failures', async () => {

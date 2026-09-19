@@ -97,11 +97,14 @@ const toDatabaseRevision = (value: bigint): string => {
 };
 
 /**
- * SQLite stores Json as TEXT. A full-row read goes through the json codec and
- * answers an object; an `include`/`select` of `document` answers the stored
- * string (`test/integration/sqlite-space-repository.test.ts` initialize/load).
- * Both are valid driver output, so the adapter parses a string here rather
- * than asking the rest of the host to accept two shapes.
+ * SQLite stores Json as TEXT. A root-level read decodes it through the json
+ * codec and answers an object — the whole row, `.select('id', 'document')` and
+ * the root of an `.include()` read alike; only a field read as a *nested
+ * relation inside `.include()`* answers the stored string, which is how
+ * Things' documents arrive here
+ * (`test/integration/sqlite-space-repository.test.ts` initialize/load). Both
+ * are valid driver output, so the adapter parses a string here rather than
+ * asking the rest of the host to accept two shapes.
  */
 const storedJson = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -176,15 +179,28 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefi
  * start-up spends its whole retry budget on it. The original travels on
  * `cause`, so the located intake prose is still there for an operator.
  *
- * Two raw-text statements, not one `include` read: `orm.Space`'s own
- * root-level `document` decodes through the driver's json codec regardless of
- * `.select()`/`.include()` — confirmed against a well-formed document too,
- * which the ORM still hands back as a decoded object rather than text —
- * because the ORM client decodes unconditionally by design
+ * The catch is unconditional by position rather than by type: the two
+ * statements below are this function's only I/O, and the per-row callback is
+ * synchronous, so nothing inside the `try` can fail for a transient reason.
+ * That property is what makes the breadth correct, and it is what an edit here
+ * has to preserve — I/O admitted into the `try` would be reported as broken
+ * stored state, which is the misclassification this function exists to avoid.
+ *
+ * Two raw-text statements, not one `include` read: whenever `document` is
+ * among the fields a root `orm.Space` read returns, it decodes through the
+ * driver's json codec — the whole row, `.select('id', 'document')` and the
+ * root of an `.include()` read alike, each answering a well-formed document as
+ * a decoded object rather than text and each throwing the codec's own
+ * `TypeError: Cannot read properties of undefined (reading 'codecId')` on text
+ * that is not JSON — because the ORM client decodes unconditionally by design
  * (`sql-orm-client`'s README, "Codec Roundtrip": rows "carry plain field
  * values"). Only a field read as a *nested relation inside `.include()`*
- * skips that decode, which is how Things' documents already arrive; there is
- * no such path for the root row itself. So this reads through the lower-level
+ * skips that decode, which is how Things' documents already arrive; those
+ * three are every root-level read there is. A `.select()` that leaves
+ * `document` out is a different case and not an exception to any of this: it
+ * fetches no document, so there is nothing to decode, which is what lets
+ * `truncateHyperContent` and `replaceAggregate` read ids off rows this
+ * function cannot decode. So this reads through the lower-level
  * `sql` builder instead, which can override a column's codec on the way out
  * (`raw\`document\`.returns('sqlite/text@1')`), for both `spaces` and
  * `things` — the low-level builder has no `.include()` to nest the second

@@ -358,12 +358,38 @@ describe('SQLite HTTP runtime', () => {
       }
     };
 
+    // The only row here whose `wait` resolves — the others park the retry on a
+    // promise that never settles — so it is the only one that lets the loop
+    // run. `retryMetaSpaceEstablishment` bounds nothing but *consecutive*
+    // invariant failures: a failure it classifies as anything else resets that
+    // counter and loops again, forever. So a classification regression would
+    // not just fail this expectation, it would leave the detached retry
+    // spinning against the SQLite file for the rest of the run, after the
+    // timeout failed the test. Counting the waits is what stops that: past the
+    // bound the retry is parked the way the other rows park it, and the race
+    // fails here instead of hanging.
+    const RETRY_WAIT_BOUND = 4;
+    let waits = 0;
+    let notifyRunaway: ((outcome: 'ran-away') => void) | undefined;
+    const ranAway = new Promise<'ran-away'>((resolve) => {
+      notifyRunaway = resolve;
+    });
+    const wait = (): Promise<void> => {
+      waits += 1;
+      if (waits > RETRY_WAIT_BOUND) {
+        notifyRunaway?.('ran-away');
+        return new Promise<void>(() => undefined);
+      }
+      return Promise.resolve();
+    };
+
     const application = await createApp({
       database: harness.database,
-      wait: () => Promise.resolve(),
+      wait,
       report,
     });
-    await gaveUp;
+    const outcome = await Promise.race([gaveUp.then(() => 'gave-up' as const), ranAway]);
+    expect(outcome).toBe('gave-up');
     expect(reports.length).toBeGreaterThanOrEqual(2);
 
     const response = await application.resolveProductRequest(
