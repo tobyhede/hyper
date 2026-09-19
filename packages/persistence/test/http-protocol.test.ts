@@ -26,6 +26,7 @@ import {
   problemCodeForType,
 } from '../src/http-protocol';
 import type { CommitRefusalBody, HyperProblemCode, HyperProblemType } from '../src/http-protocol';
+import { REVISION_CEILING } from '../src/revision-codec';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -42,10 +43,8 @@ const overTheWire = (loaded: LoadedSpace): LoadedSpace =>
   // not an unchecked `any` flowing straight through.
   decodeLoadedSpace(JSON.parse(JSON.stringify(encodeLoadedSpace(loaded))) as unknown);
 
-const BIGINT_MAX = 9_223_372_036_854_775_807n;
-
 describe('aggregate wire protocol', () => {
-  const loaded: LoadedSpace = { snapshot, revision: BIGINT_MAX, exportedRevision: null };
+  const loaded: LoadedSpace = { snapshot, revision: REVISION_CEILING, exportedRevision: null };
   const secondId = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
   const createdId = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
   const created: SpaceSnapshot = { ...snapshot, id: createdId };
@@ -67,7 +66,7 @@ describe('aggregate wire protocol', () => {
           kind: 'update' as const,
           spaceId: SPACE_ID,
           snapshot,
-          expectedRevision: BIGINT_MAX,
+          expectedRevision: REVISION_CEILING,
         },
         // A create carries a Space and no expected revision, so it is the one
         // arm whose encoding is not the shared `expectedRevision.toString()`
@@ -80,7 +79,7 @@ describe('aggregate wire protocol', () => {
 
     const committed = {
       kind: 'committed' as const,
-      revisions: [{ spaceId: SPACE_ID, revision: BIGINT_MAX }],
+      revisions: [{ spaceId: SPACE_ID, revision: REVISION_CEILING }],
       deletedSpaceIds: [secondId],
     };
     expect(decodeCommitResponse(encodeCommitResponse(committed))).toEqual(committed);
@@ -385,27 +384,29 @@ describe('aggregate wire protocol', () => {
 });
 
 describe('revision decoding', () => {
-  it('rejects a revision longer than a PostgreSQL bigint can be', () => {
+  it('rejects a revision longer than the canonical pattern allows', () => {
     expect(() => decodeCommittedRevision({ revision: '1'.repeat(40) })).toThrow(
       'canonical non-negative decimal string',
     );
   });
 
-  it('accepts the full width of a PostgreSQL bigint', () => {
-    expect(decodeCommittedRevision({ revision: BIGINT_MAX.toString() })).toBe(BIGINT_MAX);
+  it('accepts the full width of the revision ceiling', () => {
+    expect(decodeCommittedRevision({ revision: REVISION_CEILING.toString() })).toBe(
+      REVISION_CEILING,
+    );
   });
 
-  // The canonical pattern bounds decoding at 19 digits, which is the *width* of a
-  // PostgreSQL bigint but not its range: every value from BIGINT_MAX + 1 to
+  // The canonical pattern bounds decoding at 19 digits, which is the *width* of
+  // the ceiling but not its range: every value from REVISION_CEILING + 1 to
   // 9999999999999999999 is 19 digits and does not fit. Left unchecked it reaches
-  // the repository, where `toDatabaseRevision` is a bare cast, and a client error
-  // surfaces as a database failure.
-  it('rejects a 19-digit revision above the PostgreSQL bigint range', () => {
-    expect(() => decodeCommittedRevision({ revision: (BIGINT_MAX + 1n).toString() })).toThrow(
-      'within the PostgreSQL bigint range',
+  // the repository, where the shared codec is what refuses it (ADR 0095) rather
+  // than a client error surfacing as a stored-state failure.
+  it('rejects a 19-digit revision above the ceiling', () => {
+    expect(() => decodeCommittedRevision({ revision: (REVISION_CEILING + 1n).toString() })).toThrow(
+      'must not exceed 2^63-1',
     );
     expect(() => decodeCommittedRevision({ revision: '9'.repeat(19) })).toThrow(
-      'within the PostgreSQL bigint range',
+      'must not exceed 2^63-1',
     );
   });
 
@@ -420,11 +421,11 @@ describe('revision decoding', () => {
 });
 
 describe('loaded space round trip', () => {
-  it('preserves any revision a PostgreSQL bigint can hold', () => {
+  it('preserves any revision within the ceiling', () => {
     fc.assert(
       fc.property(
-        fc.bigInt({ min: 0n, max: BIGINT_MAX }),
-        fc.option(fc.bigInt({ min: 0n, max: BIGINT_MAX }), { nil: null }),
+        fc.bigInt({ min: 0n, max: REVISION_CEILING }),
+        fc.option(fc.bigInt({ min: 0n, max: REVISION_CEILING }), { nil: null }),
         (revision, exportedRevision) => {
           expect(overTheWire({ snapshot, revision, exportedRevision })).toEqual({
             snapshot,

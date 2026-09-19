@@ -1,5 +1,6 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
+import { AggregateInvariantError, REVISION_CEILING } from '@project/persistence';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -164,6 +165,21 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
 export interface RepositoryHarness {
   repository: SpaceRepository;
   close(): Promise<void>;
+  /**
+   * Write a stored Space's `revision` (and optionally `exportedRevision`)
+   * column text verbatim, bypassing the repository's own write path and the
+   * shared codec's format/ceiling check (ADR 0095). It is how the cases below
+   * construct stored state no adapter's own `commit`/`initializeAggregate`
+   * can produce — a non-canonical revision, or one already at the 2^63−1
+   * ceiling — and it is `undefined` on a harness with no raw column to write
+   * (the memory double, which mints every revision in-process and so can
+   * never hold one that fails the codec).
+   */
+  writeRawRevision?: (input: {
+    readonly spaceId: UUID;
+    readonly revision: string;
+    readonly exportedRevision?: string | null;
+  }) => Promise<void>;
 }
 
 const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revision: bigint) =>
@@ -197,6 +213,28 @@ export const spaceRepositoryContract = (
     const harness = await createHarness();
     try {
       await body(harness.repository);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  /**
+   * `withHarness`, plus the raw revision-column write the ceiling and
+   * canonical-decimal cases need. A harness with no `writeRawRevision` (the
+   * memory double) has nothing for these to prove — a stored revision it
+   * cannot represent in the first place — so the body is skipped rather than
+   * asserting anything.
+   */
+  const withRawRevisionHarness = async (
+    body: (
+      repository: SpaceRepository,
+      writeRawRevision: NonNullable<RepositoryHarness['writeRawRevision']>,
+    ) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.writeRawRevision === undefined) return;
+      await body(harness.repository, harness.writeRawRevision);
     } finally {
       await harness.close();
     }
@@ -1119,6 +1157,64 @@ export const spaceRepositoryContract = (
       expect(new Set(await repository.listSpaces())).toEqual(
         new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
       );
+    });
+  });
+
+  // Revisions above `Number.MAX_SAFE_INTEGER` are ordinary once a database
+  // stores them as text rather than a native integer (ADR 0095) — both
+  // databases hold and round-trip one identically now, so this is shared
+  // rather than PostgreSQL's own weaker "the expected revision isn't
+  // narrowed" case and SQLite's two ("speaks bigint at the repository
+  // boundary…", "commits and reloads revisions above…").
+  it(`${name} stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text`, async () => {
+    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      const aboveSafe = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+      await writeRawRevision({ spaceId: SPACE_ID, revision: aboveSafe.toString() });
+
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, aboveSafe, null));
+
+      const changed = retitled(first, 'Above safe');
+      await expect(commitUpdate(repository, changed, aboveSafe)).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: aboveSafe + 1n }],
+        deletedSpaceIds: [],
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
+        stored(changed, aboveSafe + 1n, null),
+      );
+    });
+  });
+
+  // Ticket 27 proved this for SQLite, whose TEXT column always could hold a
+  // non-canonical revision; ADR 0095's TEXT columns make it reachable on
+  // PostgreSQL too, so it belongs here rather than in one database's own
+  // integration file.
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async () => {
+    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
+
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+    });
+  });
+
+  // The shared codec refuses a revision past 2^63−1 on the way out just as it
+  // does on the way in (ADR 0095): a Space already sitting at the ceiling —
+  // constructed here the only way one legitimately could, since no ordinary
+  // commit ever reaches it — refuses the commit that would carry it one past
+  // rather than storing a value the codec could not read back.
+  it(`${name} refuses to store a revision above the 2^63-1 ceiling`, async () => {
+    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: REVISION_CEILING.toString() });
+
+      await expect(
+        commitUpdate(repository, retitled(first, 'Past the ceiling'), REVISION_CEILING),
+      ).rejects.toThrow();
     });
   });
 };

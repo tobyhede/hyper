@@ -11,6 +11,9 @@ import {
   commitRequestRefusal,
   committedRevision,
   decideCommit,
+  decodeStoredRevision,
+  encodeStoredRevision,
+  RevisionCodecError,
   type AggregateLoadResult,
   type LoadedAggregate,
   type LoadedSpace,
@@ -93,26 +96,8 @@ const isRepositoryStatePrimaryKeyConflict = (
 ): error is SqlPrimaryKeyConflictFields =>
   isPrimaryKeyConflict(error, 'repository_state', 'repository_state_pkey');
 
-const toRevision = (value: number | string | bigint): bigint => {
-  if (typeof value === 'number' && !Number.isSafeInteger(value)) {
-    throw new RangeError(`Database revision ${value} is not a safe integer`);
-  }
-  return typeof value === 'bigint' ? value : BigInt(value);
-};
-
-const toOptionalRevision = (value: number | string | bigint | null): bigint | null =>
-  value === null ? null : toRevision(value);
-
-/**
- * SAFETY: Prisma Next 0.16.0 declares `int8` inputs as `number`, although its
- * codec passes values through unchanged at runtime and node-postgres accepts
- * bigint parameters directly — this relabels the type without converting the
- * value, so no precision is lost the way a real `Number(value)` call could
- * lose it above `Number.MAX_SAFE_INTEGER`. `bigint` and `number` have no
- * direct assertion path in TypeScript, hence the `unknown` bridge. Keep the
- * upstream type workaround isolated here so revisions are never narrowed.
- */
-const toDatabaseRevision = (value: bigint): number => value as unknown as number;
+const toOptionalRevision = (value: string | null): bigint | null =>
+  value === null ? null : decodeStoredRevision(value);
 
 const toJsonValue = (value: unknown): JsonValue => {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') {
@@ -173,7 +158,7 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefi
 
   return {
     snapshot,
-    revision: toRevision(stored.revision),
+    revision: decodeStoredRevision(stored.revision),
     exportedRevision: toOptionalRevision(stored.exportedRevision),
   };
 };
@@ -181,17 +166,28 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefi
 /**
  * Every stored Space, parsed.
  *
- * A row that fails intake raises `AggregateInvariantError` rather than the
- * private `SnapshotValidationError` a bare `parseSnapshot` would. Both are
- * stored state no aggregate can be read from, and every caller of this function
- * is an aggregate-level read whose failure a reader classifies: unconverted, a
- * corrupt document reaches `src/http/space-host.ts` as an unreachable database
- * and is answered `try again later` for a defect no later attempt cures, while
- * start-up spends its whole retry budget on it. The original travels on `cause`,
- * so the located intake prose is still there for an operator.
+ * A row that fails intake or a revision that fails the shared codec raises
+ * `AggregateInvariantError` rather than the private `SnapshotValidationError`
+ * a bare `parseSnapshot` would, or the codec's own `RevisionCodecError`. All
+ * three are stored state no aggregate can be read from, and every caller of
+ * this function is an aggregate-level read whose failure a reader classifies:
+ * unconverted, a corrupt document or a non-canonical revision reaches
+ * `src/http/space-host.ts` as an unreachable database and is answered `try
+ * again later` for a defect no later attempt cures, while start-up spends its
+ * whole retry budget on it. The original travels on `cause`, so the located
+ * intake prose is still there for an operator.
  *
- * `loadSpace` keeps the narrower error deliberately. One Space failing intake is
- * that resource's answer to give, not evidence the aggregate cannot be read.
+ * The catch admits exactly those two identities and rethrows everything else
+ * — widening it to every error would read a connection failure as broken
+ * stored state (ticket 27's "the classification default does not flip"). Now
+ * that `revision`/`exported_revision` are TEXT (ADR 0095) a stored revision
+ * that is not canonical is reachable here the same way a document that fails
+ * intake always was; neither `document` being `jsonb` nor `revision` being
+ * `int8` protects this read any more.
+ *
+ * `loadSpace` keeps the narrower error deliberately. One Space failing intake
+ * is that resource's answer to give, not evidence the aggregate cannot be
+ * read.
  */
 const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
   const stored = await orm.public.Space.orderBy((space) => space.id.asc())
@@ -208,11 +204,13 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
           document: space.document,
           things: space.things.map((thing) => ({ id: thing.id, document: thing.document })),
         }),
-        revision: toRevision(space.revision),
+        revision: decodeStoredRevision(space.revision),
         exportedRevision: toOptionalRevision(space.exportedRevision),
       };
     } catch (error) {
-      if (!(error instanceof SnapshotValidationError)) throw error;
+      if (!(error instanceof SnapshotValidationError) && !(error instanceof RevisionCodecError)) {
+        throw error;
+      }
       throw new AggregateInvariantError(`Stored Space ${space.id} does not parse`, {
         cause: error,
       });
@@ -282,7 +280,7 @@ const writeSpaceDocumentUnderLock = async (
   const locked = await orm.public.Space.where({ id: snapshot.id }).update({
     document: toJsonValue(snapshot.document),
   });
-  return locked === null ? undefined : toRevision(locked.revision);
+  return locked === null ? undefined : decodeStoredRevision(locked.revision);
 };
 
 /**
@@ -307,7 +305,7 @@ const replaceStoredSpace = async (
   const locked = await writeSpaceDocumentUnderLock(orm, snapshot);
   if (locked !== expectedRevision) throw new StaleSpaceRevisionError(snapshot.id);
   await orm.public.Space.where({ id: snapshot.id }).update({
-    revision: toDatabaseRevision(revision),
+    revision: encodeStoredRevision(revision),
   });
   await upsertThings(orm, snapshot);
   const ownedThings = orm.public.Thing.where({ spaceId: snapshot.id });
@@ -341,7 +339,7 @@ const commitTopologyPreservingUpdate = async (
   const locked = await writeSpaceDocumentUnderLock(orm, change.snapshot);
   if (locked !== change.expectedRevision) throw new StaleSpaceRevisionError(change.spaceId);
   await orm.public.Space.where({ id: change.spaceId }).update({
-    revision: toDatabaseRevision(committedRevision(change)),
+    revision: encodeStoredRevision(committedRevision(change)),
   });
   await upsertThings(orm, change.snapshot);
   return decision.result;
@@ -351,7 +349,7 @@ const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<voi
   await orm.public.Space.create({
     id: snapshot.id,
     document: toJsonValue(snapshot.document),
-    revision: 0,
+    revision: encodeStoredRevision(0n),
   });
   await importThings(orm, snapshot);
 };
@@ -546,7 +544,10 @@ export class PostgresSpaceRepository implements SpaceRepository {
           const locked = await orm.public.Space.where({ id: row.id }).update({
             document: toJsonValue(row.document),
           });
-          if (locked === null || toRevision(locked.revision) !== toRevision(row.revision)) {
+          if (
+            locked === null ||
+            decodeStoredRevision(locked.revision) !== decodeStoredRevision(row.revision)
+          ) {
             throw new StaleSpaceRevisionError(uuidSchema.parse(row.id));
           }
         }
@@ -564,7 +565,7 @@ export class PostgresSpaceRepository implements SpaceRepository {
 
   async markExported(id: UUID, revision: bigint): Promise<void> {
     const updated = await this.#database.orm.public.Space.where({ id }).update({
-      exportedRevision: toDatabaseRevision(revision),
+      exportedRevision: encodeStoredRevision(revision),
     });
     if (updated === null) throw new Error(`Space ${id} does not exist`);
   }

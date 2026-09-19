@@ -60,18 +60,16 @@
     {
       // The Postgres repository's own boundary code: classifying caught driver
       // errors (`error: unknown` is the caught-exception case, structurally the
-      // same as the rule's own exempted `cause` parameter) and coercing
-      // `number | string | bigint` wire/DB revisions, where `typeof` discriminates
-      // an already-closed union rather than narrowing untyped external input.
+      // same as the rule's own exempted `cause` parameter), where `typeof`
+      // discriminates an already-closed union rather than narrowing untyped
+      // external input. ADR 0095's shared revision codec
+      // (`packages/persistence/src/revision-codec.ts`) took the narrowing
+      // assertion this override used to carry with it — revisions are TEXT on
+      // both databases now, so there is no `int8`/`bigint` relabel left here.
       "files": ["src/persistence/postgres-space-repository.ts"],
       "rules": {
         "anti-slop/no-unknown-parameters": "off",
-        "anti-slop/no-runtime-typeof": "off",
-        // toDatabaseRevision's `value as unknown as number`: bigint and number
-        // have no direct assertion path, and a real `Number(value)` call could
-        // lose precision above Number.MAX_SAFE_INTEGER — see the SAFETY comment
-        // on that function for the full rationale.
-        "anti-slop/no-chained-type-assertions": "off"
+        "anti-slop/no-runtime-typeof": "off"
       }
     },
     {
@@ -85,6 +83,43 @@
         "anti-slop/no-unknown-parameters": "off",
         "anti-slop/no-runtime-typeof": "off",
         "anti-slop/no-unknown-returns": "off"
+      }
+    },
+    {
+      // ADR 0095's `SqlStore` contract (`src/persistence/sql-store.ts`) and its
+      // two per-database implementations. `SqlStore.readDocument`/
+      // `isDuplicateKey` are declared over `unknown` on purpose: each database
+      // answers a different representation for "the stored document" and "the
+      // error a losing insert raised" — `unknown` in and a schema-parsed value
+      // or a `boolean` out is the honest contract for a boundary the interface
+      // exists to abstract over, not a narrowing skipped. The two
+      // implementations below carry the concrete boundary code this contract
+      // describes: `isDuplicateKey`'s caught-error classification is the same
+      // `error: unknown`/`cause`-shaped case `postgres-space-repository.ts` and
+      // `sqlite-space-repository.ts` are excepted for above, and SQLite's
+      // `readDocument` is `storedJson` moved here unchanged — the same
+      // root-read-vs-nested-`include`-read TEXT/decoded-object split
+      // `sqlite-space-repository.ts`'s own doc comments explain.
+      "files": [
+        "src/persistence/sql-store.ts",
+        "src/prisma/sql-store.ts",
+        "src/sqlite/sql-store.ts"
+      ],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-runtime-typeof": "off"
+      }
+    },
+    {
+      // `SqlSpaceRepository`'s private `parseSnapshot` mirrors
+      // `postgres-space-repository.ts`/`sqlite-space-repository.ts`'s own
+      // identically-named, identically-shaped helper: `loadSpaceSnapshot`'s
+      // one intake (ADR 0010) is the parser this `input: unknown` parameter
+      // exists to reach, not a narrowing that was skipped.
+      "files": ["src/persistence/sql-space-repository.ts"],
+      "rules": {
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {

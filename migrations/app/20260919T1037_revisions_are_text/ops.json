@@ -1,0 +1,178 @@
+[
+  {
+    "id": "dropDefault.spaces.revision",
+    "label": "Drop default on \"spaces\".\"revision\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "revision",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"revision\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "revision"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop default on \"revision\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ALTER COLUMN \"revision\" DROP DEFAULT"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"revision\" has no default",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"column_default\" IS NULL)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "revision"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "alterType.spaces.exported_revision",
+    "label": "Alter type of \"spaces\".\"exported_revision\" to text",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "exported_revision",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"exported_revision\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "exported_revision"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter type of \"exported_revision\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ALTER COLUMN \"exported_revision\" TYPE text USING \"exported_revision\"::text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"exported_revision\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "exported_revision",
+          "text"
+        ]
+      }
+    ],
+    "meta": {
+      "warning": "TABLE_REWRITE"
+    }
+  },
+  {
+    "id": "alterType.spaces.revision",
+    "label": "Alter type of \"spaces\".\"revision\" to text",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "revision",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"revision\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "revision"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter type of \"revision\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ALTER COLUMN \"revision\" TYPE text USING \"revision\"::text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"revision\" has type \"text\"",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_attribute\" AS \"a\" INNER JOIN \"pg_class\" AS \"c\" ON \"c\".\"oid\" = \"a\".\"attrelid\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"relnamespace\" WHERE (\"n\".\"nspname\" = $1 AND \"c\".\"relname\" = $2 AND \"a\".\"attname\" = $3 AND (format_type(\"a\".\"atttypid\", \"a\".\"atttypmod\")) = $4 AND NOT (\"a\".\"attisdropped\"))) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "revision",
+          "text"
+        ]
+      }
+    ],
+    "meta": {
+      "warning": "TABLE_REWRITE"
+    }
+  },
+  {
+    "id": "setDefault.spaces.revision",
+    "label": "Set default on \"spaces\".\"revision\"",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "revision",
+        "table": "spaces"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"revision\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "revision"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "set default on \"revision\"",
+        "sql": "ALTER TABLE \"public\".\"spaces\" ALTER COLUMN \"revision\" SET DEFAULT '0'"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"revision\" has a default",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"column_default\" IS NOT NULL)) AS \"result\"",
+        "params": [
+          "public",
+          "spaces",
+          "revision"
+        ]
+      }
+    ]
+  }
+]

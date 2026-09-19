@@ -618,8 +618,10 @@ describe('runHyper', () => {
   it('reports the stored space identity and lossless bigint revision', async () => {
     // Past `Number.MAX_SAFE_INTEGER`, so a revision that went through `Number`
     // anywhere would print 9007199254740992 and fail here. Revision 0 cannot
-    // catch that, and the `int8` workaround in `toDatabaseRevision` is exactly
-    // the kind of thing that would reintroduce it.
+    // catch that, and a revision codec that narrowed through `Number` on
+    // either database (ADR 0095's shared `decodeStoredRevision`/
+    // `encodeStoredRevision`, `packages/persistence/src/revision-codec.ts`)
+    // is exactly the kind of thing that would reintroduce it.
     //
     // A real initialization mints revision 0, so the revision is bent on the way
     // back out of the seam rather than stubbed: what is under test is the

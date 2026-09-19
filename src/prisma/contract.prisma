@@ -7,8 +7,8 @@ types {
 model Space {
   id               Uuid     @id @default(dbgenerated("gen_random_uuid()"))
   document         Json
-  revision         BigInt   @default(0)
-  exportedRevision BigInt?  @map("exported_revision")
+  revision         String   @default("0")
+  exportedRevision String?  @map("exported_revision")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        temporal.updatedAt() @map("updated_at")
   things           Thing[]

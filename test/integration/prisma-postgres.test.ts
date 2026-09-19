@@ -12,7 +12,7 @@ describe('Prisma Next PostgreSQL contract', () => {
   it('writes and reads a typed space document with its thing', async () => {
     const space = await spaces.create({
       document: { version: 1, title: 'Integration space', diagrams: [] },
-      revision: 0,
+      revision: '0',
     });
 
     try {
@@ -44,7 +44,7 @@ describe('Prisma Next PostgreSQL contract', () => {
   it('advances updatedAt when a space is updated', async () => {
     const space = await spaces.create({
       document: { version: 1, title: 'Before update', diagrams: [] },
-      revision: 0,
+      revision: '0',
     });
 
     try {
@@ -52,7 +52,7 @@ describe('Prisma Next PostgreSQL contract', () => {
 
       const updated = await spaces.where({ id: space.id }).update({
         document: { version: 1, title: 'After update', diagrams: [] },
-        revision: 1,
+        revision: '1',
       });
 
       expect(updated).not.toBeNull();

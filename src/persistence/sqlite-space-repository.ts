@@ -8,10 +8,11 @@ import {
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
-  CANONICAL_DECIMAL,
   commitRequestRefusal,
   committedRevision,
   decideCommit,
+  decodeStoredRevision,
+  encodeStoredRevision,
   type AggregateLoadResult,
   type LoadedAggregate,
   type LoadedSpace,
@@ -20,6 +21,7 @@ import {
   type SpaceSummary,
 } from '@project/persistence';
 import type { SqliteDatabase } from '../sqlite/db';
+import { serialiseSqlite } from '../sqlite/serialise';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
 import {
   decideTopologyPreservingUpdate,
@@ -78,23 +80,8 @@ const isUniqueViolation = (error: unknown): error is SqlPrimaryKeyConflictFields
   return candidate.kind === 'sql_query' && candidate.sqlState === '23505';
 };
 
-const toRevision = (value: string): bigint => {
-  if (!CANONICAL_DECIMAL.test(value)) {
-    throw new RangeError(`Database revision ${value} is not a canonical non-negative decimal`);
-  }
-  return BigInt(value);
-};
-
 const toOptionalRevision = (value: string | null): bigint | null =>
-  value === null ? null : toRevision(value);
-
-const toDatabaseRevision = (value: bigint): string => {
-  const encoded = value.toString();
-  if (!CANONICAL_DECIMAL.test(encoded)) {
-    throw new RangeError(`Revision ${encoded} is not a canonical non-negative decimal`);
-  }
-  return encoded;
-};
+  value === null ? null : decodeStoredRevision(value);
 
 /**
  * SQLite stores Json as TEXT. A root-level read decodes it through the json
@@ -159,7 +146,7 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefi
 
   return {
     snapshot,
-    revision: toRevision(stored.revision),
+    revision: decodeStoredRevision(stored.revision),
     exportedRevision: toOptionalRevision(stored.exportedRevision),
   };
 };
@@ -170,7 +157,7 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefi
  * A row that fails to decode raises `AggregateInvariantError` rather than
  * whatever the per-row step itself threw — a `SnapshotValidationError` from
  * `parseSnapshot`, but just as much a `SyntaxError` from `storedJson`'s
- * `JSON.parse` on text that is not JSON, or a `RangeError` from `toRevision`
+ * `JSON.parse` on text that is not JSON, or a `RangeError` from `decodeStoredRevision`
  * on a stored revision that is not canonical. All three are stored state no
  * aggregate can be read from, and every caller of this function is an
  * aggregate-level read whose failure a reader classifies: unconverted, a
@@ -263,7 +250,7 @@ const loadEverySpace = async (
             document: storedJson(thing.document),
           })),
         }),
-        revision: toRevision(space.revision),
+        revision: decodeStoredRevision(space.revision),
         exportedRevision: toOptionalRevision(space.exportedRevision),
       };
     } catch (error) {
@@ -309,7 +296,7 @@ const createStoredSpace = async (orm: Orm, snapshot: SpaceSnapshot): Promise<voi
   await orm.Space.create({
     id: snapshot.id,
     document: toJsonValue(snapshot.document),
-    revision: toDatabaseRevision(0n),
+    revision: encodeStoredRevision(0n),
   });
   await importThings(orm, snapshot);
 };
@@ -371,7 +358,7 @@ const writeSpaceDocumentUnderLock = async (
   const locked = await orm.Space.where({ id: snapshot.id }).update({
     document: toJsonValue(snapshot.document),
   });
-  return locked === null ? undefined : toRevision(locked.revision);
+  return locked === null ? undefined : decodeStoredRevision(locked.revision);
 };
 
 const upsertThings = async (orm: Orm, snapshot: SpaceSnapshot): Promise<void> => {
@@ -403,7 +390,7 @@ const replaceStoredSpace = async (
   const locked = await writeSpaceDocumentUnderLock(orm, snapshot);
   if (locked !== expectedRevision) throw new StaleSpaceRevisionError(snapshot.id);
   await orm.Space.where({ id: snapshot.id }).update({
-    revision: toDatabaseRevision(revision),
+    revision: encodeStoredRevision(revision),
   });
   await upsertThings(orm, snapshot);
   const ownedThings = orm.Thing.where({ spaceId: snapshot.id });
@@ -431,7 +418,7 @@ const commitTopologyPreservingUpdate = async (
   const locked = await writeSpaceDocumentUnderLock(orm, change.snapshot);
   if (locked !== change.expectedRevision) throw new StaleSpaceRevisionError(change.spaceId);
   await orm.Space.where({ id: change.spaceId }).update({
-    revision: toDatabaseRevision(committedRevision(change)),
+    revision: encodeStoredRevision(committedRevision(change)),
   });
   await upsertThings(orm, change.snapshot);
   return decision.result;
@@ -439,28 +426,25 @@ const commitTopologyPreservingUpdate = async (
 
 export class SqliteSpaceRepository implements SpaceRepository {
   readonly #database: SqliteDatabase;
-  #queue: Promise<void> = Promise.resolve();
 
   constructor(database: SqliteDatabase) {
     this.#database = database;
   }
 
   /**
-   * One in-process database operation at a time, reads included. The driver
-   * opens a handle per operation, so overlapping transactions would both sit in
-   * a deferred BEGIN, and an auto-commit read holding its statement open across
-   * a promise turn makes an overlapping commit's COMMIT wait out the busy
-   * timeout synchronously and fail (`test/integration/sqlite-space-repository.test.ts`
-   * overlapping reads, initializations, different-Space commits, and reads
-   * overlapping a commit).
+   * One in-process database operation at a time, reads included, over the
+   * queue `serialiseSqlite` keeps per `SqliteDatabase` handle rather than per
+   * repository instance (ADR 0095) — two repositories built over the same
+   * handle share it. The driver opens a connection per operation, so
+   * overlapping transactions would both sit in a deferred BEGIN, and an
+   * auto-commit read holding its statement open across a promise turn makes
+   * an overlapping commit's COMMIT wait out the busy timeout synchronously
+   * and fail (`test/integration/sqlite-space-repository.test.ts` overlapping
+   * reads, initializations, different-Space commits, and reads overlapping a
+   * commit).
    */
   #serialise<T>(operation: () => Promise<T>): Promise<T> {
-    const run = this.#queue.then(operation, operation);
-    this.#queue = run.then(
-      () => undefined,
-      () => undefined,
-    );
-    return run;
+    return serialiseSqlite(this.#database, operation);
   }
 
   listSpaces(): Promise<readonly SpaceSummary[]> {
@@ -572,7 +556,7 @@ export class SqliteSpaceRepository implements SpaceRepository {
   markExported(id: UUID, revision: bigint): Promise<void> {
     return this.#serialise(async () => {
       const updated = await this.#database.orm.Space.where({ id }).update({
-        exportedRevision: toDatabaseRevision(revision),
+        exportedRevision: encodeStoredRevision(revision),
       });
       if (updated === null) throw new Error(`Space ${id} does not exist`);
     });

@@ -7,9 +7,12 @@ import {
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { db } from '../../src/prisma/db';
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { spaceRepositoryContract } from '../support/repository-contract';
+import { sqlReadRepositoryContract } from '../support/sql-read-repository-contract';
 import { expectPersisted } from '../support/persistence-contract';
 
 /**
@@ -42,7 +45,31 @@ spaceRepositoryContract('PostgresSpaceRepository', async () => {
     commit: (request) => repository.commit(request),
     markExported: (id, revision) => repository.markExported(id, revision),
   };
-  return { repository: harness, close: clearHyperContent };
+  return {
+    repository: harness,
+    close: clearHyperContent,
+    writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
+      if (exportedRevision === undefined) {
+        await db.orm.public.Space.where({ id: spaceId }).update({ revision });
+        return;
+      }
+      await db.orm.public.Space.where({ id: spaceId }).update({ revision, exportedRevision });
+    },
+  };
+});
+
+// The tracer slice (ticket 22): a `SqlSpaceRepository` built over the same
+// `db` handle `PostgresSpaceRepository` seeds through, proving `listSpaces`/
+// `loadSpace` and the `SqlStore` typing on real PostgreSQL rather than merely
+// compiling. `PostgresSpaceRepository` still owns the lifecycle doors here —
+// tickets 23–24 move them onto this repository and delete the adapter.
+sqlReadRepositoryContract('SqlSpaceRepository (PostgreSQL tracer)', async () => {
+  await clearHyperContent();
+  return {
+    seed: new PostgresSpaceRepository(db),
+    read: new SqlSpaceRepository(postgresSqlStore),
+    close: clearHyperContent,
+  };
 });
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -245,7 +272,7 @@ describe('PostgresSpaceRepository', () => {
         // code has since rolled forward past.
         id: SPACE_ID,
         document: { version: 1 },
-        revision: 0,
+        revision: '0',
       });
       await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
     });
@@ -270,7 +297,7 @@ describe('PostgresSpaceRepository', () => {
       await orm.public.Space.create({
         id: OTHER_SPACE_ID,
         document: { version: 1, title: 'Corruptible' },
-        revision: 0,
+        revision: '0',
       });
     });
 
@@ -318,7 +345,7 @@ describe('PostgresSpaceRepository', () => {
         await orm.public.Space.create({
           id: OTHER_SPACE_ID,
           document: { version: 1 },
-          revision: 0,
+          revision: '0',
         });
         await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
       });
@@ -333,12 +360,12 @@ describe('PostgresSpaceRepository', () => {
         await orm.public.Space.create({
           id: OTHER_SPACE_ID,
           document: { version: 1, title: 'Meta' },
-          revision: 0,
+          revision: '0',
         });
         await orm.public.Space.create({
           id: CONCURRENT_SPACE_ID,
           document: { version: 1, title: 'Unreferenced' },
-          revision: 0,
+          revision: '0',
         });
         await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
       });
@@ -359,7 +386,7 @@ describe('PostgresSpaceRepository', () => {
       await db.orm.public.Space.create({
         id: CONCURRENT_SPACE_ID,
         document: { version: 1, title: 'Orphan' },
-        revision: 0,
+        revision: '0',
       });
 
       const rowLockHeld = Promise.withResolvers<undefined>();
@@ -415,7 +442,7 @@ describe('PostgresSpaceRepository', () => {
       await db.orm.public.Space.create({
         id: OTHER_SPACE_ID,
         document: { version: 1, title: 'Orphan' },
-        revision: 0,
+        revision: '0',
       });
 
       await expect(
@@ -461,7 +488,7 @@ describe('PostgresSpaceRepository', () => {
       await orm.public.Space.create({
         id: SPACE_ID,
         document: { version: 1, title: 'Winner' },
-        revision: 0,
+        revision: '0',
       });
       await orm.public.Thing.create({
         id: THING_ID,
@@ -502,7 +529,7 @@ describe('PostgresSpaceRepository', () => {
     const committing = db.transaction(async ({ orm }) => {
       await orm.public.Space.where({ id: SPACE_ID }).update({
         document: { version: 1, title: 'Authored winner' },
-        revision: 1,
+        revision: '1',
       });
       updateApplied.resolve(undefined);
       await releaseCommit.promise;
@@ -705,10 +732,9 @@ describe('PostgresSpaceRepository', () => {
     const blocker = db.transaction(async ({ orm }) => {
       await orm.public.Space.where({ id: SPACE_ID }).update({
         document: { version: 1, title: 'Moved by the other writer' },
-        // Prisma Next declares `int8` inputs as `number`, so the literal needs
-        // no relabelling here — unlike the adapter, which holds the same value
-        // as the domain's `bigint`.
-        revision: 1,
+        // `revision` is TEXT now (ADR 0095), so the literal needs no relabelling
+        // here — unlike the domain's `bigint`, which the codec encodes.
+        revision: '1',
       });
       updateApplied.resolve(undefined);
       await releaseBlocker.promise;
@@ -759,10 +785,9 @@ describe('PostgresSpaceRepository', () => {
     const blocker = db.transaction(async ({ orm }) => {
       await orm.public.Space.where({ id: OTHER_SPACE_ID }).update({
         document: { version: 1, title: 'Moved by the unlocked writer' },
-        // Prisma Next declares `int8` inputs as `number`, so the literal needs
-        // no relabelling here — unlike the adapter, which holds the same value
-        // as the domain's `bigint`.
-        revision: 1,
+        // `revision` is TEXT now (ADR 0095), so the literal needs no relabelling
+        // here — unlike the domain's `bigint`, which the codec encodes.
+        revision: '1',
       });
       updateApplied.resolve(undefined);
       await releaseBlocker.promise;
@@ -1283,20 +1308,11 @@ describe('PostgresSpaceRepository', () => {
     await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toBeUndefined();
   });
 
-  it('passes expected revisions beyond the safe integer range without narrowing', async () => {
-    await seed(SPACE_ID, [snapshot]);
-    const unsafeRevision = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
-
-    await expect(commitSpace(snapshot, unsafeRevision)).resolves.toEqual({
-      kind: 'conflict',
-      conflicts: [
-        {
-          spaceId: SPACE_ID,
-          current: { snapshot, revision: 0n, exportedRevision: null },
-        },
-      ],
-    });
-  });
+  // Moved to `repository-contract.ts` (ticket 22): "stores and commits a
+  // revision above Number.MAX_SAFE_INTEGER as canonical decimal text" proves
+  // the full round trip on both databases now that `revision` is TEXT on
+  // PostgreSQL too, superseding this file's weaker "does not narrow the
+  // expected revision" case.
 
   it('stores two Spaces of one aggregate that reuse a graph id', async () => {
     // A graph id is unique across the space that holds it and no wider — its
