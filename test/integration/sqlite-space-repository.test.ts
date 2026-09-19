@@ -1,5 +1,5 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { AggregateInvariantError, isAggregateInvariant } from '@project/persistence';
+import { AggregateInvariantError } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
@@ -559,6 +559,37 @@ describe('SqliteSpaceRepository', () => {
         .prepare("INSERT INTO spaces (id, document, updated_at) VALUES (?, ?, datetime('now'))")
         .run(OTHER_SPACE_ID, 'not json');
       connection
+        .prepare('INSERT INTO repository_state (singleton_id, meta_space_id) VALUES (1, ?)')
+        .run(OTHER_SPACE_ID);
+    } finally {
+      connection.close();
+    }
+
+    // Ticket 27: two raw-text statements on the transaction connection are what
+    // let the adapter's own per-row decode step catch this and wrap it as
+    // `AggregateInvariantError` — rather than the ORM's root-level json codec
+    // throwing first, before any intake of ours runs. See
+    // `.scratch/database-persistence/issues/27`.
+    await expectReadAndInitializeRefuse(repository);
+    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
+      kind: 'replaced',
+    });
+    await expectTruncatedTo(repository);
+  });
+
+  it('truncates a stored Space whose Thing document is not JSON', async () => {
+    const { path, repository, database } = await opened();
+    await database.orm.Space.create({
+      id: OTHER_SPACE_ID,
+      document: { version: 1, title: 'Orphan' },
+      revision: '0',
+    });
+    // Only a raw write can store Thing text that is not JSON; the ORM encodes
+    // `document` as JSON, same as for a Space's own document above.
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+    const connection = new DatabaseSync(path);
+    try {
+      connection
         .prepare(
           "INSERT INTO things (id, space_id, document, updated_at) VALUES (?, ?, ?, datetime('now'))",
         )
@@ -570,17 +601,26 @@ describe('SqliteSpaceRepository', () => {
       connection.close();
     }
 
-    // Both reads fail, and — unlike every sibling above — *not* as
-    // `AggregateInvariantError`: the row fails inside the driver's json codec,
-    // before any intake of ours runs. That is pinned rather than left to a bare
-    // `toThrow()`, which would pass on any throw at all and hide the difference.
-    // The difference matters: `space-host.ts` asks `isAggregateInvariant` to
-    // tell broken stored state from an unreachable database, so this defect is
-    // answered `persistence-unavailable` — try again later — and no retry cures
-    // it. See `.scratch/database-persistence/issues/27`.
-    await expect(repository.loadAggregate()).rejects.toBeInstanceOf(Error);
-    await expect(repository.loadAggregate()).rejects.not.toSatisfy(isAggregateInvariant);
-    await expect(repository.initializeAggregate(proposal)).rejects.toThrow();
+    await expectReadAndInitializeRefuse(repository);
+    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
+      kind: 'replaced',
+    });
+    await expectTruncatedTo(repository);
+  });
+
+  it('truncates a stored Space whose revision is not canonical', async () => {
+    const { repository, database } = await opened();
+    // A raw ORM write is required: the repository's own `toDatabaseRevision`
+    // refuses a non-canonical value before it ever reaches the column, so only
+    // a write that bypasses it can store one to read back.
+    await database.orm.Space.create({
+      id: OTHER_SPACE_ID,
+      document: { version: 1, title: 'Orphan' },
+      revision: '01',
+    });
+    await database.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+
+    await expectReadAndInitializeRefuse(repository);
     await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
       kind: 'replaced',
     });

@@ -33,6 +33,14 @@ import type {
 } from './space-repository';
 
 type Orm = SqliteDatabase['orm'];
+/**
+ * The transaction context `SqliteDatabase['transaction']`'s callback receives —
+ * `orm` as `Orm` above, plus the lower-level `sql` builder and the `execute`
+ * every scope (runtime, connection, transaction) carries. `loadEverySpace`
+ * takes this rather than `Orm` alone because it reads through `sql`/`execute`,
+ * on this same connection, rather than through `orm`.
+ */
+type Tx = Parameters<Parameters<SqliteDatabase['transaction']>[0]>[0];
 type JsonValue =
   null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
@@ -89,11 +97,14 @@ const toDatabaseRevision = (value: bigint): string => {
 };
 
 /**
- * SQLite stores Json as TEXT. A full-row read goes through the json codec and
- * answers an object; an `include`/`select` of `document` answers the stored
- * string (`test/integration/sqlite-space-repository.test.ts` initialize/load).
- * Both are valid driver output, so the adapter parses a string here rather
- * than asking the rest of the host to accept two shapes.
+ * SQLite stores Json as TEXT. A root-level read decodes it through the json
+ * codec and answers an object — the whole row, `.select('id', 'document')` and
+ * the root of an `.include()` read alike; only a field read as a *nested
+ * relation inside `.include()`* answers the stored string, which is how
+ * Things' documents arrive here
+ * (`test/integration/sqlite-space-repository.test.ts` initialize/load). Both
+ * are valid driver output, so the adapter parses a string here rather than
+ * asking the rest of the host to accept two shapes.
  */
 const storedJson = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -153,20 +164,101 @@ const loadStoredSpace = async (orm: Orm, id: UUID): Promise<LoadedSpace | undefi
   };
 };
 
-const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
-  const stored = await orm.Space.orderBy((space) => space.id.asc())
-    .include('things', (things) =>
-      things.select('id', 'document').orderBy((thing) => thing.id.asc()),
-    )
-    .all();
+/**
+ * Every stored Space, parsed.
+ *
+ * A row that fails to decode raises `AggregateInvariantError` rather than
+ * whatever the per-row step itself threw — a `SnapshotValidationError` from
+ * `parseSnapshot`, but just as much a `SyntaxError` from `storedJson`'s
+ * `JSON.parse` on text that is not JSON, or a `RangeError` from `toRevision`
+ * on a stored revision that is not canonical. All three are stored state no
+ * aggregate can be read from, and every caller of this function is an
+ * aggregate-level read whose failure a reader classifies: unconverted, a
+ * corrupt row reaches `src/http/space-host.ts` as an unreachable database and
+ * is answered `try again later` for a defect no later attempt cures, while
+ * start-up spends its whole retry budget on it. The original travels on
+ * `cause`, so the located intake prose is still there for an operator.
+ *
+ * The catch is unconditional by position rather than by type: the two
+ * statements below are this function's only I/O, and the per-row callback is
+ * synchronous, so nothing inside the `try` can fail for a transient reason.
+ * That property is what makes the breadth correct, and it is what an edit here
+ * has to preserve — I/O admitted into the `try` would be reported as broken
+ * stored state, which is the misclassification this function exists to avoid.
+ *
+ * Two raw-text statements, not one `include` read: whenever `document` is
+ * among the fields a root `orm.Space` read returns, it decodes through the
+ * driver's json codec — the whole row, `.select('id', 'document')` and the
+ * root of an `.include()` read alike, each answering a well-formed document as
+ * a decoded object rather than text and each throwing the codec's own
+ * `TypeError: Cannot read properties of undefined (reading 'codecId')` on text
+ * that is not JSON — because the ORM client decodes unconditionally by design
+ * (`sql-orm-client`'s README, "Codec Roundtrip": rows "carry plain field
+ * values"). Only a field read as a *nested relation inside `.include()`*
+ * skips that decode, which is how Things' documents already arrive; those
+ * three are every root-level read there is. A `.select()` that leaves
+ * `document` out is a different case and not an exception to any of this: it
+ * fetches no document, so there is nothing to decode, which is what lets
+ * `truncateHyperContent` and `replaceAggregate` read ids off rows this
+ * function cannot decode. So this reads through the lower-level
+ * `sql` builder instead, which can override a column's codec on the way out
+ * (`raw\`document\`.returns('sqlite/text@1')`), for both `spaces` and
+ * `things` — the low-level builder has no `.include()` to nest the second
+ * inside the first, so Things are grouped by `spaceId` here rather than by
+ * the query. Both statements run through `tx.sql`/`tx.execute` on the
+ * transaction's own connection (never a second one, which would sit outside
+ * its lock and could deadlock against it), inside the transaction every
+ * caller of this function already holds open, so the two see one snapshot —
+ * a SQLite transaction holds its lock from first read to commit. Neither
+ * statement itself is wrapped, so a connection failure cannot be misread as
+ * broken state, and nothing matches the driver codec's `TypeError` by
+ * message. This is what ticket 22's `SqlStore.readDocument` later lifts out
+ * for both databases.
+ *
+ * `loadSpace` and `listSpaces` keep the narrower error deliberately. One Space
+ * failing intake is that resource's answer to give, not evidence the aggregate
+ * cannot be read.
+ */
+const loadEverySpace = async (
+  database: SqliteDatabase,
+  tx: Tx,
+): Promise<readonly LoadedSpace[]> => {
+  const spacesPlan = tx.sql.spaces
+    .select((fields) => ({
+      id: fields.id,
+      document: database.raw`document`.returns('sqlite/text@1'),
+      revision: fields.revision,
+      exportedRevision: fields.exported_revision,
+    }))
+    .orderBy('id', { direction: 'asc' })
+    .build();
+  const spaceRows = await tx.execute(spacesPlan);
 
-  return stored.map((space) => {
+  const thingsPlan = tx.sql.things
+    .select((fields) => ({
+      id: fields.id,
+      spaceId: fields.space_id,
+      document: database.raw`document`.returns('sqlite/text@1'),
+    }))
+    .orderBy('id', { direction: 'asc' })
+    .build();
+  const thingRows = await tx.execute(thingsPlan);
+
+  const thingsBySpace = new Map<string, (typeof thingRows)[number][]>();
+  for (const thing of thingRows) {
+    const things = thingsBySpace.get(thing.spaceId);
+    if (things === undefined) thingsBySpace.set(thing.spaceId, [thing]);
+    else things.push(thing);
+  }
+
+  return spaceRows.map((space) => {
     try {
+      const things = thingsBySpace.get(space.id) ?? [];
       return {
         snapshot: parseSnapshot({
           id: space.id,
           document: storedJson(space.document),
-          things: space.things.map((thing) => ({
+          things: things.map((thing) => ({
             id: thing.id,
             document: storedJson(thing.document),
           })),
@@ -175,8 +267,7 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
         exportedRevision: toOptionalRevision(space.exportedRevision),
       };
     } catch (error) {
-      if (!(error instanceof SnapshotValidationError)) throw error;
-      throw new AggregateInvariantError(`Stored Space ${space.id} does not parse`, {
+      throw new AggregateInvariantError(`Stored Space ${space.id} does not decode`, {
         cause: error,
       });
     }
@@ -241,8 +332,12 @@ const truncateHyperContent = async (orm: Orm): Promise<void> => {
   }
 };
 
-const authoritativeAggregate = async (orm: Orm, metaSpaceId: UUID): Promise<LoadedAggregate> => {
-  const spaces = await loadEverySpace(orm);
+const authoritativeAggregate = async (
+  database: SqliteDatabase,
+  tx: Tx,
+  metaSpaceId: UUID,
+): Promise<LoadedAggregate> => {
+  const spaces = await loadEverySpace(database, tx);
   const intake = loadSpaceAggregate({
     metaSpaceId,
     snapshots: spaces.map(({ snapshot }) => snapshot),
@@ -256,13 +351,17 @@ const ascendingSnapshotId = (left: SpaceSnapshot, right: SpaceSnapshot): number 
   return left.id < right.id ? -1 : 1;
 };
 
-const replaceAllSpaces = async (orm: Orm, input: AggregateInput): Promise<LoadedAggregate> => {
-  await truncateHyperContent(orm);
+const replaceAllSpaces = async (
+  database: SqliteDatabase,
+  tx: Tx,
+  input: AggregateInput,
+): Promise<LoadedAggregate> => {
+  await truncateHyperContent(tx.orm);
   for (const snapshot of [...input.spaces].sort(ascendingSnapshotId)) {
-    await createStoredSpace(orm, snapshot);
+    await createStoredSpace(tx.orm, snapshot);
   }
-  await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: input.metaSpaceId });
-  return authoritativeAggregate(orm, input.metaSpaceId);
+  await tx.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: input.metaSpaceId });
+  return authoritativeAggregate(database, tx, input.metaSpaceId);
 };
 
 const writeSpaceDocumentUnderLock = async (
@@ -384,13 +483,18 @@ export class SqliteSpaceRepository implements SpaceRepository {
   }
 
   #loadAggregateUnserialised(): Promise<AggregateLoadResult> {
-    return this.#database.transaction(async ({ orm }) => {
-      const metaSpaceId = await lockMetaIdentity(orm);
+    return this.#database.transaction(async (tx) => {
+      const metaSpaceId = await lockMetaIdentity(tx.orm);
       if (metaSpaceId === undefined) {
-        if ((await loadEverySpace(orm)).length === 0) return { kind: 'uninitialized' };
+        if ((await loadEverySpace(this.#database, tx)).length === 0) {
+          return { kind: 'uninitialized' };
+        }
         throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
       }
-      return { kind: 'loaded', aggregate: await authoritativeAggregate(orm, metaSpaceId) };
+      return {
+        kind: 'loaded',
+        aggregate: await authoritativeAggregate(this.#database, tx, metaSpaceId),
+      };
     });
   }
 
@@ -405,18 +509,21 @@ export class SqliteSpaceRepository implements SpaceRepository {
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     try {
-      return await this.#database.transaction(async ({ orm }) => {
-        const metaSpaceId = await lockMetaIdentity(orm);
+      return await this.#database.transaction(async (tx) => {
+        const metaSpaceId = await lockMetaIdentity(tx.orm);
         if (metaSpaceId !== undefined) {
           return classifyInitializedAggregate(
             input,
-            await authoritativeAggregate(orm, metaSpaceId),
+            await authoritativeAggregate(this.#database, tx, metaSpaceId),
           );
         }
-        if ((await loadEverySpace(orm)).length > 0) {
+        if ((await loadEverySpace(this.#database, tx)).length > 0) {
           throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
         }
-        return { kind: 'initialized', aggregate: await replaceAllSpaces(orm, input) };
+        return {
+          kind: 'initialized',
+          aggregate: await replaceAllSpaces(this.#database, tx, input),
+        };
       });
     } catch (error) {
       if (!(error instanceof ThingOwnershipError) && !isUniqueViolation(error)) {
@@ -448,17 +555,17 @@ export class SqliteSpaceRepository implements SpaceRepository {
       snapshots: input.spaces,
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
-    return this.#database.transaction(async ({ orm }) => {
+    return this.#database.transaction(async (tx) => {
       // Read raw rather than through `loadEverySpace`: truncation replaces
       // stored state whether or not it parses (ADR 0094).
-      const metaSpaceId = await lockMetaIdentity(orm);
-      if (metaSpaceId === undefined && (await orm.Space.select('id').first()) === null) {
+      const metaSpaceId = await lockMetaIdentity(tx.orm);
+      if (metaSpaceId === undefined && (await tx.orm.Space.select('id').first()) === null) {
         return { kind: 'uninitialized' };
       }
       if (metaSpaceId !== expectedMetaSpaceId) {
         return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
       }
-      return { kind: 'replaced', aggregate: await replaceAllSpaces(orm, input) };
+      return { kind: 'replaced', aggregate: await replaceAllSpaces(this.#database, tx, input) };
     });
   }
 
@@ -504,24 +611,24 @@ export class SqliteSpaceRepository implements SpaceRepository {
   }
 
   #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
-    return this.#database.transaction(async ({ orm }) => {
-      const topologyPreserving = await commitTopologyPreservingUpdate(orm, request);
+    return this.#database.transaction(async (tx) => {
+      const topologyPreserving = await commitTopologyPreservingUpdate(tx.orm, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
-      const metaSpaceId = await lockMetaIdentity(orm);
-      const decision = decideCommit(request, metaSpaceId, await loadEverySpace(orm));
+      const metaSpaceId = await lockMetaIdentity(tx.orm);
+      const decision = decideCommit(request, metaSpaceId, await loadEverySpace(this.#database, tx));
       if (decision.kind === 'answer') return decision.result;
 
       for (const change of request.changes) {
         if (change.kind === 'delete') {
-          await orm.Thing.where({ spaceId: change.spaceId }).deleteAll();
-          const deleted = await orm.Space.where({ id: change.spaceId }).delete();
+          await tx.orm.Thing.where({ spaceId: change.spaceId }).deleteAll();
+          const deleted = await tx.orm.Space.where({ id: change.spaceId }).delete();
           if (deleted === null)
             throw new Error(`Space ${change.spaceId} disappeared during commit`);
         } else if (change.kind === 'create') {
-          await createStoredSpace(orm, change.snapshot);
+          await createStoredSpace(tx.orm, change.snapshot);
         } else {
           await replaceStoredSpace(
-            orm,
+            tx.orm,
             change.snapshot,
             change.expectedRevision,
             committedRevision(change),

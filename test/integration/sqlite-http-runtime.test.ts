@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { uuidSchema } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import {
   decodeCommitConflict,
@@ -314,5 +315,94 @@ describe('SQLite HTTP runtime', () => {
       kind: 'retryable-failure',
       code: 'unavailable',
     });
+  });
+
+  // Ticket 27: a real, non-mocked case of the "not JSON" flavour, driven
+  // through composition rather than a stubbed repository. Both of the host's
+  // `isAggregateInvariant` calls (`src/http/space-host.ts:85` re-reads once
+  // rather than rethrowing; `:149` classifies) are exercised for it: the read
+  // fails identically every time this row is behind it, so `GET /` answers
+  // `internal-error` — a permanent defect — and start-up's retry
+  // (`retryMetaSpaceEstablishment`) gives up after two consecutive invariant
+  // failures rather than spending its unbounded retry budget on it.
+  it('answers internal-error for a non-JSON stored Meta document, and start-up gives up establishing it', async () => {
+    const harness = await openSqliteRepository();
+    close = harness.close;
+    const spaceId = uuidSchema.parse('00000000-0000-4000-8000-0000000000aa');
+
+    // Store a row the ORM's json codec cannot decode, the same way
+    // `sqlite-space-repository.test.ts`'s "truncates a stored Space whose
+    // document is not JSON" does.
+    const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+    const connection = new DatabaseSync(harness.path);
+    try {
+      connection
+        .prepare("INSERT INTO spaces (id, document, updated_at) VALUES (?, ?, datetime('now'))")
+        .run(spaceId, 'not json');
+      connection
+        .prepare('INSERT INTO repository_state (singleton_id, meta_space_id) VALUES (1, ?)')
+        .run(spaceId);
+    } finally {
+      connection.close();
+    }
+
+    const reports: unknown[] = [];
+    let notifyGaveUp: (() => void) | undefined;
+    const gaveUp = new Promise<void>((resolve) => {
+      notifyGaveUp = resolve;
+    });
+    const report = (cause: unknown): void => {
+      reports.push(cause);
+      if (cause instanceof Error && cause.message.startsWith('Gave up establishing')) {
+        notifyGaveUp?.();
+      }
+    };
+
+    // The only row here whose `wait` resolves — the others park the retry on a
+    // promise that never settles — so it is the only one that lets the loop
+    // run. `retryMetaSpaceEstablishment` bounds nothing but *consecutive*
+    // invariant failures: a failure it classifies as anything else resets that
+    // counter and loops again, forever. So a classification regression would
+    // not just fail this expectation, it would leave the detached retry
+    // spinning against the SQLite file for the rest of the run, after the
+    // timeout failed the test. Counting the waits is what stops that: past the
+    // bound the retry is parked the way the other rows park it, and the race
+    // fails here instead of hanging.
+    const RETRY_WAIT_BOUND = 4;
+    let waits = 0;
+    let notifyRunaway: ((outcome: 'ran-away') => void) | undefined;
+    const ranAway = new Promise<'ran-away'>((resolve) => {
+      notifyRunaway = resolve;
+    });
+    const wait = (): Promise<void> => {
+      waits += 1;
+      if (waits > RETRY_WAIT_BOUND) {
+        notifyRunaway?.('ran-away');
+        return new Promise<void>(() => undefined);
+      }
+      return Promise.resolve();
+    };
+
+    const application = await createApp({
+      database: harness.database,
+      wait,
+      report,
+    });
+    const outcome = await Promise.race([gaveUp.then(() => 'gave-up' as const), ranAway]);
+    expect(outcome).toBe('gave-up');
+    expect(reports.length).toBeGreaterThanOrEqual(2);
+
+    const response = await application.resolveProductRequest(
+      '/',
+      'GET',
+      'application/problem+json',
+    );
+    if (response === undefined) throw new Error('Expected a response for /');
+    expect(response.status).toBe(500);
+    const problem = decodeProblemDetails(
+      // SAFETY: JSON.parse is the HTTP body boundary; decodeProblemDetails parses next.
+      JSON.parse(response.body ?? '') as unknown,
+    );
+    expect(problem.type).toBe(problemCatalogue['internal-error'].type);
   });
 });
