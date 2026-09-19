@@ -260,3 +260,45 @@ describe('the Meta step in the Open Spaces menu', () => {
     expect(rows.map((row) => row.textContent)).toEqual(['Meta', 'Home']);
   });
 });
+
+/** A backend that cannot load the Meta Space, as a dropped request would. */
+class MetaUnloadableBackend extends MemorySpaceBackend {
+  override loadSpace(id: Parameters<MemorySpaceBackend['loadSpace']>[0]) {
+    return id === META_ID
+      ? Promise.reject(new Error('The Meta Space is unavailable.'))
+      : super.loadSpace(id);
+  }
+}
+
+describe('choosing a closed Meta from the Open Spaces menu', () => {
+  /**
+   * The row the reader chose is named by Meta's title, so a failure to open it
+   * names Meta too rather than an anonymous Space.
+   */
+  it('names Meta by its title when it cannot be opened', async () => {
+    const backend = new MetaUnloadableBackend(
+      META_ID,
+      [meta, home, other].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    );
+    const reported: unknown[] = [];
+    const spaces = createOpenSpaces({
+      backend,
+      metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
+      newId: newUuid,
+      history: recordingHistory(),
+      reportObserverError: (error) => reported.push(error),
+    });
+    const initial = await spaces.open(HOME_ID);
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    await readyToAuthor();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Spaces. 1 open.' }));
+    fireEvent.click(
+      within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Meta' }),
+    );
+
+    expect(await screen.findByText('Meta could not be opened.')).toBeInTheDocument();
+    expect(screen.queryByText('That Space could not be opened.')).not.toBeInTheDocument();
+  });
+});

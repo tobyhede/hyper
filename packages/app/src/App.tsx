@@ -1562,7 +1562,11 @@ export const createApp = (
               onSwitchTo: (spaceId) => {
                 if (spaces === null) return;
                 const entry = spaces.entry(spaceId);
-                const title = entry?.session.getState().working.document.title ?? 'That Space';
+                // A closed Meta is the one row not backed by an open entry, and
+                // the menu named it by `metaStep`'s title, so its failure does too.
+                const title =
+                  entry?.session.getState().working.document.title ??
+                  (metaStep?.spaceId === spaceId ? metaStep.title : 'That Space');
                 setSpaceCommandBreak(null);
                 void (async () => {
                   try {
