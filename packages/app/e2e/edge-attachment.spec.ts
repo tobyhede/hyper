@@ -77,7 +77,9 @@ const near = (actual: Point, expected: Point, what: string): void => {
 };
 
 /** The fixture's Long Graph, and the Edge it draws from A to B. An Edge is
- *  identified by its Graph and its two endpoints (`graphRenderEdgeId`). */
+ *  identified by its Graph and its two endpoints (`graphRenderEdgeId`). Long is
+ *  the fixture's Active Graph, so its Edge takes the centre lane and connects
+ *  anchor to anchor (ADR 0100). */
 const LONG = '00000000-0000-4000-8000-000000000023';
 const THING_A = '00000000-0000-4000-8000-000000000002';
 const THING_B = '00000000-0000-4000-8000-000000000003';
@@ -175,7 +177,7 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   expect(paths.every((d) => d.length > 0 && !d.includes('NaN'))).toBe(true);
 });
 
-test('several Graphs over one pair of Things share the anchors and keep their colours', async ({
+test('several Graphs over one pair of Things run as parallel lines below the active one', async ({
   page,
 }) => {
   await page.goto('/');
@@ -183,31 +185,50 @@ test('several Graphs over one pair of Things share the anchors and keep their co
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  // Long, Mid and Short all carry A → B. Four anchors are Graph-independent, so
-  // every Graph joining the same two Things resolves to the same two points and
-  // the three lines coincide. **This is ADR 0087's stated cost**, accepted
-  // deliberately: colour and the Active Graph's emphasis are what separate them,
-  // and fanning is a decision to take against `.scratch/multiple-routes`'
-  // measured finding rather than a rule to build in now.
-  // The reference is Long's A → B by its own id, not whichever path happens to
-  // be drawn first. Taking `[0]` would keep passing if render order put some
-  // other coincident pair there, and would then report a count for an Edge the
-  // assertion message does not name.
-  const reference = await page
-    .locator(`.react-flow__edge[data-id="${A_TO_B}"] .react-flow__edge-path`)
-    .first()
-    .getAttribute('d');
-  expect(reference, 'Long carries A → B').not.toBeNull();
+  // Long, Mid and Short all carry A → B, and A and B sit level. Long is active,
+  // so it connects on the centre line (asserted against the anchors above) and
+  // carries the arrowhead; Mid and Short run below it (ADR 0100) — each a level
+  // line of its own, in its own colour, stopping short of both Things with no
+  // marker.
+  const lines = await page
+    .locator(`.react-flow__edge[data-id$="::${THING_A}::${THING_B}"]`)
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const path = element.querySelector('.react-flow__edge-path');
+        return {
+          id: element.getAttribute('data-id') ?? '',
+          d: path?.getAttribute('d') ?? '',
+          stroke: path === null ? '' : getComputedStyle(path).stroke,
+          marker: path?.getAttribute('marker-end') ?? null,
+        };
+      }),
+    );
+  expect(lines.length, 'three Graphs carry A → B').toBe(3);
+  expect(new Set(lines.map((line) => line.stroke)).size, 'each in its own colour').toBe(3);
 
-  const between = await page.locator('.react-flow__edge-path').evaluateAll((elements) =>
-    elements.map((element) => ({
-      d: element.getAttribute('d') ?? '',
-      stroke: getComputedStyle(element).stroke,
-    })),
-  );
-  const shared = between.filter((edge) => edge.d === reference);
-  expect(shared.length, 'three Graphs carry A → B').toBe(3);
-  expect(new Set(shared.map((edge) => edge.stroke)).size, 'each in its own colour').toBe(3);
+  const pointsOf = (d: string) => (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+  const levelOf = (points: number[]) => {
+    const ys = points.filter((_, index) => index % 2 === 1);
+    expect(Math.max(...ys) - Math.min(...ys), 'a level line').toBeLessThan(0.01);
+    return ys[0]!;
+  };
+  const activeLine = lines.find((line) => line.id === A_TO_B)!;
+  expect(activeLine.marker, 'the active line carries the arrowhead').not.toBeNull();
+  const active = pointsOf(activeLine.d);
+  const activeLevel = levelOf(active);
+
+  const others = lines.filter((line) => line.id !== A_TO_B);
+  const levels = new Set<number>();
+  for (const other of others) {
+    expect(other.marker, 'a line beside the active one carries no marker').toBeNull();
+    const line = pointsOf(other.d);
+    const level = levelOf(line);
+    expect(level, 'runs below the active line').toBeGreaterThan(activeLevel);
+    levels.add(Math.round(level));
+    expect(line[0]!, 'stops short of A').toBeGreaterThan(active[0]!);
+    expect(line[6]!, 'stops short of B').toBeLessThan(active[6]!);
+  }
+  expect(levels.size, 'each in its own lane').toBe(2);
 });
 
 test('a selected Edge draws its controls on the geometry it moved to', async ({ page }) => {

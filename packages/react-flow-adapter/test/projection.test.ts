@@ -5,6 +5,7 @@ import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
 import { projectThingNodes, projectGraphEdges, type GraphEmphasis } from '../src/index';
 import { referenceFile, thingFile } from './thing-files';
+import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
 function load(
@@ -294,16 +295,23 @@ describe('projectGraphEdges', () => {
   it('carries the Graph it belongs to and no geometry of its own', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
 
-    // The Edge data is the Graph id and nothing else (ADR 0086). It carried an
+    // The Edge data is the Graph id, its lane and its end trim, and no geometry
+    // (ADR 0086). Both fixture Graphs join the same two Things, Alt in the other
+    // direction: with nothing active the first keeps the centre and Alt takes
+    // the lane below it. Nothing is active, so both connect. It carried an
     // optional routed polyline until then, for waypoints a routing strategy
     // might have placed; nothing ever placed one, and a Diagram has nowhere to
     // store one, so the bezier the Edge draws between the two anchors it
     // attaches to is the only Edge geometry there has ever been.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
+      laneOffset: 0,
+      endTrim: 0,
     });
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
+      laneOffset: GRAPH_LANE_SPACING,
+      endTrim: 0,
     });
   });
 
@@ -342,5 +350,102 @@ describe('projectGraphEdges', () => {
       0,
     );
     expect(subtle.count).toBe(equal.count);
+  });
+
+  describe('Graphs joining the same two Things', () => {
+    const [A, B, C] = ['a', 'b', 'c'].map((id) => uuid(`00000000-0000-4000-8000-00000000010${id}`));
+    const [RED, BLUE, GREEN] = ['1', '2', '3'].map((id) =>
+      uuid(`00000000-0000-4000-8000-00000000020${id}`),
+    );
+    const edge = (graphId: string, source: string, target: string) => ({
+      id: `${graphId}::${source}::${target}`,
+      graphId: uuid(graphId),
+      source: uuid(source),
+      target: uuid(target),
+    });
+    const shared = [edge(RED!, A!, B!), edge(BLUE!, A!, B!), edge(GREEN!, B!, C!)];
+    const laneOf = (edges: ReturnType<typeof projectGraphEdges>, graphId: string) =>
+      edges.find((e) => e.id.startsWith(graphId))!.data!.laneOffset;
+
+    const dataOf = (edges: ReturnType<typeof projectGraphEdges>, graphId: string) =>
+      edges.find((e) => e.id.startsWith(graphId))!.data!;
+
+    it('puts the Active Graph on the centre, connecting, with the others below it', () => {
+      const edges = projectGraphEdges(shared, colors, {
+        activeGraphId: uuid(BLUE!),
+        emphasis: 'subtle',
+      });
+
+      expect(dataOf(edges, BLUE!)).toMatchObject({ laneOffset: 0, endTrim: 0 });
+      expect(dataOf(edges, RED!)).toMatchObject({
+        laneOffset: GRAPH_LANE_SPACING,
+        endTrim: DETACHED_END_TRIM,
+      });
+      // Green joins a different pair, so it is alone in its lane — and still
+      // stops short, being another Graph's.
+      expect(dataOf(edges, GREEN!)).toMatchObject({ laneOffset: 0, endTrim: DETACHED_END_TRIM });
+    });
+
+    it('splits the centre between both directions of a pair the Active Graph holds', () => {
+      const edges = projectGraphEdges(
+        [edge(RED!, A!, B!), edge(BLUE!, A!, B!), edge(BLUE!, B!, A!)],
+        colors,
+        { activeGraphId: uuid(BLUE!), emphasis: 'subtle' },
+      );
+      const byId = (source: string, target: string, graphId: string) =>
+        edges.find((e) => e.id === `${graphId}::${source}::${target}`)!;
+      const forward = byId(A!, B!, BLUE!);
+      const back = byId(B!, A!, BLUE!);
+
+      // A sorts before B, so A → B takes the negative side.
+      expect(forward.data).toMatchObject({ laneOffset: -GRAPH_LANE_SPACING / 2, endTrim: 0 });
+      expect(back.data).toMatchObject({ laneOffset: GRAPH_LANE_SPACING / 2, endTrim: 0 });
+      expect(forward.markerEnd).toMatchObject({ type: 'arrowclosed' });
+      expect(back.markerEnd).toMatchObject({ type: 'arrowclosed' });
+      expect(byId(A!, B!, RED!).data).toMatchObject({
+        laneOffset: (3 * GRAPH_LANE_SPACING) / 2,
+        endTrim: DETACHED_END_TRIM,
+      });
+      expect(byId(A!, B!, RED!).markerEnd).toBeUndefined();
+    });
+
+    it('draws an arrowhead on the connecting Edge alone', () => {
+      const edges = projectGraphEdges(shared, colors, {
+        activeGraphId: uuid(BLUE!),
+        emphasis: 'subtle',
+      });
+      const markerOf = (graphId: string) => edges.find((e) => e.id.startsWith(graphId))!.markerEnd;
+
+      expect(markerOf(BLUE!)).toMatchObject({ type: 'arrowclosed' });
+      expect(markerOf(RED!)).toBeUndefined();
+      expect(markerOf(GREEN!)).toBeUndefined();
+    });
+
+    it('moves the centre to whichever Graph becomes active', () => {
+      const centred = (activeGraphId: string) => {
+        const edges = projectGraphEdges(shared, colors, {
+          activeGraphId: uuid(activeGraphId),
+          emphasis: 'subtle',
+        });
+        return [RED!, BLUE!].filter((graphId) => laneOf(edges, graphId) === 0);
+      };
+
+      expect(centred(RED!)).toEqual([RED]);
+      expect(centred(BLUE!)).toEqual([BLUE]);
+    });
+
+    it('connects every Edge while no Graph is active', () => {
+      const edges = projectGraphEdges(shared, colors, { emphasis: 'equal' });
+      expect(edges.map((e) => e.data!.endTrim)).toEqual([0, 0, 0]);
+    });
+
+    it('draws the Active Graph last, over the lanes it converges with', () => {
+      const edges = projectGraphEdges(shared, colors, {
+        activeGraphId: uuid(RED!),
+        emphasis: 'subtle',
+      });
+
+      expect(edges.map((e) => e.data!.graphId)).toEqual([BLUE, GREEN, RED]);
+    });
   });
 });

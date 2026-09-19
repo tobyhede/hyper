@@ -1,7 +1,6 @@
 import type { ComponentProps } from 'react';
 import {
   BaseEdge,
-  getBezierPath,
   useInternalNode,
   type Edge,
   type EdgeProps,
@@ -16,6 +15,7 @@ import {
   type AnchorRect,
   type EdgeAttachment,
 } from './edge-attachment';
+import { laneBezier } from './edge-lanes';
 
 /**
  * React Flow custom edge that draws a bezier between the two handles.
@@ -32,6 +32,19 @@ import {
  */
 export type RoutedEdgeData = {
   graphId: GraphId;
+  /**
+   * How far below (or right of) where its two anchors put it this Edge is
+   * drawn, whole — above (or left) when negative — so the Edges of several
+   * Graphs joining the same two Things run as parallel lines rather than over
+   * each other. Zero for a lone Edge.
+   */
+  laneOffset: number;
+  /**
+   * What fraction of its length the Edge leaves undrawn at each end. Zero for
+   * an Edge that connects; a Graph other than the Active one runs beside it and
+   * stops short.
+   */
+  endTrim: number;
 };
 
 /**
@@ -52,25 +65,14 @@ export interface RoutedEdgeGeometry {
  *
  * Takes the attachment rather than the Edge's props: what the props answer is
  * where the *projected* handles were, and the side is chosen from where the two
- * Things are now (ADR 0087).
+ * Things are now (ADR 0087). The lane is the projection's, because only the
+ * projection sees every Edge that shares this one's pair.
  */
-function routedEdgeGeometry({
-  sourceX,
-  sourceY,
-  sourcePosition,
-  targetX,
-  targetY,
-  targetPosition,
-}: EdgeAttachment): RoutedEdgeGeometry {
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-  return { path, labelX, labelY };
+function routedEdgeGeometry(
+  attachment: EdgeAttachment,
+  { laneOffset, endTrim }: Pick<RoutedEdgeData, 'laneOffset' | 'endTrim'>,
+): RoutedEdgeGeometry {
+  return laneBezier(attachment, laneOffset, endTrim);
 }
 
 /**
@@ -83,7 +85,7 @@ function routedEdgeGeometry({
  * the same question, and the two would disagree the day the curve changed.
  */
 export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedEdgeGeometry {
-  return routedEdgeGeometry(useEdgeAttachment(props));
+  return routedEdgeGeometry(useEdgeAttachment(props), props.data ?? { laneOffset: 0, endTrim: 0 });
 }
 
 /**

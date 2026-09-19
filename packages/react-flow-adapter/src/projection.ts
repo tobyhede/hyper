@@ -1,4 +1,4 @@
-import type { Edge, Node, NodeHandle } from '@xyflow/react';
+import type { Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import type {
@@ -14,8 +14,9 @@ import type {
   LayoutStrategyGraph,
   Space,
 } from '@project/graph';
-import type { RoutedEdgeData } from './RoutedEdge';
+import type { RoutedEdgeData, RoutedFlowEdge } from './RoutedEdge';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
+import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
 
 const FALLBACK_COLOR = '#8a94a6';
 
@@ -411,32 +412,49 @@ export function projectGraphEdges(
   graphRenderEdges: readonly GraphRenderEdge[],
   colors: ColorByGraphId,
   options: ProjectGraphEdgesOptions = {},
-): Edge[] {
+): RoutedFlowEdge[] {
   const activeGraphId = options.activeGraphId ?? null;
   const emphasis = options.emphasis ?? 'equal';
 
-  return graphRenderEdges.map((edge) => {
+  const lanes = graphLanes(graphRenderEdges, activeGraphId);
+
+  // React Flow paints Edges in the order it is given them, so the Active Graph
+  // goes last: wherever it crosses another Graph's Edge, its stroke is the one
+  // on top.
+  const drawn = graphRenderEdges.map((edge) => {
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
     const emphasized = isActiveGraph || emphasis === 'equal';
+    const lane = lanes.get(edge.id) ?? { offset: 0, connects: true };
 
-    const data: RoutedEdgeData = { graphId: edge.graphId };
+    const data: RoutedEdgeData = {
+      graphId: edge.graphId,
+      laneOffset: lane.offset,
+      endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
+    };
 
-    return {
+    const flowEdge: RoutedFlowEdge = {
       id: edge.id,
       // A custom edge, drawing a bezier between the handles React Flow resolved.
       type: 'routed',
       source: edge.source,
       target: edge.target,
-      className: `rf-graph-edge rf-graph-edge--${edge.graphId}`,
+      className: `rf-graph-edge rf-graph-edge--${edge.graphId}${isActiveGraph ? ' rf-graph-edge--active' : ''}`,
       animated: emphasized,
       style: {
         stroke: color,
         strokeWidth: isActiveGraph ? 3 : 2,
         opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY[emphasis],
       },
-      markerEnd: { type: MarkerType.ArrowClosed, color },
       data,
     };
+    // The arrowhead says where the Graph goes, so it is the connecting Edge's
+    // alone: a Graph running beside the active one stops short and carries none.
+    if (lane.connects) flowEdge.markerEnd = { type: MarkerType.ArrowClosed, color };
+    return { flowEdge, onTop: isActiveGraph };
   });
+  return [
+    ...drawn.filter(({ onTop }) => !onTop).map(({ flowEdge }) => flowEdge),
+    ...drawn.filter(({ onTop }) => onTop).map(({ flowEdge }) => flowEdge),
+  ];
 }
