@@ -84,7 +84,6 @@ const openSpaceThing = (
     showContent: false,
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
-    emphasis: 'equal',
   },
 });
 
@@ -287,7 +286,6 @@ describe('embedded open Space Thing discovery', () => {
         showContent: false,
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
-        emphasis: 'equal',
       },
     };
     const drawn = embeddedDiagram({
@@ -370,7 +368,6 @@ describe('embedded open Space Thing discovery', () => {
         showContent: false,
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
-        emphasis: 'equal',
       },
     };
     expect(

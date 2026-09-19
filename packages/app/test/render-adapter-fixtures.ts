@@ -19,7 +19,6 @@ export function node(id: string, x: number, y: number, title = id): ThingFlowNod
       showContent: false,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
-      emphasis: 'equal',
     },
   };
 }

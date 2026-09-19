@@ -21,20 +21,11 @@ import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
 const FALLBACK_COLOR = '#8a94a6';
 
 /**
- * How strongly graphs other than the active one recede.
- *
- * A level rather than a boolean, because a view may want more than on/off — and
- * because the adapter should not know that the app has modes. It once carried a
- * third, 'strong', for dimming the graph while presenting; presenting no longer
- * draws the graph at all (ADR 0008), so that level had no caller.
+ * Opacity of the Graphs that are not the active one, while one is. With no
+ * Graph active every Graph is drawn at full strength; activating one recedes
+ * the rest rather than hiding them.
  */
-export type GraphEmphasis = 'equal' | 'subtle';
-
-/** Opacity applied to graphs that are not the active one. */
-export const OTHER_GRAPH_OPACITY = {
-  equal: 1,
-  subtle: 0.35,
-} satisfies Record<GraphEmphasis, number>;
+export const OTHER_GRAPH_OPACITY = 0.35;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
  *  new title was accepted — the same contract `CanvasThing`'s editor reads, where
@@ -225,7 +216,6 @@ export type ThingNodeData = {
   activeGraphId: GraphId | null;
   /** The active Graph's colour, used by graph-independent authoring handles. */
   activeGraphColor: string;
-  emphasis: GraphEmphasis;
   /**
    * Whether this Thing leans because a Thing framing it is being dragged.
    *
@@ -264,7 +254,6 @@ export interface ProjectThingNodesOptions {
   activeGraphId?: GraphId | null;
   /** The active Graph's resolved colour for graph authoring controls. */
   activeGraphColor?: string;
-  emphasis?: GraphEmphasis;
   /** The laid-out graph; the things' positions come from here when present. */
   strategyGraph?: LayoutStrategyGraph;
   /** Restrict the projection to these thing ids (e.g. one graph's things). */
@@ -325,7 +314,6 @@ export function projectThingNodes(
   const activeThingId = options.activeThingId ?? null;
   const showActiveThingContent = options.showActiveThingContent ?? false;
   const activeGraphId = options.activeGraphId ?? null;
-  const emphasis = options.emphasis ?? 'equal';
   const visible = options.thingIds ? new Set(options.thingIds) : null;
   const laidOut = new Map((options.strategyGraph?.things ?? []).map((t) => [t.id, t]));
 
@@ -360,7 +348,6 @@ export function projectThingNodes(
         showContent,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
-        emphasis,
       },
       className: active ? 'rf-thing-node rf-thing-node--active' : 'rf-thing-node',
     };
@@ -397,8 +384,6 @@ export function projectThingNodes(
 export interface ProjectGraphEdgesOptions {
   /** The graph to emphasise, if any. */
   activeGraphId?: GraphId | null;
-  /** How strongly the other graphs recede. */
-  emphasis?: GraphEmphasis;
 }
 
 /**
@@ -414,7 +399,6 @@ export function projectGraphEdges(
   options: ProjectGraphEdgesOptions = {},
 ): RoutedFlowEdge[] {
   const activeGraphId = options.activeGraphId ?? null;
-  const emphasis = options.emphasis ?? 'equal';
 
   const lanes = graphLanes(graphRenderEdges, activeGraphId);
 
@@ -424,7 +408,7 @@ export function projectGraphEdges(
   const drawn = graphRenderEdges.map((edge) => {
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
-    const emphasized = isActiveGraph || emphasis === 'equal';
+    const emphasized = isActiveGraph || activeGraphId === null;
     const lane = lanes.get(edge.id) ?? { offset: 0, connects: true };
 
     const data: RoutedEdgeData = {
@@ -444,7 +428,7 @@ export function projectGraphEdges(
       style: {
         stroke: color,
         strokeWidth: isActiveGraph ? 3 : 2,
-        opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY[emphasis],
+        opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY,
       },
       data,
     };

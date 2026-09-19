@@ -108,7 +108,6 @@ const node = (
     showContent: false,
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
-    emphasis: 'equal',
   },
 });
 

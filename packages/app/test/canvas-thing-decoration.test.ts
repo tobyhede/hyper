@@ -55,7 +55,6 @@ const projectionNode = (
     showContent: false,
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
-    emphasis: 'equal',
   },
 });
 
