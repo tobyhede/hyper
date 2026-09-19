@@ -412,8 +412,11 @@ export const createApp = (
             // it has, and a Spaces read that failed is not a refusal of
             // anything the reader asked for.
             reportBreak(failure);
-            // The epoch goes back, so the next showing retries rather than
-            // standing on an empty list until another Space is framed.
+            // The epoch goes back, so this Space's next showing retries rather
+            // than standing on an empty list until the Space set changes. While
+            // it stays shown nothing retries; Meta's row does not depend on it
+            // (`space-set-freshness.test.tsx`, "lists a closed Meta by its title
+            // when the Space list read fails").
             readSpacesEpoch.current = null;
             if (latestSpacesRead.current === token) setMetaSpaces([]);
           }
@@ -1386,17 +1389,26 @@ export const createApp = (
             from: openSpacesState.openedFrom.get(entry.id) ?? null,
             persistence: entry.session.getState().persistence,
           })),
+          spaces?.metaSpaceId ?? null,
         ),
-      [openSpacesState],
+      [openSpacesState, spaces],
     );
     const openerId = openSpacesState.openedFrom.get(renderedSpace.id) ?? null;
-    const parentSpace = useMemo(() => {
+    const opener = useMemo(() => {
       if (openerId === null) return null;
       const entry = openSpacesState.entries.find((candidate) => candidate.id === openerId);
       return entry === undefined
         ? null
         : { spaceId: openerId, title: entry.session.getState().working.document.title };
     }, [openerId, openSpacesState]);
+    /**
+     * The Meta Space, named by its own title whether or not it is open, from
+     * Open Spaces rather than from `metaSpaces`: that list is a repository read
+     * that may not have answered, or may have failed, and Meta's row must not
+     * wait on it. Read on every render rather than memoized, because the title
+     * is the live session's while Meta is open and nothing here is keyed on it.
+     */
+    const meta = spaces === null ? null : spaces.meta();
 
     /**
      * The one Diagram refusal there is anywhere to put, now that Add Diagram and
@@ -1535,8 +1547,8 @@ export const createApp = (
             space: {
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,
-              isMeta: renderedSpace.id === spaces?.metaSpaceId,
-              parent: parentSpace,
+              meta,
+              opener,
               openSpaces: openSpaceRows,
               // Behind `chromeTitleEdit` exactly as the Diagram and Graph names
               // are below, and for the one reason the guard exists: all three
@@ -1551,12 +1563,20 @@ export const createApp = (
               onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
               onSwitchTo: (spaceId) => {
                 if (spaces === null) return;
+                const entry = spaces.entry(spaceId);
+                // A closed Meta is the one row not backed by an open entry, and
+                // the menu named it by `meta()`'s title, so its failure does too.
                 const title =
-                  spaces.entry(spaceId)?.session.getState().working.document.title ?? 'That Space';
+                  spaceId === spaces.metaSpaceId
+                    ? spaces.meta().title
+                    : (entry?.session.getState().working.document.title ?? 'That Space');
                 setSpaceCommandBreak(null);
                 void (async () => {
                   try {
-                    await spaces.switchTo(spaceId);
+                    // The Open Spaces menu lists Meta whether or not it is open.
+                    // Choosing it from the menu is not a crossing, so a Meta
+                    // that is not open yet is opened directly, with no Opener.
+                    await (entry === undefined ? spaces.open(spaceId) : spaces.switchTo(spaceId));
                   } catch (failure) {
                     reportBreak(failure);
                     setSpaceCommandBreak(`${title} could not be opened.`);

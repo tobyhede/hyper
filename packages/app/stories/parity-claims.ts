@@ -398,7 +398,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'A Space entered from another names that one Space as a step back, marked with OPEN, and holds every other open Space behind the Open Spaces disclosure beside it. The current Meta Space also draws OPEN, while an ordinary Space draws a cube.',
+      'A Space entered from another names that one Space as its Opener, marked with OPEN, and holds every other open Space behind the Open Spaces disclosure beside it. The Spaces trigger draws OPEN, and the Space you are in draws a cube whichever Space it is, Meta included.',
   },
   {
     id: 'command-dock-keeps-its-names-on-a-side-edge',
@@ -406,6 +406,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'DockedLeft',
     claim:
       'Docked to a side edge the surface is a column of named rows rather than a rail of glyphs, and its disclosures open away from that edge into the canvas.',
+  },
+  {
+    id: 'command-dock-always-reaches-meta',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'NewSpace',
+    claim:
+      'The Open Spaces menu is drawn in every Space and lists the Meta Space first by its own title, marked with OPEN, with a cube on every other open Space, and choosing it opens Meta even when Meta is not open.',
   },
   {
     id: 'command-dock-names-a-new-spaces-initial-diagram-and-graph',

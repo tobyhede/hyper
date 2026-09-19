@@ -465,20 +465,20 @@
   gap: 2px;
 }
 
-/* The parent step and the Open Spaces menu are the trail's two list items, and the
+/* The Opener control and the Open Spaces menu are the trail's two list items, and the
    grid places **those** — a class on the button inside an `li` is a class on
    something the grid never sees. So `command-dock__crumb` and
    `command-dock__disclose` sit on the `BreadcrumbItem`, and the placement below
    is all either of them is for.
 
-   **The parent's ink is not here**, and neither is the open treatment every
+   **The Opener's ink is not here**, and neither is the open treatment every
    disclosure in the Dock takes. Both were declarations over controls the shared
    `Button` recipe draws, so this sheet was a second owner of that recipe's
    appearance — and each won only by being loaded after Tailwind's output rather
    than by saying anything stronger. They are the `receded` variant and
    `quietFeedback`'s `aria-expanded` state in `@project/ui` now.
 
-   The parent step uses the OPEN Parent/Meta mark, recedes below the current
+   The Opener control uses the OPEN mark Meta shares, recedes below the current
    Space's tone, and keeps the Divider at the cluster boundary. The regular
    Space uses a cube; geometry belongs to the shared icons, not this sheet. */
 .command-dock__crumb {
@@ -513,7 +513,7 @@
 /* The Open Spaces menu's trigger — a chevron, like every other disclosure in the Dock.
 
    It was `⋯` while it stood for hidden steps of a trail. It stopped standing for
-   that when the trail became one named parent and a list of the open set: what
+   that when the trail became one named Opener and a list of the open set: what
    it discloses is a set, which is what a chevron says everywhere else here, and
    an ellipsis beside four chevrons was the one mark a reader had to learn
    separately.
@@ -528,7 +528,7 @@
   color: var(--muted-foreground);
 }
 
-/* The parent's own row: glyph and name at one weight, so the two follow the
+/* The Opener's own row: glyph and name at one weight, so the two follow the
    button's colour together. */
 .command-dock__crumb .command-name {
   margin-inline-start: 6px;

@@ -785,7 +785,7 @@ test('an embedded Thing can move, open with the keyboard and resize in its targe
  * **The bar names one step up rather than a whole path**, which is the
  * arrangement's answer to width rather than an omission: the step a reader
  * reaches for is the one above them, and everything further up is behind the
- * Open Spaces disclosure. The shared OPEN mark identifies Parent/Meta and the
+ * Open Spaces disclosure. The shared OPEN mark identifies Opener/Meta and the
  * cube identifies an ordinary Space, including when opened directly.
  */
 test(
@@ -795,21 +795,21 @@ test(
     await openSpaceThingOnItsDiagram(page);
 
     // Two Spaces open and neither entered, so the bar carries the Open Spaces
-    // menu and no parent step: there is nothing above `Diagram fixture`.
+    // menu and no Opener control: there is nothing above `Diagram fixture`.
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
     await switchToSpace(page, 'Space 1');
 
     // Entered, so the crossing is named — and named as the Space, with the
-    // parent glyph carrying the relation rather than a word.
-    const parent = page.getByRole('button', { name: 'Go to Diagram fixture' });
-    await expect(parent).toBeVisible();
+    // OPEN mark carrying the relation rather than a word.
+    const opener = page.getByRole('button', { name: 'Go to Diagram fixture' });
+    await expect(opener).toBeVisible();
     // The mark contributes nothing to the name: the OPEN mark is `aria-hidden`, so
     // the control is named for the Space alone and the glyph carries the
     // relation to it.
-    await expect(parent).toHaveAccessibleName('Go to Diagram fixture');
-    await expect(parent).toContainText('Diagram fixture');
-    await expect(parent.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
-    await expect(parent.locator('svg[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
+    await expect(opener).toHaveAccessibleName('Go to Diagram fixture');
+    await expect(opener).toContainText('Diagram fixture');
+    await expect(opener.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
+    await expect(opener.locator('svg[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
     await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
     await expect(showingSpace(page).getByRole('img')).toHaveCount(0);
     await expect(showingSpace(page).locator('[title]')).toHaveCount(0);
@@ -820,10 +820,13 @@ test(
 
     await expect(showingSpace(page)).toContainText('Diagram fixture');
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
-    await expect(showingSpace(page).locator('[data-icon="parent"]')).toHaveAttribute(
-      'viewBox',
-      '0 0 16 16',
-    );
+    // Meta is the Space you are in, so it draws the cube; the OPEN mark is the
+    // Spaces trigger's.
+    await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    await expect(showingSpace(page).locator('[data-icon="parent"]')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).locator('[data-icon="parent"]'),
+    ).toBeVisible();
 
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
@@ -837,6 +840,38 @@ test(
     await page.goto(ordinarySpaceUrl);
     await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+  },
+);
+
+/**
+ * Meta is always one choice away, from every Space.
+ *
+ * A Space reached by its own address has no Opener, and after a reload
+ * Meta is not open at all. The Open Spaces menu is drawn anyway, lists Meta
+ * first by its own title, and choosing it opens Meta.
+ */
+test(
+  'the Open Spaces menu lists Meta first and opens it from a Space opened by its own address',
+  { tag: '@parity:command-dock-always-reaches-meta' },
+  async ({ page }) => {
+    await openSpaceThingOnItsDiagram(page);
+    await switchToSpace(page, 'Space 1');
+    await page.goto(page.url());
+    await expect(showingSpace(page)).toContainText('Space 1');
+    await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Spaces. 1 open.' }).click({ delay: 120 });
+    const rows = page.getByRole('menu').getByRole('menuitemradio');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toHaveAccessibleName('Diagram fixture');
+    await expect(rows.first().locator('svg[data-icon="parent"]')).toBeVisible();
+    await expect(rows.nth(1)).toHaveAccessibleName('Space 1');
+    await expect(rows.nth(1).locator('svg[data-icon="space"]')).toBeVisible();
+
+    await rows.first().click();
+    await expect(showingSpace(page)).toContainText('Diagram fixture');
+    await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Spaces. 2 open.' })).toBeVisible();
   },
 );
 

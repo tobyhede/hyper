@@ -139,6 +139,7 @@ it('offers Exit on a Space opened by its own address, which has no opener', asyn
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: SPACE_ID,
+    metaSpaceTitle: meta.document.title,
     newId: newUuid,
     history: recordingHistory(),
   });
@@ -181,6 +182,7 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: SPACE_ID,
+    metaSpaceTitle: first.document.title,
     newId: newUuid,
     history: recordingHistory(),
   });

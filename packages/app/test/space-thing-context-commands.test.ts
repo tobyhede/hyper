@@ -84,6 +84,7 @@ async function setup() {
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: META,
+    metaSpaceTitle: meta.document.title,
     newId: newUuid,
     history: recordingHistory(),
   });

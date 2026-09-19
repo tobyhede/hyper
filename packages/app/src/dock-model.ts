@@ -72,11 +72,9 @@ export const unwellReport = (persistence: SpaceSessionState['persistence']): str
  * which is the case a single session-wide persistence field could not express at
  * all.
  *
- * One derivation rather than one per consumer, because two of them now read it
- * and they must not disagree: {@link openSpacesName} and the dot say *that*
- * something needs attention, and {@link trailControls} decides whether the
- * control carrying both is drawn. A surface that counted separately for the mark
- * and for the disclosure could withhold the control that draws the mark.
+ * One derivation rather than one per consumer, because two of them read it and
+ * they must not disagree: {@link openSpacesName} and the dot on the trigger both
+ * say *that* something needs attention.
  */
 export const unwellElsewhere = (openSpaces: readonly OpenRow[], currentSpaceId: UUID): number =>
   openSpaces.filter(
@@ -331,8 +329,8 @@ export const nearestAlong = (bounds: DockBox, box: DockBox, edge: DockEdge): Doc
 
 /* ------------------------------------------------------------ open Spaces */
 
-/** A Space the Dock names: the parent step, and every row of the Open Spaces menu. */
-export interface SpaceStep {
+/** A Space the Dock names: the Opener, and every row of the Open Spaces menu. */
+export interface NamedSpace {
   readonly spaceId: UUID;
   readonly title: string;
 }
@@ -346,7 +344,7 @@ export interface SpaceStep {
  * Open Spaces menu indents by, and it is derived from `from` rather than stored, so a
  * row cannot claim a depth its opener does not give it.
  */
-export interface OpenRow extends SpaceStep {
+export interface OpenRow extends NamedSpace {
   /** What this Space's row has to say about it, which is nothing unless it is unwell. */
   readonly depth: number;
   readonly persistence: SpaceSessionState['persistence'];
@@ -368,7 +366,7 @@ export interface OpenSpaceRow {
  * flat list is what lets the Open Spaces menu say *where* a Space is as well as that it
  * is open. A flat list would put a Space three crossings down beside the root
  * with nothing to tell them apart but their names, which is exactly the
- * confusion the bar's parent step exists to remove.
+ * confusion the bar's Opener control exists to remove.
  *
  * Siblings keep the order the caller lists them in, which is the order the
  * reader opened them. Nothing sorts them here: a Open Spaces menu that reordered itself as
@@ -378,87 +376,30 @@ export interface OpenSpaceRow {
  * total: entries begin that way and Open Spaces re-homes the rows below
  * the Space it closes. Without that invariant this drops a Space whose opener
  * exited — still open, and not in the list that is the only way back to it.
+ *
+ * **Meta is the one exception to both rules**: it draws first at the root
+ * whatever opened it, with what was Entered from it beneath. A Space Thing may
+ * target Meta, so Meta can have an Opener, and hung by it Meta drew under that
+ * Space where the menu promises it on top (`dock-open-tree.test.ts`).
  */
-export const openTree = (rows: readonly OpenSpaceRow[]): readonly OpenRow[] => {
+export const openTree = (
+  rows: readonly OpenSpaceRow[],
+  metaSpaceId: UUID | null,
+): readonly OpenRow[] => {
+  const parent = (row: OpenSpaceRow): UUID | null =>
+    row.spaceId === metaSpaceId ? null : row.from;
   const below = (from: UUID | null, depth: number): readonly OpenRow[] =>
     rows
-      .filter((row) => row.from === from)
+      .filter((row) => parent(row) === from)
+      .sort(
+        (left, right) =>
+          Number(right.spaceId === metaSpaceId) - Number(left.spaceId === metaSpaceId),
+      )
       .flatMap((row) => [
         { spaceId: row.spaceId, title: row.title, depth, persistence: row.persistence },
         ...below(row.spaceId, depth + 1),
       ]);
   return below(null, 0);
-};
-
-/**
- * What the bar draws above the Space you are in.
- *
- * `none` is the session that has never crossed and has nowhere to go; the
- * other three are the parent step, the Open Spaces menu, or both.
- */
-export type TrailControls = 'none' | 'open-spaces-menu' | 'parent' | 'parent-and-open-spaces-menu';
-
-/**
- * **The bar names one step and the Open Spaces menu holds the rest.**
- *
- * Settled against nine candidates drawn at one, three and six crossings in both
- * dock orientations; the sheet that drew them is gone and the reasoning is in
- * `.scratch/command-dock/issues/01-settle-the-three-open-decision-sheets.md`.
- * Depth costs width and the Dock is furniture at the edge of a canvas rather
- * than a page header, so every scheme that spends a mark per crossing loses the
- * same way: by four crossings it is a row of collapsed glyphs saying "two
- * Spaces, and you will have to hover to learn which". One named step — the
- * Space you came from, which is the one a reader actually reaches for — costs a
- * word, and everything above it moves behind the Open Spaces menu.
- *
- * What that buys beyond width is the thing no trail could offer: the Open Spaces menu
- * lists the **open set** rather than the path, so a Space opened from the root
- * and left behind is in it beside the branch you are standing on. A trail can
- * only show what is above you, so an open Space that is not an ancestor had
- * nowhere to be and leaving one meant losing it.
- *
- * **The Open Spaces menu discloses whatever the bar is not already naming**, which is
- * why the count it is compared against is 1 at the root and 2 below it: the bar
- * names this Space always, and the parent step when there is one. So the
- * Open Spaces menu arrives at the Space after those — the third ordinarily, the second
- * at the root. It stays at the root rather than vanishing there, because a
- * Open Spaces menu reachable from everywhere except the top makes the top the one place
- * a reader cannot get back from.
- *
- * **And it arrives early when a Space the bar is not naming is unwell.** ADR
- * 0082 binds two things at once here: an unwell member of the open set must be
- * distinguishable from a well one, and "a standing failure announces itself
- * rather than waiting to be opened — a report you have to go and find is not a
- * report". Both of those ride on this control — the count is in its accessible
- * name and the dot is on its face, and the row inside it is what says *which* —
- * so withholding it withholds the report. The width rule had one shape where
- * that bit: two Spaces open with the reader in the child, where the bar names
- * the parent, the Open Spaces menu is withheld as redundant, and the parent step
- * draws a name and no state. A parent whose commit had failed then showed
- * nothing anywhere, and there was no chevron to go and find it behind either.
- *
- * The report wins for as long as it stands and the bar returns to two controls
- * when the Space recovers. That is a control appearing under the reader, which
- * this surface otherwise avoids — but a set that gains a way in is not the set
- * changing shape under a reader using it, and the alternative is a failure the
- * surface never mentions. Marking the parent step itself was the other candidate
- * and loses on consistency: it would be the one Space in the set whose state is
- * read off a second control, and only in the shape where this one is absent.
- *
- * `unwell` is a count and not a flag so the caller can spend the same number on
- * the name; `unwellElsewhere` is where it comes from, and passing it in rather
- * than deriving it here is what keeps the mark and the control that carries it
- * reading one answer.
- */
-export const trailControls = (
-  parent: SpaceStep | null,
-  openSpaces: readonly OpenRow[],
-  unwell: number,
-): TrailControls => {
-  const named = parent === null ? 1 : 2;
-  const openSpacesMenu = openSpaces.length > named || unwell > 0;
-  if (parent === null) return openSpacesMenu ? 'open-spaces-menu' : 'none';
-  return openSpacesMenu ? 'parent-and-open-spaces-menu' : 'parent';
 };
 
 /**
