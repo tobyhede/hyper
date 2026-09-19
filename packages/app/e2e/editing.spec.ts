@@ -2344,7 +2344,7 @@ test('a selected Thing exposes four circular handles coloured as the active Grap
   await expect(handles.first()).toHaveCSS('width', '24px');
   await expect(handles.first()).toHaveCSS('height', '24px');
   const graphStroke = await page
-    .locator('.rf-graph-edge')
+    .locator('.rf-graph-edge--active')
     .filter({ has: page.locator('.react-flow__edge-path') })
     .first()
     .locator('.react-flow__edge-path')
