@@ -795,7 +795,7 @@ test(
     await openSpaceThingOnItsDiagram(page);
 
     // Two Spaces open and neither entered, so the bar carries the Open Spaces
-    // menu and no parent step: there is nothing above `Diagram fixture`.
+    // menu and no Opener control: there is nothing above `Diagram fixture`.
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
     await switchToSpace(page, 'Space 1');
 
@@ -846,7 +846,7 @@ test(
 /**
  * Meta is always one choice away, from every Space.
  *
- * A Space reached by its own address has no parent step, and after a reload
+ * A Space reached by its own address has no Opener, and after a reload
  * Meta is not open at all. The Open Spaces menu is drawn anyway, lists Meta
  * first by its own title, and choosing it opens Meta.
  */

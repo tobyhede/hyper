@@ -644,7 +644,7 @@ test(
       'aria-disabled',
       'true',
     );
-    // Opened directly, so there is no parent step.
+    // Opened directly, so there is no Opener.
     await expect(surface(page).getByRole('button', { name: /^Go to / })).toHaveCount(0);
   },
 );

@@ -329,7 +329,7 @@ export const nearestAlong = (bounds: DockBox, box: DockBox, edge: DockEdge): Doc
 
 /* ------------------------------------------------------------ open Spaces */
 
-/** A Space the Dock names: the parent step, and every row of the Open Spaces menu. */
+/** A Space the Dock names: the Opener, and every row of the Open Spaces menu. */
 export interface SpaceStep {
   readonly spaceId: UUID;
   readonly title: string;
@@ -366,7 +366,7 @@ export interface OpenSpaceRow {
  * flat list is what lets the Open Spaces menu say *where* a Space is as well as that it
  * is open. A flat list would put a Space three crossings down beside the root
  * with nothing to tell them apart but their names, which is exactly the
- * confusion the bar's parent step exists to remove.
+ * confusion the bar's Opener control exists to remove.
  *
  * Siblings keep the order the caller lists them in, which is the order the
  * reader opened them. Nothing sorts them here: a Open Spaces menu that reordered itself as

@@ -465,7 +465,7 @@
   gap: 2px;
 }
 
-/* The parent step and the Open Spaces menu are the trail's two list items, and the
+/* The Opener control and the Open Spaces menu are the trail's two list items, and the
    grid places **those** — a class on the button inside an `li` is a class on
    something the grid never sees. So `command-dock__crumb` and
    `command-dock__disclose` sit on the `BreadcrumbItem`, and the placement below
@@ -478,7 +478,7 @@
    than by saying anything stronger. They are the `receded` variant and
    `quietFeedback`'s `aria-expanded` state in `@project/ui` now.
 
-   The parent step uses the OPEN Parent/Meta mark, recedes below the current
+   The Opener control uses the OPEN Parent/Meta mark, recedes below the current
    Space's tone, and keeps the Divider at the cluster boundary. The regular
    Space uses a cube; geometry belongs to the shared icons, not this sheet. */
 .command-dock__crumb {

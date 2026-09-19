@@ -29,7 +29,7 @@
  *
  * **A Space is a Space Thing, held by the Meta Space above it.** So the Spaces
  * *inside* a Space are Things in it and the Things surface already offers them,
- * while the bar names one step back and the Open Spaces menu holds the set open
+ * while the bar names the Opener and the Open Spaces menu holds the set open
  * beside it — drawn as the tree the Opener makes. Moving between them closes
  * nothing; Exit, in the Space menu, is what takes one out of the set (ADR 0068).
  *
@@ -287,7 +287,7 @@ export interface DockChrome {
  * The Space you are in, the one you came from, and the set open beside them.
  *
  * One group rather than two because the bar draws them as one region: the
- * parent step and the Open Spaces menu are how you leave this Space, and the name and
+ * Opener control and the Open Spaces menu are how you leave this Space, and the name and
  * its menu are what you can do while you are in it.
  */
 export interface DockSpace {
@@ -320,7 +320,7 @@ export interface DockSpace {
    * Title of a Thing that references it are two stored values that agree only at
    * creation, and ADR 0083 keeps the target's name off that Thing's front. So
    * there is nothing here for this surface to keep in step — the Open Spaces
-   * rows and the parent step each read their own session's title and redraw on
+   * rows and the Opener control each read their own session's title and redraw on
    * its publication (`open-spaces.ts`). Renaming *another* Space, from a Space
    * Thing or from a row of that menu, is a `SpaceThingLifecycle` operation over
    * a second session (ADR 0076) and is deliberately not this.
@@ -336,7 +336,7 @@ export interface DockSpace {
   readonly onCopyLink: () => void;
   /**
    * Move to an open Space, closing nothing — or to the Meta Space, which is
-   * opened if it is not open yet. The parent step and the Open Spaces menu both
+   * opened if it is not open yet. The Opener control and the Open Spaces menu both
    * spend this.
    */
   readonly onSwitchTo: (spaceId: UUID) => void;
@@ -1599,8 +1599,8 @@ function ThingsControl({
  * minus the part that names a set** (`.scratch/dock-menu-reorganisation/issues/02`):
  * Rename beside Copy link to Space, then Exit Space — one separator between
  * the two groups. The list of Spaces this control does *not* draw is the
- * **open** set, and that belongs to the Open Spaces menu beside the parent
- * step, where the question is which Space you are looking at rather than what
+ * **open** set, and that belongs to the Open Spaces menu beside the Opener
+ * control, where the question is which Space you are looking at rather than what
  * you can do to it.
  *
  * **Exit is the one command the Open Spaces menu made necessary.** While pressing an
@@ -1826,7 +1826,7 @@ function ParentSpace({
               // identically, `ToolbarButton` being this same `Button`.
               render={
                 <ToolbarButton
-                  // **The step back is a shared variant and not a rule here.**
+                  // **The Opener's ink is a shared variant and not a rule here.**
                   // The parent recedes below the bar's own tone so the two rows
                   // read as a place and the volume it sits inside, and that is
                   // a Button's ink: declared over this class, it made an
@@ -1923,7 +1923,7 @@ function ParentSpace({
                 {/* Meta tops the list whether or not it is open, so where
                       navigation starts is one choice away from every Space —
                       including one reached by its own address, which has no
-                      parent step. Open, it is the tree's own first row below. */}
+                      Opener. Open, it is the tree's own first row below. */}
                 {closedMeta === null ? null : (
                   <SpaceItem value={closedMeta.spaceId} closeOnClick>
                     <ParentIcon />
@@ -2001,7 +2001,7 @@ function ParentSpace({
  *   opened directly   `[∞ Spaces ⌄] │ [⬡ Space ⌄]`
  *   entered           `[↰ Parent] [⌄] │ [⬡ Space ⌄]`
  *
- * Two parts, and the split is the arrangement. The **parent** is one step back,
+ * Two parts, and the split is the arrangement. The **parent** is the Opener,
  * marked with a direction rather than the Space glyph because both are Spaces
  * and only their position differs, and the `⌄` beside it switches among every
  * open Space (`ParentSpace` above).
@@ -2015,7 +2015,7 @@ function ParentSpace({
  * — the Meta Space — that list is every Space there is, which is the "All
  * Spaces" every comparable tool builds a separate screen for.
  *
- * **Only the Space you are in is authorable.** The parent step draws a name and
+ * **Only the Space you are in is authorable.** The Opener control draws a name and
  * never an editor: a Space is renamed from inside it, and two equally weighted
  * editable names would say you are in both.
  *
@@ -2025,7 +2025,7 @@ function ParentSpace({
  * carrying depth — the Open Spaces menu's indent carries it. The Sidebar's tab strip
  * (`OpenSpaces`, deleted by `.scratch/command-dock/issues/08`) is not carried
  * over as a strip, but this is what it modelled: the *set* of open Spaces. What
- * it could not model is the crossing, and the parent step is that.
+ * it could not model is the crossing, and the Opener control is that.
  *
  * **What depth costs is width, and the two parts are how it is paid.** Only one
  * step is ever a word, so a fourth crossing costs nothing at all on the bar; and

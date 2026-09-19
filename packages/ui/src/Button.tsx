@@ -58,7 +58,7 @@ const buttonVariants = cva(
         // reader is *not* — the Command Dock's parent crumb beside the Space
         // they are in. Every quiet control measures identically, so two of them
         // at the same tone read as one list rather than as a place and the
-        // volume it sits inside; the step back is the difference, and a glyph
+        // volume it sits inside; the receded ink is the difference, and a glyph
         // beside it owes a little more stroke to hold it. The mix is against
         // `transparent` rather than a second ink token so the step is taken
         // from whatever `--muted-foreground` is, in either theme.

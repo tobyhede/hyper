@@ -27,7 +27,7 @@ describe('the unwell Spaces the Open Spaces trigger reports', () => {
   /**
    * **A standing failure announces itself rather than waiting to be opened
    * (ADR 0082)**, so a parent whose commit failed is counted even while the
-   * parent step is already naming it.
+   * Opener control is already naming it.
    */
   it('counts a Space the bar is not naming that needs attention', () => {
     const current = newUuid();

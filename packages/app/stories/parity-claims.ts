@@ -398,7 +398,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'A Space entered from another names that one Space as a step back, marked with OPEN, and holds every other open Space behind the Open Spaces disclosure beside it. The Spaces trigger draws OPEN, and the Space you are in draws a cube whichever Space it is, Meta included.',
+      'A Space entered from another names that one Space as its Opener, marked with OPEN, and holds every other open Space behind the Open Spaces disclosure beside it. The Spaces trigger draws OPEN, and the Space you are in draws a cube whichever Space it is, Meta included.',
   },
   {
     id: 'command-dock-keeps-its-names-on-a-side-edge',

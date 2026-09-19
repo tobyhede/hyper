@@ -1022,6 +1022,74 @@ describe('the retired name for the surface over the open set is gone', () => {
 });
 
 /**
+ * The retired names for the Opener and the Dock control that names it.
+ *
+ * `CONTEXT.md` names the Space a Space was Entered from its **Opener**. The Dock
+ * called the same thing, and the control drawing it, a step — one back, or the
+ * parent's — which is a trail's word for a history `CONTEXT.md` defines as a
+ * record, not a path. Built from fragments for the reason the block above is.
+ *
+ * Read spanning lines, because prose wraps the two words apart: the one site a
+ * line-by-line grep missed when this was retired was exactly that.
+ */
+const RETIRED_OPENER_GAP = '[ -]|\\s*\\n\\s*(?:\\*|//)?\\s*';
+// Case is spelled into the pattern rather than flagged, because `spanningHits`
+// recompiles with `g` alone and would drop an `i`.
+const RETIRED_OPENER_NAME = new RegExp(
+  [
+    ['[Pp]arent', '[Ss]tep'].join(`(?:${RETIRED_OPENER_GAP})`),
+    ['[Ss]tep', '[Bb]ack'].join(`(?:${RETIRED_OPENER_GAP})`),
+  ]
+    // Letters rather than `\\b` at the edges: a BEM block puts `_` before it.
+    .map((phrase) => `(?<![A-Za-z])${phrase}(?![A-Za-z])`)
+    .join('|'),
+);
+
+/** `CONTEXT.md` names what it retires. */
+const RETIRED_OPENER_FILES: readonly string[] = ['CONTEXT.md'];
+
+describe('the Opener is named once', () => {
+  it('finds no retired name for it outside the document that retires them', () => {
+    const offenders = scannableFiles()
+      .filter((file) => !RETIRED_OPENER_FILES.includes(file))
+      .flatMap((file) => {
+        const source = readTracked(file);
+        return source === null
+          ? []
+          : spanningHits(source, RETIRED_OPENER_NAME).map((hit) => `${file}:${hit}`);
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('holds each exemption to still earning itself', () => {
+    expectEachExemptionEarned(RETIRED_OPENER_FILES, RETIRED_OPENER_NAME);
+  });
+
+  it('reads the shapes the names were actually written in', () => {
+    for (const spelling of [
+      `the ${['parent', 'step'].join(' ')} and the Open Spaces menu`,
+      `beside the ${['parent', 'step'].join('\n * ')}, where`,
+      `// root draws. ${['Parent', 'step'].join(' ')} is for.`,
+      `names one ${['step', 'back'].join(' ')}`,
+      `.dock__${['parent', 'step'].join('-')} {`,
+    ]) {
+      expect(spanningHits(spelling, RETIRED_OPENER_NAME), JSON.stringify(spelling)).not.toEqual([]);
+    }
+  });
+
+  it('stays silent on a step that is not the Opener', () => {
+    for (const line of [
+      'The band was one growth-step wide',
+      'the lightest step a hover takes',
+      'A parent\n * component passes it down',
+    ]) {
+      expect(spanningHits(line, RETIRED_OPENER_NAME), JSON.stringify(line)).toEqual([]);
+    }
+  });
+});
+
+/**
  * ADR 0085 makes Diagram the first-public name for the entity that was a
  * Layout, and states the same completion criterion ADR 0041 did: a repository
  * scan finds the retired name only in historical records and in qualified

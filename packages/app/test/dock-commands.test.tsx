@@ -183,7 +183,7 @@ describe("every control's accessible name contains its visible label (WCAG 2.5.3
   it('names the root Open Spaces menu with the word it shows', async () => {
     await renderDock(<Default />);
     // Three crossings in, the Open Spaces menu is a bare chevron; the word is what the
-    // root draws. Walk up to it, which is what the parent step is for.
+    // root draws. Walk up to it, which is what the Opener control is for.
     await act(() => {
       fireEvent.click(within(dock()).getByRole('button', { name: 'Go to Design system' }));
       return Promise.resolve();
@@ -499,7 +499,7 @@ describe('an unwell Space the reader is not in', () => {
    * menu is drawn whatever the persistence says.
    *
    * Two Spaces open and the reader in the child. The bar names the parent, and
-   * the parent step draws a name and never a state. The Open Spaces menu was
+   * the Opener control draws a name and never a state. The Open Spaces menu was
    * once withheld here as redundant, which left a parent whose commit had
    * failed reported nowhere; it is always drawn now, so its trigger reports it.
    *
