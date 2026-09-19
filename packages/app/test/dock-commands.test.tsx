@@ -286,6 +286,21 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
 
     expect(parent.closest('[role="toolbar"]')).toBe(dock());
   });
+
+  /**
+   * The Opener and the Open Spaces menu sit in the one landmark the Dock draws,
+   * and it is named for the surface CONTEXT.md defines rather than for the
+   * registry primitive's default, which is a word that entry retires.
+   */
+  it('names its one landmark Open Spaces', async () => {
+    await renderDock(<Default />);
+
+    const landmark = within(dock()).getByRole('navigation', { name: 'Open Spaces' });
+
+    expect(
+      within(landmark).getByRole('button', { name: 'Go to Design system' }),
+    ).toBeInTheDocument();
+  });
 });
 
 /**

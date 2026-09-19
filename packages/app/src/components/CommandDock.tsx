@@ -1806,7 +1806,9 @@ function ParentSpace({
     meta !== null && !space.openSpaces.some((row) => row.spaceId === meta.spaceId) ? meta : null;
 
   return (
-    <Breadcrumb>
+    // Named for the surface it draws: the primitive's own default is a word
+    // CONTEXT.md retires for it (`dock-commands.test.tsx` holds the name).
+    <Breadcrumb aria-label="Open Spaces">
       {/* The Dock has one type scale and the trail is in it. `BreadcrumbList`
           defaults to `text-sm`, which is a page's scale: the crumb inside it
           drew its own 13px and took its line height from the list, so the
