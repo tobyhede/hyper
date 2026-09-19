@@ -653,7 +653,7 @@ test(
  * Meta is always one choice away, from every Space.
  *
  * The new Space is opened by its own address and Meta is not open. The bar is
- * `[∞ Spaces ⌄] [□ New space ⌄]`, and the menu still lists Meta first, by its
+ * `[∞ Spaces ⌄] [⬡ New space ⌄]`, and the menu still lists Meta first, by its
  * own title; choosing it opens Meta.
  */
 test(

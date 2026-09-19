@@ -414,7 +414,9 @@ export const createApp = (
             reportBreak(failure);
             // The epoch goes back, so this Space's next showing retries rather
             // than standing on an empty list until the Space set changes. While
-            // it stays shown nothing retries; Meta's row does not depend on it.
+            // it stays shown nothing retries; Meta's row does not depend on it
+            // (`space-set-freshness.test.tsx`, "lists a closed Meta by its title
+            // when the Space list read fails").
             readSpacesEpoch.current = null;
             if (latestSpacesRead.current === token) setMetaSpaces([]);
           }
@@ -1406,7 +1408,7 @@ export const createApp = (
      * wait on it. Read on every render rather than memoized, because the title
      * is the live session's while Meta is open and nothing here is keyed on it.
      */
-    const metaStep = spaces === null ? null : spaces.meta();
+    const meta = spaces === null ? null : spaces.meta();
 
     /**
      * The one Diagram refusal there is anywhere to put, now that Add Diagram and
@@ -1545,7 +1547,7 @@ export const createApp = (
             space: {
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,
-              meta: metaStep,
+              meta,
               parent: parentSpace,
               openSpaces: openSpaceRows,
               // Behind `chromeTitleEdit` exactly as the Diagram and Graph names
@@ -1563,10 +1565,11 @@ export const createApp = (
                 if (spaces === null) return;
                 const entry = spaces.entry(spaceId);
                 // A closed Meta is the one row not backed by an open entry, and
-                // the menu named it by `metaStep`'s title, so its failure does too.
+                // the menu named it by `meta()`'s title, so its failure does too.
                 const title =
-                  entry?.session.getState().working.document.title ??
-                  (metaStep?.spaceId === spaceId ? metaStep.title : 'That Space');
+                  spaceId === spaces.metaSpaceId
+                    ? spaces.meta().title
+                    : (entry?.session.getState().working.document.title ?? 'That Space');
                 setSpaceCommandBreak(null);
                 void (async () => {
                   try {

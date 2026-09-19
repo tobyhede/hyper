@@ -229,7 +229,7 @@ class UnlistableBackend extends MemorySpaceBackend {
   }
 }
 
-describe('the Meta step in the Open Spaces menu', () => {
+describe("Meta's row in the Open Spaces menu", () => {
   /**
    * Meta's row is not read from the Space list: a Space opened by its own
    * address, with Meta closed, still lists Meta first when that read fails.

@@ -13,7 +13,6 @@ import {
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import type { SpaceStep } from './dock-model';
 import { createSpaceThingLifecycle, type SpaceThingAuthoring } from './space-thing-lifecycle';
 import type { SpaceThingFraming } from './space-thing-framing';
 
@@ -90,7 +89,7 @@ export interface OpenSpaces {
    * on, or fails with, a Space list read. `packages/app/test/open-spaces.test.ts`
    * holds both halves.
    */
-  readonly meta: () => SpaceStep;
+  readonly meta: () => { readonly spaceId: UUID; readonly title: string };
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;

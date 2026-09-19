@@ -304,7 +304,8 @@ export interface DockSpace {
   readonly currentSpaceId: UUID;
   /**
    * The Meta Space, which the Open Spaces menu lists first whether or not it is
-   * open. `null` until its title is known.
+   * open. `null` only where the App is drawn outside Open Spaces, which is
+   * what knows Meta; inside it Meta always has a title (`OpenSpaces.meta`).
    */
   readonly meta: SpaceStep | null;
   /** The Space this one was entered from, and the only step the bar names. Null at the root. */
@@ -1794,10 +1795,9 @@ function ParentSpace({
    * the recovery in them. What this mark is for is the Space you are not
    * looking at.
    *
-   * Derived in the model and read here, because the trail decision below now
-   * reads the same number: the control this mark rides on is withheld while the
-   * bar is already naming the whole set, so a count taken twice could withhold
-   * the control that draws it.
+   * Derived in the model and read here, because the trigger's accessible name
+   * (`openSpacesName`) reads the same number, and a count taken twice could
+   * have the dot and the name disagree.
    */
   const unwell = unwellElsewhere(space.openSpaces, space.currentSpaceId);
   const meta = space.meta;
