@@ -785,7 +785,7 @@ test('an embedded Thing can move, open with the keyboard and resize in its targe
  * **The bar names one step up rather than a whole path**, which is the
  * arrangement's answer to width rather than an omission: the step a reader
  * reaches for is the one above them, and everything further up is behind the
- * Open Spaces disclosure. The shared OPEN mark identifies Parent/Meta and the
+ * Open Spaces disclosure. The shared OPEN mark identifies Opener/Meta and the
  * cube identifies an ordinary Space, including when opened directly.
  */
 test(
@@ -800,16 +800,16 @@ test(
     await switchToSpace(page, 'Space 1');
 
     // Entered, so the crossing is named — and named as the Space, with the
-    // parent glyph carrying the relation rather than a word.
-    const parent = page.getByRole('button', { name: 'Go to Diagram fixture' });
-    await expect(parent).toBeVisible();
+    // OPEN mark carrying the relation rather than a word.
+    const opener = page.getByRole('button', { name: 'Go to Diagram fixture' });
+    await expect(opener).toBeVisible();
     // The mark contributes nothing to the name: the OPEN mark is `aria-hidden`, so
     // the control is named for the Space alone and the glyph carries the
     // relation to it.
-    await expect(parent).toHaveAccessibleName('Go to Diagram fixture');
-    await expect(parent).toContainText('Diagram fixture');
-    await expect(parent.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
-    await expect(parent.locator('svg[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
+    await expect(opener).toHaveAccessibleName('Go to Diagram fixture');
+    await expect(opener).toContainText('Diagram fixture');
+    await expect(opener.locator('svg[data-icon="parent"][aria-hidden="true"]')).toBeVisible();
+    await expect(opener.locator('svg[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
     await expect(showingSpace(page).locator('[data-icon="space"]')).toBeVisible();
     await expect(showingSpace(page).getByRole('img')).toHaveCount(0);
     await expect(showingSpace(page).locator('[title]')).toHaveCount(0);

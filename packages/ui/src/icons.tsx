@@ -191,7 +191,7 @@ const CubeGlyph = ({ size }: { size: number }) => {
 };
 
 /**
- * Parent/Meta uses the OPEN infinity-cube artwork selected in the design review.
+ * Opener/Meta uses the OPEN infinity-cube artwork selected in the design review.
  * This product mark is the approved custom exception to the Lucide vocabulary;
  * icons.test.tsx holds its geometry to the supplied 16px SVG.
  */

@@ -1394,7 +1394,7 @@ export const createApp = (
       [openSpacesState, spaces],
     );
     const openerId = openSpacesState.openedFrom.get(renderedSpace.id) ?? null;
-    const parentSpace = useMemo(() => {
+    const opener = useMemo(() => {
       if (openerId === null) return null;
       const entry = openSpacesState.entries.find((candidate) => candidate.id === openerId);
       return entry === undefined
@@ -1548,7 +1548,7 @@ export const createApp = (
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,
               meta,
-              parent: parentSpace,
+              opener,
               openSpaces: openSpaceRows,
               // Behind `chromeTitleEdit` exactly as the Diagram and Graph names
               // are below, and for the one reason the guard exists: all three

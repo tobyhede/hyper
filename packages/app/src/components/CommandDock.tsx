@@ -127,7 +127,7 @@ import {
   type DockPosition,
   type ExitOutcome,
   type OpenRow,
-  type SpaceStep,
+  type NamedSpace,
   openSpacesName,
   SPACES_LABEL,
 } from '../dock-model';
@@ -307,9 +307,9 @@ export interface DockSpace {
    * open. `null` only where the App is drawn outside Open Spaces, which is
    * what knows Meta; inside it Meta always has a title (`OpenSpaces.meta`).
    */
-  readonly meta: SpaceStep | null;
-  /** The Space this one was entered from, and the only step the bar names. Null at the root. */
-  readonly parent: SpaceStep | null;
+  readonly meta: NamedSpace | null;
+  /** The Space this one was entered from, and the only Space the bar names. Null at the root. */
+  readonly opener: NamedSpace | null;
   /** Every open Space, depth-first from the root — what the Open Spaces menu lists. */
   readonly openSpaces: readonly OpenRow[];
   /**
@@ -354,7 +354,7 @@ export interface DockSpace {
    * Whether this Space can be left at all, which is one question and not two.
    *
    * The meta Space is permanent (`open-spaces.ts`), and every other open Space
-   * can be exited. This read {@link parent} instead — "is there a Space I was
+   * can be exited. This read {@link opener} instead — "is there a Space I was
    * opened from" — which answers `null` for every Space reached by its own
    * address as well, and so withheld Exit from a pasted link. The two happen to
    * agree while the reader arrived by pressing Space Things, which is what hid
@@ -1658,7 +1658,7 @@ function SpaceMenu({
               re-entering costs one press on a Thing. Meta cannot be exited,
               so there the row is present and unavailable rather than gone —
               and that is the *only* case, which `exitDisabled` is named for
-              and `space.parent` was not.
+              and `space.opener` was not.
 
               **Exit, because the glossary says Exit.** `CONTEXT.md` gives the
               word to the one action that closes an entered Space, and
@@ -1748,7 +1748,7 @@ function ExitReport({ space }: { readonly space: DockSpace }) {
 }
 
 /**
- * `[Parent] [⌄]` — where you came from, and every other Space you have open.
+ * `[Opener] [⌄]` — where you came from, and every other Space you have open.
  *
  * **The bar names one step, and the Open Spaces menu holds the rest.** Depth costs
  * width and the Dock is furniture at the edge of a canvas, so drawing the whole
@@ -1771,7 +1771,7 @@ function ExitReport({ space }: { readonly space: DockSpace }) {
  *
  * At the root the shape is therefore `[∞ Spaces ⌄] [⬡ Space ⌄]`.
  */
-function ParentSpace({
+function OpenerAndOpenSpaces({
   space,
   side = 'bottom',
 }: {
@@ -1779,7 +1779,7 @@ function ParentSpace({
   readonly side?: MenuSide;
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
-  const parent = space.parent;
+  const opener = space.opener;
   /**
    * **The open Spaces that are unwell, counted on the bar rather than inside
    * the menu.**
@@ -1815,7 +1815,7 @@ function ParentSpace({
           Open Spaces menu came out a pixel shorter than every other named control.
           `compact` is the 13px the rest of the surface is at. */}
       <BreadcrumbList size="compact" className="command-dock__trail-list">
-        {parent === null ? null : (
+        {opener === null ? null : (
           <BreadcrumbItem className="command-dock__crumb">
             <BreadcrumbLink
               // A `ToolbarButton`, because the Dock is one `Toolbar` now: a
@@ -1827,7 +1827,7 @@ function ParentSpace({
               render={
                 <ToolbarButton
                   // **The Opener's ink is a shared variant and not a rule here.**
-                  // The parent recedes below the bar's own tone so the two rows
+                  // The Opener recedes below the bar's own tone so the two rows
                   // read as a place and the volume it sits inside, and that is
                   // a Button's ink: declared over this class, it made an
                   // application stylesheet a second owner of the shared
@@ -1835,9 +1835,9 @@ function ParentSpace({
                   variant="receded"
                   size="compact"
                   className="command-dock__crumb nokey"
-                  aria-label={`Go to ${parent.title}`}
-                  title={`Go to ${parent.title}`}
-                  onClick={() => space.onSwitchTo(parent.spaceId)}
+                  aria-label={`Go to ${opener.title}`}
+                  title={`Go to ${opener.title}`}
+                  onClick={() => space.onSwitchTo(opener.spaceId)}
                 />
               }
             >
@@ -1845,7 +1845,7 @@ function ParentSpace({
                   this one is somewhere you are not, so the one thing it offers
                   is going there. */}
               <ParentIcon />
-              <CommandName>{parent.title}</CommandName>
+              <CommandName>{opener.title}</CommandName>
             </BreadcrumbLink>
           </BreadcrumbItem>
         )}
@@ -1855,13 +1855,13 @@ function ParentSpace({
             stands in the name track; below it, it is a bare chevron in the
             disclosure track. */}
         <BreadcrumbItem
-          className={parent === null ? 'command-dock__name-item' : 'command-dock__disclose'}
+          className={opener === null ? 'command-dock__name-item' : 'command-dock__disclose'}
         >
           <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
             <DropdownMenuTrigger
               id={triggerId}
               className={
-                parent === null
+                opener === null
                   ? `command-dock__spaces-trigger ${SET_TRIGGER.className}`
                   : 'nokey command-dock__more command-dock__disclose'
               }
@@ -1877,20 +1877,20 @@ function ParentSpace({
               // one root now, so this is inside it and takes no tab stop of
               // its own.
               render={
-                <ToolbarButton variant="ghost" size={parent === null ? SET_TRIGGER.size : 'icon'} />
+                <ToolbarButton variant="ghost" size={opener === null ? SET_TRIGGER.size : 'icon'} />
               }
             >
               {/* **At the root the chevron says what it discloses**, and it
                     says it the way Things does — the same `SetTrigger`, so the
                     two cannot space themselves differently. Below the root the
-                    parent's name stands beside the chevron and the pair reads
+                    Opener's name stands beside the chevron and the pair reads
                     as a place and a way out of it; at the top there is no
-                    parent, and a bare chevron left the region opening with a
+                    Opener, and a bare chevron left the region opening with a
                     mark that names nothing.
 
                     The OPEN mark: the Spaces set starts at Meta, while the
                     Space you are in carries the cube whichever Space it is. */}
-              {parent === null ? (
+              {opener === null ? (
                 <SetTrigger icon={<ParentIcon />}>{SPACES_LABEL}</SetTrigger>
               ) : (
                 <ChevronDownIcon />
@@ -1994,17 +1994,17 @@ function ParentSpace({
 }
 
 /**
- * `[↰ Parent] [⌄] │ [⬡ Rendering ⌄]` — where you came from, and where you are.
+ * `[↰ Opener] [⌄] │ [⬡ Rendering ⌄]` — where you came from, and where you are.
  *
  * Two shapes, decided by whether this Space was entered from another:
  *
  *   opened directly   `[∞ Spaces ⌄] │ [⬡ Space ⌄]`
- *   entered           `[↰ Parent] [⌄] │ [⬡ Space ⌄]`
+ *   entered           `[↰ Opener] [⌄] │ [⬡ Space ⌄]`
  *
- * Two parts, and the split is the arrangement. The **parent** is the Opener,
- * marked with a direction rather than the Space glyph because both are Spaces
+ * Two parts, and the split is the arrangement. The **Opener** is the Space
+ * this one was Entered from, marked with a direction rather than the Space glyph because both are Spaces
  * and only their position differs, and the `⌄` beside it switches among every
- * open Space (`ParentSpace` above).
+ * open Space (`OpenerAndOpenSpaces` above).
  * The **cluster** is the Space you are in — a Diagram or Graph cluster in every
  * respect: a named disclosure, and Rename a command in that list.
  *
@@ -2029,7 +2029,7 @@ function ParentSpace({
  *
  * **What depth costs is width, and the two parts are how it is paid.** Only one
  * step is ever a word, so a fourth crossing costs nothing at all on the bar; and
- * in a vertical dock, where width is the scarce axis, the parent takes a line
+ * in a vertical dock, where width is the scarce axis, the Opener takes a line
  * of its own above the cluster instead of running along beside it.
  */
 function SpacesControl({
@@ -2048,7 +2048,7 @@ function SpacesControl({
        it costs no tab stop — the toolbar root is the Dock's, so both parts'
        controls are items in the one roving order. */
     <div className="command-dock__space">
-      <ParentSpace space={space} side={side} />
+      <OpenerAndOpenSpaces space={space} side={side} />
       {/* Always, because the region above always draws the Open Spaces menu. */}
       <Divider orientation={vertical ? 'horizontal' : 'vertical'} />
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">

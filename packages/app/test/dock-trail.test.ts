@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newUuid } from '@project/core';
-import { unwellElsewhere, type OpenRow, type SpaceStep } from '../src/dock-model';
+import { unwellElsewhere, type OpenRow, type NamedSpace } from '../src/dock-model';
 
-const step = (title: string): SpaceStep => ({ spaceId: newUuid(), title });
+const named = (title: string): NamedSpace => ({ spaceId: newUuid(), title });
 
 /** A commit that failed on one of the open Spaces, which is the least of the three unwell states. */
 const failedOn = (open: readonly OpenRow[], spaceId: string): readonly OpenRow[] =>
@@ -26,23 +26,23 @@ const failedOn = (open: readonly OpenRow[], spaceId: string): readonly OpenRow[]
 describe('the unwell Spaces the Open Spaces trigger reports', () => {
   /**
    * **A standing failure announces itself rather than waiting to be opened
-   * (ADR 0082)**, so a parent whose commit failed is counted even while the
+   * (ADR 0082)**, so an Opener whose commit failed is counted even while the
    * Opener control is already naming it.
    */
   it('counts a Space the bar is not naming that needs attention', () => {
     const current = newUuid();
-    const parent = step('Design system');
+    const opener = named('Design system');
     const open: readonly OpenRow[] = failedOn(
       [
         {
-          spaceId: parent.spaceId,
-          title: parent.title,
+          spaceId: opener.spaceId,
+          title: opener.title,
           depth: 0,
           persistence: { kind: 'settled' },
         },
         { spaceId: current, title: 'Rendering', depth: 1, persistence: { kind: 'settled' } },
       ],
-      parent.spaceId,
+      opener.spaceId,
     );
 
     expect(unwellElsewhere(open, current)).toBe(1);
@@ -56,12 +56,12 @@ describe('the unwell Spaces the Open Spaces trigger reports', () => {
    */
   it('does not count the unwell Space that is the one being read', () => {
     const current = newUuid();
-    const parent = step('Design system');
+    const opener = named('Design system');
     const open: readonly OpenRow[] = failedOn(
       [
         {
-          spaceId: parent.spaceId,
-          title: parent.title,
+          spaceId: opener.spaceId,
+          title: opener.title,
           depth: 0,
           persistence: { kind: 'settled' },
         },

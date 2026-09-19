@@ -330,7 +330,7 @@ export const nearestAlong = (bounds: DockBox, box: DockBox, edge: DockEdge): Doc
 /* ------------------------------------------------------------ open Spaces */
 
 /** A Space the Dock names: the Opener, and every row of the Open Spaces menu. */
-export interface SpaceStep {
+export interface NamedSpace {
   readonly spaceId: UUID;
   readonly title: string;
 }
@@ -344,7 +344,7 @@ export interface SpaceStep {
  * Open Spaces menu indents by, and it is derived from `from` rather than stored, so a
  * row cannot claim a depth its opener does not give it.
  */
-export interface OpenRow extends SpaceStep {
+export interface OpenRow extends NamedSpace {
   /** What this Space's row has to say about it, which is nothing unless it is unwell. */
   readonly depth: number;
   readonly persistence: SpaceSessionState['persistence'];

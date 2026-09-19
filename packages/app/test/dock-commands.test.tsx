@@ -282,9 +282,9 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
   it('keeps the way back inside the same roving order', async () => {
     await renderDock(<Default />);
 
-    const parent = within(dock()).getByRole('button', { name: 'Go to Design system' });
+    const opener = within(dock()).getByRole('button', { name: 'Go to Design system' });
 
-    expect(parent.closest('[role="toolbar"]')).toBe(dock());
+    expect(opener.closest('[role="toolbar"]')).toBe(dock());
   });
 
   /**
@@ -498,19 +498,19 @@ describe('an unwell Space the reader is not in', () => {
    * cannot stage: the catalogue's session is five Spaces deep so the Open Spaces
    * menu is drawn whatever the persistence says.
    *
-   * Two Spaces open and the reader in the child. The bar names the parent, and
+   * Two Spaces open and the reader in the child. The bar names the Opener, and
    * the Opener control draws a name and never a state. The Open Spaces menu was
-   * once withheld here as redundant, which left a parent whose commit had
+   * once withheld here as redundant, which left an Opener whose commit had
    * failed reported nowhere; it is always drawn now, so its trigger reports it.
    *
    * Assembled here rather than added to the stable sheet: it is the same
    * production `CommandDock` over the same fixture, with the one thing the
-   * session shape decides — the open set and the parent — replaced. A story
+   * session shape decides — the open set and the Opener — replaced. A story
    * export owes a parity claim and two suites (ADR 0052), and what is under
    * test is a derivation, not a treatment.
    */
-  it('reports the unwell parent when it is the only other open Space', async () => {
-    await renderDock(<TwoSpacesWithAnUnwellParent />);
+  it('reports the unwell Opener when it is the only other open Space', async () => {
+    await renderDock(<TwoSpacesWithAnUnwellOpener />);
 
     const trigger = within(dock()).getByRole('button', { name: /^Spaces\./ });
     expect(trigger).toHaveAccessibleName(/needs attention/i);
@@ -526,7 +526,7 @@ describe('an unwell Space the reader is not in', () => {
 });
 
 /**
- * The parent's commit, waited for on the session itself.
+ * The Opener's commit, waited for on the session itself.
  *
  * **Not testing-library's `waitFor`.** This runs inside `Application`'s startup
  * resolver, which `renderDock`'s `act` scope has already returned from — so a
@@ -555,20 +555,20 @@ const failedCommit = (session: OpenSpace['session']): Promise<void> =>
     }
   });
 
-/** Two real open Spaces; the parent's backend rejects its completed Edit. */
-function TwoSpacesWithAnUnwellParent() {
+/** Two real open Spaces; the Opener's backend rejects its completed Edit. */
+function TwoSpacesWithAnUnwellOpener() {
   return (
     <Application
       resolve={async () => {
         const control = new MemorySpaceBackendTestControl();
-        const parent = {
+        const opener = {
           ...metaSnapshot,
           document: { ...metaSnapshot.document, title: 'Design system' },
         };
         const spaces = storySpaces(
-          parent.id,
+          opener.id,
           [
-            parent,
+            opener,
             commandDockSnapshot,
             platformSnapshot,
             designSystemSnapshot,
@@ -578,11 +578,11 @@ function TwoSpacesWithAnUnwellParent() {
           ],
           control,
         );
-        const openedParent = await spaces.open(parent.id);
+        const openedOpener = await spaces.open(opener.id);
         control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Unavailable' });
-        const thing = parent.things[0];
-        if (thing === undefined) throw new Error('The parent needs a Thing');
-        const edit = openedParent.app.authoring.complete({
+        const thing = opener.things[0];
+        if (thing === undefined) throw new Error('The Opener needs a Thing');
+        const edit = openedOpener.app.authoring.complete({
           kind: 'edited-thing',
           thingId: thing.id,
           document: { ...thing.document, title: 'An edited Thing' },
@@ -591,8 +591,8 @@ function TwoSpacesWithAnUnwellParent() {
         // whole timeout and then report the persistence state rather than the
         // refusal that caused it. `openDockStory` checks the same thing.
         if (edit.kind !== 'completed')
-          throw new Error(`The parent's Edit was ${edit.kind}, so no commit failed.`);
-        await failedCommit(openedParent.session);
+          throw new Error(`The Opener's Edit was ${edit.kind}, so no commit failed.`);
+        await failedCommit(openedOpener.session);
         return storyOpening(spaces, await spaces.enter(commandDockSnapshot.id));
       }}
     />

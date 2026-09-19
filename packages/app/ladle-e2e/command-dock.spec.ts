@@ -380,7 +380,7 @@ test(
     // **The Space first, because it is the identity that was a label.** It is one
     // Edit on this Space's own session, writing `document.title` and nothing
     // else: the four other Spaces this story has open are untouched, and the
-    // Space Thing in the parent that points here keeps its own Title (ADR 0083).
+    // Space Thing in the Opener that points here keeps its own Title (ADR 0083).
     // Visible-filtered for the reason every `getByTestId` here is — an inactive
     // open Space stays mounted and draws a Dock of its own.
     const spaceTitle = () => page.getByTestId('space-title').filter({ visible: true });
@@ -455,7 +455,7 @@ test(
  *
  * The bar names **one** step up rather than the full Traversal history — that
  * is the Dock's answer to width, and the Open Spaces menu is what makes it an
- * answer rather than an omission. Parent/Meta carries the approved OPEN mark;
+ * answer rather than an omission. Opener/Meta carries the approved OPEN mark;
  * ordinary Spaces carry cubes.
  */
 test(
@@ -467,14 +467,14 @@ test(
     await expect(page.getByTestId('space-title').filter({ visible: true })).toContainText(
       'Rendering',
     );
-    const parent = surface(page).getByRole('button', { name: 'Go to Design system' });
-    await expect(parent).toBeVisible();
+    const opener = surface(page).getByRole('button', { name: 'Go to Design system' });
+    await expect(opener).toBeVisible();
     // The mark contributes nothing to the name: the OPEN mark is `aria-hidden`, so
     // the control is named for the Space alone and the glyph carries the
     // relation to it.
-    await expect(parent).toHaveAccessibleName('Go to Design system');
-    await expect(parent).toContainText('Design system');
-    await expect(parent.locator('[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
+    await expect(opener).toHaveAccessibleName('Go to Design system');
+    await expect(opener).toContainText('Design system');
+    await expect(opener.locator('[data-icon="parent"]')).toHaveAttribute('viewBox', '0 0 16 16');
     await expect(
       page.getByTestId('space-title').filter({ visible: true }).locator('[data-icon="space"]'),
     ).toBeVisible();

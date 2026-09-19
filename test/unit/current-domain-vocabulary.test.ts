@@ -1031,17 +1031,42 @@ describe('the retired name for the surface over the open set is gone', () => {
  *
  * Read spanning lines, because prose wraps the two words apart: the one site a
  * line-by-line grep missed when this was retired was exactly that.
+ *
+ * The identifiers went in a commit of their own, and their shapes are here too:
+ * the component and the prop that drew the Opener, and the type that named it
+ * and every Open Spaces row as a step. The camelCase and kebab-case arms close
+ * on any letter rather than a lowercase one, because the aggregate differential
+ * test calls the Spaces Meta's Space Things point at its parents and writes
+ * their ids as one camelCase compound — containment, not the Opener, and not
+ * this block's to report. The PascalCase arm opens on the left, so a compound
+ * built on a retired type is still read.
  */
 const RETIRED_OPENER_GAP = '[ -]|\\s*\\n\\s*(?:\\*|//)?\\s*';
+/** The retired identifiers, as the two lowercase words each was compounded from. */
+const RETIRED_OPENER_COMPOUNDS: readonly (readonly [string, string])[] = [
+  ['parent', 'space'],
+  ['space', 'step'],
+  ['meta', 'step'],
+];
+const capitalised = (word: string): string => word.replace(/^./, (first) => first.toUpperCase());
 // Case is spelled into the pattern rather than flagged, because `spanningHits`
 // recompiles with `g` alone and would drop an `i`.
 const RETIRED_OPENER_NAME = new RegExp(
   [
     ['[Pp]arent', '[Ss]tep'].join(`(?:${RETIRED_OPENER_GAP})`),
     ['[Ss]tep', '[Bb]ack'].join(`(?:${RETIRED_OPENER_GAP})`),
+    ...RETIRED_OPENER_COMPOUNDS.flatMap(([head, tail]) => [
+      `${head}${capitalised(tail)}`,
+      `${head}-${tail}`,
+    ]),
   ]
     // Letters rather than `\\b` at the edges: a BEM block puts `_` before it.
     .map((phrase) => `(?<![A-Za-z])${phrase}(?![A-Za-z])`)
+    .concat(
+      RETIRED_OPENER_COMPOUNDS.map(
+        ([head, tail]) => `${capitalised(head)}${capitalised(tail)}(?![a-z])`,
+      ),
+    )
     .join('|'),
 );
 
@@ -1073,6 +1098,16 @@ describe('the Opener is named once', () => {
       `// root draws. ${['Parent', 'step'].join(' ')} is for.`,
       `names one ${['step', 'back'].join(' ')}`,
       `.dock__${['parent', 'step'].join('-')} {`,
+      `function ${['Parent', 'Space'].join('')}({`,
+      `const ${['parent', 'Space'].join('')} = useMemo(`,
+      `type ${['Space', 'Step'].join('')},`,
+      `const ${['space', 'Step'].join('')} = open[0];`,
+      `interface Open${['Space', 'Step'].join('')}Props {`,
+      `const ${['meta', 'Step'].join('')} = null;`,
+      `readonly meta: ${['Meta', 'Step'].join('')} | null;`,
+      `.command-dock__${['parent', 'space'].join('-')}-mark {`,
+      `data-testid="${['space', 'step'].join('-')}"`,
+      `data-testid="${['meta', 'step'].join('-')}"`,
     ]) {
       expect(spanningHits(spelling, RETIRED_OPENER_NAME), JSON.stringify(spelling)).not.toEqual([]);
     }
@@ -1083,6 +1118,9 @@ describe('the Opener is named once', () => {
       'The band was one growth-step wide',
       'the lightest step a hover takes',
       'A parent\n * component passes it down',
+      `...${['parent', 'Space', 'Ids'].join('')}.map((spaceId, index) =>`,
+      'requires at least two parent Spaces',
+      'the ideal space-stepping rule',
     ]) {
       expect(spanningHits(line, RETIRED_OPENER_NAME), JSON.stringify(line)).toEqual([]);
     }
