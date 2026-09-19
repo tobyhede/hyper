@@ -48,9 +48,13 @@ export const createSpaceStartup = (
     const opening = backend.loadAggregate().then((result) => {
       if (result.kind === 'uninitialized')
         throw new Error('The Space repository is uninitialized.');
+      const { metaSpaceId, spaces } = result.aggregate;
+      const meta = spaces.find(({ snapshot }) => snapshot.id === metaSpaceId);
+      if (meta === undefined) throw new Error('The loaded aggregate does not hold its Meta Space.');
       return createOpenSpaces({
         backend,
-        metaSpaceId: result.aggregate.metaSpaceId,
+        metaSpaceId,
+        metaSpaceTitle: meta.snapshot.document.title,
         newId,
         history,
       });

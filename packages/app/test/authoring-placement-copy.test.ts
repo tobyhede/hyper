@@ -175,6 +175,7 @@ describe('Entering draws the entered Diagram’s geometry (ticket 02, item 2)', 
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: metaSnapshot.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });

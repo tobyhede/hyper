@@ -152,6 +152,17 @@ describe('HTTP space startup composition', () => {
     expect(result.opened.app.currentSpace().id).toBe(OTHER_SPACE_ID);
   });
 
+  it('names the Meta Space from the aggregate it loaded while Meta is not open', async () => {
+    const startup = startupFor(SPACE_ID, metaReferencingOther(), otherSnapshot());
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
+    );
+
+    expect(result.spaces.entry(SPACE_ID)).toBeUndefined();
+    expect(result.spaces.meta()).toEqual({ spaceId: SPACE_ID, title: 'Stored space' });
+  });
+
   it('retries a startup whose first aggregate load failed', async () => {
     class FlakyAggregateBackend extends MemorySpaceBackend {
       failNextLoad = true;

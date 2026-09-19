@@ -412,8 +412,9 @@ export const createApp = (
             // it has, and a Spaces read that failed is not a refusal of
             // anything the reader asked for.
             reportBreak(failure);
-            // The epoch goes back, so the next showing retries rather than
-            // standing on an empty list until another Space is framed.
+            // The epoch goes back, so this Space's next showing retries rather
+            // than standing on an empty list until the Space set changes. While
+            // it stays shown nothing retries; Meta's row does not depend on it.
             readSpacesEpoch.current = null;
             if (latestSpacesRead.current === token) setMetaSpaces([]);
           }
@@ -1404,18 +1405,13 @@ export const createApp = (
         : { spaceId: openerId, title: entry.session.getState().working.document.title };
     }, [openerId, openSpacesState]);
     /**
-     * The Meta Space, named by its own title whether or not it is open: an open
-     * Meta's row says it, and a closed one is among `metaSpaces`, which lists
-     * every Space bar the one being drawn. `null` until either can say it.
+     * The Meta Space, named by its own title whether or not it is open, from
+     * Open Spaces rather than from `metaSpaces`: that list is a repository read
+     * that may not have answered, or may have failed, and Meta's row must not
+     * wait on it. Read on every render rather than memoized, because the title
+     * is the live session's while Meta is open and nothing here is keyed on it.
      */
-    const metaStep = useMemo(() => {
-      if (spaces === null) return null;
-      const spaceId = spaces.metaSpaceId;
-      const title =
-        openSpaceRows.find((row) => row.spaceId === spaceId)?.title ??
-        metaSpaces.find((summary) => summary.id === spaceId)?.title;
-      return title === undefined ? null : { spaceId, title };
-    }, [spaces, openSpaceRows, metaSpaces]);
+    const metaStep = spaces === null ? null : spaces.meta();
 
     /**
      * The one Diagram refusal there is anywhere to put, now that Add Diagram and

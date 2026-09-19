@@ -170,6 +170,7 @@ async function mount(): Promise<OpenSpaces> {
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: META_ID,
+    metaSpaceTitle: meta.document.title,
     newId: newUuid,
     history: recordingHistory(),
   });

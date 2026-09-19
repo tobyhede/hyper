@@ -208,6 +208,7 @@ async function mount(value: SpaceSnapshot): Promise<SpaceSession> {
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: META_ID,
+    metaSpaceTitle: meta.document.title,
     newId: newUuid,
     history: recordingHistory(),
   });
@@ -310,6 +311,7 @@ describe('the Diagram an Open Space Thing draws', () => {
       const spaces = createOpenSpaces({
         backend,
         metaSpaceId: META_ID,
+        metaSpaceTitle: meta.document.title,
         newId: newUuid,
         history: recordingHistory(),
       });
@@ -582,6 +584,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -800,6 +803,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -848,6 +852,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -948,6 +953,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -1073,6 +1079,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -1165,6 +1172,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -1201,6 +1209,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -1411,6 +1420,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });
@@ -1451,6 +1461,7 @@ describe('the Diagram an Open Space Thing draws', () => {
     const spaces = createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: meta.document.title,
       newId: newUuid,
       history: recordingHistory(),
     });

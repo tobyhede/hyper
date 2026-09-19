@@ -147,6 +147,7 @@ const setup = (
     openSpaces: createOpenSpaces({
       backend,
       metaSpaceId: META_ID,
+      metaSpaceTitle: spaces.find(([id]) => id === META_ID)?.[1] ?? 'Meta',
       newId,
       history,
     }),
@@ -165,6 +166,17 @@ const edit = (space: SpaceSnapshot): SpaceSnapshot => ({
 });
 
 describe('Open Spaces', () => {
+  it('names Meta from startup while it is closed, and from its session once open', async () => {
+    const { openSpaces } = setup();
+    await openSpaces.open(OTHER_ID);
+    expect(openSpaces.entry(META_ID)).toBeUndefined();
+    expect(openSpaces.meta()).toEqual({ spaceId: META_ID, title: 'Meta' });
+
+    const meta = await openSpaces.open(META_ID);
+    meta.session.submit(edit(meta.session.getState().working));
+    expect(openSpaces.meta()).toEqual({ spaceId: META_ID, title: 'Meta edited' });
+  });
+
   it('authors the embedded Diagram while preserving the full canvas selection', async () => {
     const { openSpaces } = setup();
     const target = await openSpaces.open(OTHER_ID, SECOND_DIAGRAM_ID);

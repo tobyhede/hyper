@@ -51,6 +51,7 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   const spaces = createOpenSpaces({
     backend,
     metaSpaceId: SPACE_ID,
+    metaSpaceTitle: snapshot.document.title,
     newId: () => THING_ID,
     history: recordingHistory(),
   });

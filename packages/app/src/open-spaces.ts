@@ -13,6 +13,7 @@ import {
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
+import type { SpaceStep } from './dock-model';
 import { createSpaceThingLifecycle, type SpaceThingAuthoring } from './space-thing-lifecycle';
 import type { SpaceThingFraming } from './space-thing-framing';
 
@@ -81,6 +82,15 @@ export interface RejectedExitConfirmation {
 
 export interface OpenSpaces {
   readonly metaSpaceId: UUID;
+  /**
+   * The Meta Space, named whether or not it is open.
+   *
+   * The title is Meta's live session's when there is one, and otherwise the
+   * one startup read from the aggregate it loaded — so naming Meta never waits
+   * on, or fails with, a Space list read. `packages/app/test/open-spaces.test.ts`
+   * holds both halves.
+   */
+  readonly meta: () => SpaceStep;
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
@@ -128,6 +138,8 @@ export interface OpenSpaces {
 export interface OpenSpacesOptions {
   readonly backend: SpaceBackend;
   readonly metaSpaceId: UUID;
+  /** Meta's title as the aggregate startup loaded stored it. */
+  readonly metaSpaceTitle: string;
   readonly newId: () => UUID;
   /**
    * What the browser is asked for, required with no default (ADR 0016).
@@ -165,6 +177,7 @@ const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
 export function createOpenSpaces({
   backend,
   metaSpaceId,
+  metaSpaceTitle,
   newId,
   history,
   reportObserverError,
@@ -647,6 +660,10 @@ export function createOpenSpaces({
 
   return {
     metaSpaceId,
+    meta: () => ({
+      spaceId: metaSpaceId,
+      title: registry.session(metaSpaceId)?.getState().working.document.title ?? metaSpaceTitle,
+    }),
     getState: observable.getState,
     subscribe: observable.subscribe,
     entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),

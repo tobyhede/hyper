@@ -14,10 +14,13 @@ export function storySpaces(
     snapshots.map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     control,
   );
+  const meta = snapshots.find((snapshot) => snapshot.id === metaSpaceId);
+  if (meta === undefined) throw new Error('The story fixture does not hold its Meta Space.');
   let pathname = productDestinationPath({ kind: 'space', spaceId: metaSpaceId });
   return createOpenSpaces({
     backend,
     metaSpaceId,
+    metaSpaceTitle: meta.document.title,
     newId: newUuid,
     history: {
       pathname: () => pathname,
