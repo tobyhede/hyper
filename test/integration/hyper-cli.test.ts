@@ -1,7 +1,13 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  AGGREGATE_FILE_VERSION,
+  DEFAULT_OPEN_SIZE,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   AGGREGATE_FILE_NAME,
@@ -380,7 +386,7 @@ describe('hyper CLI', () => {
     const created = catalog[0];
     if (created === undefined) throw new Error('Expected the new space in the catalog');
     expect(result.stdout).toBe(`Opened space ${created.id} at revision 0\n`);
-    expect(created.title).toBe('New space');
+    expect(created.title).toBe('Space');
     const stored = await repository.loadSpace(created.id);
     // A new Space begins complete: its Thing is already placed in an authored
     // default Diagram with one empty Active Graph (ADR 0079, ADR 0080). Every id
@@ -396,13 +402,13 @@ describe('hyper CLI', () => {
         id: created.id,
         document: {
           version: 1,
-          title: 'New space',
+          title: 'Space',
           diagrams: [
             {
               id: diagram.id,
               title: 'Diagram 1',
               kind: 'positioned',
-              positions: { [thingId]: { x: 0, y: 0, open: false } },
+              positions: { [thingId]: { x: 0, y: 0, open: true, openSize: DEFAULT_OPEN_SIZE } },
               graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
               activeGraph: graph.id,
             },
@@ -412,7 +418,11 @@ describe('hyper CLI', () => {
         things: [
           {
             id: thingId,
-            document: { title: 'Thing 1', kind: 'markdown', body: '' },
+            document: {
+              title: 'Welcome to Infinity Cube',
+              kind: 'markdown',
+              body: '![Infinity Cube](/infinity-cube-logo.svg)',
+            },
           },
         ],
       },
