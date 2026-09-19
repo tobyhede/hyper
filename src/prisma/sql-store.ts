@@ -1,4 +1,5 @@
 import type { SqlSpaceListRow, SqlStore, SqlTables } from '../persistence/sql-store';
+import { toJsonValue } from '../persistence/sql-store';
 import { db } from './db';
 
 type Orm = typeof db.orm.public;
@@ -80,6 +81,90 @@ const loadWithThings = (orm: Orm, id: string) =>
     )
     .first();
 
+/**
+ * Every stored Space with its Things, ascending by id. PostgreSQL's `jsonb`
+ * column refuses non-JSON text before it is ever stored, so — unlike
+ * SQLite's — this reads through the ordinary ORM exactly as `loadWithThings`
+ * above does; nothing here needs the lower-level `sql`/`execute` treatment
+ * `SqlTables`'s doc comment describes for the other database.
+ */
+const loadEvery = (orm: Orm) =>
+  orm.Space.orderBy((space) => space.id.asc())
+    .include('things', (things) =>
+      things.select('id', 'document').orderBy((thing) => thing.id.asc()),
+    )
+    .all();
+
+/** `SqlTables.Space.loadAllForReplacement`'s own doc comment explains why `document` is never selected. */
+const loadAllForReplacement = (orm: Orm) =>
+  orm.Space.select('id', 'revision')
+    .orderBy((space) => space.id.asc())
+    .all();
+
+/** `SqlTables.Space.relock`'s own doc comment explains the placeholder `document`. */
+const relock = async (orm: Orm, id: string): Promise<string | undefined> => {
+  const locked = await orm.Space.where({ id }).update({ document: toJsonValue({}) });
+  return locked === null ? undefined : locked.revision;
+};
+
+const createSpace = async (
+  orm: Orm,
+  input: { readonly id: string; readonly document: unknown; readonly revision: string },
+): Promise<void> => {
+  await orm.Space.create({
+    id: input.id,
+    document: toJsonValue(input.document),
+    revision: input.revision,
+  });
+};
+
+const listSpaceIds = async (orm: Orm): Promise<readonly string[]> => {
+  const rows = await orm.Space.select('id').all();
+  return rows.map((row) => row.id);
+};
+
+const deleteSpaceById = async (orm: Orm, id: string): Promise<void> => {
+  await orm.Space.where({ id }).delete();
+};
+
+const setExportedRevision = async (orm: Orm, id: string, revision: string): Promise<boolean> => {
+  const updated = await orm.Space.where({ id }).update({ exportedRevision: revision });
+  return updated !== null;
+};
+
+const createThing = async (
+  orm: Orm,
+  input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
+): Promise<void> => {
+  await orm.Thing.create({
+    id: input.id,
+    spaceId: input.spaceId,
+    document: toJsonValue(input.document),
+  });
+};
+
+const deleteThingsForSpace = async (orm: Orm, spaceId: string): Promise<void> => {
+  await orm.Thing.where({ spaceId }).deleteAll();
+};
+
+const readRepositoryState = async (orm: Orm): Promise<{ readonly metaSpaceId: string } | null> => {
+  const state = await orm.RepositoryState.where({ singletonId: 1 }).first();
+  return state === null ? null : { metaSpaceId: state.metaSpaceId };
+};
+
+const relockRepositoryState = async (orm: Orm, metaSpaceId: string): Promise<boolean> => {
+  const locked = await orm.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId });
+  return locked !== null;
+};
+
+const createRepositoryState = async (orm: Orm, metaSpaceId: string): Promise<void> => {
+  await orm.RepositoryState.create({ singletonId: 1, metaSpaceId });
+};
+
+const deleteRepositoryState = async (orm: Orm): Promise<void> => {
+  await orm.RepositoryState.where({ singletonId: 1 }).delete();
+};
+
 /** PostgreSQL's `SqlStore`: `document` already decoded by the `jsonb` codec, never re-parsed here. */
 export const postgresSqlStore = defineSqlStore({
   orm: db.orm.public,
@@ -88,6 +173,24 @@ export const postgresSqlStore = defineSqlStore({
       Space: {
         orderBy: (build) => orm.Space.orderBy(build),
         loadWithThings: (id: string) => loadWithThings(orm, id),
+        loadEvery: () => loadEvery(orm),
+        loadAllForReplacement: () => loadAllForReplacement(orm),
+        relock: (id: string) => relock(orm, id),
+        create: (input) => createSpace(orm, input),
+        listIds: () => listSpaceIds(orm),
+        deleteById: (id: string) => deleteSpaceById(orm, id),
+        setExportedRevision: (id: string, revision: string) =>
+          setExportedRevision(orm, id, revision),
+      },
+      Thing: {
+        create: (input) => createThing(orm, input),
+        deleteAllForSpace: (spaceId: string) => deleteThingsForSpace(orm, spaceId),
+      },
+      RepositoryState: {
+        read: () => readRepositoryState(orm),
+        relock: (metaSpaceId: string) => relockRepositoryState(orm, metaSpaceId),
+        create: (metaSpaceId: string) => createRepositoryState(orm, metaSpaceId),
+        delete: () => deleteRepositoryState(orm),
       },
     };
   },

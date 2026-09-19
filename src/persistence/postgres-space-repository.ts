@@ -229,6 +229,25 @@ const loadEverySpace = async (orm: Orm): Promise<readonly LoadedSpace[]> => {
  * answers them first. Requiring Meta here instead made a commit against an
  * unbootstrapped database throw, which the HTTP host reports as a retryable
  * 503.
+ *
+ * The self-update can find the row gone: a concurrent replacement deleted and
+ * rewrote it between the read above and this update. `retryAfterReplacement`
+ * re-reads and re-locks once for exactly that case, and answers with **the
+ * identity the retry itself locks** -- the one now actually stored -- never
+ * the one this call read before the replacement. `4ec1d1e7` ("Preserve
+ * replacement authorization across lock retry") answered with the
+ * pre-replacement identity instead, and ticket 23's race test
+ * (`test/integration/postgres-space-repository.test.ts`, "conflicts a
+ * replacement authorized against an identity a concurrent replacement
+ * retired" and "judges a complete-aggregate commit against an identity a
+ * concurrent replacement retired") demonstrated why that is wrong: a
+ * `replaceAggregate` call authorized against the pre-replacement identity then
+ * compares its caller's expected identity against that same stale value,
+ * passes, and silently overwrites the concurrent replacement instead of
+ * conflicting against it; a commit's `decideCommit` validates the *current*
+ * stored Spaces against the stale identity and refuses a perfectly valid
+ * aggregate as broken because that identity is no longer among them. Both
+ * tests fail against the pre-replacement answer and pass against this one.
  */
 const lockMetaIdentity = async (
   orm: Orm,
@@ -239,10 +258,7 @@ const lockMetaIdentity = async (
   const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
   const locked = await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId });
   if (locked === null) {
-    if (retryAfterReplacement) {
-      const replacementMetaSpaceId = await lockMetaIdentity(orm, false);
-      if (replacementMetaSpaceId !== undefined) return metaSpaceId;
-    }
+    if (retryAfterReplacement) return lockMetaIdentity(orm, false);
     throw new Error('Repository state disappeared while locking it');
   }
   return metaSpaceId;

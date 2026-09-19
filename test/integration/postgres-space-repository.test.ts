@@ -6,12 +6,16 @@ import {
 } from '@project/persistence';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
+import { toJsonValue } from '../../src/persistence/sql-store';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { db } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
-import { spaceRepositoryContract } from '../support/repository-contract';
+import {
+  spaceRepositoryContract,
+  spaceRepositoryLifecycleContract,
+} from '../support/repository-contract';
 import { sqlReadRepositoryContract } from '../support/sql-read-repository-contract';
 import { expectPersisted } from '../support/persistence-contract';
 
@@ -72,6 +76,26 @@ sqlReadRepositoryContract('SqlSpaceRepository (PostgreSQL tracer)', async () => 
   };
 });
 
+// Ticket 23: `SqlSpaceRepository` now owns the Meta lifecycle itself, so the
+// lifecycle group runs directly against it -- no seeding through the old
+// adapter, unlike the read tracer above. `commit` stays on
+// `PostgresSpaceRepository` until ticket 24, so this is the lifecycle group
+// rather than the whole `spaceRepositoryContract`.
+spaceRepositoryLifecycleContract('SqlSpaceRepository (PostgreSQL)', async () => {
+  await clearHyperContent();
+  return {
+    repository: new SqlSpaceRepository(postgresSqlStore),
+    close: clearHyperContent,
+    writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
+      if (exportedRevision === undefined) {
+        await db.orm.public.Space.where({ id: spaceId }).update({ revision });
+        return;
+      }
+      await db.orm.public.Space.where({ id: spaceId }).update({ revision, exportedRevision });
+    },
+  };
+});
+
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const OMITTED_THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
@@ -97,6 +121,10 @@ const ORDERED_THING_IDS = [
   uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-3333-4eee-8eee-eeeeeeeeeeee'),
 ] as const;
+const RACE_CHILD_SPACE_ID = uuidSchema.parse('1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a');
+const RACE_CHILD_DIAGRAM_ID = uuidSchema.parse('1b1b1b1b-1b1b-4b1b-8b1b-1b1b1b1b1b1b');
+const RACE_CHILD_GRAPH_ID = uuidSchema.parse('1c1c1c1c-1c1c-4c1c-8c1c-1c1c1c1c1c1c');
+const RACE_LINK_THING_ID = uuidSchema.parse('1d1d1d1d-1d1d-4d1d-8d1d-1d1d1d1d1d1d');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -208,6 +236,78 @@ const linkedSnapshot: SpaceSnapshot = {
     },
   ],
 };
+
+describe('SqlSpaceRepository (PostgreSQL) — Meta-lock retry race', () => {
+  const repository = new SqlSpaceRepository(postgresSqlStore);
+
+  afterEach(clearHyperContent);
+
+  /*
+   * Ticket 23: the same race as `PostgresSpaceRepository`'s own version above
+   * (see its doc comment for the full account), run against the one SQL
+   * repository directly -- the fix lives in `SqlSpaceRepository`'s own
+   * `#lockMetaIdentity` (`src/persistence/sql-space-repository.ts`), which
+   * every database now shares, not merely in the adapter ticket 24 deletes.
+   */
+  it('conflicts a replacement authorized against an identity a concurrent replacement retired', async () => {
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
+
+    const lockHeld = Promise.withResolvers<undefined>();
+    const releaseLock = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      // Take the singleton row's write lock exactly where `lockMetaIdentity`'s
+      // own self-update would, so the racing call blocks on this transaction
+      // rather than on a second real replacement's own lock-acquisition timing.
+      await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId: SPACE_ID });
+      lockHeld.resolve(undefined);
+      await releaseLock.promise;
+      // What the held lock stands in for: retire the identity the racing call
+      // already read and establish an entirely different one, before releasing
+      // the lock the racing call's self-update has been waiting on all along.
+      await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
+      await orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
+      await orm.public.Space.where({ id: SPACE_ID }).delete();
+      await orm.public.Space.create({
+        id: OTHER_SPACE_ID,
+        document: toJsonValue(otherSnapshot.document),
+        revision: '0',
+      });
+      for (const thing of otherSnapshot.things) {
+        await orm.public.Thing.create({
+          id: thing.id,
+          spaceId: OTHER_SPACE_ID,
+          document: toJsonValue(thing.document),
+        });
+      }
+      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+    });
+    await lockHeld.promise;
+
+    const racing = repository.replaceAggregate(
+      {
+        metaSpaceId: SPACE_ID,
+        spaces: [{ ...snapshot, document: { ...snapshot.document, title: 'Must not land' } }],
+      },
+      SPACE_ID,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    releaseLock.resolve(undefined);
+    await blocker;
+
+    // The identity `replaceAggregate` was authorized against (`SPACE_ID`) is
+    // gone by the time its write would land -- a conflict naming the identity
+    // now actually stored, never a silent overwrite of the replacement that
+    // retired it.
+    await expect(racing).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: OTHER_SPACE_ID,
+        spaces: [{ snapshot: otherSnapshot, revision: 0n, exportedRevision: null }],
+      },
+    });
+  });
+});
 
 describe('PostgresSpaceRepository', () => {
   const repository = new PostgresSpaceRepository(db);
@@ -564,19 +664,33 @@ describe('PostgresSpaceRepository', () => {
   });
 
   /*
-   * The regression this pins: a CI run failed asserting that the *second* of
-   * two concurrent replacements is the one whose state survives. It is not the
-   * call order that decides. Both proposals read the Meta identity they are
-   * authorized against before either write lands, so both replace, and the
-   * survivor is whichever PostgreSQL grants the Meta row lock to last.
+   * The regression this used to pin, before ticket 23: a CI run failed
+   * asserting that the *second* of two concurrent replacements is the one
+   * whose state survives, and the fix at the time was to stop asserting which
+   * one survives -- both proposals read the Meta identity they are authorized
+   * against before either write lands, so (that version reasoned) both
+   * replace, and the survivor is whichever PostgreSQL grants the Meta row
+   * lock to last.
+   *
+   * That reasoning missed a second race living inside the same window: the
+   * *loser* of the row-lock queue does not simply wait its turn and then
+   * write against the row it originally read. The winner's whole
+   * `replaceAggregate` -- including `truncateHyperContent`'s delete of the very
+   * row the loser is blocked on -- runs and commits before the loser's blocked
+   * self-update ever unblocks, so the loser meets exactly ticket 23's race
+   * (`lockMetaIdentity`'s self-update finds the row gone) and, correctly
+   * fixed, conflicts against the identity the winner just established rather
+   * than silently overwriting it. `expectPersisted(...).toMatchObject([{kind:
+   * 'replaced'}, {kind: 'replaced'}])` no longer holds -- exactly one of the
+   * two replaces, the other conflicts, and this is now where that is pinned.
    *
    * The blocking transaction is what the shared contract cannot have. It makes
    * the two genuinely overlap: issued back to back they might simply run one
-   * after the other, and the second would then read the new identity and
-   * conflict, so `replaced` twice is itself a race there and is asserted here
-   * instead.
+   * after the other, and the second would then read the new identity outright
+   * and conflict for that unrelated reason, which is not the race this test is
+   * about.
    */
-  it('leaves one whole proposal when two replacements overlap on the Meta row lock', async () => {
+  it('conflicts the loser when two replacements overlap on the Meta row lock', async () => {
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
 
     const metaLockHeld = Promise.withResolvers<undefined>();
@@ -602,38 +716,213 @@ describe('PostgresSpaceRepository', () => {
     releaseMetaLock.resolve(undefined);
     await blocking;
 
-    // Both replace, and the barrier is what makes that certain: neither could
-    // take the lock while the blocking transaction held it, so both had already
-    // read the identity they are authorized against by the time it released.
-    expectPersisted(await Promise.all([queuedFirst, queuedSecond])).toMatchObject([
-      { kind: 'replaced' },
-      { kind: 'replaced' },
-    ]);
-    /*
-     * Which one survives is not asserted. PostgreSQL serves the waiters in the
-     * order they queue, but that is its behaviour rather than a promise it
-     * makes, and a test that fixes a flake by depending on it has moved the
-     * flake rather than removed it. What the store owes is that it holds one
-     * proposal whole -- its Meta identity and its Space from the same
-     * replacement, never a mixture of the two.
-     */
-    const loaded = await repository.loadAggregate();
-    expect([
-      {
-        kind: 'loaded',
-        aggregate: {
-          metaSpaceId: OTHER_SPACE_ID,
-          spaces: [{ snapshot: otherSnapshot, revision: 0n, exportedRevision: null }],
-        },
+    const results = await Promise.all([queuedFirst, queuedSecond]);
+    // Neither could take the lock while the blocking transaction held it, so
+    // both had already read the identity they were authorized against
+    // (`SPACE_ID`) by the time it released -- but only one of them can then be
+    // the one PostgreSQL grants the row lock to first, and that one's own
+    // replacement retires `SPACE_ID` out from under the other, which is
+    // ticket 23's race. Which one wins is not asserted, for the same reason
+    // the sibling "leaves one whole proposal" test below does not assert it.
+    expect(results.filter((result) => result.kind === 'replaced')).toHaveLength(1);
+    expect(results.filter((result) => result.kind === 'conflict')).toHaveLength(1);
+    const winnerIsFirst = results[0].kind === 'replaced';
+    const winningMetaSpaceId = winnerIsFirst ? OTHER_SPACE_ID : CONCURRENT_SPACE_ID;
+    const winningSnapshot = winnerIsFirst ? otherSnapshot : concurrentSnapshot;
+    expect(results).toContainEqual({ kind: 'conflict', currentMetaSpaceId: winningMetaSpaceId });
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: winningMetaSpaceId,
+        spaces: [{ snapshot: winningSnapshot, revision: 0n, exportedRevision: null }],
       },
+    });
+  });
+
+  /*
+   * Ticket 23: `lockMetaIdentity`'s self-update finds the singleton row gone
+   * when a concurrent replacement has deleted and rewritten it between this
+   * read and that self-update. `4ec1d1e7` ("Preserve replacement
+   * authorization across lock retry") made the retry's caller receive the
+   * identity read *before* the replacement rather than the one the retry
+   * itself just found -- and nothing failed if that were reversed. This pins
+   * which is correct: a manually held row lock stands in for a replacement
+   * mid-flight, so `replaceAggregate`'s own read is forced to land before the
+   * held lock's release and its self-update is forced to block on it, then
+   * the held transaction retires the identity `replaceAggregate` read and
+   * commits an entirely different one before releasing.
+   */
+  it('conflicts a replacement authorized against an identity a concurrent replacement retired', async () => {
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
+
+    const lockHeld = Promise.withResolvers<undefined>();
+    const releaseLock = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      // Take the singleton row's write lock exactly where `lockMetaIdentity`'s
+      // own self-update would, so the racing call blocks on this transaction
+      // rather than on a second real replacement's own lock-acquisition timing.
+      await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId: SPACE_ID });
+      lockHeld.resolve(undefined);
+      await releaseLock.promise;
+      // What the held lock stands in for: retire the identity the racing call
+      // already read and establish an entirely different one, before releasing
+      // the lock the racing call's self-update has been waiting on all along.
+      await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
+      await orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
+      await orm.public.Space.where({ id: SPACE_ID }).delete();
+      await orm.public.Space.create({
+        id: OTHER_SPACE_ID,
+        document: toJsonValue(otherSnapshot.document),
+        revision: '0',
+      });
+      for (const thing of otherSnapshot.things) {
+        await orm.public.Thing.create({
+          id: thing.id,
+          spaceId: OTHER_SPACE_ID,
+          document: toJsonValue(thing.document),
+        });
+      }
+      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+    });
+    await lockHeld.promise;
+
+    const racing = repository.replaceAggregate(
       {
-        kind: 'loaded',
-        aggregate: {
-          metaSpaceId: CONCURRENT_SPACE_ID,
-          spaces: [{ snapshot: concurrentSnapshot, revision: 0n, exportedRevision: null }],
-        },
+        metaSpaceId: SPACE_ID,
+        spaces: [{ ...snapshot, document: { ...snapshot.document, title: 'Must not land' } }],
       },
-    ]).toContainEqual(loaded);
+      SPACE_ID,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    releaseLock.resolve(undefined);
+    await blocker;
+
+    // The identity `replaceAggregate` was authorized against (`SPACE_ID`) is
+    // gone by the time its write would land -- a conflict naming the identity
+    // now actually stored, never a silent overwrite of the replacement that
+    // retired it.
+    await expect(racing).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: OTHER_SPACE_ID });
+    await expect(repository.loadAggregate()).resolves.toEqual({
+      kind: 'loaded',
+      aggregate: {
+        metaSpaceId: OTHER_SPACE_ID,
+        spaces: [{ snapshot: otherSnapshot, revision: 0n, exportedRevision: null }],
+      },
+    });
+  });
+
+  /*
+   * The same race, reaching `commit`'s own `lockMetaIdentity` call instead
+   * (`#commitInTransaction`, past the topology-preserving fast path, which a
+   * two-change commit never takes). The candidate this commit proposes is
+   * only valid rooted at the identity the concurrent replacement actually
+   * established, never at the one the racing call read: judged against the
+   * stale identity, `loadSpaceAggregate` cannot find it among the now-current
+   * Spaces at all and the commit is wrongly refused as an invariant failure;
+   * judged against the current identity, it commits.
+   */
+  it('judges a complete-aggregate commit against an identity a concurrent replacement retired', async () => {
+    createdSpaceIds.add(RACE_CHILD_SPACE_ID);
+    const linkedOther: SpaceSnapshot = {
+      ...otherSnapshot,
+      things: [
+        ...otherSnapshot.things,
+        {
+          id: RACE_LINK_THING_ID,
+          document: {
+            title: 'To the race child',
+            kind: 'space',
+            spaceId: RACE_CHILD_SPACE_ID,
+            diagram: RACE_CHILD_DIAGRAM_ID,
+            graph: RACE_CHILD_GRAPH_ID,
+          },
+        },
+      ],
+    };
+    const raceChild: SpaceSnapshot = {
+      id: RACE_CHILD_SPACE_ID,
+      document: {
+        version: 1,
+        title: 'Race child',
+        defaultDiagram: RACE_CHILD_DIAGRAM_ID,
+        diagrams: [
+          {
+            id: RACE_CHILD_DIAGRAM_ID,
+            title: 'Diagram 1',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: RACE_CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: RACE_CHILD_GRAPH_ID,
+          },
+        ],
+      },
+      things: [],
+    };
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
+
+    const lockHeld = Promise.withResolvers<undefined>();
+    const releaseLock = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      await orm.public.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId: SPACE_ID });
+      lockHeld.resolve(undefined);
+      await releaseLock.promise;
+      await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
+      await orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
+      await orm.public.Space.where({ id: SPACE_ID }).delete();
+      await orm.public.Space.create({
+        id: OTHER_SPACE_ID,
+        document: toJsonValue(linkedOther.document),
+        revision: '0',
+      });
+      for (const thing of linkedOther.things) {
+        await orm.public.Thing.create({
+          id: thing.id,
+          spaceId: OTHER_SPACE_ID,
+          document: toJsonValue(thing.document),
+        });
+      }
+      await orm.public.Space.create({
+        id: RACE_CHILD_SPACE_ID,
+        document: toJsonValue(raceChild.document),
+        revision: '0',
+      });
+      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
+    });
+    await lockHeld.promise;
+
+    // Two changes -- an ordinary single-Space update takes the
+    // topology-preserving fast path, which never reaches `lockMetaIdentity` at
+    // all. Both retitle only, keeping the Space Thing link intact, so the
+    // candidate this proposes stays valid exactly when it is judged against
+    // the identity the concurrent replacement actually established.
+    const racing = repository.commit({
+      changes: [
+        {
+          kind: 'update',
+          spaceId: OTHER_SPACE_ID,
+          snapshot: {
+            ...linkedOther,
+            document: { ...linkedOther.document, title: 'Retitled after race' },
+          },
+          expectedRevision: 0n,
+        },
+        {
+          kind: 'update',
+          spaceId: RACE_CHILD_SPACE_ID,
+          snapshot: { ...raceChild, document: { ...raceChild.document, title: 'Retitled child' } },
+          expectedRevision: 0n,
+        },
+      ],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    releaseLock.resolve(undefined);
+    await blocker;
+
+    expectPersisted(await racing).toMatchObject({ kind: 'committed' });
+    expectPersisted(await repository.loadSpace(OTHER_SPACE_ID)).toMatchObject({
+      revision: 1n,
+      snapshot: { document: { title: 'Retitled after race' } },
+    });
   });
 
   it('persists first-working-load initialization for a fresh repository host', async () => {

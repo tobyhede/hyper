@@ -5,7 +5,10 @@ import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
-import { spaceRepositoryContract } from '../support/repository-contract';
+import {
+  spaceRepositoryContract,
+  spaceRepositoryLifecycleContract,
+} from '../support/repository-contract';
 import { sqlReadRepositoryContract } from '../support/sql-read-repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
@@ -38,6 +41,29 @@ sqlReadRepositoryContract('SqlSpaceRepository (SQLite tracer)', async () => {
     seed: harness.repository,
     read: new SqlSpaceRepository(sqliteSqlStore(harness.database)),
     close: harness.close,
+  };
+});
+
+// Ticket 23: `SqlSpaceRepository` now owns the Meta lifecycle itself, so the
+// lifecycle group runs directly against it -- no seeding through the old
+// adapter, unlike the read tracer above. `commit` stays on
+// `SqliteSpaceRepository` until ticket 24, so this is the lifecycle group
+// rather than the whole `spaceRepositoryContract`.
+spaceRepositoryLifecycleContract('SqlSpaceRepository (SQLite)', async () => {
+  const harness = await openSqliteRepository();
+  return {
+    repository: new SqlSpaceRepository(sqliteSqlStore(harness.database)),
+    close: harness.close,
+    writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
+      if (exportedRevision === undefined) {
+        await harness.database.orm.Space.where({ id: spaceId }).update({ revision });
+        return;
+      }
+      await harness.database.orm.Space.where({ id: spaceId }).update({
+        revision,
+        exportedRevision,
+      });
+    },
   };
 });
 

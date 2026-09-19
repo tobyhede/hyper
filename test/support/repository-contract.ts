@@ -195,21 +195,29 @@ const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revi
   });
 
 /**
- * Seeding runs through `initializeAggregate` rather than through a constructor
- * argument, unlike the `SpaceBackend` contract. That is the door (ADR 0078):
- * rows reach a PostgreSQL-backed repository only through the two lifecycle
- * operations or a commit, all of which are part of the seam under test, and a
- * test helper seeds through the same ones the product uses.
- *
- * The first Space named is the Meta identity, stated rather than inferred —
- * every case below passes its whole aggregate in one call, so there is no batch
- * position for Meta to be read off.
+ * The lifecycle group -- everything `spaceRepositoryContract` below owes
+ * that does not touch `commit` -- run on its own against a repository that
+ * implements only the lifecycle members (ADR 0095's one SQL repository has
+ * no `commit` yet; tickets 23-24). `spaceRepositoryContract` calls this
+ * first with its own, wider harness (a `RepositoryHarness` is one, since
+ * `SpaceRepository` has everything `LifecycleRepository` needs and more), so
+ * every case here still runs against both full adapters exactly once -- this
+ * split changes nothing about what they are held to, only what a
+ * commit-less repository can be held to as well.
  */
-export const spaceRepositoryContract = (
+export type LifecycleRepository = Omit<SpaceRepository, 'commit'>;
+
+export interface LifecycleRepositoryHarness {
+  repository: LifecycleRepository;
+  close(): Promise<void>;
+  writeRawRevision?: RepositoryHarness['writeRawRevision'];
+}
+
+export const spaceRepositoryLifecycleContract = (
   name: string,
-  createHarness: () => Promise<RepositoryHarness>,
+  createHarness: () => Promise<LifecycleRepositoryHarness>,
 ): void => {
-  const withHarness = async (body: (repository: SpaceRepository) => Promise<void>) => {
+  const withHarness = async (body: (repository: LifecycleRepository) => Promise<void>) => {
     const harness = await createHarness();
     try {
       await body(harness.repository);
@@ -227,8 +235,8 @@ export const spaceRepositoryContract = (
    */
   const withRawRevisionHarness = async (
     body: (
-      repository: SpaceRepository,
-      writeRawRevision: NonNullable<RepositoryHarness['writeRawRevision']>,
+      repository: LifecycleRepository,
+      writeRawRevision: NonNullable<LifecycleRepositoryHarness['writeRawRevision']>,
     ) => Promise<void>,
   ) => {
     const harness = await createHarness();
@@ -240,7 +248,7 @@ export const spaceRepositoryContract = (
     }
   };
 
-  const seed = async (repository: SpaceRepository, ...spaces: readonly SpaceSnapshot[]) => {
+  const seed = async (repository: LifecycleRepository, ...spaces: readonly SpaceSnapshot[]) => {
     const meta = spaces[0];
     if (meta === undefined) throw new Error('Seeding needs at least a Meta Space');
     const result = await repository.initializeAggregate({ metaSpaceId: meta.id, spaces });
@@ -466,6 +474,170 @@ export const spaceRepositoryContract = (
       });
     });
   });
+
+  it(`${name} refuses to record an exported revision for a Space it does not store`, async () => {
+    await withHarness(async (repository) => {
+      await expect(repository.markExported(MISSING_SPACE_ID, 0n)).rejects.toThrow(
+        `Space ${MISSING_SPACE_ID} does not exist`,
+      );
+    });
+  });
+
+  it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
+    await withHarness(async (repository) => {
+      const spaces = [
+        space(SPACE_ID, 'First', [THING_ID]),
+        space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
+      ];
+
+      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
+      expect(result.kind).toBe('aggregate-refused');
+      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-space-id', spaceId: SPACE_ID }),
+      );
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  /*
+   * A Thing belongs to exactly one Space of the aggregate, and an aggregate
+   * that says otherwise is refused whole. There is no longer a second,
+   * insert-only reading in which a proposal collides with a Thing some
+   * *surviving stored* Space owns: both lifecycle doors take the aggregate
+   * entire, so what is stored after the call is what the call proposed, and
+   * ownership is settled inside that proposal alone (ADR 0078). The two
+   * distinct codes this pair of cases used to hold apart went with it.
+   */
+  it(`${name} refuses an aggregate that repeats a Thing identity, storing none of it`, async () => {
+    await withHarness(async (repository) => {
+      const spaces = [
+        space(SPACE_ID, 'First', [THING_ID]),
+        space(OTHER_SPACE_ID, 'Second', [THING_ID]),
+      ];
+
+      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
+      expect(result.kind).toBe('aggregate-refused');
+      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-thing-id', thingId: THING_ID }),
+      );
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
+    await withHarness(async (repository) => {
+      const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
+
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      // A refusal stores none of what it was offered, not even the Space that
+      // would have loaded on its own.
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  /*
+   * Replacement drops every stored Space, so a Thing a doomed Space owns is free
+   * for the replacement to claim. Ownership is judged against what the
+   * replacement proposes, never against what the same call is about to delete —
+   * which is what taking the aggregate entire buys over inserting into whatever
+   * is already there.
+   */
+  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
+    await withHarness(async (repository) => {
+      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
+      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
+
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
+          SPACE_ID,
+        ),
+      ).resolves.toEqual({
+        kind: 'replaced',
+        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
+      expect(new Set(await repository.listSpaces())).toEqual(
+        new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
+      );
+    });
+  });
+
+  // Ticket 27 proved this for SQLite, whose TEXT column always could hold a
+  // non-canonical revision; ADR 0095's TEXT columns make it reachable on
+  // PostgreSQL too, so it belongs here rather than in one database's own
+  // integration file.
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async () => {
+    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
+
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+    });
+  });
+};
+
+/**
+ * Seeding runs through `initializeAggregate` rather than through a constructor
+ * argument, unlike the `SpaceBackend` contract. That is the door (ADR 0078):
+ * rows reach a PostgreSQL-backed repository only through the two lifecycle
+ * operations or a commit, all of which are part of the seam under test, and a
+ * test helper seeds through the same ones the product uses.
+ *
+ * The first Space named is the Meta identity, stated rather than inferred —
+ * every case below passes its whole aggregate in one call, so there is no batch
+ * position for Meta to be read off.
+ */
+export const spaceRepositoryContract = (
+  name: string,
+  createHarness: () => Promise<RepositoryHarness>,
+): void => {
+  spaceRepositoryLifecycleContract(name, createHarness);
+
+  const withHarness = async (body: (repository: SpaceRepository) => Promise<void>) => {
+    const harness = await createHarness();
+    try {
+      await body(harness.repository);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  /**
+   * `withHarness`, plus the raw revision-column write the ceiling and
+   * canonical-decimal cases need. A harness with no `writeRawRevision` (the
+   * memory double) has nothing for these to prove — a stored revision it
+   * cannot represent in the first place — so the body is skipped rather than
+   * asserting anything.
+   */
+  const withRawRevisionHarness = async (
+    body: (
+      repository: SpaceRepository,
+      writeRawRevision: NonNullable<RepositoryHarness['writeRawRevision']>,
+    ) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.writeRawRevision === undefined) return;
+      await body(harness.repository, harness.writeRawRevision);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  const seed = async (repository: SpaceRepository, ...spaces: readonly SpaceSnapshot[]) => {
+    const meta = spaces[0];
+    if (meta === undefined) throw new Error('Seeding needs at least a Meta Space');
+    const result = await repository.initializeAggregate({ metaSpaceId: meta.id, spaces });
+    if (result.kind !== 'initialized') throw new Error(`Seeding failed: ${result.kind}`);
+    return result.aggregate.spaces;
+  };
 
   /*
    * The migration that adds the singleton Meta row deliberately leaves it empty
@@ -1067,99 +1239,6 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses to record an exported revision for a Space it does not store`, async () => {
-    await withHarness(async (repository) => {
-      await expect(repository.markExported(MISSING_SPACE_ID, 0n)).rejects.toThrow(
-        `Space ${MISSING_SPACE_ID} does not exist`,
-      );
-    });
-  });
-
-  it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
-    await withHarness(async (repository) => {
-      const spaces = [
-        space(SPACE_ID, 'First', [THING_ID]),
-        space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
-      ];
-
-      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
-      expect(result.kind).toBe('aggregate-refused');
-      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
-      expect(result.errors).toContainEqual(
-        expect.objectContaining({ kind: 'duplicate-space-id', spaceId: SPACE_ID }),
-      );
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  /*
-   * A Thing belongs to exactly one Space of the aggregate, and an aggregate
-   * that says otherwise is refused whole. There is no longer a second,
-   * insert-only reading in which a proposal collides with a Thing some
-   * *surviving stored* Space owns: both lifecycle doors take the aggregate
-   * entire, so what is stored after the call is what the call proposed, and
-   * ownership is settled inside that proposal alone (ADR 0078). The two
-   * distinct codes this pair of cases used to hold apart went with it.
-   */
-  it(`${name} refuses an aggregate that repeats a Thing identity, storing none of it`, async () => {
-    await withHarness(async (repository) => {
-      const spaces = [
-        space(SPACE_ID, 'First', [THING_ID]),
-        space(OTHER_SPACE_ID, 'Second', [THING_ID]),
-      ];
-
-      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
-      expect(result.kind).toBe('aggregate-refused');
-      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
-      expect(result.errors).toContainEqual(
-        expect.objectContaining({ kind: 'duplicate-thing-id', thingId: THING_ID }),
-      );
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
-    await withHarness(async (repository) => {
-      const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
-      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
-
-      await expect(
-        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
-      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
-      // A refusal stores none of what it was offered, not even the Space that
-      // would have loaded on its own.
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  /*
-   * Replacement drops every stored Space, so a Thing a doomed Space owns is free
-   * for the replacement to claim. Ownership is judged against what the
-   * replacement proposes, never against what the same call is about to delete —
-   * which is what taking the aggregate entire buys over inserting into whatever
-   * is already there.
-   */
-  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
-    await withHarness(async (repository) => {
-      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
-      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
-
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
-          SPACE_ID,
-        ),
-      ).resolves.toEqual({
-        kind: 'replaced',
-        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
-      });
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-      expect(new Set(await repository.listSpaces())).toEqual(
-        new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
-      );
-    });
-  });
-
   // Revisions above `Number.MAX_SAFE_INTEGER` are ordinary once a database
   // stores them as text rather than a native integer (ADR 0095) — both
   // databases hold and round-trip one identically now, so this is shared
@@ -1184,20 +1263,6 @@ export const spaceRepositoryContract = (
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
         stored(changed, aboveSafe + 1n, null),
       );
-    });
-  });
-
-  // Ticket 27 proved this for SQLite, whose TEXT column always could hold a
-  // non-canonical revision; ADR 0095's TEXT columns make it reachable on
-  // PostgreSQL too, so it belongs here rather than in one database's own
-  // integration file.
-  it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async () => {
-    await withRawRevisionHarness(async (repository, writeRawRevision) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
-      await seed(repository, first);
-      await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
-
-      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     });
   });
 

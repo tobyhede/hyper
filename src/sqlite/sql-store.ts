@@ -1,8 +1,17 @@
 import type { SqlSpaceListRow, SqlStore, SqlTables } from '../persistence/sql-store';
+import { toJsonValue } from '../persistence/sql-store';
 import type { SqliteDatabase } from './db';
 import { serialiseSqlite } from './serialise';
 
 type Orm = SqliteDatabase['orm'];
+/**
+ * The transaction context `SqliteDatabase['transaction']`'s callback receives.
+ * `Handle` below is built from this rather than from `Orm` alone, because
+ * `Space.loadEvery` needs the same lower-level `sql`/`execute` access
+ * `SqliteSpaceRepository.loadEverySpace` used before ticket 23 (see
+ * `SqlTables`'s doc comment in `../persistence/sql-store`).
+ */
+type Tx = Parameters<Parameters<SqliteDatabase['transaction']>[0]>[0];
 
 /**
  * The one member `SqlTables`'s doc comment says crosses the module boundary
@@ -23,19 +32,35 @@ const asOrderable = <Order>(space: Orderable<Order>): Orderable<Order> => space;
 interface SqlUniqueViolationFields {
   readonly kind?: unknown;
   readonly sqlState?: unknown;
+  readonly constraint?: unknown;
 }
 
 /**
- * SQLite's own answer to a losing insert: SQLSTATE 23505, with no
- * table/constraint precision to check further — the 0.16.0 driver does not
- * reliably carry one (ticket 23 records whether a later version does).
+ * SQLite's own answer to a losing insert: SQLSTATE 23505, matched against the
+ * `<table>.<column>` constraint text `SqlQueryError.constraint` carries on
+ * the pinned 0.16.0 driver.
+ *
+ * Investigated for ticket 23 against a real duplicate-key error on both
+ * `spaces` and `repository_state` (`@prisma-next/driver-sqlite`'s
+ * `normalizeSqliteError`, 0.16.0): the driver's own `SqlQueryError.table` is
+ * always `undefined` — nothing sets it — but `.constraint` is not; it is
+ * parsed from SQLite's own message (`UNIQUE constraint failed: <table>.
+ * <column>`) into exactly that `<table>.<column>` text, e.g. `spaces.id` or
+ * `repository_state.singleton_id`. That reaches PostgreSQL's table precision
+ * despite arriving through a different field, so this checks `constraint`
+ * rather than the ever-`undefined` `table`.
  */
-const isUniqueViolation = (error: unknown): boolean => {
+const isUniqueViolation = (error: unknown, table: string): boolean => {
   if (typeof error !== 'object' || error === null) return false;
   // SAFETY: checked above — error is a non-null object, so probing named
   // fields on it (each still typed unknown until compared) cannot throw.
   const candidate = error as SqlUniqueViolationFields;
-  return candidate.kind === 'sql_query' && candidate.sqlState === '23505';
+  return (
+    candidate.kind === 'sql_query' &&
+    candidate.sqlState === '23505' &&
+    typeof candidate.constraint === 'string' &&
+    candidate.constraint.startsWith(`${table}.`)
+  );
 };
 
 /**
@@ -68,6 +93,134 @@ const loadWithThings = (orm: Orm, id: string) =>
     .first();
 
 /**
+ * Every stored Space with its Things, ascending by id — read through the
+ * lower-level `sql`/`execute` builder rather than the ORM, so that a
+ * `document` that is not even JSON reaches the repository's own per-row
+ * classification as raw text instead of throwing inside the driver's json
+ * codec before any of this module's code runs (`SqlTables`'s doc comment).
+ * This is `SqliteSpaceRepository.loadEverySpace`'s pre-ticket-23 read,
+ * unchanged in technique and moved here; its own extended doc comment (see
+ * `git log` on that file) is the fuller account of why two raw-text
+ * statements rather than one `include` read, and why `document`'s codec is
+ * overridden to `'sqlite/text@1'` on the way out.
+ *
+ * `database.sql`/`database.raw` are stateless plan builders — the exact same
+ * type whichever handle names them (`SqliteClient.sql`/`SqliteTransactionContext.sql`
+ * share one `UnboundSql<TContract>` type) — so they are read from `database`'s
+ * own closure rather than threaded through `Handle`; only `execute`, which
+ * runs a built plan against one specific connection, has to come from the
+ * `Handle` this call is running under.
+ */
+const loadEvery = async (database: SqliteDatabase, handle: Handle) => {
+  const spacesPlan = database.sql.spaces
+    .select((fields) => ({
+      id: fields.id,
+      document: database.raw`document`.returns('sqlite/text@1'),
+      revision: fields.revision,
+      exportedRevision: fields.exported_revision,
+    }))
+    .orderBy('id', { direction: 'asc' })
+    .build();
+  const spaceRows = await handle.execute(spacesPlan);
+
+  const thingsPlan = database.sql.things
+    .select((fields) => ({
+      id: fields.id,
+      spaceId: fields.space_id,
+      document: database.raw`document`.returns('sqlite/text@1'),
+    }))
+    .orderBy('id', { direction: 'asc' })
+    .build();
+  const thingRows = await handle.execute(thingsPlan);
+
+  const thingsBySpace = new Map<string, { readonly id: string; readonly document: unknown }[]>();
+  for (const thing of thingRows) {
+    const row = { id: thing.id, document: thing.document };
+    const existing = thingsBySpace.get(thing.spaceId);
+    if (existing === undefined) thingsBySpace.set(thing.spaceId, [row]);
+    else existing.push(row);
+  }
+
+  return spaceRows.map((space) => ({
+    id: space.id,
+    document: space.document,
+    revision: space.revision,
+    exportedRevision: space.exportedRevision,
+    things: thingsBySpace.get(space.id) ?? [],
+  }));
+};
+
+/** `SqlTables.Space.loadAllForReplacement`'s own doc comment explains why `document` is never selected. */
+const loadAllForReplacement = (orm: Orm) =>
+  orm.Space.select('id', 'revision')
+    .orderBy((space) => space.id.asc())
+    .all();
+
+/** `SqlTables.Space.relock`'s own doc comment explains the placeholder `document`. */
+const relock = async (orm: Orm, id: string): Promise<string | undefined> => {
+  const locked = await orm.Space.where({ id }).update({ document: toJsonValue({}) });
+  return locked === null ? undefined : locked.revision;
+};
+
+const createSpace = async (
+  orm: Orm,
+  input: { readonly id: string; readonly document: unknown; readonly revision: string },
+): Promise<void> => {
+  await orm.Space.create({
+    id: input.id,
+    document: toJsonValue(input.document),
+    revision: input.revision,
+  });
+};
+
+const listSpaceIds = async (orm: Orm): Promise<readonly string[]> => {
+  const rows = await orm.Space.select('id').all();
+  return rows.map((row) => row.id);
+};
+
+const deleteSpaceById = async (orm: Orm, id: string): Promise<void> => {
+  await orm.Space.where({ id }).delete();
+};
+
+const setExportedRevision = async (orm: Orm, id: string, revision: string): Promise<boolean> => {
+  const updated = await orm.Space.where({ id }).update({ exportedRevision: revision });
+  return updated !== null;
+};
+
+const createThing = async (
+  orm: Orm,
+  input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
+): Promise<void> => {
+  await orm.Thing.create({
+    id: input.id,
+    spaceId: input.spaceId,
+    document: toJsonValue(input.document),
+  });
+};
+
+const deleteThingsForSpace = async (orm: Orm, spaceId: string): Promise<void> => {
+  await orm.Thing.where({ spaceId }).deleteAll();
+};
+
+const readRepositoryState = async (orm: Orm): Promise<{ readonly metaSpaceId: string } | null> => {
+  const state = await orm.RepositoryState.where({ singletonId: 1 }).first();
+  return state === null ? null : { metaSpaceId: state.metaSpaceId };
+};
+
+const relockRepositoryState = async (orm: Orm, metaSpaceId: string): Promise<boolean> => {
+  const locked = await orm.RepositoryState.where({ singletonId: 1 }).update({ metaSpaceId });
+  return locked !== null;
+};
+
+const createRepositoryState = async (orm: Orm, metaSpaceId: string): Promise<void> => {
+  await orm.RepositoryState.create({ singletonId: 1, metaSpaceId });
+};
+
+const deleteRepositoryState = async (orm: Orm): Promise<void> => {
+  await orm.RepositoryState.where({ singletonId: 1 }).delete();
+};
+
+/**
  * Same trick, over the whole `SqlStore` value: `Handle` is inferred from
  * what is passed rather than written out, so nothing here asserts a shape
  * the object literal does not actually have. `Order`, unlike `Handle`, is
@@ -76,6 +229,21 @@ const loadWithThings = (orm: Orm, id: string) =>
  */
 const defineSqlStore = <Handle, Order>(store: SqlStore<Handle, Order>): SqlStore<Handle, Order> =>
   store;
+
+/**
+ * What `tables(handle)` calls through, on either side of a transaction
+ * boundary: `orm` for the ordinary ORM calls every other member runs, and
+ * `execute` for `loadEvery`'s lower-level plans. A transaction's own context
+ * (`Tx`) carries strictly more than this — `sql`, `enums`, `invalidated` —
+ * so passing one where a `Handle` is expected needs no conversion; only the
+ * non-transactional case (`sqliteSqlStore`'s own `orm` field below) has to
+ * build one, since `SqliteClient` carries no bound `execute` of its own
+ * outside `.runtime()`.
+ */
+interface Handle {
+  readonly orm: Orm;
+  readonly execute: Tx['execute'];
+}
 
 /** SQLite's `SqlStore`, built over one file handle. */
 export const sqliteSqlStore = (database: SqliteDatabase) => {
@@ -91,22 +259,54 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
   const _orderProbe = asOrderable(orm.Space);
   type InferredOrder = typeof _orderProbe extends Orderable<infer O> ? O : never;
 
-  return defineSqlStore<Orm, InferredOrder>({
+  /**
+   * The non-transactional `Handle`. `orm` is `database.orm` directly; `execute`
+   * runs against `database.runtime()`, called fresh on every invocation rather
+   * than cached once, so this never holds on to a stale runtime reference.
+   * Nothing in this repository actually calls `Space.loadEvery` outside a
+   * transaction — `loadAggregate`/`initializeAggregate`/`replaceAggregate` all
+   * open one — but `Handle` is one type for both cases, so this still has to
+   * be a genuine, working value of it.
+   */
+  const nonTransactionalHandle: Handle = {
     orm,
-    tables(scopedOrm: Orm): SqlTables<InferredOrder> {
+    execute: (plan, options) => database.runtime().execute(plan, options),
+  };
+
+  return defineSqlStore<Handle, InferredOrder>({
+    orm: nonTransactionalHandle,
+    tables(handle: Handle): SqlTables<InferredOrder> {
       return {
         Space: {
-          orderBy: (build) => scopedOrm.Space.orderBy(build),
-          loadWithThings: (id: string) => loadWithThings(scopedOrm, id),
+          orderBy: (build) => handle.orm.Space.orderBy(build),
+          loadWithThings: (id: string) => loadWithThings(handle.orm, id),
+          loadEvery: () => loadEvery(database, handle),
+          loadAllForReplacement: () => loadAllForReplacement(handle.orm),
+          relock: (id: string) => relock(handle.orm, id),
+          create: (input) => createSpace(handle.orm, input),
+          listIds: () => listSpaceIds(handle.orm),
+          deleteById: (id: string) => deleteSpaceById(handle.orm, id),
+          setExportedRevision: (id: string, revision: string) =>
+            setExportedRevision(handle.orm, id, revision),
+        },
+        Thing: {
+          create: (input) => createThing(handle.orm, input),
+          deleteAllForSpace: (spaceId: string) => deleteThingsForSpace(handle.orm, spaceId),
+        },
+        RepositoryState: {
+          read: () => readRepositoryState(handle.orm),
+          relock: (metaSpaceId: string) => relockRepositoryState(handle.orm, metaSpaceId),
+          create: (metaSpaceId: string) => createRepositoryState(handle.orm, metaSpaceId),
+          delete: () => deleteRepositoryState(handle.orm),
         },
       };
     },
-    transaction<T>(fn: (orm: Orm) => Promise<T>): Promise<T> {
-      return database.transaction((tx) => fn(tx.orm));
+    transaction<T>(fn: (handle: Handle) => Promise<T>): Promise<T> {
+      return database.transaction((tx) => fn(tx));
     },
     readDocument,
-    isDuplicateKey(error: unknown): boolean {
-      return isUniqueViolation(error);
+    isDuplicateKey(error: unknown, table: string): boolean {
+      return isUniqueViolation(error, table);
     },
     serialise<T>(operation: () => Promise<T>): Promise<T> {
       return serialiseSqlite(database, operation);
