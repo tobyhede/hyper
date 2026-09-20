@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace } from '../src/index';
-import { thingFile, uuid } from './thing-files';
+import { resourceFile, uuid } from './resource-files';
 
 /**
- * `loadSpace`'s own half of intake: the space file's shape, the thing files
+ * `loadSpace`'s own half of intake: the space file's shape, the resource files
  * beside it, and the version it declares.
  *
  * What it shares with `loadSpaceSnapshot` — the aggregate relationships, the
@@ -23,7 +23,7 @@ const MAIN = {
   ],
 };
 
-/** The Diagram that owns `MAIN`; its position keys are its Thing membership. */
+/** The Map that owns `MAIN`; its position keys are its Resource membership. */
 const WORKING = {
   id: uuid('00000000-0000-4000-8000-000000000022'),
   title: 'Working',
@@ -39,33 +39,33 @@ const validInput = {
   version: 1,
   id: uuid('00000000-0000-4000-8000-000000000001'),
   title: 'Test space',
-  diagrams: [WORKING],
+  maps: [WORKING],
 };
 
-/** The same input with no Diagrams, and so no Graphs (ADR 0015). */
-const noStructure = { ...validInput, diagrams: [] };
+/** The same input with no Maps, and so no Graphs (ADR 0015). */
+const noStructure = { ...validInput, maps: [] };
 
-const validThings = [
-  thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
-  thingFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
+const validResources = [
+  resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
+  resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
 ];
 
 describe('loadSpace', () => {
   it('carries the space id and title through to the Space', () => {
-    const result = loadSpace(validInput, validThings);
+    const result = loadSpace(validInput, validResources);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.space.id).toBe(uuid('00000000-0000-4000-8000-000000000001'));
     expect(result.space.title).toBe('Test space');
-    expect(result.space.things).toHaveLength(2);
+    expect(result.space.resources).toHaveLength(2);
     expect(result.space.graphs).toHaveLength(1);
-    expect(result.space.diagrams).toHaveLength(1);
+    expect(result.space.maps).toHaveLength(1);
   });
 
-  it('builds each thing from its file, body included', () => {
-    const result = loadSpace(validInput, validThings);
+  it('builds each resource from its file, body included', () => {
+    const result = loadSpace(validInput, validResources);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.lookup.thing(uuid('00000000-0000-4000-8000-000000000002'))).toEqual({
+    expect(result.space.lookup.resource(uuid('00000000-0000-4000-8000-000000000002'))).toEqual({
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
@@ -73,11 +73,11 @@ describe('loadSpace', () => {
     });
   });
 
-  it('rejects a reference thing file with a body, because its content comes from its target', () => {
+  it('rejects a reference resource file with a body, because its content comes from its target', () => {
     const result = loadSpace(noStructure, [
-      thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
       {
-        path: 'things/a-again.md',
+        path: 'resources/a-again.md',
         text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A again\nkind: reference\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\nThis would be discarded.\n',
       },
     ]);
@@ -85,56 +85,56 @@ describe('loadSpace', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors).toEqual([
-      expect.objectContaining({ kind: 'invalid-frontmatter', path: 'things/a-again.md' }),
+      expect.objectContaining({ kind: 'invalid-frontmatter', path: 'resources/a-again.md' }),
     ]);
   });
 
-  it('orders things by title, whatever order the files arrived in', () => {
+  it('orders resources by title, whatever order the files arrived in', () => {
     const result = loadSpace(noStructure, [
-      thingFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
-      thingFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
-      thingFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
     ]);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.things.map((t) => t.title)).toEqual(['Anders', 'Bo', 'Carla']);
+    expect(result.space.resources.map((r) => r.title)).toEqual(['Anders', 'Bo', 'Carla']);
   });
 
-  it('rejects the same thing id in two files, naming both', () => {
+  it('rejects the same resource id in two files, naming both', () => {
     const result = loadSpace(noStructure, [
       { path: 'intro.md', text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n' },
       {
-        path: 'things/a.md',
+        path: 'resources/a.md',
         text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A again\n---\n',
       },
     ]);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    const duplicate = result.errors.find((e) => e.kind === 'duplicate-thing-id');
+    const duplicate = result.errors.find((e) => e.kind === 'duplicate-resource-id');
     expect(duplicate?.message).toContain('intro.md');
-    expect(duplicate?.message).toContain('things/a.md');
+    expect(duplicate?.message).toContain('resources/a.md');
   });
 
-  it('reports a thing file that will not parse, without throwing', () => {
+  it('reports a resource file that will not parse, without throwing', () => {
     const result = loadSpace(noStructure, [
-      { path: 'things/a.md', text: 'No frontmatter here.\n' },
+      { path: 'resources/a.md', text: 'No frontmatter here.\n' },
     ]);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors.some((e) => e.kind === 'missing-frontmatter')).toBe(true);
   });
 
-  it('loads a space with no things at all — a new space, before anything is written', () => {
+  it('loads a space with no resources at all — a new space, before anything is written', () => {
     const result = loadSpace(noStructure, []);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.space.things).toEqual([]);
+    expect(result.space.resources).toEqual([]);
   });
 
   it('rejects a version 2 document by its version, not by every key that moved', () => {
     // The disposable pre-release shape carried a space-level `graphs` array and
-    // diagrams with none of their own. Read against version 1 it fails twice over
-    // — once per diagram missing the graphs it now owns — and none of those
-    // issues says the thing worth saying. Hyper is unreleased, so the answer is
+    // maps with none of their own. Read against version 1 it fails twice over
+    // — once per map missing the graphs it now owns — and none of those
+    // issues says the resource worth saying. Hyper is unreleased, so the answer is
     // rejection naming the version, never a migration (ADR 0040).
     const result = loadSpace(
       {
@@ -142,7 +142,7 @@ describe('loadSpace', () => {
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Test space',
         graphs: [MAIN],
-        diagrams: [
+        maps: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -152,7 +152,7 @@ describe('loadSpace', () => {
           },
         ],
       },
-      validThings,
+      validResources,
     );
 
     expect(result.ok).toBe(false);
@@ -170,7 +170,7 @@ describe('loadSpace', () => {
     // unrecognized-key refusal leaves a reader to work out why that one
     // mattered. Declaring the key in the schema instead would put it in the
     // inferred document type, which the HTTP contract is checked against.
-    const result = loadSpace({ ...validInput, graphs: [MAIN] }, validThings);
+    const result = loadSpace({ ...validInput, graphs: [MAIN] }, validResources);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -179,38 +179,38 @@ describe('loadSpace', () => {
     expect(result.errors[0]?.message).toContain('graphs');
   });
 
-  it('accepts a version 1 space whose only graphs are the ones its Diagrams own', () => {
-    // The other side of the check above: ownership nested under a Diagram is the
+  it('accepts a version 1 space whose only graphs are the ones its Maps own', () => {
+    // The other side of the check above: ownership nested under a Map is the
     // shape, so the key it looks for is absent and nothing is rejected.
-    expect(loadSpace(validInput, validThings).ok).toBe(true);
+    expect(loadSpace(validInput, validResources).ok).toBe(true);
   });
 
   it('reports a bad shape as errors rather than throwing', () => {
-    const result = loadSpace({ version: 1, title: 'X' }, validThings); // id missing
+    const result = loadSpace({ version: 1, title: 'X' }, validResources); // id missing
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors.every((e) => e.kind === 'invalid-shape')).toBe(true);
   });
 
-  it('gives a space with no declared diagrams an empty list, never undefined', () => {
-    const { diagrams: _diagrams, ...withoutDiagrams } = validInput;
-    const result = loadSpace(withoutDiagrams, validThings);
+  it('gives a space with no declared maps an empty list, never undefined', () => {
+    const { maps: _maps, ...withoutMaps } = validInput;
+    const result = loadSpace(withoutMaps, validResources);
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.diagrams).toEqual([]);
+    expect(result.space.maps).toEqual([]);
     expect(result.space.graphs).toEqual([]);
-    expect(result.space.defaultDiagram).toBeUndefined();
+    expect(result.space.defaultMap).toBeUndefined();
   });
 
-  it('carries a declared diagram’s positions through unchanged', () => {
+  it('carries a declared map’s positions through unchanged', () => {
     const result = loadSpace(
-      { ...validInput, defaultDiagram: uuid('00000000-0000-4000-8000-000000000022') },
-      validThings,
+      { ...validInput, defaultMap: uuid('00000000-0000-4000-8000-000000000022') },
+      validResources,
     );
     if (!result.ok) throw new Error('expected a valid space');
-    expect(result.space.defaultDiagram).toBe(uuid('00000000-0000-4000-8000-000000000022'));
+    expect(result.space.defaultMap).toBe(uuid('00000000-0000-4000-8000-000000000022'));
     expect(
-      result.space.lookup.diagram(uuid('00000000-0000-4000-8000-000000000022'))?.diagram.positions[
+      result.space.lookup.map(uuid('00000000-0000-4000-8000-000000000022'))?.map.positions[
         uuid('00000000-0000-4000-8000-000000000003')
       ],
     ).toEqual({ x: 320, y: 0, open: false });
@@ -218,16 +218,16 @@ describe('loadSpace', () => {
 
   /**
    * The one intake refuses a stale authored file outright rather than reading
-   * the version 2 filter as a diagram that owns nothing. Shape, not reference:
+   * the version 2 filter as a map that owns nothing. Shape, not reference:
    * a graph id is not a graph, so no reference check ever runs over it.
    */
-  it('rejects a diagram whose graphs are ids rather than owned values', () => {
+  it('rejects a map whose graphs are ids rather than owned values', () => {
     const result = loadSpace(
       {
         ...validInput,
-        diagrams: [{ ...WORKING, graphs: [uuid('00000000-0000-4000-8000-000000000004')] }],
+        maps: [{ ...WORKING, graphs: [uuid('00000000-0000-4000-8000-000000000004')] }],
       },
-      validThings,
+      validResources,
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;

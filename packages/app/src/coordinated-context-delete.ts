@@ -1,14 +1,14 @@
 import type { UUID } from '@project/core';
 import type {
-  DeleteReferencedDiagramInput,
+  DeleteReferencedMapInput,
   DeleteReferencedGraphInput,
-  SpaceThingContextDeletionResult,
+  SpaceResourceContextDeletionResult,
 } from '@project/persistence';
-import { describeSpaceThingRefusal } from './authoring-refusal';
+import { describeSpaceResourceRefusal } from './authoring-refusal';
 
 /**
  * Why a coordinated context command did not run: a Space in the Edit had not
- * settled. The sentence is the one Space Thing commands used; delete and create
+ * settled. The sentence is the one Space Resource commands used; delete and create
  * tests pin it (`coordinated-context-delete.test.ts`,
  * `coordinated-context-create.test.ts`).
  */
@@ -16,7 +16,7 @@ export const PERSISTENCE_UNSETTLED =
   'The change could not be saved. Check the Space persistence status.';
 
 export type CoordinatedContextDeleteResult =
-  | { readonly kind: 'completed'; readonly diagramId: UUID; readonly graphId: UUID }
+  | { readonly kind: 'completed'; readonly mapId: UUID; readonly graphId: UUID }
   | { readonly kind: 'error'; readonly message: string }
   | { readonly kind: 'unchanged' };
 
@@ -30,7 +30,7 @@ export const coordinatedDeleteOk = (result: CoordinatedContextDeleteResult): boo
   result.kind !== 'error';
 
 const run = async (
-  del: () => Promise<SpaceThingContextDeletionResult>,
+  del: () => Promise<SpaceResourceContextDeletionResult>,
   waitBefore: (() => Promise<boolean>) | undefined,
 ): Promise<CoordinatedContextDeleteResult> => {
   if (waitBefore !== undefined && !(await waitBefore())) {
@@ -38,28 +38,28 @@ const run = async (
   }
   const result = await del();
   if (result.kind === 'refused') {
-    return { kind: 'error', message: describeSpaceThingRefusal(result.refusal) };
+    return { kind: 'error', message: describeSpaceResourceRefusal(result.refusal) };
   }
   if (result.kind === 'completed') {
     return {
       kind: 'completed',
-      diagramId: result.diagramId,
+      mapId: result.mapId,
       graphId: result.graphId,
     };
   }
   return { kind: 'unchanged' };
 };
 
-/** Coordinated Diagram deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
-export const coordinatedDiagramDelete = (
-  deleteDiagram: (input: DeleteReferencedDiagramInput) => Promise<SpaceThingContextDeletionResult>,
-  input: DeleteReferencedDiagramInput,
+/** Coordinated Map deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
+export const coordinatedMapDelete = (
+  deleteMap: (input: DeleteReferencedMapInput) => Promise<SpaceResourceContextDeletionResult>,
+  input: DeleteReferencedMapInput,
   waitBefore?: () => Promise<boolean>,
-): Promise<CoordinatedContextDeleteResult> => run(() => deleteDiagram(input), waitBefore);
+): Promise<CoordinatedContextDeleteResult> => run(() => deleteMap(input), waitBefore);
 
 /** Coordinated Graph deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
 export const coordinatedGraphDelete = (
-  deleteGraph: (input: DeleteReferencedGraphInput) => Promise<SpaceThingContextDeletionResult>,
+  deleteGraph: (input: DeleteReferencedGraphInput) => Promise<SpaceResourceContextDeletionResult>,
   input: DeleteReferencedGraphInput,
   waitBefore?: () => Promise<boolean>,
 ): Promise<CoordinatedContextDeleteResult> => run(() => deleteGraph(input), waitBefore);

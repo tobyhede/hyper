@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  COLLAPSED_THING_SIZE,
+  COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
   uuidSchema,
   type Graph,
-  type DiagramId,
+  type MapId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -17,11 +17,11 @@ import { composeApp } from '../src/compose-app';
 import { mintingIds } from './minting';
 
 /**
- * The semantic operations Space Authoring gained for the complete Thing and
+ * The semantic operations Space Authoring gained for the complete Resource and
  * Graph authoring experience, asserted through the interface that owns them.
  *
  * Every case here is a row of the handoff's domain transition matrix: what one
- * completed Edit writes, what creating a Diagram does to it, and the
+ * completed Edit writes, what creating a Map does to it, and the
  * invariant or no-op that row names. Deliberately separate from
  * `space-authoring.test.ts`, which owns the lifecycle around a completion —
  * ordering, the install gate, persistence and replacement — rather than the
@@ -29,79 +29,83 @@ import { mintingIds } from './minting';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const THING_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const THING_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const RESOURCE_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 /** The second identity an Edit mints, for the tests that create twice. */
 const SECOND_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
-/** A Graph identity minted by Diagram creation. */
+/** A Graph identity minted by Map creation. */
 const MINTED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
-/** What a second Diagram creation would mint. */
-const UNKNOWN_THING = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** What a second Map creation would mint. */
+const UNKNOWN_RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 /**
- * What a Space Thing pointed at a Space these tests never load selects (ADR 0079).
+ * What a Space Resource pointed at a Space these tests never load selects (ADR 0079).
  *
- * Every Space Thing names a Diagram of its target and a Graph that Diagram owns,
- * so there is no Space Thing here with nothing chosen. Whether the pair resolves
+ * Every Space Resource names a Map of its target and a Graph that Map owns,
+ * so there is no Space Resource here with nothing chosen. Whether the pair resolves
  * is the whole aggregate's question and not this seam's: single-Space intake
  * holds one Space, so a target outside it supplies nothing to check these
  * against, which is why they can be ids and nothing more.
  */
-const UNLOADED_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
+const UNLOADED_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
 const UNLOADED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
 
 const CENTRE = { x: 400, y: 300, open: false };
 
-const MAIN_GRAPH: Graph = { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] };
+const MAIN_GRAPH: Graph = {
+  id: GRAPH_ID,
+  title: 'Main',
+  edges: [{ from: RESOURCE_A, to: RESOURCE_B }],
+};
 
-/** A Space with no Diagrams, and so with no Graphs at all (ADR 0040). */
+/** A Space with no Maps, and so with no Graphs at all (ADR 0040). */
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
-/** One Diagram placing both Things and owning the Graph over them. */
+/** One Map placing both Resources and owning the Graph over them. */
 const positionedSnapshot: SpaceSnapshot = {
   ...automaticSnapshot,
   document: {
     ...automaticSnapshot.document,
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
         graphs: [MAIN_GRAPH],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
 };
 
 const graphsOf = (snapshot: SpaceSnapshot): readonly Graph[] =>
-  (snapshot.document.diagrams ?? []).flatMap((diagram) => diagram.graphs);
+  (snapshot.document.maps ?? []).flatMap((map) => map.graphs);
 
-const diagramOf = (snapshot: SpaceSnapshot, diagramId: string) =>
-  (snapshot.document.diagrams ?? []).find((diagram) => diagram.id === diagramId);
+const mapOf = (snapshot: SpaceSnapshot, mapId: string) =>
+  (snapshot.document.maps ?? []).find((map) => map.id === mapId);
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  diagramId: DiagramId = DIAGRAM_ID,
+  mapId: MapId = MAP_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
   // than taken from the ambient generator (ADR 0016, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),
@@ -110,7 +114,7 @@ function open(
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring } = composeApp({
     spaceSession: session,
-    selection: diagramId,
+    selection: mapId,
     newId,
   });
   return { session, navigation, authoring };
@@ -119,20 +123,20 @@ function open(
 const openPositioned = (newId?: () => UUID) =>
   newId === undefined ? open() : open(positionedSnapshot, undefined, newId);
 
-describe('Add Diagram', () => {
-  it('creates and selects an empty Diagram with one empty Active Graph', () => {
+describe('Add Map', () => {
+  it('creates and selects an empty Map with one empty Active Graph', () => {
     const { authoring, navigation, session } = open(
       positionedSnapshot,
-      DIAGRAM_ID,
+      MAP_ID,
       mintingIds(MINTED, MINTED_GRAPH),
     );
-    expect(authoring.complete({ kind: 'created-diagram' })).toEqual({ kind: 'completed' });
+    expect(authoring.complete({ kind: 'created-map' })).toEqual({ kind: 'completed' });
 
-    expect(session.getState().working.document.diagrams).toEqual([
-      positionedSnapshot.document.diagrams![0],
+    expect(session.getState().working.document.maps).toEqual([
+      positionedSnapshot.document.maps![0],
       {
         id: MINTED,
-        title: 'Diagram 2',
+        title: 'Map 2',
         kind: 'positioned',
         positions: {},
         graphs: [
@@ -146,59 +150,59 @@ describe('Add Diagram', () => {
         activeGraph: MINTED_GRAPH,
       },
     ]);
-    expect(session.getState().working.document.defaultDiagram).toBe(MINTED);
-    expect(navigation.getState().selectedDiagramId).toBe(MINTED);
+    expect(session.getState().working.document.defaultMap).toBe(MINTED);
+    expect(navigation.getState().selectedMapId).toBe(MINTED);
   });
 
   it('does not require the current canvas placement to resolve', () => {
     const { authoring, navigation, session } = open(
       positionedSnapshot,
-      DIAGRAM_ID,
+      MAP_ID,
       mintingIds(MINTED, MINTED_GRAPH),
     );
 
-    expect(authoring.complete({ kind: 'created-diagram' })).toEqual({ kind: 'completed' });
-    expect(session.getState().working.document.diagrams).toHaveLength(2);
-    expect(navigation.getState().selectedDiagramId).toBe(MINTED);
+    expect(authoring.complete({ kind: 'created-map' })).toEqual({ kind: 'completed' });
+    expect(session.getState().working.document.maps).toHaveLength(2);
+    expect(navigation.getState().selectedMapId).toBe(MINTED);
   });
 });
 
-describe('Add Thing', () => {
-  it('creates one neutrally titled detached Thing at the anchor it was given', () => {
+describe('Add Resource', () => {
+  it('creates one neutrally titled detached Resource at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-thing', anchor: CENTRE })).toEqual({
+    expect(authoring.complete({ kind: 'created-resource', anchor: CENTRE })).toEqual({
       kind: 'completed',
-      createdThingId: MINTED,
+      createdResourceId: MINTED,
     });
 
-    expect(session.getState().working.things[2]).toEqual({
+    expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Thing 1', kind: 'markdown', body: '' },
+      document: { title: 'Resource 1', kind: 'markdown', body: '' },
     });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual({
-      [THING_A]: { x: 10, y: 20, open: false },
-      [THING_B]: { x: 300, y: 40, open: false },
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_B]: { x: 300, y: 40, open: false },
       [MINTED]: CENTRE,
     });
-    // No Edge, and no second Graph: Add Thing adds neither (ADR 0040).
+    // No Edge, and no second Graph: Add Resource adds neither (ADR 0040).
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('steps off an anchor another Thing already occupies rather than stacking exactly', () => {
+  it('steps off an anchor another Resource already occupies rather than stacking exactly', () => {
     // Two creations, so two ids. The old global mock answered both with one
     // constant and the duplicate went unnoticed; naming them is what makes the
     // second creation a real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete({ kind: 'created-thing', anchor: CENTRE });
-    authoring.complete({ kind: 'created-thing', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
 
-    const positions = diagramOf(session.getState().working, DIAGRAM_ID)?.positions ?? {};
+    const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
       (at) => at !== undefined && at.x >= CENTRE.x && at.y >= CENTRE.y,
     );
-    // A visible stack, not collision avoidance: the first Thing never moves, and
+    // A visible stack, not collision avoidance: the first Resource never moves, and
     // the second takes one small diagonal step off it.
     expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
   });
@@ -208,12 +212,12 @@ describe('Add Thing', () => {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
+        maps: [
           {
-            ...positionedSnapshot.document.diagrams![0]!,
+            ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [THING_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-              [THING_B]: { x: 300, y: 40, open: false },
+              [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [RESOURCE_B]: { x: 300, y: 40, open: false },
             },
           },
         ],
@@ -221,12 +225,12 @@ describe('Add Thing', () => {
     };
     const { authoring, session } = open(expandedSnapshot);
 
-    authoring.complete({ kind: 'created-thing', anchor: { x: 500, y: 400 } });
+    authoring.complete({ kind: 'created-resource', anchor: { x: 500, y: 400 } });
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
-    // way in any more (ADR 0084). The Thing lands where it was dropped.
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual({
+    // way in any more (ADR 0084). The Resource lands where it was dropped.
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual({
       x: 500,
       y: 400,
       open: false,
@@ -234,24 +238,24 @@ describe('Add Thing', () => {
   });
 });
 
-describe('Edit Thing', () => {
+describe('Edit Resource', () => {
   /**
    * A blank title is refused *at the interface*, not only at the field that
    * typed it. Intake rejects an empty title, and this derivation reports an
    * unloadable Space by throwing — so without this the author's own mistake
    * arrives as an exception, which the transient-authoring contract forbids.
    */
-  it('refuses an empty Thing title rather than throwing on intake', () => {
+  it('refuses an empty Resource title rather than throwing on intake', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(
       authoring.complete({
-        kind: 'edited-thing',
-        thingId: THING_A,
+        kind: 'edited-resource',
+        resourceId: RESOURCE_A,
         document: { title: '', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'thing-title-required' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -260,14 +264,14 @@ describe('Edit Thing', () => {
     const before = session.getState().working;
 
     // `z.string().min(1)` counts characters and a space is one, so this would
-    // be stored and draw as a Thing with no name at all.
+    // be stored and draw as a Resource with no name at all.
     expect(
       authoring.complete({
-        kind: 'edited-thing',
-        thingId: THING_A,
+        kind: 'edited-resource',
+        resourceId: RESOURCE_A,
         document: { title: '   ', kind: 'markdown', body: 'A' },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'thing-title-required' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
   });
 
@@ -279,26 +283,26 @@ describe('Edit Thing', () => {
     // the write path taking the trim would store a Title intake would not mint.
     expect(
       authoring.complete({
-        kind: 'edited-thing',
-        thingId: THING_A,
+        kind: 'edited-resource',
+        resourceId: RESOURCE_A,
         document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(session.getState().working.things[0]?.document.title).toBe('Renamed\nA subtitle');
+    expect(session.getState().working.resources[0]?.document.title).toBe('Renamed\nA subtitle');
 
     // "Renaming a Title to the same Title plus a trailing newline is therefore
     // unchanged rather than an Edit" (ADR 0083).
     expect(
       authoring.complete({
-        kind: 'edited-thing',
-        thingId: THING_A,
+        kind: 'edited-resource',
+        resourceId: RESOURCE_A,
         document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', body: 'A' },
       }),
     ).toEqual({ kind: 'unchanged' });
   });
 });
 
-describe('Expanded Thing geometry', () => {
+describe('Expanded Resource geometry', () => {
   /**
    * What {@link DEFAULT_OPEN_SIZE} displaces by: the Open rect less the
    * collapsed one, per axis (ADR 0084). Named rather than derived so the
@@ -307,47 +311,47 @@ describe('Expanded Thing geometry', () => {
   const GROWTH = { width: 300, height: 274 };
 
   /**
-   * Five Things at every relation to THING_A that deciding a Thing's one room
+   * Five Resources at every relation to RESOURCE_A that deciding a Resource's one room
    * axis distinguishes (ADR 0093): clear of its collapsed rect on `x` alone, on
    * `y` alone, on both, and before it on both.
    */
   const displacementSnapshot: SpaceSnapshot = {
     ...positionedSnapshot,
-    things: [
-      ...positionedSnapshot.things,
-      { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      { id: THING_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
-      { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
+    resources: [
+      ...positionedSnapshot.resources,
+      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      { id: RESOURCE_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
+      { id: RESOURCE_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
     ],
     document: {
       ...positionedSnapshot.document,
-      diagrams: [
+      maps: [
         {
-          id: DIAGRAM_ID,
-          title: 'Diagram 1',
+          id: MAP_ID,
+          title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [THING_A]: { x: 100, y: 100, open: false },
-            [THING_B]: { x: 400, y: 100, open: false },
-            [THING_C]: { x: 100, y: 300, open: false },
-            [THING_D]: { x: 500, y: 500, open: false },
-            [THING_E]: { x: 40, y: 40, open: false },
+            [RESOURCE_A]: { x: 100, y: 100, open: false },
+            [RESOURCE_B]: { x: 400, y: 100, open: false },
+            [RESOURCE_C]: { x: 100, y: 300, open: false },
+            [RESOURCE_D]: { x: 500, y: 500, open: false },
+            [RESOURCE_E]: { x: 40, y: 40, open: false },
           },
           graphs: [MAIN_GRAPH],
         },
       ],
-      defaultDiagram: DIAGRAM_ID,
+      defaultMap: MAP_ID,
     },
   };
 
   const openDisplacement = () => open(displacementSnapshot);
 
-  /** Every origin the Diagram authors, so a whole Diagram can be compared at once. */
+  /** Every origin the Map authors, so a whole Map can be compared at once. */
   const originsOf = (session: ReturnType<typeof open>['session']) => {
     const origins = new Map<string, readonly [number, number]>();
-    const positions = diagramOf(session.getState().working, DIAGRAM_ID)?.positions ?? {};
-    for (const [thingId, at] of Object.entries(positions)) {
-      if (at !== undefined) origins.set(thingId, [at.x, at.y]);
+    const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
+    for (const [resourceId, at] of Object.entries(positions)) {
+      if (at !== undefined) origins.set(resourceId, [at.x, at.y]);
     }
     return Object.fromEntries(origins);
   };
@@ -355,30 +359,30 @@ describe('Expanded Thing geometry', () => {
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
     expect(
       authoring.complete({
-        kind: 'resized-thing',
-        thingId: THING_A,
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
         size: { width: 640, height: 480 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
       openSize: { width: 640, height: 480 },
     });
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
       open: true,
@@ -389,25 +393,25 @@ describe('Expanded Thing geometry', () => {
   it('Closes at the exact Closed rect without replacing the remembered Open Size', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
     expect(
       authoring.complete({
-        kind: 'resized-thing',
-        thingId: THING_A,
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
         size: { width: 640, height: 480 },
       }),
     ).toEqual({ kind: 'completed' });
 
     expect(
       authoring.complete({
-        kind: 'resized-thing',
-        thingId: THING_A,
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
         size: { width: 260, height: 146 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
@@ -415,134 +419,134 @@ describe('Expanded Thing geometry', () => {
     });
   });
 
-  it('refuses a stale resize completion for a Thing that is no longer Expanded', () => {
+  it('refuses a stale resize completion for a Resource that is no longer Expanded', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(
       authoring.complete({
-        kind: 'resized-thing',
-        thingId: THING_A,
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
         size: { width: 560, height: 420 },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'thing-not-expanded' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-expanded' } });
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves the Things clear of the opening Thing by one axis growth, and nobody else', () => {
+  it('moves the Resources clear of the opening Resource by one axis growth, and nobody else', () => {
     const { authoring, session } = openDisplacement();
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual({
-      // A Thing does not displace itself.
-      [THING_A]: [100, 100],
+      // A Resource does not displace itself.
+      [RESOURCE_A]: [100, 100],
       // Clear on `x` and level on `y`, so it moves right and not down.
-      [THING_B]: [400 + GROWTH.width, 100],
+      [RESOURCE_B]: [400 + GROWTH.width, 100],
       // The mirror of it: inside the column on `x` and clear on `y`.
-      [THING_C]: [100, 300 + GROWTH.height],
+      [RESOURCE_C]: [100, 300 + GROWTH.height],
       // Clear on both, and the width alone takes it clear of the Open rect.
-      [THING_D]: [500 + GROWTH.width, 500],
-      // Before the Thing on both axes: the room is made after it, not around it.
-      [THING_E]: [40, 40],
+      [RESOURCE_D]: [500 + GROWTH.width, 500],
+      // Before the Resource on both axes: the room is made after it, not around it.
+      [RESOURCE_E]: [40, 40],
     });
   });
 
-  it('returns every position to exactly what it was when the Thing Closes again', () => {
+  it('returns every position to exactly what it was when the Resource Closes again', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
-    expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual(before);
   });
 
-  it('reclaims from a Thing the author moved beyond the Open Thing, which the Open never pushed', () => {
-    // ADR 0084: Open and Close each read the Diagram as it is at that moment and
+  it('reclaims from a Resource the author moved beyond the Open Resource, which the Open never pushed', () => {
+    // ADR 0084: Open and Close each read the Map as it is at that moment and
     // remember nothing about who was pushed, so Close reclaims from everything
-    // currently clear of the closing Thing. This is the deliberate memoryless
-    // behaviour and not a defect — recording which Things a particular Open moved
-    // is the per-Thing history that ADR rejected, because it goes stale the
-    // moment the author moves anything and makes two identical Diagrams behave
+    // currently clear of the closing Resource. This is the deliberate memoryless
+    // behaviour and not a defect — recording which Resources a particular Open moved
+    // is the per-Resource history that ADR rejected, because it goes stale the
+    // moment the author moves anything and makes two identical Maps behave
     // differently.
     const { authoring, session } = openDisplacement();
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
-    // The author drags E from before the Open Thing to clear of it on both axes.
+    // The author drags E from before the Open Resource to clear of it on both axes.
     expect(
       authoring.complete({
-        kind: 'settled-thing-movement',
-        moved: new Map([[THING_E, { x: 900, y: 900 }]]),
+        kind: 'settled-resource-movement',
+        moved: new Map([[RESOURCE_E, { x: 900, y: 900 }]]),
       }),
     ).toEqual({ kind: 'completed' });
 
-    expect(authoring.complete({ kind: 'closed-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual({
-      [THING_A]: [100, 100],
-      [THING_B]: [400, 100],
-      [THING_C]: [100, 300],
-      [THING_D]: [500, 500],
+      [RESOURCE_A]: [100, 100],
+      [RESOURCE_B]: [400, 100],
+      [RESOURCE_C]: [100, 300],
+      [RESOURCE_D]: [500, 500],
       // Never pushed by the Open, and moved back by the Close all the same —
       // on `x` alone, the one axis it makes room on.
-      [THING_E]: [900 - GROWTH.width, 900],
+      [RESOURCE_E]: [900 - GROWTH.width, 900],
     });
   });
 
-  it('takes an already Open Thing room as it finds it, with nothing summed over Open Things', () => {
+  it('takes an already Open Resource room as it finds it, with nothing summed over Open Resources', () => {
     const { authoring, session } = openDisplacement();
 
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
     // B is at (700, 100) by now, and its own growth is measured from there.
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_B })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_B })).toEqual({
       kind: 'completed',
     });
 
     expect(originsOf(session)).toEqual({
       // Level with B on `y` and before it on `x`: A does not move for it.
-      [THING_A]: [100, 100],
-      [THING_B]: [700, 100],
-      [THING_C]: [100, 574 + GROWTH.height],
+      [RESOURCE_A]: [100, 100],
+      [RESOURCE_B]: [700, 100],
+      [RESOURCE_C]: [100, 574 + GROWTH.height],
       // Inside B's collapsed column now, and clear of it below.
-      [THING_D]: [800, 500 + GROWTH.height],
-      [THING_E]: [40, 40],
+      [RESOURCE_D]: [800, 500 + GROWTH.height],
+      [RESOURCE_E]: [40, 40],
     });
   });
 
-  it('refuses a subject the Diagram does not hold and moves nobody', () => {
+  it('refuses a subject the Map does not hold and moves nobody', () => {
     const { authoring, session } = openDisplacement();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'opened-thing', thingId: UNKNOWN_THING })).toEqual({
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'thing-not-in-diagram' },
+      refusal: { code: 'resource-not-in-map' },
     });
-    expect(authoring.complete({ kind: 'closed-thing', thingId: UNKNOWN_THING })).toEqual({
+    expect(authoring.complete({ kind: 'closed-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'thing-not-in-diagram' },
+      refusal: { code: 'resource-not-in-map' },
     });
     expect(session.getState().working).toBe(before);
   });
 
   it('moves neighbours by the difference between the old growth and the new one', () => {
     const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
 
     expect(
       authoring.complete({
-        kind: 'resized-thing',
-        thingId: THING_A,
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
         size: { width: 860, height: 720 },
       }),
     ).toEqual({ kind: 'completed' });
@@ -550,41 +554,45 @@ describe('Expanded Thing geometry', () => {
     // 860x720 grows by (600, 574); the Open already applied (300, 274); the
     // difference this Edit applies is (300, 300).
     expect(originsOf(session)).toEqual({
-      [THING_A]: [100, 100],
-      [THING_B]: [1000, 100],
-      [THING_C]: [100, 874],
-      [THING_D]: [1100, 500],
-      [THING_E]: [40, 40],
+      [RESOURCE_A]: [100, 100],
+      [RESOURCE_B]: [1000, 100],
+      [RESOURCE_C]: [100, 874],
+      [RESOURCE_D]: [1100, 500],
+      [RESOURCE_E]: [40, 40],
     });
   });
 
   it('moves neighbours on one axis only when only one axis of the size changed', () => {
     const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
 
     // 100 wider at the same height, so the height difference is zero.
     authoring.complete({
-      kind: 'resized-thing',
-      thingId: THING_A,
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
       size: { width: 660, height: 420 },
     });
 
     expect(originsOf(session)).toEqual({
-      [THING_A]: [100, 100],
-      [THING_B]: [800, 100],
-      [THING_C]: [100, 574],
-      [THING_D]: [900, 500],
-      [THING_E]: [40, 40],
+      [RESOURCE_A]: [100, 100],
+      [RESOURCE_B]: [800, 100],
+      [RESOURCE_C]: [100, 574],
+      [RESOURCE_D]: [900, 500],
+      [RESOURCE_E]: [40, 40],
     });
   });
 
-  it('is unchanged and moves nobody when the proposal is the size the Thing already has', () => {
+  it('is unchanged and moves nobody when the proposal is the size the Resource already has', () => {
     const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'resized-thing', thingId: THING_A, size: DEFAULT_OPEN_SIZE }),
+      authoring.complete({
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
+        size: DEFAULT_OPEN_SIZE,
+      }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
@@ -593,14 +601,18 @@ describe('Expanded Thing geometry', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
     authoring.complete({
-      kind: 'resized-thing',
-      thingId: THING_A,
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
       size: { width: 860, height: 720 },
     });
-    authoring.complete({ kind: 'resized-thing', thingId: THING_A, size: DEFAULT_OPEN_SIZE });
-    authoring.complete({ kind: 'closed-thing', thingId: THING_A });
+    authoring.complete({
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
+      size: DEFAULT_OPEN_SIZE,
+    });
+    authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A });
 
     expect(originsOf(session)).toEqual(before);
   });
@@ -609,23 +621,27 @@ describe('Expanded Thing geometry', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
     authoring.complete({
-      kind: 'resized-thing',
-      thingId: THING_A,
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
       size: { width: 860, height: 720 },
     });
 
     // The magnetic Close (ADR 0066) arrives as a resize proposal at exactly the
     // collapsed size. What it gives back is (600, 574) — the growth of the
-    // 860x720 the Thing was actually Open at — and not the zero growth of the
+    // 860x720 the Resource was actually Open at — and not the zero growth of the
     // collapsed rect being proposed.
     expect(
-      authoring.complete({ kind: 'resized-thing', thingId: THING_A, size: COLLAPSED_THING_SIZE }),
+      authoring.complete({
+        kind: 'resized-resource',
+        resourceId: RESOURCE_A,
+        size: COLLAPSED_RESOURCE_SIZE,
+      }),
     ).toEqual({ kind: 'completed' });
 
     expect(originsOf(session)).toEqual(before);
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_A]).toEqual({
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 100,
       y: 100,
       open: false,
@@ -634,75 +650,79 @@ describe('Expanded Thing geometry', () => {
   });
 
   /**
-   * A Thing that leaves the Diagram takes its room with it.
+   * A Resource that leaves the Map takes its room with it.
    *
    * Under the derived model this reclaimed itself: the entry carried the Open
    * state, so removing the entry removed the displacement. Now the room is
    * written into the neighbours' own coordinates, and a removal that only drops
    * the entry leaves a hole with nothing left on the canvas to explain it and no
-   * Edit that can give it back. Leaving the Diagram is a Close the Thing does not
+   * Edit that can give it back. Leaving the Map is a Close the Resource does not
    * come back from, so it reclaims exactly as Close does (ADR 0084).
    */
-  it('reclaims the room an Open Thing held when it is removed from the Diagram', () => {
+  it('reclaims the room an Open Resource held when it is removed from the Map', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
-    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
+    expect(
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
+    ).toEqual({
       kind: 'completed',
     });
 
-    const { [THING_A]: removed, ...remaining } = before;
+    const { [RESOURCE_A]: removed, ...remaining } = before;
     expect(removed).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
 
-  it('reclaims the room an Open Thing held when it is deleted', () => {
+  it('reclaims the room an Open Resource held when it is deleted', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    authoring.complete({ kind: 'opened-thing', thingId: THING_A });
-    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
+    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'completed',
     });
 
-    const { [THING_A]: deleted, ...remaining } = before;
+    const { [RESOURCE_A]: deleted, ...remaining } = before;
     expect(deleted).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
 
-  it('moves nobody when the Thing leaving the Diagram was Closed', () => {
+  it('moves nobody when the Resource leaving the Map was Closed', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
 
-    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
+    expect(
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
+    ).toEqual({
       kind: 'completed',
     });
 
-    const { [THING_A]: removed, ...remaining } = before;
+    const { [RESOURCE_A]: removed, ...remaining } = before;
     expect(removed).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
 });
 
-describe('Add Reference Thing', () => {
-  it('creates and places a Reference Thing on its Target, minting a neutral title when none was typed', () => {
+describe('Add Reference Resource', () => {
+  it('creates and places a Reference Resource on its Target, minting a neutral title when none was typed', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: THING_A, anchor: CENTRE }),
+      authoring.complete({ kind: 'created-reference', target: RESOURCE_A, anchor: CENTRE }),
     ).toEqual({
       kind: 'completed',
-      createdThingId: MINTED,
+      createdResourceId: MINTED,
     });
 
-    // The Target's own Title is never copied: a Reference Thing that arrived already
-    // named after its Target gave the Space two Things with one name by default.
-    expect(session.getState().working.things[2]).toEqual({
+    // The Target's own Title is never copied: a Reference Resource that arrived already
+    // named after its Target gave the Space two Resources with one name by default.
+    expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Thing 1', kind: 'reference', target: THING_A },
+      document: { title: 'Resource 1', kind: 'reference', target: RESOURCE_A },
     });
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[MINTED]).toEqual(CENTRE);
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
   });
 
   /**
@@ -719,63 +739,63 @@ describe('Add Reference Thing', () => {
 
     authoring.complete({
       kind: 'created-reference',
-      target: THING_A,
+      target: RESOURCE_A,
       title: '  Recap  \n  the week  ',
       anchor: CENTRE,
     });
 
-    expect(session.getState().working.things[2]?.document).toEqual({
+    expect(session.getState().working.resources[2]?.document).toEqual({
       title: '  Recap\n  the week',
       kind: 'reference',
-      target: THING_A,
+      target: RESOURCE_A,
     });
   });
 
-  it('refuses a Target that is itself a Reference Thing, so no chain is ever authored', () => {
+  it('refuses a Target that is itself a Reference Resource, so no chain is ever authored', () => {
     const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
+      resources: [
+        positionedSnapshot.resources[0]!,
+        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
       ],
     };
     const { authoring, session } = open(referenced);
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: THING_B, anchor: CENTRE }),
+      authoring.complete({ kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'reference-target-must-own-content', targetId: THING_B },
+      refusal: { code: 'reference-target-must-own-content', targetId: RESOURCE_B },
     });
     expect(session.getState().working).toBe(before);
   });
 
-  it('creates a Reference Thing whose Target is a Space Thing', () => {
-    const withSpaceThing: SpaceSnapshot = {
+  it('creates a Reference Resource whose Target is a Space Resource', () => {
+    const withSpaceResource: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        positionedSnapshot.things[0]!,
+      resources: [
+        positionedSnapshot.resources[0]!,
         {
-          id: THING_B,
+          id: RESOURCE_B,
           document: {
             title: 'Nested Space',
             kind: 'space',
-            spaceId: UNKNOWN_THING,
-            diagram: UNLOADED_DIAGRAM,
+            spaceId: UNKNOWN_RESOURCE,
+            map: UNLOADED_MAP,
             graph: UNLOADED_GRAPH,
           },
         },
       ],
     };
-    const { authoring, session } = open(withSpaceThing);
+    const { authoring, session } = open(withSpaceResource);
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: THING_B, anchor: CENTRE }).kind,
+      authoring.complete({ kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }).kind,
     ).toBe('completed');
-    expect(session.getState().working.things.at(-1)?.document).toMatchObject({
+    expect(session.getState().working.resources.at(-1)?.document).toMatchObject({
       kind: 'reference',
-      target: THING_B,
+      target: RESOURCE_B,
     });
   });
 
@@ -783,29 +803,29 @@ describe('Add Reference Thing', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: UNKNOWN_THING, anchor: CENTRE }),
+      authoring.complete({ kind: 'created-reference', target: UNKNOWN_RESOURCE, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'reference-target-not-found', targetId: UNKNOWN_THING },
+      refusal: { code: 'reference-target-not-found', targetId: UNKNOWN_RESOURCE },
     });
   });
 });
 
 describe('Add Graph', () => {
-  it('rotates colour by its appended position in the owning Diagram', () => {
+  it('rotates colour by its appended position in the owning Map', () => {
     const snapshot: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
-          positionedSnapshot.document.diagrams![0]!,
+        maps: [
+          positionedSnapshot.document.maps![0]!,
           {
-            id: OTHER_DIAGRAM_ID,
-            title: 'Diagram 2',
+            id: OTHER_MAP_ID,
+            title: 'Map 2',
             kind: 'positioned',
             positions: {
-              [THING_A]: { x: 20, y: 30, open: false },
-              [THING_B]: { x: 310, y: 50, open: false },
+              [RESOURCE_A]: { x: 20, y: 30, open: false },
+              [RESOURCE_B]: { x: 310, y: 50, open: false },
             },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           },
@@ -819,9 +839,7 @@ describe('Add Graph', () => {
       createdGraphId: MINTED,
     });
 
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.graphs.at(-1)?.color).toBe(
-      GRAPH_PALETTE[1],
-    );
+    expect(mapOf(session.getState().working, MAP_ID)?.graphs.at(-1)?.color).toBe(GRAPH_PALETTE[1]);
   });
 
   it('appends, colours and activates one empty Graph without touching the others', () => {
@@ -836,9 +854,9 @@ describe('Add Graph', () => {
       MAIN_GRAPH,
       { id: MINTED, title: 'Graph 1', color: GRAPH_PALETTE[1], edges: [] },
     ]);
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.activeGraph).toBe(MINTED);
+    expect(mapOf(session.getState().working, MAP_ID)?.activeGraph).toBe(MINTED);
     expect(navigation.getState().activeGraphId).toBe(MINTED);
-    expect(session.getState().working.things).toEqual(positionedSnapshot.things);
+    expect(session.getState().working.resources).toEqual(positionedSnapshot.resources);
   });
 
   it('is literal and repeatable, so an already empty active Graph does not swallow it', () => {
@@ -900,17 +918,17 @@ describe('Edit Graph', () => {
   });
 });
 
-describe('Rename Diagram', () => {
-  it('trims and replaces only the Diagram title', () => {
+describe('Rename Map', () => {
+  it('trims and replaces only the Map title', () => {
     const { authoring, session } = openPositioned();
-    const before = diagramOf(session.getState().working, DIAGRAM_ID);
+    const before = mapOf(session.getState().working, MAP_ID);
 
     expect(
-      authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: '  Workshop  ' }),
+      authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: '  Workshop  ' }),
     ).toEqual({
       kind: 'completed',
     });
-    const after = diagramOf(session.getState().working, DIAGRAM_ID);
+    const after = mapOf(session.getState().working, MAP_ID);
     expect(after?.title).toBe('Workshop');
     expect(after?.id).toBe(before?.id);
     expect(after?.positions).toEqual(before?.positions);
@@ -921,50 +939,46 @@ describe('Rename Diagram', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(
-      authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: '   ' }),
-    ).toEqual({
+    expect(authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: '   ' })).toEqual({
       kind: 'refused',
-      refusal: { code: 'diagram-title-required' },
+      refusal: { code: 'map-title-required' },
     });
     expect(session.getState().working).toBe(before);
-    expect(
-      authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: ' Diagram 1 ' }),
-    ).toEqual({
+    expect(authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: ' Map 1 ' })).toEqual({
       kind: 'unchanged',
     });
   });
 
   /**
-   * The Edit is addressed by Diagram id, as Rename Graph is by Graph id. Without
-   * that the rename lands on whichever Diagram the resolver happens to answer,
-   * so a draft begun on one Diagram and completed after the drawing Diagram
-   * changed writes the title onto a Diagram the author never named.
+   * The Edit is addressed by Map id, as Rename Graph is by Graph id. Without
+   * that the rename lands on whichever Map the resolver happens to answer,
+   * so a draft begun on one Map and completed after the drawing Map
+   * changed writes the title onto a Map the author never named.
    */
-  it('refuses a rename addressed to a Diagram other than the one drawing', () => {
+  it('refuses a rename addressed to a Map other than the one drawing', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(
       authoring.complete({
-        kind: 'renamed-diagram',
-        diagramId: OTHER_DIAGRAM_ID,
+        kind: 'renamed-map',
+        mapId: OTHER_MAP_ID,
         title: 'Workshop',
       }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'diagram-not-found' },
+      refusal: { code: 'map-not-found' },
     });
     expect(session.getState().working).toBe(before);
   });
 });
 
 /**
- * The one Edit on the Space document above any Diagram.
+ * The one Edit on the Space document above any Map.
  *
- * It is grouped with Add Diagram and Delete Diagram rather than with Rename
- * Diagram and Rename Graph, because those two write inside the drawing Diagram
- * and this writes the key beside `diagrams`. What that buys is asserted below:
+ * It is grouped with Add Map and Delete Map rather than with Rename
+ * Map and Rename Graph, because those two write inside the drawing Map
+ * and this writes the key beside `maps`. What that buys is asserted below:
  * the Edit needs no reported placement, and it moves nothing.
  */
 describe('Rename Space', () => {
@@ -976,30 +990,30 @@ describe('Rename Space', () => {
     });
     const after = session.getState().working;
     expect(after.document.title).toBe('Second draft');
-    expect(after.things).toEqual(positionedSnapshot.things);
-    expect(after.document.diagrams).toEqual(positionedSnapshot.document.diagrams);
-    expect(after.document.defaultDiagram).toBe(DIAGRAM_ID);
+    expect(after.resources).toEqual(positionedSnapshot.resources);
+    expect(after.document.maps).toEqual(positionedSnapshot.document.maps);
+    expect(after.document.defaultMap).toBe(MAP_ID);
   });
 
   /**
    * **The emphasised Graph is Navigation's answer, and a rename must not retake it.**
    *
    * Activating a Graph is not an Edit (ADR 0028), so the Graph a reader is
-   * looking at routinely differs from the `activeGraph` the Diagram stores. An
-   * Edit that re-resolves from the Diagram would therefore make a rename of the
+   * looking at routinely differs from the `activeGraph` the Map stores. An
+   * Edit that re-resolves from the Map would therefore make a rename of the
    * Space activate a different Graph — moving the emphasis, the Dock's Graph
    * cluster and the product URL for a change that wrote only `document.title`.
-   * `created-diagram` and `deleted-diagram` re-resolve because each lands the
-   * reader in a different Diagram; this one lands nowhere.
+   * `created-map` and `deleted-map` re-resolve because each lands the
+   * reader in a different Map; this one lands nowhere.
    */
   it('leaves the Active Graph where Navigation put it', () => {
     const twoGraphs: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
+        maps: [
           {
-            ...positionedSnapshot.document.diagrams![0]!,
+            ...positionedSnapshot.document.maps![0]!,
             graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
             // Stored as the first, so re-resolving and preserving give different
             // answers and the assertion below can tell them apart.
@@ -1016,7 +1030,7 @@ describe('Rename Space', () => {
     });
 
     expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
-    expect(navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
+    expect(navigation.getState().selectedMapId).toBe(MAP_ID);
   });
 
   it('refuses a blank Space title and treats the stored title with padding as unchanged', () => {
@@ -1038,8 +1052,8 @@ describe('Rename Space', () => {
   });
 
   /**
-   * A Space's name is not written into a Diagram, so a rename has no geometry
-   * to wait on — the same standing Add Diagram and Delete Diagram have.
+   * A Space's name is not written into a Map, so a rename has no geometry
+   * to wait on — the same standing Add Map and Delete Map have.
    */
   it('does not require the current canvas placement to resolve', () => {
     const { authoring, session } = open();
@@ -1051,21 +1065,21 @@ describe('Rename Space', () => {
   });
 
   /**
-   * The Diagram rides through a rename unchanged — `renamed-space` writes only
-   * `document.title` — so an Open Thing's remembered Open Size survives it too,
-   * with nothing narrower than the whole Diagram in the way to drop it.
+   * The Map rides through a rename unchanged — `renamed-space` writes only
+   * `document.title` — so an Open Resource's remembered Open Size survives it too,
+   * with nothing narrower than the whole Map in the way to drop it.
    */
-  it('leaves an Open Thing and its remembered Open Size exactly as they were', () => {
+  it('leaves an Open Resource and its remembered Open Size exactly as they were', () => {
     const opened: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
+        maps: [
           {
-            ...positionedSnapshot.document.diagrams![0]!,
+            ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [THING_A]: { x: 10, y: 20, open: false, openSize: { width: 500, height: 300 } },
-              [THING_B]: { x: 300, y: 40, open: true, openSize: { width: 640, height: 360 } },
+              [RESOURCE_A]: { x: 10, y: 20, open: false, openSize: { width: 500, height: 300 } },
+              [RESOURCE_B]: { x: 300, y: 40, open: true, openSize: { width: 640, height: 360 } },
             },
           },
         ],
@@ -1077,9 +1091,7 @@ describe('Rename Space', () => {
       kind: 'completed',
     });
 
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)).toEqual(
-      diagramOf(opened, DIAGRAM_ID),
-    );
+    expect(mapOf(session.getState().working, MAP_ID)).toEqual(mapOf(opened, MAP_ID));
   });
 
   /**
@@ -1093,7 +1105,7 @@ describe('Rename Space', () => {
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
       spaceSession: session,
-      selection: DIAGRAM_ID,
+      selection: MAP_ID,
       newId: mintingIds(MINTED),
     });
 
@@ -1108,27 +1120,27 @@ describe('Rename Space', () => {
     // Reload: a fresh session and composition over exactly what was stored.
     const reopened = composeApp({
       spaceSession: openSpaceSession(backend, stored!),
-      selection: DIAGRAM_ID,
+      selection: MAP_ID,
       newId: mintingIds(MINTED),
     });
     expect(reopened.currentSpace().title).toBe('Stored name');
   });
 });
 
-describe('Delete Diagram', () => {
+describe('Delete Map', () => {
   const otherGraph: Graph = { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] };
-  const twoDiagrams: SpaceSnapshot = {
+  const twoMaps: SpaceSnapshot = {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      diagrams: [
-        positionedSnapshot.document.diagrams![0]!,
+      maps: [
+        positionedSnapshot.document.maps![0]!,
         {
-          id: OTHER_DIAGRAM_ID,
-          title: 'Diagram 2',
+          id: OTHER_MAP_ID,
+          title: 'Map 2',
           kind: 'positioned',
           positions: {
-            [THING_B]: {
+            [RESOURCE_B]: {
               x: 80,
               y: 90,
               open: true,
@@ -1142,29 +1154,29 @@ describe('Delete Diagram', () => {
     },
   };
 
-  it('deletes only the selected Diagram and continues in the first survivor', () => {
-    const { authoring, navigation, session } = open(twoDiagrams, OTHER_DIAGRAM_ID);
+  it('deletes only the selected Map and continues in the first survivor', () => {
+    const { authoring, navigation, session } = open(twoMaps, OTHER_MAP_ID);
 
-    expect(authoring.complete({ kind: 'deleted-diagram', diagramId: OTHER_DIAGRAM_ID })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-map', mapId: OTHER_MAP_ID })).toEqual({
       kind: 'completed',
     });
 
-    expect(session.getState().working.things).toEqual(twoDiagrams.things);
-    expect(session.getState().working.document.diagrams).toEqual([
-      positionedSnapshot.document.diagrams![0]!,
+    expect(session.getState().working.resources).toEqual(twoMaps.resources);
+    expect(session.getState().working.document.maps).toEqual([
+      positionedSnapshot.document.maps![0]!,
     ]);
-    expect(navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
+    expect(navigation.getState().selectedMapId).toBe(MAP_ID);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    expect(authoring.diagramPlacement().get(THING_A)).toEqual({ x: 10, y: 20, open: false });
+    expect(authoring.mapPlacement().get(RESOURCE_A)).toEqual({ x: 10, y: 20, open: false });
   });
 
-  it('refuses to delete the last Diagram with a stable identity', () => {
+  it('refuses to delete the last Map with a stable identity', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-diagram', diagramId: DIAGRAM_ID })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-map', mapId: MAP_ID })).toEqual({
       kind: 'refused',
-      refusal: { code: 'space-must-keep-diagram' },
+      refusal: { code: 'space-must-keep-map' },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -1175,9 +1187,9 @@ describe('Delete Graph', () => {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      diagrams: [
+      maps: [
         {
-          ...positionedSnapshot.document.diagrams![0]!,
+          ...positionedSnapshot.document.maps![0]!,
           graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           activeGraph: OTHER_GRAPH_ID,
         },
@@ -1194,10 +1206,10 @@ describe('Delete Graph', () => {
 
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    // Things and positions are untouched; only the Graph left.
-    expect(session.getState().working.things).toEqual(positionedSnapshot.things);
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual(
-      positionedSnapshot.document.diagrams![0]!.positions,
+    // Resources and positions are untouched; only the Graph left.
+    expect(session.getState().working.resources).toEqual(positionedSnapshot.resources);
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual(
+      positionedSnapshot.document.maps![0]!.positions,
     );
   });
 
@@ -1209,35 +1221,35 @@ describe('Delete Graph', () => {
     expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
   });
 
-  it("refuses to delete a Diagram's last Graph", () => {
+  it("refuses to delete a Map's last Graph", () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
       kind: 'refused',
-      refusal: { code: 'diagram-must-keep-graph' },
+      refusal: { code: 'map-must-keep-graph' },
     });
     expect(session.getState().working).toBe(before);
   });
 
-  it('refuses a Graph another Diagram owns, although the Space plainly holds it', () => {
-    const twoDiagrams: SpaceSnapshot = {
+  it('refuses a Graph another Map owns, although the Space plainly holds it', () => {
+    const twoMaps: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
-          positionedSnapshot.document.diagrams![0]!,
+        maps: [
+          positionedSnapshot.document.maps![0]!,
           {
-            id: OTHER_DIAGRAM_ID,
-            title: 'Diagram 2',
+            id: OTHER_MAP_ID,
+            title: 'Map 2',
             kind: 'positioned',
-            positions: { [THING_A]: { x: 0, y: 400, open: false } },
+            positions: { [RESOURCE_A]: { x: 0, y: 400, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           },
         ],
       },
     };
-    const { authoring } = open(twoDiagrams);
+    const { authoring } = open(twoMaps);
 
     expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
       kind: 'refused',
@@ -1250,19 +1262,19 @@ describe('Edge lifecycle', () => {
   it('replaces exactly one endpoint and keeps the Edge in its Graph', () => {
     const { authoring, session } = open({
       ...positionedSnapshot,
-      things: [
-        ...positionedSnapshot.things,
-        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      resources: [
+        ...positionedSnapshot.resources,
+        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
+        maps: [
           {
-            ...positionedSnapshot.document.diagrams![0]!,
+            ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [THING_A]: { x: 10, y: 20, open: false },
-              [THING_B]: { x: 300, y: 40, open: false },
-              [THING_C]: { x: 600, y: 40, open: false },
+              [RESOURCE_A]: { x: 10, y: 20, open: false },
+              [RESOURCE_B]: { x: 300, y: 40, open: false },
+              [RESOURCE_C]: { x: 600, y: 40, open: false },
             },
           },
         ],
@@ -1273,14 +1285,14 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
         endpoint: 'to',
-        thingId: THING_C,
+        resourceId: RESOURCE_C,
       }),
     ).toEqual({ kind: 'completed' });
 
     expect(graphsOf(session.getState().working)).toEqual([
-      { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_C }] },
+      { id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_C }] },
     ]);
   });
 
@@ -1291,13 +1303,13 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
         endpoint: 'from',
-        thingId: THING_B,
+        resourceId: RESOURCE_B,
       }),
     ).toEqual({ kind: 'completed' });
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
-      { from: THING_B, to: THING_B },
+      { from: RESOURCE_B, to: RESOURCE_B },
     ]);
   });
 
@@ -1309,9 +1321,9 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
         endpoint: 'to',
-        thingId: THING_B,
+        resourceId: RESOURCE_B,
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
@@ -1322,16 +1334,16 @@ describe('Edge lifecycle', () => {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
+        maps: [
           {
-            ...positionedSnapshot.document.diagrams![0]!,
+            ...positionedSnapshot.document.maps![0]!,
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Main',
                 edges: [
-                  { from: THING_A, to: THING_B },
-                  { from: THING_B, to: THING_B },
+                  { from: RESOURCE_A, to: RESOURCE_B },
+                  { from: RESOURCE_B, to: RESOURCE_B },
                 ],
               },
             ],
@@ -1345,19 +1357,19 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
         endpoint: 'from',
-        thingId: THING_B,
+        resourceId: RESOURCE_B,
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
   });
 
-  it('refuses a reconnection onto a Thing this Diagram does not hold', () => {
+  it('refuses a reconnection onto a Resource this Map does not hold', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        ...positionedSnapshot.things,
-        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      resources: [
+        ...positionedSnapshot.resources,
+        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
     const { authoring } = open(sparse);
@@ -1366,11 +1378,11 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'reconnected-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
         endpoint: 'to',
-        thingId: THING_C,
+        resourceId: RESOURCE_C,
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-resource-outside-map' } });
   });
 
   it('refuses an Edge the Graph no longer holds', () => {
@@ -1380,7 +1392,7 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'deleted-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_B, to: THING_A },
+        edge: { from: RESOURCE_B, to: RESOURCE_A },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'edge-not-found' } });
   });
@@ -1392,12 +1404,12 @@ describe('Edge lifecycle', () => {
       authoring.complete({
         kind: 'deleted-edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
       }),
     ).toEqual({ kind: 'completed' });
 
     // Removing the last Edge retains the Graph: Graphs go only through Delete
-    // Graph, and this Diagram has just the one anyway.
+    // Graph, and this Map has just the one anyway.
     expect(graphsOf(session.getState().working)).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
     ]);
@@ -1418,17 +1430,21 @@ describe('Edge eligibility', () => {
   const RECONNECT = {
     kind: 'reconnect',
     graphId: GRAPH_ID,
-    edge: { from: THING_A, to: THING_B },
+    edge: { from: RESOURCE_A, to: RESOURCE_B },
     endpoint: 'to',
   } as const;
 
   it('offers a connection the completion accepts', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_B, to: THING_A })).toEqual({
+    expect(
+      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_B, to: RESOURCE_A }),
+    ).toEqual({
       kind: 'eligible',
     });
-    expect(authoring.complete({ kind: 'connected-things', from: THING_B, to: THING_A })).toEqual({
+    expect(
+      authoring.complete({ kind: 'connected-resources', from: RESOURCE_B, to: RESOURCE_A }),
+    ).toEqual({
       kind: 'completed',
     });
   });
@@ -1437,63 +1453,69 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
 
     const refusal = { kind: 'refused', refusal: { code: 'edge-already-exists' } };
-    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_B })).toEqual(
-      refusal,
-    );
-    expect(authoring.complete({ kind: 'connected-things', from: THING_A, to: THING_B })).toEqual(
-      refusal,
-    );
+    expect(
+      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_B }),
+    ).toEqual(refusal);
+    expect(
+      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_B }),
+    ).toEqual(refusal);
   });
 
   it('offers a self-Edge and a cycle, which are legal authored structure', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_A })).toEqual({
+    expect(
+      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_A }),
+    ).toEqual({
       kind: 'eligible',
     });
-    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_B, to: THING_A })).toEqual({
+    expect(
+      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_B, to: RESOURCE_A }),
+    ).toEqual({
       kind: 'eligible',
     });
   });
 
-  it('refuses a Thing the selected Diagram does not hold', () => {
+  it('refuses a Resource the selected Map does not hold', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        ...positionedSnapshot.things,
-        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      resources: [
+        ...positionedSnapshot.resources,
+        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
     const { authoring } = open(sparse);
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_C })).toEqual({
+    expect(
+      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_C }),
+    ).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-thing-outside-diagram' },
+      refusal: { code: 'edge-resource-outside-map' },
     });
-    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: THING_C })).toEqual({
+    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: RESOURCE_C })).toEqual({
       kind: 'refused',
-      refusal: { code: 'edge-thing-outside-diagram' },
+      refusal: { code: 'edge-resource-outside-map' },
     });
   });
 
   /**
-   * An empty drop's Thing does not exist yet, so it can duplicate nothing. The
+   * An empty drop's Resource does not exist yet, so it can duplicate nothing. The
    * two connecting proposals therefore diverge on exactly one rule, and this is
    * the case that would go unnoticed if they were folded into one query.
    */
-  it('offers an empty drop from a Thing whose every existing Edge is taken', () => {
+  it('offers an empty drop from a Resource whose every existing Edge is taken', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ kind: 'connect', from: THING_A, to: THING_B }).kind).toBe(
-      'refused',
-    );
-    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: THING_A })).toEqual({
+    expect(
+      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_B }).kind,
+    ).toBe('refused');
+    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: RESOURCE_A })).toEqual({
       kind: 'eligible',
     });
   });
 
   /**
-   * **Returning an endpoint to the Thing it already names is eligible**, and
+   * **Returning an endpoint to the Resource it already names is eligible**, and
    * completes as `unchanged`. Eligibility answers what the author may still do,
    * not what the Edit will turn out to have changed — a picker that disabled the
    * current value would show it as the one forbidden choice.
@@ -1501,38 +1523,38 @@ describe('Edge eligibility', () => {
   it('offers a reconnection back to the endpoint it came from, which completes unchanged', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.edgeEligibility({ ...RECONNECT, thingId: THING_B })).toEqual({
+    expect(authoring.edgeEligibility({ ...RECONNECT, resourceId: RESOURCE_B })).toEqual({
       kind: 'eligible',
     });
     expect(
-      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: THING_B }),
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', resourceId: RESOURCE_B }),
     ).toEqual({
       kind: 'unchanged',
     });
   });
 
-  it('refuses a reconnection onto a Thing outside this Diagram, and completes the same way', () => {
+  it('refuses a reconnection onto a Resource outside this Map, and completes the same way', () => {
     const sparse: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        ...positionedSnapshot.things,
-        { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      resources: [
+        ...positionedSnapshot.resources,
+        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
       ],
     };
     const { authoring } = open(sparse);
 
-    const refusal = { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
-    expect(authoring.edgeEligibility({ ...RECONNECT, thingId: THING_C })).toEqual(refusal);
+    const refusal = { kind: 'refused', refusal: { code: 'edge-resource-outside-map' } };
+    expect(authoring.edgeEligibility({ ...RECONNECT, resourceId: RESOURCE_C })).toEqual(refusal);
     expect(
-      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', thingId: THING_C }),
+      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', resourceId: RESOURCE_C }),
     ).toEqual(refusal);
   });
 
-  it('refuses a reconnection naming a Graph this Diagram does not own', () => {
+  it('refuses a reconnection naming a Graph this Map does not own', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, thingId: THING_A }),
+      authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, resourceId: RESOURCE_A }),
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 
@@ -1541,15 +1563,15 @@ describe('Edge eligibility', () => {
    * it would go unnoticed: an Edge the Graph no longer holds indexes at `-1`, so
    * the `map` that writes the reconnection replaces nothing and the Edit answers
    * as though it had — `unchanged` when the snapshot is otherwise untouched,
-   * `completed` when writing the Diagram back settles something else, and the
+   * `completed` when writing the Map back settles something else, and the
    * refusal the author is owed never said either way.
    */
   it('refuses an Edge the Graph no longer holds, and completes the same way', () => {
     const { authoring } = openPositioned();
     const absent = {
       ...RECONNECT,
-      edge: { from: THING_B, to: THING_A },
-      thingId: THING_A,
+      edge: { from: RESOURCE_B, to: RESOURCE_A },
+      resourceId: RESOURCE_A,
     } as const;
 
     const refusal = { kind: 'refused', refusal: { code: 'edge-not-found' } };
@@ -1558,42 +1580,42 @@ describe('Edge eligibility', () => {
   });
 });
 
-describe('Diagram membership', () => {
-  /** A Space holding a third Thing the Diagram does not place. */
+describe('Map membership', () => {
+  /** A Space holding a third Resource the Map does not place. */
   const sparse: SpaceSnapshot = {
     ...positionedSnapshot,
-    things: [
-      ...positionedSnapshot.things,
-      { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+    resources: [
+      ...positionedSnapshot.resources,
+      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
     ],
   };
 
-  it('adds an absent Space Thing at a deliberate position and infers no Edge', () => {
+  it('adds an absent Space Resource at a deliberate position and infers no Edge', () => {
     const { authoring, session } = open(sparse);
 
     expect(
-      authoring.complete({ kind: 'added-thing-to-diagram', thingId: THING_C, anchor: CENTRE }),
+      authoring.complete({ kind: 'added-resource-to-map', resourceId: RESOURCE_C, anchor: CENTRE }),
     ).toEqual({ kind: 'completed' });
 
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions).toEqual({
-      [THING_A]: { x: 10, y: 20, open: false },
-      [THING_B]: { x: 300, y: 40, open: false },
-      [THING_C]: CENTRE,
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('places a Thing added to a Diagram at the anchor given, whatever is Open', () => {
+  it('places a Resource added to a Map at the anchor given, whatever is Open', () => {
     const expandedSparse: SpaceSnapshot = {
       ...sparse,
       document: {
         ...sparse.document,
-        diagrams: [
+        maps: [
           {
-            ...sparse.document.diagrams![0]!,
+            ...sparse.document.maps![0]!,
             positions: {
-              [THING_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-              [THING_B]: { x: 300, y: 40, open: false },
+              [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [RESOURCE_B]: { x: 300, y: 40, open: false },
             },
           },
         ],
@@ -1602,116 +1624,122 @@ describe('Diagram membership', () => {
     const { authoring, session } = open(expandedSparse);
 
     authoring.complete({
-      kind: 'added-thing-to-diagram',
-      thingId: THING_C,
+      kind: 'added-resource-to-map',
+      resourceId: RESOURCE_C,
       anchor: { x: 500, y: 400 },
     });
 
     // As above: the anchor is authorship, not a drawn coordinate to invert.
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)?.positions[THING_C]).toEqual({
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_C]).toEqual({
       x: 500,
       y: 400,
       open: false,
     });
   });
 
-  it('refuses a Thing the Space no longer holds', () => {
+  it('refuses a Resource the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
     expect(
       authoring.complete({
-        kind: 'added-thing-to-diagram',
-        thingId: UNKNOWN_THING,
+        kind: 'added-resource-to-map',
+        resourceId: UNKNOWN_RESOURCE,
         anchor: CENTRE,
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'thing-not-found' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-found' } });
   });
 
-  it('refuses a Thing the Diagram already holds', () => {
+  it('refuses a Resource the Map already holds', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'added-thing-to-diagram', thingId: THING_A, anchor: CENTRE }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'thing-already-in-diagram' } });
+      authoring.complete({ kind: 'added-resource-to-map', resourceId: RESOURCE_A, anchor: CENTRE }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-already-in-map' } });
   });
 
-  it('removes membership and every incident Edge, in this Diagram only', () => {
-    const twoDiagrams: SpaceSnapshot = {
+  it('removes membership and every incident Edge, in this Map only', () => {
+    const twoMaps: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [
+        maps: [
           {
-            ...positionedSnapshot.document.diagrams![0]!,
+            ...positionedSnapshot.document.maps![0]!,
             graphs: [
               MAIN_GRAPH,
-              { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: THING_B, to: THING_A }] },
+              { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: RESOURCE_B, to: RESOURCE_A }] },
             ],
           },
           {
-            id: OTHER_DIAGRAM_ID,
-            title: 'Diagram 2',
+            id: OTHER_MAP_ID,
+            title: 'Map 2',
             kind: 'positioned',
             positions: {
-              [THING_A]: { x: 0, y: 400, open: false },
-              [THING_B]: { x: 0, y: 600, open: false },
+              [RESOURCE_A]: { x: 0, y: 400, open: false },
+              [RESOURCE_B]: { x: 0, y: 600, open: false },
             },
-            graphs: [{ id: MINTED, title: 'Elsewhere', edges: [{ from: THING_A, to: THING_B }] }],
+            graphs: [
+              { id: MINTED, title: 'Elsewhere', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
+            ],
           },
         ],
       },
     };
-    const { authoring, session } = open(twoDiagrams);
+    const { authoring, session } = open(twoMaps);
 
-    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_B })).toEqual({
+    expect(
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_B }),
+    ).toEqual({
       kind: 'completed',
     });
 
     const working = session.getState().working;
-    expect(diagramOf(working, DIAGRAM_ID)?.positions).toEqual({
-      [THING_A]: { x: 10, y: 20, open: false },
+    expect(mapOf(working, MAP_ID)?.positions).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
     });
-    expect(diagramOf(working, DIAGRAM_ID)?.graphs).toEqual([
+    expect(mapOf(working, MAP_ID)?.graphs).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
       { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
     ]);
-    // The Thing stays in the Space and in every other Diagram, Edges and all.
-    expect(working.things).toEqual(positionedSnapshot.things);
-    expect(diagramOf(working, OTHER_DIAGRAM_ID)).toEqual(twoDiagrams.document.diagrams![1]);
+    // The Resource stays in the Space and in every other Map, Edges and all.
+    expect(working.resources).toEqual(positionedSnapshot.resources);
+    expect(mapOf(working, OTHER_MAP_ID)).toEqual(twoMaps.document.maps![1]);
   });
 
-  it('refuses removing a Thing the Diagram does not hold', () => {
+  it('refuses removing a Resource the Map does not hold', () => {
     const { authoring } = open(sparse);
 
-    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_C })).toEqual({
+    expect(
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_C }),
+    ).toEqual({
       kind: 'refused',
-      refusal: { code: 'thing-not-in-diagram' },
+      refusal: { code: 'resource-not-in-map' },
     });
   });
 });
 
-describe('Delete Thing from Space', () => {
-  const twoDiagrams: SpaceSnapshot = {
+describe('Delete Resource from Space', () => {
+  const twoMaps: SpaceSnapshot = {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      diagrams: [
-        positionedSnapshot.document.diagrams![0]!,
+      maps: [
+        positionedSnapshot.document.maps![0]!,
         {
-          id: OTHER_DIAGRAM_ID,
-          title: 'Diagram 2',
+          id: OTHER_MAP_ID,
+          title: 'Map 2',
           kind: 'positioned',
           positions: {
-            [THING_A]: { x: 0, y: 400, open: false },
-            [THING_B]: { x: 0, y: 600, open: false },
+            [RESOURCE_A]: { x: 0, y: 400, open: false },
+            [RESOURCE_B]: { x: 0, y: 600, open: false },
           },
           graphs: [
             {
               id: OTHER_GRAPH_ID,
               title: 'Elsewhere',
               edges: [
-                { from: THING_A, to: THING_B },
-                { from: THING_B, to: THING_A },
+                { from: RESOURCE_A, to: RESOURCE_B },
+                { from: RESOURCE_B, to: RESOURCE_A },
               ],
             },
           ],
@@ -1720,45 +1748,45 @@ describe('Delete Thing from Space', () => {
     },
   };
 
-  it('deletes the Thing and cascades it out of every Diagram at once', () => {
-    const { authoring, session } = open(twoDiagrams);
+  it('deletes the Resource and cascades it out of every Map at once', () => {
+    const { authoring, session } = open(twoMaps);
 
-    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
       kind: 'completed',
     });
 
     const working = session.getState().working;
-    expect(working.things).toEqual([positionedSnapshot.things[0]]);
-    expect(diagramOf(working, DIAGRAM_ID)?.positions).toEqual({
-      [THING_A]: { x: 10, y: 20, open: false },
+    expect(working.resources).toEqual([positionedSnapshot.resources[0]]);
+    expect(mapOf(working, MAP_ID)?.positions).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
     });
-    expect(diagramOf(working, DIAGRAM_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
-    expect(diagramOf(working, OTHER_DIAGRAM_ID)?.positions).toEqual({
-      [THING_A]: { x: 0, y: 400, open: false },
+    expect(mapOf(working, MAP_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
+    expect(mapOf(working, OTHER_MAP_ID)?.positions).toEqual({
+      [RESOURCE_A]: { x: 0, y: 400, open: false },
     });
-    // Empty Graphs and Diagrams remain: deleting a Thing is not an instruction to
+    // Empty Graphs and Maps remain: deleting a Resource is not an instruction to
     // delete either.
-    expect(diagramOf(working, OTHER_DIAGRAM_ID)?.graphs).toEqual([
+    expect(mapOf(working, OTHER_MAP_ID)?.graphs).toEqual([
       { id: OTHER_GRAPH_ID, title: 'Elsewhere', edges: [] },
     ]);
     expect(loadSpaceSnapshot(working).ok).toBe(true);
   });
 
-  it('refuses a Thing its Reference Things still point at, naming them', () => {
+  it('refuses a Resource its Reference Resources still point at, naming them', () => {
     const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
+      resources: [
+        positionedSnapshot.resources[0]!,
+        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
       ],
     };
     const { authoring, session } = open(referenced);
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'refused',
       refusal: {
-        code: 'thing-has-references',
+        code: 'resource-has-references',
         referenceTitles: ['A again'],
       },
     });
@@ -1766,25 +1794,25 @@ describe('Delete Thing from Space', () => {
   });
 
   /*
-   * A Space Thing owns the Space it names (ADR 0058), so deleting it deletes
+   * A Space Resource owns the Space it names (ADR 0058), so deleting it deletes
    * that Space and the closure below it — one coordinated multi-Space Edit,
    * which is the session registry's and not a single-Space update this seam can
    * make. Completing it here stores a Space whose target is unreachable, and
-   * aggregate intake refuses that commit permanently with the Thing already gone
+   * aggregate intake refuses that commit permanently with the Resource already gone
    * from the working state, leaving the author nothing to correct.
    */
-  it('refuses deleting a Space Thing rather than orphaning the Space it owns', () => {
+  it('refuses deleting a Space Resource rather than orphaning the Space it owns', () => {
     const linked: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        positionedSnapshot.things[0]!,
+      resources: [
+        positionedSnapshot.resources[0]!,
         {
-          id: THING_B,
+          id: RESOURCE_B,
           document: {
             title: 'Nested Space',
             kind: 'space',
-            spaceId: UNKNOWN_THING,
-            diagram: UNLOADED_DIAGRAM,
+            spaceId: UNKNOWN_RESOURCE,
+            map: UNLOADED_MAP,
             graph: UNLOADED_GRAPH,
           },
         },
@@ -1793,51 +1821,53 @@ describe('Delete Thing from Space', () => {
     const { authoring, session } = open(linked);
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
       kind: 'refused',
-      refusal: { code: 'space-thing-deletion-unsupported' },
+      refusal: { code: 'space-resource-deletion-unsupported' },
     });
     expect(session.getState().working).toBe(before);
   });
 
-  it('deletes a Reference Thing and leaves its Target untouched', () => {
+  it('deletes a Reference Resource and leaves its Target untouched', () => {
     const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
+      resources: [
+        positionedSnapshot.resources[0]!,
+        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
       ],
     };
     const { authoring, session } = open(referenced);
 
-    expect(authoring.complete({ kind: 'deleted-thing', thingId: THING_B })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
       kind: 'completed',
     });
-    expect(session.getState().working.things).toEqual([positionedSnapshot.things[0]]);
+    expect(session.getState().working.resources).toEqual([positionedSnapshot.resources[0]]);
   });
 
-  it('removing a Thing from one Diagram is never blocked by an incoming Reference Thing', () => {
+  it('removing a Resource from one Map is never blocked by an incoming Reference Resource', () => {
     const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
-      things: [
-        positionedSnapshot.things[0]!,
-        { id: THING_B, document: { title: 'A again', kind: 'reference', target: THING_A } },
+      resources: [
+        positionedSnapshot.resources[0]!,
+        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
       ],
     };
     const { authoring, session } = open(referenced);
 
-    expect(authoring.complete({ kind: 'removed-thing-from-diagram', thingId: THING_A })).toEqual({
+    expect(
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
+    ).toEqual({
       kind: 'completed',
     });
-    expect(session.getState().working.things).toEqual(referenced.things);
+    expect(session.getState().working.resources).toEqual(referenced.resources);
   });
 
-  it('refuses a Thing the Space no longer holds', () => {
+  it('refuses a Resource the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.complete({ kind: 'deleted-thing', thingId: UNKNOWN_THING })).toEqual({
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
       kind: 'refused',
-      refusal: { code: 'thing-not-found' },
+      refusal: { code: 'resource-not-found' },
     });
   });
 });
@@ -1861,7 +1891,7 @@ describe('Keep local', () => {
     });
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
-    const { authoring } = composeApp({ spaceSession: session, selection: DIAGRAM_ID });
+    const { authoring } = composeApp({ spaceSession: session, selection: MAP_ID });
 
     authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
@@ -1899,15 +1929,15 @@ describe('Stale identities', () => {
   });
 });
 
-describe('connecting Things on an embedded Diagram', () => {
+describe('connecting Resources on an embedded Map', () => {
   const SHOWN_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
   const other = {
-    id: OTHER_DIAGRAM_ID,
-    title: 'Other Diagram',
+    id: OTHER_MAP_ID,
+    title: 'Other Map',
     kind: 'positioned' as const,
     positions: {
-      [THING_A]: { x: 500, y: 600, open: false as const },
-      [THING_C]: { x: 800, y: 600, open: false as const },
+      [RESOURCE_A]: { x: 500, y: 600, open: false as const },
+      [RESOURCE_C]: { x: 800, y: 600, open: false as const },
     },
     graphs: [
       { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
@@ -1919,34 +1949,32 @@ describe('connecting Things on an embedded Diagram', () => {
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      diagrams: [...(positionedSnapshot.document.diagrams ?? []), other],
+      maps: [...(positionedSnapshot.document.maps ?? []), other],
     },
-    things: [
-      ...positionedSnapshot.things,
-      { id: THING_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
+    resources: [
+      ...positionedSnapshot.resources,
+      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
     ],
   };
-  it('writes the Edge into the Graph the Space Thing is showing, not the canvas Active Graph', () => {
+  it('writes the Edge into the Graph the Space Resource is showing, not the canvas Active Graph', () => {
     const { session, navigation, authoring } = open(withOther);
     const initialNavigation = navigation.getState();
 
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
-        kind: 'connected-things',
-        from: THING_A,
-        to: THING_C,
+      authoring.completeInMap(OTHER_MAP_ID, {
+        kind: 'connected-resources',
+        from: RESOURCE_A,
+        to: RESOURCE_C,
         graphId: SHOWN_GRAPH_ID,
       }).kind,
     ).toBe('completed');
 
     expect(navigation.getState()).toEqual(initialNavigation);
-    expect(diagramOf(session.getState().working, OTHER_DIAGRAM_ID)?.graphs).toEqual([
+    expect(mapOf(session.getState().working, OTHER_MAP_ID)?.graphs).toEqual([
       { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
-      { id: SHOWN_GRAPH_ID, title: 'Shown Graph', edges: [{ from: THING_A, to: THING_C }] },
+      { id: SHOWN_GRAPH_ID, title: 'Shown Graph', edges: [{ from: RESOURCE_A, to: RESOURCE_C }] },
     ]);
-    expect(diagramOf(session.getState().working, DIAGRAM_ID)).toEqual(
-      diagramOf(positionedSnapshot, DIAGRAM_ID),
-    );
+    expect(mapOf(session.getState().working, MAP_ID)).toEqual(mapOf(positionedSnapshot, MAP_ID));
   });
 
   it('refuses a duplicate on the Graph being shown', () => {
@@ -1954,8 +1982,8 @@ describe('connecting Things on an embedded Diagram', () => {
       ...withOther,
       document: {
         ...withOther.document,
-        diagrams: [
-          ...(positionedSnapshot.document.diagrams ?? []),
+        maps: [
+          ...(positionedSnapshot.document.maps ?? []),
           {
             ...other,
             graphs: [
@@ -1963,7 +1991,7 @@ describe('connecting Things on an embedded Diagram', () => {
               {
                 id: SHOWN_GRAPH_ID,
                 title: 'Shown Graph',
-                edges: [{ from: THING_A, to: THING_C }],
+                edges: [{ from: RESOURCE_A, to: RESOURCE_C }],
               },
             ],
           },
@@ -1972,23 +2000,23 @@ describe('connecting Things on an embedded Diagram', () => {
     });
 
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
-        kind: 'connected-things',
-        from: THING_A,
-        to: THING_C,
+      authoring.completeInMap(OTHER_MAP_ID, {
+        kind: 'connected-resources',
+        from: RESOURCE_A,
+        to: RESOURCE_C,
         graphId: SHOWN_GRAPH_ID,
       }),
     ).toMatchObject({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
   });
 });
 
-describe('context commands on an embedded Diagram', () => {
-  it('authors the addressed Diagram and Graph without switching the target canvas', () => {
+describe('context commands on an embedded Map', () => {
+  it('authors the addressed Map and Graph without switching the target canvas', () => {
     const other = {
-      id: OTHER_DIAGRAM_ID,
-      title: 'Other Diagram',
+      id: OTHER_MAP_ID,
+      title: 'Other Map',
       kind: 'positioned' as const,
-      positions: { [THING_A]: { x: 500, y: 600, open: false as const } },
+      positions: { [RESOURCE_A]: { x: 500, y: 600, open: false as const } },
       graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       activeGraph: OTHER_GRAPH_ID,
     };
@@ -1996,54 +2024,53 @@ describe('context commands on an embedded Diagram', () => {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        diagrams: [...(positionedSnapshot.document.diagrams ?? []), other],
+        maps: [...(positionedSnapshot.document.maps ?? []), other],
       },
     });
     const initialNavigation = navigation.getState();
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
-        kind: 'renamed-diagram',
-        diagramId: OTHER_DIAGRAM_ID,
+      authoring.completeInMap(OTHER_MAP_ID, {
+        kind: 'renamed-map',
+        mapId: OTHER_MAP_ID,
         title: 'Renamed context',
       }).kind,
     ).toBe('completed');
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+      authoring.completeInMap(OTHER_MAP_ID, {
         kind: 'renamed-graph',
         graphId: OTHER_GRAPH_ID,
         title: 'Renamed Graph',
       }).kind,
     ).toBe('completed');
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+      authoring.completeInMap(OTHER_MAP_ID, {
         kind: 'recolored-graph',
         graphId: OTHER_GRAPH_ID,
         color: '#f472b6',
       }).kind,
     ).toBe('completed');
-    expect(authoring.completeInDiagram(OTHER_DIAGRAM_ID, { kind: 'added-graph' })).toMatchObject({
+    expect(authoring.completeInMap(OTHER_MAP_ID, { kind: 'added-graph' })).toMatchObject({
       kind: 'completed',
       createdGraphId: MINTED,
     });
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, { kind: 'deleted-graph', graphId: MINTED })
-        .kind,
+      authoring.completeInMap(OTHER_MAP_ID, { kind: 'deleted-graph', graphId: MINTED }).kind,
     ).toBe('completed');
     expect(
-      authoring.completeInDiagram(OTHER_DIAGRAM_ID, {
+      authoring.completeInMap(OTHER_MAP_ID, {
         kind: 'renamed-graph',
         graphId: GRAPH_ID,
         title: 'Wrong owner',
       }),
     ).toMatchObject({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
     const working = session.getState().working;
-    expect(diagramOf(working, OTHER_DIAGRAM_ID)).toMatchObject({
+    expect(mapOf(working, OTHER_MAP_ID)).toMatchObject({
       title: 'Renamed context',
       positions: other.positions,
       graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }],
     });
-    expect(diagramOf(working, DIAGRAM_ID)).toEqual(diagramOf(positionedSnapshot, DIAGRAM_ID));
-    expect(working.document.defaultDiagram).toBe(DIAGRAM_ID);
+    expect(mapOf(working, MAP_ID)).toEqual(mapOf(positionedSnapshot, MAP_ID));
+    expect(working.document.defaultMap).toBe(MAP_ID);
     expect(navigation.getState()).toEqual(initialNavigation);
   });
 });
@@ -2053,14 +2080,14 @@ it('repairs the target canvas when a context command deletes its active Graph', 
     ...positionedSnapshot,
     document: {
       ...positionedSnapshot.document,
-      diagrams: [
+      maps: [
         {
-          id: DIAGRAM_ID,
-          title: 'Diagram 1',
+          id: MAP_ID,
+          title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [THING_A]: { x: 10, y: 20, open: false },
-            [THING_B]: { x: 300, y: 40, open: false },
+            [RESOURCE_A]: { x: 10, y: 20, open: false },
+            [RESOURCE_B]: { x: 300, y: 40, open: false },
           },
           graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           activeGraph: GRAPH_ID,
@@ -2068,9 +2095,9 @@ it('repairs the target canvas when a context command deletes its active Graph', 
       ],
     },
   });
-  expect(
-    authoring.completeInDiagram(DIAGRAM_ID, { kind: 'deleted-graph', graphId: GRAPH_ID }).kind,
-  ).toBe('completed');
+  expect(authoring.completeInMap(MAP_ID, { kind: 'deleted-graph', graphId: GRAPH_ID }).kind).toBe(
+    'completed',
+  );
   expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
   expect(graphsOf(session.getState().working).map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
 });

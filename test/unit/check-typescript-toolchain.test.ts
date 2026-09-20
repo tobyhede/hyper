@@ -178,7 +178,7 @@ describe('what the check probes', () => {
     // Asked of pnpm rather than re-derived here. An expectation rebuilt from the
     // same manifest with the same globbing rule can only ever agree with the code
     // under test; `pnpm -r list` is the enumeration `pnpm -r typecheck` itself
-    // walks, so this compares the claim against the thing it is a claim about.
+    // walks, so this compares the claim against the subject it is a claim about.
     const { stdout } = await promisify(execFile)(
       'pnpm',
       ['-r', 'list', '--depth', '-1', '--json'],

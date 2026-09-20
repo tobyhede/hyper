@@ -1,2 +1,2 @@
 /** Must survive: `as const` preserves the literal types rather than widening them. */
-export const thingKinds = ['markdown', 'reference'] as const;
+export const resourceKinds = ['markdown', 'reference'] as const;

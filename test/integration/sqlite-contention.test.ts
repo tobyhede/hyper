@@ -28,19 +28,19 @@ import {
 const META_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000001');
 const CHILD_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000002');
 const REPLACEMENT_META_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000003');
-const META_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000010');
-const CHILD_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000011');
-const LINK_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000012');
-const CONTESTED_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000013');
-const REPLACEMENT_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000014');
-const DIAGRAM_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000020');
+const META_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000010');
+const CHILD_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000011');
+const LINK_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000012');
+const CONTESTED_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000013');
+const REPLACEMENT_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000014');
+const MAP_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000020');
 const GRAPH_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000021');
 const NEW_CHILD_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000004');
-const NEW_CHILD_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000017');
-const NEW_CHILD_DIAGRAM_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000022');
+const NEW_CHILD_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000017');
+const NEW_CHILD_MAP_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000022');
 const NEW_CHILD_GRAPH_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000023');
-const LINK_A_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000015');
-const LINK_B_THING_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000016');
+const LINK_A_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000015');
+const LINK_B_RESOURCE_ID = uuidSchema.parse('f0000000-0000-4000-8000-000000000016');
 
 /** The driver's hard-coded `PRAGMA busy_timeout` (`@prisma-next/driver-sqlite`). */
 const BUSY_TIMEOUT_MS = 5_000;
@@ -60,11 +60,11 @@ const child: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Child',
-    defaultDiagram: DIAGRAM_ID,
-    diagrams: [
+    defaultMap: MAP_ID,
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -72,21 +72,21 @@ const child: SpaceSnapshot = {
       },
     ],
   },
-  things: [markdown(CHILD_THING_ID, 'Child thing')],
+  resources: [markdown(CHILD_RESOURCE_ID, 'Child resource')],
 };
 
 const meta: SpaceSnapshot = {
   id: META_ID,
   document: { version: 1, title: 'Meta' },
-  things: [
-    markdown(META_THING_ID, 'Meta thing'),
+  resources: [
+    markdown(META_RESOURCE_ID, 'Meta resource'),
     {
-      id: LINK_THING_ID,
+      id: LINK_RESOURCE_ID,
       document: {
         title: 'Open child',
         kind: 'space',
         spaceId: CHILD_ID,
-        diagram: DIAGRAM_ID,
+        map: MAP_ID,
         graph: GRAPH_ID,
       },
     },
@@ -99,7 +99,7 @@ const replacement = {
     {
       id: REPLACEMENT_META_ID,
       document: { version: 1 as const, title: 'Replacement' },
-      things: [markdown(REPLACEMENT_THING_ID, 'Replacement thing')],
+      resources: [markdown(REPLACEMENT_RESOURCE_ID, 'Replacement resource')],
     },
   ],
 };
@@ -109,9 +109,9 @@ const retitled = (snapshot: SpaceSnapshot, title: string): SpaceSnapshot => ({
   document: { ...snapshot.document, title },
 });
 
-const withThing = (snapshot: SpaceSnapshot, id: UUID): SpaceSnapshot => ({
+const withResource = (snapshot: SpaceSnapshot, id: UUID): SpaceSnapshot => ({
   ...snapshot,
-  things: [...snapshot.things, markdown(id, 'Contested')],
+  resources: [...snapshot.resources, markdown(id, 'Contested')],
 });
 
 const update = (snapshot: SpaceSnapshot, expectedRevision = 0n): SpaceCommit => ({
@@ -127,11 +127,11 @@ const newChildSnapshot = (title: string): SpaceSnapshot => ({
   document: {
     version: 1,
     title,
-    defaultDiagram: NEW_CHILD_DIAGRAM_ID,
-    diagrams: [
+    defaultMap: NEW_CHILD_MAP_ID,
+    maps: [
       {
-        id: NEW_CHILD_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: NEW_CHILD_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: NEW_CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -139,20 +139,20 @@ const newChildSnapshot = (title: string): SpaceSnapshot => ({
       },
     ],
   },
-  things: [markdown(NEW_CHILD_THING_ID, 'New child thing')],
+  resources: [markdown(NEW_CHILD_RESOURCE_ID, 'New child resource')],
 });
 
-const metaLinkingNewChild = (linkThingId: UUID): SpaceSnapshot => ({
+const metaLinkingNewChild = (linkResourceId: UUID): SpaceSnapshot => ({
   ...meta,
-  things: [
-    ...meta.things,
+  resources: [
+    ...meta.resources,
     {
-      id: linkThingId,
+      id: linkResourceId,
       document: {
         title: 'Open new child',
         kind: 'space' as const,
         spaceId: NEW_CHILD_ID,
-        diagram: NEW_CHILD_DIAGRAM_ID,
+        map: NEW_CHILD_MAP_ID,
         graph: NEW_CHILD_GRAPH_ID,
       },
     },
@@ -164,13 +164,13 @@ const metaLinkingNewChild = (linkThingId: UUID): SpaceSnapshot => ({
  * links it — a create can never be valid alone, since nothing yet refers to
  * the new Space (ADR 0079's `ordinary-space-unreferenced`).
  */
-const createNewChild = (linkThingId: UUID, title: string): SpaceCommit => ({
+const createNewChild = (linkResourceId: UUID, title: string): SpaceCommit => ({
   changes: [
     { kind: 'create', spaceId: NEW_CHILD_ID, snapshot: newChildSnapshot(title) },
     {
       kind: 'update',
       spaceId: META_ID,
-      snapshot: metaLinkingNewChild(linkThingId),
+      snapshot: metaLinkingNewChild(linkResourceId),
       expectedRevision: 0n,
     },
   ],
@@ -228,15 +228,15 @@ describe('SQLite contention', () => {
       });
     });
 
-    // The loser's complete aggregate intake sees the winner's Thing already
+    // The loser's complete aggregate intake sees the winner's Resource already
     // stored, so it is refused in domain terms before any write is attempted.
-    it('refuses the loser of a Thing identity race and writes nothing of it', async () => {
+    it('refuses the loser of a Resource identity race and writes nothing of it', async () => {
       const { repository } = await initialized();
 
       const { settled, elapsed } = await timed(() =>
         Promise.all([
-          repository.commit(update(withThing(meta, CONTESTED_THING_ID))),
-          repository.commit(update(withThing(child, CONTESTED_THING_ID))),
+          repository.commit(update(withResource(meta, CONTESTED_RESOURCE_ID))),
+          repository.commit(update(withResource(child, CONTESTED_RESOURCE_ID))),
         ]),
       );
 
@@ -270,8 +270,8 @@ describe('SQLite contention', () => {
 
       const { settled, elapsed } = await timed(() =>
         Promise.all([
-          repository.commit(createNewChild(LINK_A_THING_ID, 'From A')),
-          repository.commit(createNewChild(LINK_B_THING_ID, 'From B')),
+          repository.commit(createNewChild(LINK_A_RESOURCE_ID, 'From A')),
+          repository.commit(createNewChild(LINK_B_RESOURCE_ID, 'From B')),
         ]),
       );
 

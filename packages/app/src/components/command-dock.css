@@ -24,10 +24,10 @@
 /* ------------------------------------------------------------------ frame */
 
 /* **The treatment is not here.** Every dock shares one, and so does the strip
-   a Thing reveals on hover: translucent, blurred, hairline-bordered, and never
-   the paper a Thing is. That is `.command-surface` in
+   a Resource reveals on hover: translucent, blurred, hairline-bordered, and never
+   the paper a Resource is. That is `.command-surface` in
    `packages/ui/src/command-surface.css`, which `CommandToolbar` wears and this
-   surface mounts — so the Dock and the Thing read as one language because they
+   surface mounts — so the Dock and the Resource read as one language because they
    are one surface drawn twice, rather than because two stylesheets were kept in
    step (`.scratch/command-dock/issues/12`). The axis is there too, read off the
    same `data-orientation` Base UI is given.
@@ -45,7 +45,7 @@
    **Only while the dock is actually down there.** The offset is the Dock's to
    ask for, so it is asked for by the Dock: unconditional, it moved the Graph key
    and the zoom control up by 40px at every one of the twelve slots, which put
-   the key over the bottom-right corner of any Thing drawn under it — and a Thing's
+   the key over the bottom-right corner of any Resource drawn under it — and a Resource's
    resize control lives in exactly that corner.
 
    Written as an attribute test rather than `.bottom`, because `bottom` is a
@@ -65,7 +65,7 @@
    element exists. It used to be a child of the surface — a status region nested
    in `role="toolbar"`, which is what ADR 0082's *"status is not a command"*
    forbids and what a screen reader reads as one more item in the command order.
-   A wrapper is the smallest thing that makes the two siblings without moving
+   A wrapper is the smallest structure that makes the two siblings without moving
    either off the dock. */
 .command-dock {
   position: absolute;
@@ -238,13 +238,13 @@
 
 /* --------------------------------------------------------------- identity */
 
-/* Which Diagram and which Graph are active. The name is always drawn — the
+/* Which Map and which Graph are active. The name is always drawn — the
    three collapse modes a narrow dock was compared through are gone, because a
    vertical dock stacks into named rows rather than shrinking into a rail.
 
    **How a name is drawn is not here either.** Ellipsed rather than wrapped, and
    never widening the strip it is on, is `CommandName` in `@project/ui` — shared
-   with an Open Space Thing, which names a Diagram and a Graph exactly as this
+   with an Open Space Resource, which names a Map and a Graph exactly as this
    surface does.
 
    **The gap belongs to the control, not to the label.** The label used to carry
@@ -260,7 +260,7 @@
 
 /* A vertical dock is a column of rows, and every control in it has to agree —
    not just the two carrying titles. Left-aligned at a common width, the icons
-   line up under the Diagram and Graph glyphs and the column reads as a list;
+   line up under the Map and Graph glyphs and the column reads as a list;
    centred, they float in the middle of a width the titles set and the column
    reads as an accident. */
 .command-dock__surface[data-orientation='vertical'] > *:not(.command-dock__grip) {
@@ -305,7 +305,7 @@
    it sits in one track and the name keeps the width. `GraphControls` reorders
    its own JSX for this, so the Tab order still matches what the eye reads.
 
-   **Things is not placed by this grid at all** — see the Things cluster below.
+   **Resources is not placed by this grid at all** — see the Resources cluster below.
    Its three Create commands would have wanted three more tracks, so it packs
    instead and gives up the `1fr` track its fixed word never needed. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
@@ -321,19 +321,19 @@
   grid-column: 3;
 }
 
-/* ------------------------------------------------------- the Things cluster */
+/* ------------------------------------------------------- the Resources cluster */
 
-/* **Things leaves the grid, because it is the one cluster whose name is not a
+/* **Resources leaves the grid, because it is the one cluster whose name is not a
    title.**
 
-   The grid above exists for names the author wrote: Space, Diagram and Graph
+   The grid above exists for names the author wrote: Space, Map and Graph
    each name an entity that has been renamed, so the length is theirs, and the
    `1fr` track is what lets a name take the slack and truncate instead of
    resizing the column when the reader crosses from `Meta Space` to `Design
-   system`. "Things" names a *set*. It has no name to edit — which is why the
+   system`. "Resources" names a *set*. It has no name to edit — which is why the
    word lives inside its trigger rather than beside it — and it is the same
    literal string in every Space there will ever be. Measured, that track holds
-   about 69px of nothing: the run from the Thing glyph to the chevron is 122px
+   about 69px of nothing: the run from the Resource glyph to the chevron is 122px
    under the grid against 53px packed.
 
    So this cluster packs and spends that room on its three Create commands. It
@@ -348,20 +348,20 @@
    others' x=146 — and this chevron is the odd one anyway, being *inside* its
    trigger rather than a button beside it. The trailing edge is unaffected: the
    last Create ends where Present ends. */
-.command-dock__surface[data-orientation='vertical'] .command-dock__things {
+.command-dock__surface[data-orientation='vertical'] .command-dock__resources {
   display: flex;
   justify-content: space-between;
   gap: 1px;
 }
 
 /* The three are sized by their glyphs; the trigger takes every remaining pixel.
-   That is also what pins the chevron: `.command-dock__things-trigger` already
+   That is also what pins the chevron: `.command-dock__resources-trigger` already
    pushes its last child to its own trailing edge, so an elastic trigger puts
    that chevron one gap before the first Create — on the same 29px pitch the
    three keep between themselves (a 28px button plus this 1px gap). The
    trigger's existing 6px end padding is what makes that pitch exact; 5px and
    7px put the chevron a pixel either side of the rhythm. */
-.command-dock__surface[data-orientation='vertical'] .command-dock__things .command-dock__create {
+.command-dock__surface[data-orientation='vertical'] .command-dock__resources .command-dock__create {
   flex: 0 0 auto;
 }
 
@@ -372,31 +372,33 @@
   padding-inline-start: 0;
 }
 
-/* Things is the one trigger carrying its own chevron, so it spans the name and
+/* Resources is the one trigger carrying its own chevron, so it spans the name and
    disclosure tracks and pushes that chevron to the end of the span. The 6px is
    what an icon button spends on either side of a 16px glyph in a 28px track, so
    the chevron lands in the column rather than merely near it. */
 /* At the root the Open Spaces menu carries the word "Spaces", so it stands in the name
    track and pushes its own chevron into the disclosure column — the same
-   arrangement the Things trigger has, and the same rule. */
+   arrangement the Resources trigger has, and the same rule. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__name,
 .command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
 .command-dock__surface[data-orientation='vertical'] .command-dock__spaces-trigger,
-.command-dock__surface[data-orientation='vertical'] .command-dock__things-trigger {
+.command-dock__surface[data-orientation='vertical'] .command-dock__resources-trigger {
   padding-inline-end: 6px;
   grid-column: 1 / span 2;
 }
 
 .command-dock__surface[data-orientation='vertical'] .command-dock__name > svg:last-child,
 .command-dock__surface[data-orientation='vertical'] .command-dock__spaces-trigger > svg:last-child,
-.command-dock__surface[data-orientation='vertical'] .command-dock__things-trigger > svg:last-child {
+.command-dock__surface[data-orientation='vertical']
+  .command-dock__resources-trigger
+  > svg:last-child {
   margin-inline-start: auto;
 }
 
 /* ---------------------------------------------------------------- cluster */
 
-/* Diagram and Graph each read as one named entity carrying several commands,
-   which is what a Thing rail is (ADR 0073) — so each is a `Toolbar`, drawn
+/* Map and Graph each read as one named entity carrying several commands,
+   which is what a Resource rail is (ADR 0073) — so each is a `Toolbar`, drawn
    tight, with the dock's own gap doing the separating between them. */
 .command-dock__cluster {
   display: inline-flex;
@@ -407,7 +409,7 @@
 
 /* The three Create commands, as one run. A group rather than three siblings so
    the vertical column has one element to place — left loose they auto-place
-   onto three rows and the cluster stands at 102px beside a 44px Diagram. */
+   onto three rows and the cluster stands at 102px beside a 44px Map. */
 .command-dock__create {
   display: inline-flex;
   min-width: 0;
@@ -419,7 +421,7 @@
    edge whatever the title's length — which is what makes the two clusters line
    up under each other in the vertical dock instead of ending wherever the words
    happen to. In a horizontal dock there is no slack and this does nothing. */
-/* Every control that carries a name: the four identities, the Things trigger and
+/* Every control that carries a name: the four identities, the Resources trigger and
    the Open Spaces menu at the root. One gap, so a glyph, a name and a chevron sit the
    same distance apart wherever they appear — and a control with no glyph is
    simply one item short rather than one indent adrift. */
@@ -439,7 +441,7 @@
 /* The Space region: the trail of Spaces crossed, then the Space you are in.
 
    **Two lines in a vertical dock and one in a horizontal one**, which is the
-   only thing about this region the edge decides. A trail runs along its own
+   only resource about this region the edge decides. A trail runs along its own
    axis whatever the dock does — it is a breadcrumb, and a breadcrumb reads left
    to right — so a vertical dock that stacked everything else would have left a
    row of crumbs running across its narrow axis and set the dock's width by how
@@ -489,7 +491,7 @@
 /* The open-Spaces tree, one hairline per level.
 
    Structure drawn rather than implied, and the Space glyph gone with it: the
-   glyph repeated once per row was the loudest thing on a panel whose content is
+   glyph repeated once per row was the loudest resource on a panel whose content is
    names and nesting, and it repeated the same rule every time. The rules say
    something different on every row.
 
@@ -566,7 +568,7 @@
      container's width as the one term this element cannot say, so the viewport
      stands in for it. Nothing scrolls the page (`.shell` is `overflow: hidden`
      with no scrollbar to discount) and nothing yields a strip of it any more —
-     the Things list is a Popover anchored to its own trigger and drawn over this
+     the Resources list is a Popover anchored to its own trigger and drawn over this
      notice rather than beside it — so the two agree.
 
      The 32px is `EDGE_INSET` spent twice — the 16px the dock is held off its own
@@ -630,7 +632,7 @@
 
    A dot rather than a word or an icon: the row's content is a name and an
    indent, and the mark has to be findable down a six-row list without becoming
-   the loudest thing on it — which is the same test every candidate indent was
+   the loudest resource on it — which is the same test every candidate indent was
    put through in `.scratch/command-dock/issues/01-...`. The sentence lives in
    an `sr-only` span, so the state is never carried by colour alone.
 

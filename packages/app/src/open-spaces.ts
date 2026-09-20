@@ -1,4 +1,4 @@
-import type { DiagramId, GraphId, UUID } from '@project/core';
+import type { MapId, GraphId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
@@ -13,24 +13,27 @@ import {
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import { createSpaceThingLifecycle, type SpaceThingAuthoring } from './space-thing-lifecycle';
-import type { SpaceThingFraming } from './space-thing-framing';
+import {
+  createSpaceResourceLifecycle,
+  type SpaceResourceAuthoring,
+} from './space-resource-lifecycle';
+import type { SpaceResourceFraming } from './space-resource-framing';
 
 export interface OpenSpace {
   readonly id: UUID;
   readonly session: SpaceSession;
   readonly app: ComposedApp;
   /**
-   * Authoring the Space Things this Space holds (ADR 0074, ADR 0076).
+   * Authoring the Space Resources this Space holds (ADR 0074, ADR 0076).
    *
    * Carried on the entry rather than composed inside the app because it is
    * written over the *registry*, not over one session: creating, referencing
-   * and deleting a Space Thing are Edits across several Spaces, and the registry
+   * and deleting a Space Resource are Edits across several Spaces, and the registry
    * is what holds the others. Every entry names the same one — which is why it
    * is required rather than optional, and why an app is never composed half
-   * able to author a Space Thing.
+   * able to author a Space Resource.
    */
-  readonly spaceThings: SpaceThingAuthoring;
+  readonly spaceResources: SpaceResourceAuthoring;
 }
 
 export interface OpenSpacesState {
@@ -93,7 +96,7 @@ export interface OpenSpaces {
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
-  readonly open: (spaceId: UUID, selection?: DiagramId) => Promise<OpenSpace>;
+  readonly open: (spaceId: UUID, selection?: MapId) => Promise<OpenSpace>;
   /** Keep the containing canvas active while opening a target for embedded editing. */
   readonly embed: (spaceId: UUID) => Promise<OpenSpace>;
   /** Wait for queued and in-flight writes before another Space refers to their result. */
@@ -104,9 +107,9 @@ export interface OpenSpaces {
   }>;
   readonly enter: (
     spaceId: UUID,
-    selection?: DiagramId,
+    selection?: MapId,
     graph?: GraphId,
-    framing?: SpaceThingFraming,
+    framing?: SpaceResourceFraming,
   ) => Promise<OpenSpace>;
   /**
    * The camera Enter asked the first canvas showing to take, or `undefined`.
@@ -115,13 +118,13 @@ export interface OpenSpaces {
    * second read still answers the same seed, and that a later Enter of a Space
    * already shown does not write one.
    */
-  readonly openingFraming: (entry: OpenSpace) => SpaceThingFraming | undefined;
+  readonly openingFraming: (entry: OpenSpace) => SpaceResourceFraming | undefined;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly exit: (
     spaceId: UUID,
     confirmation?: RejectedExitConfirmation,
   ) => Promise<ExitSpaceResult>;
-  readonly spaceThings: SpaceThingAuthoring;
+  readonly spaceResources: SpaceResourceAuthoring;
   /**
    * The browser's location, following whichever Space is on the canvas.
    *
@@ -157,9 +160,9 @@ interface ValidatedLoadedSpace {
 }
 
 interface FirstCanvasSeed {
-  selection?: DiagramId;
+  selection?: MapId;
   graph?: GraphId;
-  framing?: SpaceThingFraming;
+  framing?: SpaceResourceFraming;
 }
 
 const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
@@ -184,10 +187,10 @@ export function createOpenSpaces({
   const report: ObserverErrorReporter =
     reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
   const registry = createSpaceSessionRegistry(backend, { reportObserverError: report });
-  // Opening a Space is a working load, so it initializes a stored diagramless
+  // Opening a Space is a working load, so it initializes a stored mapless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
-  const spaceThings = createSpaceThingLifecycle({
+  const spaceResources = createSpaceResourceLifecycle({
     backend,
     registry,
     newId,
@@ -203,12 +206,12 @@ export function createOpenSpaces({
    *
    * Embed adds an Open Spaces entry without activating it (`embed` holds
    * `activeSpaceId` on the containing Space). Enter is the first canvas
-   * showing, so it still seeds from the Thing — held by
-   * `packages/app/test/enter-space-thing.test.tsx`. A later Enter keeps the
+   * showing, so it still seeds from the Resource — held by
+   * `packages/app/test/enter-space-resource.test.tsx`. A later Enter keeps the
    * live selection, which that file's already-open case holds.
    */
   const shownOnCanvas = new WeakSet<OpenSpace>();
-  const openingFramingByEntry = new WeakMap<OpenSpace, SpaceThingFraming>();
+  const openingFramingByEntry = new WeakMap<OpenSpace, SpaceResourceFraming>();
   const browserLocation = createBrowserLocation(history, report, async (pathname) => {
     await openPath(pathname);
   });
@@ -349,7 +352,7 @@ export function createOpenSpaces({
     followActiveSpace();
   };
 
-  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: DiagramId): OpenSpace => {
+  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: MapId): OpenSpace => {
     const spaceId = loaded.snapshot.id;
     const session = registry.open(loaded);
     // Every identity and every observer failure in a composed Space comes from
@@ -364,9 +367,9 @@ export function createOpenSpaces({
         selection,
         newId,
         reportObserverError: report,
-        spaceThings,
+        spaceResources,
       }),
-      spaceThings,
+      spaceResources,
     };
     session.subscribe(() => {
       const state = observable.getState();
@@ -378,7 +381,7 @@ export function createOpenSpaces({
 
   const composeValidated = async (
     validated: ValidatedLoadedSpace,
-    selection?: DiagramId,
+    selection?: MapId,
   ): Promise<OpenSpace> => {
     const { loaded } = validated;
     const spaceId = loaded.snapshot.id;
@@ -391,7 +394,7 @@ export function createOpenSpaces({
     return opening;
   };
 
-  const compose = async (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> => {
+  const compose = async (spaceId: UUID, selection?: MapId): Promise<OpenSpace> => {
     await exiting.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
@@ -437,7 +440,7 @@ export function createOpenSpaces({
     }
     include(target, target.id, from);
     if (seedFrom !== undefined) {
-      if (seedFrom.selection !== undefined) target.app.navigation.selectDiagram(seedFrom.selection);
+      if (seedFrom.selection !== undefined) target.app.navigation.selectMap(seedFrom.selection);
       if (seedFrom.graph !== undefined) target.app.navigation.activateGraph(seedFrom.graph);
     }
     return target;
@@ -445,7 +448,7 @@ export function createOpenSpaces({
 
   const activate = async (
     spaceId: UUID,
-    selection: DiagramId | undefined,
+    selection: MapId | undefined,
     from: UUID | null,
     firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
@@ -467,7 +470,7 @@ export function createOpenSpaces({
   };
 
   /** Open a Space directly, which is not a crossing and records no opener. */
-  const open = (spaceId: UUID, selection?: DiagramId): Promise<OpenSpace> =>
+  const open = (spaceId: UUID, selection?: MapId): Promise<OpenSpace> =>
     activate(spaceId, selection, null);
 
   /**
@@ -480,9 +483,9 @@ export function createOpenSpaces({
    */
   const enter = (
     spaceId: UUID,
-    selection?: DiagramId,
+    selection?: MapId,
     graph?: GraphId,
-    framing?: SpaceThingFraming,
+    framing?: SpaceResourceFraming,
   ): Promise<OpenSpace> => {
     const firstDisplay: FirstCanvasSeed = {};
     if (selection !== undefined) firstDisplay.selection = selection;
@@ -494,7 +497,7 @@ export function createOpenSpaces({
   /**
    * Open a target for embedded editing without taking the canvas off the Space
    * that embeds it, which is still a crossing: the target hangs off the Space
-   * whose Thing reached it.
+   * whose Resource reached it.
    */
   const embed = async (spaceId: UUID): Promise<OpenSpace> => {
     const target = await compose(spaceId);
@@ -518,7 +521,7 @@ export function createOpenSpaces({
     request: number,
   ): ReturnType<OpenSpaces['openPath']> => {
     // Resolving an address is a working load, so it initializes a stored
-    // diagramless Space before the destination is read off it (ADR 0079).
+    // mapless Space before the destination is read off it (ADR 0079).
     const resolution = await resolveProductDestination({ loadSpace: loadWorkingSpace }, pathname);
     if (resolution.kind === 'outside') throw new Error('The URL is outside product addressing.');
     if (resolution.kind === 'malformed') throw new Error('The product URL is malformed.');
@@ -534,9 +537,9 @@ export function createOpenSpaces({
     );
     // A Space already open keeps the selection it is being worked in, so the
     // URL's is only a proposal. Report the one that holds: a caller opening the
-    // named Graph does so against the selected Diagram, and the two disagreeing
-    // is how a Graph lands on a Diagram nobody named.
-    const selection = opened.app.navigation.getState().selectedDiagramId;
+    // named Graph does so against the selected Map, and the two disagreeing
+    // is how a Graph lands on a Map nobody named.
+    const selection = opened.app.navigation.getState().selectedMapId;
     const opening: DestinationOpening =
       selection === destination.selection ? destination : { ...destination, selection };
     return { opened, opening };
@@ -625,7 +628,7 @@ export function createOpenSpaces({
     // `authoring.dispose` clearing the subscriber set the others registered in:
     // that is true today and is an ordering nothing here states or tests.
     target.app.edgeAuthoring.dispose();
-    target.app.thingDeletion.dispose();
+    target.app.resourceDeletion.dispose();
     target.app.continuation.dispose();
     target.app.authoring.dispose();
     retired.add(target);
@@ -677,7 +680,7 @@ export function createOpenSpaces({
     openingFraming: (entry) => openingFramingByEntry.get(entry),
     switchTo,
     exit,
-    spaceThings,
+    spaceResources,
     browserLocation,
   };
 }

@@ -8,10 +8,10 @@ import { nodeTypes } from '@project/react-flow-adapter';
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canvasProjection } from '#src/canvas-projection';
-import { thingChoiceOf } from '#src/thing-choice';
+import { resourceChoiceOf } from '#src/resource-choice';
 import type { SelectedEdgeRefusal } from '#src/edge-authoring';
 import { edgeSelectionOf } from '#src/render-adapter';
-import { requireDefaultDiagram, resolveDiagram } from '#src/diagram-resolution';
+import { requireDefaultMap, resolveMap } from '#src/map-resolution';
 import { AuthorableEdge } from '#components/AuthorableEdge';
 // `#components/*` maps to `src/components/*.tsx`; this seam is a `.ts`, so it
 // comes through `#src/*` instead. Naming the wrong one resolves to nothing and
@@ -33,7 +33,7 @@ import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
  * `EdgeLabelRenderer` portals the controls into the flow's transformed layer, so
  * they are drawn at the viewport's scale: the fixture opens at roughly 0.55 and
  * the controls are correspondingly small, which a story rendering the component
- * at 1:1 flatters out of existence. Legibility, collision with Things and the
+ * at 1:1 flatters out of existence. Legibility, collision with Resources and the
  * HUD, and weight against the drawn Edges are all questions only this can
  * answer.
  *
@@ -47,23 +47,23 @@ const SPACE = authoredSpace;
 const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
 
 /**
- * The Diagram the story opens on: the Space's declared default, which is its
- * first positioned Diagram — so the placement comes from authored positions
+ * The Map the story opens on: the Space's declared default, which is its
+ * first positioned Map — so the placement comes from authored positions
  * rather than from computing any inside a story.
  */
-const DIAGRAM = resolveDiagram(SPACE, requireDefaultDiagram(SPACE));
+const MAP = resolveMap(SPACE, requireDefaultMap(SPACE));
 
-const PENDING = canvasProjection(SPACE, DIAGRAM);
+const PENDING = canvasProjection(SPACE, MAP);
 
-const STRATEGY = positionedStrategy(Placement.fromDiagram(DIAGRAM.diagram));
+const STRATEGY = positionedStrategy(Placement.fromMap(MAP.map));
 
-const ACTIVE_GRAPH: GraphId | null = DIAGRAM.diagram.graphs[0]?.id ?? null;
+const ACTIVE_GRAPH: GraphId | null = MAP.map.graphs[0]?.id ?? null;
 
 export interface SelectedEdgeCanvasFixtureProps {
   /**
    * How close the canvas is.
    *
-   * `fit` is what an author sees on opening — every Thing in view, and the
+   * `fit` is what an author sees on opening — every Resource in view, and the
    * controls drawn at that scale. `close` is the same surface at 1:1, which is
    * what the component stories show; the pair together is the comparison worth
    * looking at.
@@ -103,8 +103,8 @@ export function SelectedEdgeCanvasFixture({
         ? null
         : PENDING.project(laidOut, {
             activeGraphId: ACTIVE_GRAPH,
-            activeThingId: null,
-            selectedThingId: null,
+            activeResourceId: null,
+            selectedResourceId: null,
             presenting: false,
           }),
     [laidOut],
@@ -115,7 +115,7 @@ export function SelectedEdgeCanvasFixture({
    *
    * Read through the production `edgeSelectionOf` rather than off `source` and
    * `target` here: that translation — including the widening React Flow's `Edge`
-   * type does to a `ThingId` — is the render adapter's, and a second copy in a
+   * type does to a `ResourceId` — is the render adapter's, and a second copy in a
    * fixture is exactly the transcription ADR 0052 rules out.
    */
   const selected = useMemo(
@@ -138,18 +138,18 @@ export function SelectedEdgeCanvasFixture({
       refusal,
       openEditor: () => setOpen(true),
       closeEditor: () => setOpen(false),
-      reconnect: (endpoint, thingId) => {
+      reconnect: (endpoint, resourceId) => {
         if (endpoints === null) return;
         setReconnected(
           endpoint === 'from'
-            ? { from: thingId, to: endpoints.to }
-            : { from: endpoints.from, to: thingId },
+            ? { from: resourceId, to: endpoints.to }
+            : { from: endpoints.from, to: resourceId },
         );
         setOpen(false);
       },
       deleteEdge: () => setOpen(false),
       endpointChoices: () =>
-        SPACE.things.map((thing) => thingChoiceOf(thing, { kind: 'eligible' })),
+        SPACE.resources.map((resource) => resourceChoiceOf(resource, { kind: 'eligible' })),
     }),
     [open, refusal, selected, endpoints],
   );
@@ -179,5 +179,5 @@ export function SelectedEdgeCanvasFixture({
   );
 }
 
-/** 1:1, roughly over the first Edge, so the two zoom stories frame the same Things. */
+/** 1:1, roughly over the first Edge, so the two zoom stories frame the same Resources. */
 const CLOSE_VIEWPORT = { x: -120, y: -40, zoom: 1 };

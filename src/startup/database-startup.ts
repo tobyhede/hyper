@@ -90,7 +90,7 @@ const CONFIRMING_INVARIANT_FAILURES = 2;
  */
 export class DefaultContentInvalidError extends Error {}
 
-/** What start-up's retry is given instead of the two ambient things it would name. */
+/** What start-up's retry is given instead of the two ambient resources it would name. */
 export interface MetaSpaceRetryOptions {
   wait: (milliseconds: number) => Promise<void>;
   report: (cause: unknown) => void;
@@ -113,7 +113,7 @@ export interface MetaSpaceRetryOptions {
  *
  * Nothing is thrown. Nothing awaits this, and a rejection nothing listens for is
  * what takes a Node process down — which includes a rejection out of `report`,
- * so reporting a failure cannot become the thing that ends the recovery.
+ * so reporting a failure cannot become the failure that ends the recovery.
  */
 export const retryMetaSpaceEstablishment = async (
   repository: SpaceRepository,

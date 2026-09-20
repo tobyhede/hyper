@@ -7,19 +7,19 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * Reading and driving the React Flow graph from e2e.
  *
  * Shared rather than duplicated because several specs need it: `editing.spec`
- * drags things around the fixture and draws Edges between them, `read-only.spec`
+ * drags resources around the fixture and draws Edges between them, `read-only.spec`
  * does the same to prove none of it reaches the imported files, and
- * `new-space.spec` drags the single thing of a space the app minted. The
+ * `new-space.spec` drags the single resource of a space the app minted. The
  * `settled` gate and the mid-connection waits in `connectHandles` are the
  * non-obvious parts, and the ones worth having in exactly one place.
  */
 
 /* -------------------------------------------------------------------------- */
-/* The fixture's thinginalities                                                 */
+/* The fixture's resourceinalities                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * How many Things and Edges the fixture Meta Space actually declares, read from
+ * How many Resources and Edges the fixture Meta Space actually declares, read from
  * the authored files at load.
  *
  * Four assertions used to spell these out as literals — `40` target handles,
@@ -38,8 +38,8 @@ const fixtureDir = `${fixtureRoot}/${fixtureMetaId}`;
 /**
  * Ordinary Spaces the fixture aggregate already holds, excluding Meta.
  *
- * `space-thing.spec.ts` (`stops offering a Space…`, `deleting the last Space
- * Thing…`) lands back on this count after destroying a Space it just created.
+ * `space-resource.spec.ts` (`stops offering a Space…`, `deleting the last Space
+ * Resource…`) lands back on this count after destroying a Space it just created.
  */
 export const FIXTURE_ORDINARY_SPACE_COUNT = readdirSync(fixtureRoot, {
   withFileTypes: true,
@@ -51,21 +51,21 @@ const markdownFileCount = (directory: string): number =>
   ).length;
 
 /**
- * Things are discovered non-recursively in two places — beside the space file and
- * in `things/` — and every `.md` in scope *is* a thing (ADR 0020), so counting
- * those files counts the Things.
+ * Resources are discovered non-recursively in two places — beside the space file and
+ * in `resources/` — and every `.md` in scope *is* a resource (ADR 0020), so counting
+ * those files counts the Resources.
  */
-export const FIXTURE_THING_COUNT =
-  markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/things`);
+export const FIXTURE_RESOURCE_COUNT =
+  markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/resources`);
 
 /**
- * Graphs are a Diagram's only connection structure, so every Edge the overview
+ * Graphs are a Map's only connection structure, so every Edge the overview
  * draws is one of a Graph's authored `{from, to}` pairs — summed across every
- * Diagram, because a Graph is a nested owned value of the one that holds it (ADR
- * 0040) and the fixture Meta Space spreads five Graphs over three Diagrams.
+ * Map, because a Graph is a nested owned value of the one that holds it (ADR
+ * 0040) and the fixture Meta Space spreads five Graphs over three Maps.
  *
- * This is the count across every Diagram the fixture Meta Space holds. A
- * *selected* Diagram draws only the Graphs it owns, so it is not the number
+ * This is the count across every Map the fixture Meta Space holds. A
+ * *selected* Map draws only the Graphs it owns, so it is not the number
  * to assert after a conversion. Ordinary Spaces in the same aggregate are
  * never opened here.
  */
@@ -76,15 +76,14 @@ export const FIXTURE_EDGE_COUNT =
   // fields used below.
   (
     JSON.parse(readFileSync(`${fixtureDir}/space.json`, 'utf8')) as {
-      diagrams: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
+      maps: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
     }
-  ).diagrams.reduce(
-    (total, diagram) =>
-      total + diagram.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
+  ).maps.reduce(
+    (total, map) => total + map.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
     0,
   );
 
-/** Authoring presents one handle per side of a Thing, source and target alike —
+/** Authoring presents one handle per side of a Resource, source and target alike —
  *  four sides, graph-independent (ADR 0033). */
 export const AUTHORING_HANDLE_SIDES = 4;
 
@@ -99,12 +98,12 @@ export function nodeByTitle(page: Page, title: string): Locator {
 }
 
 /** The visible face shares its node's complete rectangle, including during resize. */
-export async function expectThingFillsNode(node: Locator): Promise<void> {
+export async function expectResourceFillsNode(node: Locator): Promise<void> {
   await expect
     .poll(() =>
       node.evaluate((element) => {
-        const face = element.querySelector('.canvas-thing');
-        if (face === null) throw new Error('Thing face is missing');
+        const face = element.querySelector('.canvas-resource');
+        if (face === null) throw new Error('Resource face is missing');
         const outer = element.getBoundingClientRect();
         const inner = face.getBoundingClientRect();
         return Math.max(
@@ -119,7 +118,7 @@ export async function expectThingFillsNode(node: Locator): Promise<void> {
 }
 
 /**
- * The Thing reached during traversal, by the class the projection marks it with.
+ * The Resource reached during traversal, by the class the projection marks it with.
  *
  * Shared because presenting is asserted from both projects: `presenting.spec`
  * traverses the fixture's authored Graphs, and `new-space.spec` presents the Graph a
@@ -127,36 +126,38 @@ export async function expectThingFillsNode(node: Locator): Promise<void> {
  * render layer's, not the domain's, so a second copy of the string is one the
  * next rename leaves behind.
  */
-export function activeThing(page: Page): Locator {
-  return page.locator('.react-flow__node.rf-thing-node--active');
+export function activeResource(page: Page): Locator {
+  return page.locator('.react-flow__node.rf-resource-node--active');
 }
 
 /**
- * Open a Thing in place, without beginning content editing (ADR 0064).
+ * Open a Resource in place, without beginning content editing (ADR 0064).
  *
- * No pointer gesture on a Thing's body opens it (ADR 0036) — the Thing's own
- * control does, and it is revealed by hovering the Thing.
+ * No pointer gesture on a Resource's body opens it (ADR 0036) — the Resource's own
+ * control does, and it is revealed by hovering the Resource.
  */
-export async function openThing(node: Locator, title: string): Promise<void> {
+export async function openResource(node: Locator, title: string): Promise<void> {
   await node.hover();
-  await node.getByRole('button', { name: `Open Thing ${title}` }).click();
+  await node.getByRole('button', { name: `Open Resource ${title}` }).click();
 }
 
 /**
- * Reveal a placed Thing's own rail and open its actions menu.
+ * Reveal a placed Resource's own rail and open its actions menu.
  *
  * Shared because three suites drove the identical gesture before this was
  * pulled out — `editing.spec` and `mobile-dock.spec` through the real page
  * harness, `ladle-e2e/command-dock.spec` through the Ladle story host — all
- * reaching for the Command Dock's organising rule that a Thing's own commands
+ * reaching for the Command Dock's organising rule that a Resource's own commands
  * live on its rail rather than on the Dock (ADR 0073). `.last()` is what the
  * Ladle copy already used and costs nothing when only one menu is open, which
  * is every case these three exercise.
  */
-export async function thingActions(page: Page, title: string): Promise<Locator> {
-  const thing = nodeByTitle(page, title).first();
-  await thing.hover();
-  await thing.getByRole('button', { name: `Actions for Thing ${title}` }).click({ delay: 120 });
+export async function resourceActions(page: Page, title: string): Promise<Locator> {
+  const resource = nodeByTitle(page, title).first();
+  await resource.hover();
+  await resource
+    .getByRole('button', { name: `Actions for Resource ${title}` })
+    .click({ delay: 120 });
   const menu = page.getByRole('menu').last();
   await expect(menu).toBeVisible();
   return menu;
@@ -167,8 +168,8 @@ export async function thingActions(page: Page, title: string): Promise<Locator> 
  *
  * **Every helper below opens a menu where it used to press a button**, and that
  * is the whole of what the Command Dock changed for this suite. The Sidebar was
- * a sixteen-rem column with room for a permanent row per Diagram, a permanent row
- * per Graph and a permanent Add Diagram; the Dock is a strip over the canvas that
+ * a sixteen-rem column with room for a permanent row per Map, a permanent row
+ * per Graph and a permanent Add Map; the Dock is a strip over the canvas that
  * finds room by disclosure. So the *claims* the specs make are unchanged and the
  * reach is not, which is exactly why the reach lives here — one module rather
  * than the thirty call sites that would otherwise each settle on their own way
@@ -195,12 +196,12 @@ async function disclose(page: Page, name: string | RegExp): Promise<Locator> {
   return menu;
 }
 
-/** The Diagram cluster's disclosure: the authored Diagrams, then its own commands. */
-export function diagramMenu(page: Page): Promise<Locator> {
-  return disclose(page, /^Diagram: /);
+/** The Map cluster's disclosure: the authored Maps, then its own commands. */
+export function mapMenu(page: Page): Promise<Locator> {
+  return disclose(page, /^Map: /);
 }
 
-/** The Graph cluster's disclosure: the Graphs this Diagram owns, then its commands. */
+/** The Graph cluster's disclosure: the Graphs this Map owns, then its commands. */
 export function graphMenu(page: Page): Promise<Locator> {
   return disclose(page, /^Active Graph: /);
 }
@@ -238,53 +239,53 @@ export function selectedCanvas(page: Page): Locator {
 }
 
 /**
- * Draw one authored Diagram, by title.
+ * Draw one authored Map, by title.
  *
- * One exclusive choice over authored Diagrams, with no second control and no
+ * One exclusive choice over authored Maps, with no second control and no
  * empty value — ADR 0053's one durable clause, which ADR 0082 keeps verbatim.
  * The fixture Meta Space declares Collection 1 and Collection 2
  * (`fixture/<meta>/space.json`), so a test can open one without authoring it
- * first, which is the only way to drag a Thing in a Diagram that already owns
- * Edges. Linked Spaces is the third Diagram, holding the Space Things.
+ * first, which is the only way to drag a Resource in a Map that already owns
+ * Edges. Linked Spaces is the third Map, holding the Space Resources.
  */
 export async function selectCanvas(page: Page, title: string): Promise<void> {
   // Exact, both times. On a substring the early return fires for `Workshop`
-  // while `Workshop 2` is drawing — the test then runs against the wrong Diagram
+  // while `Workshop 2` is drawing — the test then runs against the wrong Map
   // and the closing `toContainText` agrees with it.
   const named = (text: string): boolean => text.trim() === title;
   if (named(await selectedCanvas(page).innerText())) return;
-  const menu = await diagramMenu(page);
+  const menu = await mapMenu(page);
   await menu.getByRole('menuitemradio', { name: title, exact: true }).click();
   await expect(selectedCanvas(page)).toHaveText(title);
 }
 
 /**
- * Create and select an empty Diagram owning one empty Graph (ADR 0079, ADR 0080).
+ * Create and select an empty Map owning one empty Graph (ADR 0079, ADR 0080).
  *
- * **It leaves the caret in the new Diagram's name**, which is where the command
+ * **It leaves the caret in the new Map's name**, which is where the command
  * continues (`.scratch/command-dock/issues/13`) — so the Dock is drawing an
  * editor and not a name when this returns, and `selectedCanvas` matches nothing.
  * Callers that want to read the Dock back settle the editor with
- * {@link settleNewDiagramName} first.
+ * {@link settleNewMapName} first.
  */
-export async function newDiagram(page: Page): Promise<void> {
-  const menu = await diagramMenu(page);
-  await menu.getByRole('menuitem', { name: 'New Diagram' }).click();
+export async function newMap(page: Page): Promise<void> {
+  const menu = await mapMenu(page);
+  await menu.getByRole('menuitem', { name: 'New Map' }).click();
 }
 
 /**
- * Assert the New Diagram continuation landed, and hand the Dock back its name.
+ * Assert the New Map continuation landed, and hand the Dock back its name.
  *
- * The caret in the new Diagram's name is the command's visible outcome, so it is
+ * The caret in the new Map's name is the command's visible outcome, so it is
  * asserted here rather than stepped over: a continuation that stopped firing
  * would otherwise show up only as a puzzling absence somewhere later.
  *
  * Escape rather than Enter, because the Edit already stored this title — the
- * editor opened on `Diagram N` as the numbering minted it, and cancelling an
+ * editor opened on `Map N` as the numbering minted it, and cancelling an
  * untouched draft leaves exactly that.
  */
-export async function settleNewDiagramName(page: Page, title: string): Promise<void> {
-  const editor = page.getByRole('textbox', { name: 'Diagram name' });
+export async function settleNewMapName(page: Page, title: string): Promise<void> {
+  const editor = page.getByRole('textbox', { name: 'Map name' });
   await expect(editor).toBeFocused();
   await expect(editor).toHaveValue(title);
   await page.keyboard.press('Escape');
@@ -294,7 +295,7 @@ export async function settleNewDiagramName(page: Page, title: string): Promise<v
 /**
  * Append, colour and activate one empty Graph (ADR 0040).
  *
- * Unlike New Diagram, the Edit completes on the press — there is no name
+ * Unlike New Map, the Edit completes on the press — there is no name
  * continuation and the new Graph is already selected when this returns.
  */
 export async function newGraph(page: Page): Promise<void> {
@@ -309,9 +310,9 @@ export async function deleteActiveGraph(page: Page): Promise<void> {
   await menu.getByRole('menuitem', { name: `Delete ${title}` }).click();
 }
 
-/** The Diagrams the Space offers, read from the one list that offers them. */
-export async function diagramChoices(page: Page): Promise<Locator> {
-  return (await diagramMenu(page)).getByRole('menuitemradio');
+/** The Maps the Space offers, read from the one list that offers them. */
+export async function mapChoices(page: Page): Promise<Locator> {
+  return (await mapMenu(page)).getByRole('menuitemradio');
 }
 
 /** The Graph the Dock is naming as active, or nothing when none is. */
@@ -328,7 +329,7 @@ export async function activateGraph(page: Page, title: string): Promise<void> {
   await expect(activeGraph(page)).toHaveText(title);
 }
 
-/** The Graphs the selected Diagram owns, read from the one list that offers them. */
+/** The Graphs the selected Map owns, read from the one list that offers them. */
 export async function graphChoices(page: Page): Promise<Locator> {
   return (await graphMenu(page)).getByRole('menuitemradio');
 }
@@ -359,30 +360,33 @@ export function presentControl(page: Page): Locator {
 }
 
 /** The kinds the Dock offers, named as their controls announce them. */
-export type ThingKindName = 'Markdown Thing' | 'Space Thing';
+export type ResourceKindName = 'Markdown Resource' | 'Space Resource';
 
 /**
  * One kind's Create control, which is also what reports whether creating is
  * available at all — both peers are withdrawn by the same fact.
  *
  * **The default answers the availability question and nothing else.** Asking
- * "can a Thing be created" may use either peer, because `createDisabled`
+ * "can a Resource be created" may use either peer, because `createDisabled`
  * withdraws them together; an assertion about *which* control names its kind.
  */
-export function createThingControl(page: Page, kind: ThingKindName = 'Markdown Thing'): Locator {
+export function createResourceControl(
+  page: Page,
+  kind: ResourceKindName = 'Markdown Resource',
+): Locator {
   return dock(page).getByRole('button', { name: `Create ${kind}` });
 }
 
 /**
- * Create a Thing of one kind, from its own control in the Things cluster.
+ * Create a Resource of one kind, from its own control in the Resources cluster.
  *
  * The two kinds are peers with no disclosure in front of them and each completes
  * its Edit on the press (ADR 0089), so this is one press whichever kind is
- * asked for. A Reference Thing is not here: it is created from the Thing it points at,
- * through that Thing's own command menu.
+ * asked for. A Reference Resource is not here: it is created from the Resource it points at,
+ * through that Resource's own command menu.
  */
-export async function createThing(page: Page, kind: ThingKindName): Promise<void> {
-  await createThingControl(page, kind).click();
+export async function createResource(page: Page, kind: ResourceKindName): Promise<void> {
+  await createResourceControl(page, kind).click();
 }
 
 /** The resolved colour drawn on one Graph's legend swatch, by its title. */
@@ -438,7 +442,7 @@ export const viewportTransform = (page: Page) =>
  * Wait until the viewport stops moving.
  *
  * Camera moves while presenting are animated. A bounding box read during one is
- * stale by the time the mouse gets there, so mousedown lands beside the thing and
+ * stale by the time the mouse gets there, so mousedown lands beside the resource and
  * no drag starts — a failure that looks exactly like dragging being broken.
  */
 export async function settled(page: Page): Promise<void> {
@@ -460,7 +464,7 @@ export async function settled(page: Page): Promise<void> {
  * yet laid out, and the assertion then fires on a later line as a null property
  * read — reporting the arithmetic rather than the element that never arrived.
  * Waiting for visibility first turns that into Playwright's own "not visible"
- * timeout against `what`, which names the thing actually missing.
+ * timeout against `what`, which names the resource actually missing.
  */
 export async function boxOf(
   locator: Locator,
@@ -482,11 +486,11 @@ const NUDGE = 2;
 /**
  * Drag by a flow-space delta, scaled through the current zoom.
  *
- * Anything a caller wants to assert *while* the Thing is being dragged goes in
+ * Anything a caller wants to assert *while* the Resource is being dragged goes in
  * `whileDragging`, which runs between the two moves — the same shape
  * `connectHandles` uses above, and for the same kind of reason. What a drag does
  * to the rest of the canvas mid-flight is invisible from either resting frame:
- * the defect ADR 0084 removes moved a neighbour as the dragged Thing crossed its
+ * the defect ADR 0084 removes moved a neighbour as the dragged Resource crossed its
  * origin and moved it back before release, so a test that reads only the before
  * and after sees a gesture that did nothing. The callback runs after the first
  * move, which lands on exactly the halfway point of the delta — a crossing a
@@ -503,23 +507,23 @@ export async function dragBy(
   const box = (await node.boundingBox())!;
   const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
 
-  // Grab the thing's header rather than its centre: the body scrolls its markdown
+  // Grab the resource's header rather than its centre: the body scrolls its markdown
   // and the ports sit at the edges.
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
-  // The opening nudge is its own move, and it is the difference between a Thing
+  // The opening nudge is its own move, and it is the difference between a Resource
   // that lands where the delta says and one that lands ninety per cent of the
   // way there. React Flow begins the drag at the first pointer event past
-  // `nodeDragThreshold` (1px at the pinned 12.11.2) and measures the Thing's
+  // `nodeDragThreshold` (1px at the pinned 12.11.2) and measures the Resource's
   // travel from *that* position, so everything covered before it is lost — and a
   // `steps: 5` move to the halfway point spends a tenth of the whole delta on
   // its first event.
   //
   // Spending the nudge on its own move makes that loss a known constant instead
   // of a proportion, and **every coordinate below is then measured from the
-  // nudge rather than from the press**, so the Thing travels exactly `dx`/`dy`
+  // nudge rather than from the press**, so the Resource travels exactly `dx`/`dy`
   // flow units. Leaving the nudge uncompensated would have left an error of
-  // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Diagram gets
+  // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Map gets
   // wider or a viewport narrower, which is precisely the shape of assertion
   // that passes until the day it does not.
   const from = {
@@ -536,17 +540,17 @@ export async function dragBy(
   await page.mouse.up();
 }
 
-/** Which side of a Thing an authoring handle sits on. The side is interaction
+/** Which side of a Resource an authoring handle sits on. The side is interaction
  *  geometry and is never authored (ADR 0033). */
 export type HandleSide = 'top' | 'right' | 'bottom' | 'left';
 
-/** A Thing's graph-independent authoring handle on one side. */
+/** A Resource's graph-independent authoring handle on one side. */
 export function authoringHandle(
   node: Locator,
   type: 'source' | 'target',
   side: HandleSide,
 ): Locator {
-  return node.locator(`.rf-thing-node__authoring-handle--${type}.react-flow__handle-${side}`);
+  return node.locator(`.rf-resource-node__authoring-handle--${type}.react-flow__handle-${side}`);
 }
 
 /**
@@ -582,7 +586,7 @@ export async function connectHandles(
   await page.mouse.move(start.x + nudge, start.y, { steps: 4 });
 
   // Eligibility arms `connectableend` for the whole drag; seeking-end *visibility*
-  // waits until the pointer is within the product proximity of the Thing
+  // waits until the pointer is within the product proximity of the Resource
   // (connection-handle-proximity/01). Hidden handles keep `pointer-events: none`,
   // so Playwright `hover` cannot arm them — move by coordinates onto the target
   // first, then the reveal turns pointer events back on.
@@ -615,7 +619,7 @@ export async function connectToEmptyWithAlt(
     await page.keyboard.down('Alt');
     altDown = true;
     await page.mouse.move(pane.x + 36, pane.y + 36, { steps: 4 });
-    const preview = page.getByTestId('new-thing-preview');
+    const preview = page.getByTestId('new-resource-preview');
     await expect(preview).toBeVisible();
     previewed = true;
     // Read the position while the drag is still live — the preview is gone the
@@ -628,9 +632,9 @@ export async function connectToEmptyWithAlt(
     // an unrelated-looking reason.
     //
     // Which key comes up first is the difference between a drop and a cancel.
-    // On the way out with a preview in hand, the drop is what creates the Thing,
+    // On the way out with a preview in hand, the drop is what creates the Resource,
     // so it must still see Alt down. On the way out through a failed assertion
-    // it must not: an Alt-drop would create a Thing the aborted test never asked
+    // it must not: an Alt-drop would create a Resource the aborted test never asked
     // for, and whatever that broke next would be reported instead of the
     // assertion that actually failed.
     if (!previewed && altDown) await page.keyboard.up('Alt');
@@ -640,23 +644,23 @@ export async function connectToEmptyWithAlt(
 }
 
 /** Commands belong to a placement even when its rail is lifted above embedded nodes. */
-export async function thingControls(page: Page, thing: Locator): Promise<Locator> {
-  const id = await thing.getAttribute('data-id');
-  if (id === null) throw new Error('Thing placement id missing');
-  return thing.or(page.locator(`[data-thing-rail-for="${id}"]`));
+export async function resourceControls(page: Page, resource: Locator): Promise<Locator> {
+  const id = await resource.getAttribute('data-id');
+  if (id === null) throw new Error('Resource placement id missing');
+  return resource.or(page.locator(`[data-resource-rail-for="${id}"]`));
 }
 
 /**
  * Assert a menu's rows read as the given groups, in order, with exactly one
  * separator between each pair of groups — the one grouping grammar every
- * entity, Diagram, Graph and Space menu in this product now shares
+ * entity, Map, Graph and Space menu in this product now shares
  * (`.scratch/dock-menu-reorganisation/`).
  *
  * Reads the ordered `menuitem` / `menuitemradio` / `separator` rows rather
  * than `role="group"`, because that is the one shape every menu here
- * supports: the Diagram and Graph command lists (`DiagramMenuActions`,
- * `GraphMenuActions`) do render a `role="group"` per group, but the Thing
- * and Space Thing entity menus (`EntityActionsMenu`) deliberately do not —
+ * supports: the Map and Graph command lists (`MapMenuActions`,
+ * `GraphMenuActions`) do render a `role="group"` per group, but the Resource
+ * and Space Resource entity menus (`EntityActionsMenu`) deliberately do not —
  * its own `MenuGroup` doc comment explains why. A matching separator count
  * in the wrong place still fails.
  */

@@ -4,19 +4,19 @@ import {
   ReferenceIcon,
   ParentIcon,
   SpaceIcon,
-  SpaceThingIcon,
-  ThingKindIcon,
+  SpaceResourceIcon,
+  ResourceKindIcon,
   CheckIcon,
   ChevronDownIcon,
-  CloseThingIcon,
+  CloseResourceIcon,
   EditIcon,
   EnterSpaceIcon,
   OpenIndependentlyIcon,
   FitViewIcon,
   GraphIcon,
-  DiagramIcon,
+  MapIcon,
   MarkdownIcon,
-  OpenThingIcon,
+  OpenResourceIcon,
   PlusIcon,
   PresentIcon,
   StopPresentingIcon,
@@ -43,22 +43,22 @@ describe('the public icon facade', () => {
     ]);
   });
 
-  it('uses the same cube for Spaces, Space Things and their kind glyphs', () => {
+  it('uses the same cube for Spaces, Space Resources and their kind glyphs', () => {
     render(
       <>
         <span data-testid="space">
           <SpaceIcon size={16} />
         </span>
-        <span data-testid="space-thing">
-          <SpaceThingIcon size={16} />
+        <span data-testid="space-resource">
+          <SpaceResourceIcon size={16} />
         </span>
-        <ThingKindIcon kind="space" size={16} />
+        <ResourceKindIcon kind="space" size={16} />
       </>,
     );
     for (const glyph of [
       screen.getByTestId('space'),
-      screen.getByTestId('space-thing'),
-      screen.getByRole('img', { name: 'Space Thing' }),
+      screen.getByTestId('space-resource'),
+      screen.getByRole('img', { name: 'Space Resource' }),
     ]) {
       expect(glyph.querySelector('.lucide-box')).toBeInTheDocument();
       expect(glyph.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
@@ -69,8 +69,8 @@ describe('the public icon facade', () => {
   it('uses Lucide for every general-purpose interface glyph', () => {
     render(
       <div>
-        <span data-testid="diagram">
-          <DiagramIcon />
+        <span data-testid="map">
+          <MapIcon />
         </span>
         <span data-testid="graph">
           <GraphIcon color="#123456" />
@@ -93,11 +93,11 @@ describe('the public icon facade', () => {
         <span data-testid="reference">
           <ReferenceIcon />
         </span>
-        <span data-testid="open-thing">
-          <OpenThingIcon />
+        <span data-testid="open-resource">
+          <OpenResourceIcon />
         </span>
-        <span data-testid="close-thing">
-          <CloseThingIcon />
+        <span data-testid="close-resource">
+          <CloseResourceIcon />
         </span>
         <span data-testid="enter-space">
           <EnterSpaceIcon />
@@ -127,15 +127,15 @@ describe('the public icon facade', () => {
     // glyph the facade composes rather than forwards, so its outer element is
     // ours and only the base inside it is Lucide's.
     const expectedLucideName = {
-      diagram: 'layout-grid',
+      map: 'layout-grid',
       graph: 'route',
       present: 'play',
       'stop-presenting': 'square',
       edit: 'pencil',
       chevron: 'chevron-down',
       plus: 'plus',
-      'open-thing': 'maximize-2',
-      'close-thing': 'minimize-2',
+      'open-resource': 'maximize-2',
+      'close-resource': 'minimize-2',
       'enter-space': 'log-in',
       'open-independently': 'external-link',
       markdown: 'sticky-note',
@@ -152,7 +152,7 @@ describe('the public icon facade', () => {
     }
   });
 
-  it('draws a Reference Thing as the base glyph it points at, badged rather than replaced', () => {
+  it('draws a Reference Resource as the base glyph it points at, badged rather than replaced', () => {
     render(
       <>
         <span data-testid="reference-default">
@@ -200,7 +200,7 @@ describe('the public icon facade', () => {
       </>,
     );
 
-    // `querySelectorAll` is document order, and the Reference Thing contributes two —
+    // `querySelectorAll` is document order, and the Reference Resource contributes two —
     // its own composed SVG and the Lucide base nested inside it — so the
     // indices after it are not the argument order.
     const glyphs = container.querySelectorAll('svg');
@@ -213,7 +213,7 @@ describe('the public icon facade', () => {
     expect(glyphs[2]).toHaveAttribute('width', '16');
     expect(glyphs[2]).toHaveClass('origin-center', 'scale-75');
     expect(glyphs[2]).toHaveAttribute('stroke', '#abcdef');
-    // The Reference Thing sizes its own box; the base inside it always fills the 24-unit
+    // The Reference Resource sizes its own box; the base inside it always fills the 24-unit
     // viewBox, which is what keeps the badge in the same corner at every size.
     expect(glyphs[3]).toHaveAttribute('width', '11');
     expect(glyphs[4]).toHaveAttribute('width', '24');
@@ -240,21 +240,21 @@ describe('the public icon facade', () => {
     expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
   });
 
-  it('keeps Thing-kind glyphs decorative while their wrapper names the kind', () => {
+  it('keeps Resource-kind glyphs decorative while their wrapper names the kind', () => {
     render(
       <>
-        <ThingKindIcon kind="markdown" />
-        <ThingKindIcon kind="reference" />
-        <ThingKindIcon kind="space" />
+        <ResourceKindIcon kind="markdown" />
+        <ResourceKindIcon kind="reference" />
+        <ResourceKindIcon kind="space" />
       </>,
     );
 
-    const markdown = screen.getByRole('img', { name: 'Markdown Thing' });
-    const reference = screen.getByRole('img', { name: 'Reference Thing' });
-    const space = screen.getByRole('img', { name: 'Space Thing' });
-    expect(markdown).toHaveAttribute('title', 'Markdown Thing');
-    expect(reference).toHaveAttribute('title', 'Reference Thing');
-    expect(space).toHaveAttribute('title', 'Space Thing');
+    const markdown = screen.getByRole('img', { name: 'Markdown Resource' });
+    const reference = screen.getByRole('img', { name: 'Reference Resource' });
+    const space = screen.getByRole('img', { name: 'Space Resource' });
+    expect(markdown).toHaveAttribute('title', 'Markdown Resource');
+    expect(reference).toHaveAttribute('title', 'Reference Resource');
+    expect(space).toHaveAttribute('title', 'Space Resource');
     expect(markdown.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(reference.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(space.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
@@ -262,21 +262,21 @@ describe('the public icon facade', () => {
 
   /**
    * A decorative glyph sits inside a control that has already named the command
-   * it performs — `Create Reference`, not `Reference Thing`. A `title` here is a second
+   * it performs — `Create Reference`, not `Reference Resource`. A `title` here is a second
    * tooltip on the same pixels, and the inner node is the one the pointer lands
    * on, so the button's own tooltip never appears: hovering Create Reference would
-   * read `Reference Thing`, which names the noun the button does not perform.
+   * read `Reference Resource`, which names the noun the button does not perform.
    */
   it('gives a decorative glyph no tooltip of its own', () => {
     const { container } = render(
       <>
-        <ThingKindIcon kind="markdown" decorative />
-        <ThingKindIcon kind="reference" decorative />
-        <ThingKindIcon kind="space" decorative />
+        <ResourceKindIcon kind="markdown" decorative />
+        <ResourceKindIcon kind="reference" decorative />
+        <ResourceKindIcon kind="space" decorative />
       </>,
     );
 
-    const glyphs = container.querySelectorAll('[data-thing-kind]');
+    const glyphs = container.querySelectorAll('[data-resource-kind]');
 
     expect(glyphs).toHaveLength(3);
     for (const glyph of glyphs) {
@@ -286,20 +286,20 @@ describe('the public icon facade', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('tells a Reference to a Space Thing from a Reference to a Markdown Thing', () => {
+  it('tells a Reference to a Space Resource from a Reference to a Markdown Resource', () => {
     render(
       <>
-        <ThingKindIcon kind="reference" referenceOf="markdown" />
-        <ThingKindIcon kind="reference" referenceOf="space" />
+        <ResourceKindIcon kind="reference" referenceOf="markdown" />
+        <ResourceKindIcon kind="reference" referenceOf="space" />
       </>,
     );
 
     // The glyph carries the distinction, so the accessible name has to as well —
     // otherwise the two draw differently and announce identically, which is
-    // worse than the single Reference Thing glyph this replaced.
-    const ofMarkdown = screen.getByRole('img', { name: 'Reference to a Markdown Thing' });
-    const ofSpace = screen.getByRole('img', { name: 'Reference to a Space Thing' });
-    expect(ofMarkdown).toHaveAttribute('data-thing-kind', 'reference');
+    // worse than the single Reference Resource glyph this replaced.
+    const ofMarkdown = screen.getByRole('img', { name: 'Reference to a Markdown Resource' });
+    const ofSpace = screen.getByRole('img', { name: 'Reference to a Space Resource' });
+    expect(ofMarkdown).toHaveAttribute('data-resource-kind', 'reference');
     expect(ofMarkdown).toHaveAttribute('data-reference-of', 'markdown');
     expect(ofSpace).toHaveAttribute('data-reference-of', 'space');
     expect(ofMarkdown.querySelector('svg svg')).toHaveClass('lucide-sticky-note');

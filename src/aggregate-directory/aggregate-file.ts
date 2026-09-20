@@ -214,7 +214,7 @@ const identifyReadSpaces = (
  * persistence lifecycle takes.
  *
  * This reads and identifies; it validates nothing about how the Spaces relate.
- * Meta rooting, Space Thing targets, cross-Space Thing ownership and the rest
+ * Meta rooting, Space Resource targets, cross-Space Resource ownership and the rest
  * are `loadSpaceAggregate`'s, asked once over the whole collection by
  * `initializeAggregate` and `replaceAggregate` — so a directory that reads
  * cleanly here can still be refused, and is refused in one place rather than

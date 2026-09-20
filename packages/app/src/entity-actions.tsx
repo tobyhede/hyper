@@ -1,9 +1,9 @@
 import {
-  type Thing,
+  type Resource,
   type Graph,
   type GraphId,
-  type Diagram,
-  type DiagramId,
+  type Map,
+  type MapId,
   type UUID,
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
@@ -27,9 +27,9 @@ import {
  * step — a menu on screen in the catalogue that the application does not have
  * is worse evidence than none.
  *
- * **It has two consumers and they spend it differently.** A Thing's own rail
- * draws the `thing` arm as a menu (ADR 0073), and the Command Dock spends the
- * other three one command at a time — its Diagram, Graph and Space clusters are
+ * **It has two consumers and they spend it differently.** A Resource's own rail
+ * draws the `resource` arm as a menu (ADR 0073), and the Command Dock spends the
+ * other three one command at a time — its Map, Graph and Space clusters are
  * menus of their own with a radio group in them, so what they take from here is
  * the *decision* about which address an entity offers rather than a list to
  * render. Either way the decision is made once: the two surfaces cannot come to
@@ -49,7 +49,7 @@ import {
  * it stays because the answer is still the only way to tell a Delete that ran
  * from one the domain refused.
  */
-export const DELETE_DIAGRAM_ACTION_ID = 'delete-diagram';
+export const DELETE_MAP_ACTION_ID = 'delete-map';
 
 /**
  * The two addresses, spelled once.
@@ -63,35 +63,35 @@ export const DELETE_DIAGRAM_ACTION_ID = 'delete-diagram';
  * {@link EntityCommandId} is what stops a fifth being invented.
  */
 export const COPY_LINK_ACTION_ID = 'copy-link';
-export const COPY_THING_LINK_ACTION_ID = 'copy-thing-link';
+export const COPY_RESOURCE_LINK_ACTION_ID = 'copy-resource-link';
 export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
 export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';
 export const OPEN_INDEPENDENTLY_ACTION_ID = 'open-independently';
 
 /** The commands a surface may ask this list for by id. */
 export type EntityCommandId =
-  typeof DELETE_DIAGRAM_ACTION_ID | typeof COPY_LINK_ACTION_ID | typeof COPY_THING_LINK_ACTION_ID;
+  typeof DELETE_MAP_ACTION_ID | typeof COPY_LINK_ACTION_ID | typeof COPY_RESOURCE_LINK_ACTION_ID;
 
 /**
  * An entity a surface offers commands for, named the way that surface knows it.
  *
- * It carries the whole `Diagram`/`Graph`/`Thing` rather than an id: handed an id,
- * a caller has to find the thing again down a second path, and the surface and
+ * It carries the whole `Map`/`Graph`/`Resource` rather than an id: handed an id,
+ * a caller has to find the resource again down a second path, and the surface and
  * the menu it draws are then free to disagree about what they are naming.
  */
 export type SpaceEntity =
   | { readonly kind: 'space' }
-  | { readonly kind: 'diagram'; readonly diagram: Diagram }
-  | { readonly kind: 'graph'; readonly graph: Graph; readonly diagram: Diagram }
-  | { readonly kind: 'thing'; readonly thing: Thing; readonly diagram: Diagram };
+  | { readonly kind: 'map'; readonly map: Map }
+  | { readonly kind: 'graph'; readonly graph: Graph; readonly map: Map }
+  | { readonly kind: 'resource'; readonly resource: Resource; readonly map: Map };
 
 /**
  * What an inline rename names — the three entities the Command Dock names, all
  * of which now have one.
  *
  * **The Space arm carries no id, and that asymmetry is the domain's.** A
- * Diagram and a Graph are named *inside* a Space, so an Edit on one has to say
- * which, and the surface may be naming a Diagram the canvas has since left. A
+ * Map and a Graph are named *inside* a Space, so an Edit on one has to say
+ * which, and the surface may be naming a Map the canvas has since left. A
  * Space rename writes `document.title` of the session the Edit is completed on,
  * which is the Space the Dock is drawing — there is no second candidate for it
  * to disambiguate, and `renamed-space` accordingly carries only the title
@@ -100,7 +100,7 @@ export type SpaceEntity =
  */
 export type SpaceChromeTitleSubject =
   | { readonly kind: 'space' }
-  | { readonly kind: 'diagram'; readonly id: UUID }
+  | { readonly kind: 'map'; readonly id: UUID }
   | { readonly kind: 'graph'; readonly id: GraphId };
 export interface SpaceEntityActionsOptions {
   readonly spaceId: UUID;
@@ -119,8 +119,8 @@ export interface SpaceEntityActionsOptions {
   /**
    * Opens one address in a new browsing context, answering whether it opened.
    *
-   * A Space Thing offers this for the Space it shows, on that Space's own
-   * address and nothing the containing Diagram carries (ADR 0068). `null`
+   * A Space Resource offers this for the Space it shows, on that Space's own
+   * address and nothing the containing Map carries (ADR 0068). `null`
    * withholds the row — a story that only records copies has no tab to open.
    */
   readonly onOpenIndependently: ((destination: ProductDestination) => boolean) | null;
@@ -128,12 +128,12 @@ export interface SpaceEntityActionsOptions {
    * Begins the entity's inline rename, or `null` while no rename may begin.
    *
    * `null` rather than a disabled item: Rename here is a second path to the
-   * very chrome title edit that a live Thing title editor withdraws, so while it
+   * very chrome title edit that a live Resource title editor withdraws, so while it
    * cannot run there is nothing to offer.
    */
   readonly onRename: ((subject: SpaceChromeTitleSubject, title: string) => void) | null;
   /**
-   * Deletes the Diagram, answering whether it went, or `null` while no Diagram
+   * Deletes the Map, answering whether it went, or `null` while no Map
    * Edit may run.
    *
    * The answer is not decoration: it is the only way a caller can tell a Delete
@@ -141,7 +141,7 @@ export interface SpaceEntityActionsOptions {
    * outcome left the item answering `done` either way. Same shape and same
    * reason as `onCopy` above.
    */
-  readonly onDeleteDiagram: ((diagramId: DiagramId) => boolean | Promise<boolean>) | null;
+  readonly onDeleteMap: ((mapId: MapId) => boolean | Promise<boolean>) | null;
 }
 
 /**
@@ -149,9 +149,9 @@ export interface SpaceEntityActionsOptions {
  * (`.scratch/link-ux/issues/01`, Terminology).
  *
  * **"Copy link" is whichever address reproduces what is on screen** — the one
- * within the drawing Diagram where that address exists, the entity's own where
+ * within the drawing Map where that address exists, the entity's own where
  * it does not — and a second, more durable form is offered only where it
- * differs and only under its own name (a Thing's "Copy link to Thing").
+ * differs and only under its own name (a Resource's "Copy link to Resource").
  * Neither label says "canonical", "contextual" or "permanent"; those words
  * stay in the code and out of the product. A Graph's own durable address is no
  * longer offered from any menu at all
@@ -161,8 +161,8 @@ export interface SpaceEntityActionsOptions {
  * says why there.
  */
 const COPY_LINK = 'Copy link';
-const THING_COPY_LINK_IN_DIAGRAM = 'Copy link to Thing in Diagram';
-const THING_COPY_LINK = 'Copy link to Thing';
+const RESOURCE_COPY_LINK_IN_MAP = 'Copy link to Resource in Map';
+const RESOURCE_COPY_LINK = 'Copy link to Resource';
 const COPY_SPACE_LINK = 'Copy link to Space';
 const COPY_LINK_TO_TARGET = 'Copy link to Target';
 const OPEN_INDEPENDENTLY = 'Open in New Tab';
@@ -210,7 +210,7 @@ export function spaceEntityActions({
   onCopy,
   onOpenIndependently,
   onRename,
-  onDeleteDiagram,
+  onDeleteMap,
 }: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityActionGroup[] {
   const renameAction = (subject: SpaceChromeTitleSubject, title: string): EntityActionGroup =>
     onRename === null
@@ -233,17 +233,17 @@ export function spaceEntityActions({
   return (entity) => {
     if (entity.kind === 'space') {
       // No Rename, and no longer because there is no such Edit — `renamed-space`
-      // exists now. The Dock renames a Space the way it renames a Diagram and a
+      // exists now. The Dock renames a Space the way it renames a Map and a
       // Graph: by a click on the name it already draws, right beside this menu.
       // A row here would open that same editor from a second place, which is the
       // duplication the whole arrangement keeps removing — and the same reason
-      // the Diagram and Graph branches below get their Rename row only from a
+      // the Map and Graph branches below get their Rename row only from a
       // caller that has one, while the application passes `onRename: null`.
       //
       // One address, and it is the Space's **own** — the one place this module
       // departs from the rule above, so it is written down rather than left to
       // be discovered. An address that reproduces what is on screen does exist:
-      // the drawing Diagram's. Copying that here would hand a recipient the
+      // the drawing Map's. Copying that here would hand a recipient the
       // Collection the reader is looking at, and would give this menu a second
       // address it has never had. It would also stop the Space's link meaning
       // the Space. Which of the two a Space title means is a product decision
@@ -253,20 +253,20 @@ export function spaceEntityActions({
       return [[], [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'space', spaceId }, onCopy)], []];
     }
 
-    if (entity.kind === 'diagram') {
-      const { id: diagramId, title } = entity.diagram;
+    if (entity.kind === 'map') {
+      const { id: mapId, title } = entity.map;
       return [
-        renameAction({ kind: 'diagram', id: diagramId }, title),
-        [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'diagram', spaceId, diagramId }, onCopy)],
-        onDeleteDiagram === null
+        renameAction({ kind: 'map', id: mapId }, title),
+        [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'map', spaceId, mapId }, onCopy)],
+        onDeleteMap === null
           ? []
           : [
               {
                 // Named from the constant above rather than written out, so a
                 // caller that recognises this one command spells it the same
                 // way this does.
-                id: DELETE_DIAGRAM_ACTION_ID,
-                label: 'Delete Diagram',
+                id: DELETE_MAP_ACTION_ID,
+                label: 'Delete Map',
                 icon: <DeleteIcon />,
                 variant: 'destructive',
                 // The Edit's prose report is the application's own refusal
@@ -274,24 +274,24 @@ export function spaceEntityActions({
                 // what the outcome is read for is not the label. It is what
                 // tells a caller whether the Delete had a canvas result at all.
                 onSelect: async (): Promise<EntityActionOutcome> =>
-                  (await onDeleteDiagram(diagramId)) ? 'done' : 'failed',
+                  (await onDeleteMap(mapId)) ? 'done' : 'failed',
               },
             ],
       ];
     }
 
     if (entity.kind === 'graph') {
-      // A Diagram **owns** its Graphs (ADR 0040), so a Graph row always has a
-      // within-Diagram address, which is the only address this menu offers
+      // A Map **owns** its Graphs (ADR 0040), so a Graph row always has a
+      // within-Map address, which is the only address this menu offers
       // (`.scratch/dock-menu-reorganisation/issues/01`).
-      const { graph, diagram } = entity;
+      const { graph, map } = entity;
       return [
         renameAction({ kind: 'graph', id: graph.id }, graph.title),
         [
           copy(
             COPY_LINK_ACTION_ID,
             COPY_LINK,
-            { kind: 'diagram-graph', spaceId, diagramId: diagram.id, graphId: graph.id },
+            { kind: 'map-graph', spaceId, mapId: map.id, graphId: graph.id },
             onCopy,
           ),
         ],
@@ -299,43 +299,43 @@ export function spaceEntityActions({
       ];
     }
 
-    const { thing, diagram } = entity;
-    // A menu row names the Thing, so it says the Thing's name (ADR 0083).
-    const permanent: ProductDestination = { kind: 'thing', spaceId, thingId: thing.id };
-    // A Diagram's members *are* its position keys (ADR 0040). A Thing the Things
-    // drawer reveals but this Diagram does not place has no within-Diagram
+    const { resource, map } = entity;
+    // A menu row names the Resource, so it says the Resource's name (ADR 0083).
+    const permanent: ProductDestination = { kind: 'resource', spaceId, resourceId: resource.id };
+    // A Map's members *are* its position keys (ADR 0040). A Resource the Resources
+    // drawer reveals but this Map does not place has no within-Map
     // address at all, so the one link it has is its own — and there is nothing
     // left for a permanent link to differ from. Withheld, never shown and
-    // refused: `diagram-thing` would 404 on the address it copied.
-    const placed = diagram.positions[thing.id] !== undefined;
-    const thingAddresses: readonly EntityAction[] = placed
+    // refused: `map-resource` would 404 on the address it copied.
+    const placed = map.positions[resource.id] !== undefined;
+    const resourceAddresses: readonly EntityAction[] = placed
       ? [
           copy(
             COPY_LINK_ACTION_ID,
-            THING_COPY_LINK_IN_DIAGRAM,
-            { kind: 'diagram-thing', spaceId, diagramId: diagram.id, thingId: thing.id },
+            RESOURCE_COPY_LINK_IN_MAP,
+            { kind: 'map-resource', spaceId, mapId: map.id, resourceId: resource.id },
             onCopy,
           ),
-          copy(COPY_THING_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy),
+          copy(COPY_RESOURCE_LINK_ACTION_ID, RESOURCE_COPY_LINK, permanent, onCopy),
         ]
-      : [copy(COPY_LINK_ACTION_ID, THING_COPY_LINK, permanent, onCopy)];
+      : [copy(COPY_LINK_ACTION_ID, RESOURCE_COPY_LINK, permanent, onCopy)];
     /**
-     * The Space this Thing shows, at that Space's own address.
+     * The Space this Resource shows, at that Space's own address.
      *
-     * Copy link to Thing in Diagram and Copy link to Thing still name the
-     * Thing. Independently opening the target is a third destination: no
-     * containing Diagram, no presentation, and not this Space (ADR 0068, ADR
-     * 0069). Offered only on a Space Thing — a Markdown Thing has no target
+     * Copy link to Resource in Map and Copy link to Resource still name the
+     * Resource. Independently opening the target is a third destination: no
+     * containing Map, no presentation, and not this Space (ADR 0068, ADR
+     * 0069). Offered only on a Space Resource — a Markdown Resource has no target
      * Space to address.
      */
     const targetSpaceAddress: readonly EntityAction[] =
-      thing.kind !== 'space'
+      resource.kind !== 'space'
         ? []
         : [
             copy(
               COPY_SPACE_LINK_ACTION_ID,
               COPY_SPACE_LINK,
-              { kind: 'space', spaceId: thing.spaceId },
+              { kind: 'space', spaceId: resource.spaceId },
               onCopy,
             ),
             ...(onOpenIndependently === null
@@ -349,37 +349,37 @@ export function spaceEntityActions({
                     // Sync on purpose: `window.open` spends the click's user
                     // gesture, and an `await` here would yield and lose it.
                     onSelect: (): EntityActionOutcome =>
-                      onOpenIndependently({ kind: 'space', spaceId: thing.spaceId })
+                      onOpenIndependently({ kind: 'space', spaceId: resource.spaceId })
                         ? 'done'
                         : 'failed',
                   },
                 ]),
           ];
     /**
-     * The Target a Reference Thing shows, at that Target's own Thing address.
+     * The Target a Reference Resource shows, at that Target's own Resource address.
      *
      * **One row, never two.** The Target is frequently absent from this
-     * Diagram entirely, so there is no within-Diagram form for it to differ
-     * from — unlike `thingAddresses` above, which names the Reference Thing
+     * Map entirely, so there is no within-Map form for it to differ
+     * from — unlike `resourceAddresses` above, which names the Reference Resource
      * itself and does have one when placed here. Offered only on a Reference
-     * Thing (ADR 0092); a Markdown or Space Thing has no Target to address.
+     * Resource (ADR 0092); a Markdown or Space Resource has no Target to address.
      */
-    const targetThingAddress: readonly EntityAction[] =
-      thing.kind !== 'reference'
+    const targetResourceAddress: readonly EntityAction[] =
+      resource.kind !== 'reference'
         ? []
         : [
             copy(
               COPY_LINK_TO_TARGET_ACTION_ID,
               COPY_LINK_TO_TARGET,
-              { kind: 'thing', spaceId, thingId: thing.target },
+              { kind: 'resource', spaceId, resourceId: resource.target },
               onCopy,
             ),
           ];
     return [
-      // No Rename: a Thing's title is renamed in place on the canvas, and the
-      // chrome title edit takes Diagram and Graph subjects only.
+      // No Rename: a Resource's title is renamed in place on the canvas, and the
+      // chrome title edit takes Map and Graph subjects only.
       [],
-      [...thingAddresses, ...targetSpaceAddress, ...targetThingAddress],
+      [...resourceAddresses, ...targetSpaceAddress, ...targetResourceAddress],
       [],
     ];
   };

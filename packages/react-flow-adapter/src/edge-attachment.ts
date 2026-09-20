@@ -2,7 +2,7 @@ import { Position } from '@xyflow/react';
 
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 
-/** A Thing's rect on the canvas, in flow coordinates. */
+/** A Resource's rect on the canvas, in flow coordinates. */
 export interface AnchorRect {
   readonly x: number;
   readonly y: number;
@@ -10,7 +10,7 @@ export interface AnchorRect {
   readonly height: number;
 }
 
-/** The two sides an Edge attaches to: one on each Thing. */
+/** The two sides an Edge attaches to: one on each Resource. */
 export interface FacingSides {
   readonly source: Position;
   readonly target: Position;
@@ -29,20 +29,20 @@ const gap = (aMin: number, aMax: number, bMin: number, bMax: number): number =>
   Math.max(aMin - bMax, bMin - aMax);
 
 /**
- * Which side of each Thing faces the other (ADR 0087).
+ * Which side of each Resource faces the other (ADR 0087).
  *
  * The axis is chosen by the **gap between the rects**, not by the vector between
- * their middles. Two Things are side by side when they are clear of each other
+ * their middles. Two Resources are side by side when they are clear of each other
  * horizontally and overlapping vertically, whatever their sizes — and a large
- * Open Thing beside a collapsed one is the normal state of a Diagram someone is
+ * Open Resource beside a collapsed one is the normal state of a Map someone is
  * reading, not an edge case. The centre vector answers that pair wrongly,
- * because a tall Thing's middle is far from a small neighbour sitting by its
+ * because a tall Resource's middle is far from a small neighbour sitting by its
  * lower edge.
  *
  * When the rects overlap on both axes neither gap is positive, and the larger —
  * the axis they overlap on least — still names the side an Edge crosses by the
  * shortest route. The direction is then the centre vector's, which is the only
- * thing that can answer it once the axis is fixed.
+ * fact that can answer it once the axis is fixed.
  */
 export function facingSides(source: AnchorRect, target: AnchorRect): FacingSides {
   const horizontal = gap(source.x, source.x + source.width, target.x, target.x + target.width);
@@ -67,10 +67,10 @@ export interface AnchorPoint {
 }
 
 /**
- * Where an Edge meets the anchor on one side of a Thing.
+ * Where an Edge meets the anchor on one side of a Resource.
  *
  * The same point React Flow resolves from the declaration `projection.ts` makes
- * for that side: the handle's own rect, offset from the Thing's, with the edge
+ * for that side: the handle's own rect, offset from the Resource's, with the edge
  * of it facing outwards taken. Both read `AUTHORING_HANDLE_DIAMETER`, so a
  * drawn Edge lands on the anchor that was declared rather than near it.
  */
@@ -93,7 +93,7 @@ export function anchorPoint(rect: AnchorRect, side: Position): AnchorPoint {
  *
  * The same six fields React Flow hands a custom Edge as props. This module
  * answers them again because the props name the handles the *projection* chose,
- * and the side has to be chosen from where the two Things are at this moment
+ * and the side has to be chosen from where the two Resources are at this moment
  * (ADR 0087).
  */
 export interface EdgeAttachment {
@@ -105,7 +105,7 @@ export interface EdgeAttachment {
   readonly targetPosition: Position;
 }
 
-/** The anchors an Edge between two Things attaches to. */
+/** The anchors an Edge between two Resources attaches to. */
 export function edgeAttachment(source: AnchorRect, target: AnchorRect): EdgeAttachment {
   const sides = facingSides(source, target);
   const from = anchorPoint(source, sides.source);
@@ -127,8 +127,8 @@ export function edgeAttachment(source: AnchorRect, target: AnchorRect): EdgeAtta
  * rule would answer, not fail: one rect against itself overlaps on both axes, so
  * the shallower overlap picks an axis and the two coincident centres fall to the
  * `>=` — Bottom leaving, Top entering. Those two sides face away from each other
- * with the Thing between them, so the curve would be drawn straight through the
- * Thing it belongs to. A plausible answer rather than a broken one is why this
+ * with the Resource between them, so the curve would be drawn straight through the
+ * Resource it belongs to. A plausible answer rather than a broken one is why this
  * is taken first rather than caught afterwards.
  */
 export function selfEdgeAttachment(rect: AnchorRect): EdgeAttachment {

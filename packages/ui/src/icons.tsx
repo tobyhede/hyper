@@ -25,17 +25,17 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import type { Thing } from '@project/core';
+import type { Resource } from '@project/core';
 
-type ThingActionIconProps = ComponentProps<typeof Pencil>;
+type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
 
 /**
- * An authored Diagram: the Things a Space placed, and the Graphs over them.
+ * An authored Map: the Resources a Space placed, and the Graphs over them.
  *
  * Placements on a plane. This was `PanelsTopLeft` — a header, a sidebar and a
  * content well, which is a *web page chrome* and describes nothing the product
- * does. A Diagram is authored placement (ADR 0014 — placement is authored, not
+ * does. A Map is authored placement (ADR 0014 — placement is authored, not
  * computed), so the glyph is the placements.
  *
  * `size` exists for the same reason `SpaceIcon` and `GraphIcon` carry one: a
@@ -43,17 +43,15 @@ type CanvasControlIconProps = ComponentProps<typeof Minus>;
  * size, and the canvas HUD draws this one beside a 13px Space cube. The default
  * is the 16 every other call site was already getting.
  */
-export const DiagramIcon = ({ size = 16 }: { size?: number | undefined }) => (
-  <LayoutGrid size={size} />
-);
+export const MapIcon = ({ size = 16 }: { size?: number | undefined }) => <LayoutGrid size={size} />;
 
 /**
  * A directed Graph, including its branches and joins.
  *
  * A path from a start pin to an end pin. This was `Network` — one node above
  * two, joined by a bracket — which draws a *hierarchy*, and a Graph is a
- * curated traversal over Things a Diagram has already placed. Present is what a
- * Graph is for, and a path is the thing you present.
+ * curated traversal over Resources a Map has already placed. Present is what a
+ * Graph is for, and a path is the resource you present.
  *
  * Drawn heavier than Lucide's default 2. This is the only glyph in the set
  * carrying a *colour* rather than ink, and the palette is pastel because those
@@ -94,41 +92,45 @@ export const StopPresentingIcon = ({ color }: { color: string }) => (
   <Square className="origin-center scale-75" color={color} size={16} />
 );
 
-/** Edit the content of a Markdown Thing. */
-export const EditIcon = (props: ThingActionIconProps) => <Pencil size={14} {...props} />;
+/** Edit the content of a Markdown Resource. */
+export const EditIcon = (props: ResourceActionIconProps) => <Pencil size={14} {...props} />;
 
-/** Commit the edit running on a Thing's content. */
-export const CommitEditIcon = (props: ThingActionIconProps) => <Check size={14} {...props} />;
+/** Commit the edit running on a Resource's content. */
+export const CommitEditIcon = (props: ResourceActionIconProps) => <Check size={14} {...props} />;
 
-/** Abandon the edit running on a Thing's content. */
-export const AbandonEditIcon = (props: ThingActionIconProps) => (
+/** Abandon the edit running on a Resource's content. */
+export const AbandonEditIcon = (props: ResourceActionIconProps) => (
   <X size={14} strokeWidth={3} {...props} />
 );
 
 /**
- * Enter the Space a Space Thing references.
+ * Enter the Space a Space Resource references.
  *
  * Lucide `log-in`: an arrow going *into* a container, deliberately unlike
- * Open's `maximize-2`. Entering the Space and expanding the Thing in place
+ * Open's `maximize-2`. Entering the Space and expanding the Resource in place
  * are two destinations and must not share a symbol.
  */
-export const EnterSpaceIcon = (props: ThingActionIconProps) => <LogIn size={14} {...props} />;
+export const EnterSpaceIcon = (props: ResourceActionIconProps) => <LogIn size={14} {...props} />;
 
 /**
- * Open the Space a Space Thing shows, in a new browsing context.
+ * Open the Space a Space Resource shows, in a new browsing context.
  *
  * Lucide `external-link`: the destination leaves this tab. Enter's `log-in`
  * stays the crossing that keeps the session; this one is a link (ADR 0068).
  */
-export const OpenIndependentlyIcon = (props: ThingActionIconProps) => (
+export const OpenIndependentlyIcon = (props: ResourceActionIconProps) => (
   <ExternalLink size={14} {...props} />
 );
 
-/** Open a Thing in place. */
-export const OpenThingIcon = (props: ThingActionIconProps) => <Maximize2 size={14} {...props} />;
+/** Open a Resource in place. */
+export const OpenResourceIcon = (props: ResourceActionIconProps) => (
+  <Maximize2 size={14} {...props} />
+);
 
-/** Close a Thing that is open in place. */
-export const CloseThingIcon = (props: ThingActionIconProps) => <Minimize2 size={14} {...props} />;
+/** Close a Resource that is open in place. */
+export const CloseResourceIcon = (props: ResourceActionIconProps) => (
+  <Minimize2 size={14} {...props} />
+);
 
 /** The shared affordance for a trigger that opens a list or menu. */
 export const ChevronDownIcon = () => <ChevronDown size={14} />;
@@ -136,7 +138,7 @@ export const ChevronDownIcon = () => <ChevronDown size={14} />;
 /** Search within the collection named by the surrounding input. */
 export const SearchIcon = () => <Search size={16} />;
 
-/** Create a Markdown Thing. */
+/** Create a Markdown Resource. */
 export const PlusIcon = () => <Plus size={14} />;
 
 /** Move the canvas camera one zoom step farther away. */
@@ -145,16 +147,16 @@ export const ZoomOutIcon = (props: CanvasControlIconProps) => <Minus size={14} {
 /** Move the canvas camera one zoom step closer. */
 export const ZoomInIcon = (props: CanvasControlIconProps) => <Plus size={14} {...props} />;
 
-/** Frame every visible canvas Thing in the viewport. */
+/** Frame every visible canvas Resource in the viewport. */
 export const FitViewIcon = (props: CanvasControlIconProps) => <Maximize size={14} {...props} />;
 
-/** The Thing kind that owns the Markdown it draws. */
+/** The Resource kind that owns the Markdown it draws. */
 export const MarkdownIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <StickyNote size={size} />
 );
 
 /**
- * The isometric cube shared by Spaces and Space Things.
+ * The isometric cube shared by Spaces and Space Resources.
  *
  * **The scale is an optical correction, not a size.** Lucide's `box` has a
  * geometry box 20 units tall — `3..21` across by `2..22` down, read off
@@ -224,43 +226,43 @@ export const SpaceIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <CubeGlyph size={size} />
 );
 
-/** Space Things share the Space cube, including when used as a Reference Thing base. */
-export const SpaceThingIcon = SpaceIcon;
+/** Space Resources share the Space cube, including when used as a Reference Resource base. */
+export const SpaceResourceIcon = SpaceIcon;
 
 /**
- * The Thing kinds that own what they draw, and so have a glyph of their own.
+ * The Resource kinds that own what they draw, and so have a glyph of their own.
  *
- * A Reference Thing is deliberately absent: it is not a third silhouette but a badge on
+ * A Reference Resource is deliberately absent: it is not a third silhouette but a badge on
  * one of these two.
  *
  * **Subtracted from the domain union rather than restated as its own.** Written
- * out as `'markdown' | 'space'` it was a second list agreeing with `Thing['kind']`
+ * out as `'markdown' | 'space'` it was a second list agreeing with `Resource['kind']`
  * only by hand, so a kind added to the domain left every record keyed by this
  * type exhaustive and wrong. Derived, the addition lands here, and
  * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
  */
-export type ThingBaseKind = Exclude<Thing['kind'], 'reference'>;
+export type ResourceBaseKind = Exclude<Resource['kind'], 'reference'>;
 
-/** The silhouette each Thing kind that owns one draws. */
+/** The silhouette each Resource kind that owns one draws. */
 export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
-  space: SpaceThingIcon,
-} satisfies Record<ThingBaseKind, ComponentType<{ size?: number }>>;
+  space: SpaceResourceIcon,
+} satisfies Record<ResourceBaseKind, ComponentType<{ size?: number }>>;
 
 /**
- * A Reference Thing, drawn as the glyph of the Thing it points at with a badge on it.
+ * A Reference Resource, drawn as the glyph of the Resource it points at with a badge on it.
  *
- * **A Reference Thing is not a third Thing silhouette.** A single Reference Thing glyph can say
- * *that* a Thing refers elsewhere but never *what it refers to* — and a Space
- * Thing is as legitimate a Target as a Markdown Thing (ADR 0070), so the two
+ * **A Reference Resource is not a third Resource silhouette.** A single Reference Resource glyph can say
+ * *that* a Resource refers elsewhere but never *what it refers to* — and a Space
+ * Resource is as legitimate a Target as a Markdown Resource (ADR 0070), so the two
  * would draw identically while the kind on the canvas is exactly what the
  * glyph exists to carry. Keeping the base and adding a mark is also what the
- * canvas already does: `canvas-thing.css` keeps the Thing and changes only
+ * canvas already does: `canvas-resource.css` keeps the Resource and changes only
  * `border-style` to dotted.
  *
  * **The hole is cut, not painted.** The badge sits over the base's own stroke,
  * and a disc filled with a background colour would have to know which surface
- * it is on — a menu, a popover, a Thing's cream face. An SVG mask removes that
+ * it is on — a menu, a popover, a Resource's cream face. An SVG mask removes that
  * region from the base instead, so whatever is behind shows through and the
  * mark is legible on every surface. `useId` keeps the mask reference unique
  * when several of these are drawn in one list, which they are.
@@ -273,8 +275,8 @@ export function ReferenceIcon({
   base = 'markdown',
   size = 14,
 }: {
-  /** The kind of the Target. Absent, a Reference Thing draws over the Markdown base. */
-  base?: ThingBaseKind | undefined;
+  /** The kind of the Target. Absent, a Reference Resource draws over the Markdown base. */
+  base?: ResourceBaseKind | undefined;
   size?: number | undefined;
 }) {
   const maskId = useId();
@@ -324,20 +326,20 @@ export const AlertIcon = () => <CircleAlert />;
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
 
 /**
- * Open an entity's actions menu, on a **Thing rail**.
+ * Open an entity's actions menu, on a **Resource rail**.
  *
  * A link glyph rather than the conventional kebab, and that argument is the
  * rail's alone: every other control there names its command (`EditIcon`,
- * `OpenThingIcon`, `CloseThingIcon`), so a generic "more" glyph beside them would
+ * `OpenResourceIcon`, `CloseResourceIcon`), so a generic "more" glyph beside them would
  * be the one control saying nothing about what it does.
  *
  * It is no longer the glyph the menu wears everywhere. The menu grew a rename
  * and a delete beside its addresses, so a Sidebar row — which has no cluster of
  * self-naming commands to sit in — draws `EntityActionsIcon` instead. Whether
- * the rail follows is a rail decision, taken when `ThingNode` first supplies the
+ * the rail follows is a rail decision, taken when `ResourceNode` first supplies the
  * actions; until then this stays exactly what it draws today.
  */
-export const LinkActionsIcon = (props: ThingActionIconProps) => <Link size={14} {...props} />;
+export const LinkActionsIcon = (props: ResourceActionIconProps) => <Link size={14} {...props} />;
 
 /**
  * Open an entity's actions menu, where the menu does not primarily serve one action.
@@ -347,15 +349,17 @@ export const LinkActionsIcon = (props: ThingActionIconProps) => <Link size={14} 
  * and the menu behind it holds a rename, two addresses and a delete. A glyph
  * naming any one of those would name the wrong one.
  */
-export const EntityActionsIcon = (props: ThingActionIconProps) => <Ellipsis size={14} {...props} />;
+export const EntityActionsIcon = (props: ResourceActionIconProps) => (
+  <Ellipsis size={14} {...props} />
+);
 
 /** Put an address on the clipboard. */
-export const CopyIcon = (props: ThingActionIconProps) => <Copy size={14} {...props} />;
+export const CopyIcon = (props: ResourceActionIconProps) => <Copy size={14} {...props} />;
 
 /** Remove the entity the surrounding command names. */
-export const DeleteIcon = (props: ThingActionIconProps) => <Trash2 size={14} {...props} />;
+export const DeleteIcon = (props: ResourceActionIconProps) => <Trash2 size={14} {...props} />;
 
-/** Remove a Thing from this Diagram while it stays in the Space. */
-export const RemoveFromDiagramIcon = (props: ThingActionIconProps) => (
+/** Remove a Resource from this Map while it stays in the Space. */
+export const RemoveFromMapIcon = (props: ResourceActionIconProps) => (
   <Unlink size={14} {...props} />
 );

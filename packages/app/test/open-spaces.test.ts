@@ -13,17 +13,17 @@ import { mintingIds } from './minting';
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const UNOPENED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const META_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const META_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const META_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
-const META_SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
-const MINTED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
-const SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
+const META_SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
+const MINTED_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+const SECOND_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e');
 /**
  * A third Space, which is what a crossing needs to be a tree rather than a line.
@@ -32,22 +32,22 @@ const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e')
  * three, because what it asserts is where the Space below the exited one lands.
  */
 const THIRD_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000f');
-const THIRD_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
-const THIRD_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const THIRD_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
+const THIRD_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const THIRD_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const THIRD_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 
 /**
- * Two aggregate-valid Spaces. Every Thing, Diagram and Graph id is distinct
- * across them, because a Space Thing coordination validates the whole aggregate
+ * Two aggregate-valid Spaces. Every Resource, Map and Graph id is distinct
+ * across them, because a Space Resource coordination validates the whole aggregate
  * and refuses a duplicate id wherever it appears — and Meta carries the Space
- * Thing that owns the ordinary Space, which the same intake requires.
+ * Resource that owns the ordinary Space, which the same intake requires.
  */
 const snapshot = (id: UUID, title: string): SpaceSnapshot => {
   const meta = id === META_ID;
   const third = id === THIRD_ID;
-  const thingId = meta ? THING_ID : third ? THIRD_THING_ID : OTHER_THING_ID;
-  const diagramId = meta ? META_DIAGRAM_ID : third ? THIRD_DIAGRAM_ID : DIAGRAM_ID;
+  const resourceId = meta ? RESOURCE_ID : third ? THIRD_RESOURCE_ID : OTHER_RESOURCE_ID;
+  const mapId = meta ? META_MAP_ID : third ? THIRD_MAP_ID : MAP_ID;
   const graphOne = meta ? META_GRAPH_ONE : third ? THIRD_GRAPH_ONE : GRAPH_ONE;
   const graphTwo = meta ? META_GRAPH_TWO : third ? THIRD_GRAPH_TWO : GRAPH_TWO;
   return {
@@ -55,34 +55,34 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
     document: {
       version: 1,
       title,
-      defaultDiagram: diagramId,
-      diagrams: [
+      defaultMap: mapId,
+      maps: [
         {
-          id: diagramId,
-          title: 'Diagram',
+          id: mapId,
+          title: 'Map',
           kind: 'positioned',
           positions: meta
             ? {
-                [thingId]: { x: 0, y: 0, open: false },
-                [META_SPACE_THING_ID]: { x: 0, y: 40, open: false },
+                [resourceId]: { x: 0, y: 0, open: false },
+                [META_SPACE_RESOURCE_ID]: { x: 0, y: 40, open: false },
               }
-            : { [thingId]: { x: 0, y: 0, open: false } },
+            : { [resourceId]: { x: 0, y: 0, open: false } },
           graphs: [
             { id: graphOne, title: 'One', edges: [] },
             { id: graphTwo, title: 'Two', edges: [] },
           ],
           activeGraph: graphOne,
         },
-        // A second Diagram, so a selection made in an open Space can differ from
+        // A second Map, so a selection made in an open Space can differ from
         // the one an address proposes. Only the Space those tests use needs it,
-        // and its ids are its own — every Diagram and Graph id is distinct across
-        // the three Spaces, because a Space Thing coordination validates the
+        // and its ids are its own — every Map and Graph id is distinct across
+        // the three Spaces, because a Space Resource coordination validates the
         // whole aggregate and refuses a duplicate wherever it appears.
         ...(id === OTHER_ID
           ? [
               {
-                id: SECOND_DIAGRAM_ID,
-                title: 'Second Diagram',
+                id: SECOND_MAP_ID,
+                title: 'Second Map',
                 kind: 'positioned' as const,
                 positions: {},
                 graphs: [{ id: SECOND_GRAPH_ID, title: 'Second', edges: [] }],
@@ -92,24 +92,24 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           : []),
       ],
     },
-    things: meta
+    resources: meta
       ? [
-          { id: thingId, document: { title: 'Thing', kind: 'markdown', body: '' } },
+          { id: resourceId, document: { title: 'Resource', kind: 'markdown', body: '' } },
           {
-            id: META_SPACE_THING_ID,
-            // The Diagram `Other` opens on and that Diagram's Active Graph —
-            // what the lifecycle would have stored had this Thing been authored
+            id: META_SPACE_RESOURCE_ID,
+            // The Map `Other` opens on and that Map's Active Graph —
+            // what the lifecycle would have stored had this Resource been authored
             // rather than written out (ADR 0079).
             document: {
               title: 'Other',
               kind: 'space',
               spaceId: OTHER_ID,
-              diagram: DIAGRAM_ID,
+              map: MAP_ID,
               graph: GRAPH_ONE,
             },
           },
         ]
-      : [{ id: thingId, document: { title: 'Thing', kind: 'markdown', body: '' } }],
+      : [{ id: resourceId, document: { title: 'Resource', kind: 'markdown', body: '' } }],
   };
 };
 
@@ -122,14 +122,14 @@ const loaded = (id: UUID, title: string) => ({
 /**
  * Two Spaces, or three where a test needs a crossing to be a tree.
  *
- * The third is opt-in rather than always present because a Space Thing
+ * The third is opt-in rather than always present because a Space Resource
  * coordination is written over every Space the backend holds: a third one in
  * the default fixture changes what those tests are coordinating across, and
  * they assert on the requests it makes.
  */
 const setup = (
   control?: MemorySpaceBackendTestControl,
-  newId: () => UUID = () => THING_ID,
+  newId: () => UUID = () => RESOURCE_ID,
   spaces: readonly (readonly [UUID, string])[] = [
     [META_ID, 'Meta'],
     [OTHER_ID, 'Other'],
@@ -154,7 +154,7 @@ const setup = (
   };
 };
 
-/** Distinct ids for a Space Thing coordination, which mints several per call. */
+/** Distinct ids for a Space Resource coordination, which mints several per call. */
 const countingIds = (): (() => UUID) => {
   let next = 0x20;
   return () => uuidSchema.parse(`00000000-0000-4000-8000-0000000000${(next++).toString(16)}`);
@@ -177,27 +177,25 @@ describe('Open Spaces', () => {
     expect(openSpaces.meta()).toEqual({ spaceId: META_ID, title: 'Meta edited' });
   });
 
-  it('authors the embedded Diagram while preserving the full canvas selection', async () => {
+  it('authors the embedded Map while preserving the full canvas selection', async () => {
     const { openSpaces } = setup();
-    const target = await openSpaces.open(OTHER_ID, SECOND_DIAGRAM_ID);
+    const target = await openSpaces.open(OTHER_ID, SECOND_MAP_ID);
     const before = target.session.getState().working;
     expect(
-      target.app.authoring.completeInDiagram(DIAGRAM_ID, {
-        kind: 'opened-thing',
-        thingId: OTHER_THING_ID,
+      target.app.authoring.completeInMap(MAP_ID, {
+        kind: 'opened-resource',
+        resourceId: OTHER_RESOURCE_ID,
       }).kind,
     ).toBe('completed');
     const after = target.session.getState().working;
     expect(
-      after.document.diagrams?.find((diagram) => diagram.id === DIAGRAM_ID)?.positions[
-        OTHER_THING_ID
-      ]?.open,
+      after.document.maps?.find((map) => map.id === MAP_ID)?.positions[OTHER_RESOURCE_ID]?.open,
     ).toBe(true);
-    expect(after.document.diagrams?.find((diagram) => diagram.id === SECOND_DIAGRAM_ID)).toEqual(
-      before.document.diagrams?.find((diagram) => diagram.id === SECOND_DIAGRAM_ID),
+    expect(after.document.maps?.find((map) => map.id === SECOND_MAP_ID)).toEqual(
+      before.document.maps?.find((map) => map.id === SECOND_MAP_ID),
     );
-    expect(target.app.navigation.getState().selectedDiagramId).toBe(SECOND_DIAGRAM_ID);
-    expect(after.document.defaultDiagram).toBe(before.document.defaultDiagram);
+    expect(target.app.navigation.getState().selectedMapId).toBe(SECOND_MAP_ID);
+    expect(after.document.defaultMap).toBe(before.document.defaultMap);
   });
 
   it('opens an embedded target in the shared entry without leaving the containing Space', async () => {
@@ -233,11 +231,11 @@ describe('Open Spaces', () => {
     other.app.navigation.activateGraph(GRAPH_TWO);
     await openSpaces.open(META_ID);
 
-    const reopened = await openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID);
+    const reopened = await openSpaces.enter(OTHER_ID, SECOND_MAP_ID);
 
     expect(reopened).toBe(other);
     expect(reopened.app.navigation.getState()).toMatchObject({
-      selectedDiagramId: DIAGRAM_ID,
+      selectedMapId: MAP_ID,
       activeGraphId: GRAPH_TWO,
     });
   });
@@ -246,13 +244,13 @@ describe('Open Spaces', () => {
     const { openSpaces } = setup();
     await openSpaces.open(META_ID);
     const framing = { centreX: 100, centreY: 50, zoom: 2 };
-    const entered = await openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_ONE, framing);
+    const entered = await openSpaces.enter(OTHER_ID, MAP_ID, GRAPH_ONE, framing);
 
     expect(openSpaces.openingFraming(entered)).toEqual(framing);
     expect(openSpaces.openingFraming(entered)).toEqual(framing);
 
     await openSpaces.switchTo(META_ID);
-    const again = await openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID, GRAPH_TWO, {
+    const again = await openSpaces.enter(OTHER_ID, SECOND_MAP_ID, GRAPH_TWO, {
       centreX: 1,
       centreY: 1,
       zoom: 1,
@@ -284,7 +282,7 @@ describe('Open Spaces', () => {
       framingAtActivation = entry === undefined ? undefined : openSpaces.openingFraming(entry);
     });
 
-    await openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_ONE, framing);
+    await openSpaces.enter(OTHER_ID, MAP_ID, GRAPH_ONE, framing);
     unsubscribe();
 
     expect(capturedActivation).toBe(true);
@@ -374,7 +372,7 @@ describe('Open Spaces', () => {
     expect(reopened).not.toBe(first);
     expect(reopened.session).not.toBe(first.session);
     expect(reopened.app.navigation.getState()).toMatchObject({
-      selectedDiagramId: DIAGRAM_ID,
+      selectedMapId: MAP_ID,
       activeGraphId: GRAPH_ONE,
     });
   });
@@ -427,16 +425,16 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
-  it('commits an edit queued behind a Space Thing coordination before exiting', async () => {
+  it('commits an edit queued behind a Space Resource coordination before exiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { backend, openSpaces } = setup(control, countingIds());
     await openSpaces.open(META_ID);
     const other = await openSpaces.open(OTHER_ID);
 
     const release = control.deferNextCommit();
-    const creating = openSpaces.spaceThings.create({
+    const creating = openSpaces.spaceResources.create({
       containingSpaceId: META_ID,
-      diagramId: META_DIAGRAM_ID,
+      mapId: META_MAP_ID,
       title: 'Child',
       position: { x: 10, y: 10 },
     });
@@ -469,9 +467,9 @@ describe('Open Spaces', () => {
     await openSpaces.open(OTHER_ID);
 
     const releaseFirst = control.deferNextCommit();
-    const first = openSpaces.spaceThings.create({
+    const first = openSpaces.spaceResources.create({
       containingSpaceId: META_ID,
-      diagramId: META_DIAGRAM_ID,
+      mapId: META_MAP_ID,
       title: 'First child',
       position: { x: 10, y: 10 },
     });
@@ -482,9 +480,9 @@ describe('Open Spaces', () => {
     // wait reports a retirable Space, and the second raises the barrier again
     // before the exit gets to retire it. Retiring has to survive that window.
     const exiting = openSpaces.exit(OTHER_ID);
-    const second = openSpaces.spaceThings.create({
+    const second = openSpaces.spaceResources.create({
       containingSpaceId: META_ID,
-      diagramId: META_DIAGRAM_ID,
+      mapId: META_MAP_ID,
       title: 'Second child',
       position: { x: 20, y: 20 },
     });
@@ -496,15 +494,17 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
-  it('mints a composed Space\u2019s Thing identities from the minter it was given', async () => {
-    const { openSpaces } = setup(undefined, mintingIds(MINTED_THING_ID));
+  it('mints a composed Space\u2019s Resource identities from the minter it was given', async () => {
+    const { openSpaces } = setup(undefined, mintingIds(MINTED_RESOURCE_ID));
     const other = await openSpaces.open(OTHER_ID);
 
     expect(
-      other.app.authoring.complete({ kind: 'created-thing', anchor: { x: 100, y: 100 } }),
-    ).toEqual({ kind: 'completed', createdThingId: MINTED_THING_ID });
+      other.app.authoring.complete({ kind: 'created-resource', anchor: { x: 100, y: 100 } }),
+    ).toEqual({ kind: 'completed', createdResourceId: MINTED_RESOURCE_ID });
 
-    expect(other.session.getState().working.things.map(({ id }) => id)).toContain(MINTED_THING_ID);
+    expect(other.session.getState().working.resources.map(({ id }) => id)).toContain(
+      MINTED_RESOURCE_ID,
+    );
   });
 
   it('never reinstates a superseded Space when the one being left settles', async () => {
@@ -551,7 +551,7 @@ describe('Open Spaces', () => {
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
   });
 
-  it('seeds the Thing’s Graph when Enter waits out an exit of the same Space', async () => {
+  it('seeds the Resource’s Graph when Enter waits out an exit of the same Space', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
     const { openSpaces } = setup(control);
@@ -564,11 +564,11 @@ describe('Open Spaces', () => {
     // Exit parks until Other settles, so Enter reads the still-advertised entry
     // and would treat this as a return if first-display were decided before the
     // wait. The entry is gone once the exit settles, and the reloaded Space is
-    // a first canvas showing — GRAPH_TWO is not that Diagram's Active Graph, so
+    // a first canvas showing — GRAPH_TWO is not that Map's Active Graph, so
     // compose alone cannot look like a seed.
     const exiting = openSpaces.exit(OTHER_ID);
     await Promise.resolve();
-    const entering = openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_TWO);
+    const entering = openSpaces.enter(OTHER_ID, MAP_ID, GRAPH_TWO);
 
     release();
     await expect(exiting).resolves.toEqual({ kind: 'exited' });
@@ -576,7 +576,7 @@ describe('Open Spaces', () => {
 
     expect(entered).not.toBe(other);
     expect(entered.app.navigation.getState()).toMatchObject({
-      selectedDiagramId: DIAGRAM_ID,
+      selectedMapId: MAP_ID,
       activeGraphId: GRAPH_TWO,
     });
   });
@@ -591,8 +591,8 @@ describe('Open Spaces', () => {
 
     // Enter numbers first and parks until Meta settles. Open is the later
     // choice, so it owns the canvas. GRAPH_TWO is only applied by Enter's
-    // first-display seed — compose opens the Diagram on GRAPH_ONE.
-    const entering = openSpaces.enter(OTHER_ID, DIAGRAM_ID, GRAPH_TWO);
+    // first-display seed — compose opens the Map on GRAPH_ONE.
+    const entering = openSpaces.enter(OTHER_ID, MAP_ID, GRAPH_TWO);
     await Promise.resolve();
     const opening = openSpaces.open(OTHER_ID);
 
@@ -602,12 +602,12 @@ describe('Open Spaces', () => {
 
     expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
     expect(openSpaces.entry(OTHER_ID)?.app.navigation.getState()).toMatchObject({
-      selectedDiagramId: DIAGRAM_ID,
+      selectedMapId: MAP_ID,
       activeGraphId: GRAPH_ONE,
     });
   });
 
-  it('does not apply a superseded Enter’s Diagram once a later activation owns the canvas', async () => {
+  it('does not apply a superseded Enter’s Map once a later activation owns the canvas', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
     const { openSpaces } = setup(control);
@@ -616,9 +616,9 @@ describe('Open Spaces', () => {
     await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('pending'));
 
     // Enter numbers first and parks until Meta settles. Open is the later
-    // choice, so it owns the canvas. SECOND_DIAGRAM_ID is only applied by
-    // Enter's first-display seed — compose opens the Space on DIAGRAM_ID.
-    const entering = openSpaces.enter(OTHER_ID, SECOND_DIAGRAM_ID);
+    // choice, so it owns the canvas. SECOND_MAP_ID is only applied by
+    // Enter's first-display seed — compose opens the Space on MAP_ID.
+    const entering = openSpaces.enter(OTHER_ID, SECOND_MAP_ID);
     await Promise.resolve();
     const opening = openSpaces.open(OTHER_ID);
 
@@ -628,7 +628,7 @@ describe('Open Spaces', () => {
 
     expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
     expect(openSpaces.entry(OTHER_ID)?.app.navigation.getState()).toMatchObject({
-      selectedDiagramId: DIAGRAM_ID,
+      selectedMapId: MAP_ID,
       activeGraphId: GRAPH_ONE,
     });
   });
@@ -711,13 +711,13 @@ describe('Open Spaces', () => {
     const { openSpaces, history } = setup();
     await openSpaces.open(META_ID);
     const metaPath = productDestinationPath({
-      kind: 'diagram',
+      kind: 'map',
       spaceId: META_ID,
-      diagramId: META_DIAGRAM_ID,
+      mapId: META_MAP_ID,
     });
     const other = await openSpaces.open(OTHER_ID);
     const otherPath = history.pathname();
-    other.app.navigation.selectDiagram(SECOND_DIAGRAM_ID);
+    other.app.navigation.selectMap(SECOND_MAP_ID);
     const writes = [...history.writes];
 
     history.popTo(metaPath);
@@ -726,7 +726,7 @@ describe('Open Spaces', () => {
 
     history.popTo(otherPath);
     await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID));
-    expect(other.app.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
+    expect(other.app.navigation.getState().selectedMapId).toBe(MAP_ID);
     expect(history.writes).toEqual(writes);
   });
 
@@ -748,20 +748,20 @@ describe('Open Spaces', () => {
   it('reports the selection an already-open Space actually kept', async () => {
     const { openSpaces } = setup();
     const path = productDestinationPath({
-      kind: 'diagram',
+      kind: 'map',
       spaceId: OTHER_ID,
-      diagramId: DIAGRAM_ID,
+      mapId: MAP_ID,
     });
     const first = await openSpaces.openPath(path);
-    first.opened.app.navigation.selectDiagram(SECOND_DIAGRAM_ID);
+    first.opened.app.navigation.selectMap(SECOND_MAP_ID);
 
     // The Space is already open, so it keeps the selection it is being worked
     // in. Reporting the URL's selection anyway would have the caller open a
-    // Graph against a Diagram that was never selected.
+    // Graph against a Map that was never selected.
     const again = await openSpaces.openPath(path);
 
     expect(again.opened).toBe(first.opened);
-    expect(again.opening?.selection).toBe(SECOND_DIAGRAM_ID);
+    expect(again.opening?.selection).toBe(SECOND_MAP_ID);
   });
 
   it('detaches an exited Space\u2019s composition from its retired session', async () => {
@@ -782,7 +782,7 @@ describe('Open Spaces', () => {
   it('accepts the baseline for a participant the conflict never named', async () => {
     const control = new MemorySpaceBackendTestControl();
     // The conflict names the cascade's target only. Meta is a participant
-    // because the same edit removes its Space Thing, but the repository never
+    // because the same edit removes its Space Resource, but the repository never
     // complained about it, so it has no remote snapshot of its own. The named
     // Space carries a revision of its own so that Meta keeping 1n below is
     // evidence it held its own baseline rather than adopting the reported one.
@@ -797,18 +797,18 @@ describe('Open Spaces', () => {
     // *stored* is the claim under test, so it is not named for the conclusion.
     const beforeCascade = meta.session.getState().working;
 
-    await openSpaces.spaceThings.delete({
+    await openSpaces.spaceResources.delete({
       containingSpaceId: META_ID,
-      thingId: META_SPACE_THING_ID,
+      resourceId: META_SPACE_RESOURCE_ID,
     });
     await vi.waitFor(() => expect(meta.session.getState().persistence.kind).toBe('conflicted'));
-    expect(meta.session.getState().working.things.map((thing) => thing.id)).not.toContain(
-      META_SPACE_THING_ID,
+    expect(meta.session.getState().working.resources.map((resource) => resource.id)).not.toContain(
+      META_SPACE_RESOURCE_ID,
     );
     const before = meta.app.authoring.getState().replacementEpoch;
 
     // Reload is reachable here precisely because the baseline is what is
-    // stored: the cascade never committed, so accepting it puts the Space Thing
+    // stored: the cascade never committed, so accepting it puts the Space Resource
     // the edit removed back.
     expect(meta.app.authoring.acceptStoredSpace()).toBeNull();
 
@@ -817,8 +817,8 @@ describe('Open Spaces', () => {
       acknowledgedRevision: 1n,
       persistence: { kind: 'settled' },
     });
-    expect(meta.session.getState().working.things.map((thing) => thing.id)).toContain(
-      META_SPACE_THING_ID,
+    expect(meta.session.getState().working.resources.map((resource) => resource.id)).toContain(
+      META_SPACE_RESOURCE_ID,
     );
     expect(meta.app.authoring.getState().replacementEpoch).toBe(before + 1);
   });
@@ -855,7 +855,7 @@ describe('Open Spaces', () => {
    * was entered from it (ADR 0068), which is the next test but one.
    */
   const crossing = () =>
-    setup(undefined, () => THING_ID, [
+    setup(undefined, () => RESOURCE_ID, [
       [META_ID, 'Meta'],
       [OTHER_ID, 'Other'],
       [THIRD_ID, 'Third'],
@@ -876,7 +876,7 @@ describe('Open Spaces', () => {
     // recording Other here would put Third under a Space it was never entered
     // from, only standing beside.
     await openSpaces.openPath(
-      productDestinationPath({ kind: 'diagram', spaceId: THIRD_ID, diagramId: THIRD_DIAGRAM_ID }),
+      productDestinationPath({ kind: 'map', spaceId: THIRD_ID, mapId: THIRD_MAP_ID }),
     );
 
     expect(openSpaces.getState().openedFrom.get(THIRD_ID)).toBe(null);
@@ -903,7 +903,7 @@ describe('Open Spaces', () => {
     // settles before it reaches the record at all.
     await openSpaces.switchTo(META_ID);
     await openSpaces.openPath(
-      productDestinationPath({ kind: 'diagram', spaceId: OTHER_ID, diagramId: DIAGRAM_ID }),
+      productDestinationPath({ kind: 'map', spaceId: OTHER_ID, mapId: MAP_ID }),
     );
 
     expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
@@ -964,7 +964,7 @@ describe('Open Spaces', () => {
   it('joins a Space reopened while its exit was still waiting at the root', async () => {
     const control = new MemorySpaceBackendTestControl();
     const release = control.deferNextCommit();
-    const { openSpaces } = setup(control, () => THING_ID, [
+    const { openSpaces } = setup(control, () => RESOURCE_ID, [
       [META_ID, 'Meta'],
       [OTHER_ID, 'Other'],
       [THIRD_ID, 'Third'],

@@ -3,7 +3,7 @@ import {
   encodeCompactUuid,
   spaceSnapshotSchema,
   uuidSchema,
-  type ThingId,
+  type ResourceId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -15,19 +15,19 @@ import { createWorkingSpaceReader } from '../src/snapshot';
 const uuid = (value: string): UUID => uuidSchema.parse(value);
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
-const THING_A = uuid('00000000-0000-4000-8000-000000000002');
-const THING_B = uuid('00000000-0000-4000-8000-000000000003');
-/** A Thing of the Space the Diagram does not hold, so no contextual URL names it. */
-const THING_OFF_DIAGRAM = uuid('00000000-0000-4000-8000-000000000004');
-const DIAGRAM = uuid('00000000-0000-4000-8000-000000000010');
+const RESOURCE_A = uuid('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuid('00000000-0000-4000-8000-000000000003');
+/** A Resource of the Space the Map does not hold, so no contextual URL names it. */
+const RESOURCE_OFF_MAP = uuid('00000000-0000-4000-8000-000000000004');
+const MAP = uuid('00000000-0000-4000-8000-000000000010');
 const OPENING_GRAPH = uuid('00000000-0000-4000-8000-000000000020');
 const OTHER_GRAPH = uuid('00000000-0000-4000-8000-000000000021');
-/** A second Diagram, so a selection can move to a Diagram no location names. */
-const OTHER_DIAGRAM = uuid('00000000-0000-4000-8000-000000000011');
-const OTHER_DIAGRAM_GRAPH = uuid('00000000-0000-4000-8000-000000000022');
+/** A second Map, so a selection can move to a Map no location names. */
+const OTHER_MAP = uuid('00000000-0000-4000-8000-000000000011');
+const OTHER_MAP_GRAPH = uuid('00000000-0000-4000-8000-000000000022');
 
 /**
- * One Diagram owning two Graphs, only one of which it opens on.
+ * One Map owning two Graphs, only one of which it opens on.
  *
  * Two, because the whole question this module answers is whether a location
  * already opens an address, and a Space whose only Graph is the one every
@@ -38,65 +38,68 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    defaultDiagram: DIAGRAM,
-    diagrams: [
+    defaultMap: MAP,
+    maps: [
       {
-        id: DIAGRAM,
-        title: 'Diagram',
+        id: MAP,
+        title: 'Map',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 0, y: 0, open: false },
-          [THING_B]: { x: 320, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0, open: false },
+          [RESOURCE_B]: { x: 320, y: 0, open: false },
         },
         graphs: [
-          { id: OPENING_GRAPH, title: 'Opening', edges: [{ from: THING_A, to: THING_B }] },
-          { id: OTHER_GRAPH, title: 'Other', edges: [{ from: THING_B, to: THING_A }] },
+          { id: OPENING_GRAPH, title: 'Opening', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
+          { id: OTHER_GRAPH, title: 'Other', edges: [{ from: RESOURCE_B, to: RESOURCE_A }] },
         ],
         activeGraph: OPENING_GRAPH,
       },
       {
-        id: OTHER_DIAGRAM,
-        title: 'Other Diagram',
+        id: OTHER_MAP,
+        title: 'Other Map',
         kind: 'positioned',
-        positions: { [THING_A]: { x: 0, y: 0, open: false } },
-        graphs: [{ id: OTHER_DIAGRAM_GRAPH, title: 'Other Diagram Graph', edges: [] }],
+        positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: OTHER_MAP_GRAPH, title: 'Other Map Graph', edges: [] }],
       },
     ],
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: '' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: '' } },
-    { id: THING_OFF_DIAGRAM, document: { title: 'C', kind: 'markdown', body: '' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: '' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: '' } },
+    { id: RESOURCE_OFF_MAP, document: { title: 'C', kind: 'markdown', body: '' } },
   ],
 });
 
 const space = createWorkingSpaceReader()(snapshot);
 
 const overview = (activeGraphId: UUID | null = OPENING_GRAPH): NavigationAddress => ({
-  selectedDiagramId: DIAGRAM,
+  selectedMapId: MAP,
   activeGraphId,
-  presentingThingId: null,
+  presentingResourceId: null,
 });
 
-const presenting = (thingId: ThingId, activeGraphId: UUID = OPENING_GRAPH): NavigationAddress => ({
-  selectedDiagramId: DIAGRAM,
+const presenting = (
+  resourceId: ResourceId,
+  activeGraphId: UUID = OPENING_GRAPH,
+): NavigationAddress => ({
+  selectedMapId: MAP,
   activeGraphId,
-  presentingThingId: thingId,
+  presentingResourceId: resourceId,
 });
 
-const view = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM)}`;
+const view = `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP)}`;
 
 const sync = (
   pathname: string,
   address: NavigationAddress,
   synced: NavigationAddress,
-  addressedThingId: ThingId | null = null,
+  addressedResourceId: ResourceId | null = null,
 ) =>
   destinationSync({
     space,
     snapshot,
     pathname,
-    position: { ...address, addressedThingId },
+    position: { ...address, addressedResourceId },
     synced,
   });
 
@@ -116,13 +119,13 @@ describe('what the browser should do about an address', () => {
     });
   });
 
-  it('does nothing at a canonical Thing location naming the addressed Thing', () => {
+  it('does nothing at a canonical Resource location naming the addressed Resource', () => {
     expect(
       sync(
-        productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: THING_A }),
+        productDestinationPath({ kind: 'resource', spaceId: SPACE_ID, resourceId: RESOURCE_A }),
         overview(),
         overview(),
-        THING_A,
+        RESOURCE_A,
       ),
     ).toEqual({ kind: 'none' });
   });
@@ -135,88 +138,88 @@ describe('what the browser should do about an address', () => {
     expect(sync(view, overview(OTHER_GRAPH), overview())).toEqual({
       kind: 'push',
       destination: {
-        kind: 'diagram-graph',
+        kind: 'map-graph',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM,
+        mapId: MAP,
         graphId: OTHER_GRAPH,
       },
     });
   });
 
   it('pushes the presentation point a presenting address is at', () => {
-    expect(sync(view, presenting(THING_A), overview())).toEqual({
+    expect(sync(view, presenting(RESOURCE_A), overview())).toEqual({
       kind: 'push',
       destination: {
         kind: 'presentation',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM,
+        mapId: MAP,
         graphId: OPENING_GRAPH,
-        thingId: THING_A,
+        resourceId: RESOURCE_A,
       },
     });
   });
 
   /**
    * The rule `adoptedRendererDestination` carried, generalised: a location that
-   * is *more* specific than the address, in the same Diagram, is left as
+   * is *more* specific than the address, in the same Map, is left as
    * specific as it was rather than widened.
    */
   it('keeps the Graph a location already names when a presentation ends', () => {
-    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(THING_A)}`;
+    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(RESOURCE_A)}`;
 
-    expect(sync(point, overview(), presenting(THING_A))).toEqual({
+    expect(sync(point, overview(), presenting(RESOURCE_A))).toEqual({
       kind: 'push',
       destination: {
-        kind: 'diagram-graph',
+        kind: 'map-graph',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM,
+        mapId: MAP,
         graphId: OPENING_GRAPH,
       },
     });
   });
 
   /**
-   * Leaving a presentation returns to the Graph, whatever Thing the location has
+   * Leaving a presentation returns to the Graph, whatever Resource the location has
    * been naming.
    *
-   * A canonical Thing URL leaves `addressedThingId` set, and nothing on the way
-   * out of a presentation clears it. Answering a Thing destination there would
+   * A canonical Resource URL leaves `addressedResourceId` set, and nothing on the way
+   * out of a presentation clears it. Answering a Resource destination there would
    * drop the Active Graph out of the address — which is exactly the
-   * distinction the two Thing spellings exist to keep.
+   * distinction the two Resource spellings exist to keep.
    */
-  it('leaves a presentation for the Graph even while a Thing is still addressed', () => {
-    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(THING_A)}`;
+  it('leaves a presentation for the Graph even while a Resource is still addressed', () => {
+    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(RESOURCE_A)}`;
 
-    expect(sync(point, overview(), presenting(THING_A), THING_A)).toEqual({
+    expect(sync(point, overview(), presenting(RESOURCE_A), RESOURCE_A)).toEqual({
       kind: 'push',
       destination: {
-        kind: 'diagram-graph',
+        kind: 'map-graph',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM,
+        mapId: MAP,
         graphId: OPENING_GRAPH,
       },
     });
   });
 
   /**
-   * The canonical Thing URL is the Thing's identity and names no Diagram; the
+   * The canonical Resource URL is the Resource's identity and names no Map; the
    * contextual one names both. Nothing here may rewrite the first into the
    * second — the reader holding a canonical link would find it silently
    * narrowed to the context they happened to be in.
    */
-  it('does not rewrite a canonical Thing location into its contextual spelling', () => {
+  it('does not rewrite a canonical Resource location into its contextual spelling', () => {
     const canonical = productDestinationPath({
-      kind: 'thing',
+      kind: 'resource',
       spaceId: SPACE_ID,
-      thingId: THING_A,
+      resourceId: RESOURCE_A,
     });
 
-    expect(sync(canonical, overview(OTHER_GRAPH), overview(), THING_A)).toEqual({
+    expect(sync(canonical, overview(OTHER_GRAPH), overview(), RESOURCE_A)).toEqual({
       kind: 'push',
       destination: {
-        kind: 'diagram-graph',
+        kind: 'map-graph',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM,
+        mapId: MAP,
         graphId: OTHER_GRAPH,
       },
     });
@@ -225,15 +228,15 @@ describe('what the browser should do about an address', () => {
   /**
    * Every destination this answers must be one the same Space can open again.
    *
-   * A Thing the Diagram omits has a canonical URL and no contextual one: the
-   * resolver refuses `/diagrams/<diagram>/things/<thing>` and the host answers 404.
-   * Addressing that Thing *within* the Diagram would therefore write a
+   * A Resource the Map omits has a canonical URL and no contextual one: the
+   * resolver refuses `/maps/<map>/resources/<resource>` and the host answers 404.
+   * Addressing that Resource *within* the Map would therefore write a
    * location that reloads into nothing.
    */
   it('answers no destination this Space refuses to resolve', () => {
-    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(THING_A)}`;
+    const point = `${view}/graphs/${encodeCompactUuid(OPENING_GRAPH)}/present/${encodeCompactUuid(RESOURCE_A)}`;
 
-    const decision = sync(point, overview(), presenting(THING_A), THING_OFF_DIAGRAM);
+    const decision = sync(point, overview(), presenting(RESOURCE_A), RESOURCE_OFF_MAP);
 
     expect(decision.kind).not.toBe('none');
     if (decision.kind === 'none') return;
@@ -243,12 +246,14 @@ describe('what the browser should do about an address', () => {
     ).toBe('resolved');
   });
 
-  it('replaces, without a history entry, when the location still names a Thing the address has dropped', () => {
-    // Choosing the current Diagram row again: Navigation republishes the same
-    // address, and the Thing the location names is no longer addressed.
-    expect(sync(`${view}/things/${encodeCompactUuid(THING_A)}`, overview(), overview())).toEqual({
+  it('replaces, without a history entry, when the location still names a Resource the address has dropped', () => {
+    // Choosing the current Map row again: Navigation republishes the same
+    // address, and the Resource the location names is no longer addressed.
+    expect(
+      sync(`${view}/resources/${encodeCompactUuid(RESOURCE_A)}`, overview(), overview()),
+    ).toEqual({
       kind: 'replace',
-      destination: { kind: 'diagram', spaceId: SPACE_ID, diagramId: DIAGRAM },
+      destination: { kind: 'map', spaceId: SPACE_ID, mapId: MAP },
     });
   });
 
@@ -257,24 +262,24 @@ describe('what the browser should do about an address', () => {
 
     expect(sync(`${view}/graphs/${encodeCompactUuid(missing)}`, overview(), overview())).toEqual({
       kind: 'replace',
-      destination: { kind: 'diagram', spaceId: SPACE_ID, diagramId: DIAGRAM },
+      destination: { kind: 'map', spaceId: SPACE_ID, mapId: MAP },
     });
   });
 
-  it('addresses the Diagram a selection has moved to', () => {
+  it('addresses the Map a selection has moved to', () => {
     expect(
       sync(
         view,
         {
-          selectedDiagramId: OTHER_DIAGRAM,
-          activeGraphId: OTHER_DIAGRAM_GRAPH,
-          presentingThingId: null,
+          selectedMapId: OTHER_MAP,
+          activeGraphId: OTHER_MAP_GRAPH,
+          presentingResourceId: null,
         },
         overview(),
       ),
     ).toEqual({
       kind: 'push',
-      destination: { kind: 'diagram', spaceId: SPACE_ID, diagramId: OTHER_DIAGRAM },
+      destination: { kind: 'map', spaceId: SPACE_ID, mapId: OTHER_MAP },
     });
   });
 });

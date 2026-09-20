@@ -29,7 +29,7 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  *    through `String.localeCompare` and the other through PostgreSQL's ordering
  *    of the `uuid` type. Those agree for canonical lowercase UUIDs by a property
  *    of ICU collation, not by anything either implementation promises, so the
- *    contract compares catalogs as sets. The Things *inside* a Space are a
+ *    contract compares catalogs as sets. The Resources *inside* a Space are a
  *    different matter: both order them by id on every read, by codepoint over
  *    the canonical text on one side and by the `uuid` bytes on the other, which
  *    are the same comparison — so the whole-snapshot `toEqual` comparisons below
@@ -44,77 +44,77 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000002');
 const MISSING_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000003');
-const THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
-const SECOND_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
-const OTHER_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
-const LINK_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
-const MISSING_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
-const THIRD_SPACE_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
-const FOURTH_SPACE_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
+const RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
+const SECOND_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
+const OTHER_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
+const LINK_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const MISSING_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
+const THIRD_SPACE_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000014');
+const FOURTH_SPACE_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000015');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
-const DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
+const MAP_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
 const SECOND_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000022');
-const SECOND_DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
+const SECOND_MAP_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000023');
 const THIRD_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000024');
 const FOURTH_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000025');
 
-const thing = (id: UUID, title: string) => ({
+const resource = (id: UUID, title: string) => ({
   id,
   document: { title, kind: 'markdown' as const, body: title },
 });
 
 /**
- * A Space Thing and the selection it carries.
+ * A Space Resource and the selection it carries.
  *
- * The selection is a parameter rather than a default because a Space Thing names
- * a Diagram of its target and a Graph that Diagram owns from the moment it
- * exists (ADR 0079). Every case below therefore says which Diagram of which
+ * The selection is a parameter rather than a default because a Space Resource names
+ * a Map of its target and a Graph that Map owns from the moment it
+ * exists (ADR 0079). Every case below therefore says which Map of which
  * target it is pointing at, and a target built without one cannot be linked to
  * at all — which is what `targetSpace` is for.
  */
-const spaceThing = (
+const spaceResource = (
   id: UUID,
   target: UUID,
-  selection: { readonly diagram: UUID; readonly graph: UUID },
+  selection: { readonly map: UUID; readonly graph: UUID },
 ) => ({
   id,
   document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
 });
 
 /**
- * A Space with things and no structure — no diagrams, and so no graphs, which is
+ * A Space with resources and no structure — no maps, and so no graphs, which is
  * one statement under version 1 (ADR 0040). Most of this suite is about
  * identity, rollback and revisions rather than about structure, so the cases
- * that need a graph build a diagram to own it rather than every case carrying an
+ * that need a graph build a map to own it rather than every case carrying an
  * empty collection.
  */
-const space = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
+const space = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  things: thingIds.map((thingId) => thing(thingId, `${title} thing`)),
+  resources: resourceIds.map((resourceId) => resource(resourceId, `${title} resource`)),
 });
 
 /**
- * A Space complete enough to be pointed at: one positioned Diagram owning one
- * Graph, which is the least a Space Thing's selection can resolve against.
+ * A Space complete enough to be pointed at: one positioned Map owning one
+ * Graph, which is the least a Space Resource's selection can resolve against.
  *
  * `space` above deliberately has no structure, and under ADR 0079 that makes it
- * a Space no valid Space Thing can name. The cases that link build their target
- * through this instead, and select `DIAGRAM_ID` and `GRAPH_ID` when they do. The
- * Diagram positions nothing: what a Space Thing resolves is the Diagram and the
- * Graph, and which Things that Diagram places is a separate matter this suite
+ * a Space no valid Space Resource can name. The cases that link build their target
+ * through this instead, and select `MAP_ID` and `GRAPH_ID` when they do. The
+ * Map positions nothing: what a Space Resource resolves is the Map and the
+ * Graph, and which Resources that Map places is a separate matter this suite
  * never reads.
  */
-const targetSpace = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
-  ...space(id, title, thingIds),
+const targetSpace = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({
+  ...space(id, title, resourceIds),
   document: {
     version: 1,
     title,
-    defaultDiagram: DIAGRAM_ID,
-    diagrams: [
+    defaultMap: MAP_ID,
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -125,11 +125,11 @@ const targetSpace = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceS
 });
 
 /**
- * A Space whose one diagram owns one graph with one edge out of the diagram.
+ * A Space whose one map owns one graph with one edge out of the map.
  *
- * Under version 1 an edge endpoint must name a thing of the diagram that owns the
+ * Under version 1 an edge endpoint must name a resource of the map that owns the
  * graph, so "dangling" is now a membership failure rather than a space-wide
- * lookup miss — and a graph can only reach domain intake through a diagram, so
+ * lookup miss — and a graph can only reach domain intake through a map, so
  * the failure cannot be built without one.
  */
 const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSnapshot => ({
@@ -137,14 +137,14 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
   document: {
     version: 1,
     title,
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
+        id: MAP_ID,
         title: 'Dangling',
         kind: 'positioned',
         positions: { [memberId]: { x: 0, y: 0, open: false } },
         graphs: [
-          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_THING_ID }] },
+          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
         ],
       },
     ],
@@ -286,7 +286,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} initializes and replaces only through explicit Meta-rooted aggregates`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
       await expect(
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
@@ -319,12 +319,12 @@ export const spaceRepositoryContract = (
 
   it(`${name} classifies canonical and different initialization proposals`, async () => {
     await withHarness(async (repository) => {
-      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID]);
       const meta = {
-        ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [
-          thing(THING_ID, 'Meta thing'),
-          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ...space(SPACE_ID, 'Meta', [RESOURCE_ID]),
+        resources: [
+          resource(RESOURCE_ID, 'Meta resource'),
+          spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       const input = { metaSpaceId: SPACE_ID, spaces: [meta, child] };
@@ -345,12 +345,12 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a replacement proposal naming a Meta Space it does not hold`, async () => {
     await withHarness(async (repository) => {
-      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID]);
       const meta = {
-        ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [
-          thing(THING_ID, 'Meta thing'),
-          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ...space(SPACE_ID, 'Meta', [RESOURCE_ID]),
+        resources: [
+          resource(RESOURCE_ID, 'Meta resource'),
+          spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       await seed(repository, meta, child);
@@ -369,20 +369,20 @@ export const spaceRepositoryContract = (
       const first: SpaceSnapshot = {
         id: SPACE_ID,
         document: { version: 1, title: 'Meta' },
-        things: [
+        resources: [
           {
-            id: THING_ID,
-            document: { title: 'Thing', kind: 'markdown', body: 'Body' },
+            id: RESOURCE_ID,
+            document: { title: 'Resource', kind: 'markdown', body: 'Body' },
           },
         ],
       };
       const reordered: SpaceSnapshot = {
         id: SPACE_ID,
         document: { title: 'Meta', version: 1 },
-        things: [
+        resources: [
           {
-            id: THING_ID,
-            document: { body: 'Body', kind: 'markdown', title: 'Thing' },
+            id: RESOURCE_ID,
+            document: { body: 'Body', kind: 'markdown', title: 'Resource' },
           },
         ],
       };
@@ -398,8 +398,8 @@ export const spaceRepositoryContract = (
 
   it(`${name} lets only one different concurrent initialization establish state`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'First', [THING_ID]);
-      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_THING_ID]);
+      const first = space(SPACE_ID, 'First', [RESOURCE_ID]);
+      const second = space(OTHER_SPACE_ID, 'Second', [OTHER_RESOURCE_ID]);
       const results = await Promise.all([
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
         repository.initializeAggregate({ metaSpaceId: OTHER_SPACE_ID, spaces: [second] }),
@@ -414,7 +414,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} rolls back a refused replacement`, async () => {
     await withHarness(async (repository) => {
-      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
+      const initial = space(SPACE_ID, 'Initial', [RESOURCE_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
       await expect(
         repository.replaceAggregate(
@@ -431,7 +431,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses replacement before initialization`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
+      const meta = space(SPACE_ID, 'Meta', [RESOURCE_ID]);
       for (const expected of [SPACE_ID, undefined]) {
         await expect(
           repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [meta] }, expected),
@@ -446,7 +446,7 @@ export const spaceRepositoryContract = (
       await expect(repository.loadMetaSpaceId()).resolves.toBeUndefined();
       await repository.initializeAggregate({
         metaSpaceId: SPACE_ID,
-        spaces: [space(SPACE_ID, 'Meta', [THING_ID])],
+        spaces: [space(SPACE_ID, 'Meta', [RESOURCE_ID])],
       });
       await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
       await repository.replaceAggregate(
@@ -459,7 +459,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a replacement expecting no Meta identity where one is stored`, async () => {
     await withHarness(async (repository) => {
-      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
+      const initial = space(SPACE_ID, 'Initial', [RESOURCE_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
 
       await expect(
@@ -474,9 +474,9 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a replacement authorized against a superseded Meta identity`, async () => {
     await withHarness(async (repository) => {
-      const initial = space(SPACE_ID, 'Initial', [THING_ID]);
-      const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_THING_ID]);
-      const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_THING_ID]);
+      const initial = space(SPACE_ID, 'Initial', [RESOURCE_ID]);
+      const first = space(OTHER_SPACE_ID, 'First replacement', [OTHER_RESOURCE_ID]);
+      const second = space(MISSING_SPACE_ID, 'Second replacement', [MISSING_RESOURCE_ID]);
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
 
       await expect(
@@ -514,8 +514,8 @@ export const spaceRepositoryContract = (
   it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
       const spaces = [
-        space(SPACE_ID, 'First', [THING_ID]),
-        space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
+        space(SPACE_ID, 'First', [RESOURCE_ID]),
+        space(SPACE_ID, 'Repeat', [OTHER_RESOURCE_ID]),
       ];
 
       const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
@@ -529,26 +529,26 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * A Thing belongs to exactly one Space of the aggregate, and an aggregate
+   * A Resource belongs to exactly one Space of the aggregate, and an aggregate
    * that says otherwise is refused whole. There is no longer a second,
-   * insert-only reading in which a proposal collides with a Thing some
+   * insert-only reading in which a proposal collides with a Resource some
    * *surviving stored* Space owns: both lifecycle doors take the aggregate
    * entire, so what is stored after the call is what the call proposed, and
    * ownership is settled inside that proposal alone (ADR 0078). The two
    * distinct codes this pair of cases used to hold apart went with it.
    */
-  it(`${name} refuses an aggregate that repeats a Thing identity, storing none of it`, async () => {
+  it(`${name} refuses an aggregate that repeats a Resource identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
       const spaces = [
-        space(SPACE_ID, 'First', [THING_ID]),
-        space(OTHER_SPACE_ID, 'Second', [THING_ID]),
+        space(SPACE_ID, 'First', [RESOURCE_ID]),
+        space(OTHER_SPACE_ID, 'Second', [RESOURCE_ID]),
       ];
 
       const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
       expect(result.kind).toBe('aggregate-refused');
       if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
       expect(result.errors).toContainEqual(
-        expect.objectContaining({ kind: 'duplicate-thing-id', thingId: THING_ID }),
+        expect.objectContaining({ kind: 'duplicate-resource-id', resourceId: RESOURCE_ID }),
       );
       expect(await repository.listSpaces()).toEqual([]);
     });
@@ -556,8 +556,8 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
     await withHarness(async (repository) => {
-      const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
-      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
+      const valid = space(SPACE_ID, 'Must roll back', [RESOURCE_ID]);
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_RESOURCE_ID);
 
       await expect(
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
@@ -569,16 +569,16 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * Replacement drops every stored Space, so a Thing a doomed Space owns is free
+   * Replacement drops every stored Space, so a Resource a doomed Space owns is free
    * for the replacement to claim. Ownership is judged against what the
    * replacement proposes, never against what the same call is about to delete —
    * which is what taking the aggregate entire buys over inserting into whatever
    * is already there.
    */
-  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
+  it(`${name} replaces everything stored, freeing the Resource ids it clears`, async () => {
     await withHarness(async (repository) => {
-      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
-      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
+      await seed(repository, space(SPACE_ID, 'Cleared', [RESOURCE_ID]));
+      const replacement = space(OTHER_SPACE_ID, 'Replacement', [RESOURCE_ID]);
 
       await expect(
         repository.replaceAggregate(
@@ -602,7 +602,7 @@ export const spaceRepositoryContract = (
   // integration file.
   it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
 
@@ -618,7 +618,7 @@ export const spaceRepositoryContract = (
    */
   it(`${name} becomes committable from an empty store`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
 
       await expect(repository.loadAggregate()).resolves.toEqual({
@@ -635,7 +635,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a topology-preserving update when stored Spaces have no Meta identity`, async (context) => {
     await withMissingMetaHarness(context, async (repository, removeMetaIdentity) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       await removeMetaIdentity();
 
@@ -650,7 +650,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} stores an initialized Space, then lists, loads and commits it`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
 
       await expect(
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
@@ -678,20 +678,24 @@ export const spaceRepositoryContract = (
    * On the SQL repository (`sql-space-repository.ts`, ticket 24), the shared
    * `#writeUpdate` helper runs an unconditional `deleteExcept` after every
    * update it writes, including on the fast path -- whose own
-   * `preservesSnapshotBoundary` never lets the Thing set change before
+   * `preservesSnapshotBoundary` never lets the Resource set change before
    * reaching it, so that delete keeps nothing out there either. Nothing in
    * this case forces that path, though: on the memory double it never reaches
    * `#writeUpdate` at all. What every implementation is held to, whichever
    * path it takes, is the invariant itself: a topology-preserving commit over
-   * several Things, changing none of their membership, leaves every one of
+   * several Resources, changing none of their membership, leaves every one of
    * them in place.
    */
-  it(`${name} keeps every Thing through a topology-preserving commit's own delete`, async () => {
+  it(`${name} keeps every Resource through a topology-preserving commit's own delete`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'Three things', [THING_ID, SECOND_THING_ID, OTHER_THING_ID]);
+      const first = space(SPACE_ID, 'Three resources', [
+        RESOURCE_ID,
+        SECOND_RESOURCE_ID,
+        OTHER_RESOURCE_ID,
+      ]);
       await seed(repository, first);
 
-      const changed = retitled(first, 'Renamed, same Things');
+      const changed = retitled(first, 'Renamed, same Resources');
       await expect(commitUpdate(repository, changed, 0n)).resolves.toEqual({
         kind: 'committed',
         revisions: [{ spaceId: SPACE_ID, revision: 1n }],
@@ -703,17 +707,17 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses to create a new unreachable Space by removing its last reference alone`, async () => {
     await withHarness(async (repository) => {
-      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
+      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_RESOURCE_ID]);
       const linkedMeta: SpaceSnapshot = {
-        ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [
-          thing(THING_ID, 'Meta thing'),
-          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ...space(SPACE_ID, 'Meta', [RESOURCE_ID]),
+        resources: [
+          resource(RESOURCE_ID, 'Meta resource'),
+          spaceResource(SECOND_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       await seed(repository, linkedMeta, target);
 
-      const unlinked = { ...linkedMeta, things: [thing(THING_ID, 'Meta thing')] };
+      const unlinked = { ...linkedMeta, resources: [resource(RESOURCE_ID, 'Meta resource')] };
       await expect(commitUpdate(repository, unlinked, 0n)).resolves.toEqual({
         kind: 'aggregate-refused',
         errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
@@ -725,15 +729,15 @@ export const spaceRepositoryContract = (
 
   it(`${name} atomically creates, links, reads, converges on, and deletes a Space`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
+      const meta = space(SPACE_ID, 'Meta', [RESOURCE_ID]);
       await seed(repository, meta);
-      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+      const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID]);
       const linked = {
         ...meta,
-        things: [
-          ...meta.things,
-          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
-          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        resources: [
+          ...meta.resources,
+          spaceResource(SECOND_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
+          spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
 
@@ -783,9 +787,9 @@ export const spaceRepositoryContract = (
        */
       const halfUnlinked = {
         ...meta,
-        things: [
-          ...meta.things,
-          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        resources: [
+          ...meta.resources,
+          spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       await expect(
@@ -826,10 +830,10 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses an authored commit that deletes the Meta Space`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
+      const meta = space(SPACE_ID, 'Meta', [RESOURCE_ID]);
       await seed(repository, meta);
 
-      // The one Space no Space Thing creates and no deletion reaches. A commit
+      // The one Space no Space Resource creates and no deletion reaches. A commit
       // that removes it leaves an aggregate the Meta identity no longer names,
       // which complete intake refuses by identity rather than by cardinality.
       await expect(
@@ -847,22 +851,22 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} keeps each Space Thing's own selection across a later default Diagram change`, async () => {
+  it(`${name} keeps each Space Resource's own selection across a later default Map change`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
+      const meta = space(SPACE_ID, 'Meta', [RESOURCE_ID]);
       await seed(repository, meta);
       const target: SpaceSnapshot = {
-        ...space(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]),
+        ...space(OTHER_SPACE_ID, 'Target', [OTHER_RESOURCE_ID]),
         document: {
           version: 1,
           title: 'Target',
-          defaultDiagram: DIAGRAM_ID,
-          diagrams: [
+          defaultMap: MAP_ID,
+          maps: [
             {
-              id: DIAGRAM_ID,
-              title: 'First diagram',
+              id: MAP_ID,
+              title: 'First map',
               kind: 'positioned',
-              positions: { [OTHER_THING_ID]: { x: 0, y: 0, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [
                 { id: GRAPH_ID, title: 'First graph', edges: [] },
                 { id: THIRD_GRAPH_ID, title: 'Second graph', edges: [] },
@@ -870,10 +874,10 @@ export const spaceRepositoryContract = (
               activeGraph: GRAPH_ID,
             },
             {
-              id: SECOND_DIAGRAM_ID,
-              title: 'Second diagram',
+              id: SECOND_MAP_ID,
+              title: 'Second map',
               kind: 'positioned',
-              positions: { [OTHER_THING_ID]: { x: 100, y: 100, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false } },
               graphs: [
                 { id: SECOND_GRAPH_ID, title: 'Third graph', edges: [] },
                 { id: FOURTH_GRAPH_ID, title: 'Fourth graph', edges: [] },
@@ -884,35 +888,35 @@ export const spaceRepositoryContract = (
         },
       };
       /*
-       * Four Space Things on one target, no two selecting the same pair. Two
-       * share a Diagram and differ by Graph, two share the other Diagram and
+       * Four Space Resources on one target, no two selecting the same pair. Two
+       * share a Map and differ by Graph, two share the other Map and
        * differ by Graph, so the round trip has to carry both halves of a
-       * selection rather than a Diagram with a Graph implied by it (ADR 0026).
+       * selection rather than a Map with a Graph implied by it (ADR 0026).
        */
-      const onDefaultDiagram = spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, {
-        diagram: DIAGRAM_ID,
+      const onDefaultMap = spaceResource(SECOND_RESOURCE_ID, OTHER_SPACE_ID, {
+        map: MAP_ID,
         graph: GRAPH_ID,
       });
-      const onDefaultDiagramAtAnotherGraph = spaceThing(LINK_THING_ID, OTHER_SPACE_ID, {
-        diagram: DIAGRAM_ID,
+      const onDefaultMapAtAnotherGraph = spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, {
+        map: MAP_ID,
         graph: THIRD_GRAPH_ID,
       });
-      const onSecondDiagram = spaceThing(THIRD_SPACE_THING_ID, OTHER_SPACE_ID, {
-        diagram: SECOND_DIAGRAM_ID,
+      const onSecondMap = spaceResource(THIRD_SPACE_RESOURCE_ID, OTHER_SPACE_ID, {
+        map: SECOND_MAP_ID,
         graph: SECOND_GRAPH_ID,
       });
-      const onSecondDiagramAtAnotherGraph = spaceThing(FOURTH_SPACE_THING_ID, OTHER_SPACE_ID, {
-        diagram: SECOND_DIAGRAM_ID,
+      const onSecondMapAtAnotherGraph = spaceResource(FOURTH_SPACE_RESOURCE_ID, OTHER_SPACE_ID, {
+        map: SECOND_MAP_ID,
         graph: FOURTH_GRAPH_ID,
       });
       const linked = {
         ...meta,
-        things: [
-          ...meta.things,
-          onDefaultDiagram,
-          onDefaultDiagramAtAnotherGraph,
-          onSecondDiagram,
-          onSecondDiagramAtAnotherGraph,
+        resources: [
+          ...meta.resources,
+          onDefaultMap,
+          onDefaultMapAtAnotherGraph,
+          onSecondMap,
+          onSecondMapAtAnotherGraph,
         ],
       };
 
@@ -926,14 +930,14 @@ export const spaceRepositoryContract = (
       ).resolves.toMatchObject({ kind: 'committed' });
 
       /*
-       * The target changes the Diagram it opens on, and nothing else changes.
-       * That commit stands alone: no Thing reads its selection through the
-       * target's `defaultDiagram`, so moving the opening choice cannot invalidate
-       * a Thing that chose the Diagram it is leaving (ADR 0079).
+       * The target changes the Map it opens on, and nothing else changes.
+       * That commit stands alone: no Resource reads its selection through the
+       * target's `defaultMap`, so moving the opening choice cannot invalidate
+       * a Resource that chose the Map it is leaving (ADR 0079).
        */
       const retargetedDefault: SpaceSnapshot = {
         ...target,
-        document: { ...target.document, defaultDiagram: SECOND_DIAGRAM_ID },
+        document: { ...target.document, defaultMap: SECOND_MAP_ID },
       };
       await expect(commitUpdate(repository, retargetedDefault, 0n)).resolves.toEqual({
         kind: 'committed',
@@ -949,17 +953,17 @@ export const spaceRepositoryContract = (
         spaces: [stored(linked, 1n, null), stored(retargetedDefault, 1n, null)],
       });
       // Read back one at a time as well, and strictly: the whole-snapshot
-      // comparison above would accept a `diagram` the adapter had quietly
-      // rewritten to the target's new opening choice if every Thing agreed on
+      // comparison above would accept a `map` the adapter had quietly
+      // rewritten to the target's new opening choice if every Resource agreed on
       // it, and it would accept an extra key alongside.
-      const storedThings = aggregate.spaces[0]?.snapshot.things ?? [];
+      const storedResources = aggregate.spaces[0]?.snapshot.resources ?? [];
       for (const authored of [
-        onDefaultDiagram,
-        onDefaultDiagramAtAnotherGraph,
-        onSecondDiagram,
-        onSecondDiagramAtAnotherGraph,
+        onDefaultMap,
+        onDefaultMapAtAnotherGraph,
+        onSecondMap,
+        onSecondMapAtAnotherGraph,
       ]) {
-        expect(storedThings.find(({ id }) => id === authored.id)?.document).toStrictEqual(
+        expect(storedResources.find(({ id }) => id === authored.id)?.document).toStrictEqual(
           authored.document,
         );
       }
@@ -968,9 +972,9 @@ export const spaceRepositoryContract = (
 
   it(`${name} reports every conflict and rolls back every refused aggregate`, async () => {
     await withHarness(async (repository) => {
-      const meta = space(SPACE_ID, 'Meta', [THING_ID]);
+      const meta = space(SPACE_ID, 'Meta', [RESOURCE_ID]);
       await seed(repository, meta);
-      const orphan = space(OTHER_SPACE_ID, 'Orphan', [OTHER_THING_ID]);
+      const orphan = space(OTHER_SPACE_ID, 'Orphan', [OTHER_RESOURCE_ID]);
 
       await expect(
         repository.commit({
@@ -1004,7 +1008,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} answers a stale expected revision with the current aggregate`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       const committed = retitled(first, 'Committed');
       await commitUpdate(repository, committed, 0n);
@@ -1019,9 +1023,9 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a commit that fails domain intake and stores nothing`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
-      const dangling = spaceWithDanglingEdge(SPACE_ID, 'One', THING_ID);
+      const dangling = spaceWithDanglingEdge(SPACE_ID, 'One', RESOURCE_ID);
 
       await expect(commitUpdate(repository, dangling, 0n)).resolves.toMatchObject({
         kind: 'aggregate-refused',
@@ -1044,7 +1048,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a commit whose Space id differs from its snapshot id`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
 
       await expect(
@@ -1065,12 +1069,12 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses an update whose snapshot names another stored Space at a matching revision`, async () => {
     await withHarness(async (repository) => {
-      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
+      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_RESOURCE_ID]);
       const linkedMeta: SpaceSnapshot = {
-        ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [
-          thing(THING_ID, 'Meta thing'),
-          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ...space(SPACE_ID, 'Meta', [RESOURCE_ID]),
+        resources: [
+          resource(RESOURCE_ID, 'Meta resource'),
+          spaceResource(SECOND_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       await seed(repository, linkedMeta, target);
@@ -1097,16 +1101,16 @@ export const spaceRepositoryContract = (
 
   it(`${name} places a single update's failed intake at its Space's position in the aggregate`, async () => {
     await withHarness(async (repository) => {
-      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);
+      const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_RESOURCE_ID]);
       const linkedMeta: SpaceSnapshot = {
-        ...space(SPACE_ID, 'Meta', [THING_ID]),
-        things: [
-          thing(THING_ID, 'Meta thing'),
-          spaceThing(SECOND_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        ...space(SPACE_ID, 'Meta', [RESOURCE_ID]),
+        resources: [
+          resource(RESOURCE_ID, 'Meta resource'),
+          spaceResource(SECOND_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       await seed(repository, linkedMeta, target);
-      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Target', OTHER_THING_ID);
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Target', OTHER_RESOURCE_ID);
 
       // The refusal the complete-aggregate decision gives: the Target is the
       // second stored Space by id, so its snapshot is refused at index 1 rather
@@ -1130,7 +1134,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} refuses a commit that names one Space more than once`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
 
       await expect(
@@ -1155,21 +1159,21 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses a commit claiming a Thing another Space owns`, async () => {
+  it(`${name} refuses a commit claiming a Resource another Space owns`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
-      const other = targetSpace(OTHER_SPACE_ID, 'Other', [OTHER_THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+      const other = targetSpace(OTHER_SPACE_ID, 'Other', [OTHER_RESOURCE_ID]);
       const linked = {
         ...first,
-        things: [
-          ...first.things,
-          spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+        resources: [
+          ...first.resources,
+          spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
         ],
       };
       await seed(repository, linked, other);
       const claiming: SpaceSnapshot = {
         ...retitled(other, 'Must roll back'),
-        things: [...other.things, thing(THING_ID, 'Claimed')],
+        resources: [...other.resources, resource(RESOURCE_ID, 'Claimed')],
       };
 
       await expect(commitUpdate(repository, claiming, 0n)).resolves.toMatchObject({
@@ -1180,11 +1184,11 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} keeps the Things a commit names and drops the ones it omits`, async () => {
+  it(`${name} keeps the Resources a commit names and drops the ones it omits`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID, SECOND_THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID, SECOND_RESOURCE_ID]);
       await seed(repository, first);
-      const narrowed: SpaceSnapshot = { ...first, things: [thing(THING_ID, 'Kept')] };
+      const narrowed: SpaceSnapshot = { ...first, resources: [resource(RESOURCE_ID, 'Kept')] };
 
       await expect(commitUpdate(repository, narrowed, 0n)).resolves.toMatchObject({
         kind: 'committed',
@@ -1193,11 +1197,11 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} drops every Thing when a commit omits them all`, async () => {
+  it(`${name} drops every Resource when a commit omits them all`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID, SECOND_THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID, SECOND_RESOURCE_ID]);
       await seed(repository, first);
-      const empty: SpaceSnapshot = { ...first, things: [] };
+      const empty: SpaceSnapshot = { ...first, resources: [] };
 
       await expect(commitUpdate(repository, empty, 0n)).resolves.toMatchObject({
         kind: 'committed',
@@ -1207,7 +1211,7 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * `loadSpaceAggregate` orders the PostgreSQL aggregate's things by id, on the
+   * `loadSpaceAggregate` orders the PostgreSQL aggregate's resources by id, on the
    * read inside an import transaction and on the one outside it alike, so
    * ascending id order is what every read path answers with — and the
    * whole-snapshot `toEqual` comparisons throughout this suite are
@@ -1217,10 +1221,18 @@ export const spaceRepositoryContract = (
    * the aggregate an initialization answers with, and the Space loaded after a
    * commit.
    */
-  it(`${name} returns a Space's Things in ascending id order however they were supplied`, async () => {
+  it(`${name} returns a Space's Resources in ascending id order however they were supplied`, async () => {
     await withHarness(async (repository) => {
-      const descending = space(SPACE_ID, 'Unordered', [OTHER_THING_ID, SECOND_THING_ID, THING_ID]);
-      const ascending = space(SPACE_ID, 'Unordered', [THING_ID, SECOND_THING_ID, OTHER_THING_ID]);
+      const descending = space(SPACE_ID, 'Unordered', [
+        OTHER_RESOURCE_ID,
+        SECOND_RESOURCE_ID,
+        RESOURCE_ID,
+      ]);
+      const ascending = space(SPACE_ID, 'Unordered', [
+        RESOURCE_ID,
+        SECOND_RESOURCE_ID,
+        OTHER_RESOURCE_ID,
+      ]);
 
       await expect(
         repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [descending] }),
@@ -1239,7 +1251,7 @@ export const spaceRepositoryContract = (
 
   it(`${name} records an exported revision and carries it across later commits`, async () => {
     await withHarness(async (repository) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
 
       await repository.markExported(SPACE_ID, 0n);
@@ -1260,7 +1272,7 @@ export const spaceRepositoryContract = (
   // boundary…", "commits and reloads revisions above…").
   it(`${name} stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       const aboveSafe = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
       await writeRawRevision({ spaceId: SPACE_ID, revision: aboveSafe.toString() });
@@ -1290,7 +1302,7 @@ export const spaceRepositoryContract = (
   // it was — "refused rather than stored".
   it(`${name} refuses to store a revision above the 2^63-1 ceiling`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: REVISION_CEILING.toString() });
 
@@ -1309,7 +1321,7 @@ export const spaceRepositoryContract = (
   // this one), and an aggregate read of it raises the same identity.
   it(`${name} raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: (REVISION_CEILING + 1n).toString() });
 
@@ -1325,7 +1337,7 @@ export const spaceRepositoryContract = (
   // escaping the commit unclassified.
   it(`${name} raises an identifiable invariant failure for a commit whose fast-path candidate has a non-canonical stored revision`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
-      const first = space(SPACE_ID, 'One', [THING_ID]);
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
 

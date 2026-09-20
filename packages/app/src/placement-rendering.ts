@@ -22,14 +22,14 @@ function toError(reason: unknown): Error {
 }
 
 /**
- * Resolve a Diagram's positioned strategy over its own placement.
+ * Resolve a Map's positioned strategy over its own placement.
  *
- * `placement` is the one source of geometry — the selected Diagram's own
+ * `placement` is the one source of geometry — the selected Map's own
  * positions, or a resize draft's rect layered over them — and the positioned
  * strategy is built from it here rather than taken as a second argument: a
  * caller that also built one from the same placement could only agree with
  * this or be stale. Keyed on `placement`'s identity, which every caller
- * memoises on the selected Diagram, so an ordinary drag frame — which moves
+ * memoises on the selected Map, so an ordinary drag frame — which moves
  * nothing in the working snapshot until it settles — does not rebuild the
  * strategy and does not re-run layout.
  */

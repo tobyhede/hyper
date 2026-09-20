@@ -1,8 +1,8 @@
-import type { ThingId, SpaceSnapshot } from '@project/core';
+import type { ResourceId, SpaceSnapshot } from '@project/core';
 import { resolveProductDestinationInSnapshot, type ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
-import { resolveDiagram } from './diagram-resolution';
+import { resolveMap } from './map-resolution';
 import { openingGraphId, type NavigationAddress } from './navigation';
 
 export type DestinationRestoration =
@@ -58,29 +58,29 @@ export interface DestinationSyncInput {
 }
 
 /**
- * The complete position a browser location shows: the address, plus the Thing
+ * The complete position a browser location shows: the address, plus the Resource
  * the location addresses within it.
  *
  * It **extends** the address rather than restating its three fields, and the
- * Thing arrives inside it rather than beside it. Both were separate once and
+ * Resource arrives inside it rather than beside it. Both were separate once and
  * both carry the same risk: a caller could hand `destinationSync` an address
- * already carrying a Thing and a second Thing argument that disagreed with it,
+ * already carrying a Resource and a second Resource argument that disagreed with it,
  * and structural typing had nothing to say — the spread that built the position
  * silently preferred the loose one while the `synced` comparison had seen the
  * other. One value cannot disagree with itself.
  *
- * The addressed Thing is `app`'s and not Navigation's (ADR 0081): it is read
+ * The addressed Resource is `app`'s and not Navigation's (ADR 0081): it is read
  * from a URL and never written back, so it belongs to the position the browser
  * is showing without belonging to the address that decides push from replace.
  */
 export interface AddressedPosition extends NavigationAddress {
-  readonly addressedThingId: ThingId | null;
+  readonly addressedResourceId: ResourceId | null;
 }
 
 const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean =>
-  one.selectedDiagramId === other.selectedDiagramId &&
+  one.selectedMapId === other.selectedMapId &&
   one.activeGraphId === other.activeGraphId &&
-  one.presentingThingId === other.presentingThingId;
+  one.presentingResourceId === other.presentingResourceId;
 
 /**
  * Whether two positions are the same one.
@@ -90,46 +90,46 @@ const sameAddress = (one: NavigationAddress, other: NavigationAddress): boolean 
  * invocation of the same effect, from writing history at all.
  */
 export const samePosition = (one: AddressedPosition, other: AddressedPosition): boolean =>
-  sameAddress(one, other) && one.addressedThingId === other.addressedThingId;
+  sameAddress(one, other) && one.addressedResourceId === other.addressedResourceId;
 
 /**
  * The position an opening puts the application in, decided the way
  * `installDestinationOpening` decides it.
  *
  * A location that names no Graph does not leave the Active Graph unknown: it
- * opens whatever its Diagram opens on, which is Navigation's own
+ * opens whatever its Map opens on, which is Navigation's own
  * {@link openingGraphId} rather than a second answer written here.
  */
 function openingPosition(space: Space, opening: DestinationOpening): AddressedPosition {
   return {
-    selectedDiagramId: opening.selection,
-    activeGraphId: opening.graphId ?? openingGraphId(resolveDiagram(space, opening.selection)),
-    presentingThingId: opening.presentationThingId,
-    addressedThingId: opening.thingId,
+    selectedMapId: opening.selection,
+    activeGraphId: opening.graphId ?? openingGraphId(resolveMap(space, opening.selection)),
+    presentingResourceId: opening.presentationResourceId,
+    addressedResourceId: opening.resourceId,
   };
 }
 
 /**
  * The destination that names a position, no more specifically than it has to.
  *
- * Three kinds are writable and a Thing destination is not one of them, in either
- * spelling. A Thing address is something the application *arrives at* — read off
- * a location and held in `addressedThingId` until a choice clears it — and never
+ * Three kinds are writable and a Resource destination is not one of them, in either
+ * spelling. A Resource address is something the application *arrives at* — read off
+ * a location and held in `addressedResourceId` until a choice clears it — and never
  * something it moves to, so writing one would answer a URL no operation asked
  * for: the canonical spelling silently narrowed into its contextual form, the
- * Active Graph dropped out of the address it names nothing of, and, for a Thing
- * the Diagram omits, a location this Space's own resolver refuses. The Thing
- * still decides {@link samePosition}, which is how a restored Thing location is
+ * Active Graph dropped out of the address it names nothing of, and, for a Resource
+ * the Map omits, a location this Space's own resolver refuses. The Resource
+ * still decides {@link samePosition}, which is how a restored Resource location is
  * recognised as already open.
  *
  * Two rules decide whether the URL names the Active Graph. It must, when the
- * Diagram would open on some other Graph — a Diagram URL that reopens a
+ * Map would open on some other Graph — a Map URL that reopens a
  * different Graph does not name this position at all. It also keeps naming one
- * the location already named in this same Diagram: leaving a presentation
+ * the location already named in this same Map: leaving a presentation
  * returns to the Graph the presentation URL spelled out, and widening it to the
- * bare Diagram would throw away specificity the reader is holding. That
- * second rule is the surviving half of `adoptedDiagramDestination` — do not
- * widen a URL that already names something inside this Diagram.
+ * bare Map would throw away specificity the reader is holding. That
+ * second rule is the surviving half of `adoptedMapDestination` — do not
+ * widen a URL that already names something inside this Map.
  */
 function positionDestination(
   space: Space,
@@ -137,30 +137,30 @@ function positionDestination(
   opening: DestinationOpening | null,
 ): ProductDestination {
   const spaceId = space.id;
-  const { selectedDiagramId, activeGraphId, presentingThingId } = position;
-  if (presentingThingId !== null && activeGraphId !== null) {
+  const { selectedMapId, activeGraphId, presentingResourceId } = position;
+  if (presentingResourceId !== null && activeGraphId !== null) {
     return {
       kind: 'presentation',
       spaceId,
-      diagramId: selectedDiagramId,
+      mapId: selectedMapId,
       graphId: activeGraphId,
-      thingId: presentingThingId,
+      resourceId: presentingResourceId,
     };
   }
   const namesGraph =
-    opening !== null && opening.selection === selectedDiagramId && opening.graphId !== null;
+    opening !== null && opening.selection === selectedMapId && opening.graphId !== null;
   if (
     activeGraphId !== null &&
-    (namesGraph || activeGraphId !== openingGraphId(resolveDiagram(space, selectedDiagramId)))
+    (namesGraph || activeGraphId !== openingGraphId(resolveMap(space, selectedMapId)))
   ) {
     return {
-      kind: 'diagram-graph',
+      kind: 'map-graph',
       spaceId,
-      diagramId: selectedDiagramId,
+      mapId: selectedMapId,
       graphId: activeGraphId,
     };
   }
-  return { kind: 'diagram', spaceId, diagramId: selectedDiagramId };
+  return { kind: 'map', spaceId, mapId: selectedMapId };
 }
 
 /**

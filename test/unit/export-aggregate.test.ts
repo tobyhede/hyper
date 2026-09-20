@@ -9,12 +9,12 @@ import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
-const THING_B = uuidSchema.parse('a0000000-0000-4000-8000-000000000011');
-const THING_E = uuidSchema.parse('a0000000-0000-4000-8000-000000000012');
-const THING_F = uuidSchema.parse('a0000000-0000-4000-8000-000000000013');
-const SPINE_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000020');
-const ECHO_DIAGRAM_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021');
+const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
+const RESOURCE_B = uuidSchema.parse('a0000000-0000-4000-8000-000000000011');
+const RESOURCE_E = uuidSchema.parse('a0000000-0000-4000-8000-000000000012');
+const RESOURCE_F = uuidSchema.parse('a0000000-0000-4000-8000-000000000013');
+const SPINE_MAP_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000020');
+const ECHO_MAP_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000021');
 const LONG_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000030');
 const SHORT_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000031');
 const ECHO_GRAPH_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000032');
@@ -27,14 +27,14 @@ const UPPER_CASE_NAME = 'B0000000-0000-4000-8000-0000000000FF';
 /**
  * What one Space's bytes look like is this file's whole subject, so every
  * aggregate below holds exactly one Space and that Space is Meta. The aggregate
- * shapes — the aggregate file, several Space directories, converging Space Things —
+ * shapes — the aggregate file, several Space directories, converging Space Resources —
  * belong to `aggregate-round-trip.test.ts`, which owns the round trip; a second
  * Space here would only make the canonical form harder to read off the page.
  *
- * Two Diagrams owning three Graphs between them, which is the only shape that
+ * Two Maps owning three Graphs between them, which is the only shape that
  * exercises what version 1 moved: a Graph reached through its owner rather than
- * through a Space-level array. The second Diagram's Graph shares no Thing with the
- * first, so each owned Edge is closed over its own Diagram's position keys.
+ * through a Space-level array. The second Map's Graph shares no Resource with the
+ * first, so each owned Edge is closed over its own Map's position keys.
  *
  * Deliberately supplied *unsorted* — positions in descending key order, Graphs
  * in an order no sort would produce — so the canonical form's two different
@@ -47,43 +47,45 @@ const storedSpace: LoadedSpace = {
     document: {
       version: 1,
       title: 'Stored talk',
-      diagrams: [
+      maps: [
         {
-          id: SPINE_DIAGRAM_ID,
+          id: SPINE_MAP_ID,
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [THING_B]: { x: 260, y: 0, open: false },
-            [THING_A]: { x: 0, y: 0, open: false },
+            [RESOURCE_B]: { x: 260, y: 0, open: false },
+            [RESOURCE_A]: { x: 0, y: 0, open: false },
           },
           graphs: [
             {
               id: SHORT_GRAPH_ID,
               title: 'Short',
               color: '#22aa88',
-              edges: [{ from: THING_B, to: THING_A }],
+              edges: [{ from: RESOURCE_B, to: RESOURCE_A }],
             },
-            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] },
+            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
           ],
           activeGraph: LONG_GRAPH_ID,
         },
         {
-          id: ECHO_DIAGRAM_ID,
+          id: ECHO_MAP_ID,
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [THING_E]: { x: 0, y: 200, open: false },
-            [THING_F]: { x: 260, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, open: false },
+            [RESOURCE_F]: { x: 260, y: 200, open: false },
           },
-          graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: THING_E, to: THING_F }] }],
+          graphs: [
+            { id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: RESOURCE_E, to: RESOURCE_F }] },
+          ],
         },
       ],
     },
-    things: [
-      { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
-      { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-      { id: THING_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      { id: THING_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
+    resources: [
+      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
+      { id: RESOURCE_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
+      { id: RESOURCE_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
     ],
   },
   revision: 7n,
@@ -119,7 +121,7 @@ afterEach(async () => {
 });
 
 describe('canonical export', () => {
-  it('emits a version 1 space file whose Graphs are nested under the Diagrams that own them', async () => {
+  it('emits a version 1 space file whose Graphs are nested under the Maps that own them', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
@@ -130,35 +132,37 @@ describe('canonical export', () => {
       version: 1,
       id: SPACE_ID,
       title: 'Stored talk',
-      diagrams: [
+      maps: [
         {
-          id: SPINE_DIAGRAM_ID,
+          id: SPINE_MAP_ID,
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [THING_A]: { x: 0, y: 0, open: false },
-            [THING_B]: { x: 260, y: 0, open: false },
+            [RESOURCE_A]: { x: 0, y: 0, open: false },
+            [RESOURCE_B]: { x: 260, y: 0, open: false },
           },
           graphs: [
             {
               id: SHORT_GRAPH_ID,
               title: 'Short',
               color: '#22aa88',
-              edges: [{ from: THING_B, to: THING_A }],
+              edges: [{ from: RESOURCE_B, to: RESOURCE_A }],
             },
-            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] },
+            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
           ],
           activeGraph: LONG_GRAPH_ID,
         },
         {
-          id: ECHO_DIAGRAM_ID,
+          id: ECHO_MAP_ID,
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [THING_E]: { x: 0, y: 200, open: false },
-            [THING_F]: { x: 260, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, open: false },
+            [RESOURCE_F]: { x: 260, y: 200, open: false },
           },
-          graphs: [{ id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: THING_E, to: THING_F }] }],
+          graphs: [
+            { id: ECHO_GRAPH_ID, title: 'Echo', edges: [{ from: RESOURCE_E, to: RESOURCE_F }] },
+          ],
         },
       ],
     });
@@ -176,51 +180,53 @@ describe('canonical export', () => {
    * alone, whatever ordering the exporter does or does not impose.
    *
    * So every object below is permuted against `storedSpace`: the document's
-   * keys, each diagram's, each graph's, each edge's, the position map's, each
-   * *point's*, and the thing array's. Only the exporter rebuilding all of them
+   * keys, each map's, each graph's, each edge's, the position map's, each
+   * *point's*, and the resource array's. Only the exporter rebuilding all of them
    * makes the two agree.
    */
   const shuffledStoredSpace: LoadedSpace = {
     revision: 7n,
     exportedRevision: null,
     snapshot: {
-      things: [
-        { id: THING_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
-        { id: THING_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
-        { id: THING_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
-        { id: THING_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
+      resources: [
+        { id: RESOURCE_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
+        { id: RESOURCE_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
+        { id: RESOURCE_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
+        { id: RESOURCE_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
       ],
       id: SPACE_ID,
       document: {
         title: 'Stored talk',
-        diagrams: [
+        maps: [
           {
             kind: 'positioned',
             activeGraph: LONG_GRAPH_ID,
             graphs: [
               {
                 color: '#22aa88',
-                edges: [{ to: THING_A, from: THING_B }],
+                edges: [{ to: RESOURCE_A, from: RESOURCE_B }],
                 title: 'Short',
                 id: SHORT_GRAPH_ID,
               },
-              { edges: [{ to: THING_B, from: THING_A }], id: LONG_GRAPH_ID, title: 'Long' },
+              { edges: [{ to: RESOURCE_B, from: RESOURCE_A }], id: LONG_GRAPH_ID, title: 'Long' },
             ],
             title: 'Spine',
             positions: {
-              [THING_A]: { y: 0, x: 0, open: false },
-              [THING_B]: { y: 0, x: 260, open: false },
+              [RESOURCE_A]: { y: 0, x: 0, open: false },
+              [RESOURCE_B]: { y: 0, x: 260, open: false },
             },
-            id: SPINE_DIAGRAM_ID,
+            id: SPINE_MAP_ID,
           },
           {
             title: 'Echo',
             positions: {
-              [THING_F]: { y: 200, x: 260, open: false },
-              [THING_E]: { y: 200, x: 0, open: false },
+              [RESOURCE_F]: { y: 200, x: 260, open: false },
+              [RESOURCE_E]: { y: 200, x: 0, open: false },
             },
-            graphs: [{ title: 'Echo', edges: [{ to: THING_F, from: THING_E }], id: ECHO_GRAPH_ID }],
-            id: ECHO_DIAGRAM_ID,
+            graphs: [
+              { title: 'Echo', edges: [{ to: RESOURCE_F, from: RESOURCE_E }], id: ECHO_GRAPH_ID },
+            ],
+            id: ECHO_MAP_ID,
             kind: 'positioned',
           },
         ],
@@ -239,16 +245,18 @@ describe('canonical export', () => {
     await expect(readFile(spaceFileIn(first), 'utf8')).resolves.toBe(
       await readFile(spaceFileIn(second), 'utf8'),
     );
-    for (const thingId of [THING_A, THING_B, THING_E, THING_F]) {
+    for (const resourceId of [RESOURCE_A, RESOURCE_B, RESOURCE_E, RESOURCE_F]) {
       await expect(
-        readFile(join(first, SPACE_ID, 'things', `${thingId}.md`), 'utf8'),
-      ).resolves.toBe(await readFile(join(second, SPACE_ID, 'things', `${thingId}.md`), 'utf8'));
+        readFile(join(first, SPACE_ID, 'resources', `${resourceId}.md`), 'utf8'),
+      ).resolves.toBe(
+        await readFile(join(second, SPACE_ID, 'resources', `${resourceId}.md`), 'utf8'),
+      );
     }
   });
 
   /**
    * Both arms of the placement union carrying a remembered Open Size (ADR 0066)
-   * — an Open Thing, and a Closed one that kept its rect for the next Open — each
+   * — an Open Resource, and a Closed one that kept its rect for the next Open — each
    * stored *height first*, which is an order `jsonb` is free to hand back.
    */
   const storedSpaceWithOpenSizes: LoadedSpace = {
@@ -257,22 +265,24 @@ describe('canonical export', () => {
       document: {
         version: 1,
         title: 'Stored talk',
-        diagrams: [
+        maps: [
           {
-            id: SPINE_DIAGRAM_ID,
+            id: SPINE_MAP_ID,
             title: 'Spine',
             kind: 'positioned',
             positions: {
-              [THING_A]: { x: 0, y: 0, open: true, openSize: { height: 420, width: 560 } },
-              [THING_B]: { x: 260, y: 0, open: false, openSize: { height: 300, width: 400 } },
+              [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { height: 420, width: 560 } },
+              [RESOURCE_B]: { x: 260, y: 0, open: false, openSize: { height: 300, width: 400 } },
             },
-            graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] }],
+            graphs: [
+              { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
+            ],
           },
         ],
       },
-      things: [
-        { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-        { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      resources: [
+        { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
+        { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
       ],
     },
     revision: 7n,
@@ -282,7 +292,7 @@ describe('canonical export', () => {
   /**
    * The keys of every exported `openSize`, in the order the bytes hold them.
    * Read off the text rather than a parsed value: re-parsing through the schema
-   * would impose the schema's own key order and hide the thing under test.
+   * would impose the schema's own key order and hide the resource under test.
    */
   const exportedOpenSizeKeys = (json: string): string[][] =>
     [...json.matchAll(/"openSize": \{([^}]*)\}/g)].map((openSize) =>
@@ -296,8 +306,8 @@ describe('canonical export', () => {
     await exportTo(repository, destination);
 
     const written = await readFile(spaceFileIn(destination), 'utf8');
-    // Positions export sorted by Thing id, so the Open Thing's rect is first and
-    // the Closed Thing's remembered rect second.
+    // Positions export sorted by Resource id, so the Open Resource's rect is first and
+    // the Closed Resource's remembered rect second.
     expect(exportedOpenSizeKeys(written)).toEqual([
       ['width', 'height'],
       ['width', 'height'],
@@ -306,16 +316,18 @@ describe('canonical export', () => {
       version: 1,
       id: SPACE_ID,
       title: 'Stored talk',
-      diagrams: [
+      maps: [
         {
-          id: SPINE_DIAGRAM_ID,
+          id: SPINE_MAP_ID,
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [THING_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-            [THING_B]: { x: 260, y: 0, open: false, openSize: { width: 400, height: 300 } },
+            [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+            [RESOURCE_B]: { x: 260, y: 0, open: false, openSize: { width: 400, height: 300 } },
           },
-          graphs: [{ id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: THING_A, to: THING_B }] }],
+          graphs: [
+            { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
+          ],
         },
       ],
     });
@@ -404,7 +416,7 @@ describe('canonical export', () => {
    * the canonical bytes say something the stored aggregate did not.
    *
    * Which makes the identities inside the refusal the whole of its value — the
-   * operator has to find the Space or Thing the serializer mangled. Rendering
+   * operator has to find the Space or Resource the serializer mangled. Rendering
    * `error.kind` alone reduced that to one word, which is exactly the loss
    * `src/cli/aggregate-refusal.ts` was added in the same change to prevent.
    *
@@ -423,7 +435,7 @@ describe('canonical export', () => {
           spaces: [
             storedSpace,
             {
-              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, things: [] },
+              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, resources: [] },
               revision: 0n,
               exportedRevision: null,
             },

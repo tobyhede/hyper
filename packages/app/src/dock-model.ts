@@ -33,7 +33,7 @@ import type { ExitSpaceResult } from './open-spaces';
  * spends them — the Open Spaces menu draws what that answers. They stay in
  * `@project/ui` rather than moving here because a second vocabulary for one
  * state is how a reader learns that "Save failed" and "Changes not saved" are
- * two different things, and that risk returns with the next surface that
+ * two different resources, and that risk returns with the next surface that
  * reports an unwell Space.
  *
  * **A total record and not a chain of `if`s**, which is the difference between
@@ -220,7 +220,7 @@ export type DockOrientation = 'horizontal' | 'vertical';
  * **A record, because a ternary answers for an edge it has never met.**
  *
  * `edge === 'left' || edge === 'right' ? 'vertical' : 'horizontal'` was the last
- * edge-keyed thing in the Dock that took a default. Deriving `DockEdge` from its
+ * edge-keyed resource in the Dock that took a default. Deriving `DockEdge` from its
  * tuple turned a fifth edge into compile errors at `EDGE_INSET`, `MENU_SIDE`,
  * `EDGE_LABEL`, `slotLabel` and `alongStyle` — every one a total record — while
  * this quietly called it horizontal, which is the one answer that then decides
@@ -267,7 +267,7 @@ export interface DockBox {
  * was no gesture that turned a top Dock into a left one near that corner. The
  * same asymmetry ran the other way for a vertical Dock near the top edge.
  *
- * The gap to an edge does not know how big the thing measuring it is, so both
+ * The gap to an edge does not know how big the resource measuring it is, so both
  * corners are reachable from either direction and the orientation follows the
  * direction the reader dragged from — which is what the two-ways-into-a-corner
  * claim always said and did not deliver. `dock-geometry.test.ts` is what holds
@@ -378,7 +378,7 @@ export interface OpenSpaceRow {
  * exited — still open, and not in the list that is the only way back to it.
  *
  * **Meta is the one exception to both rules**: it draws first at the root
- * whatever opened it, with what was Entered from it beneath. A Space Thing may
+ * whatever opened it, with what was Entered from it beneath. A Space Resource may
  * target Meta, so Meta can have an Opener, and hung by it Meta drew under that
  * Space where the menu promises it on top (`dock-open-tree.test.ts`).
  */

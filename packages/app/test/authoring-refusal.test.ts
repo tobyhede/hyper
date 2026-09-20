@@ -11,40 +11,40 @@ import {
 import type { AuthoringRefusal } from '../src/space-authoring';
 
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
-const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 /** One transport sentence, so any copy that leaked it is visible as a collision. */
 const WIRE = 'the transport said this';
 
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
-  'diagram-not-found': { code: 'diagram-not-found' },
-  'diagram-required': { code: 'diagram-required', operation: 'added-thing-to-diagram' },
-  'thing-not-found': { code: 'thing-not-found' },
-  'thing-kind-immutable': { code: 'thing-kind-immutable' },
+  'map-not-found': { code: 'map-not-found' },
+  'map-required': { code: 'map-required', operation: 'added-resource-to-map' },
+  'resource-not-found': { code: 'resource-not-found' },
+  'resource-kind-immutable': { code: 'resource-kind-immutable' },
   'reference-target-immutable': { code: 'reference-target-immutable' },
-  'space-thing-target-immutable': { code: 'space-thing-target-immutable' },
-  'thing-title-required': { code: 'thing-title-required' },
-  'diagram-title-required': { code: 'diagram-title-required' },
+  'space-resource-target-immutable': { code: 'space-resource-target-immutable' },
+  'resource-title-required': { code: 'resource-title-required' },
+  'map-title-required': { code: 'map-title-required' },
   'space-title-required': { code: 'space-title-required' },
   'reference-target-not-found': { code: 'reference-target-not-found', targetId: TARGET_ID },
   'reference-target-must-own-content': {
     code: 'reference-target-must-own-content',
     targetId: TARGET_ID,
   },
-  'thing-already-in-diagram': { code: 'thing-already-in-diagram' },
-  'thing-not-in-diagram': { code: 'thing-not-in-diagram' },
-  'thing-not-expanded': { code: 'thing-not-expanded' },
-  'thing-has-references': { code: 'thing-has-references', referenceTitles: ['Recap'] },
+  'resource-already-in-map': { code: 'resource-already-in-map' },
+  'resource-not-in-map': { code: 'resource-not-in-map' },
+  'resource-not-expanded': { code: 'resource-not-expanded' },
+  'resource-has-references': { code: 'resource-has-references', referenceTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
-  'diagram-must-keep-graph': { code: 'diagram-must-keep-graph' },
-  'space-must-keep-diagram': { code: 'space-must-keep-diagram' },
+  'map-must-keep-graph': { code: 'map-must-keep-graph' },
+  'space-must-keep-map': { code: 'space-must-keep-map' },
   'graph-not-owned': { code: 'graph-not-owned' },
   'edge-not-found': { code: 'edge-not-found' },
-  'edge-thing-outside-diagram': { code: 'edge-thing-outside-diagram' },
+  'edge-resource-outside-map': { code: 'edge-resource-outside-map' },
   'edge-already-exists': { code: 'edge-already-exists' },
-  'diagram-active-graph-required': { code: 'diagram-active-graph-required' },
-  'space-thing-deletion-unsupported': { code: 'space-thing-deletion-unsupported' },
+  'map-active-graph-required': { code: 'map-active-graph-required' },
+  'space-resource-deletion-unsupported': { code: 'space-resource-deletion-unsupported' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
 describe('describeAuthoringRefusal', () => {
@@ -52,9 +52,9 @@ describe('describeAuthoringRefusal', () => {
     expect(
       describeAuthoringRefusal({
         code: 'placement-failed',
-        error: new Error('No position for Thing A'),
+        error: new Error('No position for Resource A'),
       }),
-    ).toBe('This view could not place its Things: No position for Thing A');
+    ).toBe('This view could not place its Resources: No position for Resource A');
   });
 });
 
@@ -62,20 +62,20 @@ describe('describeAuthoringRefusal', () => {
  * The three Edge surfaces, and the one rule that separates their channels.
  *
  * A refusal a different endpoint or target could correct belongs on the field
- * that names it; a stale Diagram, Graph or Edge belongs on the form, because no
+ * that names it; a stale Map, Graph or Edge belongs on the form, because no
  * choice in the picker would answer it (ADR 0057).
  */
-const CORRECTABLE_BY_CHOOSING_ANOTHER_THING = [
-  'edge-thing-outside-diagram',
+const CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE = [
+  'edge-resource-outside-map',
   'edge-already-exists',
 ] as const;
 
 /** The same list, widened once so the loops below can ask it about any code. */
-const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_THING);
+const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE);
 
 describe('presentEdgeEndpointRefusal', () => {
   it.each(['from', 'to'] as const)('marks only the attempted %s Field invalid', (endpoint) => {
-    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_THING) {
+    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE) {
       const refusal = EVERY_REFUSAL[code];
       expect(presentEdgeEndpointRefusal(refusal, endpoint)).toEqual({
         fields: { [endpoint]: describeAuthoringRefusal(refusal) },
@@ -163,7 +163,7 @@ describe('describePersistenceFailure', () => {
    *
    * What it must not do is misdescribe the limit or the recovery. `MAX_COMMIT_
    * BODY_BYTES` is checked over the whole serialised snapshot, so a Space can
-   * exceed it on Thing *count* with no long Thing anywhere — and the rejection
+   * exceed it on Resource *count* with no long Resource anywhere — and the rejection
    * dialog offers only Continue editing, since `PersistenceNotice`, which owns
    * Retry, draws nothing for `rejected`.
    */
@@ -178,8 +178,8 @@ describe('describePersistenceFailure', () => {
     expect(description).not.toBe(
       'The application and the server disagree about how changes are saved.',
     );
-    // Not one Thing: the limit is on the whole change.
-    expect(description).not.toMatch(/\ba (long )?thing\b/i);
+    // Not one Resource: the limit is on the whole change.
+    expect(description).not.toMatch(/\ba (long )?resource\b/i);
     // Not a retry: this dialog has no such control.
     expect(description).not.toMatch(/try again|retry/i);
   });
@@ -225,9 +225,9 @@ describe('describeStoredSpaceRefusal', () => {
    */
   it('caps how many references it recites and says how many it left out', () => {
     const errors = Array.from({ length: 7 }, (_, index) => ({
-      kind: 'graph-edge-missing-thing' as const,
+      kind: 'graph-edge-missing-resource' as const,
       ref: `00000000-0000-4000-8000-00000000000${index}`,
-      message: 'graph edge references unknown thing',
+      message: 'graph edge references unknown resource',
     }));
 
     const description = describeStoredSpaceRefusal({ code: 'stored-space-invalid', errors });
@@ -242,15 +242,15 @@ describe('describeStoredSpaceRefusal', () => {
       code: 'stored-space-invalid',
       errors: [
         {
-          kind: 'graph-edge-missing-thing',
-          ref: MISSING_THING_ID,
-          message: 'graph edge references unknown thing',
+          kind: 'graph-edge-missing-resource',
+          ref: MISSING_RESOURCE_ID,
+          message: 'graph edge references unknown resource',
         },
       ],
     });
 
     expect(description).toContain('The remote space is invalid and was not accepted');
-    expect(description).toContain(MISSING_THING_ID);
-    expect(description).not.toContain('graph edge references unknown thing');
+    expect(description).toContain(MISSING_RESOURCE_ID);
+    expect(description).not.toContain('graph edge references unknown resource');
   });
 });

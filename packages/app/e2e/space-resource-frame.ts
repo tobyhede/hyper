@@ -1,0 +1,243 @@
+import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
+import { expect, type Locator, type Page } from '@playwright/test';
+import { boxOf } from './graph';
+
+/** Put the Space Resource into portal Edit so its embedded Map can be authored. */
+export async function beginPortalEdit(page: Page, resource: Locator): Promise<void> {
+  const id = await resource.getAttribute('data-id');
+  if (id === null) throw new Error('Resource placement id missing');
+  await resource.hover({ position: { x: 8, y: 80 } });
+  await page
+    .locator(`[data-resource-rail-for="${id}"]`)
+    .getByTestId('canvas-resource-actions')
+    .getByRole('button', { name: /^Edit Resource/ })
+    .click({ delay: 120 });
+}
+
+/** Wheel the portal camera from the containing Resource's left inset. */
+export async function zoomPortal(
+  page: Page,
+  resource: Locator,
+  ticks: number,
+  direction: 'in' | 'out',
+): Promise<void> {
+  const outer = await boxOf(resource, 'Open Space Resource');
+  const child = page.locator('.react-flow__node[data-id^="embedded:"]').first();
+  const before = await child.evaluate((node) =>
+    node instanceof HTMLElement ? node.style.transform : '',
+  );
+  await page.mouse.move(outer.x + 8, outer.y + outer.height / 2);
+  for (let i = 0; i < ticks; i += 1) {
+    await page.mouse.wheel(0, direction === 'in' ? -120 : 120);
+  }
+  await expect
+    .poll(async () =>
+      child.evaluate((node) => (node instanceof HTMLElement ? node.style.transform : '')),
+    )
+    .not.toBe(before);
+  await expect
+    .poll(async () => {
+      const first = await child.evaluate((node) =>
+        node instanceof HTMLElement ? node.style.transform : '',
+      );
+      await page.waitForTimeout(180);
+      const second = await child.evaluate((node) =>
+        node instanceof HTMLElement ? node.style.transform : '',
+      );
+      return first === second;
+    })
+    .toBe(true);
+}
+
+const flowPixelSize = (resource: Locator) =>
+  resource.evaluate((node) =>
+    node instanceof HTMLElement
+      ? { width: node.offsetWidth, height: node.offsetHeight }
+      : { width: 0, height: 0 },
+  );
+
+const paintedOutsideWindow = async (parent: Locator): Promise<boolean> => {
+  const parentId = await parent.getAttribute('data-id');
+  if (parentId === null) throw new Error('Space Resource placement id missing');
+  return parent.evaluate((node, id) => {
+    if (!(node instanceof HTMLElement)) return true;
+    const box = node.getBoundingClientRect();
+    const samples = [
+      { x: box.left - 16, y: box.top + box.height / 2 },
+      { x: box.right + 16, y: box.top + box.height / 2 },
+      { x: box.left + box.width / 2, y: box.top - 16 },
+      { x: box.left + box.width / 2, y: box.bottom + 16 },
+    ];
+    for (const sample of samples) {
+      if (
+        sample.x < 0 ||
+        sample.y < 0 ||
+        sample.x > window.innerWidth ||
+        sample.y > window.innerHeight
+      ) {
+        continue;
+      }
+      const hit = document.elementFromPoint(sample.x, sample.y);
+      const embedded = hit?.closest('.react-flow__node[data-id^="embedded:"]');
+      if (
+        embedded instanceof HTMLElement &&
+        embedded.dataset['id']?.startsWith(`embedded:${id}:`)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, parentId);
+};
+
+/**
+ * Portal Edit frames authored coordinates. A Resource's box stays Closed Size, and
+ * a Resource that leaves the window does not paint on the containing canvas.
+ */
+export async function exercisePortalEditHostCanvas(
+  page: Page,
+  parent: Locator,
+  child: Locator,
+): Promise<void> {
+  await beginPortalEdit(page, parent);
+  const before = await flowPixelSize(child);
+  expect(before).toEqual(COLLAPSED_RESOURCE_SIZE);
+  expect(await paintedOutsideWindow(parent)).toBe(false);
+
+  await zoomPortal(page, parent, 6, 'in');
+  expect(await flowPixelSize(child)).toEqual(before);
+  expect(await paintedOutsideWindow(parent)).toBe(false);
+
+  await zoomPortal(page, parent, 16, 'in');
+  expect(await paintedOutsideWindow(parent)).toBe(false);
+  await zoomPortal(page, parent, 22, 'out');
+  expect(await paintedOutsideWindow(parent)).toBe(false);
+  expect(await flowPixelSize(child)).toEqual(before);
+}
+
+/** Measure the visible embedding through the browser, independent of projection constants. */
+export async function exerciseSpaceResourcePadding(page: Page, parent: Locator, child: Locator) {
+  await beginPortalEdit(page, parent);
+  const outer = await boxOf(parent, 'Space Resource');
+  const inner = await boxOf(child, 'embedded Resource');
+  // Derive canvas scale from the containing Resource, not from its projected bounds.
+  const zoom = await parent.evaluate((node) =>
+    node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
+  );
+  expect((inner.x - outer.x) / zoom).toBeCloseTo(16, 0);
+  expect((inner.y - outer.y) / zoom).toBeCloseTo(16, 0);
+  await page.mouse.move(inner.x + 40 * zoom, inner.y + 12 * zoom);
+  await page.mouse.down();
+  await page.mouse.move(outer.x - 20 * zoom, outer.y - 20 * zoom, { steps: 12 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const moved = await boxOf(child, 'embedded Resource at the top left');
+      return [Math.round((moved.x - outer.x) / zoom), Math.round((moved.y - outer.y) / zoom)];
+    })
+    .toEqual([16, 16]);
+  // Drag to the right edge. The visible portion ends at the same inset.
+  const at = await boxOf(child, 'embedded Resource');
+  await page.mouse.move(at.x + 40 * zoom, at.y + 12 * zoom);
+  await page.mouse.down();
+  await page.mouse.move(outer.x + outer.width - 20 * zoom, at.y + 110 * zoom, { steps: 16 });
+  await page.mouse.up();
+  const moved = await boxOf(child, 'embedded Resource at the right edge');
+  const belongsToChild = (x: number) =>
+    child.evaluate((node, point) => node.contains(document.elementFromPoint(point.x, point.y)), {
+      x,
+      y: moved.y + 12 * zoom,
+    });
+  expect(await belongsToChild(outer.x + outer.width - 18 * zoom)).toBe(true);
+  expect(await belongsToChild(outer.x + outer.width - 14 * zoom)).toBe(false);
+}
+
+export async function exerciseSpaceResourceFooter(page: Page, placement: Locator, child: Locator) {
+  const id = await placement.getAttribute('data-id');
+  const parent = page.locator(`.react-flow__node[data-id="${id}"]`);
+  const footer = parent.locator('.canvas-resource__body');
+  const zoom = await parent.evaluate((node) =>
+    node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
+  );
+  const single = await boxOf(footer, 'single-line title footer');
+  expect(single.height / zoom).toBeLessThan(50);
+  await parent.getByRole('button', { name: /^Edit Title / }).click();
+  const editor = parent.getByRole('textbox');
+  await editor.fill('Architecture\nA second title line\nA third title line');
+  await editor.press('ControlOrMeta+Enter');
+  await expect(parent.getByRole('heading', { name: /Architecture/ })).toBeVisible();
+  const multiple = await boxOf(footer, 'multiline title footer');
+  expect(multiple.height).toBeGreaterThan(single.height + 15 * zoom);
+  expect(multiple.height / zoom).toBeLessThan(90);
+  const outer = await boxOf(parent, 'Space Resource');
+  const at = await boxOf(child, 'embedded Resource');
+  await beginPortalEdit(page, parent);
+  await page.mouse.move(at.x + 40 * zoom, at.y + 12 * zoom);
+  await page.mouse.down();
+  await page.mouse.move(outer.x + 60 * zoom, multiple.y + 30 * zoom, { steps: 16 });
+  await page.mouse.up();
+  // The visible Map reaches the actual footer; it no longer ends 100px up.
+  // React Flow may pan near the viewport edge during this drag.
+  const settledOuter = await boxOf(parent, 'Space Resource after dragging');
+  const settledFooter = await boxOf(footer, 'footer after dragging');
+  const x = settledOuter.x + 55 * zoom;
+  expect(
+    await child.evaluate((node, p) => node.contains(document.elementFromPoint(p.x, p.y)), {
+      x,
+      y: settledFooter.y - 2 * zoom,
+    }),
+  ).toBe(true);
+  expect(
+    await child.evaluate((node, p) => node.contains(document.elementFromPoint(p.x, p.y)), {
+      x,
+      y: settledFooter.y + 2 * zoom,
+    }),
+  ).toBe(false);
+}
+
+/**
+ * Edges the visible host Graph owns.
+ *
+ * Remapped embedded Edges are prefixed with the parent id. Every open Space
+ * stays mounted (`OpenSpacesApplication`), so an unscoped `.react-flow__edge`
+ * also hits the hidden target canvas.
+ */
+export async function hostGraphEdgeCount(page: Page, parent: Locator): Promise<number> {
+  const id = await parent.getAttribute('data-id');
+  if (id === null) throw new Error('Resource placement id missing');
+  return page.locator(`.react-flow:visible .react-flow__edge:not([data-id^="${id}:"])`).count();
+}
+
+/** Edges the Space Resource's shown Graph draws inside the window. */
+export async function embeddedGraphEdgeCount(page: Page, parent: Locator): Promise<number> {
+  const id = await parent.getAttribute('data-id');
+  if (id === null) throw new Error('Resource placement id missing');
+  return page.locator(`.react-flow:visible .react-flow__edge[data-id^="${id}:"]`).count();
+}
+
+export async function exerciseFloatingResourceDock(page: Page, parent: Locator) {
+  const name = await parent.getByRole('article').getAttribute('aria-label');
+  const dock = page.getByRole('toolbar', { name: `Resource ${name}`, exact: true });
+  await parent.hover({ position: { x: 8, y: 80 } });
+  const outer = await boxOf(parent, 'Space Resource');
+  const zoom = await parent.evaluate((node) =>
+    node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
+  );
+  const panel = await boxOf(dock, 'floating dock');
+  // The chrome's shadow is cast right and down and takes no room, so the right
+  // gap is measured past it. Read from the page, because a theme sets it.
+  const shadowOffset = await dock.evaluate((node) =>
+    Number.parseFloat(getComputedStyle(node).getPropertyValue('--shadow-chrome-elevated-offset')),
+  );
+  expect(shadowOffset).toBeGreaterThan(0);
+  expect((panel.y - outer.y) / zoom).toBeCloseTo(12, 0);
+  expect((outer.x + outer.width - panel.x - panel.width) / zoom).toBeCloseTo(12 + shadowOffset, 0);
+  await dock.getByRole('button', { name: /^Map:/ }).click({ delay: 120 });
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await dock.getByRole('button', { name: /^Actions for Resource/ }).click({ delay: 120 });
+  await expect(page.getByRole('menuitem', { name: 'Create Reference', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dock.locator('.resource-rail__kind')).toBeHidden();
+}

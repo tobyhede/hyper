@@ -24,7 +24,7 @@ import { cn } from '../lib/utils';
  * rather than an exclusive choice.
  *
  * **Neither half forwards a ref, deliberately.** `Toolbar` beside this one does,
- * because `CanvasThing` returns focus to a toolbar item and a generic function
+ * because `CanvasResource` returns focus to a toolbar item and a generic function
  * component under React 18 would advertise a ref and silently drop it. Nothing
  * reaches for a toggle that way, and the generic `forwardRef` that would keep
  * the type accurate needs a narrowing assertion to survive — which ADR 0062

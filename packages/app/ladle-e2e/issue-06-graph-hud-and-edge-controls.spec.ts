@@ -1,12 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import type { Diagram, Graph, SpaceSnapshot } from '@project/core';
+import type { Map, Graph, SpaceSnapshot } from '@project/core';
 import { authoredSnapshot, sparseAuthoredSnapshot } from '../stories/support/spaces';
 
 /**
  * The selected Edge's controls and the canvas HUD, on the rendered stories.
  *
  * Ladle proves the control semantics: what the two buttons do, that Edit and
- * nothing else opens the editor, that a refused Thing keeps its place disabled,
+ * nothing else opens the editor, that a refused Resource keeps its place disabled,
  * that each refusal lands on the channel ADR 0057 assigns it, and that Edit
  * reads as open while the editor is. The spatial half — these controls over
  * the real routed Edge, gated on selection and the Active Graph — is the
@@ -16,23 +16,22 @@ import { authoredSnapshot, sparseAuthoredSnapshot } from '../stories/support/spa
 const story = (name: string): string => `/?story=${name}&mode=preview`;
 
 /**
- * The Diagram a story's Space opens on, read the way the application reads it —
- * through `defaultDiagram`, never `diagrams[0]` (array order is not a
+ * The Map a story's Space opens on, read the way the application reads it —
+ * through `defaultMap`, never `maps[0]` (array order is not a
  * declaration). What the Graph HUD assertions below hold the rendered key to.
  */
-const openingDiagramOf = (snapshot: SpaceSnapshot): Diagram => {
-  const diagram = snapshot.document.diagrams?.find(
-    (candidate) => candidate.id === snapshot.document.defaultDiagram,
+const openingMapOf = (snapshot: SpaceSnapshot): Map => {
+  const map = snapshot.document.maps?.find(
+    (candidate) => candidate.id === snapshot.document.defaultMap,
   );
-  if (diagram === undefined) throw new Error('Story Space declares no opening Diagram.');
-  return diagram;
+  if (map === undefined) throw new Error('Story Space declares no opening Map.');
+  return map;
 };
 
-/** The Graph a Diagram is active on, falling back to its first (ADR 0026). */
-const activeGraphOf = (diagram: Diagram): Graph => {
-  const active =
-    diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
-  if (active === undefined) throw new Error('Diagram owns no Graph.');
+/** The Graph a Map is active on, falling back to its first (ADR 0026). */
+const activeGraphOf = (map: Map): Graph => {
+  const active = map.graphs.find((graph) => graph.id === map.activeGraph) ?? map.graphs[0];
+  if (active === undefined) throw new Error('Map owns no Graph.');
   return active;
 };
 
@@ -139,7 +138,7 @@ test(
 
     // **Edit toggles, and pressing it again is the close.** The control
     // advertises that with `aria-expanded`, so it has to be true: a button that
-    // says it owns an expanded thing and cannot collapse it leaves Escape as the
+    // says it owns an expanded resource and cannot collapse it leaves Escape as the
     // only way out. It is the popup's registered trigger for exactly this
     // reason — an unregistered button counts as an *outside press*, which closes
     // the popup on pointerdown and lets the click that follows reopen it.
@@ -182,16 +181,16 @@ test(
 
     const from = page.getByRole('combobox', { name: 'From' });
     const to = page.getByRole('combobox', { name: 'To' });
-    await expect(from).toHaveValue('Thing 1');
-    await expect(to).toHaveValue('Thing 2');
+    await expect(from).toHaveValue('Resource 1');
+    await expect(to).toHaveValue('Resource 2');
 
-    // Choosing a Thing is the completion, and it settles the editor.
+    // Choosing a Resource is the completion, and it settles the editor.
     await to.press('ArrowDown');
-    await page.getByRole('option', { name: /Thing 4/ }).click();
+    await page.getByRole('option', { name: /Resource 4/ }).click();
 
     await expect(page.getByTestId('edge-editor')).toHaveCount(0);
     await page.getByRole('button', { name: 'Edit this Edge' }).click();
-    await expect(page.getByRole('combobox', { name: 'To' })).toHaveValue('Thing 4');
+    await expect(page.getByRole('combobox', { name: 'To' })).toHaveValue('Resource 4');
 
     // Escape dismisses the open list first, then the editor above it — two
     // layers, one press each (ADR 0048).
@@ -225,10 +224,10 @@ test(
     await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
 
     const refused = page.getByRole('option', {
-      name: /These Things are already connected in this Graph/,
+      name: /These Resources are already connected in this Graph/,
     });
     await expect(refused).toHaveAttribute('aria-disabled', 'true');
-    await expect(refused).toContainText('Thing 3');
+    await expect(refused).toContainText('Resource 3');
     // Still offered rather than filtered out: an author searching for it finds
     // it, and finds out why it cannot be taken.
     await expect(page.getByRole('option')).toHaveCount(5);
@@ -258,7 +257,7 @@ test(
     const describedBy = await attempted.getAttribute('aria-describedby');
     expect(describedBy).not.toBeNull();
     await expect(page.locator(`#${describedBy ?? ''}`)).toHaveText(
-      'These Things are already connected in this Graph.',
+      'These Resources are already connected in this Graph.',
     );
     await expect(page.getByTestId('edge-endpoint-refusal')).toHaveCount(0);
   },
@@ -280,7 +279,7 @@ test(
     const describedBy = await attempted.getAttribute('aria-describedby');
     expect(describedBy).not.toBeNull();
     await expect(page.locator(`#${describedBy ?? ''}`)).toHaveText(
-      'These Things are already connected in this Graph.',
+      'These Resources are already connected in this Graph.',
     );
     await expect(page.getByTestId('edge-endpoint-refusal')).toHaveCount(0);
   },
@@ -316,7 +315,7 @@ test(
     await page.goto(story('components--selected-edge-controls--deletion-refusal'));
 
     await expect(page.getByTestId('edge-delete-refusal')).toHaveText(
-      'Select a Diagram to edit its Edges.',
+      'Select a Map to edit its Edges.',
     );
     await expect(page.getByRole('alert')).toBeVisible();
     // Not an endpoint error in an editor nobody opened.
@@ -328,7 +327,7 @@ test(
 /**
  * The HUD on a real canvas: React Flow's own MiniMap over nodes it measured.
  *
- * What the story fixes is the key beside it — the Graphs the open Diagram
+ * What the story fixes is the key beside it — the Graphs the open Map
  * owns, in authored order, each with its resolved colour, and exactly one
  * emphasised. **Emphasis is not filtering** (ADR 0040): the inactive Graphs
  * stay listed and stay coloured. The expectations are read off the Space the
@@ -346,12 +345,12 @@ test(
   async ({ page }) => {
     await page.goto(story('surfaces--graph-hud--retained'));
 
-    const diagram = openingDiagramOf(authoredSnapshot);
-    const titles = diagram.graphs.map((graph) => graph.title);
-    const active = activeGraphOf(diagram);
+    const map = openingMapOf(authoredSnapshot);
+    const titles = map.graphs.map((graph) => graph.title);
+    const active = activeGraphOf(map);
 
     await expect(page.getByTestId('hud-space')).toHaveText(authoredSnapshot.document.title);
-    await expect(page.getByTestId('hud-diagram')).toHaveText(diagram.title);
+    await expect(page.getByTestId('hud-map')).toHaveText(map.title);
     await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
 
     const key = page.getByTestId('graph-legend');
@@ -363,7 +362,7 @@ test(
     const minimap = page.locator('.react-flow__minimap');
     await expect(minimap).toBeVisible();
     await expect(page.locator('.react-flow__minimap-node')).toHaveCount(
-      Object.keys(diagram.positions).length,
+      Object.keys(map.positions).length,
     );
 
     // The key and MiniMap are sibling Panels meeting at one edge. This catches
@@ -372,11 +371,11 @@ test(
       .locator('.react-flow__panel')
       .filter({ has: page.getByTestId('canvas-identity') });
     const keyBox = await keyPanel.boundingBox();
-    const map = await minimap.boundingBox();
-    if (keyBox === null || map === null) throw new Error('The HUD drew no measurable box.');
-    expect(keyBox.y + keyBox.height).toBeCloseTo(map.y, 0);
-    expect(map.width).toBe(200);
-    expect(map.height).toBe(150);
+    const minimapBox = await minimap.boundingBox();
+    if (keyBox === null || minimapBox === null) throw new Error('The HUD drew no measurable box.');
+    expect(keyBox.y + keyBox.height).toBeCloseTo(minimapBox.y, 0);
+    expect(minimapBox.width).toBe(200);
+    expect(minimapBox.height).toBe(150);
 
     await expectMinimapDrawnToScale(page);
 
@@ -396,7 +395,7 @@ test(
  *
  * A `.react-flow__panel` has no `pointer-events` rule of React Flow's own, so
  * a Panel swallows every gesture over its box — and this HUD stands in the
- * corner a Thing's bottom-right resize control lives in. The key holds no
+ * corner a Resource's bottom-right resize control lives in. The key holds no
  * control, so it hands them back; the two clipped names keep theirs, because
  * their `title` is the only place a truncated name can be read. The MiniMap
  * beside it is excluded on purpose: it pans and zooms, so it is *meant* to
@@ -414,7 +413,7 @@ test(
         ([px, py]: readonly number[]) => {
           const element = document.elementFromPoint(px ?? 0, py ?? 0);
           if (element === null) return 'nothing';
-          if (element.closest('[data-testid="hud-space"], [data-testid="hud-diagram"]') !== null)
+          if (element.closest('[data-testid="hud-space"], [data-testid="hud-map"]') !== null)
             return 'name';
           if (element.closest('.react-flow__panel') !== null) return 'hud';
           return 'canvas';
@@ -440,26 +439,26 @@ test(
 );
 
 /**
- * The key changes with the Diagram it opens on, not with the Space.
+ * The key changes with the Map it opens on, not with the Space.
  *
- * `SparseDiagram` opens the tracked Space on `Collection 2` rather than
+ * `SparseMap` opens the tracked Space on `Collection 2` rather than
  * `Collection 1` — one Graph, `Echo`, instead of three. The expectation is
  * read off `sparseAuthoredSnapshot` the same way the `Retained` case reads
- * its own, so this is the same rule proven on a second Diagram rather than a
+ * its own, so this is the same rule proven on a second Map rather than a
  * transcription of what today's fixture happens to draw.
- * `packages/app/e2e/overview.spec.ts`'s "selecting a Diagram draws the Graphs
+ * `packages/app/e2e/overview.spec.ts`'s "selecting a Map draws the Graphs
  * it owns and only those" is the same claim in the browser, over the tracked
  * fixture rather than this catalogue's.
  */
 test(
-  'the Graph HUD key changes with the Diagram it opens on',
-  { tag: '@parity:graph-hud-key-follows-the-open-diagram' },
+  'the Graph HUD key changes with the Map it opens on',
+  { tag: '@parity:graph-hud-key-follows-the-open-map' },
   async ({ page }) => {
-    await page.goto(story('surfaces--graph-hud--sparse-diagram'));
+    await page.goto(story('surfaces--graph-hud--sparse-map'));
 
-    const diagram = openingDiagramOf(sparseAuthoredSnapshot);
-    const titles = diagram.graphs.map((graph) => graph.title);
-    const active = activeGraphOf(diagram);
+    const map = openingMapOf(sparseAuthoredSnapshot);
+    const titles = map.graphs.map((graph) => graph.title);
+    const active = activeGraphOf(map);
 
     const items = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(items).toHaveCount(titles.length);
@@ -467,11 +466,11 @@ test(
     await expect(items.first()).toHaveAttribute('data-active', 'true');
     await expect(items.first()).toHaveText(active.title);
     await expect(page.locator('.react-flow__minimap-node')).toHaveCount(
-      Object.keys(diagram.positions).length,
+      Object.keys(map.positions).length,
     );
 
-    // Ticket 01 requires the scale proof at every catalogue Diagram. This
-    // sparse second Diagram has a different authored extent, so it catches a
+    // Ticket 01 requires the scale proof at every catalogue Map. This
+    // sparse second Map has a different authored extent, so it catches a
     // map that happens to be valid only for Collection 1's five-node spine.
     await expectMinimapDrawnToScale(page);
   },

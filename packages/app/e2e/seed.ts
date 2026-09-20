@@ -1,5 +1,5 @@
 import { uuidSchema } from '@project/core';
-import type { ThingPlacement, SpaceSnapshot } from '@project/core';
+import type { ResourcePlacement, SpaceSnapshot } from '@project/core';
 import { expect, type Page } from './fixtures';
 
 /**
@@ -13,30 +13,30 @@ export interface HttpLoadedSpace {
   readonly exportedRevision: string | null;
 }
 
-/** The Diagram id every seeded scenario writes, so no test asserts against a literal of its own. */
-export const SEEDED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** The Map id every seeded scenario writes, so no test asserts against a literal of its own. */
+export const SEEDED_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 /**
- * The Graph that Diagram owns. A Diagram owns at least one (ADR 0040), and seeding
- * one that is empty is what a conversion would have produced — the seeded Diagram
- * stands in for the Diagram an author's first edit creates, so it starts with
+ * The Graph that Map owns. A Map owns at least one (ADR 0040), and seeding
+ * one that is empty is what a conversion would have produced — the seeded Map
+ * stands in for the Map an author's first edit creates, so it starts with
  * nothing authored into it.
  */
 export const SEEDED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
 /**
- * Seed the opened Space with a single positioned Diagram, then read it back.
+ * Seed the opened Space with a single positioned Map, then read it back.
  *
- * What it buys a test is an app that opens in an authored Diagram rather than an
- * default Diagram. This goes through the same HTTP boundary the browser uses
+ * What it buys a test is an app that opens in an authored Map rather than an
+ * default Map. This goes through the same HTTP boundary the browser uses
  * rather than reaching past it, so the seeded revision is one the app will
  * actually observe — hence the read-back: the caller asserts against the
  * revision the commit produced.
  */
-export async function seedPositionedDiagram(
+export async function seedPositionedMap(
   page: Page,
   title: string,
-  positionsFor: (snapshot: SpaceSnapshot) => Record<string, ThingPlacement>,
+  positionsFor: (snapshot: SpaceSnapshot) => Record<string, ResourcePlacement>,
 ): Promise<HttpLoadedSpace> {
   const summariesResponse = await page.request.get('/api/spaces');
   expect(summariesResponse.ok()).toBe(true);
@@ -58,16 +58,16 @@ export async function seedPositionedDiagram(
     ...loaded.snapshot,
     document: {
       ...loaded.snapshot.document,
-      diagrams: [
+      maps: [
         {
-          id: SEEDED_DIAGRAM_ID,
+          id: SEEDED_MAP_ID,
           title,
           kind: 'positioned',
           positions: positionsFor(loaded.snapshot),
           graphs: [{ id: SEEDED_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],
-      defaultDiagram: SEEDED_DIAGRAM_ID,
+      defaultMap: SEEDED_MAP_ID,
     },
   };
   const commitResponse = await page.request.post('/api/spaces', {

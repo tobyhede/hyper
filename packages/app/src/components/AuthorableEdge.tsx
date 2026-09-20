@@ -50,7 +50,7 @@ function EdgeControlLayer({
  *
  * It composes the reusable Edge rather than redrawing it — both the curve and
  * the point the controls sit at come from one `useRoutedEdgeGeometry`, so this
- * cannot disagree with what is on screen, and the Edge's two Things are read
+ * cannot disagree with what is on screen, and the Edge's two Resources are read
  * from React Flow's store once rather than once per layer.
  *
  * The controls' visibility rule is `selected`, React Flow's own default for edge

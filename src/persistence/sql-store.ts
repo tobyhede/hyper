@@ -52,14 +52,14 @@ export interface SqlSpaceRevisionRow {
   readonly revision: string;
 }
 
-/** A Thing nested under a loaded Space's `things` (ADR 0095's `Tables` rules). */
-export interface SqlThingRow {
+/** A Resource nested under a loaded Space's `resources` (ADR 0095's `Tables` rules). */
+export interface SqlResourceRow {
   readonly id: string;
   readonly document: unknown;
 }
 
 /**
- * The row shape `loadSpace` reads off `Space.where({ id }).include('things',
+ * The row shape `loadSpace` reads off `Space.where({ id }).include('resources',
  * …).first()`. `revision`/`exportedRevision` are canonical decimal TEXT on
  * both databases now (ADR 0095), so this shape is exactly the same whichever
  * database answered it.
@@ -69,11 +69,11 @@ export interface SqlLoadedSpaceRow {
   readonly document: unknown;
   readonly revision: string;
   readonly exportedRevision: string | null;
-  readonly things: readonly SqlThingRow[];
+  readonly resources: readonly SqlResourceRow[];
 }
 
 /**
- * The structural handle onto the generated ORM's `Space`/`Thing`/
+ * The structural handle onto the generated ORM's `Space`/`Resource`/
  * `RepositoryState` collections that this repository calls through —
  * declared by the repository over exactly the calls it makes (ADR 0095),
  * rather than modelling the ORM's full surface. Property syntax throughout,
@@ -88,10 +88,10 @@ export interface SqlLoadedSpaceRow {
  * a field accessor's `.asc()` answers inside `.orderBy(...)`.
  *
  * Every member is a plain, already-composed CRUD operation with a shared
- * implementation below (`buildSpaceTable`/`buildThingTable`/
+ * implementation below (`buildSpaceTable`/`buildResourceTable`/
  * `buildRepositoryStateTable` and the functions they call), except three that
- * each database module still composes for itself — `Space.loadWithThings`,
- * `Space.loadEvery` and `Thing.deleteExcept` — each carrying its own doc
+ * each database module still composes for itself — `Space.loadWithResources`,
+ * `Space.loadEvery` and `Resource.deleteExcept` — each carrying its own doc
  * comment below explaining why.
  */
 export interface SqlTables<Order> {
@@ -100,8 +100,8 @@ export interface SqlTables<Order> {
       readonly all: () => PromiseLike<readonly SqlSpaceListRow[]>;
     };
     /**
-     * `.where({ id }).include('things', (things) => things.select('id',
-     * 'document').orderBy((thing) => thing.id.asc())).first()`, composed
+     * `.where({ id }).include('resources', (resources) => resources.select('id',
+     * 'document').orderBy((resource) => resource.id.asc())).first()`, composed
      * once inside each database module's own `tables()` rather than a chain
      * this interface exposes for the repository to compose generically.
      * `.include`'s own generated signature carries a *second* opaque type —
@@ -116,17 +116,17 @@ export interface SqlTables<Order> {
      * generic relation entirely; only its *result* crosses this interface,
      * typed as the concrete `SqlLoadedSpaceRow`.
      */
-    readonly loadWithThings: (id: string) => Promise<SqlLoadedSpaceRow | null>;
+    readonly loadWithResources: (id: string) => Promise<SqlLoadedSpaceRow | null>;
     /**
-     * Every stored Space, with its Things, ascending by id -- the Meta
+     * Every stored Space, with its Resources, ascending by id -- the Meta
      * lifecycle's aggregate read. Carries the *same* raw-document treatment
-     * `loadWithThings` above does not need but this always has: a document
+     * `loadWithResources` above does not need but this always has: a document
      * that fails even to parse as JSON must reach the repository as data to
      * classify (`AggregateInvariantError`, ADR 0094's truncation of broken
      * stored state), never as a driver codec's own thrown `TypeError`. On
      * PostgreSQL that is nothing special -- `jsonb` refuses non-JSON text
      * before it is ever stored, so this reads through the ordinary ORM the
-     * same way `loadWithThings` does. On SQLite it is not: `document`
+     * same way `loadWithResources` does. On SQLite it is not: `document`
      * decodes through the driver's json codec on *any* ORM-level read that
      * selects it, throwing on text that is not JSON, so `Space.loadEvery`
      * there reads through the lower-level `sql`/`execute` builder instead,
@@ -164,7 +164,7 @@ export interface SqlTables<Order> {
      * decode `document`: each database module answers it through a
      * count-only delete rather than one that returns the deleted row, which
      * a stored document failing even to parse as JSON would otherwise throw
-     * out of on SQLite (`Thing.deleteAllForSpace`'s doc comment carries the
+     * out of on SQLite (`Resource.deleteAllForSpace`'s doc comment carries the
      * fuller account).
      */
     readonly deleteById: (id: string) => Promise<boolean>;
@@ -187,14 +187,14 @@ export interface SqlTables<Order> {
     /** The second write `writeDocumentUnderLock`'s caller makes once its revision comparison holds. */
     readonly setRevision: (id: string, revision: string) => Promise<void>;
   };
-  readonly Thing: {
+  readonly Resource: {
     readonly create: (input: {
       readonly id: string;
       readonly spaceId: string;
       readonly document: unknown;
     }) => Promise<void>;
     /**
-     * Create or replace one Thing's document, answering the Space id the row
+     * Create or replace one Resource's document, answering the Space id the row
      * actually belongs to — which the caller compares against the Space it
      * meant to write. `commit`'s update path has no losing insert
      * to catch the way `create` does: the row already exists, and this
@@ -207,25 +207,25 @@ export interface SqlTables<Order> {
       readonly document: unknown;
     }) => Promise<{ readonly spaceId: string }>;
     /**
-     * Delete every Thing owned by `spaceId` whose id is not in `keepIds` —
-     * `commit`'s own drop of the Things a snapshot removed. Runs on both the
+     * Delete every Resource owned by `spaceId` whose id is not in `keepIds` —
+     * `commit`'s own drop of the Resources a snapshot removed. Runs on both the
      * fast and complete-aggregate write paths through the one shared write
-     * helper; an empty `keepIds` deletes every Thing the Space owns, and on
-     * the fast path `keepIds` is always every Thing already there, so
+     * helper; an empty `keepIds` deletes every Resource the Space owns, and on
+     * the fast path `keepIds` is always every Resource already there, so
      * nothing is ever actually dropped. The one CRUD member each database
      * module still composes for itself: its second `.where(...)` call takes
-     * a query-builder callback (`(thing) => thing.id.notIn(keepIds)`) whose
+     * a query-builder callback (`(resource) => resource.id.notIn(keepIds)`) whose
      * filter-expression type comes from the same ORM-client internals
      * `.include` cannot be named from either.
      */
     readonly deleteExcept: (spaceId: string, keepIds: readonly string[]) => Promise<void>;
     /**
-     * Delete every Thing `spaceId` owns. `#truncateHyperContent` (ADR 0094)
+     * Delete every Resource `spaceId` owns. `#truncateHyperContent` (ADR 0094)
      * calls this over stored state it has never validated, so — like
      * `Space.deleteById` above — this must never decode `document`: on
      * SQLite, a root-level delete that returns the deleted rows decodes
      * `document` through the json codec on the way back (`readDocument`'s own
-     * doc comment), which throws on a Thing whose stored text is not even
+     * doc comment), which throws on a Resource whose stored text is not even
      * JSON, exactly the broken content truncation exists to remove without
      * reading. Each database module answers this through a count-only
      * delete instead.
@@ -290,11 +290,11 @@ export interface SqlStore<Handle, Order> {
  * slice of the raw generated collection named for exactly the calls it
  * makes — property syntax, no optional field — so the same "assignable
  * without a cast" proof `SqlTables` itself rests on covers these too.
- * `buildSpaceTable`/`buildThingTable`/`buildRepositoryStateTable` below
+ * `buildSpaceTable`/`buildResourceTable`/`buildRepositoryStateTable` below
  * assemble a whole `SqlTables<Order>` from these, and `src/prisma/sql-store.ts`
  * and `src/sqlite/sql-store.ts` each call one set of those three with their
- * own generated `Space`/`Thing`/`RepositoryState` — keeping only
- * `loadWithThings`, `loadEvery` and `deleteExcept`'s query-builder `.notIn(...)`
+ * own generated `Space`/`Resource`/`RepositoryState` — keeping only
+ * `loadWithResources`, `loadEvery` and `deleteExcept`'s query-builder `.notIn(...)`
  * call local, passed in as the few remaining per-database closures. Those are
  * the members `SqlTables`'s own doc comment explains cannot cross this
  * boundary generically, or whose filter callback this module cannot name
@@ -341,7 +341,7 @@ interface SpaceRevisionListable<Order> {
   };
 }
 
-interface ThingCreatable {
+interface ResourceCreatable {
   readonly create: (input: {
     readonly id: string;
     readonly spaceId: string;
@@ -349,7 +349,7 @@ interface ThingCreatable {
   }) => Promise<unknown>;
 }
 
-interface ThingUpsertable {
+interface ResourceUpsertable {
   readonly upsert: (input: {
     readonly create: {
       readonly id: string;
@@ -360,7 +360,7 @@ interface ThingUpsertable {
   }) => Promise<{ readonly spaceId: string }>;
 }
 
-interface ThingDeletableForSpace {
+interface ResourceDeletableForSpace {
   readonly where: (filter: { readonly spaceId: string }) => {
     readonly deleteCount: () => Promise<number>;
   };
@@ -417,8 +417,8 @@ export const loadAllForReplacement = <Order>(
  * `deleteCount()` rather than `delete()`: the latter returns the deleted row,
  * decoded `document` included, and a truncation this answers for (ADR 0094)
  * deletes whatever is stored whether or not `document` parses — so this must
- * never decode it, the same requirement `deleteThingsExcept`/
- * `deleteThingsForSpace` below carry for Things.
+ * never decode it, the same requirement `deleteResourcesExcept`/
+ * `deleteResourcesForSpace` below carry for Resources.
  */
 export const deleteSpaceById = async (space: SpaceWithId, id: string): Promise<boolean> => {
   const deleted = await space.where({ id }).deleteCount();
@@ -452,23 +452,23 @@ export const setSpaceRevision = async (
   await space.where({ id }).update({ revision });
 };
 
-export const createThingRow = async (
-  thing: ThingCreatable,
+export const createResourceRow = async (
+  resource: ResourceCreatable,
   input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
 ): Promise<void> => {
-  await thing.create({
+  await resource.create({
     id: input.id,
     spaceId: input.spaceId,
     document: toJsonValue(input.document),
   });
 };
 
-/** `SqlTables.Thing.upsert`'s own doc comment explains the ownership answer. */
-export const upsertThingRow = async (
-  thing: ThingUpsertable,
+/** `SqlTables.Resource.upsert`'s own doc comment explains the ownership answer. */
+export const upsertResourceRow = async (
+  resource: ResourceUpsertable,
   input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
 ): Promise<{ readonly spaceId: string }> => {
-  const stored = await thing.upsert({
+  const stored = await resource.upsert({
     create: { id: input.id, spaceId: input.spaceId, document: toJsonValue(input.document) },
     update: { document: toJsonValue(input.document) },
   });
@@ -482,11 +482,11 @@ export const upsertThingRow = async (
  * deleted rows — decoded `document` included — which would decode exactly
  * the broken content truncation exists to remove without reading.
  */
-export const deleteThingsForSpace = async (
-  thing: ThingDeletableForSpace,
+export const deleteResourcesForSpace = async (
+  resource: ResourceDeletableForSpace,
   spaceId: string,
 ): Promise<void> => {
-  await thing.where({ spaceId }).deleteCount();
+  await resource.where({ spaceId }).deleteCount();
 };
 
 export const readRepositoryState = async (
@@ -518,7 +518,7 @@ export const deleteRepositoryState = async (state: RepositoryStateWithSingleton)
 /**
  * `SqlTables<Order>['Space']`, assembled once from the CRUD functions above
  * plus the two closures each database module still composes for itself
- * (`loadWithThings`, `loadEvery` — `SqlTables`'s own doc comment explains
+ * (`loadWithResources`, `loadEvery` — `SqlTables`'s own doc comment explains
  * why). `space` is checked structurally against the intersection of every
  * CRUD function's own parameter type, the same "assignable without a cast"
  * proof each of those already rests on individually.
@@ -529,11 +529,11 @@ export const buildSpaceTable = <Order>(
     SpaceIdListable &
     SpaceRevisionListable<Order> &
     Orderable<Order>,
-  loadWithThings: (id: string) => Promise<SqlLoadedSpaceRow | null>,
+  loadWithResources: (id: string) => Promise<SqlLoadedSpaceRow | null>,
   loadEvery: () => PromiseLike<readonly SqlLoadedSpaceRow[]>,
 ): SqlTables<Order>['Space'] => ({
   orderBy: (build) => space.orderBy(build),
-  loadWithThings,
+  loadWithResources,
   loadEvery,
   loadAllForReplacement: () => loadAllForReplacement(space),
   relock: (id) => relockSpace(space, id),
@@ -546,18 +546,18 @@ export const buildSpaceTable = <Order>(
 });
 
 /**
- * `SqlTables<Order>['Thing']`, assembled once from the CRUD functions above
+ * `SqlTables<Order>['Resource']`, assembled once from the CRUD functions above
  * plus `deleteExcept`, the one member each database module still composes
  * for itself (`SqlTables`'s own doc comment explains why).
  */
-export const buildThingTable = (
-  thing: ThingCreatable & ThingUpsertable & ThingDeletableForSpace,
+export const buildResourceTable = (
+  resource: ResourceCreatable & ResourceUpsertable & ResourceDeletableForSpace,
   deleteExcept: (spaceId: string, keepIds: readonly string[]) => Promise<void>,
-): SqlTables<unknown>['Thing'] => ({
-  create: (input) => createThingRow(thing, input),
-  upsert: (input) => upsertThingRow(thing, input),
+): SqlTables<unknown>['Resource'] => ({
+  create: (input) => createResourceRow(resource, input),
+  upsert: (input) => upsertResourceRow(resource, input),
   deleteExcept,
-  deleteAllForSpace: (spaceId) => deleteThingsForSpace(thing, spaceId),
+  deleteAllForSpace: (spaceId) => deleteResourcesForSpace(resource, spaceId),
 });
 
 /** `SqlTables<Order>['RepositoryState']`, assembled once from the CRUD functions above. */

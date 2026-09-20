@@ -1,27 +1,27 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { diagramMenu, expectMenuGroups, graphMenu, spaceMenu } from './graph';
-import { SEEDED_GRAPH_ID, SEEDED_DIAGRAM_ID, seedPositionedDiagram } from './seed';
+import { mapMenu, expectMenuGroups, graphMenu, spaceMenu } from './graph';
+import { SEEDED_GRAPH_ID, SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
-const FIRST_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
-const SECOND_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
+const FIRST_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000050');
+const SECOND_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000051');
 const LONG_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const MID_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
 const ECHO_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000026');
-const THING_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const THING_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const RESOURCE_A_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const RESOURCE_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
 /**
  * Copy one address out of the menu that offers it.
  *
- * **Two menus now, and which one an entity uses is the design.** A Thing's own
+ * **Two menus now, and which one an entity uses is the design.** A Resource's own
  * commands are on its rail (ADR 0073) — the Command Dock's organising rule is
- * that they are not on the Space's command surface at all — while a Diagram's and
+ * that they are not on the Space's command surface at all — while a Map's and
  * a Graph's are behind their own cluster's disclosure. Both are `DropdownMenu`s
  * with the same `spaceEntityActions` deciding what an address means, which is
  * what stops the two coming to disagree.
@@ -41,9 +41,9 @@ const copyMatchingFromMenu = async (
   await page.keyboard.press('Escape');
 };
 
-/** Canonical Thing address — not the contextual Diagram one. */
-const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
-const THING_COPY_LINK_IN_DIAGRAM = /^Copy link to Thing in Diagram/;
+/** Canonical Resource address — not the contextual Map one. */
+const RESOURCE_COPY_LINK = /^Copy link to Resource(?! in Map)/;
+const RESOURCE_COPY_LINK_IN_MAP = /^Copy link to Resource in Map/;
 
 const installClipboard = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
@@ -64,49 +64,49 @@ test('root redirects to and opens the canonical Meta Space URL', async ({ page }
 
   expect(response?.status()).toBe(200);
   await expect(page).toHaveURL(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
-  await expect(page.getByTestId('space-title')).toHaveText('Diagram fixture');
+  await expect(page.getByTestId('space-title')).toHaveText('Map fixture');
 });
 
 test('a direct canonical URL opens its exact existing Space', async ({ page }) => {
   const response = await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
   expect(response?.status()).toBe(200);
-  await expect(page.getByTestId('space-title')).toHaveText('Diagram fixture');
+  await expect(page.getByTestId('space-title')).toHaveText('Map fixture');
 });
 
 /**
- * Deliberately not the Space's `defaultDiagram`. A URL naming the Diagram the
+ * Deliberately not the Space's `defaultMap`. A URL naming the Map the
  * Space would have opened on anyway is satisfied by ignoring the id in the path
  * altogether, so it proves nothing about the address being read; the second
- * authored Diagram is the only one whose appearance can only have come from the
- * path. The assertions are the header naming the one selected Diagram and the
- * canvas drawing that Diagram's Things rather than the default's — the Sidebar
- * lists every Diagram title at all times, so matching a title as plain page text
+ * authored Map is the only one whose appearance can only have come from the
+ * path. The assertions are the header naming the one selected Map and the
+ * canvas drawing that Map's Resources rather than the default's — the Sidebar
+ * lists every Map title at all times, so matching a title as plain page text
  * would be true whatever is selected.
  */
-test('a direct Diagram URL restores the named authored Diagram', async ({ page }) => {
+test('a direct Map URL restores the named authored Map', async ({ page }) => {
   const response = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(SECOND_DIAGRAM_ID)}`,
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(SECOND_MAP_ID)}`,
   );
 
   expect(response?.status()).toBe(200);
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
-  await expect(page.locator(`.react-flow__node[data-id="${THING_E_ID}"]`)).toBeVisible();
-  await expect(page.locator(`.react-flow__node[data-id="${THING_A_ID}"]`)).toHaveCount(0);
+  await expect(page.locator(`.react-flow__node[data-id="${RESOURCE_E_ID}"]`)).toBeVisible();
+  await expect(page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`)).toHaveCount(0);
 });
 
-test('choosing a Diagram pushes history and Back, Forward and reload restore it without authoring', async ({
+test('choosing a Map pushes history and Back, Forward and reload restore it without authoring', async ({
   page,
 }) => {
   const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}`;
-  const second = `${canonical}/diagrams/${encodeCompactUuid(SECOND_DIAGRAM_ID)}`;
+  const second = `${canonical}/maps/${encodeCompactUuid(SECOND_MAP_ID)}`;
   await page.goto(canonical);
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
-  const diagrams = await diagramMenu(page);
-  await diagrams.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
+  const maps = await mapMenu(page);
+  await maps.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
   await expect(page).toHaveURL(second);
   await page.reload();
   await expect(page.getByTestId('selected-canvas')).toContainText('Collection 2');
@@ -135,7 +135,7 @@ test('Back or Forward to an unresolved destination shows the destination surface
       window.history.pushState(null, '', path);
       window.dispatchEvent(new PopStateEvent('popstate'));
     },
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(MISSING_ID)}`,
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(MISSING_ID)}`,
   );
 
   const alert = page.getByRole('alert');
@@ -150,15 +150,15 @@ test('malformed and unresolved Space URLs have real host statuses', async ({ pag
   const unresolved = await page.goto(`/spaces/${encodeCompactUuid(MISSING_ID)}`);
   expect(unresolved?.status()).toBe(404);
 
-  const malformedDiagram = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/not-a-compact-uuid`,
+  const malformedMap = await page.goto(
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/not-a-compact-uuid`,
   );
-  expect(malformedDiagram?.status()).toBe(400);
+  expect(malformedMap?.status()).toBe(400);
 
-  const unresolvedDiagram = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(MISSING_ID)}`,
+  const unresolvedMap = await page.goto(
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(MISSING_ID)}`,
   );
-  expect(unresolvedDiagram?.status()).toBe(404);
+  expect(unresolvedMap?.status()).toBe(404);
 
   const malformedGraph = await page.goto(
     `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/not-a-compact-uuid`,
@@ -171,32 +171,32 @@ test('malformed and unresolved Space URLs have real host statuses', async ({ pag
   expect(unresolvedGraph?.status()).toBe(404);
 });
 
-test('canonical and contextual Thing links reveal a Closed Thing without authoring', async ({
+test('canonical and contextual Resource links reveal a Closed Resource without authoring', async ({
   page,
 }) => {
-  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/things/${encodeCompactUuid(THING_A_ID)}`;
-  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/things/${encodeCompactUuid(THING_A_ID)}`;
+  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`;
+  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
   expect((await page.goto(canonical))?.status()).toBe(200);
-  const canonicalThing = page.locator(`.react-flow__node[data-id="${THING_A_ID}"]`);
-  await expect(canonicalThing).toBeFocused();
-  await expect(canonicalThing.getByTestId('thing')).toHaveAttribute('data-expanded', 'false');
+  const canonicalResource = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
+  await expect(canonicalResource).toBeFocused();
+  await expect(canonicalResource.getByTestId('resource')).toHaveAttribute('data-expanded', 'false');
 
   expect((await page.goto(contextual))?.status()).toBe(200);
-  const thingA = page.locator(`.react-flow__node[data-id="${THING_A_ID}"]`);
-  await expect(thingA).toBeFocused();
-  await expect(thingA.getByTestId('thing')).toHaveAttribute('data-expanded', 'false');
+  const resourceA = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
+  await expect(resourceA).toBeFocused();
+  await expect(resourceA.getByTestId('resource')).toHaveAttribute('data-expanded', 'false');
   await page.reload();
-  await expect(thingA).toBeFocused();
+  await expect(resourceA).toBeFocused();
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(canonicalThing).toBeFocused();
+  await expect(canonicalResource).toBeFocused();
   await page.goForward();
   await expect(page).toHaveURL(contextual);
-  await expect(thingA).toBeFocused();
+  await expect(resourceA).toBeFocused();
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
@@ -204,83 +204,83 @@ test('canonical and contextual Thing links reveal a Closed Thing without authori
   expect(after).toEqual(before);
 });
 
-test('a contextual Diagram-and-Thing link is not found when the Diagram omits the Thing', async ({
+test('a contextual Map-and-Resource link is not found when the Map omits the Resource', async ({
   page,
 }) => {
   const response = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/things/${encodeCompactUuid(THING_E_ID)}`,
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/resources/${encodeCompactUuid(RESOURCE_E_ID)}`,
   );
 
   expect(response?.status()).toBe(404);
 });
 
-test('a canonical Thing omitted by the default Diagram is revealed only in the Things collection', async ({
+test('a canonical Resource omitted by the default Map is revealed only in the Resources collection', async ({
   page,
 }) => {
-  const seeded = await seedPositionedDiagram(page, 'Sparse Diagram', (snapshot) => {
-    const included = snapshot.things[0];
+  const seeded = await seedPositionedMap(page, 'Sparse Map', (snapshot) => {
+    const included = snapshot.resources[0];
     expect(included).toBeDefined();
     return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
   });
-  const omitted = seeded.snapshot.things[1];
+  const omitted = seeded.snapshot.resources[1];
   expect(omitted).toBeDefined();
   if (omitted === undefined) return;
-  const canonical = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/things/${encodeCompactUuid(omitted.id)}`;
+  const canonical = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/resources/${encodeCompactUuid(omitted.id)}`;
 
   expect((await page.goto(canonical))?.status()).toBe(200);
-  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Diagram');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
-  await expect(page.locator(`[data-thing-id="${omitted.id}"]`)).toHaveAttribute(
+  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Map');
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
+  await expect(page.locator(`[data-resource-id="${omitted.id}"]`)).toHaveAttribute(
     'aria-current',
     'true',
   );
   await expect(page.locator(`.react-flow__node[data-id="${omitted.id}"]`)).toHaveCount(0);
 
   await page.reload();
-  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Diagram');
-  await expect(page.locator(`[data-thing-id="${omitted.id}"]`)).toHaveAttribute(
+  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Map');
+  await expect(page.locator(`[data-resource-id="${omitted.id}"]`)).toHaveAttribute(
     'aria-current',
     'true',
   );
 });
 
-test('returning to a canonical Thing address reveals it again', async ({ page }) => {
-  const seeded = await seedPositionedDiagram(page, 'Sparse Diagram', (snapshot) => {
-    const included = snapshot.things[0];
+test('returning to a canonical Resource address reveals it again', async ({ page }) => {
+  const seeded = await seedPositionedMap(page, 'Sparse Map', (snapshot) => {
+    const included = snapshot.resources[0];
     expect(included).toBeDefined();
     return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
   });
-  const omitted = seeded.snapshot.things[1];
+  const omitted = seeded.snapshot.resources[1];
   expect(omitted).toBeDefined();
   if (omitted === undefined) return;
-  const canonical = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/things/${encodeCompactUuid(omitted.id)}`;
+  const canonical = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/resources/${encodeCompactUuid(omitted.id)}`;
 
   expect((await page.goto(canonical))?.status()).toBe(200);
-  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
 
-  // Dismiss the collection and leave the Thing address behind. This is the
+  // Dismiss the collection and leave the Resource address behind. This is the
   // reader moving on.
   await page.keyboard.press('Escape');
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
-  await expect(page.getByRole('dialog', { name: 'Things' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toBeHidden();
 
   // Back is a second arrival at the address, not a repeat of the first, so the
-  // Thing it names is revealed rather than left invisible off the Diagram.
+  // Resource it names is revealed rather than left invisible off the Map.
   await page.goBack();
   await expect(page).toHaveURL(canonical);
-  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Diagram');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
-  await expect(page.locator(`[data-thing-id="${omitted.id}"]`)).toHaveAttribute(
+  await expect(page.getByTestId('selected-canvas')).toContainText('Sparse Map');
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
+  await expect(page.locator(`[data-resource-id="${omitted.id}"]`)).toHaveAttribute(
     'aria-current',
     'true',
   );
 });
 
-test('history restores a canonical Thing through the default Diagram, not the context being left', async ({
+test('history restores a canonical Resource through the default Map, not the context being left', async ({
   page,
 }) => {
-  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/things/${encodeCompactUuid(THING_A_ID)}`;
-  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/things/${encodeCompactUuid(THING_A_ID)}`;
+  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`;
+  const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`;
   await page.goto(contextual);
   await page.goto(canonical);
   await page.goBack();
@@ -292,78 +292,76 @@ test('history restores a canonical Thing through the default Diagram, not the co
 });
 
 /**
- * A Thing's two addresses, from the Thing's own rail.
+ * A Resource's two addresses, from the Resource's own rail.
  *
  * **Untagged, and that is a decision rather than an omission.** The claim this
- * carried — `space-sidebar-copies-thing-destinations` — was retired with the
- * surface it named: a Thing's links are the rail's now, and the rail's story
+ * carried — `space-sidebar-copies-resource-destinations` — was retired with the
+ * surface it named: a Resource's links are the rail's now, and the rail's story
  * sheet is still under `stories/review`, so there is no stable story for a
  * parity claim to name. The behaviour is proved here and in
- * `thing-rail-actions.test.tsx` meanwhile, and `parity-claims.ts` records that
+ * `resource-rail-actions.test.tsx` meanwhile, and `parity-claims.ts` records that
  * the claim returns when the rail's sheet is promoted.
  */
-test('copy commands distinguish canonical Thing identity from its current Diagram', async ({
+test('copy commands distinguish canonical Resource identity from its current Map', async ({
   page,
 }) => {
   await installClipboard(page);
-  const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-  await page.goto(diagram);
-  const thing = page.locator(`.react-flow__node[data-id="${THING_A_ID}"]`);
-  await thing.click();
-  // The rail reveals on hover, and it is the Thing's own — no Space surface is
+  const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+  await page.goto(map);
+  const resource = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
+  await resource.click();
+  // The rail reveals on hover, and it is the Resource's own — no Space surface is
   // involved in reaching it.
-  await thing.hover();
+  await resource.hover();
 
-  await copyMatchingFromMenu(page, 'Actions for Thing A', THING_COPY_LINK);
+  await copyMatchingFromMenu(page, 'Actions for Resource A', RESOURCE_COPY_LINK);
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(
-      `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/things/${encodeCompactUuid(THING_A_ID)}`,
+      `${new URL(page.url()).origin}/spaces/${encodeCompactUuid(FIXTURE_ID)}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`,
     );
 
-  await thing.hover();
-  await copyMatchingFromMenu(page, 'Actions for Thing A', THING_COPY_LINK_IN_DIAGRAM);
+  await resource.hover();
+  await copyMatchingFromMenu(page, 'Actions for Resource A', RESOURCE_COPY_LINK_IN_MAP);
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe(`${new URL(page.url()).origin}${diagram}/things/${encodeCompactUuid(THING_A_ID)}`);
+    .toBe(`${new URL(page.url()).origin}${map}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`);
 });
 
 /**
- * What the Diagram cluster's disclosure holds, and what it deliberately does not.
+ * What the Map cluster's disclosure holds, and what it deliberately does not.
  *
  * **The claim this test carried is gone with its mechanism.**
  * `space-sidebar-entity-actions-menu` said one menu was "reached two ways from a
  * Sidebar row — its trailing icon and a right click". The Dock has clusters
  * rather than rows and no `onContextMenu` anywhere, so there is no second route
- * to restate; what survives is that a Diagram's commands are all in one place,
+ * to restate; what survives is that a Map's commands are all in one place,
  * including Rename, and that the name itself is the disclosure that opens it.
  *
  * **The order is one grouping grammar** (`.scratch/dock-menu-reorganisation/issues/01`):
- * the Diagram list, New Diagram on its own, Rename beside Copy link to
- * Diagram, then Delete — one separator between each group.
+ * the Map list, New Map on its own, Rename beside Copy link to
+ * Map, then Delete — one separator between each group.
  */
-test('the Diagram cluster holds every Diagram command including Rename', async ({ page }) => {
+test('the Map cluster holds every Map command including Rename', async ({ page }) => {
   await page.goto(`/spaces/${encodeCompactUuid(FIXTURE_ID)}`);
 
-  const menu = await diagramMenu(page);
+  const menu = await mapMenu(page);
   await expectMenuGroups(menu, [
     ['Collection 1', 'Collection 2', 'Linked Spaces'],
-    ['New Diagram'],
-    ['Rename', 'Copy link to Diagram'],
+    ['New Map'],
+    ['Rename', 'Copy link to Map'],
     ['Delete Collection 1'],
   ]);
   await page.keyboard.press('Escape');
 
-  await expect(
-    page.getByRole('button', { name: 'Diagram: Collection 1', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Map: Collection 1', exact: true })).toBeVisible();
 });
 
 /**
  * The Space menu's own grouping grammar
  * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
  * Space, then Exit Space — one separator between the two groups. The address
- * copied is the Space's own, not the drawing Diagram's
+ * copied is the Space's own, not the drawing Map's
  * (`link-actions.spec.ts` holds why no second address is offered here).
  */
 test('the Space menu groups Rename with Copy link to Space, then Exit Space', async ({ page }) => {
@@ -384,7 +382,7 @@ test('canonical and contextual Graph links restore navigation context without au
   page,
 }) => {
   const canonical = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`;
-  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(SECOND_DIAGRAM_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`;
+  const contextual = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(SECOND_MAP_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
@@ -414,15 +412,15 @@ test('canonical and contextual Graph links restore navigation context without au
 test('activating a Graph pushes a contextual destination restored by Back and Forward', async ({
   page,
 }) => {
-  const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-  const mid = `${diagram}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
-  await page.goto(diagram);
+  const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+  const mid = `${map}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
+  await page.goto(map);
 
   const graphs = await graphMenu(page);
   await graphs.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
   await expect(page).toHaveURL(mid);
   await page.goBack();
-  await expect(page).toHaveURL(diagram);
+  await expect(page).toHaveURL(map);
   await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(mid);
@@ -437,14 +435,14 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
  * address offered any more.
  */
 test(
-  'the Graph menu copies its within-Diagram address and offers no permanent one',
+  'the Graph menu copies its within-Map address and offers no permanent one',
   {
     tag: '@parity:command-dock-copies-graph-destinations',
   },
   async ({ page }) => {
     await installClipboard(page);
-    const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-    await page.goto(diagram);
+    const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+    await page.goto(map);
 
     const menu = await graphMenu(page);
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
@@ -460,41 +458,39 @@ test(
     await page.keyboard.press('Escape');
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(`${new URL(page.url()).origin}${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+      .toBe(`${new URL(page.url()).origin}${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
   },
 );
 
-test('an incompatible contextual Diagram-and-Graph destination has a real 404', async ({
-  page,
-}) => {
+test('an incompatible contextual Map-and-Graph destination has a real 404', async ({ page }) => {
   const response = await page.goto(
-    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`,
+    `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/graphs/${encodeCompactUuid(ECHO_GRAPH_ID)}`,
   );
 
   expect(response?.status()).toBe(404);
 });
 
-test('an exact presentation link starts fresh at its Thing and moves through browser history', async ({
+test('an exact presentation link starts fresh at its Resource and moves through browser history', async ({
   page,
 }) => {
-  const diagram = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}`;
-  const atB = `${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(THING_B_ID)}`;
-  const atC = `${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(THING_C_ID)}`;
+  const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+  const atB = `${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_B_ID)}`;
+  const atC = `${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_C_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
 
   expect((await page.goto(atB))?.status()).toBe(200);
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(page.locator(`.react-flow__node[data-id="${THING_B_ID}"]`)).toHaveClass(
-    /rf-thing-node--active/,
+  await expect(page.locator(`.react-flow__node[data-id="${RESOURCE_B_ID}"]`)).toHaveClass(
+    /rf-resource-node--active/,
   );
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
   await page.reload();
   await expect(page).toHaveURL(atB);
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(page.locator(`.react-flow__node[data-id="${THING_B_ID}"]`)).toHaveClass(
-    /rf-thing-node--active/,
+  await expect(page.locator(`.react-flow__node[data-id="${RESOURCE_B_ID}"]`)).toHaveClass(
+    /rf-resource-node--active/,
   );
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
 
@@ -506,7 +502,7 @@ test('an exact presentation link starts fresh at its Thing and moves through bro
   await page.goForward();
   await expect(page).toHaveURL(atC);
   await page.getByTestId('exit-presenting').click();
-  await expect(page).toHaveURL(`${diagram}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+  await expect(page).toHaveURL(`${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
@@ -516,7 +512,7 @@ test('an exact presentation link starts fresh at its Thing and moves through bro
 
 test('copies the exact current presentation point', async ({ page }) => {
   await installClipboard(page);
-  const path = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(THING_B_ID)}`;
+  const path = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_B_ID)}`;
   await page.goto(path);
 
   await page.getByRole('button', { name: 'Copy link to this presentation point' }).click();
@@ -527,9 +523,9 @@ test('copies the exact current presentation point', async ({ page }) => {
 });
 
 test('entering, advancing and retreating each append presentation history', async ({ page }) => {
-  const graph = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`;
-  const atA = `${graph}/present/${encodeCompactUuid(THING_A_ID)}`;
-  const atB = `${graph}/present/${encodeCompactUuid(THING_B_ID)}`;
+  const graph = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`;
+  const atA = `${graph}/present/${encodeCompactUuid(RESOURCE_A_ID)}`;
+  const atB = `${graph}/present/${encodeCompactUuid(RESOURCE_B_ID)}`;
   await page.goto(graph);
 
   await page.getByRole('button', { name: /^Present / }).click();
@@ -551,28 +547,28 @@ test('entering, advancing and retreating each append presentation history', asyn
 
 /**
  * A self-Edge is where a Traversal history move and an address move come apart:
- * advancing appends the same Thing, so the history grows and the position does
+ * advancing appends the same Resource, so the history grows and the position does
  * not. Under ADR 0081 the browser is told about the position, so entering the
  * presentation earns an entry and the move over the self-Edge earns none. This
  * asserted the opposite until that decision — a second entry at the same URL,
  * which made Back a no-op the reader had to press twice.
  */
 test('a self-Edge presentation move takes no browser entry', async ({ page }) => {
-  const seeded = await seedPositionedDiagram(page, 'Self Edge', () => ({
-    [THING_A_ID]: { x: 20, y: 20, open: false },
+  const seeded = await seedPositionedMap(page, 'Self Edge', () => ({
+    [RESOURCE_A_ID]: { x: 20, y: 20, open: false },
   }));
   const snapshot = {
     ...seeded.snapshot,
     document: {
       ...seeded.snapshot.document,
-      diagrams: [
+      maps: [
         {
-          ...seeded.snapshot.document.diagrams?.[0],
+          ...seeded.snapshot.document.maps?.[0],
           graphs: [
             {
               id: SEEDED_GRAPH_ID,
               title: 'Graph 1',
-              edges: [{ from: THING_A_ID, to: THING_A_ID }],
+              edges: [{ from: RESOURCE_A_ID, to: RESOURCE_A_ID }],
             },
           ],
         },
@@ -592,8 +588,8 @@ test('a self-Edge presentation move takes no browser entry', async ({ page }) =>
     },
   });
   expect(commit.ok()).toBe(true);
-  const graph = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/diagrams/${encodeCompactUuid(SEEDED_DIAGRAM_ID)}/graphs/${encodeCompactUuid(SEEDED_GRAPH_ID)}`;
-  const point = `${graph}/present/${encodeCompactUuid(THING_A_ID)}`;
+  const graph = `/spaces/${encodeCompactUuid(seeded.snapshot.id)}/maps/${encodeCompactUuid(SEEDED_MAP_ID)}/graphs/${encodeCompactUuid(SEEDED_GRAPH_ID)}`;
+  const point = `${graph}/present/${encodeCompactUuid(RESOURCE_A_ID)}`;
   await page.goto(graph);
 
   await page.getByRole('button', { name: /^Present / }).click();
@@ -613,7 +609,7 @@ test('a self-Edge presentation move takes no browser entry', async ({ page }) =>
 test('malformed and incompatible presentation destinations have real host statuses', async ({
   page,
 }) => {
-  const base = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/diagrams/${encodeCompactUuid(FIRST_DIAGRAM_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present`;
+  const base = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present`;
   expect((await page.goto(`${base}/not-a-compact-uuid`))?.status()).toBe(400);
-  expect((await page.goto(`${base}/${encodeCompactUuid(THING_E_ID)}`))?.status()).toBe(404);
+  expect((await page.goto(`${base}/${encodeCompactUuid(RESOURCE_E_ID)}`))?.status()).toBe(404);
 });

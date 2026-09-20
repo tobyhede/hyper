@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Position, type Edge } from '@xyflow/react';
 
-import { uuidSchema, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
 import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { mintingIds } from './minting';
@@ -17,15 +17,15 @@ import type {
 
 import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
 
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const CREATED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const CREATED_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
-const PROJECTED = [node(THING_A, 10, 20), node(THING_B, 300, 20)];
+const PROJECTED = [node(RESOURCE_A, 10, 20), node(RESOURCE_B, 300, 20)];
 
 /**
  * One projected Graph Edge, in the shape `projectGraphEdges` builds: the id
@@ -35,9 +35,9 @@ const PROJECTED = [node(THING_A, 10, 20), node(THING_B, 300, 20)];
  * it.
  */
 const EDGE: Edge = {
-  id: graphRenderEdgeId(GRAPH_ID, { from: THING_A, to: THING_B }),
-  source: THING_A,
-  target: THING_B,
+  id: graphRenderEdgeId(GRAPH_ID, { from: RESOURCE_A, to: RESOURCE_B }),
+  source: RESOURCE_A,
+  target: RESOURCE_B,
   data: { graphId: GRAPH_ID },
 };
 
@@ -45,27 +45,24 @@ const EDGE: Edge = {
 interface AuthoringCapabilities {
   /** The proposal kind this Authoring refuses; every other kind is eligible. */
   readonly refusing?: EdgeProposal['kind'];
-  readonly diagramPlacement?: Placement;
+  readonly mapPlacement?: Placement;
 }
 
 /** A Space Authoring that records what it was told, without a session behind it. */
-function authoringSpy({
-  refusing,
-  diagramPlacement = Placement.empty(),
-}: AuthoringCapabilities = {}) {
+function authoringSpy({ refusing, mapPlacement = Placement.empty() }: AuthoringCapabilities = {}) {
   const completions: unknown[] = [];
   const authoring: SpaceAuthoring = {
-    completeInDiagram: () => {
+    completeInMap: () => {
       throw new Error('Embedded authoring is outside this adapter test.');
     },
     // SAFETY: `getState` is never read by these tests — the spy only needs to
     // satisfy `SpaceAuthoring`'s shape, not implement a real state.
     getState: () => ({}) as never,
-    diagramPlacement: () => diagramPlacement,
+    mapPlacement: () => mapPlacement,
     subscribe: () => () => undefined,
     edgeEligibility: (proposal: EdgeProposal): EdgeEligibility =>
       proposal.kind === refusing
-        ? { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } }
+        ? { kind: 'refused', refusal: { code: 'edge-resource-outside-map' } }
         : { kind: 'eligible' },
     complete: (completion): AuthoringResult => {
       completions.push(completion);
@@ -103,13 +100,13 @@ function connections(
  * above answers what the adapter was *told*; this answers what a Space ends up
  * holding, so the two are not interchangeable.
  *
- * Opens on the selected Diagram's own map (ADR 0025) — Authoring derives it
+ * Opens on the selected Map's own map (ADR 0025) — Authoring derives it
  * fresh rather than holding a copy, so there is no separate starting geometry
  * to state.
  */
 function sessionBackedAdapter(
   snapshot: SpaceSnapshot,
-  diagramId: DiagramId,
+  mapId: MapId,
   /** A newer stored state, so the first commit conflicts rather than settling. */
   stored?: SpaceSnapshot,
   /** The ids this Space's Edits mint, supplied rather than mocked. */
@@ -120,15 +117,15 @@ function sessionBackedAdapter(
     stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
   );
   const session = openSpaceSession(backend, loaded);
-  const { authoring, adapter } = composeApp({ spaceSession: session, selection: diagramId, newId });
+  const { authoring, adapter } = composeApp({ spaceSession: session, selection: mapId, newId });
   return { session, authoring, store: adapter };
 }
 
 /**
- * A Space whose Diagram places Things A and B, leaving C outside the Diagram.
+ * A Space whose Map places Resources A and B, leaving C outside the Map.
  *
- * The Diagram's position keys are its Thing membership and every Edge of a Graph
- * it owns is closed over them (ADR 0040), so the omitted Thing is one the Graph
+ * The Map's position keys are its Resource membership and every Edge of a Graph
+ * it owns is closed over them (ADR 0040), so the omitted Resource is one the Graph
  * never names — C, which the positioned projection does not draw.
  */
 function sparsePositionedAdapter(newId?: () => UUID) {
@@ -137,42 +134,42 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     document: {
       version: 1,
       title: 'Space',
-      diagrams: [
+      maps: [
         {
-          id: DIAGRAM_ID,
-          title: 'Diagram 1',
+          id: MAP_ID,
+          title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(THING_A)]: { x: 10, y: 20, open: false },
-            [uuidSchema.parse(THING_B)]: { x: 300, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
               id: GRAPH_ID,
               title: 'Main',
-              edges: [{ from: uuidSchema.parse(THING_A), to: uuidSchema.parse(THING_B) }],
+              edges: [{ from: uuidSchema.parse(RESOURCE_A), to: uuidSchema.parse(RESOURCE_B) }],
             },
           ],
         },
       ],
-      defaultDiagram: DIAGRAM_ID,
+      defaultMap: MAP_ID,
     },
-    things: [
+    resources: [
       {
-        id: uuidSchema.parse(THING_A),
+        id: uuidSchema.parse(RESOURCE_A),
         document: { title: 'A', kind: 'markdown', body: 'A' },
       },
       {
-        id: uuidSchema.parse(THING_B),
+        id: uuidSchema.parse(RESOURCE_B),
         document: { title: 'B', kind: 'markdown', body: 'B' },
       },
       {
-        id: uuidSchema.parse(THING_C),
+        id: uuidSchema.parse(RESOURCE_C),
         document: { title: 'C', kind: 'markdown', body: 'C' },
       },
     ],
   };
-  return sessionBackedAdapter(snapshot, DIAGRAM_ID, undefined, newId);
+  return sessionBackedAdapter(snapshot, MAP_ID, undefined, newId);
 }
 
 /** The same Space, with a newer one already stored — so an Edit conflicts. */
@@ -182,36 +179,36 @@ function storedSpaceAdapter() {
     document: {
       version: 1,
       title: 'Space',
-      diagrams: [
+      maps: [
         {
-          id: DIAGRAM_ID,
-          title: 'Diagram 1',
+          id: MAP_ID,
+          title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(THING_A)]: { x: 10, y: 20, open: false },
-            [uuidSchema.parse(THING_B)]: { x: 300, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
               id: GRAPH_ID,
               title: 'Main',
-              edges: [{ from: uuidSchema.parse(THING_A), to: uuidSchema.parse(THING_B) }],
+              edges: [{ from: uuidSchema.parse(RESOURCE_A), to: uuidSchema.parse(RESOURCE_B) }],
             },
           ],
         },
       ],
-      defaultDiagram: DIAGRAM_ID,
+      defaultMap: MAP_ID,
     },
-    things: [
-      { id: uuidSchema.parse(THING_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
-      { id: uuidSchema.parse(THING_B), document: { title: 'B', kind: 'markdown', body: 'B' } },
+    resources: [
+      { id: uuidSchema.parse(RESOURCE_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
+      { id: uuidSchema.parse(RESOURCE_B), document: { title: 'B', kind: 'markdown', body: 'B' } },
     ],
   };
   const stored: SpaceSnapshot = {
     ...snapshot,
     document: { ...snapshot.document, title: 'Stored' },
   };
-  return sessionBackedAdapter(snapshot, DIAGRAM_ID, stored);
+  return sessionBackedAdapter(snapshot, MAP_ID, stored);
 }
 
 describe('render adapter', () => {
@@ -227,12 +224,12 @@ describe('render adapter', () => {
     expect(adapter().getState().projection).toBeNull();
   });
 
-  it('drops the published Graph Edges with their nodes when the Diagram changes', () => {
+  it('drops the published Graph Edges with their nodes when the Map changes', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
     expect(store.getState().projection?.edges).toEqual([EDGE]);
 
-    store.getState().selectDiagram();
+    store.getState().selectMap();
 
     expect(store.getState().projection).toBeNull();
   });
@@ -241,24 +238,24 @@ describe('render adapter', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    completeDrag(store, THING_A, 500, 400);
-    store.getState().selectThing(uuidSchema.parse(THING_A));
+    completeDrag(store, RESOURCE_A, 500, 400);
+    store.getState().selectResource(uuidSchema.parse(RESOURCE_A));
 
     expect(store.getState().projection?.edges).toEqual([EDGE]);
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 500, y: 400 });
   });
 
-  it("takes React Flow's own selection change as the Thing selected for authoring", () => {
-    // The other path into the selection: `selectThing` is the explicit store
+  it("takes React Flow's own selection change as the Resource selected for authoring", () => {
+    // The other path into the selection: `selectResource` is the explicit store
     // action, this is React Flow reporting an ordinary click. Both read a node
-    // id as a Thing identity, and only the first was covered.
+    // id as a Resource identity, and only the first was covered.
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().changeNodes([{ type: 'select', id: THING_A, selected: true }]);
-    expect(store.getState().selection).toEqual({ kind: 'thing', thingId: THING_A });
+    store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
+    expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_A });
 
-    store.getState().changeNodes([{ type: 'select', id: THING_A, selected: false }]);
+    store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: false }]);
     expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
@@ -273,39 +270,39 @@ describe('render adapter', () => {
     const selectingEdge = (store: RenderAdapter) =>
       store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: true }]);
 
-    it('keeps a newly selected Edge when the Thing deselection arrives after it', () => {
+    it('keeps a newly selected Edge when the Resource deselection arrives after it', () => {
       const store = adapter();
       store.getState().syncProjection(PROJECTED, [EDGE]);
-      store.getState().changeNodes([{ type: 'select', id: THING_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
 
       selectingEdge(store);
-      store.getState().changeNodes([{ type: 'select', id: THING_A, selected: false }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: false }]);
 
       expect(store.getState().selection).toEqual({
         kind: 'edge',
         graphId: GRAPH_ID,
-        edge: { from: THING_A, to: THING_B },
+        edge: { from: RESOURCE_A, to: RESOURCE_B },
       });
     });
 
-    it('keeps a newly selected Thing when the Edge deselection arrives after it', () => {
+    it('keeps a newly selected Resource when the Edge deselection arrives after it', () => {
       const store = adapter();
       store.getState().syncProjection(PROJECTED, [EDGE]);
       selectingEdge(store);
 
-      store.getState().changeNodes([{ type: 'select', id: THING_B, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_B, selected: true }]);
       store.getState().changeEdges([{ type: 'select', id: EDGE.id, selected: false }]);
 
-      expect(store.getState().selection).toEqual({ kind: 'thing', thingId: THING_B });
+      expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_B });
     });
 
-    it('clears the Thing React Flow still holds selected when an Edge takes the selection', () => {
+    it('clears the Resource React Flow still holds selected when an Edge takes the selection', () => {
       // The controlled node array is what React Flow's Delete key reads, so a
-      // Thing left `selected` there would be deleted alongside the Edge the
+      // Resource left `selected` there would be deleted alongside the Edge the
       // author actually named.
       const store = adapter();
       store.getState().syncProjection(PROJECTED, [EDGE]);
-      store.getState().changeNodes([{ type: 'select', id: THING_A, selected: true }]);
+      store.getState().changeNodes([{ type: 'select', id: RESOURCE_A, selected: true }]);
 
       selectingEdge(store);
 
@@ -322,12 +319,12 @@ describe('render adapter', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: THING_A, to: THING_B } });
+    store.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: RESOURCE_B } });
 
     expect(store.getState().selection).toEqual({
       kind: 'edge',
       graphId: GRAPH_ID,
-      edge: { from: THING_A, to: THING_B },
+      edge: { from: RESOURCE_A, to: RESOURCE_B },
     });
   });
 
@@ -341,33 +338,33 @@ describe('render adapter', () => {
   it('ignores a selection change for an Edge this projection does not draw', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
-    store.getState().selectThing(uuidSchema.parse(THING_A));
+    store.getState().selectResource(uuidSchema.parse(RESOURCE_A));
 
     store.getState().changeEdges([
       {
         type: 'select',
-        id: graphRenderEdgeId(GRAPH_ID, { from: THING_A, to: THING_C }),
+        id: graphRenderEdgeId(GRAPH_ID, { from: RESOURCE_A, to: RESOURCE_C }),
         selected: false,
       },
     ]);
 
-    expect(store.getState().selection).toEqual({ kind: 'thing', thingId: THING_A });
+    expect(store.getState().selection).toEqual({ kind: 'resource', resourceId: RESOURCE_A });
   });
 
   /**
-   * A Thing selected before the projection draws it is selected in React Flow's
+   * A Resource selected before the projection draws it is selected in React Flow's
    * own node array once it does.
    *
-   * Authoring selects a Thing in the same tick it creates it, one render before
-   * the projection that first draws it — so `selectThing` records the subject
+   * Authoring selects a Resource in the same tick it creates it, one render before
+   * the projection that first draws it — so `selectResource` records the subject
    * while no live node carries `selected`, and `selecting` maps over nodes that
    * do not include it yet. A projection carries no selection of its own either:
-   * `projectThingNodes` sets `data.selectedForAuthoring` and never the node's
-   * `selected`. So unless the sync folds the union back in, the Thing arrives
+   * `projectResourceNodes` sets `data.selectedForAuthoring` and never the node's
+   * `selected`. So unless the sync folds the union back in, the Resource arrives
    * unselected and stays that way — it *reads* as selected, since
    * `selectedForAuthoring` is right, while React Flow holds no selected node at
    * all. `F2` asks React Flow, so `F2` is what stops working, until any click
-   * repairs it. Add Thing, Add Reference Thing and create-and-connect all land here.
+   * repairs it. Add Resource, Add Reference Resource and create-and-connect all land here.
    *
    * The `dimensions` change is the window in front of it: React Flow measures
    * anything it renders, so `changeNodes` is reached before that projection
@@ -376,39 +373,48 @@ describe('render adapter', () => {
    * and this pins that too, since the model this replaced *did* erase it by
    * re-deriving the selection from the live node array.
    */
-  it('keeps a selection seeded for a Thing the projection has not drawn yet', () => {
+  it('keeps a selection seeded for a Resource the projection has not drawn yet', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectThing(CREATED_THING_ID);
+    store.getState().selectResource(CREATED_RESOURCE_ID);
     store
       .getState()
-      .changeNodes([{ type: 'dimensions', id: THING_A, dimensions: { width: 260, height: 146 } }]);
+      .changeNodes([
+        { type: 'dimensions', id: RESOURCE_A, dimensions: { width: 260, height: 146 } },
+      ]);
 
-    expect(store.getState().selection).toEqual({ kind: 'thing', thingId: CREATED_THING_ID });
+    expect(store.getState().selection).toEqual({
+      kind: 'resource',
+      resourceId: CREATED_RESOURCE_ID,
+    });
 
-    store.getState().syncProjection([...PROJECTED, node(CREATED_THING_ID, 900, 20)], [EDGE]);
+    store.getState().syncProjection([...PROJECTED, node(CREATED_RESOURCE_ID, 900, 20)], [EDGE]);
 
-    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_THING_ID);
+    const seeded = store
+      .getState()
+      .projection?.nodes.find((each) => each.id === CREATED_RESOURCE_ID);
     expect(seeded?.selected).toBe(true);
   });
 
   /**
-   * The same seeding on the other path a created Thing arrives by.
+   * The same seeding on the other path a created Resource arrives by.
    *
-   * A completed create-and-connect publishes, Authoring selects the Thing it has
-   * just minted, and the projection carrying that Thing reaches the store through
+   * A completed create-and-connect publishes, Authoring selects the Resource it has
+   * just minted, and the projection carrying that Resource reaches the store through
    * `mergeProjected` rather than `syncProjection`. Two call sites, one rule —
    * and this is the one the Edge Authoring seam uses.
    */
-  it('seeds a selection for a Thing that arrives through a merged projection', () => {
+  it('seeds a selection for a Resource that arrives through a merged projection', () => {
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    store.getState().selectThing(CREATED_THING_ID);
-    store.getState().mergeProjected([...PROJECTED, node(CREATED_THING_ID, 900, 20)]);
+    store.getState().selectResource(CREATED_RESOURCE_ID);
+    store.getState().mergeProjected([...PROJECTED, node(CREATED_RESOURCE_ID, 900, 20)]);
 
-    const seeded = store.getState().projection?.nodes.find((each) => each.id === CREATED_THING_ID);
+    const seeded = store
+      .getState()
+      .projection?.nodes.find((each) => each.id === CREATED_RESOURCE_ID);
     expect(seeded?.selected).toBe(true);
   });
 
@@ -420,8 +426,8 @@ describe('render adapter', () => {
     const targetHandle = `${graphId}::in`;
     const edge: Edge = {
       id: `${graphId}:A->B`,
-      source: THING_A,
-      target: THING_B,
+      source: RESOURCE_A,
+      target: RESOURCE_B,
       sourceHandle,
       targetHandle,
     };
@@ -455,10 +461,10 @@ describe('render adapter', () => {
     );
   });
 
-  it('keeps the Things on screen when a connection completes with no fresh projection', () => {
+  it('keeps the Resources on screen when a connection completes with no fresh projection', () => {
     // A Space change starts a replacement placement, so the render path has no
     // projection to hand over — while the canvas deliberately keeps drawing the
-    // Things already on screen, which is what makes it still connectable. Nothing
+    // Resources already on screen, which is what makes it still connectable. Nothing
     // fresh to merge means keep what is live: reconciling against an empty list
     // would blank the canvas until the strategy resolved.
     const spy = authoringSpy();
@@ -467,20 +473,23 @@ describe('render adapter', () => {
     store.getState().syncProjection(PROJECTED, []);
     expect(
       connections(store, spy.authoring).connect(
-        uuidSchema.parse(THING_A),
-        uuidSchema.parse(THING_B),
+        uuidSchema.parse(RESOURCE_A),
+        uuidSchema.parse(RESOURCE_B),
         null,
       ),
-    ).toEqual({ kind: 'completed', thingId: THING_B });
+    ).toEqual({ kind: 'completed', resourceId: RESOURCE_B });
 
-    expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([THING_A, THING_B]);
+    expect(store.getState().projection?.nodes.map((node) => node.id)).toEqual([
+      RESOURCE_A,
+      RESOURCE_B,
+    ]);
   });
 
   /*
-   * A reprojection can land while a Thing is in flight — an activated Graph or a
+   * A reprojection can land while a Resource is in flight — an activated Graph or a
    * selection redraws the graph without the gesture ending. The nodes it reports
    * carry the live position, and the author has settled on nothing, so that
-   * geometry is not theirs to author. Reported at review as reaching the Diagram
+   * geometry is not theirs to author. Reported at review as reaching the Map
    * through a later connection; it does not, because every completion re-reports
    * first. What it does reach is the in-memory placement, which re-runs the
    * strategy under a gesture still in progress.
@@ -489,35 +498,35 @@ describe('render adapter', () => {
     const { authoring, store } = sparsePositionedAdapter();
     store.getState().syncProjection(PROJECTED, []);
 
-    store.getState().changeNodes(moving(THING_A, 90, 90));
+    store.getState().changeNodes(moving(RESOURCE_A, 90, 90));
     store.getState().syncProjection(PROJECTED, []);
     // The gesture ends where it began, so no Edit completes and nothing reports.
-    store.getState().changeNodes(settled(THING_A, 10, 20));
+    store.getState().changeNodes(settled(RESOURCE_A, 10, 20));
 
-    expect(authoring.diagramPlacement()).toEqual(
+    expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: false }],
-        [THING_B, { x: 300, y: 20, open: false }],
+        [RESOURCE_A, { x: 10, y: 20, open: false }],
+        [RESOURCE_B, { x: 300, y: 20, open: false }],
       ]),
     );
   });
 
-  it('adds a newly created Thing without placing other omitted Things', () => {
-    const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_THING_ID));
+  it('adds a newly created Resource without placing other omitted Resources', () => {
+    const { session, store, authoring } = sparsePositionedAdapter(mintingIds(CREATED_RESOURCE_ID));
     store.getState().syncProjection(PROJECTED, []);
 
     expect(
       connections(store, authoring).createAndConnect(
-        uuidSchema.parse(THING_A),
+        uuidSchema.parse(RESOURCE_A),
         { x: 420, y: 360 },
         null,
       ),
-    ).toEqual({ kind: 'completed', thingId: CREATED_THING_ID });
+    ).toEqual({ kind: 'completed', resourceId: CREATED_RESOURCE_ID });
 
-    expect(session.getState().working.document.diagrams?.[0]?.positions).toEqual({
-      [THING_A]: { x: 10, y: 20, open: false },
-      [THING_B]: { x: 300, y: 20, open: false },
-      [CREATED_THING_ID]: { x: 420, y: 360, open: false },
+    expect(session.getState().working.document.maps?.[0]?.positions).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_B]: { x: 300, y: 20, open: false },
+      [CREATED_RESOURCE_ID]: { x: 420, y: 360, open: false },
     });
   });
 
@@ -534,31 +543,31 @@ describe('render adapter', () => {
 
     expect(
       connections(store, spy.authoring).connect(
-        uuidSchema.parse(THING_A),
-        uuidSchema.parse(THING_B),
+        uuidSchema.parse(RESOURCE_A),
+        uuidSchema.parse(RESOURCE_B),
         PROJECTED,
       ),
       // The refusal travels with the outcome, so nothing asks eligibility a
       // second time to recover the identity it already had — and it travels
       // structured, because the sentence is the surface's (ADR 0057).
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-resource-outside-map' } });
 
     expect(spy.completions).toEqual([]);
     expect(store.getState().projection).toBe(published);
   });
 
-  it('completes nothing for a created Thing Authoring refuses', () => {
+  it('completes nothing for a created Resource Authoring refuses', () => {
     const spy = authoringSpy({ refusing: 'create-and-connect' });
     const store = createRenderAdapter(spy.authoring);
     store.getState().syncProjection(PROJECTED, []);
 
     expect(
       connections(store, spy.authoring).createAndConnect(
-        uuidSchema.parse(THING_A),
+        uuidSchema.parse(RESOURCE_A),
         { x: 420, y: 360 },
         null,
       ),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-resource-outside-map' } });
 
     expect(spy.completions).toEqual([]);
   });
@@ -567,12 +576,12 @@ describe('render adapter', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
 
-    const closed = node(THING_A, 10, 20);
+    const closed = node(RESOURCE_A, 10, 20);
     closed.width = 260;
     closed.height = 146;
     store.getState().syncProjection([closed], []);
 
-    const expanded = node(THING_A, 40, 60);
+    const expanded = node(RESOURCE_A, 40, 60);
     expanded.width = 560;
     expanded.height = 420;
     expanded.zIndex = 10;
@@ -598,98 +607,98 @@ describe('render adapter', () => {
    */
   it('answers one resize capability across writes resize knows nothing about', () => {
     const spy = authoringSpy({
-      diagramPlacement: Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      mapPlacement: Placement.fromEntries([
+        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
-    const capability = store.getState().thingResize;
+    const capability = store.getState().resourceResize;
 
     store.getState().syncProjection(PROJECTED, []);
-    store.getState().selectThing(THING_A);
-    completeDrag(store, THING_A, 111, 222);
+    store.getState().selectResource(RESOURCE_A);
+    completeDrag(store, RESOURCE_A, 111, 222);
 
-    expect(store.getState().thingResize).toBe(capability);
+    expect(store.getState().resourceResize).toBe(capability);
     // Still the live capability and not a snapshot of one: the canvas holds it
     // from before the gesture and the store has to answer that same value.
-    capability.beginResize(THING_A);
-    expect(store.getState().resizeDraft?.thingId).toBe(THING_A);
+    capability.beginResize(RESOURCE_A);
+    expect(store.getState().resizeDraft?.resourceId).toBe(RESOURCE_A);
   });
 
-  it('previews the resizing Thing and nobody else, and completes only its final size', () => {
+  it('previews the resizing Resource and nobody else, and completes only its final size', () => {
     // The draft layers the proposed Open Size over the authored Placement and
     // nothing more. B keeps its authored coordinate through the whole gesture
-    // although A grows past it, because a Thing's neighbours do not move until
+    // although A grows past it, because a Resource's neighbours do not move until
     // the Edit lands (ADR 0084) — there is no derived layer left to preview.
     // This is what stops the render adapter reacquiring a `move` draft: a
-    // dragged Thing displaces nobody either.
+    // dragged Resource displaces nobody either.
     const authored = Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
-      [THING_B, { x: 300, y: 200, open: false }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
-    const spy = authoringSpy({ diagramPlacement: authored });
+    const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().thingResize.beginResize(THING_A);
-    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
+    store.getState().resourceResize.beginResize(RESOURCE_A);
+    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 620, height: 440 });
 
     expect(store.getState().resizeDraft).toEqual({
-      thingId: THING_A,
+      resourceId: RESOURCE_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
-        [THING_B, { x: 300, y: 200, open: false }],
+        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
+        [RESOURCE_B, { x: 300, y: 200, open: false }],
       ]),
     });
     expect(spy.completions).toEqual([]);
 
-    store.getState().thingResize.finishResize(THING_A);
+    store.getState().resourceResize.finishResize(RESOURCE_A);
 
     expect(spy.completions).toEqual([
-      { kind: 'resized-thing', thingId: THING_A, size: { width: 620, height: 440 } },
+      { kind: 'resized-resource', resourceId: RESOURCE_A, size: { width: 620, height: 440 } },
     ]);
     expect(store.getState().resizeDraft).toBeNull();
   });
 
   it('snaps both dimensions inside the Close range to the exact Closed rect', () => {
     const authored = Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
-    const spy = authoringSpy({ diagramPlacement: authored });
+    const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().thingResize.beginResize(THING_A);
-    store.getState().thingResize.previewResize(THING_A, { width: 280, height: 166 });
+    store.getState().resourceResize.beginResize(RESOURCE_A);
+    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 280, height: 166 });
 
     expect(store.getState().resizeDraft).toMatchObject({
-      thingId: THING_A,
+      resourceId: RESOURCE_A,
       size: { width: 260, height: 146 },
     });
-    expect(store.getState().resizeDraft?.placement.get(THING_A)).toEqual({
+    expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)).toEqual({
       x: 10,
       y: 20,
       open: true,
       openSize: { width: 260, height: 146 },
     });
 
-    store.getState().thingResize.finishResize(THING_A);
+    store.getState().resourceResize.finishResize(RESOURCE_A);
 
     expect(spy.completions).toEqual([
-      { kind: 'resized-thing', thingId: THING_A, size: { width: 260, height: 146 } },
+      { kind: 'resized-resource', resourceId: RESOURCE_A, size: { width: 260, height: 146 } },
     ]);
   });
 
   it('keeps an Open resize proposal when only one dimension reaches the Close range', () => {
     const authored = Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
-    const store = createRenderAdapter(authoringSpy({ diagramPlacement: authored }).authoring);
+    const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
 
-    store.getState().thingResize.beginResize(THING_A);
-    store.getState().thingResize.previewResize(THING_A, { width: 280, height: 240 });
+    store.getState().resourceResize.beginResize(RESOURCE_A);
+    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 280, height: 240 });
 
     expect(store.getState().resizeDraft).toMatchObject({
-      thingId: THING_A,
+      resourceId: RESOURCE_A,
       size: { width: 280, height: 240 },
     });
   });
@@ -698,25 +707,25 @@ describe('render adapter', () => {
    * A resize draft leaves the live nodes alone. Nothing rejects a node-only
    * rect here because React Flow never proposes one: its resize control emits
    * that `dimensions` change from the callback `shouldResize` gates, and the
-   * Thing refuses every frame while still handing the rect on. What proves that
+   * Resource refuses every frame while still handing the rect on. What proves that
    * end of it is the real control under a real gesture, in
    * `SpaceCanvas.test.tsx`; what this holds is that the draft alone does not
    * touch the published projection.
    */
   it('leaves the published projection alone while the resize draft grows', () => {
     const authored = Placement.fromEntries([
-      [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
-      [THING_B, { x: 300, y: 200, open: false }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
-    const store = createRenderAdapter(authoringSpy({ diagramPlacement: authored }).authoring);
-    const open = node(THING_A, 10, 20);
+    const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
+    const open = node(RESOURCE_A, 10, 20);
     open.width = 500;
     open.height = 360;
-    store.getState().syncProjection([open, node(THING_B, 300, 200)], [EDGE]);
+    store.getState().syncProjection([open, node(RESOURCE_B, 300, 200)], [EDGE]);
     const beforeDraftProjection = store.getState().projection;
 
-    store.getState().thingResize.beginResize(THING_A);
-    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
+    store.getState().resourceResize.beginResize(RESOURCE_A);
+    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 620, height: 440 });
 
     expect(store.getState().projection).toBe(beforeDraftProjection);
     expect(store.getState().projection?.nodes[0]).toMatchObject({ width: 500, height: 360 });
@@ -724,15 +733,15 @@ describe('render adapter', () => {
 
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
-      diagramPlacement: Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      mapPlacement: Placement.fromEntries([
+        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().thingResize.beginResize(THING_A);
-    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
-    store.getState().thingResize.cancelResize(THING_A);
+    store.getState().resourceResize.beginResize(RESOURCE_A);
+    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 620, height: 440 });
+    store.getState().resourceResize.cancelResize(RESOURCE_A);
 
     expect(store.getState().resizeDraft).toBeNull();
     expect(spy.completions).toEqual([]);
@@ -742,10 +751,10 @@ describe('render adapter', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
 
-    store.getState().syncProjection([node(THING_A, 10, 20)], []);
-    store.getState().changeNodes(moving(THING_A, 111, 222));
+    store.getState().syncProjection([node(RESOURCE_A, 10, 20)], []);
+    store.getState().changeNodes(moving(RESOURCE_A, 111, 222));
 
-    const expanded = node(THING_A, 40, 60);
+    const expanded = node(RESOURCE_A, 40, 60);
     expanded.width = 560;
     expanded.height = 420;
     expanded.zIndex = 10;
@@ -764,16 +773,16 @@ describe('render adapter', () => {
   it('completes no Edit for a drag that returns to where it began', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    store.getState().syncProjection([node(THING_A, 10, 20)], []);
+    store.getState().syncProjection([node(RESOURCE_A, 10, 20)], []);
 
     // React Flow reports a drag as many moving frames and one settled frame, and
     // the settled frame is measured against the *gesture's* start, not the
     // previous frame. `dragOrigins` is what retains that start across the two
     // callbacks; without it the comparison falls back to the last moving frame,
-    // and a thing put back where it came from reads as moved — persisting an Edit
+    // and a resource put back where it came from reads as moved — persisting an Edit
     // the author did not make.
-    store.getState().changeNodes(moving(THING_A, 500, 400));
-    store.getState().changeNodes(settled(THING_A, 10, 20));
+    store.getState().changeNodes(moving(RESOURCE_A, 500, 400));
+    store.getState().changeNodes(settled(RESOURCE_A, 10, 20));
 
     expect(spy.completions).toEqual([]);
     expect(store.getState().projection?.nodes[0]?.position).toEqual({ x: 10, y: 20 });
@@ -782,12 +791,14 @@ describe('render adapter', () => {
   it('publishes nothing new for a change aimed at a node it does not own', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
-    store.getState().syncProjection([node(THING_A, 10, 20)], []);
+    store.getState().syncProjection([node(RESOURCE_A, 10, 20)], []);
     const published = store.getState().projection;
 
     store
       .getState()
-      .changeNodes([{ type: 'dimensions', id: THING_C, dimensions: { width: 240, height: 120 } }]);
+      .changeNodes([
+        { type: 'dimensions', id: RESOURCE_C, dimensions: { width: 240, height: 120 } },
+      ]);
 
     // React Flow measures everything it renders and reports a `dimensions`
     // change for it, while `applyNodeChanges` always returns a fresh array. An
@@ -797,19 +808,19 @@ describe('render adapter', () => {
     expect(store.getState().projection).toBe(published);
   });
 
-  it('completes a settled-thing-movement Edit for a drag that lands somewhere new', () => {
+  it('completes a settled-resource-movement Edit for a drag that lands somewhere new', () => {
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     store.getState().syncProjection(PROJECTED, [EDGE]);
 
-    completeDrag(store, THING_A, 500, 400);
+    completeDrag(store, RESOURCE_A, 500, 400);
 
     expect(spy.completions).toEqual([
       {
-        kind: 'settled-thing-movement',
-        // Only the moved Thing's own drop point — B never moved, so it is not
-        // carried at all, and Authoring reads its position from the Diagram.
-        moved: new Map([[THING_A, { x: 500, y: 400 }]]),
+        kind: 'settled-resource-movement',
+        // Only the moved Resource's own drop point — B never moved, so it is not
+        // carried at all, and Authoring reads its position from the Map.
+        moved: new Map([[RESOURCE_A, { x: 500, y: 400 }]]),
       },
     ]);
   });
@@ -831,19 +842,19 @@ describe('render adapter', () => {
     const store = createRenderAdapter(failing);
     store.getState().syncProjection(PROJECTED, []);
     const published = store.getState().projection;
-    const projected = PROJECTED.map((thing) => ({ ...thing, className: 'connected' }));
+    const projected = PROJECTED.map((resource) => ({ ...resource, className: 'connected' }));
 
     expect(() =>
       connections(store, failing).connect(
-        uuidSchema.parse(THING_A),
-        uuidSchema.parse(THING_B),
+        uuidSchema.parse(RESOURCE_A),
+        uuidSchema.parse(RESOURCE_B),
         projected,
       ),
     ).toThrow('Authoring produced an invalid Space');
 
     expect(store.getState().projection).toBe(published);
     expect(
-      store.getState().projection?.nodes.every((thing) => thing.className !== 'connected'),
+      store.getState().projection?.nodes.every((resource) => resource.className !== 'connected'),
     ).toBe(true);
   });
 
@@ -865,13 +876,13 @@ describe('render adapter', () => {
     const store = createRenderAdapter(queueing);
     store.getState().syncProjection(PROJECTED, []);
     const published = store.getState().projection;
-    const projected = PROJECTED.map((thing) => ({ ...thing, className: 'connected' }));
+    const projected = PROJECTED.map((resource) => ({ ...resource, className: 'connected' }));
     const reported: unknown[] = [];
 
     expect(
       connections(store, queueing, (error) => reported.push(error)).connect(
-        uuidSchema.parse(THING_A),
-        uuidSchema.parse(THING_B),
+        uuidSchema.parse(RESOURCE_A),
+        uuidSchema.parse(RESOURCE_B),
         projected,
       ),
       // Not a refusal: the author is owed no sentence for a diagnostic, and a
@@ -881,29 +892,29 @@ describe('render adapter', () => {
     expect(reported).toHaveLength(1);
     expect(store.getState().projection).toBe(published);
     expect(
-      store.getState().projection?.nodes.every((thing) => thing.className !== 'connected'),
+      store.getState().projection?.nodes.every((resource) => resource.className !== 'connected'),
     ).toBe(true);
   });
 
   /*
-   * An embedded Diagram's live edit is an Interaction of the canvas, so it is
+   * An embedded Map's live edit is an Interaction of the canvas, so it is
    * held beside `resizeDraft` rather than reported up through a callback prop:
    * this store is what re-renders the Space's command surface and the canvas
    * together, and every availability answer is derived once, above both of them
    * (`authoring-availability.ts`).
    */
   it('carries no embedded edit before the canvas has reported one', () => {
-    expect(adapter().getState().editingEmbeddedDiagram).toBe(false);
+    expect(adapter().getState().editingEmbeddedMap).toBe(false);
   });
 
   it("takes the canvas's report of a live embedded edit and of its end", () => {
     const store = adapter();
 
-    store.getState().reportEmbeddedDiagramEditing(true);
-    expect(store.getState().editingEmbeddedDiagram).toBe(true);
+    store.getState().reportEmbeddedMapEditing(true);
+    expect(store.getState().editingEmbeddedMap).toBe(true);
 
-    store.getState().reportEmbeddedDiagramEditing(false);
-    expect(store.getState().editingEmbeddedDiagram).toBe(false);
+    store.getState().reportEmbeddedMapEditing(false);
+    expect(store.getState().editingEmbeddedMap).toBe(false);
   });
 
   /*
@@ -916,29 +927,31 @@ describe('render adapter', () => {
   it('publishes nothing for a report that says what the store already holds', () => {
     const store = adapter();
     const seen: boolean[] = [];
-    store.subscribe((state) => seen.push(state.editingEmbeddedDiagram));
+    store.subscribe((state) => seen.push(state.editingEmbeddedMap));
 
-    store.getState().reportEmbeddedDiagramEditing(false);
-    store.getState().reportEmbeddedDiagramEditing(true);
-    store.getState().reportEmbeddedDiagramEditing(true);
+    store.getState().reportEmbeddedMapEditing(false);
+    store.getState().reportEmbeddedMapEditing(true);
+    store.getState().reportEmbeddedMapEditing(true);
 
     expect(seen).toEqual([true]);
   });
 
   /*
    * Accepting a stored Space replaces the working state without unmounting
-   * anything, so this store is left holding a projection of Things that may no
+   * anything, so this store is left holding a projection of Resources that may no
    * longer exist. Local placement cannot outlive the Space it belonged to
    * (ADR 0030).
    */
   it('drops the published projection when a replacement Space is opened', async () => {
     const { store, session, authoring } = storedSpaceAdapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
-    completeDrag(store, THING_A, 500, 400);
+    completeDrag(store, RESOURCE_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
-    expect(authoring.complete({ kind: 'opened-thing', thingId: THING_A }).kind).toBe('completed');
-    store.getState().thingResize.beginResize(THING_A);
-    store.getState().thingResize.previewResize(THING_A, { width: 620, height: 440 });
+    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A }).kind).toBe(
+      'completed',
+    );
+    store.getState().resourceResize.beginResize(RESOURCE_A);
+    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 620, height: 440 });
     expect(store.getState().projection).not.toBeNull();
     expect(store.getState().resizeDraft).not.toBeNull();
 

@@ -7,7 +7,7 @@ model Space {
   exportedRevision String?  @map("exported_revision")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        temporal.updatedAt() @map("updated_at")
-  things           Thing[]
+  resources        Resource[]
   repositoryStates RepositoryState[]
 
   @@map("spaces")
@@ -21,7 +21,7 @@ model RepositoryState {
   @@map("repository_state")
 }
 
-model Thing {
+model Resource {
   id        String   @id
   spaceId   String   @map("space_id")
   document  Json
@@ -30,5 +30,5 @@ model Thing {
   space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
   @@index([spaceId])
-  @@map("things")
+  @@map("resources")
 }

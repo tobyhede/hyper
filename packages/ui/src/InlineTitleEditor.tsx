@@ -16,12 +16,12 @@ import { cn } from './lib/utils';
 /**
  * Which surface the field is standing in.
  *
- * Two, since ADR 0082: a Thing on the canvas and a name on the Command Dock.
+ * Two, since ADR 0082: a Resource on the canvas and a name on the Command Dock.
  * There was a `'sidebar'` arm and it went with the Sidebar — a variant with no
  * caller is an invitation, and the next chrome control would reasonably have
  * been written against it and taken styling tuned for a sixteen-rem column.
  */
-export type InlineTitleEditorVariant = 'thing' | 'header';
+export type InlineTitleEditorVariant = 'resource' | 'header';
 
 /** The two controls this editor drives, which share every handler it writes. */
 type TitleField = HTMLInputElement | HTMLTextAreaElement;
@@ -35,11 +35,11 @@ interface InlineTitleEditorBase {
    * Whether this Title may be written on more than one line (ADR 0083).
    *
    * A capability the caller opts into rather than a reading of `variant`. A
-   * Thing's Title is Title Lines and the Thing front draws the ladder; a Space,
-   * Diagram or Graph title is a label in a list with no front to draw one on,
+   * Resource's Title is Title Lines and the Resource front draws the ladder; a Space,
+   * Map or Graph title is a label in a list with no front to draw one on,
    * and giving all three the capability because they share a field type would
    * be the model following the implementation. Where a Title stands in that
-   * decision is the mounting surface's to know, so `CanvasThing` sets this and
+   * decision is the mounting surface's to know, so `CanvasResource` sets this and
    * the Dock's header does not — which is also what keeps the answer
    * visible at the call site rather than buried in a `variant` check here.
    *
@@ -69,7 +69,7 @@ interface InlineTitleEditorControlled {
   readonly onErrorChange: (error: string | null) => void;
 }
 
-/** The editor keeps the draft itself, which is what a Thing's Title does. */
+/** The editor keeps the draft itself, which is what a Resource's Title does. */
 interface InlineTitleEditorUncontrolled {
   readonly draft?: never;
   readonly error?: never;
@@ -81,7 +81,7 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
   (InlineTitleEditorControlled | InlineTitleEditorUncontrolled);
 
 /**
- * Refusable title editing shared by Things and named Space chrome, on one line
+ * Refusable title editing shared by Resources and named Space chrome, on one line
  * or on several.
  *
  * Custom-interaction deviation (ADR 0047):
@@ -91,7 +91,7 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  *   inline-edit item and no multiline-title item.
  * - Product requirement they cannot express: select-on-entry, Enter/blur completion, Escape
  *   cancellation, keyboard focus return, a refused draft that remains editable — and, for a
- *   Thing's Title Lines (ADR 0083), `Shift+Enter` inserting a line inside all of that.
+ *   Resource's Title Lines (ADR 0083), `Shift+Enter` inserting a line inside all of that.
  * - Why composition alone is insufficient: Input, Textarea and Field provide control and
  *   validation semantics and own none of that edit lifecycle. `Textarea` supplies the growing
  *   field — `field-sizing: content` is why the height follows the content here rather than a
@@ -100,9 +100,9 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  *   component's to decide and `Shift` is what it decides on.
  * - Custom behavior: only that lifecycle, in the two shapes {@link InlineTitleEditorBase.multiline}
  *   selects; product identity and authorship stay in the caller.
- * - Tests: `InlineTitleEditor.test.tsx`, `CanvasThing.test.tsx` for the `thing` variant and
+ * - Tests: `InlineTitleEditor.test.tsx`, `CanvasResource.test.tsx` for the `resource` variant and
  *   `SpaceApp.test.tsx` for the `header` one, which is where the Command Dock renames a
- *   Diagram and a Graph now that ADR 0082 has retired the Sidebar that used to; application
+ *   Map and a Graph now that ADR 0082 has retired the Sidebar that used to; application
  *   Playwright in `e2e/editing.spec.ts` and Ladle Playwright in
  *   `ladle-e2e/command-dock.spec.ts`.
  */
@@ -201,7 +201,7 @@ export function InlineTitleEditor({
   };
 
   const controlClassName = cn(
-    variant === 'thing' && 'thing__title-input',
+    variant === 'resource' && 'resource__title-input',
     variant === 'header' && 'h-7 rounded-md border-transparent px-1 py-0 font-medium',
   );
 
@@ -221,12 +221,12 @@ export function InlineTitleEditor({
   ) : (
     <Input ref={holdField} className={controlClassName} {...shared} />
   );
-  if (variant === 'thing') {
+  if (variant === 'resource') {
     return (
-      <div className={cn('thing__title-editor nodrag nopan nowheel min-w-0', className)}>
+      <div className={cn('resource__title-editor nodrag nopan nowheel min-w-0', className)}>
         {control}
         {error !== null && (
-          <span id={errorId} role="alert" className="thing__field-error">
+          <span id={errorId} role="alert" className="resource__field-error">
             {error}
           </span>
         )}

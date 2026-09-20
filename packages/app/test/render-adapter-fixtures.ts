@@ -1,16 +1,16 @@
 import type { NodeChange } from '@xyflow/react';
 import { uuidSchema } from '@project/core';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from '../src/render-adapter';
 
-export function node(id: string, x: number, y: number, title = id): ThingFlowNode {
+export function node(id: string, x: number, y: number, title = id): ResourceFlowNode {
   return {
     id,
-    type: 'thing',
+    type: 'resource',
     position: { x, y },
-    className: 'rf-thing-node',
+    className: 'rf-resource-node',
     data: {
-      thingId: uuidSchema.parse(id),
+      resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,
       kind: 'markdown',
@@ -23,11 +23,11 @@ export function node(id: string, x: number, y: number, title = id): ThingFlowNod
   };
 }
 
-export function moving(id: string, x: number, y: number): NodeChange<ThingFlowNode>[] {
+export function moving(id: string, x: number, y: number): NodeChange<ResourceFlowNode>[] {
   return [{ type: 'position', id, position: { x, y }, dragging: true }];
 }
 
-export function settled(id: string, x: number, y: number): NodeChange<ThingFlowNode>[] {
+export function settled(id: string, x: number, y: number): NodeChange<ResourceFlowNode>[] {
   return [{ type: 'position', id, position: { x, y }, dragging: false }];
 }
 

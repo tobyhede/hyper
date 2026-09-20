@@ -1,13 +1,9 @@
-import type { DiagramPosition } from '@project/core';
-import { CANVAS_THING_DRAG_TILT_DEGREES } from '@project/ui';
+import type { MapPosition } from '@project/core';
+import { CANVAS_RESOURCE_DRAG_TILT_DEGREES } from '@project/ui';
 
-export const DRAG_TILT_RADIANS = (CANVAS_THING_DRAG_TILT_DEGREES * Math.PI) / 180;
+export const DRAG_TILT_RADIANS = (CANVAS_RESOURCE_DRAG_TILT_DEGREES * Math.PI) / 180;
 
-export function rotateAbout(
-  point: DiagramPosition,
-  origin: DiagramPosition,
-  radians: number,
-): DiagramPosition {
+export function rotateAbout(point: MapPosition, origin: MapPosition, radians: number): MapPosition {
   const dx = point.x - origin.x;
   const dy = point.y - origin.y;
   const cos = Math.cos(radians);
@@ -18,12 +14,12 @@ export function rotateAbout(
   };
 }
 
-export function tiltThingPosition(
-  position: DiagramPosition,
+export function tiltResourcePosition(
+  position: MapPosition,
   size: { readonly width?: number | undefined; readonly height?: number | undefined },
-  origin: DiagramPosition,
+  origin: MapPosition,
   radians: number,
-): DiagramPosition {
+): MapPosition {
   const halfX = (size.width ?? 0) / 2;
   const halfY = (size.height ?? 0) / 2;
   const turned = rotateAbout({ x: position.x + halfX, y: position.y + halfY }, origin, radians);

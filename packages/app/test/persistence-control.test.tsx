@@ -5,13 +5,13 @@ import type { LoadedSpace } from '@project/persistence';
 import { PersistenceControl, PersistenceNotice } from '../src/components/PersistenceControl';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a2');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a3');
 
 const SNAPSHOT: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Stored space' },
-  things: [],
+  resources: [],
 };
 
 const STORED: LoadedSpace = { snapshot: SNAPSHOT, revision: 5n, exportedRevision: null };
@@ -26,9 +26,9 @@ describe('PersistenceControl', () => {
             kind: 'aggregate-refused',
             errors: [
               {
-                kind: 'space-thing-target-missing',
+                kind: 'space-resource-target-missing',
                 spaceId: SPACE_ID,
-                thingId: THING_ID,
+                resourceId: RESOURCE_ID,
                 targetSpaceId: TARGET_ID,
               },
               { kind: 'ordinary-space-unreferenced', spaceId: TARGET_ID },
@@ -40,11 +40,13 @@ describe('PersistenceControl', () => {
       />,
     );
 
-    expect(screen.getByText(/space thing points at a space that no longer exists/i)).toBeVisible();
+    expect(
+      screen.getByText(/space resource points at a space that no longer exists/i),
+    ).toBeVisible();
     expect(screen.getByText(/nothing pointing at it/i)).toBeVisible();
     // The domain identity stays in the domain: a refusal code is a stable name
     // for the repository to answer with, not a sentence to show an author.
-    expect(screen.queryByText(/space-thing-target-missing/)).toBeNull();
+    expect(screen.queryByText(/space-resource-target-missing/)).toBeNull();
     expect(screen.queryByText(/ordinary-space-unreferenced/)).toBeNull();
   });
 
@@ -97,7 +99,7 @@ describe('PersistenceControl', () => {
           baseline: {
             id: SPACE_ID,
             document: { version: 1, title: 'Before the coordinated edit' },
-            things: [],
+            resources: [],
           },
         }}
         onAcceptRemote={onAcceptRemote}
@@ -149,12 +151,12 @@ describe('PersistenceControl', () => {
     [
       'reload',
       { current: STORED, baseline: undefined },
-      /A newer version of this space is available\. Reload discards your local changes, including unsaved text you have typed into an open Thing\. Keep local and retry preserves that editing and tries to save it again\./,
+      /A newer version of this space is available\. Reload discards your local changes, including unsaved text you have typed into an open Resource\. Keep local and retry preserves that editing and tries to save it again\./,
     ],
     [
       'revert',
       { current: undefined, baseline: SNAPSHOT },
-      /A related space changed while this coordinated edit was saving\. Reload returns this space to how it was before the edit and discards unsaved text typed into an open Thing\. Keep local and retry preserves that editing and tries to save it again\./,
+      /A related space changed while this coordinated edit was saving\. Reload returns this space to how it was before the edit and discards unsaved text typed into an open Resource\. Keep local and retry preserves that editing and tries to save it again\./,
     ],
     [
       'none',

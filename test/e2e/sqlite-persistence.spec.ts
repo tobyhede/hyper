@@ -12,8 +12,8 @@ import { createSqliteDatabase, requireConfiguredSqlitePath } from '../../src/sql
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearSqliteContent } from '../support/clear-sqlite-content';
 import {
-  dragThingAndCapturePosition,
-  expectThingRestoredAt,
+  dragResourceAndCapturePosition,
+  expectResourceRestoredAt,
   openStoredSpace,
 } from '../support/restart-proof';
 import { SQLITE_E2E_PORT } from '../../packages/app/e2e/projects';
@@ -30,7 +30,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     // Below the default suite's `E2E_PORT_BASE + workerIndex` range and
     // distinct from the PostgreSQL proof's own fixed port, so this project can
     // run beside `pnpm e2e` and `pnpm e2e:postgres`. `strictPort` turns any
-    // overlap into a failure that blames the wrong thing.
+    // overlap into a failure that blames the wrong resource.
     server: { host: '127.0.0.1', port: SQLITE_E2E_PORT, strictPort: true },
   });
   try {
@@ -54,8 +54,8 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
   // message a host and this proof both report for an unset path.
   const path = requireConfiguredSqlitePath();
   const spaceId = newUuid();
-  const thingId = newUuid();
-  const diagramId = newUuid();
+  const resourceId = newUuid();
+  const mapId = newUuid();
   const graphId = newUuid();
   const title = `SQLite restart ${spaceId}`;
   let firstHost: ViteDevServer | undefined;
@@ -77,16 +77,16 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
       // and for its reason: `initializeAggregate` leaves an initialized
       // repository exactly as it is (ADR 0078), so a file still holding a Space
       // answers `already-initialized`, writes nothing, and sends the drag below
-      // looking for a Thing that was never stored. The outer `finally` handles
+      // looking for a Resource that was never stored. The outer `finally` handles
       // this run failing; this handles a run that never reached its `finally` at
       // all — a killed process, a CI timeout — and a file left dirty before the
       // outer cleanup existed.
       await clearSqliteContent(seedDatabase);
       const seedRepository = new SqlSpaceRepository(sqliteSqlStore(seedDatabase));
-      // The Diagram is part of the fixture, and has to be — see the matching
+      // The Map is part of the fixture, and has to be — see the matching
       // comment in `postgres-persistence.spec.ts`, which this mirrors exactly:
-      // a diagramless Space's first working load would mint an *empty*
-      // Diagram (ADR 0079), stranding the fixture's Thing off every canvas.
+      // a mapless Space's first working load would mint an *empty*
+      // Map (ADR 0079), stranding the fixture's Resource off every canvas.
       const initialized = await seedRepository.initializeAggregate({
         metaSpaceId: spaceId,
         spaces: [
@@ -95,22 +95,22 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
             document: {
               version: 1,
               title,
-              diagrams: [
+              maps: [
                 {
-                  id: diagramId,
-                  title: 'Diagram 1',
+                  id: mapId,
+                  title: 'Map 1',
                   kind: 'positioned',
-                  positions: { [thingId]: { x: 0, y: 0, open: false } },
+                  positions: { [resourceId]: { x: 0, y: 0, open: false } },
                   graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
                   activeGraph: graphId,
                 },
               ],
-              defaultDiagram: diagramId,
+              defaultMap: mapId,
             },
-            things: [
+            resources: [
               {
-                id: thingId,
-                document: { title: 'Restart thing', kind: 'markdown', body: 'Durable.' },
+                id: resourceId,
+                document: { title: 'Restart resource', kind: 'markdown', body: 'Durable.' },
               },
             ],
           },
@@ -128,9 +128,9 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     firstHost = first.server;
     const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
-    const durablePosition = await dragThingAndCapturePosition(
+    const durablePosition = await dragResourceAndCapturePosition(
       openedFirst.page,
-      'Restart thing',
+      'Restart resource',
       0,
       220,
       '1',
@@ -160,7 +160,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     secondHost = second.server;
     const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
-    await expectThingRestoredAt(openedSecond.page, 'Restart thing', durablePosition, '1');
+    await expectResourceRestoredAt(openedSecond.page, 'Restart resource', durablePosition, '1');
 
     await secondContext.close();
     secondContext = undefined;
@@ -206,7 +206,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     if (exportDirectory !== undefined) {
       await rm(exportDirectory, { recursive: true, force: true });
     }
-    // Clean up the Space and Thing this proof minted, as the PostgreSQL proof
+    // Clean up the Space and Resource this proof minted, as the PostgreSQL proof
     // does — so a rerun against the same `SQLITE_PATH` (a developer iterating
     // without re-migrating) meets an empty file rather than an
     // already-initialized one. Here, after every host and connection above has

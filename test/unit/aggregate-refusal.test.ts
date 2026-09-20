@@ -5,17 +5,21 @@ import { describeAggregateRefusal } from '../../src/cli/aggregate-refusal';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const DIAGRAM_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const MAP_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  things: [],
+  resources: [],
 };
 
-const location = { spaceId: SPACE_ID, thingId: THING_ID, targetSpaceId: TARGET_SPACE_ID } as const;
+const location = {
+  spaceId: SPACE_ID,
+  resourceId: RESOURCE_ID,
+  targetSpaceId: TARGET_SPACE_ID,
+} as const;
 
 const describeOne = (error: SpaceAggregateError, spaces: readonly SpaceSnapshot[] = [snapshot]) => {
   const [described] = describeAggregateRefusal([error], spaces);
@@ -62,11 +66,13 @@ describe('describeAggregateRefusal', () => {
     ).toBe(`Space ${SPACE_ID} is declared 2 times`);
     expect(
       describeOne({
-        kind: 'duplicate-thing-id',
-        thingId: THING_ID,
+        kind: 'duplicate-resource-id',
+        resourceId: RESOURCE_ID,
         spaceIds: [SPACE_ID, TARGET_SPACE_ID],
       }),
-    ).toBe(`Thing ${THING_ID} is claimed by more than one Space: ${SPACE_ID}, ${TARGET_SPACE_ID}`);
+    ).toBe(
+      `Resource ${RESOURCE_ID} is claimed by more than one Space: ${SPACE_ID}, ${TARGET_SPACE_ID}`,
+    );
   });
 
   it('names the Meta Space a directory declares but does not contain', () => {
@@ -75,39 +81,37 @@ describe('describeAggregateRefusal', () => {
 
   it('names an ordinary Space nothing points at', () => {
     expect(describeOne({ kind: 'ordinary-space-unreferenced', spaceId: SPACE_ID })).toBe(
-      `Space ${SPACE_ID} is not the Meta Space and no Space Thing points at it`,
+      `Space ${SPACE_ID} is not the Meta Space and no Space Resource points at it`,
     );
   });
 
   it.each([
-    { kind: 'space-thing-target-missing' as const, expected: 'does not contain' },
-    { kind: 'space-thing-reference-cycle' as const, expected: 'closes a reference cycle' },
-  ])('names the Space Thing and its target for $kind', ({ kind, expected }) => {
+    { kind: 'space-resource-target-missing' as const, expected: 'does not contain' },
+    { kind: 'space-resource-reference-cycle' as const, expected: 'closes a reference cycle' },
+  ])('names the Space Resource and its target for $kind', ({ kind, expected }) => {
     const described = describeOne({ kind, ...location });
 
-    expect(described).toContain(`Space Thing ${THING_ID} in Space ${SPACE_ID}`);
+    expect(described).toContain(`Space Resource ${RESOURCE_ID} in Space ${SPACE_ID}`);
     expect(described).toContain(TARGET_SPACE_ID);
     expect(described).toContain(expected);
   });
 
-  it('tells a missing selection apart from one the target has but the Diagram does not own', () => {
-    expect(
-      describeOne({ kind: 'space-thing-diagram-missing', ...location, diagramId: DIAGRAM_ID }),
-    ).toBe(
-      `Space Thing ${THING_ID} in Space ${SPACE_ID} selects Diagram ${DIAGRAM_ID}, which Space ${TARGET_SPACE_ID} does not have`,
+  it('tells a missing selection apart from one the target has but the Map does not own', () => {
+    expect(describeOne({ kind: 'space-resource-map-missing', ...location, mapId: MAP_ID })).toBe(
+      `Space Resource ${RESOURCE_ID} in Space ${SPACE_ID} selects Map ${MAP_ID}, which Space ${TARGET_SPACE_ID} does not have`,
     );
     expect(
-      describeOne({ kind: 'space-thing-graph-missing', ...location, graphId: GRAPH_ID }),
+      describeOne({ kind: 'space-resource-graph-missing', ...location, graphId: GRAPH_ID }),
     ).toContain(`selects Graph ${GRAPH_ID}, which Space ${TARGET_SPACE_ID} does not have`);
     expect(
       describeOne({
-        kind: 'space-thing-graph-outside-diagram',
+        kind: 'space-resource-graph-outside-map',
         ...location,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
       }),
     ).toContain(
-      `selects Graph ${GRAPH_ID}, which Space ${TARGET_SPACE_ID} has but Diagram ${DIAGRAM_ID} does not own`,
+      `selects Graph ${GRAPH_ID}, which Space ${TARGET_SPACE_ID} has but Map ${MAP_ID} does not own`,
     );
   });
 
@@ -127,7 +131,7 @@ describe('describeAggregateRefusal', () => {
         [snapshot],
       ),
     ).toEqual([
-      `Space ${TARGET_SPACE_ID} is not the Meta Space and no Space Thing points at it`,
+      `Space ${TARGET_SPACE_ID} is not the Meta Space and no Space Resource points at it`,
       `The aggregate names Meta Space ${SPACE_ID}, which it does not contain`,
     ]);
   });

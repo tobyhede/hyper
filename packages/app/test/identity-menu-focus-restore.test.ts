@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { identityMenuRestoresFocusOnClose } from '../src/components/identity-menu-focus-restore';
 
 describe('identityMenuRestoresFocusOnClose', () => {
-  it('suppresses trigger restoration once New Diagram has moved the caret', () => {
+  it('suppresses trigger restoration once New Map has moved the caret', () => {
     const identityRestoresFocusOnClose = vi.fn(() => true);
 
     expect(identityMenuRestoresFocusOnClose(() => true, identityRestoresFocusOnClose)()).toBe(

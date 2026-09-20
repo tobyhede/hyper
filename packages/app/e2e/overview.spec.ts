@@ -7,25 +7,25 @@ import {
   boxOf,
   graphChoices,
   graphLegendSwatchColor,
-  diagramChoices,
-  openThing,
+  mapChoices,
+  openResource,
   selectCanvas,
   selectedCanvas,
   settled,
 } from './graph';
 
 // The app loads the tracked fixture aggregate (packages/app/fixture) and opens
-// its Meta Space — two disconnected collections sharing no Things:
+// its Meta Space — two disconnected collections sharing no Resources:
 //   1. Long (A→B→C→D→A′), Mid (A→B→C→D), Short (A→B→C) — graphs over one spine,
-//      plus T, a member of that Diagram no Edge reaches, whose Title is three
+//      plus T, a member of that Map no Edge reaches, whose Title is three
 //      lines (ADR 0083)
 //   2. Echo (E→F→G→H→E′) — a plain linear collection
-// Each collection is a Diagram, because a Graph is a nested owned value of one
-// (ADR 0040) and these two share no Things. The fixture opens in Collection 1,
-// and each Diagram draws only the Things and Graphs it owns.
-// Each returns to its start via a reference thing, so this particular fixture is acyclic
+// Each collection is a Map, because a Graph is a nested owned value of one
+// (ADR 0040) and these two share no Resources. The fixture opens in Collection 1,
+// and each Map draws only the Resources and Graphs it owns.
+// Each returns to its start via a reference resource, so this particular fixture is acyclic
 // and lays out as clean forward paths even though Graphs may contain cycles
-// (ADR 0032). These tests assert *behaviour* against that shape; none read thing prose. See
+// (ADR 0032). These tests assert *behaviour* against that shape; none read resource prose. See
 // packages/app/README.md for why each case is there.
 //
 // This file is the **overview**: the space drawn whole, every graph at once.
@@ -34,8 +34,8 @@ import {
 // its own spec. The deck's tests are not adapted here; they asserted against a
 // surface that no longer exists.
 
-/** A graph node located by its exact thing title, so single-letter titles don't
- *  collide (a reference thing node names its target, so "A" appears on more than one). */
+/** A graph node located by its exact resource title, so single-letter titles don't
+ *  collide (a reference resource node names its target, so "A" appears on more than one). */
 function nodeByTitle(page: Page, title: string): Locator {
   return page
     .locator('.react-flow__node')
@@ -44,24 +44,24 @@ function nodeByTitle(page: Page, title: string): Locator {
 
 test('offers more than one named graph', async ({ page }) => {
   await page.goto('/');
-  // The Graph cluster's own list holds every Graph the selected Diagram owns.
+  // The Graph cluster's own list holds every Graph the selected Map owns.
   await expect(await graphChoices(page)).toHaveCount(3);
 });
 
-test('draws every Graph in the selected Diagram, each in its own color', async ({ page }) => {
+test('draws every Graph in the selected Map, each in its own color', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
 
   // Collection 1 owns three Graphs. A legend maps each to a color.
   await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(3);
 
-  // Six Things — the five on the spine plus T, which joins no Graph — Long's four
-  // Edges plus Mid's three plus Short's two, and eight anchors on every Thing.
-  // T draws its eight like the rest: an anchor is a Thing's and not a Graph's
+  // Six Resources — the five on the spine plus T, which joins no Graph — Long's four
+  // Edges plus Mid's three plus Short's two, and eight anchors on every Resource.
+  // T draws its eight like the rest: an anchor is a Resource's and not a Graph's
   // since ADR 0087, so joining no Graph takes none of them away.
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
-  await expect(page.locator('.rf-thing-node__authoring-handle')).toHaveCount(48);
+  await expect(page.locator('.rf-resource-node__authoring-handle')).toHaveCount(48);
 
   // Distinct colors, so the graphs can be told apart.
   const strokes = await page
@@ -72,12 +72,12 @@ test('draws every Graph in the selected Diagram, each in its own color', async (
 });
 
 test(
-  'production Canvas Things expose Reference Thing identity and a keyboard Open action',
+  'production Canvas Resources expose Reference Resource identity and a keyboard Open action',
   {
     tag: [
-      '@parity:canvas-thing-exposes-kind-and-keyboard-actions',
-      '@parity:canvas-thing-shows-kind-treatment',
-      '@parity:markdown-thing-opens-and-closes-in-place',
+      '@parity:canvas-resource-exposes-kind-and-keyboard-actions',
+      '@parity:canvas-resource-shows-kind-treatment',
+      '@parity:markdown-resource-opens-and-closes-in-place',
     ],
   },
   async ({ page }) => {
@@ -85,24 +85,24 @@ test(
     await selectCanvas(page, 'Collection 1');
 
     const reference = nodeByTitle(page, 'A′').first();
-    await expect(reference.getByRole('img', { name: 'Reference Thing' })).toBeVisible();
+    await expect(reference.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
 
     const markdown = nodeByTitle(page, 'A').first();
     await markdown.click();
-    const open = markdown.getByRole('button', { name: 'Open Thing A' });
+    const open = markdown.getByRole('button', { name: 'Open Resource A' });
     await open.focus();
     await expect(open).toBeFocused();
     await open.press('Enter');
     await expect(markdown.getByRole('heading', { name: 'A', exact: true })).toBeVisible();
     await expect(markdown.getByText('entry point')).toBeVisible();
-    await markdown.getByRole('button', { name: 'Edit Thing A' }).click();
+    await markdown.getByRole('button', { name: 'Edit Resource A' }).click();
     const source = markdown.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
     await markdown.getByRole('heading', { name: 'A', exact: true }).click();
     await expect(source).toBeVisible();
-    await expect(markdown.getByRole('button', { name: 'Close Thing A' })).toBeDisabled();
+    await expect(markdown.getByRole('button', { name: 'Close Resource A' })).toBeDisabled();
     await source.press('Escape');
-    await expect(markdown.getByRole('button', { name: 'Edit Thing A' })).toBeFocused();
+    await expect(markdown.getByRole('button', { name: 'Edit Resource A' })).toBeFocused();
   },
 );
 
@@ -110,27 +110,27 @@ test(
  * **The requested treatment change, read off the running application**
  * (`.scratch/command-dock/issues/12`).
  *
- * This test used to assert the opposite — that a selected Thing's rail painted
+ * This test used to assert the opposite — that a selected Resource's rail painted
  * the Active Graph's colour. Three cues replace it, and none of them is a
  * weaker version of the claim: the band paints nothing; the commands on it are
  * the *same* surface the Command Dock is drawn on, compared property by property
  * against the Dock actually on screen rather than against numbers copied out of
- * a stylesheet; and the Graph's colour is still on the Thing, on the handles an
+ * a stylesheet; and the Graph's colour is still on the Resource, on the handles an
  * Edge of that Graph leaves it from.
  */
 test(
-  "a selected Thing's commands are the Dock's own surface, and the Graph's colour stays on its handles",
-  { tag: '@parity:canvas-thing-toolbar-is-neutral-and-graph-colour-stays-on-connections' },
+  "a selected Resource's commands are the Dock's own surface, and the Graph's colour stays on its handles",
+  { tag: '@parity:canvas-resource-toolbar-is-neutral-and-graph-colour-stays-on-connections' },
   async ({ page }) => {
     await page.goto('/');
     await activateGraph(page, 'Long');
     const graphColor = await graphLegendSwatchColor(page, 'Long');
 
-    const thing = nodeByTitle(page, 'A').first();
-    await thing.click();
+    const resource = nodeByTitle(page, 'A').first();
+    await resource.click();
 
     // No band, at the one state that used to carry the loudest one.
-    await expect(thing.locator('.canvas-thing__rail')).toHaveCSS(
+    await expect(resource.locator('.canvas-resource__rail')).toHaveCSS(
       'background-color',
       'rgba(0, 0, 0, 0)',
     );
@@ -149,7 +149,7 @@ test(
           gap: style.columnGap,
         };
       });
-    const commands = thing.getByTestId('canvas-thing-actions');
+    const commands = resource.getByTestId('canvas-resource-actions');
     await expect(commands).toHaveCSS('opacity', '1');
     expect(await treatment(commands)).toEqual(
       await treatment(page.locator('.command-dock__surface:visible')),
@@ -157,25 +157,25 @@ test(
     expect((await treatment(commands)).background).not.toBe(graphColor);
 
     // And the colour identifies the Graph where a Graph is: the points its Edges
-    // leave the Thing from.
-    const handle = thing.locator('.rf-thing-node__authoring-handle--source').first();
+    // leave the Resource from.
+    const handle = resource.locator('.rf-resource-node__authoring-handle--source').first();
     await expect(handle).toHaveCSS('opacity', '1');
     await expect(handle).toHaveCSS('background-color', graphColor);
   },
 );
 
 /**
- * A Diagram draws the Graphs it owns. Selecting is navigation and writes
+ * A Map draws the Graphs it owns. Selecting is navigation and writes
  * nothing (ADR 0031), so the revision is unmoved throughout.
  *
- * This is also the application half of the Graph HUD's `SparseDiagram` story
+ * This is also the application half of the Graph HUD's `SparseMap` story
  * (`packages/app/stories/surfaces/graph-hud.stories.tsx`, issue 06 ticket 02):
- * the same claim, that the key is the selected Diagram's own Graphs and not
+ * the same claim, that the key is the selected Map's own Graphs and not
  * the Space's, over the tracked fixture rather than the catalogue's.
  */
 test(
-  'selecting a Diagram draws the Graphs it owns and only those',
-  { tag: '@parity:graph-hud-key-follows-the-open-diagram' },
+  'selecting a Map draws the Graphs it owns and only those',
+  { tag: '@parity:graph-hud-key-follows-the-open-map' },
   async ({ page }) => {
     await page.goto('/');
     const persistence = page.getByTestId('persistence-status');
@@ -183,7 +183,7 @@ test(
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
     await expect(selectedCanvas(page)).toContainText('Collection 1');
-    await expect(await diagramChoices(page)).toHaveCount(3);
+    await expect(await mapChoices(page)).toHaveCount(3);
     await page.keyboard.press('Escape');
 
     // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
@@ -210,15 +210,15 @@ test(
  *
  * A `.react-flow__panel` is `position: absolute` with no `pointer-events` rule
  * of React Flow's own, so a Panel swallows every gesture over its box — and the
- * HUD stands in the corner a Thing's bottom-right resize control lives in,
+ * HUD stands in the corner a Resource's bottom-right resize control lives in,
  * which is the harm `command-dock.css`'s bottom-edge offset already names for
  * the Dock. The key holds no control, so it hands the pointer back; the two
  * clipped names keep theirs, because their `title` is the only place a name
  * `truncate` has ellipsised can still be read.
  *
  * The three gestures this buys back are asserted where they live rather than
- * restated here — the Open Thing drag in `editing.spec.ts`, Reference Thing A′'s
- * resize below, and the Space Thing padding probe in `space-thing.spec.ts` all
+ * restated here — the Open Resource drag in `editing.spec.ts`, Reference Resource A′'s
+ * resize below, and the Space Resource padding probe in `space-resource.spec.ts` all
  * reach past the HUD to the canvas. This is the mechanism under them.
  */
 test(
@@ -234,7 +234,7 @@ test(
         ([px, py]: readonly number[]) => {
           const element = document.elementFromPoint(px ?? 0, py ?? 0);
           if (element === null) return 'nothing';
-          if (element.closest('[data-testid="hud-space"], [data-testid="hud-diagram"]') !== null)
+          if (element.closest('[data-testid="hud-space"], [data-testid="hud-map"]') !== null)
             return 'name';
           if (element.closest('.react-flow__panel') !== null) return 'hud';
           return 'canvas';
@@ -250,15 +250,15 @@ test(
     const name = page.getByTestId('hud-space');
     const nameBox = await boxOf(name, "the HUD's Space name");
     expect(await topmostAt(nameBox.x + 4, nameBox.y + nameBox.height / 2)).toBe('name');
-    await expect(name).toHaveAttribute('title', 'Diagram fixture');
-    await expect(page.getByTestId('hud-diagram')).toHaveAttribute('title', 'Collection 1');
+    await expect(name).toHaveAttribute('title', 'Map fixture');
+    await expect(page.getByTestId('hud-map')).toHaveAttribute('title', 'Collection 1');
   },
 );
 
 /**
  * The two surfaces that name a Graph, held to the same answer.
  *
- * The Command Dock's Graph cluster discloses every Graph the selected Diagram
+ * The Command Dock's Graph cluster discloses every Graph the selected Map
  * owns, with its title, its colour and which one is active — which is what the
  * canvas HUD's key already said. Issue 06 keeps the key: it is the on-canvas
  * colour reference beside the Edges being read, and it is the one of the two
@@ -275,12 +275,12 @@ test(
     await expect(legendItems).toHaveCount(3);
 
     // The read-only identity says what the key belongs to, using the same
-    // selected Space and Diagram the Dock names rather than resolving again.
-    await expect(page.getByTestId('hud-space')).toHaveText('Diagram fixture');
-    await expect(page.getByTestId('hud-diagram')).toHaveText('Collection 1');
+    // selected Space and Map the Dock names rather than resolving again.
+    await expect(page.getByTestId('hud-space')).toHaveText('Map fixture');
+    await expect(page.getByTestId('hud-map')).toHaveText('Collection 1');
     await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
 
-    // Titles, in the same order from the selected Diagram.
+    // Titles, in the same order from the selected Map.
     const choices = await graphChoices(page);
     expect(await legendItems.allInnerTexts()).toEqual(await choices.allInnerTexts());
 
@@ -330,22 +330,24 @@ test(
  *
  * The Ladle story is where the front is reviewed whole; this is the half of that
  * evidence a browser owns — the projection carrying a stored multiline Title
- * through to a drawn Thing, clamped inside the Thing the author sized rather than
+ * through to a drawn Resource, clamped inside the Resource the author sized rather than
  * growing it. `T` is the fixture's one such Title, one line of each role
  * (packages/app/README.md), which is also why a regression here shows up in a
  * failure screenshot rather than only in a unit test.
  */
 test(
-  'a Thing whose author wrote more than one line draws its Title as Title Lines',
-  { tag: '@parity:canvas-thing-front-draws-only-its-title-lines' },
+  'a Resource whose author wrote more than one line draws its Title as Title Lines',
+  { tag: '@parity:canvas-resource-front-draws-only-its-title-lines' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
 
-    const thing = page.locator('.react-flow__node[data-id="00000000-0000-4000-8000-00000000000e"]');
-    await expect(thing).toBeVisible();
+    const resource = page.locator(
+      '.react-flow__node[data-id="00000000-0000-4000-8000-00000000000e"]',
+    );
+    await expect(resource).toBeVisible();
 
-    const lines = thing.locator('.canvas-thing__title-line');
+    const lines = resource.locator('.canvas-resource__title-line');
     await expect(lines).toHaveCount(3);
     expect(await lines.allInnerTexts()).toEqual(['T', 'a subtitle line', 'a caption line']);
     expect(
@@ -354,26 +356,26 @@ test(
       ),
     ).toEqual(['title', 'subtitle', 'caption']);
 
-    // Descending, and nothing else drawn on the front: the Thing's own text is
+    // Descending, and nothing else drawn on the front: the Resource's own text is
     // its Title Lines, which is what the two undecided reference lines failed.
     const sizes = await lines.evaluateAll((elements) =>
       elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
     );
     expect(sizes[0]! > sizes[1]!).toBe(true);
     expect(sizes[1]! > sizes[2]!).toBe(true);
-    await expect(thing.locator('.canvas-thing__body > *')).toHaveCount(1);
-    await expect(thing.locator('.canvas-thing__content')).toHaveCount(0);
+    await expect(resource.locator('.canvas-resource__body > *')).toHaveCount(1);
+    await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
 
-    // A Title never resizes a Thing (ADR 0014, ADR 0083): three rungs draw in
-    // the same box every other Thing on this Diagram has.
-    const laddered = await boxOf(thing, 'the multiline-Title Thing');
-    const plain = await boxOf(nodeByTitle(page, 'B'), 'Thing B');
+    // A Title never resizes a Resource (ADR 0014, ADR 0083): three rungs draw in
+    // the same box every other Resource on this Map has.
+    const laddered = await boxOf(resource, 'the multiline-Title Resource');
+    const plain = await boxOf(nodeByTitle(page, 'B'), 'Resource B');
     expect(laddered.height).toBeCloseTo(plain.height, 0);
     expect(laddered.width).toBeCloseTo(plain.width, 0);
   },
 );
 
-test('anchors stay measurable, so Edges attach where the Thing is', async ({ page }) => {
+test('anchors stay measurable, so Edges attach where the Resource is', async ({ page }) => {
   await page.goto('/');
 
   // React Flow measures every handle's box to work out where an edge attaches,
@@ -382,7 +384,7 @@ test('anchors stay measurable, so Edges attach where the Thing is', async ({ pag
   // `opacity: 0` until the reveal shows them, which keeps the box; that reads as
   // an ordinary styling choice, and this is what stops a later CSS tidy-up from
   // reaching for `display: none`. See react-flow-guidance/issues/03.
-  const anchors = page.locator('.rf-thing-node__authoring-handle');
+  const anchors = page.locator('.rf-resource-node__authoring-handle');
   await expect(anchors.first()).toBeAttached();
 
   const boxes = await anchors.evaluateAll((els) =>
@@ -392,7 +394,7 @@ test('anchors stay measurable, so Edges attach where the Thing is', async ({ pag
     }),
   );
 
-  // Asserted against whatever the fixture currently draws — its graph/thing
+  // Asserted against whatever the fixture currently draws — its graph/resource
   // shape is free to change (fixture/README.md).
   expect(boxes.length).toBeGreaterThan(0);
   expect(boxes.every((box) => box.width > 0 && box.height > 0)).toBe(true);
@@ -430,48 +432,51 @@ test('selecting a graph emphasises it without hiding the others', async ({ page 
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 });
 
-test('a thing shows its title in the graph, and opens to show rendered Markdown', async ({
+test('a resource shows its title in the graph, and opens to show rendered Markdown', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
-  // The graph draws the title, never the thing's body (ADR 0051). "entry point"
+  // The graph draws the title, never the resource's body (ADR 0051). "entry point"
   // is A's body text, which must not appear.
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
   await expect(a).not.toContainText('entry point');
-  await expect(a.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
+  await expect(a.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 
-  // Opening renders the Markdown in the existing Thing and keeps Close reachable.
-  await openThing(a, 'A');
+  // Opening renders the Markdown in the existing Resource and keeps Close reachable.
+  await openResource(a, 'A');
   await expect(a.getByText('A', { exact: true }).last()).toHaveCSS('font-weight', '700');
 
-  // Hovered again before the press: opening grows the Thing under the pointer, so
+  // Hovered again before the press: opening grows the Resource under the pointer, so
   // the rail the Open left revealed may already have faded by the time Close is
   // reached — and a faded rail takes no pointer events.
   await a.hover();
-  await a.getByRole('button', { name: 'Close Thing A' }).click();
-  await expect(a.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
+  await a.getByRole('button', { name: 'Close Resource A' }).click();
+  await expect(a.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 
-/** The two attributes of a Thing's content as one commit left them. */
+/** The two attributes of a Resource's content as one commit left them. */
 interface PresenceCommit {
   readonly presence: string | null;
   readonly inert: string | null;
 }
 
-test('the Close action closes an opened thing', async ({ page }) => {
+test('the Close action closes an opened resource', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await openThing(thing, 'A');
-  await expect(thing.locator('.canvas-thing__content')).toHaveAttribute('data-presence', 'present');
+  const resource = nodeByTitle(page, 'A').first();
+  await openResource(resource, 'A');
+  await expect(resource.locator('.canvas-resource__content')).toHaveAttribute(
+    'data-presence',
+    'present',
+  );
 
   // Installed ahead of the Close click, because leaving is over before anything
   // out here can ask about it. `usePresence` keeps the leaving content mounted
-  // for the duration the element itself declares — `--thing-placement-duration
+  // for the duration the element itself declares — `--resource-placement-duration
   // * 0.4`, 80ms — and then unmounts it, so an `expect.poll` from the test
   // process is spending a CDP round trip on a window that is already closing;
   // on a loaded runner the first sample lands after the unmount and sees an
@@ -481,17 +486,17 @@ test('the Close action closes an opened thing', async ({ page }) => {
   // record is read back afterwards at leisure.
   //
   // Both attributes are read together in the one callback, which is what makes
-  // this one observation of one commit — `CanvasThing`'s `inert` layout effect
+  // this one observation of one commit — `CanvasResource`'s `inert` layout effect
   // runs in the commit that writes `data-presence`, and a MutationObserver is
   // delivered after that whole commit rather than between its two writes. The
   // observer then stops, so `inert` arriving a commit later would be recorded
   // here as the `null` it was when `leaving` appeared, and fail. An empty
   // record is a failure too, and a different one: the content never entered
   // `leaving` at all.
-  const leaving = await thing.evaluateHandle((node) => {
+  const leaving = await resource.evaluateHandle((node) => {
     const commits: PresenceCommit[] = [];
     new MutationObserver((_mutations, observer) => {
-      const content = node.querySelector('.canvas-thing__content');
+      const content = node.querySelector('.canvas-resource__content');
       if (content === null) return;
       const presence = content.getAttribute('data-presence');
       if (presence !== 'leaving') return;
@@ -505,37 +510,37 @@ test('the Close action closes an opened thing', async ({ page }) => {
     return commits;
   });
 
-  await thing.getByRole('button', { name: 'Close Thing A' }).click();
+  await resource.getByRole('button', { name: 'Close Resource A' }).click();
   // The unmount is a fact worth asserting on its own and also the proof that
   // the leaving window has closed, so what the observer caught is read once
   // after it rather than polled for.
-  await expect(thing.locator('.canvas-thing__content')).toHaveCount(0);
+  await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
   expect(await leaving.jsonValue()).toEqual([{ presence: 'leaving', inert: '' }]);
-  await expect(thing.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
+  await expect(resource.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 
-test('things are drawn at exactly the size the strategy placed them at', async ({ page }) => {
+test('resources are drawn at exactly the size the strategy placed them at', async ({ page }) => {
   await page.goto('/');
-  const inner = page.locator('.rf-thing-node__inner').first();
+  const inner = page.locator('.rf-resource-node__inner').first();
   await expect(inner).toBeVisible();
 
-  // The layout strategy arranges things at `thing.ts`'s size and the stylesheet draws them
-  // from the same numbers. If these drift, handles land where the thing isn't —
+  // The layout strategy arranges resources at `resource.ts`'s size and the stylesheet draws them
+  // from the same numbers. If these drift, handles land where the resource isn't —
   // silently, and looking like a strategy bug.
   const declared = await page.evaluate(() => {
     const el = document.querySelector('.graph-area')!;
     const s = getComputedStyle(el);
     return {
-      w: s.getPropertyValue('--thing-width').trim(),
-      h: s.getPropertyValue('--thing-height').trim(),
+      w: s.getPropertyValue('--resource-width').trim(),
+      h: s.getPropertyValue('--resource-height').trim(),
     };
   });
   expect(declared.w).toBe('260px');
 
   const drawn = await inner.evaluate((el) => {
     const s = getComputedStyle(el);
-    const thing = el.querySelector('.canvas-thing')!;
-    return { w: s.width, h: getComputedStyle(thing).height };
+    const resource = el.querySelector('.canvas-resource')!;
+    return { w: s.width, h: getComputedStyle(resource).height };
   });
   expect(drawn.w).toBe(declared.w);
   expect(drawn.h).toBe(declared.h);
@@ -545,7 +550,7 @@ test('things are drawn at exactly the size the strategy placed them at', async (
 });
 
 test(
-  'a Reference Thing Opens on its Target Markdown read-only with click, Enter and Space',
+  'a Reference Resource Opens on its Target Markdown read-only with click, Enter and Space',
   { tag: '@parity:open-reference-shows-target-markdown-read-only' },
   async ({ page }) => {
     await page.goto('/');
@@ -554,18 +559,18 @@ test(
     const recap = nodeByTitle(page, 'A′');
     await expect(recap).toBeVisible();
 
-    await openThing(recap, 'A′');
+    await openResource(recap, 'A′');
     await expect(recap.getByText('entry point')).toBeVisible();
     await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
     await expect(recap.getByRole('textbox')).toHaveCount(0);
-    await expect(recap.getByRole('button', { name: /Edit Thing/ })).toHaveCount(0);
+    await expect(recap.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
-    await recap.getByRole('button', { name: 'Close Thing A′' }).click();
+    await recap.getByRole('button', { name: 'Close Resource A′' }).click();
 
     await recap.focus();
     await page.keyboard.press('Enter');
-    await expect(recap.getByRole('button', { name: 'Close Thing A′' })).toBeVisible();
-    await recap.getByRole('button', { name: 'Close Thing A′' }).click();
+    await expect(recap.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
+    await recap.getByRole('button', { name: 'Close Resource A′' }).click();
 
     await recap.focus();
     await page.keyboard.press('Space');
@@ -580,7 +585,7 @@ test(
     await expect(persistence).toHaveText('Persisted');
     const beforeResizeRevisionValue = await persistence.getAttribute('data-revision');
     if (beforeResizeRevisionValue === null) {
-      throw new Error('Persisted Reference Thing A′ has no revision');
+      throw new Error('Persisted Reference Resource A′ has no revision');
     }
     const beforeResizeRevision = Number(beforeResizeRevisionValue);
     const openSize = await recap.evaluate((element) => ({
@@ -589,10 +594,10 @@ test(
     }));
     await page.getByRole('button', { name: 'Zoom out' }).click();
     await settled(page);
-    const resizeBox = await boxOf(resizeControl, "Reference Thing A′'s resize control");
+    const resizeBox = await boxOf(resizeControl, "Reference Resource A′'s resize control");
     // The drag has to end **inside the viewport**: a `mousemove` past the
     // window's edge is clamped, and the gesture then ends where it never went
-    // and commits nothing. `A′` is the last Thing on the spine and sits near the
+    // and commits nothing. `A′` is the last Resource on the spine and sits near the
     // right edge, so the delta is what fits rather than what is round.
     const grabX = resizeBox.x + resizeBox.width / 2;
     const grabY = resizeBox.y + resizeBox.height / 2;
@@ -613,9 +618,9 @@ test(
     expect(resizedSize.width).toBeGreaterThan(openSize.width);
     expect(resizedSize.height).toBeGreaterThan(openSize.height);
 
-    await recap.getByRole('button', { name: 'Close Thing A′' }).click();
+    await recap.getByRole('button', { name: 'Close Resource A′' }).click();
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 2));
-    await openThing(recap, 'A′');
+    await openResource(recap, 'A′');
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 3));
     await recap.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -630,7 +635,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A′');
     await expect(persisted.getByText('entry point')).toBeVisible();
-    await expect(persisted.getByRole('button', { name: 'Close Thing A′' })).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
     const persistedSize = await persisted.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
@@ -640,6 +645,6 @@ test(
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
 
     await persisted.getByRole('button', { name: 'Edit Title A′', exact: true }).click();
-    await expect(page.getByRole('textbox', { name: 'Thing title' })).toHaveValue('A′');
+    await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveValue('A′');
   },
 );

@@ -58,7 +58,7 @@ describe('semantic theme contrast', () => {
   // Asked of the classes `Button` actually resolves rather than of any file's
   // text. It used to read a `.btn--primary` rule out of the app stylesheet,
   // which no module had emitted since the toolbar was replaced — so the only
-  // thing keeping that rule alive was this assertion about it.
+  // reference keeping that rule alive was this assertion about it.
   it('uses the semantic foreground token for primary buttons', () => {
     const classes = buttonVariants({ variant: 'default' }).split(/\s+/);
 

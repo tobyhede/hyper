@@ -3,9 +3,9 @@ import { Button, Kbd, KbdGroup } from '@project/ui';
 import type { Move } from '../navigation';
 
 export interface PresentingChromeProps {
-  /** The moves available from the active thing, with the selected one marked. */
+  /** The moves available from the active resource, with the selected one marked. */
   moves: readonly Move[];
-  /** Whether Traversal history contains a previous Thing — false on the starting Thing. */
+  /** Whether Traversal history contains a previous Resource — false on the starting Resource. */
   canRetreat: boolean;
   /**
    * Move the selection by a signed number of places, which is Navigation's own
@@ -23,15 +23,15 @@ export interface PresentingChromeProps {
   /** Traverse back, the same Navigation operation Arrow Left performs. */
   onRetreat: () => void;
   onExit: () => void;
-  /** Copy the exact Diagram, Graph and Thing currently being presented. */
+  /** Copy the exact Map, Graph and Resource currently being presented. */
   onCopyLink: () => void;
 }
 
 /**
- * How a move names itself: the action it performs, then the Thing it goes to.
+ * How a move names itself: the action it performs, then the Resource it goes to.
  *
  * One wording, used by the control's accessible name and by the line that
- * announces the selection, so the two cannot drift into saying different things
+ * announces the selection, so the two cannot drift into saying different resources
  * about the same move.
  */
 function moveLabel(move: Move): string {
@@ -68,11 +68,11 @@ function availableCommands(
 /**
  * The presenter's controls, fixed to the screen rather than drawn on the canvas.
  *
- * At a zoom where the active thing is legible, a fork's branch things are not in
+ * At a zoom where the active resource is legible, a fork's branch resources are not in
  * frame — a neighbour cannot be both far enough off-axis to read as a direction
  * and close enough to stay in a 16:9 viewport (ADR 0027). That does not need
  * fixing on the canvas; what the presenter needs is to understand their options,
- * and enumerating them here does that while the camera still frames one thing.
+ * and enumerating them here does that while the camera still frames one resource.
  *
  * A line renders as a one-item list: the degenerate fork, not a second mode
  * (ADR 0024). A sink renders as none, marking the end of this traversal. Zero,
@@ -99,7 +99,7 @@ export function PresentingChrome({
 }: PresentingChromeProps) {
   const selectedIndex = moves.findIndex((move) => move.selected);
   const selected = moves[selectedIndex];
-  const selectedThingId = selected?.thingId;
+  const selectedResourceId = selected?.resourceId;
   const selectedMove = useRef<HTMLButtonElement>(null);
   const back = useRef<HTMLButtonElement>(null);
   const overview = useRef<HTMLButtonElement>(null);
@@ -107,7 +107,7 @@ export function PresentingChrome({
    * Focus owed by this chrome, and by nothing else.
    *
    * Advancing and retreating destroy the control that ran them — the move list
-   * is rebuilt from the Thing arrived at — so a pointer or keyboard user who
+   * is rebuilt from the Resource arrived at — so a pointer or keyboard user who
    * activated one here would be left on `<body>`. The debt is set in the
    * handler and paid in the effect below, once the replacement controls are in
    * the tree.
@@ -147,11 +147,11 @@ export function PresentingChrome({
   // calls `navigation.moves()` during render, so that array is a fresh identity
   // every time and the effect would run on every render of the application. A
   // presenter who had scrolled a wide fork's row sideways to read a distant
-  // choice would have it snapped back by any unrelated publish. The Thing's id
+  // choice would have it snapped back by any unrelated publish. The Resource's id
   // rather than the index, so advancing to a new choice set scrolls too.
   useEffect(() => {
     selectedMove.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [selectedThingId]);
+  }, [selectedResourceId]);
 
   return (
     <div
@@ -169,7 +169,7 @@ export function PresentingChrome({
       <div className="flex items-center gap-4 p-3 @max-3xl:flex-col @max-3xl:items-stretch">
         {/*
           One polite region over both, because they form one announcement: what the
-          presenter can do from the Thing they are on. A changed choice set is
+          presenter can do from the Resource they are on. A changed choice set is
           announced where it changed, without focus being moved to say it.
         */}
         <div
@@ -213,12 +213,12 @@ export function PresentingChrome({
                 className="flex [scrollbar-width:thin] gap-2 overflow-x-auto py-1.5"
               >
                 {moves.map((move, index) => (
-                  <li key={move.thingId} className="shrink-0">
+                  <li key={move.resourceId} className="shrink-0">
                     <Button
                       ref={move.selected ? selectedMove : null}
                       variant={move.selected ? 'default' : 'secondary'}
                       // The action, not the destination. The visible text is the
-                      // Thing's title and the name is that title with the verb in
+                      // Resource's title and the name is that title with the verb in
                       // front of it, so voice control can still say what is
                       // written on the control.
                       aria-label={moveLabel(move)}
@@ -239,7 +239,7 @@ export function PresentingChrome({
                         an anonymous flex item that `text-overflow` never
                         reaches — a long title then overflows past *both* ends
                         of a centred button and is hard-clipped at each, losing
-                        the beginning of the Thing's name with no ellipsis to
+                        the beginning of the Resource's name with no ellipsis to
                         say so. */}
                       <span className="min-w-0 truncate">{move.title}</span>
                     </Button>

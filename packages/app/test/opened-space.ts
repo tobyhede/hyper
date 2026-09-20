@@ -7,22 +7,25 @@ import {
   type SpaceSession,
   type SpaceSessionRegistry,
 } from '@project/persistence';
-import { createSpaceThingLifecycle, type SpaceThingAuthoring } from '../src/space-thing-lifecycle';
+import {
+  createSpaceResourceLifecycle,
+  type SpaceResourceAuthoring,
+} from '../src/space-resource-lifecycle';
 
 export interface TestOpenedSpace {
   /** The registry the session was opened through, for tests that open siblings. */
   readonly registry: SpaceSessionRegistry;
   readonly spaceSession: SpaceSession;
-  readonly spaceThings: SpaceThingAuthoring;
+  readonly spaceResources: SpaceResourceAuthoring;
 }
 
 /**
- * The session and Space Thing authoring an `OpenedSpace` is built from, opened
+ * The session and Space Resource authoring an `OpenedSpace` is built from, opened
  * the way the application opens them.
  *
  * A test cannot reach for `openSpaceSession` here and compose a lifecycle
  * beside it: the lifecycle is written over the *registry* — creating,
- * referencing and deleting a Space Thing are Edits across several Spaces, and
+ * referencing and deleting a Space Resource are Edits across several Spaces, and
  * the registry is what holds the others (ADR 0076) — so one built beside a
  * session the registry has never seen would coordinate nothing. `registry.open`
  * answers the same `SpaceSession` `openSpaceSession` does, so this changes only
@@ -37,12 +40,12 @@ export interface TestOpenedSpace {
 export const openTestSpace = (
   backend: SpaceBackend,
   loaded: LoadedSpace,
-  /** Mints the Space, Thing and Diagram identities a lifecycle Edit creates (ADR 0016). */
+  /** Mints the Space, Resource and Map identities a lifecycle Edit creates (ADR 0016). */
   newId: () => UUID = newUuid,
   /**
    * Where a Spaces-epoch observer's failure goes.
    *
-   * Rethrown by default: the epoch's observers are the mounted Things lists,
+   * Rethrown by default: the epoch's observers are the mounted Resources lists,
    * and one of them failing is a defect rather than something a test tolerates.
    */
   reportObserverError: ObserverErrorReporter = (error) => {
@@ -53,6 +56,6 @@ export const openTestSpace = (
   return {
     registry,
     spaceSession: registry.open(loaded),
-    spaceThings: createSpaceThingLifecycle({ backend, registry, newId, reportObserverError }),
+    spaceResources: createSpaceResourceLifecycle({ backend, registry, newId, reportObserverError }),
   };
 };

@@ -1,6 +1,6 @@
 import {
   spaceDocumentSchema,
-  thingDocumentSchema,
+  resourceDocumentSchema,
   uuidSchema,
   type SpaceSnapshot,
   type UUID,
@@ -33,7 +33,7 @@ import type { SqlStore, SqlTables } from './sql-store';
 
 class SnapshotValidationError extends Error {}
 
-class ThingOwnershipError extends Error {}
+class ResourceOwnershipError extends Error {}
 
 /**
  * A Space row moved between a conflict check and its write -- `replaceAggregate`'s
@@ -133,29 +133,27 @@ type TopologyPreservingDecision =
 
 /**
  * Whether a proposed snapshot keeps the boundary the fast path is allowed to
- * skip a complete-aggregate read for: the same default Diagram, the same
- * Diagrams, the same Things by id and kind, and -- for a Space Thing -- the
+ * skip a complete-aggregate read for: the same default Map, the same
+ * Maps, the same Resources by id and kind, and -- for a Space Resource -- the
  * same selection. Absorbed unchanged (ticket 24) from the now-deleted
  * `topology-preserving-update.ts`, which both SQL adapters imported one copy
  * of until this repository replaced them.
  */
 const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
-  if (current.document.defaultDiagram !== next.document.defaultDiagram) return false;
-  if (
-    JSON.stringify(current.document.diagrams ?? []) !== JSON.stringify(next.document.diagrams ?? [])
-  ) {
+  if (current.document.defaultMap !== next.document.defaultMap) return false;
+  if (JSON.stringify(current.document.maps ?? []) !== JSON.stringify(next.document.maps ?? [])) {
     return false;
   }
-  if (current.things.length !== next.things.length) return false;
-  const currentById = new Map(current.things.map((thing) => [thing.id, thing]));
-  return next.things.every((thing) => {
-    const previous = currentById.get(thing.id);
-    if (previous?.document.kind !== thing.document.kind) return false;
-    if (thing.document.kind !== 'space' || previous.document.kind !== 'space') return true;
+  if (current.resources.length !== next.resources.length) return false;
+  const currentById = new Map(current.resources.map((resource) => [resource.id, resource]));
+  return next.resources.every((resource) => {
+    const previous = currentById.get(resource.id);
+    if (previous?.document.kind !== resource.document.kind) return false;
+    if (resource.document.kind !== 'space' || previous.document.kind !== 'space') return true;
     return (
-      previous.document.spaceId === thing.document.spaceId &&
-      previous.document.diagram === thing.document.diagram &&
-      previous.document.graph === thing.document.graph
+      previous.document.spaceId === resource.document.spaceId &&
+      previous.document.map === resource.document.map &&
+      previous.document.graph === resource.document.graph
     );
   });
 };
@@ -169,7 +167,7 @@ const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undef
 /**
  * Decide a single update against the stored Space it names. A snapshot that
  * fails intake, or one that moves the snapshot boundary -- structure,
- * membership, a Thing's kind, or a Space Thing's selection -- goes to the
+ * membership, a Resource's kind, or a Space Resource's selection -- goes to the
  * complete-aggregate decision, which alone can say where in the aggregate a
  * refusal sits.
  *
@@ -245,7 +243,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * One Space and its Things, read through `tables` rather than through
+   * One Space and its Resources, read through `tables` rather than through
    * `#store.orm`/`#store.serialise` directly -- so it runs equally well
    * inside a transaction's own `tables(handle)` (the fast path's candidate
    * read, `commit`'s write loop having nothing to read here) and outside one,
@@ -265,15 +263,15 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * conflict on, where it does not equally depend on that Space's document.
    */
   async #loadStoredSpaceRow(tables: SqlTables<Order>, id: UUID): Promise<LoadedSpace | undefined> {
-    const stored = await tables.Space.loadWithThings(id);
+    const stored = await tables.Space.loadWithResources(id);
     if (stored === null) return undefined;
 
     const snapshot = parseSnapshot({
       id: stored.id,
       document: spaceDocumentSchema.parse(this.#store.readDocument(stored.document)),
-      things: stored.things.map((thing) => ({
-        id: thing.id,
-        document: thingDocumentSchema.parse(this.#store.readDocument(thing.document)),
+      resources: stored.resources.map((resource) => ({
+        id: resource.id,
+        document: resourceDocumentSchema.parse(this.#store.readDocument(resource.document)),
       })),
     });
 
@@ -336,7 +334,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * left as the plain `RevisionCodecError` `encodeStoredRevision` raises,
    * unlike its siblings above: `AggregateInvariantError`'s own declaration
    * (`@project/persistence`'s `repository.ts`) ties it to the shared
-   * `SpaceResourceRepository` seam -- `loadAggregate` and `commit`, the two
+   * `StoredSpaceRepository` seam -- `loadAggregate` and `commit`, the two
    * operations `@project/http` reaches -- and `markExported` sits only on the
    * wider `SpaceRepository` the CLI alone reaches (`export-aggregate.ts`'s
    * `markAggregateExported`, the only production caller), so no HTTP route
@@ -370,13 +368,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     try {
       return await this.#commitInTransaction(request);
     } catch (error) {
-      // A Thing the commit writes is still owned by a Space the same commit
+      // A Resource the commit writes is still owned by a Space the same commit
       // did not release. Complete intake cannot see it -- the candidate
       // aggregate is consistent and the collision only exists in the stored
       // rows the write loop meets in request order. It is permanent, so it
       // has to leave here as a rejection: escaping instead becomes 503
       // `persistence-unavailable`, which the client retries forever.
-      if (error instanceof ThingOwnershipError) {
+      if (error instanceof ResourceOwnershipError) {
         return { kind: 'rejected', code: 'invalid-commit', message: error.message };
       }
       // The transaction has rolled back, so the current state is read fresh
@@ -416,7 +414,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
 
       for (const change of request.changes) {
         if (change.kind === 'delete') {
-          await tables.Thing.deleteAllForSpace(change.spaceId);
+          await tables.Resource.deleteAllForSpace(change.spaceId);
           const deleted = await tables.Space.deleteById(change.spaceId);
           if (!deleted) throw new Error(`Space ${change.spaceId} disappeared during commit`);
         } else if (change.kind === 'create') {
@@ -484,9 +482,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * replaced always kept: write the document to take the row lock and answer
    * the revision the row carried when that lock was granted, compare it
    * against `expectedRevision`, then write the new revision, then the
-   * Things, then delete the Things the snapshot dropped -- which removes
+   * Resources, then delete the Resources the snapshot dropped -- which removes
    * nothing on the fast path, whose own `preservesSnapshotBoundary` never
-   * lets a changed Thing membership reach here. A single `UPDATE` that set
+   * lets a changed Resource membership reach here. A single `UPDATE` that set
    * the revision would return the value it just wrote rather than the one it
    * replaced, which is why the document and the revision stay two separate
    * writes rather than one.
@@ -513,29 +511,29 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       snapshot.id,
       encodeNextRevisionReclassified(snapshot.id, newRevision),
     );
-    await this.#upsertThings(tables, snapshot);
-    await tables.Thing.deleteExcept(
+    await this.#upsertResources(tables, snapshot);
+    await tables.Resource.deleteExcept(
       snapshot.id,
-      snapshot.things.map((thing) => thing.id),
+      snapshot.resources.map((resource) => resource.id),
     );
   }
 
   /**
-   * `commit`'s own Thing write for an `update` change -- distinct from
-   * `#importThings`, which `create` uses and which throws on a losing insert.
+   * `commit`'s own Resource write for an `update` change -- distinct from
+   * `#importResources`, which `create` uses and which throws on a losing insert.
    * An update's row already exists, so ownership is read back off the upsert
-   * instead (`SqlTables.Thing.upsert`'s own doc comment).
+   * instead (`SqlTables.Resource.upsert`'s own doc comment).
    */
-  async #upsertThings(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
-    for (const thing of snapshot.things) {
-      const stored = await tables.Thing.upsert({
-        id: thing.id,
+  async #upsertResources(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
+    for (const resource of snapshot.resources) {
+      const stored = await tables.Resource.upsert({
+        id: resource.id,
         spaceId: snapshot.id,
-        document: thing.document,
+        document: resource.document,
       });
       if (stored.spaceId !== snapshot.id) {
-        throw new ThingOwnershipError(
-          `Thing ${thing.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+        throw new ResourceOwnershipError(
+          `Resource ${resource.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
         );
       }
     }
@@ -614,9 +612,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
           snapshot: parseSnapshot({
             id: space.id,
             document: this.#store.readDocument(space.document),
-            things: space.things.map((thing) => ({
-              id: thing.id,
-              document: this.#store.readDocument(thing.document),
+            resources: space.resources.map((resource) => ({
+              id: resource.id,
+              document: this.#store.readDocument(resource.document),
             })),
           }),
           revision: decodeStoredRevision(space.revision),
@@ -644,13 +642,19 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     return { metaSpaceId, spaces };
   }
 
-  async #importThings(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
-    for (const thing of snapshot.things) {
+  async #importResources(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
+    for (const resource of snapshot.resources) {
       try {
-        await tables.Thing.create({ id: thing.id, spaceId: snapshot.id, document: thing.document });
+        await tables.Resource.create({
+          id: resource.id,
+          spaceId: snapshot.id,
+          document: resource.document,
+        });
       } catch (error) {
-        if (this.#store.isDuplicateKey(error, 'things')) {
-          throw new ThingOwnershipError(`Thing ${thing.id} already belongs to another space`);
+        if (this.#store.isDuplicateKey(error, 'resources')) {
+          throw new ResourceOwnershipError(
+            `Resource ${resource.id} already belongs to another space`,
+          );
         }
         throw error;
       }
@@ -663,7 +667,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       document: snapshot.document,
       revision: encodeStoredRevision(0n),
     });
-    await this.#importThings(tables, snapshot);
+    await this.#importResources(tables, snapshot);
   }
 
   async #truncateHyperContent(tables: SqlTables<Order>): Promise<void> {
@@ -671,7 +675,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     // Meta identity row before deleting any Space rows.
     await tables.RepositoryState.delete();
     for (const id of await tables.Space.listIds()) {
-      await tables.Thing.deleteAllForSpace(id);
+      await tables.Resource.deleteAllForSpace(id);
       await tables.Space.deleteById(id);
     }
   }
@@ -733,7 +737,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       // rolls back and classifies authored meaning, rather than exposing SQL
       // timing.
       if (
-        !(error instanceof ThingOwnershipError) &&
+        !(error instanceof ResourceOwnershipError) &&
         !this.#store.isDuplicateKey(error, 'spaces') &&
         !this.#store.isDuplicateKey(error, 'repository_state')
       ) {

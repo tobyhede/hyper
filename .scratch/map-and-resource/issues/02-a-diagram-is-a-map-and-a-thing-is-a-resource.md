@@ -1,6 +1,6 @@
 # 02 — A Diagram is a Map and a Thing is a Resource
 
-**Status:** ready-for-agent
+**Status:** resolved
 **Blocked by:** 01 — Free the English prose the sweep would corrupt.
 
 **What to build:** Run `.scratch/map-and-resource/rename-diagram-to-map-and-thing-to-resource.mjs`, then `pnpm exec prettier --write .`, then make by hand the six edits the script deliberately does not produce. One commit.
@@ -32,10 +32,78 @@ It currently reports one, and that one is **already broken**: `docs/agents/ui.md
 
 - [ ] The script ran, `prettier --write .` ran, and all six hand edits are in the same commit.
 - [ ] `docs/agents/ui.md`'s `space-things/04` citation resolves again.
-- [ ] `--dry` on the result reports zero files and zero paths.
+- ~~`--dry` on the result reports zero files and zero paths.~~ **Withdrawn** —
+  the script is not idempotent by construction and this box can only be ticked
+  by re-running it into a broken tree. See the Correction below.
 - [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass, and the e2e suite is green **and unchanged** — that is what proves the sweep was behaviour-preserving.
 - [ ] The commit contains no structural change. If something needed restructuring to compile, it is a separate commit before or after this one.
 
 ## Answer
 
-<!-- Filled in as the work lands. -->
+Resolved in one stacked implementation commit. The codemod rewrote the current
+source and renamed 128 paths, after which Prettier reformatted the complete
+tree. The finished-state dry run was reported as clean; see the Correction
+below for why that reading was wrong and what it cost.
+
+The manual sweep corrections are included: Resource and Map collection
+callbacks use `(r)` and `(m)`; the sorted lifecycle and resource-discovery
+expectations follow their renamed order; the current documentation retains the
+meaning of the earlier vocabulary decisions; the four built-in `Map<…>` type
+positions are explicit as `ReadonlyMap` or `globalThis.Map`; and
+`docs/agents/ui.md` again resolves `space-cards/04`.
+
+Review found that the determiner-focused preparation report had not covered
+every ordinary-English use of the old noun. The 49 additional comments and
+current-document phrases it exposed have been reworded as their actual concept
+— fact, rule, value, evidence, condition, proposal, operation or surface — so
+the sweep leaves no lowercase `resource` pretending to name one of those.
+
+The vocabulary guard and the two database migrations remain deliberately
+owned by tickets 04 and 03 respectively; this commit does not cross those
+ticket boundaries.
+
+Verification:
+
+- `pnpm verify` — passed: 229 files, 2,880 tests passed and 5 skipped.
+- `pnpm e2e` — passed: 223 tests, with no behavioural test added or removed.
+- `pnpm e2e:ladle` — passed: 112 tests. The first cold run exposed missing
+  Vite optimiser chunks; after cache population, four affected Command Dock
+  cases passed. One repeatable story-address mismatch was corrected before the
+  complete green run.
+
+## Correction — the script ran twice, and the third checkbox is why
+
+Review found the sweep had been applied twice. `PRE_REWRITES` moves
+`SpaceResource` to `SpaceEndpoint` *before* the sweep, and exists only to
+vacate the name for the pre-existing HTTP sense; a second run re-fired it on
+the ~610 `SpaceResource*` identifiers the first run had just minted. The tree
+was left split — every file name, string literal, test id and lowercase
+identifier said `resource` while the PascalCase type said `endpoint` — which
+is why it compiled and the suite stayed green. The paragraph this section used
+to carry recorded that damage as a deliberate preservation of the
+prerequisite's names. It was not deliberate, and the sentence is withdrawn.
+`SpaceEndpoint` is now `SpaceResource` everywhere bar the two local Hono
+aliases in `packages/http/test/space-http-app-types.test.ts`, which is what the
+script's own doc comment always said should be the only survivors, and
+`SpaceEndpointSelectors.tsx` and the `EnteredFromSpaceEndpoint` story address
+carry the Resource spelling.
+
+**The third checkbox — "`--dry` on the result reports zero files and zero
+paths" — is withdrawn, not merely unticked.** It cannot be satisfied by a
+correct tree: a pre-move stage is not idempotent by construction, its whole job
+being to vacate a name the sweep then occupies, so the script's fixed point is
+the broken state and ticking the box *requires* producing it. The box was
+reaching for completeness — "no sweepable spelling of either retired word
+survives" — and expressed it as idempotency, which is a different property and,
+here, the opposite of the one wanted. Completeness is 04's guard block, which
+holds it permanently in `verify` rather than once at a dry run, so the check is
+already owned and this box was a weaker duplicate of it.
+
+Guarding `PRE_REWRITES` behind a one-shot was considered and rejected: it makes
+a pure reviewable text transform stateful, moves the correctness into a marker
+whose staleness reintroduces this defect silently, and buys nothing for a
+spent one-shot script. If the script is ever wanted re-runnable, the honest fix
+is to scope the two `*Resource → *Endpoint` entries to the one HTTP test file
+they exist for — the tree-wide `SpaceResourceRepository → StoredSpaceRepository`
+entry is already idempotent, since the sweep never mints its input — which buys
+idempotency with no state at all.

@@ -4,22 +4,22 @@ import { uuidSchema } from '@project/core';
 import { Placement, type LayoutStrategyGraph } from '@project/graph';
 import { usePlacementRendering } from '../src/placement-rendering';
 
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
 const strategyGraph: LayoutStrategyGraph = {
-  things: [{ id: THING_A, width: 240, height: 140 }],
+  resources: [{ id: RESOURCE_A, width: 240, height: 140 }],
   edges: [],
 };
 
-/** A `Placement` over the thing/point pairs given, all Closed. */
+/** A `Placement` over the resource/point pairs given, all Closed. */
 const placementOf = (
-  entries: readonly (readonly [typeof THING_A, { readonly x: number; readonly y: number }])[],
+  entries: readonly (readonly [typeof RESOURCE_A, { readonly x: number; readonly y: number }])[],
 ): Placement => Placement.fromEntries(entries.map(([id, at]) => [id, { ...at, open: false }]));
 
 describe('usePlacementRendering', () => {
   it('is pending until the placement resolves the current strategyGraph', async () => {
-    const placement = placementOf([[THING_A, { x: 80, y: 120 }]]);
+    const placement = placementOf([[RESOURCE_A, { x: 80, y: 120 }]]);
     const { result } = renderHook(() => usePlacementRendering(strategyGraph, placement));
 
     expect(result.current).toEqual({ kind: 'pending' });
@@ -28,7 +28,7 @@ describe('usePlacementRendering', () => {
     expect(result.current).toEqual({
       kind: 'ready',
       strategyGraph: {
-        things: [{ ...strategyGraph.things[0]!, x: 80, y: 120 }],
+        resources: [{ ...strategyGraph.resources[0]!, x: 80, y: 120 }],
         edges: [],
       },
     });
@@ -42,13 +42,13 @@ describe('usePlacementRendering', () => {
     // is handed back on every render, so only the strategyGraph half can
     // produce the second layout run.
     const placement = placementOf([
-      [THING_A, { x: 80, y: 120 }],
-      [THING_B, { x: 400, y: 260 }],
+      [RESOURCE_A, { x: 80, y: 120 }],
+      [RESOURCE_B, { x: 400, y: 260 }],
     ]);
-    const gainedThing: LayoutStrategyGraph = {
-      things: [
-        { id: THING_A, width: 240, height: 140 },
-        { id: THING_B, width: 240, height: 140 },
+    const gainedResource: LayoutStrategyGraph = {
+      resources: [
+        { id: RESOURCE_A, width: 240, height: 140 },
+        { id: RESOURCE_B, width: 240, height: 140 },
       ],
       edges: [],
     };
@@ -60,15 +60,15 @@ describe('usePlacementRendering', () => {
     );
     await waitFor(() => expect(result.current.kind).toBe('ready'));
 
-    rerender({ input: gainedThing });
+    rerender({ input: gainedResource });
 
     await waitFor(() =>
       expect(result.current).toEqual({
         kind: 'ready',
         strategyGraph: {
-          things: [
-            { ...gainedThing.things[0]!, x: 80, y: 120 },
-            { ...gainedThing.things[1]!, x: 400, y: 260 },
+          resources: [
+            { ...gainedResource.resources[0]!, x: 80, y: 120 },
+            { ...gainedResource.resources[1]!, x: 400, y: 260 },
           ],
           edges: [],
         },
@@ -77,8 +77,8 @@ describe('usePlacementRendering', () => {
   });
 
   it('makes the previous result unavailable the instant the placement changes identity', async () => {
-    const first = placementOf([[THING_A, { x: 0, y: 0 }]]);
-    const second = placementOf([[THING_A, { x: 500, y: 500 }]]);
+    const first = placementOf([[RESOURCE_A, { x: 0, y: 0 }]]);
+    const second = placementOf([[RESOURCE_A, { x: 500, y: 500 }]]);
     const { result, rerender } = renderHook(
       ({ placement }) => usePlacementRendering(strategyGraph, placement),
       { initialProps: { placement: first } },
@@ -91,7 +91,7 @@ describe('usePlacementRendering', () => {
     await waitFor(() => expect(result.current.kind).toBe('ready'));
     expect(result.current).toEqual({
       kind: 'ready',
-      strategyGraph: { things: [{ ...strategyGraph.things[0]!, x: 500, y: 500 }], edges: [] },
+      strategyGraph: { resources: [{ ...strategyGraph.resources[0]!, x: 500, y: 500 }], edges: [] },
     });
   });
 
@@ -100,13 +100,13 @@ describe('usePlacementRendering', () => {
     // `input === strategyGraph` half of the freshness guard can hold the
     // stale result back.
     const placement = placementOf([
-      [THING_A, { x: 0, y: 0 }],
-      [THING_B, { x: 320, y: 0 }],
+      [RESOURCE_A, { x: 0, y: 0 }],
+      [RESOURCE_B, { x: 320, y: 0 }],
     ]);
     const nextGraph: LayoutStrategyGraph = {
-      things: [
-        { id: THING_A, width: 240, height: 140 },
-        { id: THING_B, width: 240, height: 140 },
+      resources: [
+        { id: RESOURCE_A, width: 240, height: 140 },
+        { id: RESOURCE_B, width: 240, height: 140 },
       ],
       edges: [],
     };
@@ -125,9 +125,9 @@ describe('usePlacementRendering', () => {
     expect(result.current).toEqual({
       kind: 'ready',
       strategyGraph: {
-        things: [
-          { ...nextGraph.things[0]!, x: 0, y: 0 },
-          { ...nextGraph.things[1]!, x: 320, y: 0 },
+        resources: [
+          { ...nextGraph.resources[0]!, x: 0, y: 0 },
+          { ...nextGraph.resources[1]!, x: 320, y: 0 },
         ],
         edges: [],
       },

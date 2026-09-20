@@ -12,7 +12,7 @@ import { captureError } from '../support/capture-error';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 /** A Space id spelled with hex letters, so upper-casing its name changes it. */
 const LETTERED_SPACE_ID = uuidSchema.parse('abcdefab-cdef-4abc-8def-abcdefabcdef');
 
@@ -238,15 +238,18 @@ describe('readAggregate', () => {
         title: 'Hand authored',
       }),
     );
-    await mkdir(join(directory, 'things'));
-    await writeFile(join(directory, 'things', 'opening.md'), '---\ntitle: Opening\n---\nHello.\n');
+    await mkdir(join(directory, 'resources'));
+    await writeFile(
+      join(directory, 'resources', 'opening.md'),
+      '---\ntitle: Opening\n---\nHello.\n',
+    );
 
     const aggregate = await readAggregate(root, countingIds());
 
     const [space] = aggregate.spaces;
     if (space === undefined) throw new Error('No Space was read');
-    expect(space.things).toHaveLength(1);
-    expect(uuidSchema.safeParse(space.things[0]?.id).success).toBe(true);
+    expect(space.resources).toHaveLength(1);
+    expect(uuidSchema.safeParse(space.resources[0]?.id).success).toBe(true);
   });
 
   /*
@@ -257,7 +260,7 @@ describe('readAggregate', () => {
    * not hide the next one's problem — but minting inside that concurrency made
    * the draw order an artifact of I/O completion: every call runs only as far as
    * its first `await`, and `newId` is consumed after it. So the same directory
-   * handed the same generator twice could put `…0001` on either Space's Diagram.
+   * handed the same generator twice could put `…0001` on either Space's Map.
    *
    * `readAggregate` is asked twice over the same bytes with a fresh counter each
    * time: the two answers have to agree, which is what "from the bytes alone"
@@ -267,7 +270,7 @@ describe('readAggregate', () => {
   it('mints in ordinal directory order however the reads complete', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
-    // Diagrams with no `id`, so each Space draws from the generator. Identical
+    // Maps with no `id`, so each Space draws from the generator. Identical
     // documents but for their ids, so nothing but order can distinguish them.
     for (const id of [OTHER_SPACE_ID, META_SPACE_ID]) {
       const directory = await writeSpace(
@@ -277,7 +280,7 @@ describe('readAggregate', () => {
           version: 1,
           id,
           title: `Space ${id}`,
-          diagrams: [
+          maps: [
             {
               title: 'Only',
               kind: 'positioned',
@@ -291,15 +294,15 @@ describe('readAggregate', () => {
       // order and ordinal order disagree. Without that the two coincide and the
       // race never shows: equal-sized reads settle in submission order.
       if (id !== META_SPACE_ID) continue;
-      await mkdir(join(directory, 'things'));
+      await mkdir(join(directory, 'resources'));
       for (let index = 0; index < 40; index += 1) {
         const suffix = index.toString().padStart(12, '0');
-        // Each Thing carries its own id, so the files buy read latency without
-        // drawing from the generator — which leaves the Diagram and its Graph as
+        // Each Resource carries its own id, so the files buy read latency without
+        // drawing from the generator — which leaves the Map and its Graph as
         // the only draws and the expectation below readable.
         await writeFile(
-          join(directory, 'things', `thing-${suffix}.md`),
-          `---\nid: 44444444-4444-4444-8444-${suffix}\ntitle: Thing ${index}\n---\nBody.\n`,
+          join(directory, 'resources', `resource-${suffix}.md`),
+          `---\nid: 44444444-4444-4444-8444-${suffix}\ntitle: Resource ${index}\n---\nBody.\n`,
         );
       }
     }
@@ -308,11 +311,11 @@ describe('readAggregate', () => {
     const second = await readAggregate(root, countingIds());
 
     const mintedBySpace = (aggregate: Awaited<ReturnType<typeof readAggregate>>) =>
-      aggregate.spaces.map(({ id, document }) => [id, document.diagrams?.[0]?.id]);
+      aggregate.spaces.map(({ id, document }) => [id, document.maps?.[0]?.id]);
     expect(mintedBySpace(first)).toEqual(mintedBySpace(second));
     // And the ordinal order is the one it follows: META sorts before OTHER, so
     // it draws first whichever order the directories were written in. Each Space
-    // draws twice — its Diagram, then the Graph that Diagram owns.
+    // draws twice — its Map, then the Graph that Map owns.
     expect(mintedBySpace(first)).toEqual([
       [META_SPACE_ID, '00000000-0000-4000-8000-000000000001'],
       [OTHER_SPACE_ID, '00000000-0000-4000-8000-000000000003'],
@@ -375,9 +378,9 @@ describe('readAggregate', () => {
       OTHER_SPACE_ID,
       JSON.stringify({ version: 1, title: 'Unidentified' }),
     );
-    await mkdir(join(unidentified, 'things'));
+    await mkdir(join(unidentified, 'resources'));
     await writeFile(
-      join(unidentified, 'things', 'opening.md'),
+      join(unidentified, 'resources', 'opening.md'),
       '---\ntitle: Opening\n---\nHello.\n',
     );
 
@@ -391,7 +394,7 @@ describe('readAggregate', () => {
     expect(thrown?.message).toBe('Canonical export wrote an entity with no id');
   });
 
-  it('keeps a Space Thing reference exactly as authored', async () => {
+  it('keeps a Space Resource reference exactly as authored', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     const meta = await writeSpace(
@@ -403,20 +406,20 @@ describe('readAggregate', () => {
         title: 'Meta',
       }),
     );
-    await mkdir(join(meta, 'things'));
+    await mkdir(join(meta, 'resources'));
     await writeFile(
-      join(meta, 'things', `${THING_ID}.md`),
-      `---\nid: ${THING_ID}\ntitle: Ordinary\nkind: space\nspaceId: ${OTHER_SPACE_ID}\ndiagram: ${META_SPACE_ID}\ngraph: ${OTHER_SPACE_ID}\n---\n`,
+      join(meta, 'resources', `${RESOURCE_ID}.md`),
+      `---\nid: ${RESOURCE_ID}\ntitle: Ordinary\nkind: space\nspaceId: ${OTHER_SPACE_ID}\nmap: ${META_SPACE_ID}\ngraph: ${OTHER_SPACE_ID}\n---\n`,
     );
 
     const aggregate = await readAggregate(root, countingIds());
 
-    const thing = aggregate.spaces[0]?.things[0];
-    expect(thing?.id).toBe(THING_ID);
-    expect(thing?.document).toMatchObject({
+    const resource = aggregate.spaces[0]?.resources[0];
+    expect(resource?.id).toBe(RESOURCE_ID);
+    expect(resource?.document).toMatchObject({
       kind: 'space',
       spaceId: OTHER_SPACE_ID,
-      diagram: META_SPACE_ID,
+      map: META_SPACE_ID,
       graph: OTHER_SPACE_ID,
     });
   });

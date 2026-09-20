@@ -4,7 +4,7 @@ import type { GraphId } from '@project/core';
 import type { Space } from '@project/graph';
 import { GraphHud, nodeTypes, edgeTypes } from '@project/react-flow-adapter';
 import { canvasProjection } from '#src/canvas-projection';
-import { resolveDiagram } from '#src/diagram-resolution';
+import { resolveMap } from '#src/map-resolution';
 import { authoredSpace } from './spaces';
 import { StoryCanvas, StoryCanvasFrame, useProjection } from './ReactFlowCanvas';
 
@@ -13,7 +13,7 @@ const SPACE = authoredSpace;
 
 export interface GraphHudFixtureProps {
   /**
-   * The Space the story draws. Its `defaultDiagram` selects the Diagram.
+   * The Space the story draws. Its `defaultMap` selects the Map.
    */
   readonly space?: Space;
   /** Which Graph is emphasised. */
@@ -23,21 +23,21 @@ export interface GraphHudFixtureProps {
 /**
  * The unchanged `GraphHud`, inside a minimal real React Flow canvas.
  *
- * **The nodes are the production projection's, so the minimap draws the Diagram
+ * **The nodes are the production projection's, so the minimap draws the Map
  * and not the Space.** `useProjection` runs the same `canvasProjection` the
- * canvas publishes, whose membership is `diagramThings(space, diagram)` — so a
- * Diagram that places two of the Space's five Things puts two marks on the
+ * canvas publishes, whose membership is `mapResources(space, map)` — so a
+ * Map that places two of the Space's five Resources puts two marks on the
  * minimap, and the key beside it and the map under it mean the same "open
- * Diagram". The fixture used to map `space.things` itself, which drew all five
+ * Map". The fixture used to map `space.resources` itself, which drew all five
  * either way and left the two halves disagreeing.
  *
- * The projection's nodes are production `ThingFlowNode`s, so the canvas is
+ * The projection's nodes are production `ResourceFlowNode`s, so the canvas is
  * given the adapter's own `nodeTypes`/`edgeTypes`: without them React Flow
- * cannot find `type: 'thing'`, falls back to its default node and draws five
+ * cannot find `type: 'resource'`, falls back to its default node and draws five
  * empty rectangles with the titles missing.
  *
  * Node dimensions come with the placement rather than from a fixture constant —
- * `projectThingNodes` declares `width`/`height` for every placed Thing — which
+ * `projectResourceNodes` declares `width`/`height` for every placed Resource — which
  * is what the MiniMap needs, since it omits any node still waiting on a
  * ResizeObserver.
  *
@@ -49,11 +49,11 @@ export interface GraphHudFixtureProps {
  * nothing would have failed.
  */
 export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtureProps) {
-  const opening = useMemo(() => resolveDiagram(space), [space]);
+  const opening = useMemo(() => resolveMap(space), [space]);
   const emphasised = activeGraphId === undefined ? opening.activeGraph.id : activeGraphId;
   const projected = useProjection(emphasised, null, {
     space,
-    diagramId: opening.diagram.id,
+    mapId: opening.map.id,
   });
   const projection = useMemo(() => canvasProjection(space, opening), [opening, space]);
 
@@ -73,7 +73,7 @@ export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtur
       >
         <GraphHud
           spaceTitle={space.title}
-          diagramTitle={opening.diagram.title}
+          mapTitle={opening.map.title}
           graphs={projection.visibleGraphs}
           colorByGraphId={projection.colors}
           activeGraphId={emphasised}

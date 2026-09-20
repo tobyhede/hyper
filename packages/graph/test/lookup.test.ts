@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadSpace, resolveContentThing, type Space } from '../src/index';
-import { referenceFile, thingFile, uuid } from './thing-files';
+import { loadSpace, resolveContentResource, type Space } from '../src/index';
+import { referenceFile, resourceFile, uuid } from './resource-files';
 
 function baseSpace(): Space {
   const result = loadSpace(
@@ -8,7 +8,7 @@ function baseSpace(): Space {
       version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      diagrams: [
+      maps: [
         {
           id: uuid('00000000-0000-4000-8000-000000000022'),
           title: 'Working',
@@ -32,7 +32,7 @@ function baseSpace(): Space {
       ],
     },
     [
-      thingFile(uuid('00000000-0000-4000-8000-000000000045'), 'The model', 'The model body.\n'),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000045'), 'The model', 'The model body.\n'),
       referenceFile(
         uuid('00000000-0000-4000-8000-000000000044'),
         'The model, again',
@@ -44,22 +44,28 @@ function baseSpace(): Space {
   return result.space;
 }
 
-describe('resolveContentThing', () => {
-  it('resolves a reference thing to the thing whose content it shows', () => {
-    const resolved = resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000044'));
+describe('resolveContentResource', () => {
+  it('resolves a reference resource to the resource whose content it shows', () => {
+    const resolved = resolveContentResource(
+      baseSpace(),
+      uuid('00000000-0000-4000-8000-000000000044'),
+    );
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.kind === 'markdown' ? resolved.body : undefined).toBe('The model body.\n');
   });
 
-  it('resolves a markdown thing to itself', () => {
-    const resolved = resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000045'));
+  it('resolves a markdown resource to itself', () => {
+    const resolved = resolveContentResource(
+      baseSpace(),
+      uuid('00000000-0000-4000-8000-000000000045'),
+    );
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.kind).toBe('markdown');
   });
 
-  it('resolves a thing id that names nothing to undefined', () => {
+  it('resolves a resource id that names nothing to undefined', () => {
     expect(
-      resolveContentThing(baseSpace(), uuid('00000000-0000-4000-8000-000000000098')),
+      resolveContentResource(baseSpace(), uuid('00000000-0000-4000-8000-000000000098')),
     ).toBeUndefined();
   });
 });

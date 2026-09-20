@@ -1,21 +1,21 @@
-import { newUuid, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
+import { newUuid, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
-import { createThingDeletion, type ThingDeletion } from './thing-deletion';
-import type { SpaceThingAuthoring } from './space-thing-lifecycle';
+import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
+import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
-import { requireDefaultDiagram } from './diagram-resolution';
+import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
 
 /**
  * What an opened Space is composed of.
  *
- * The order below is not free — the opening Diagram resolves before
+ * The order below is not free — the opening Map resolves before
  * Navigation, Authoring before the render adapter, and both before Edge
  * Authoring — and every collaborator closes over
  * **one** {@link createWorkingSpaceReader}, which is what gives them a single
@@ -43,17 +43,17 @@ export interface ComposeCoreDependencies {
    * stored snapshot and the session then `structuredClone`s
    * it, so the Space a caller holds at open and the session's `working` are
    * equal values with different identities; taking both is how production came
-   * to resolve its opening Diagram against one and everything after it against
+   * to resolve its opening Map against one and everything after it against
    * the other.
    */
   readonly spaceSession: SpaceSession;
-  /** Which Diagram the Space opens in; the Space's own default when absent. */
-  readonly selection?: DiagramId | undefined;
+  /** Which Map the Space opens in; the Space's own default when absent. */
+  readonly selection?: MapId | undefined;
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
-   * Mints the identity of every Thing, Diagram and Graph a completed Edit creates
+   * Mints the identity of every Resource, Map and Graph a completed Edit creates
    * (ADR 0016).
    *
    * Passed explicitly so `createSpaceAuthoring` cannot fall back to its own and
@@ -82,8 +82,8 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * with an option of its own, or answer a stand-in. The real one when absent.
    */
   readonly connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
-  /** Coordinated Space Thing deletion for the Delete Thing interaction. */
-  readonly spaceThings?: SpaceThingAuthoring | undefined;
+  /** Coordinated Space Resource deletion for the Delete Resource interaction. */
+  readonly spaceResources?: SpaceResourceAuthoring | undefined;
 }
 
 /** The pair a connection completion is written in terms of. */
@@ -105,13 +105,13 @@ export interface AppCore {
   readonly currentSpace: () => Space;
   readonly navigation: Navigation;
   /**
-   * The Diagram this composition opened in.
+   * The Map this composition opened in.
    *
    * Answered rather than read back off Navigation: it is what `composeCore`
    * decided, and recovering it through `navigation.getState()` makes the
    * decision look like Navigation's when it is this module's.
    */
-  readonly openingSelection: DiagramId;
+  readonly openingSelection: MapId;
 }
 
 export interface ComposedApp extends AppCore {
@@ -126,8 +126,8 @@ export interface ComposedApp extends AppCore {
    */
   readonly continuation: Continuation;
   readonly edgeAuthoring: EdgeAuthoring;
-  /** The Delete Thing confirmation interaction for this Space. */
-  readonly thingDeletion: ThingDeletion;
+  /** The Delete Resource confirmation interaction for this Space. */
+  readonly resourceDeletion: ResourceDeletion;
   /**
    * The sink this composition reports through, answered as well as taken.
    *
@@ -156,10 +156,10 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
   // is parsed and indexed once rather than once per render.
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = (): Space => readWorkingSpace(spaceSession.getState().working);
-  // Which Diagram this space opens in. It also answers which Graphs are drawn
+  // Which Map this space opens in. It also answers which Graphs are drawn
   // and which of them opens active (ADR 0026), so it has to resolve before
   // anything that reads the canvas is built.
-  const openingSelection = selection ?? requireDefaultDiagram(currentSpace());
+  const openingSelection = selection ?? requireDefaultMap(currentSpace());
   const navigation = createNavigation(currentSpace, openingSelection);
   return { readWorkingSpace, currentSpace, navigation, openingSelection };
 }
@@ -171,7 +171,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     newId = newUuid,
     reportObserverError,
     connections,
-    spaceThings,
+    spaceResources,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -194,10 +194,10 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     reportObserverError,
   });
-  const thingDeletion = createThingDeletion({
+  const resourceDeletion = createResourceDeletion({
     authoring,
     currentSpace,
-    spaceThings,
+    spaceResources,
     reportObserverError,
   });
   return {
@@ -206,7 +206,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     adapter,
     continuation,
     edgeAuthoring,
-    thingDeletion,
+    resourceDeletion,
     reportObserverError:
       reportObserverError ?? ((error) => console.error('Space composition observer failed', error)),
   };

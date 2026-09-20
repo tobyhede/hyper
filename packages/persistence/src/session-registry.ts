@@ -1,8 +1,8 @@
 import {
   SPACE_FILE_VERSION,
-  type Diagram,
-  type ThingDocument,
-  type DiagramPosition,
+  type Map,
+  type ResourceDocument,
+  type MapPosition,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -30,12 +30,12 @@ import {
   type SpaceSessionOptions,
 } from './session';
 
-type SpaceThingLifecycleChange =
+type SpaceResourceLifecycleChange =
   | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
   /**
    * `update`'s snapshot is the participant's whole next value, not a delta to
    * apply later. Every `plan` decides it against the Spaces its own wait
-   * produced (`SpaceThingCoordinatedOperation`), with nothing suspending
+   * produced (`SpaceResourceCoordinatedOperation`), with nothing suspending
    * before the coordination installs the result, so there is nothing left to
    * recompute at commit time: the value is carried directly rather than a
    * closure that would derive it again from whatever the participant's
@@ -54,12 +54,12 @@ type SpaceThingLifecycleChange =
  * before its result is installed, which is what makes a plan-level refusal
  * trustworthy against the Spaces `prepare` waited to see.
  */
-type SpaceThingPlanOutcome =
+type SpaceResourcePlanOutcome =
   | { readonly kind: 'unchanged' }
-  | SpaceThingRefused
+  | SpaceResourceRefused
   | {
       readonly kind: 'changes';
-      readonly changes: readonly [SpaceThingLifecycleChange, ...SpaceThingLifecycleChange[]];
+      readonly changes: readonly [SpaceResourceLifecycleChange, ...SpaceResourceLifecycleChange[]];
     };
 
 /**
@@ -69,10 +69,10 @@ type SpaceThingPlanOutcome =
  * directly rather than through a closure-captured variable. An operation with
  * nothing to carry parameterizes this with `undefined`.
  */
-type SpaceThingPreparationOutcome<P> =
+type SpaceResourcePreparationOutcome<P> =
   | { readonly kind: 'proceed'; readonly prepared: P }
   | { readonly kind: 'unchanged' }
-  | SpaceThingRefused;
+  | SpaceResourceRefused;
 
 /**
  * A coordinated operation in the `prepare`/`plan` shape: `prepare` is async and
@@ -87,23 +87,23 @@ type SpaceThingPreparationOutcome<P> =
  * and the coordination installing it.
  *
  * The only shape a coordinated operation is authored in: create, link, Space
- * Thing deletion, Diagram/Graph deletion and a coordinated recovery retry's
+ * Resource deletion, Map/Graph deletion and a coordinated recovery retry's
  * replay (`startRecovery`, below) all reach the coordination through this.
  */
-interface SpaceThingCoordinatedOperation<P = undefined> {
-  readonly prepare: () => Promise<SpaceThingPreparationOutcome<P>>;
+interface SpaceResourceCoordinatedOperation<P = undefined> {
+  readonly prepare: () => Promise<SpaceResourcePreparationOutcome<P>>;
   readonly plan: (
     spaces: ReadonlyMap<UUID, SpaceSnapshot>,
     aggregate: LoadedAggregate,
     prepared: P,
-  ) => SpaceThingPlanOutcome;
+  ) => SpaceResourcePlanOutcome;
 }
 
-type SpaceThingCoordinationResult =
+type SpaceResourceCoordinationResult =
   | CommitResult
   | { readonly kind: 'persistence-read-failed' }
   /** A refusal `plan` answered, installed the same way as the other two. */
-  | SpaceThingRefused;
+  | SpaceResourceRefused;
 
 export interface ProvisionalSpaceSession {
   readonly kind: 'provisional';
@@ -136,17 +136,17 @@ export interface SpaceSessionRegistry {
   readonly release: (spaceId: UUID) => boolean;
   readonly session: (spaceId: UUID) => SpaceSession | undefined;
   readonly entry: (spaceId: UUID) => SpaceSessionRegistryEntry | undefined;
-  readonly spaceThings: (newId: () => UUID) => SpaceThingLifecycle;
+  readonly spaceResources: (newId: () => UUID) => SpaceResourceLifecycle;
 }
 
-/** What a Space Thing selects in the Space it shows: one Diagram and one of its Graphs. */
-interface SpaceThingSelection {
-  readonly diagram: UUID;
+/** What a Space Resource selects in the Space it shows: one Map and one of its Graphs. */
+interface SpaceResourceSelection {
+  readonly map: UUID;
   readonly graph: UUID;
 }
 
 /**
- * Why a target supplied no Diagram and Graph for a Space Thing to select.
+ * Why a target supplied no Map and Graph for a Space Resource to select.
  *
  * Three rather than one, because the move that answers them differs even though
  * the pane offers the same two. `not-initialized` is the transient arm — a
@@ -155,66 +155,66 @@ interface SpaceThingSelection {
  * them. A single code would have told an author facing a failed commit
  * something that reads like a dead end.
  */
-export type SpaceThingTargetUnavailableReason =
+export type SpaceResourceTargetUnavailableReason =
   /** The Space is not there: deleted between the listing that offered it and this Edit. */
   | 'missing'
   /** Its stored state does not load as a valid Space, so nothing can be read off it. */
   | 'unreadable'
-  /** It could not be given the Diagram it needs — the initializing commit did not land. */
+  /** It could not be given the Map it needs — the initializing commit did not land. */
   | 'not-initialized';
 
 /** A target's selection, or why it has none. */
 type TargetSelection =
-  | { readonly kind: 'selected'; readonly selection: SpaceThingSelection }
-  | { readonly kind: 'unavailable'; readonly reason: SpaceThingTargetUnavailableReason };
+  | { readonly kind: 'selected'; readonly selection: SpaceResourceSelection }
+  | { readonly kind: 'unavailable'; readonly reason: SpaceResourceTargetUnavailableReason };
 
-export interface CreateSpaceThingInput {
+export interface CreateSpaceResourceInput {
   readonly containingSpaceId: UUID;
-  readonly diagramId: UUID;
+  readonly mapId: UUID;
   readonly title: string;
-  readonly position: DiagramPosition;
+  readonly position: MapPosition;
 }
 /**
  * Reference an existing Space. The selection is **not** a parameter (ADR 0079).
  *
- * A Space Thing stores a Diagram and a Graph of its target from the moment it
+ * A Space Resource stores a Map and a Graph of its target from the moment it
  * exists, and where those come from is this module's rule rather than a
  * caller's: the target is made working — which durably initializes a stored
- * diagramless Space — and the Diagram it opens on, with that Diagram's Active
- * Graph, is what the Thing records. A caller holding a `SpaceSummary` has
+ * mapless Space — and the Map it opens on, with that Map's Active
+ * Graph, is what the Resource records. A caller holding a `SpaceSummary` has
  * neither id to offer, and the pane that chooses a target shows no selector,
  * so an optional override here would be a seam nothing could fill honestly.
- * Choosing differently is an Edit on the Thing afterwards (ADR 0068).
+ * Choosing differently is an Edit on the Resource afterwards (ADR 0068).
  */
-export interface LinkSpaceThingInput extends CreateSpaceThingInput {
+export interface LinkSpaceResourceInput extends CreateSpaceResourceInput {
   readonly targetSpaceId: UUID;
 }
-export interface DeleteSpaceThingInput {
+export interface DeleteSpaceResourceInput {
   readonly containingSpaceId: UUID;
-  readonly thingId: UUID;
+  readonly resourceId: UUID;
 }
-export interface DeleteReferencedDiagramInput {
+export interface DeleteReferencedMapInput {
   readonly targetSpaceId: UUID;
-  readonly diagramId: UUID;
-  readonly preferredDiagramId: UUID | null;
+  readonly mapId: UUID;
+  readonly preferredMapId: UUID | null;
 }
 export interface DeleteReferencedGraphInput {
   readonly targetSpaceId: UUID;
-  readonly diagramId: UUID;
+  readonly mapId: UUID;
   readonly graphId: UUID;
   readonly preferredGraphId: UUID | null;
 }
-/** Why a coordinated Space Thing lifecycle operation refused (ADR 0076). */
-export type SpaceThingRefusal =
-  | { readonly code: 'diagram-not-found'; readonly diagramId: UUID }
-  | { readonly code: 'space-thing-not-found'; readonly thingId: UUID }
+/** Why a coordinated Space Resource lifecycle operation refused (ADR 0076). */
+export type SpaceResourceRefusal =
+  | { readonly code: 'map-not-found'; readonly mapId: UUID }
+  | { readonly code: 'space-resource-not-found'; readonly resourceId: UUID }
   /**
-   * Deleting this Space Thing is refused because a Reference Thing in the same Space
+   * Deleting this Space Resource is refused because a Reference Resource in the same Space
    * still targets it (ADR 0070), named by `SnapshotEdit.deleteFromSpace`.
-   * Mapped from the same `thing-has-references` code Space Authoring's own
-   * `deleted-thing` refuses with, and presented with the same wording.
+   * Mapped from the same `resource-has-references` code Space Authoring's own
+   * `deleted-resource` refuses with, and presented with the same wording.
    */
-  | { readonly code: 'thing-has-references'; readonly referenceTitles: readonly string[] }
+  | { readonly code: 'resource-has-references'; readonly referenceTitles: readonly string[] }
   | {
       readonly code: 'persistence-recovery-required';
       readonly spaceId: UUID;
@@ -223,10 +223,10 @@ export type SpaceThingRefusal =
   | { readonly code: 'aggregate-refused'; readonly errors: readonly SpaceAggregateError[] }
   | { readonly code: 'persistence-read-failed' }
   /**
-   * The target could not be made working, so it supplies no Diagram and
-   * Graph for the Thing to select (ADR 0079).
+   * The target could not be made working, so it supplies no Map and
+   * Graph for the Resource to select (ADR 0079).
    *
-   * One code carrying {@link SpaceThingTargetUnavailableReason}, rather
+   * One code carrying {@link SpaceResourceTargetUnavailableReason}, rather
    * than three codes: what the Edit did is identical in all three — it did
    * not begin — and only the advice differs, which is what a reason is
    * for. It stays separate from `persistence-read-failed`, which is about
@@ -234,74 +234,74 @@ export type SpaceThingRefusal =
    * pointed at.
    */
   | {
-      readonly code: 'space-thing-target-unavailable';
+      readonly code: 'space-resource-target-unavailable';
       readonly spaceId: UUID;
-      readonly reason: SpaceThingTargetUnavailableReason;
+      readonly reason: SpaceResourceTargetUnavailableReason;
     };
 
 /** The Edit did not land, said the two ways every operation here can say it. */
-type SpaceThingLifecycleUnsettled =
+type SpaceResourceLifecycleUnsettled =
   | { readonly kind: 'unchanged' }
-  | { readonly kind: 'refused'; readonly refusal: SpaceThingRefusal };
+  | { readonly kind: 'refused'; readonly refusal: SpaceResourceRefusal };
 
 /**
- * What an operation that authors a Space Thing answers: the Thing it made.
+ * What an operation that authors a Space Resource answers: the Resource it made.
  *
- * **Split from {@link SpaceThingDeletionResult} rather than carrying an optional
- * id on one shared arm.** Both `create` and `link` mint the Thing's id locally,
+ * **Split from {@link SpaceResourceDeletionResult} rather than carrying an optional
+ * id on one shared arm.** Both `create` and `link` mint the Resource's id locally,
  * so the value exists the moment the result is built, and `delete` creates no
- * Thing to name. An optional field on one `completed` arm would put "is it
+ * Resource to name. An optional field on one `completed` arm would put "is it
  * there?" at every call site — which is the cost the surface was already paying
  * when it inferred the id from a before/after set difference instead.
  */
-export type SpaceThingCreationResult =
-  { readonly kind: 'completed'; readonly thingId: UUID } | SpaceThingLifecycleUnsettled;
+export type SpaceResourceCreationResult =
+  { readonly kind: 'completed'; readonly resourceId: UUID } | SpaceResourceLifecycleUnsettled;
 
 /** What deletion answers: that it landed, and nothing a caller could continue at. */
-export type SpaceThingDeletionResult =
-  { readonly kind: 'completed' } | SpaceThingLifecycleUnsettled;
+export type SpaceResourceDeletionResult =
+  { readonly kind: 'completed' } | SpaceResourceLifecycleUnsettled;
 
 /** What context deletion answers so navigation can follow the coordinated choice. */
-export type SpaceThingContextDeletionResult =
-  | { readonly kind: 'completed'; readonly diagramId: UUID; readonly graphId: UUID }
-  | SpaceThingLifecycleUnsettled;
+export type SpaceResourceContextDeletionResult =
+  | { readonly kind: 'completed'; readonly mapId: UUID; readonly graphId: UUID }
+  | SpaceResourceLifecycleUnsettled;
 
-export interface SpaceThingLifecycle {
-  readonly create: (input: CreateSpaceThingInput) => Promise<SpaceThingCreationResult>;
-  readonly link: (input: LinkSpaceThingInput) => Promise<SpaceThingCreationResult>;
-  readonly delete: (input: DeleteSpaceThingInput) => Promise<SpaceThingDeletionResult>;
-  readonly deleteDiagram: (
-    input: DeleteReferencedDiagramInput,
-  ) => Promise<SpaceThingContextDeletionResult>;
+export interface SpaceResourceLifecycle {
+  readonly create: (input: CreateSpaceResourceInput) => Promise<SpaceResourceCreationResult>;
+  readonly link: (input: LinkSpaceResourceInput) => Promise<SpaceResourceCreationResult>;
+  readonly delete: (input: DeleteSpaceResourceInput) => Promise<SpaceResourceDeletionResult>;
+  readonly deleteMap: (
+    input: DeleteReferencedMapInput,
+  ) => Promise<SpaceResourceContextDeletionResult>;
   readonly deleteGraph: (
     input: DeleteReferencedGraphInput,
-  ) => Promise<SpaceThingContextDeletionResult>;
+  ) => Promise<SpaceResourceContextDeletionResult>;
 }
 
 /**
- * What a Space Thing selects in a Space it is shown: the Diagram that Space
- * opens on, and that Diagram's Active Graph (ADR 0079, ADR 0026).
+ * What a Space Resource selects in a Space it is shown: the Map that Space
+ * opens on, and that Map's Active Graph (ADR 0079, ADR 0026).
  *
- * The Active Graph is not re-derived here. `lookup.diagram` already answers a
- * `ResolvedDiagram` carrying the exact owned Graph — the authored choice, or
+ * The Active Graph is not re-derived here. `lookup.map` already answers a
+ * `ResolvedMap` carrying the exact owned Graph — the authored choice, or
  * the first-Graph fallback — and resolving it in a second place is how the two
  * would come to disagree. So the only question left is whether the Space has an
- * opening Diagram at all.
+ * opening Map at all.
  *
  * `undefined` is therefore the type-level boundary between a snapshot that
  * passed intake and the ids read out of it, not a state an author can produce:
- * an initialized Space records a `defaultDiagram`, and a Diagram owning no
+ * an initialized Space records a `defaultMap`, and a Map owning no
  * Graph fails `buildSpaceLookup` before it can be asked.
  */
-const selectionOf = (space: Space): SpaceThingSelection | undefined => {
-  if (space.defaultDiagram === undefined) return undefined;
-  const resolved = space.lookup.diagram(space.defaultDiagram);
+const selectionOf = (space: Space): SpaceResourceSelection | undefined => {
+  if (space.defaultMap === undefined) return undefined;
+  const resolved = space.lookup.map(space.defaultMap);
   return resolved === undefined
     ? undefined
-    : { diagram: resolved.diagram.id, graph: resolved.activeGraph.id };
+    : { map: resolved.map.id, graph: resolved.activeGraph.id };
 };
 
-const unavailableTarget = (reason: SpaceThingTargetUnavailableReason): TargetSelection => ({
+const unavailableTarget = (reason: SpaceResourceTargetUnavailableReason): TargetSelection => ({
   kind: 'unavailable',
   reason,
 });
@@ -309,7 +309,7 @@ const unavailableTarget = (reason: SpaceThingTargetUnavailableReason): TargetSel
 /**
  * A Space that loaded, read for what it opens on.
  *
- * A Space with no opening Diagram reaches here only as `not-initialized`: for a
+ * A Space with no opening Map reaches here only as `not-initialized`: for a
  * stored target that is the arm the working load was supposed to close and did
  * not, and for a live one it is a session opened by some path other than the
  * working load — the deletion cascade opens participants directly. Neither is
@@ -326,33 +326,34 @@ const clone = <T>(value: T): T => structuredClone(value);
 const completed = { kind: 'completed' } as const;
 /**
  * The refused arm on its own: the shape a `prepare` or `plan` answers as a
- * value (`SpaceThingPlanOutcome`, `SpaceThingPreparationOutcome`,
- * `SpaceThingCoordinationResult`).
+ * value (`SpaceResourcePlanOutcome`, `SpaceResourcePreparationOutcome`,
+ * `SpaceResourceCoordinationResult`).
  */
-type SpaceThingRefused = { readonly kind: 'refused'; readonly refusal: SpaceThingRefusal };
+type SpaceResourceRefused = { readonly kind: 'refused'; readonly refusal: SpaceResourceRefusal };
 
 /**
- * The completion a creating operation built when it minted its Thing's id.
+ * The completion a creating operation built when it minted its Resource's id.
  *
  * **`undefined` here is a programming error rather than an outcome.** Both
  * bodies mint the id on the one path that returns a change list, and every path
  * that returns without one assigns its refusal first — which the caller has
- * already answered by the time this is reached. So there is no third thing to
+ * already answered by the time this is reached. So there is no third resource to
  * say, and saying `unchanged` would name an outcome neither operation produces.
  */
-const completedCreation = (completion: SpaceThingCreationResult | undefined) => {
-  if (completion === undefined) throw new Error('A completed Space Thing Edit named no Thing');
+const completedCreation = (completion: SpaceResourceCreationResult | undefined) => {
+  if (completion === undefined)
+    throw new Error('A completed Space Resource Edit named no Resource');
   return completion;
 };
 /**
- * Every `create`, `link`, `delete` and `deleteDiagram`/`deleteGraph` call
+ * Every `create`, `link`, `delete` and `deleteMap`/`deleteGraph` call
  * answers a coordination result the same way: `undefined` when it committed,
  * so the caller's own success value applies, or the one refusal it maps to
  * otherwise.
  */
-const asSpaceThingRefusal = (
-  result: SpaceThingCoordinationResult,
-): SpaceThingRefused | undefined => {
+const asSpaceResourceRefusal = (
+  result: SpaceResourceCoordinationResult,
+): SpaceResourceRefused | undefined => {
   if (result.kind === 'persistence-read-failed') {
     return { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
   }
@@ -363,111 +364,112 @@ const asSpaceThingRefusal = (
   return undefined;
 };
 /**
- * `create` and `link`'s shared `plan` step: place a new Space Thing document
- * pointing at `targetSpaceId` into `containingDiagramId` of `source`, mapping
- * `SnapshotEdit.createInDiagram`'s outcome into `plan`'s vocabulary.
+ * `create` and `link`'s shared `plan` step: place a new Space Resource document
+ * pointing at `targetSpaceId` into `containingMapId` of `source`, mapping
+ * `SnapshotEdit.createInMap`'s outcome into `plan`'s vocabulary.
  *
- * The only refusal `createInDiagram` can answer here is `diagram-not-found`
- * — `thing-not-found` and `thing-has-references` belong to `deleteFromSpace`.
+ * The only refusal `createInMap` can answer here is `map-not-found`
+ * — `resource-not-found` and `resource-has-references` belong to `deleteFromSpace`.
  */
-const planSpaceThingCreation = (
+const planSpaceResourceCreation = (
   source: SpaceSnapshot,
-  containingDiagramId: UUID,
-  thingId: UUID,
+  containingMapId: UUID,
+  resourceId: UUID,
   targetSpaceId: UUID,
   title: string,
-  selection: SpaceThingSelection,
-  position: DiagramPosition,
-): SpaceThingRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
-  const document: ThingDocument = {
+  selection: SpaceResourceSelection,
+  position: MapPosition,
+): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
+  const document: ResourceDocument = {
     title,
     kind: 'space',
     spaceId: targetSpaceId,
-    diagram: selection.diagram,
+    map: selection.map,
     graph: selection.graph,
   };
-  const created = SnapshotEdit.createInDiagram(
+  const created = SnapshotEdit.createInMap(
     source,
-    containingDiagramId,
-    thingId,
+    containingMapId,
+    resourceId,
     document,
     position,
     'avoidingOverlap',
   );
   if (created.kind === 'refused') {
-    if (created.refusal.code !== 'diagram-not-found') {
-      throw new Error(`Space Thing creation refused unexpectedly: ${created.refusal.code}`);
+    if (created.refusal.code !== 'map-not-found') {
+      throw new Error(`Space Resource creation refused unexpectedly: ${created.refusal.code}`);
     }
     return {
       kind: 'refused',
-      refusal: { code: 'diagram-not-found', diagramId: containingDiagramId },
+      refusal: { code: 'map-not-found', mapId: containingMapId },
     };
   }
   if (created.kind !== 'completed') {
-    throw new Error(`Space Thing creation through SnapshotEdit answered '${created.kind}'`);
+    throw new Error(`Space Resource creation through SnapshotEdit answered '${created.kind}'`);
   }
   return { kind: 'completed', snapshot: created.snapshot };
 };
 /**
- * Whether `target` still has another Diagram or Graph to fall back to once
+ * Whether `target` still has another Map or Graph to fall back to once
  * `input` names one for deletion — the one question `deleteContext`'s
  * `prepare` and `plan` both ask of the Spaces they each read.
  *
- * Carries `targetDiagram` but not the `deletingDiagram` discriminant itself:
- * a caller that goes on to read `input.preferredDiagramId` or
- * `input.graphId` needs TypeScript's own `'preferredDiagramId' in input`
+ * Carries `targetMap` but not the `deletingMap` discriminant itself:
+ * a caller that goes on to read `input.preferredMapId` or
+ * `input.graphId` needs TypeScript's own `'preferredMapId' in input`
  * narrowing on its own copy of that check, which reading a boolean back out
  * of this function's return value cannot carry across the call.
  */
 type ContextDeletionCandidate =
-  | { readonly kind: 'not-deletable' }
-  | { readonly kind: 'deletable'; readonly targetDiagram: Diagram };
+  { readonly kind: 'not-deletable' } | { readonly kind: 'deletable'; readonly targetMap: Map };
 
 const contextDeletionCandidate = (
   target: SpaceSnapshot,
-  input: DeleteReferencedDiagramInput | DeleteReferencedGraphInput,
+  input: DeleteReferencedMapInput | DeleteReferencedGraphInput,
 ): ContextDeletionCandidate => {
-  const targetDiagram = target.document.diagrams?.find(({ id }) => id === input.diagramId);
+  const targetMap = target.document.maps?.find(({ id }) => id === input.mapId);
   const notDeletable =
-    targetDiagram === undefined ||
-    ('preferredDiagramId' in input
-      ? (target.document.diagrams?.length ?? 0) <= 1
-      : targetDiagram.graphs.length <= 1 ||
-        !targetDiagram.graphs.some(({ id }) => id === input.graphId));
-  return notDeletable ? { kind: 'not-deletable' } : { kind: 'deletable', targetDiagram };
+    targetMap === undefined ||
+    ('preferredMapId' in input
+      ? (target.document.maps?.length ?? 0) <= 1
+      : targetMap.graphs.length <= 1 || !targetMap.graphs.some(({ id }) => id === input.graphId));
+  return notDeletable ? { kind: 'not-deletable' } : { kind: 'deletable', targetMap };
 };
 const snapshotFromSpace = (space: Space): SpaceSnapshot => {
   const document: SpaceSnapshot['document'] = {
     version: SPACE_FILE_VERSION,
     title: space.title,
   };
-  if (space.diagrams.length > 0) document.diagrams = [...space.diagrams];
-  if (space.defaultDiagram !== undefined) document.defaultDiagram = space.defaultDiagram;
+  if (space.maps.length > 0) document.maps = [...space.maps];
+  if (space.defaultMap !== undefined) document.defaultMap = space.defaultMap;
   return {
     id: space.id,
     document,
-    things: space.things.map(({ id, ...thingDocument }) => ({ id, document: thingDocument })),
+    resources: space.resources.map(({ id, ...resourceDocument }) => ({
+      id,
+      document: resourceDocument,
+    })),
   };
 };
-const replaceSpaceThingSelection = (
+const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
   targetSpaceId: UUID,
-  matches: (document: Extract<ThingDocument, { kind: 'space' }>) => boolean,
-  diagram: UUID,
+  matches: (document: Extract<ResourceDocument, { kind: 'space' }>) => boolean,
+  map: UUID,
   graph: UUID,
   resetFraming: boolean,
 ): SpaceSnapshot => ({
   ...snapshot,
-  things: snapshot.things.map((thing) => {
+  resources: snapshot.resources.map((resource) => {
     if (
-      thing.document.kind !== 'space' ||
-      thing.document.spaceId !== targetSpaceId ||
-      !matches(thing.document)
+      resource.document.kind !== 'space' ||
+      resource.document.spaceId !== targetSpaceId ||
+      !matches(resource.document)
     )
-      return thing;
-    const document = { ...thing.document, diagram, graph };
+      return resource;
+    const document = { ...resource.document, map, graph };
     if (resetFraming) delete document.framing;
-    return { ...thing, document };
+    return { ...resource, document };
   }),
 });
 
@@ -539,13 +541,13 @@ export function createSpaceSessionRegistry(
     }
   };
 
-  const runSpaceThingCoordination = async <P>(
-    operation: SpaceThingCoordinatedOperation<P>,
-    installed: (result?: SpaceThingCoordinationResult) => void,
+  const runSpaceResourceCoordination = async <P>(
+    operation: SpaceResourceCoordinatedOperation<P>,
+    installed: (result?: SpaceResourceCoordinationResult) => void,
     /**
      * Whether this turn is `recovery.retry`/`keepLocal` resubmitting a change
      * set an earlier turn already decided and pre-checked, rather than a fresh
-     * Space Thing lifecycle operation.
+     * Space Resource lifecycle operation.
      *
      * A retry still reads the aggregate — the barrier still waits, and a read
      * failure still answers `persistence-read-failed` — it skips only
@@ -561,7 +563,7 @@ export function createSpaceSessionRegistry(
      * this turn's redundant pre-check loses no safety.
      */
     isRetry = false,
-  ): Promise<SpaceThingCoordinationResult> => {
+  ): Promise<SpaceResourceCoordinationResult> => {
     const previous = lifecycleTail;
     let releaseTurn = (): void => undefined;
     lifecycleTail = new Promise<void>((resolve) => {
@@ -664,7 +666,7 @@ export function createSpaceSessionRegistry(
        * `create` participant with no session yet falls back to the planned
        * snapshot either way.
        */
-      const backendChange = (change: SpaceThingLifecycleChange): SpaceChange => {
+      const backendChange = (change: SpaceResourceLifecycleChange): SpaceChange => {
         if (change.kind === 'create') {
           const managed = participants.get(change.snapshot.id);
           return {
@@ -742,18 +744,18 @@ export function createSpaceSessionRegistry(
        * the value below, rather than this recipe carrying a value or a
        * closure that would derive one.
        */
-      type SpaceThingRetryItem =
+      type SpaceResourceRetryItem =
         | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
         | { readonly kind: 'update'; readonly spaceId: UUID }
         | { readonly kind: 'delete'; readonly spaceId: UUID };
-      const toRetryItem = (change: SpaceThingLifecycleChange): SpaceThingRetryItem =>
+      const toRetryItem = (change: SpaceResourceLifecycleChange): SpaceResourceRetryItem =>
         change.kind === 'update' ? { kind: 'update', spaceId: change.spaceId } : change;
       let conflictCurrents = new Map<UUID, LoadedSpace | undefined>();
       let recoveryStarted = false;
       const startRecovery = (recoverConflict: boolean): void => {
         if (recoveryStarted) return;
         recoveryStarted = true;
-        const retryItems = changes.flatMap((change): SpaceThingRetryItem[] => {
+        const retryItems = changes.flatMap((change): SpaceResourceRetryItem[] => {
           if (!recoverConflict) return [toRetryItem(change)];
           const id = change.kind === 'create' ? change.snapshot.id : change.spaceId;
           if (!conflictCurrents.has(id)) return [toRetryItem(change)];
@@ -776,7 +778,7 @@ export function createSpaceSessionRegistry(
         });
         const [firstItem, ...remainingItems] = retryItems;
         if (firstItem === undefined) return;
-        void coordinateSpaceThing(
+        void coordinateSpaceResource(
           {
             // No wait of its own: every retried item was already decided above,
             // synchronously, from the failed attempt's own state. Only `update`
@@ -784,7 +786,7 @@ export function createSpaceSessionRegistry(
             // Spaces the *retried* coordination's own aggregate read produces.
             prepare: () => Promise.resolve({ kind: 'proceed', prepared: undefined } as const),
             plan: (spaces) => {
-              const resolve = (item: SpaceThingRetryItem): SpaceThingLifecycleChange => {
+              const resolve = (item: SpaceResourceRetryItem): SpaceResourceLifecycleChange => {
                 if (item.kind !== 'update') return item;
                 const snapshot = spaces.get(item.spaceId);
                 if (snapshot === undefined)
@@ -990,16 +992,16 @@ export function createSpaceSessionRegistry(
 
   /**
    * Run a coordinated operation in the `prepare`/`plan` shape (see
-   * {@link SpaceThingCoordinatedOperation}) — the only shape there is. Space
-   * Thing create, link, deletion, Diagram/Graph deletion and a coordinated
+   * {@link SpaceResourceCoordinatedOperation}) — the only shape there is. Space
+   * Resource create, link, deletion, Map/Graph deletion and a coordinated
    * recovery retry's replay (`startRecovery`) all call this.
    */
-  const coordinateSpaceThing = async <P>(
-    operation: SpaceThingCoordinatedOperation<P>,
+  const coordinateSpaceResource = async <P>(
+    operation: SpaceResourceCoordinatedOperation<P>,
     isRetry = false,
-  ): Promise<SpaceThingCoordinationResult> => {
-    const installation = Promise.withResolvers<SpaceThingCoordinationResult>();
-    void runSpaceThingCoordination(
+  ): Promise<SpaceResourceCoordinationResult> => {
+    const installation = Promise.withResolvers<SpaceResourceCoordinationResult>();
+    void runSpaceResourceCoordination(
       operation,
       (result) =>
         installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
@@ -1008,7 +1010,7 @@ export function createSpaceSessionRegistry(
     return installation.promise;
   };
 
-  const spaceThings = (newId: () => UUID): SpaceThingLifecycle => {
+  const spaceResources = (newId: () => UUID): SpaceResourceLifecycle => {
     const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
     /**
      * Make the target working, then read the selection it opens on.
@@ -1018,7 +1020,7 @@ export function createSpaceSessionRegistry(
      * synchronously by the call this sits in, so a Space cannot be released out
      * from under the Edit, and an Edit the containing Space has already refused
      * initializes nothing and mints no id — which is what an empty id source in
-     * `refuses %s when its containing Diagram is absent` holds it to.
+     * `refuses %s when its containing Map is absent` holds it to.
      *
      * Initialization is its own durable single-Space commit, issued while the
      * coordination's barrier is raised, and that is deliberate rather than a
@@ -1033,13 +1035,13 @@ export function createSpaceSessionRegistry(
      * target, and `plan` reads the selection from it rather than from here.
      *
      * **A failure after this point leaves the target initialized and makes no
-     * Thing, and that is accepted rather than repaired.** An aggregate refusal,
+     * Resource, and that is accepted rather than repaired.** An aggregate refusal,
      * a conflict or a commit failure all land after `prepare` has returned, so
-     * the Diagram and Graph minted here outlive the Edit that asked for them.
+     * the Map and Graph minted here outlive the Edit that asked for them.
      * What is left behind is not debris: ADR 0079 already has a Space gain its
-     * Diagram the first time anything works with it, so this is the state the
+     * Map the first time anything works with it, so this is the state the
      * author would have reached by merely opening that Space. It is also
-     * idempotent — a second attempt finds `defaultDiagram` recorded, mints
+     * idempotent — a second attempt finds `defaultMap` recorded, mints
      * nothing, commits nothing and selects the same pair — which is what makes
      * retrying the refused Edit clean rather than cumulative. Folding the
      * initialization into the coordinated Edit instead would buy atomicity at
@@ -1047,23 +1049,23 @@ export function createSpaceSessionRegistry(
      * puts that boundary in one place.
      *
      * The one rule that makes that commit legal is a carve-out the adapters
-     * already share: a diagramless ordinary Space is necessarily *unreferenced*
-     * — intake refuses a Space Thing whose target supplies no Diagram — so
+     * already share: a mapless ordinary Space is necessarily *unreferenced*
+     * — intake refuses a Space Resource whose target supplies no Map — so
      * initialization's own commit would otherwise be refused for leaving it
      * unreferenced. `baselineUnreferenced` forgives exactly the Space that was
      * already unreferenced before the commit, which is why the only window in
-     * which a diagramless Space can gain a Diagram and a first reference is
+     * which a mapless Space can gain a Map and a first reference is
      * this one.
      *
      * Nothing holds the target still between this and the Edit, and nothing
      * needs to: the selection is validated against the whole aggregate inside
-     * the coordination, so a Diagram deleted in the gap is refused as
-     * `space-thing-diagram-missing` rather than stored.
+     * the coordination, so a Map deleted in the gap is refused as
+     * `space-resource-map-missing` rather than stored.
      *
      * **Read as stored, even for an open target session (ADR 0097).** The
      * target is not a participant of this Edit, so its selection is read from
      * storage — never from a live session's `working`, which can name a
-     * Graph or Diagram that never committed, or that a failed attempt already
+     * Graph or Map that never committed, or that a failed attempt already
      * withdrew. `recoveryRefusal` on the target, called by `link` before
      * this, is what a `failed`/`conflicted` target answers instead; a
      * `rejected`, `refused` or merely divergent one still reads its last-stored
@@ -1079,7 +1081,7 @@ export function createSpaceSessionRegistry(
         // named for. `working-space.ts` throws when the initializing commit did
         // not land, when a conflict names the Space without returning its
         // current state, when a committed initialization reports no revision,
-        // and when a non-empty Diagram list loses its first value; a rejected
+        // and when a non-empty Map list loses its first value; a rejected
         // `loadSpace` reaches here too. They are one refusal because the author
         // has one move for all of them — the target has no selection to give
         // and the next attempt may find one — and `not-initialized` is what
@@ -1102,7 +1104,7 @@ export function createSpaceSessionRegistry(
       if (session === undefined) throw new Error(`Space ${id} has no live session`);
       return session.getState().working;
     };
-    const recoveryRefusal = (spaceId: UUID): SpaceThingRefused | undefined => {
+    const recoveryRefusal = (spaceId: UUID): SpaceResourceRefused | undefined => {
       const persistence = sessions.get(spaceId)?.session.getState().persistence;
       if (persistence?.kind === 'failed') {
         return {
@@ -1124,17 +1126,17 @@ export function createSpaceSessionRegistry(
     };
     /**
      * The one recovery rule for both cascading operations (ADR 0099): a
-     * non-participant session that needs recovery blocks a Space Thing
-     * delete, or a Diagram/Graph delete, when it — in either its stored
+     * non-participant session that needs recovery blocks a Space Resource
+     * delete, or a Map/Graph delete, when it — in either its stored
      * snapshot or its working Space — references a Space the deletion
-     * would remove, or holds a Space Thing selecting the Diagram or Graph
+     * would remove, or holds a Space Resource selecting the Map or Graph
      * being deleted. Neither reading alone is trustworthy on its own: a
      * `failed` edit that added the reference or selection has not reached
      * storage, and one that removed it has not left storage either —
      * either way, that session's own eventual retry or conflict resolution
      * resubmits whichever of the two turns out to be its true next
      * attempt, and a deletion that cannot see it can delete the Space, or
-     * the Diagram or Graph, that attempt still needs. `recoveryRefusal`
+     * the Map or Graph, that attempt still needs. `recoveryRefusal`
      * answers `undefined` for a `rejected` or `refused` session, so it is not checked
      * here — its work is already permanently refused, and this deletion
      * strands nothing further from it.
@@ -1143,7 +1145,7 @@ export function createSpaceSessionRegistry(
       aggregate: LoadedAggregate,
       exempt: ReadonlySet<UUID>,
       affects: (snapshot: SpaceSnapshot) => boolean,
-    ): SpaceThingRefused | undefined => {
+    ): SpaceResourceRefused | undefined => {
       for (const [id, managed] of sessions) {
         if (exempt.has(id)) continue;
         const recovery = recoveryRefusal(id);
@@ -1158,28 +1160,28 @@ export function createSpaceSessionRegistry(
       return undefined;
     };
     /**
-     * `prepare` holds the containing Diagram's early-exit check — which must
+     * `prepare` holds the containing Map's early-exit check — which must
      * run, and refuse, before the target is made working or any id is minted
      * (ADR 0079) — and every wait this operation needs: making the target
-     * working, which durably initializes a stored diagramless Space, and
-     * minting the Thing's id once that succeeds. `plan` runs
-     * `SnapshotEdit.createInDiagram` against the Spaces the coordination's own
-     * aggregate read just produced, so a containing Diagram deleted during
+     * working, which durably initializes a stored mapless Space, and
+     * minting the Resource's id once that succeeds. `plan` runs
+     * `SnapshotEdit.createInMap` against the Spaces the coordination's own
+     * aggregate read just produced, so a containing Map deleted during
      * that read is what the decision sees rather than something re-applied
      * afterward.
      */
-    const link = async (input: LinkSpaceThingInput): Promise<SpaceThingCreationResult> => {
-      let completion: SpaceThingCreationResult | undefined;
-      type LinkPrepared = { readonly thingId: UUID };
-      const result = await coordinateSpaceThing<LinkPrepared>({
-        prepare: async (): Promise<SpaceThingPreparationOutcome<LinkPrepared>> => {
+    const link = async (input: LinkSpaceResourceInput): Promise<SpaceResourceCreationResult> => {
+      let completion: SpaceResourceCreationResult | undefined;
+      type LinkPrepared = { readonly resourceId: UUID };
+      const result = await coordinateSpaceResource<LinkPrepared>({
+        prepare: async (): Promise<SpaceResourcePreparationOutcome<LinkPrepared>> => {
           const recovery = recoveryRefusal(input.containingSpaceId);
           if (recovery !== undefined) return recovery;
           const source = working(input.containingSpaceId);
-          if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
+          if (!(source.document.maps ?? []).some(({ id }) => id === input.mapId)) {
             return {
               kind: 'refused',
-              refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+              refusal: { code: 'map-not-found', mapId: input.mapId },
             };
           }
           // The target itself, next and still before initialization: the Space
@@ -1199,13 +1201,13 @@ export function createSpaceSessionRegistry(
             return {
               kind: 'refused',
               refusal: {
-                code: 'space-thing-target-unavailable',
+                code: 'space-resource-target-unavailable',
                 spaceId: input.targetSpaceId,
                 reason: target.reason,
               },
             };
           }
-          return { kind: 'proceed', prepared: { thingId: newId() } };
+          return { kind: 'proceed', prepared: { resourceId: newId() } };
         },
         plan: (spaces, aggregate, data) => {
           const source = spaces.get(input.containingSpaceId);
@@ -1229,23 +1231,23 @@ export function createSpaceSessionRegistry(
             return {
               kind: 'refused',
               refusal: {
-                code: 'space-thing-target-unavailable',
+                code: 'space-resource-target-unavailable',
                 spaceId: input.targetSpaceId,
                 reason: target.reason,
               },
             };
           }
-          const created = planSpaceThingCreation(
+          const created = planSpaceResourceCreation(
             source,
-            input.diagramId,
-            data.thingId,
+            input.mapId,
+            data.resourceId,
             input.targetSpaceId,
             input.title,
             target.selection,
             input.position,
           );
           if (created.kind === 'refused') return created;
-          completion = { kind: 'completed', thingId: data.thingId };
+          completion = { kind: 'completed', resourceId: data.resourceId };
           return {
             kind: 'changes',
             changes: [
@@ -1254,13 +1256,13 @@ export function createSpaceSessionRegistry(
           };
         },
       });
-      const refusal = asSpaceThingRefusal(result);
+      const refusal = asSpaceResourceRefusal(result);
       if (refusal !== undefined) return refusal;
       return completedCreation(completion);
     };
     /**
      * `prepare` holds only the early exits that need no read — recovery, and
-     * whether the named Diagram/Graph is even still a deletion candidate on
+     * whether the named Map/Graph is even still a deletion candidate on
      * the target's own live session, which saves the read for the ordinary
      * case where it plainly is not (already gone, or the last one). `plan`
      * re-asks that same question, and then chooses the successor, the
@@ -1269,17 +1271,17 @@ export function createSpaceSessionRegistry(
      * removed during that read is not baked into a closure that outlives it:
      * `plan` simply does not choose it. Re-choosing from what `plan` sees is
      * the answer, not a new refusal: the only ways a chosen successor can
-     * fail to exist by the time `plan` looks are "some other Diagram/Graph is
+     * fail to exist by the time `plan` looks are "some other Map/Graph is
      * still available" (re-chosen) and "none is" (keep-last, already
      * `unchanged`) — there is no state fresh data can show `plan` that isn't
      * one of those two.
      */
     const deleteContext = async (
-      input: DeleteReferencedDiagramInput | DeleteReferencedGraphInput,
-    ): Promise<SpaceThingContextDeletionResult> => {
-      let selection: { diagramId: UUID; graphId: UUID } | undefined;
-      const result = await coordinateSpaceThing({
-        prepare: (): Promise<SpaceThingPreparationOutcome<undefined>> => {
+      input: DeleteReferencedMapInput | DeleteReferencedGraphInput,
+    ): Promise<SpaceResourceContextDeletionResult> => {
+      let selection: { mapId: UUID; graphId: UUID } | undefined;
+      const result = await coordinateSpaceResource({
+        prepare: (): Promise<SpaceResourcePreparationOutcome<undefined>> => {
           const recovery = recoveryRefusal(input.targetSpaceId);
           if (recovery !== undefined) return Promise.resolve(recovery);
           const target = working(input.targetSpaceId);
@@ -1297,24 +1299,24 @@ export function createSpaceSessionRegistry(
           }
           const candidate = contextDeletionCandidate(target, input);
           if (candidate.kind === 'not-deletable') return { kind: 'unchanged' };
-          const { targetDiagram } = candidate;
-          const deletingDiagram = 'preferredDiagramId' in input;
+          const { targetMap } = candidate;
+          const deletingMap = 'preferredMapId' in input;
 
-          const replacementDiagram = deletingDiagram
-            ? ((target.document.diagrams ?? []).find(
-                ({ id }) => id === input.preferredDiagramId && id !== input.diagramId,
-              ) ?? (target.document.diagrams ?? []).find(({ id }) => id !== input.diagramId))
-            : targetDiagram;
-          const replacementGraph = deletingDiagram
-            ? (replacementDiagram?.graphs.find(({ id }) => id === replacementDiagram.activeGraph) ??
-              replacementDiagram?.graphs[0])
-            : (targetDiagram.graphs.find(
+          const replacementMap = deletingMap
+            ? ((target.document.maps ?? []).find(
+                ({ id }) => id === input.preferredMapId && id !== input.mapId,
+              ) ?? (target.document.maps ?? []).find(({ id }) => id !== input.mapId))
+            : targetMap;
+          const replacementGraph = deletingMap
+            ? (replacementMap?.graphs.find(({ id }) => id === replacementMap.activeGraph) ??
+              replacementMap?.graphs[0])
+            : (targetMap.graphs.find(
                 ({ id }) => id === input.preferredGraphId && id !== input.graphId,
-              ) ?? targetDiagram.graphs.find(({ id }) => id !== input.graphId));
-          if (replacementDiagram === undefined || replacementGraph === undefined)
+              ) ?? targetMap.graphs.find(({ id }) => id !== input.graphId));
+          if (replacementMap === undefined || replacementGraph === undefined)
             return { kind: 'unchanged' };
 
-          // Every *other* Space that selects this target's Diagram/Graph is
+          // Every *other* Space that selects this target's Map/Graph is
           // read as stored (ADR 0097): it is not yet a known participant, and
           // if a live session's own uncommitted Edit already moved its
           // selection away, that Edit's own future commit is what reconciles
@@ -1322,16 +1324,16 @@ export function createSpaceSessionRegistry(
           // The target itself is `spaces`' reading, its working Space when a
           // live session holds it, since its own structure is what this Edit
           // changes.
-          const selectsDeletedContext = (document: ThingDocument): boolean =>
+          const selectsDeletedContext = (document: ResourceDocument): boolean =>
             document.kind === 'space' &&
             document.spaceId === input.targetSpaceId &&
-            (deletingDiagram
-              ? document.diagram === input.diagramId
-              : document.diagram === input.diagramId && document.graph === input.graphId);
+            (deletingMap
+              ? document.map === input.mapId
+              : document.map === input.mapId && document.graph === input.graphId);
           const affected = aggregate.spaces
             .map(({ snapshot }) => snapshot)
             .filter((snapshot) =>
-              snapshot.things.some(({ document }) => selectsDeletedContext(document)),
+              snapshot.resources.some(({ document }) => selectsDeletedContext(document)),
             );
           const participantIds = new Set([input.targetSpaceId, ...affected.map(({ id }) => id)]);
           // Every participant's own recovery is checked, and the one shared
@@ -1344,14 +1346,14 @@ export function createSpaceSessionRegistry(
           // The one recovery rule (ADR 0099), shared with `delete`'s cascade:
           // a non-participant session that needs recovery is not made a
           // participant here either, and blocks the deletion when either its
-          // stored snapshot or its working Space still selects the Diagram
+          // stored snapshot or its working Space still selects the Map
           // or Graph being deleted — its own eventual retry or conflict
           // resolution resubmits one of the two, and deleting the context
           // out from under it would strand that attempt forever, refused
-          // with `space-thing-diagram-missing`/`space-thing-graph-missing`
+          // with `space-resource-map-missing`/`space-resource-graph-missing`
           // naming a context that no longer exists.
           const recoveryBlock = recoveryBlockedBy(aggregate, participantIds, (snapshot) =>
-            snapshot.things.some(({ document }) => selectsDeletedContext(document)),
+            snapshot.resources.some(({ document }) => selectsDeletedContext(document)),
           );
           if (recoveryBlock !== undefined) return recoveryBlock;
           for (const id of participantIds) {
@@ -1364,25 +1366,23 @@ export function createSpaceSessionRegistry(
           }
           const targetDocument = {
             ...target.document,
-            diagrams: (target.document.diagrams ?? [])
-              .filter(({ id }) => !deletingDiagram || id !== input.diagramId)
-              .map((diagram) =>
-                !deletingDiagram && diagram.id === input.diagramId
+            maps: (target.document.maps ?? [])
+              .filter(({ id }) => !deletingMap || id !== input.mapId)
+              .map((map) =>
+                !deletingMap && map.id === input.mapId
                   ? {
-                      ...diagram,
+                      ...map,
                       activeGraph:
-                        diagram.activeGraph === input.graphId
-                          ? replacementGraph.id
-                          : diagram.activeGraph,
-                      graphs: diagram.graphs.filter(({ id }) => id !== input.graphId),
+                        map.activeGraph === input.graphId ? replacementGraph.id : map.activeGraph,
+                      graphs: map.graphs.filter(({ id }) => id !== input.graphId),
                     }
-                  : diagram,
+                  : map,
               ),
           };
-          if (deletingDiagram && target.document.defaultDiagram === input.diagramId) {
-            targetDocument.defaultDiagram = replacementDiagram.id;
+          if (deletingMap && target.document.defaultMap === input.mapId) {
+            targetDocument.defaultMap = replacementMap.id;
           }
-          const targetChange: SpaceThingLifecycleChange = {
+          const targetChange: SpaceResourceLifecycleChange = {
             kind: 'update',
             spaceId: input.targetSpaceId,
             snapshot: { ...target, document: targetDocument },
@@ -1392,71 +1392,71 @@ export function createSpaceSessionRegistry(
           // snapshot for one opened just above.
           const referenceChanges = affected
             .filter((snapshot) => snapshot.id !== input.targetSpaceId)
-            .map((snapshot): SpaceThingLifecycleChange => ({
+            .map((snapshot): SpaceResourceLifecycleChange => ({
               kind: 'update',
               spaceId: snapshot.id,
-              snapshot: replaceSpaceThingSelection(
+              snapshot: replaceSpaceResourceSelection(
                 spaces.get(snapshot.id) ?? snapshot,
                 input.targetSpaceId,
                 selectsDeletedContext,
-                replacementDiagram.id,
+                replacementMap.id,
                 replacementGraph.id,
-                deletingDiagram,
+                deletingMap,
               ),
             }));
-          selection = { diagramId: replacementDiagram.id, graphId: replacementGraph.id };
+          selection = { mapId: replacementMap.id, graphId: replacementGraph.id };
           return { kind: 'changes', changes: [targetChange, ...referenceChanges] };
         },
       });
-      const refusal = asSpaceThingRefusal(result);
+      const refusal = asSpaceResourceRefusal(result);
       if (refusal !== undefined) return refusal;
       return selection !== undefined ? { kind: 'completed', ...selection } : { kind: 'unchanged' };
     };
     return {
       /**
-       * `prepare` holds the containing Diagram's early-exit check and every
+       * `prepare` holds the containing Map's early-exit check and every
        * wait this operation needs — minting the new target Space's
        * identities and running it through the normal on-disk intake (ADR
-       * 0010), then minting the Thing's id. `plan` runs
-       * `SnapshotEdit.createInDiagram` against the Spaces the coordination's
-       * own aggregate read just produced, so a containing Diagram deleted
+       * 0010), then minting the Resource's id. `plan` runs
+       * `SnapshotEdit.createInMap` against the Spaces the coordination's
+       * own aggregate read just produced, so a containing Map deleted
        * during that read is what the decision sees rather than something
        * re-applied afterward.
        */
       create: async (input) => {
-        let completion: SpaceThingCreationResult | undefined;
+        let completion: SpaceResourceCreationResult | undefined;
         type CreatePrepared = {
           readonly target: SpaceSnapshot;
-          readonly selection: SpaceThingSelection;
-          readonly thingId: UUID;
+          readonly selection: SpaceResourceSelection;
+          readonly resourceId: UUID;
         };
-        const result = await coordinateSpaceThing<CreatePrepared>({
-          prepare: (): Promise<SpaceThingPreparationOutcome<CreatePrepared>> => {
+        const result = await coordinateSpaceResource<CreatePrepared>({
+          prepare: (): Promise<SpaceResourcePreparationOutcome<CreatePrepared>> => {
             const recovery = recoveryRefusal(input.containingSpaceId);
             if (recovery !== undefined) return Promise.resolve(recovery);
             const source = working(input.containingSpaceId);
-            if (!(source.document.diagrams ?? []).some(({ id }) => id === input.diagramId)) {
+            if (!(source.document.maps ?? []).some(({ id }) => id === input.mapId)) {
               return Promise.resolve({
                 kind: 'refused',
-                refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+                refusal: { code: 'map-not-found', mapId: input.mapId },
               });
             }
             const initialized = initializeSpace({ title: input.title, newId });
-            const loaded = loadSpace(initialized.file, initialized.thingFiles);
+            const loaded = loadSpace(initialized.file, initialized.resourceFiles);
             if (!loaded.ok) throw new Error(loaded.errors.map(({ message }) => message).join('\n'));
             const target = snapshotFromSpace(loaded.space);
-            // The Diagram and Graph the initializer just minted, read back
+            // The Map and Graph the initializer just minted, read back
             // through the same rule a stored target answers rather than off
             // the file it wrote (ADR 0079). A new Space is complete, so the
             // boundary below is type-level: `initializeSpace` authors a
-            // `defaultDiagram` owning one Graph, and the intake above has
+            // `defaultMap` owning one Graph, and the intake above has
             // already accepted it.
             const selection = selectionOf(loaded.space);
             if (selection === undefined)
-              throw new Error('An initialized Space supplied no Diagram to select');
+              throw new Error('An initialized Space supplied no Map to select');
             return Promise.resolve({
               kind: 'proceed',
-              prepared: { target, selection, thingId: newId() },
+              prepared: { target, selection, resourceId: newId() },
             });
           },
           plan: (spaces, _aggregate, data) => {
@@ -1464,17 +1464,17 @@ export function createSpaceSessionRegistry(
             if (source === undefined) {
               throw new Error(`Space ${input.containingSpaceId} has no live session`);
             }
-            const created = planSpaceThingCreation(
+            const created = planSpaceResourceCreation(
               source,
-              input.diagramId,
-              data.thingId,
+              input.mapId,
+              data.resourceId,
               data.target.id,
               input.title,
               data.selection,
               input.position,
             );
             if (created.kind === 'refused') return created;
-            completion = { kind: 'completed', thingId: data.thingId };
+            completion = { kind: 'completed', resourceId: data.resourceId };
             return {
               kind: 'changes',
               changes: [
@@ -1484,31 +1484,31 @@ export function createSpaceSessionRegistry(
             };
           },
         });
-        const refusal = asSpaceThingRefusal(result);
+        const refusal = asSpaceResourceRefusal(result);
         if (refusal !== undefined) return refusal;
         return completedCreation(completion);
       },
       link,
-      deleteDiagram: deleteContext,
+      deleteMap: deleteContext,
       deleteGraph: deleteContext,
       /**
        * `prepare` holds only the one early exit that saves work without
        * needing the Spaces as they stand — a containing Space already
        * needing recovery cannot accept this Edit regardless of what the
        * cascade turns out to be. Everything that decides — is this id a
-       * Space Thing, does a Reference Thing still target it, and which target Spaces
+       * Space Resource, does a Reference Resource still target it, and which target Spaces
        * the deletion cascades to — runs in `plan`, against the Spaces the
-       * coordination's own aggregate read just produced, so a Reference Thing or a
+       * coordination's own aggregate read just produced, so a Reference Resource or a
        * reference arriving during that read is what the decision sees
        * rather than something re-applied afterward.
        */
       delete: async (input) => {
-        const result = await coordinateSpaceThing({
+        const result = await coordinateSpaceResource({
           // No wait of its own: the coordination's own aggregate read is what
           // `plan` decides against, so the only early exit worth taking here
           // is one that needs no read at all.
           prepare: () =>
-            Promise.resolve<SpaceThingPreparationOutcome<undefined>>(
+            Promise.resolve<SpaceResourcePreparationOutcome<undefined>>(
               recoveryRefusal(input.containingSpaceId) ?? { kind: 'proceed', prepared: undefined },
             ),
           plan: (spaces, aggregate) => {
@@ -1516,29 +1516,29 @@ export function createSpaceSessionRegistry(
             if (source === undefined) {
               throw new Error(`Space ${input.containingSpaceId} has no live session`);
             }
-            const thing = source.things.find(({ id }) => id === input.thingId);
-            if (thing?.document.kind !== 'space') {
+            const resource = source.resources.find(({ id }) => id === input.resourceId);
+            if (resource?.document.kind !== 'space') {
               return {
                 kind: 'refused',
-                refusal: { code: 'space-thing-not-found', thingId: input.thingId },
+                refusal: { code: 'space-resource-not-found', resourceId: input.resourceId },
               };
             }
             // The only refusal `deleteFromSpace` can answer here is
-            // `thing-has-references` — `thing-not-found` cannot occur for an id
-            // `source.things` was just found to hold, so meeting it would be
+            // `resource-has-references` — `resource-not-found` cannot occur for an id
+            // `source.resources` was just found to hold, so meeting it would be
             // a broken invariant.
-            const deletion = SnapshotEdit.deleteFromSpace(source, input.thingId);
+            const deletion = SnapshotEdit.deleteFromSpace(source, input.resourceId);
             if (deletion.kind === 'refused') {
-              if (deletion.refusal.code !== 'thing-has-references') {
+              if (deletion.refusal.code !== 'resource-has-references') {
                 throw new Error(
-                  `Space Thing deletion refused unexpectedly: ${deletion.refusal.code}`,
+                  `Space Resource deletion refused unexpectedly: ${deletion.refusal.code}`,
                 );
               }
               return { kind: 'refused', refusal: deletion.refusal };
             }
             if (deletion.kind !== 'completed') {
               throw new Error(
-                `Space Thing deletion through SnapshotEdit answered '${deletion.kind}'`,
+                `Space Resource deletion through SnapshotEdit answered '${deletion.kind}'`,
               );
             }
             /**
@@ -1563,18 +1563,18 @@ export function createSpaceSessionRegistry(
              * `ordinary-space-unreferenced` check would refuse that outcome
              * regardless of what this cascade decided.
              */
-            const spaceThingEdges = (snapshot: SpaceSnapshot): ReadonlyMap<UUID, UUID> => {
+            const spaceResourceEdges = (snapshot: SpaceSnapshot): ReadonlyMap<UUID, UUID> => {
               const edges = new Map<UUID, UUID>();
-              for (const candidate of snapshot.things) {
+              for (const candidate of snapshot.resources) {
                 if (candidate.document.kind === 'space')
                   edges.set(candidate.id, candidate.document.spaceId);
               }
               return edges;
             };
             const edgesById = new Map<UUID, ReadonlyMap<UUID, UUID>>(
-              aggregate.spaces.map(({ snapshot }) => [snapshot.id, spaceThingEdges(snapshot)]),
+              aggregate.spaces.map(({ snapshot }) => [snapshot.id, spaceResourceEdges(snapshot)]),
             );
-            edgesById.set(input.containingSpaceId, spaceThingEdges(deletion.snapshot));
+            edgesById.set(input.containingSpaceId, spaceResourceEdges(deletion.snapshot));
             const inbound = new Map<UUID, number>();
             for (const id of edgesById.keys()) inbound.set(id, 0);
             for (const edges of edgesById.values())
@@ -1582,10 +1582,10 @@ export function createSpaceSessionRegistry(
                 inbound.set(targetSpaceId, (inbound.get(targetSpaceId) ?? 0) + 1);
             const deleted: UUID[] = [];
             const pending: UUID[] =
-              thing.document.spaceId === aggregate.metaSpaceId ||
-              (inbound.get(thing.document.spaceId) ?? 0) !== 0
+              resource.document.spaceId === aggregate.metaSpaceId ||
+              (inbound.get(resource.document.spaceId) ?? 0) !== 0
                 ? []
-                : [thing.document.spaceId];
+                : [resource.document.spaceId];
             for (const id of pending) {
               if (deleted.includes(id)) continue;
               const edges = edgesById.get(id);
@@ -1614,7 +1614,7 @@ export function createSpaceSessionRegistry(
               aggregate,
               new Set([input.containingSpaceId, ...deleted]),
               (snapshot) =>
-                [...spaceThingEdges(snapshot).values()].some((targetId) =>
+                [...spaceResourceEdges(snapshot).values()].some((targetId) =>
                   deletedIds.has(targetId),
                 ),
             );
@@ -1639,7 +1639,7 @@ export function createSpaceSessionRegistry(
             };
           },
         });
-        const refusal = asSpaceThingRefusal(result);
+        const refusal = asSpaceResourceRefusal(result);
         if (refusal !== undefined) return refusal;
         return completed;
       },
@@ -1682,7 +1682,7 @@ export function createSpaceSessionRegistry(
       if (managed !== undefined) return { kind: 'session', session: managed.session };
       return provisional.get(spaceId);
     },
-    spaceThings,
+    spaceResources,
   };
   return registry;
 }

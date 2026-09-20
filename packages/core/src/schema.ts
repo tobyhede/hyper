@@ -1,13 +1,13 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import { COLLAPSED_THING_SIZE } from './thing-geometry';
-import { THING_TITLE_REQUIRED, normalizeTitle } from './title';
+import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
+import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 
 /**
  * Zod schemas for the space file (`space.json`).
  *
  * These validate *shape* only. Referential integrity (do a graph's edge
- * endpoints actually resolve to real things) is checked separately in `@project/graph`,
+ * endpoints actually resolve to real resources) is checked separately in `@project/graph`,
  * because it needs the whole space in view. A value that passes here is not yet
  * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
  */
@@ -22,7 +22,7 @@ const idSchema = uuidSchema;
  *
  * **Mint, not allocate.** Nothing reserves an id from a registry, and in
  * particular PostgreSQL does not hand them out: a space's id comes from its
- * column default, and every other id — thing, graph, diagram — is generated here,
+ * column default, and every other id — resource, graph, map — is generated here,
  * in whichever process is doing the work. Calling it allocation is what made the
  * importer read as though the database had to be consulted for a random value.
  *
@@ -35,7 +35,7 @@ const idSchema = uuidSchema;
 export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 
 /**
- * A Thing's Title: one or more Title Lines, normalized here (ADR 0083).
+ * A Resource's Title: one or more Title Lines, normalized here (ADR 0083).
  *
  * This is the boundary the rule sits at, so a stored Title, an imported one and
  * one an author just typed all get the same answer, and no surface normalizes
@@ -44,7 +44,7 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * but whitespace no longer passes: it carries no name, and the name is what
  * every list, search and accessible label shows.
  *
- * Things only. Space, Diagram and Graph titles keep their plain single-line
+ * Resources only. Space, Map and Graph titles keep their plain single-line
  * field: they are labels in lists with no front to draw a ladder on, and giving
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
@@ -52,9 +52,9 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * One instance, shared by the three kinds — `omit` and `extend` copy a field
  * schema by reference, so the stored document and the import variants inherit
  * this rule rather than restating it, which is what
- * `thing-document-equality.test.ts` holds them to.
+ * `resource-document-equality.test.ts` holds them to.
  */
-const thingTitleSchema = z
+const resourceTitleSchema = z
   .string()
   .transform(normalizeTitle)
   .refine((title) => title.length > 0, {
@@ -63,57 +63,57 @@ const thingTitleSchema = z
     // that fails intake prints, and a `refine` with no message prints Zod's
     // "Invalid input" — which names neither the field's rule nor the fix.
     message: 'A title must have at least one line with something in it',
-    params: { code: THING_TITLE_REQUIRED },
+    params: { code: RESOURCE_TITLE_REQUIRED },
   });
 
 /**
- * The frontmatter of a markdown thing file (ADR 0020). No `content` key: the
- * body of the file *is* the content, so the thing and its text are one artifact.
+ * The frontmatter of a markdown resource file (ADR 0020). No `content` key: the
+ * body of the file *is* the content, so the resource and its text are one artifact.
  */
-export const markdownThingFrontmatterSchema = z.object({
+export const markdownResourceFrontmatterSchema = z.object({
   id: idSchema,
-  title: thingTitleSchema,
+  title: resourceTitleSchema,
   kind: z.literal('markdown'),
 });
 
-/** The frontmatter of a reference thing file — a pointer to the thing whose content it shows. */
-export const referenceThingFrontmatterSchema = z.object({
+/** The frontmatter of a reference resource file — a pointer to the resource whose content it shows. */
+export const referenceResourceFrontmatterSchema = z.object({
   id: idSchema,
-  title: thingTitleSchema,
+  title: resourceTitleSchema,
   kind: z.literal('reference'),
-  /** The id of the thing this reference shows. Referential checks live in `@project/graph`. */
+  /** The id of the resource this reference shows. Referential checks live in `@project/graph`. */
   target: idSchema,
 });
 
 /**
- * A Thing that shows one selected view of another independently stored Space
+ * A Resource that shows one selected view of another independently stored Space
  * (ADR 0068).
  *
- * **The selection is part of the Thing, not an option on it (ADR 0079).** A
- * Space Thing names a Diagram of its target and a Graph that Diagram owns, and
+ * **The selection is part of the Resource, not an option on it (ADR 0079).** A
+ * Space Resource names a Map of its target and a Graph that Map owns, and
  * it names them from the moment it exists: the lifecycle that creates one
- * initializes a diagramless target before completing and stores what
- * initialization minted, so there is no valid Space Thing with nothing selected
+ * initializes a mapless target before completing and stores what
+ * initialization minted, so there is no valid Space Resource with nothing selected
  * and no surface that has to draw one. Both ids are resolved against the target
  * by aggregate intake rather than here — this file knows the shape and
  * `@project/graph` knows the Spaces.
  *
- * What used to fill the gap was a fallback to the target's `defaultDiagram`,
- * which made one Thing's selection follow another Space's opening choice.
- * Requiring the field is what stops that: two Space Things on one target differ
+ * What used to fill the gap was a fallback to the target's `defaultMap`,
+ * which made one Resource's selection follow another Space's opening choice.
+ * Requiring the field is what stops that: two Space Resources on one target differ
  * by what they store and by nothing else.
  *
- * Framing is the Diagram-coordinate centre and scale saved for this particular
+ * Framing is the Map-coordinate centre and scale saved for this particular
  * window onto the target. It is absent until the view has been framed, in which
- * case the renderer fits the selected Diagram. It belongs here rather than on
- * the Diagram because two Space Things may show the same Diagram differently.
+ * case the renderer fits the selected Map. It belongs here rather than on
+ * the Map because two Space Resources may show the same Map differently.
  */
-export const spaceThingFrontmatterSchema = z.object({
+export const spaceResourceFrontmatterSchema = z.object({
   id: idSchema,
-  title: thingTitleSchema,
+  title: resourceTitleSchema,
   kind: z.literal('space'),
   spaceId: idSchema,
-  diagram: uuidSchema,
+  map: uuidSchema,
   graph: idSchema,
   framing: z
     .object({
@@ -130,65 +130,67 @@ const defaultMarkdownKind = (value: unknown): unknown =>
     : value;
 
 /**
- * What a thing file's frontmatter must contain (ADR 0020). A thing's identity
+ * What a resource file's frontmatter must contain (ADR 0020). A resource's identity
  * lives here and never in its filename, so renaming the file is not an identity
- * change. `kind` defaults to `'markdown'` exactly as {@link thingSchema} does —
- * the common thing declares an id and a title and nothing else.
+ * change. `kind` defaults to `'markdown'` exactly as {@link resourceSchema} does —
+ * the common resource declares an id and a title and nothing else.
  */
-export const thingFrontmatterSchema = z.preprocess(
+export const resourceFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
-    markdownThingFrontmatterSchema,
-    referenceThingFrontmatterSchema,
-    spaceThingFrontmatterSchema,
+    markdownResourceFrontmatterSchema,
+    referenceResourceFrontmatterSchema,
+    spaceResourceFrontmatterSchema,
   ]),
 );
 
-export const importMarkdownThingFrontmatterSchema = markdownThingFrontmatterSchema.extend({
+export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importReferenceThingFrontmatterSchema = referenceThingFrontmatterSchema.extend({
+export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importSpaceThingFrontmatterSchema = spaceThingFrontmatterSchema.extend({
+export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importThingFrontmatterSchema = z.preprocess(
+export const importResourceFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
-    importMarkdownThingFrontmatterSchema,
-    importReferenceThingFrontmatterSchema,
-    importSpaceThingFrontmatterSchema,
+    importMarkdownResourceFrontmatterSchema,
+    importReferenceResourceFrontmatterSchema,
+    importSpaceResourceFrontmatterSchema,
   ]),
 );
 
-/** A thing written directly by the author; the body of its file is its content. */
-export const markdownThingSchema = markdownThingFrontmatterSchema.extend({ body: z.string() });
+/** A resource written directly by the author; the body of its file is its content. */
+export const markdownResourceSchema = markdownResourceFrontmatterSchema.extend({
+  body: z.string(),
+});
 
-/** A thing that shows its target's content at a second position (ADR 0009). */
-export const referenceThingSchema = referenceThingFrontmatterSchema;
+/** A resource that shows its target's content at a second position (ADR 0009). */
+export const referenceResourceSchema = referenceResourceFrontmatterSchema;
 
-/** A thing that embeds one selected view of another Space (ADR 0068). */
-export const spaceThingSchema = spaceThingFrontmatterSchema;
+/** A resource that embeds one selected view of another Space (ADR 0068). */
+export const spaceResourceSchema = spaceResourceFrontmatterSchema;
 
 /**
- * A thing parsed from its file (ADR 0020). A markdown thing carries the file body
- * that stores its content; a reference thing carries only the pointer to its target's
- * content (ADR 0009). No default for `kind` here — by the time a thing exists
+ * A resource parsed from its file (ADR 0020). A markdown resource carries the file body
+ * that stores its content; a reference resource carries only the pointer to its target's
+ * content (ADR 0009). No default for `kind` here — by the time a resource exists
  * its frontmatter has been parsed, and that is where the default was applied.
  */
-export const thingSchema = z.discriminatedUnion('kind', [
-  markdownThingSchema,
-  referenceThingSchema,
-  spaceThingSchema,
+export const resourceSchema = z.discriminatedUnion('kind', [
+  markdownResourceSchema,
+  referenceResourceSchema,
+  spaceResourceSchema,
 ]);
 
 /**
- * One edge of a graph: a directed connection from one thing to another (ADR
+ * One edge of a graph: a directed connection from one resource to another (ADR
  * 0032). This is the element an author draws, and the graph is the set of them.
  *
- * Shape only, as everywhere in this file. Whether both ids name real things,
- * whether they name things of the diagram that owns this graph, and whether an
+ * Shape only, as everywhere in this file. Whether both ids name real resources,
+ * whether they name resources of the map that owns this graph, and whether an
  * exact edge occurs more than once need the whole Graph/Space in view and are
  * checked in `@project/graph`.
  */
@@ -204,76 +206,76 @@ export const graphSchema = z.object({
   color: z.string().min(1).optional(),
   /**
    * Possibly none. A graph *is* its edges, but it is no longer minted by
-   * drawing one: creating a diagram creates its initial empty active graph in
-   * the same edit (ADR 0040), and Add Diagram produces exactly that — one fresh
+   * drawing one: creating a map creates its initial empty active graph in
+   * the same edit (ADR 0040), and Add Map produces exactly that — one fresh
    * graph holding no edges (ADR 0079). Deleting a graph's last edge leaves the
    * same shape, and graph management may not delete the graph itself to avoid
    * it. The superseded rule read ADR 0033's connect gesture as the only way a
    * graph came into being, which ADR 0040 replaced.
    *
-   * A thing may appear as the `from` of several edges (a fork) and the `to` of
+   * A resource may appear as the `from` of several edges (a fork) and the `to` of
    * several (a merge); nothing here constrains that.
    */
   edges: z.array(graphEdgeSchema),
 });
 
-/** Where a positioned diagram puts a thing, in the diagram's own coordinate space. */
-export const diagramPositionSchema = z.object({
+/** Where a positioned map puts a resource, in the map's own coordinate space. */
+export const mapPositionSchema = z.object({
   x: z.number(),
   y: z.number(),
 });
 
 const openSizeSchema = z.object({
-  width: z.number().min(COLLAPSED_THING_SIZE.width),
-  height: z.number().min(COLLAPSED_THING_SIZE.height),
+  width: z.number().min(COLLAPSED_RESOURCE_SIZE.width),
+  height: z.number().min(COLLAPSED_RESOURCE_SIZE.height),
 });
 
-/** What a Diagram stores for one Thing: its origin, Open/Closed state and remembered Open Size. */
-export const thingPlacementSchema = z.discriminatedUnion('open', [
-  diagramPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
-  diagramPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
+/** What a Map stores for one Resource: its origin, Open/Closed state and remembered Open Size. */
+export const resourcePlacementSchema = z.discriminatedUnion('open', [
+  mapPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
+  mapPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
 ]);
 
 /**
- * A diagram the author wrote: a thing-to-position map and the graphs over it
+ * A map the author wrote: a resource-to-position map and the graphs over it
  * (ADR 0025, ADR 0040).
  *
- * Its position keys **are** its thing membership. A thing the map omits is not in
- * this diagram — and a position may not name a thing the space does not hold;
+ * Its position keys **are** its resource membership. A resource the map omits is not in
+ * this map — and a position may not name a resource the space does not hold;
  * that is a reference error, checked in `@project/graph` where the whole space
  * is in view.
  *
  * The graphs are **owned**, not referenced: they are nested values of the one
- * diagram that holds them, ordered, and never shared with a second (ADR 0040).
- * Every edge endpoint of an owned graph names a thing in this diagram, which
- * again needs the whole space in view. Ownership is diagram-scoped while a graph
+ * map that holds them, ordered, and never shared with a second (ADR 0040).
+ * Every edge endpoint of an owned graph names a resource in this map, which
+ * again needs the whole space in view. Ownership is map-scoped while a graph
  * id is unique across the *space* (ADR 0045), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
  *
  * **Strict**, as the space file itself is. Under the version 2 shape this
- * key held a filter — an array of graph ids naming the graphs the diagram drew.
+ * key held a filter — an array of graph ids naming the graphs the map drew.
  * Reading one of those as an owned collection would be a type error, but a
- * *stripped* one would read a file that said "draw only these" as a diagram with
+ * *stripped* one would read a file that said "draw only these" as a map with
  * no graphs at all. Rejecting says so instead.
  */
-export const positionedDiagramSchema = z
+export const positionedMapSchema = z
   .object({
     id: idSchema,
     title: z.string().min(1),
     kind: z.literal('positioned'),
-    positions: z.record(idSchema, thingPlacementSchema),
+    positions: z.record(idSchema, resourcePlacementSchema),
     /**
-     * The graphs this diagram owns, in author order. **At least one**: creating a
-     * diagram creates its initial graph in the same edit, and graph management
-     * cannot delete the last (ADR 0040), so a diagram with none is a state no
+     * The graphs this map owns, in author order. **At least one**: creating a
+     * map creates its initial graph in the same edit, and graph management
+     * cannot delete the last (ADR 0040), so a map with none is a state no
      * gesture produces.
      */
     graphs: z.array(graphSchema).min(1),
     /**
-     * Which graph is active when this diagram opens. Absent, the **first graph**
+     * Which graph is active when this map opens. Absent, the **first graph**
      * is (ADR 0026) — resolved on read, so a hand-authored space needs nothing
      * here, while a file the app wrote names it outright rather than depending
-     * on graph order (ADR 0028). That it names a graph *this diagram* owns needs
+     * on graph order (ADR 0028). That it names a graph *this map* owns needs
      * the whole space in view and is checked in `@project/graph`.
      */
     activeGraph: idSchema.optional(),
@@ -281,14 +283,14 @@ export const positionedDiagramSchema = z
   .strict();
 
 /**
- * A diagram carried by the space file, discriminated by `kind`. Every Diagram is
- * authored: an automatic strategy computes placement from the things and graphs
+ * A map carried by the space file, discriminated by `kind`. Every Map is
+ * authored: an automatic strategy computes placement from the resources and graphs
  * alone, so it has nothing to write down and appears here nowhere (ADR 0025).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
- * `kind` defaults to `'positioned'` when absent, the same shape `thingSchema`
- * uses — here it is for hand-authoring rather than back-compat, so a diagram can
+ * `kind` defaults to `'positioned'` when absent, the same shape `resourceSchema`
+ * uses — here it is for hand-authoring rather than back-compat, so a map can
  * be written as just an id, a title, and its positions.
  */
 const defaultPositionedKind = (value: unknown): unknown =>
@@ -296,16 +298,16 @@ const defaultPositionedKind = (value: unknown): unknown =>
     ? { ...value, kind: 'positioned' }
     : value;
 
-export const diagramSchema = z.preprocess(
+export const mapSchema = z.preprocess(
   defaultPositionedKind,
-  z.discriminatedUnion('kind', [positionedDiagramSchema]),
+  z.discriminatedUnion('kind', [positionedMapSchema]),
 );
 
 /**
  * The **first-public** space document version.
  *
  * Version 2 was the disposable pre-release shape, which carried a space-level
- * `graphs` array beside diagrams that owned none. Hyper is unreleased, so it has
+ * `graphs` array beside maps that owned none. Hyper is unreleased, so it has
  * no compatibility claim on this one and is rejected rather than migrated (ADR
  * 0040). A named constant rather than a literal inlined in one schema, because
  * `documentRefusal` in `@project/graph` reads the declared version
@@ -323,15 +325,15 @@ export const SPACE_FILE_VERSION = 1;
  * (references unchecked, no index). "manifest" is retired: this is the space
  * file, not a manifest.
  *
- * It holds **structure and nothing else** (ADR 0020): things are not listed here,
- * because a thing exists by virtue of its file existing. `loadSpace` takes the
- * thing files alongside this.
+ * It holds **structure and nothing else** (ADR 0020): resources are not listed here,
+ * because a resource exists by virtue of its file existing. `loadSpace` takes the
+ * resource files alongside this.
  *
- * **Strict**, for the reason `positionedDiagramSchema` is. A stripped key is a
- * question answered silently: a top-level `things` or `edges` array (ADR 0020,
+ * **Strict**, for the reason `positionedMapSchema` is. A stripped key is a
+ * question answered silently: a top-level `resources` or `edges` array (ADR 0020,
  * ADR 0007) half-describes a space nothing loads from, and a file still
  * spelling the opening selection the way ADR 0079 renamed it reaches
- * `workingSpace`, which adopts `diagrams[0]` and commits it — the Diagram its
+ * `workingSpace`, which adopts `maps[0]` and commits it — the Map its
  * author named replaced by one they did not, and then persisted. Rejecting
  * says so instead.
  *
@@ -355,14 +357,14 @@ const spaceFileObjectSchema = z.strictObject({
   id: idSchema,
   title: z.string().min(1),
   /**
-   * Optional, and it is what holds the space's graphs — a diagram owns them
+   * Optional, and it is what holds the space's graphs — a map owns them
    * (ADR 0040), so there is no space-level collection to declare beside it. A
-   * space with no diagrams therefore has no structure yet, which is what a new
+   * space with no maps therefore has no structure yet, which is what a new
    * space *is*: it renders and it cannot be presented (ADR 0015).
    */
-  diagrams: z.array(diagramSchema).optional(),
-  /** The durable opening selection, naming one declared Diagram. */
-  defaultDiagram: uuidSchema.optional(),
+  maps: z.array(mapSchema).optional(),
+  /** The durable opening selection, naming one declared Map. */
+  defaultMap: uuidSchema.optional(),
 });
 
 export const spaceFileSchema = spaceFileObjectSchema;
@@ -370,21 +372,21 @@ export const spaceFileSchema = spaceFileObjectSchema;
 /** The JSONB document stored beside a space's relational UUID. */
 export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
-/** The JSONB document stored beside a thing's relational UUID. */
-export const markdownThingDocumentSchema = markdownThingSchema.omit({ id: true });
-export const referenceThingDocumentSchema = referenceThingSchema.omit({ id: true });
-export const spaceThingDocumentSchema = spaceThingSchema.omit({ id: true });
-export const thingDocumentSchema = z.discriminatedUnion('kind', [
-  markdownThingDocumentSchema,
-  referenceThingDocumentSchema,
-  spaceThingDocumentSchema,
+/** The JSONB document stored beside a resource's relational UUID. */
+export const markdownResourceDocumentSchema = markdownResourceSchema.omit({ id: true });
+export const referenceResourceDocumentSchema = referenceResourceSchema.omit({ id: true });
+export const spaceResourceDocumentSchema = spaceResourceSchema.omit({ id: true });
+export const resourceDocumentSchema = z.discriminatedUnion('kind', [
+  markdownResourceDocumentSchema,
+  referenceResourceDocumentSchema,
+  spaceResourceDocumentSchema,
 ]);
 
 /** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */
 export const spaceSnapshotSchema = z.object({
   id: uuidSchema,
   document: spaceDocumentSchema,
-  things: z.array(z.object({ id: uuidSchema, document: thingDocumentSchema })),
+  resources: z.array(z.object({ id: uuidSchema, document: resourceDocumentSchema })),
 });
 
 /**
@@ -409,7 +411,7 @@ export const AGGREGATE_FILE_VERSION = 1;
  * aggregate file states it outright, and a directory without one is not an aggregate.
  *
  * There is deliberately **no Space inventory** beside it. A Space is in the
- * aggregate because its directory is there, exactly as a thing exists because
+ * aggregate because its directory is there, exactly as a resource exists because
  * its file does (ADR 0020); a list would be a second answer to the same
  * question, and the two would disagree the first time someone deleted a
  * directory.
@@ -424,22 +426,22 @@ export const aggregateFileSchema = z.strictObject({
 
 export const importGraphSchema = graphSchema.extend({ id: uuidSchema.optional() });
 /**
- * A diagram being imported, with the ids the importer mints left out — its own
+ * A map being imported, with the ids the importer mints left out — its own
  * and those of the graphs it owns. Ownership is not relaxed: an owned graph
  * still arrives nested, and there is still at least one.
  */
-const importPositionedDiagramSchema = positionedDiagramSchema.extend({
+const importPositionedMapSchema = positionedMapSchema.extend({
   id: uuidSchema.optional(),
   graphs: z.array(importGraphSchema).min(1),
 });
-const importDiagramSchema = z.preprocess(
+const importMapSchema = z.preprocess(
   defaultPositionedKind,
-  z.discriminatedUnion('kind', [importPositionedDiagramSchema]),
+  z.discriminatedUnion('kind', [importPositionedMapSchema]),
 );
 
 const importSpaceFileObjectSchema = spaceFileObjectSchema.extend({
   id: uuidSchema.optional(),
-  diagrams: z.array(importDiagramSchema).optional(),
+  maps: z.array(importMapSchema).optional(),
 });
 
 export const importSpaceFileSchema = importSpaceFileObjectSchema;
@@ -451,5 +453,5 @@ export const importSpaceFileSchema = importSpaceFileObjectSchema;
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
   document: importSpaceFileObjectSchema.omit({ id: true }),
-  things: z.array(z.object({ id: uuidSchema.optional(), document: thingDocumentSchema })),
+  resources: z.array(z.object({ id: uuidSchema.optional(), document: resourceDocumentSchema })),
 });

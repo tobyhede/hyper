@@ -13,13 +13,13 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
     .map((entry) => join(directory, entry));
 
 /**
- * ADR 0038 made `core`'s schema-derived `DiagramPosition` the one representation
+ * ADR 0038 made `core`'s schema-derived `MapPosition` the one representation
  * of an **authored** point. ADR 0085 split a computed one back out — `graph`'s
  * own bare `Point`, for the routed Edge geometry a strategy could place — and
  * ADR 0086 removed the routing half of the contract, taking the only members
  * that point ever typed. A strategy answers positions and nothing else, so
  * `graph` declares no point at all now and this reads for none: the narrower
- * thing ADR 0038 was protecting is that `graph` must not re-declare the
+ * invariant ADR 0038 was protecting is that `graph` must not re-declare the
  * **authored** position, and it carries `core`'s.
  *
  * The list is deliberately written as one rather than as "zero", because the
@@ -27,18 +27,18 @@ const typeScriptSourceFiles = (directory: string): readonly string[] =>
  * strategy contract is a decision to take again, not a regression to slip in.
  *
  * This reads the declarations because **no type-level assertion can check it**.
- * TypeScript is structural, so a re-declared `interface DiagramPoint { x: number;
- * y: number }` *is* `DiagramPosition` as far as the type system is concerned —
+ * TypeScript is structural, so a re-declared `interface MapPoint { x: number;
+ * y: number }` *is* `MapPosition` as far as the type system is concerned —
  * measured, not assumed: restoring the duplicate and typing `Placement` over it
- * leaves `expectTypeOf<Placement>().toExtend<ReadonlyMap<ThingId,
- * Readonly<DiagramPosition>>>()` in `packages/graph/test/identity-types.test.ts`
+ * leaves `expectTypeOf<Placement>().toExtend<ReadonlyMap<ResourceId,
+ * Readonly<MapPosition>>>()` in `packages/graph/test/identity-types.test.ts`
  * green, along with both typechecks and lint. That assertion pins the shape, and
  * the shape is exactly what the two types agree on. Only the declarations differ,
  * so the declarations are what has to be read.
  *
  * The check is structural rather than a search for a name: it finds a point
  * re-declared under any name, and it stays silent about the legitimate uses of
- * `x` and `y` next door (`LayoutStrategyThing`), whose members are optional and
+ * `x` and `y` next door (`LayoutStrategyResource`), whose members are optional and
  * not alone.
  */
 describe('a point has one type', () => {
@@ -80,7 +80,7 @@ describe('a point has one type', () => {
    * geometry a routing strategy placed, beside the section type that was its one
    * consumer. Both went together, which is the shape to keep: an exported type
    * is exempt from `noUnusedLocals`, so a point can sit declared, exported and
-   * typing nothing while the geometry it was split from `DiagramPosition` for
+   * typing nothing while the geometry it was split from `MapPosition` for
    * quietly goes back onto the authored position — the split reverted with every
    * guard here and both typechecks green. Written as locations rather than names
    * so that a point moving between modules is reported too.
@@ -108,7 +108,7 @@ describe('a point has one type', () => {
           statement.importClause?.namedBindings !== undefined &&
           ts.isNamedImports(statement.importClause.namedBindings) &&
           statement.importClause.namedBindings.elements.some(
-            (element) => element.name.text === 'DiagramPosition',
+            (element) => element.name.text === 'MapPosition',
           ),
       ),
     );

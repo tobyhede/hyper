@@ -1,6 +1,6 @@
 # 03 — Rename the Thing model to Resource, in both databases
 
-**Status:** ready-for-agent
+**Status:** resolved
 **Blocked by:** 02 — A Diagram is a Map and a Thing is a Resource.
 
 **What to build:** `model Thing` becomes `model Resource` and `@@map("things")` becomes `@@map("resources")` in both database contracts, with one forward migration each, and the runtime SQL identifier literals move with them.
@@ -30,4 +30,62 @@
 
 ## Answer
 
-<!-- Filled in as the work lands. -->
+Resolved with one generated forward migration for each database. Ticket 02's
+atomic vocabulary sweep had already changed the live PostgreSQL and SQLite
+contracts and their runtime SQL identifiers to `Resource`/`resources`; this
+ticket regenerated both emitted contracts from those sources and connected
+them to the previously unchanged migration histories.
+
+Both plans were generated offline with their explicit head storage hashes:
+
+- PostgreSQL starts at
+  `sha256:1f367854ac0c2c316a2d9cfdbb704f5531beb59c0d04722e62220c5aaf9aad35`
+  and contains exactly four operations: drop `things`, create `resources`,
+  create `resources_space_id_idx`, and add `resources_space_id_fkey`.
+- SQLite starts at
+  `sha256:500b8c46f9e1b6fc97b6575af513184ac010b76b622c3bcbebf6065b151b26a1`
+  and contains exactly three operations: create `resources` with its inline
+  foreign key, create `resources_space_id_idx`, and drop `things`.
+
+Neither plan creates a schema, and no pre-existing migration file changed. Each
+generated migration documents that the drop-and-create destroys stored Resource
+rows and tells a developer to export before migrating and import afterwards.
+
+Verification:
+
+- `pnpm verify` — passed: 229 files, 2,880 tests passed and 5 skipped.
+- `SQLITE_PATH=<temporary-file> pnpm test:integration:sqlite` — passed on a
+  fresh database: both migrations applied, 5 files and 99 tests passed.
+- PostgreSQL integration is deferred to CI because no disposable PostgreSQL
+  database was started for this ticket.
+
+## Correction — `verify` does observe this, and two defects were hiding each other
+
+The premise above — that a contract diverging from its migrations is visible
+only to CI's `postgres` and `sqlite` jobs — is wrong, and reviewing 02 is what
+showed it. `test/unit/prisma-foundation.test.ts` runs
+`prisma-next migrate --show --from 20260728T1242_initial --to @contract` and
+asserts `ok: true`. That is exactly this divergence, and it runs in `verify`.
+
+It did not fire on 02 because the *other* half of the same defect silenced it.
+`@contract` resolves through the emitted `src/prisma/contract.json`, and the
+sweep rewrote that **generated** file as text: it changed `things` to
+`resources` in the body but could not touch `storageHash`, which is a hex
+literal with nothing to match. So the committed artifact kept advertising
+`sha256:1f367854…`, the pre-rename contract — the very hash this ticket's
+PostgreSQL plan starts from — and the migration graph found a path to it. The
+honest emit hashes to `sha256:0a1d0e87…`, which nothing reached. Regenerating
+the four artifacts is what made the test fail, and these two migrations are
+what make it pass again.
+
+The general rule, which outlives this rename: **a sweep that edits a generated
+artifact as text can disarm the test that guards it**, because the artifact's
+own hash is the thing the test trusts and the thing the substitution cannot
+reach. `EXCLUDED_PATHS` protects the migration trees; it did not protect the
+emitted contracts, and those are equally derived. Regenerate, never substitute.
+
+This ticket's work landed on `map-resource-02` rather than its own branch: 02
+renamed the contracts as an unavoidable consequence of sweeping `.prisma`, so
+there is no state of 02 alone that passes its own bar — corrupt artifacts fail
+`contract:check`, honest ones fail `verify`, and both fail `db:migrate`. The
+two changes are atomic and are now one PR.

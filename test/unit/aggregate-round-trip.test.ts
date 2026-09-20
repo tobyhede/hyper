@@ -12,18 +12,18 @@ import { MemorySpaceRepository } from '../support/memory-space-repository';
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const SECOND_TARGET_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const META_DIAGRAM_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const META_MAP_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const META_GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
-const TARGET_DIAGRAM_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const TARGET_MAP_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const TARGET_GRAPH_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
-const SECOND_DIAGRAM_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
+const SECOND_MAP_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const SECOND_GRAPH_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 const FIRST_LINK_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const SECOND_LINK_ID = uuidSchema.parse('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 const CONVERGING_LINK_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
-const MARKDOWN_THING_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
-const TARGET_THING_ID = uuidSchema.parse('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
-const SECOND_THING_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
+const MARKDOWN_RESOURCE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+const TARGET_RESOURCE_ID = uuidSchema.parse('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+const SECOND_RESOURCE_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
 
 const temporaryDirectories: string[] = [];
 
@@ -40,37 +40,39 @@ const stored = (snapshot: SpaceSnapshot): LoadedSpace => ({
 });
 
 /**
- * A target Space: one Thing on one Diagram, with one Graph the Space Things
+ * A target Space: one Resource on one Map, with one Graph the Space Resources
  * pointing here can select.
  */
 const targetSpace = (
   id: UUID,
   title: string,
-  diagramId: UUID,
+  mapId: UUID,
   graphId: UUID,
-  thingId: UUID,
+  resourceId: UUID,
 ): SpaceSnapshot => ({
   id,
   document: {
     version: 1,
     title,
-    diagrams: [
+    maps: [
       {
-        id: diagramId,
-        title: 'Diagram 1',
+        id: mapId,
+        title: 'Map 1',
         kind: 'positioned',
-        positions: { [thingId]: { x: 0, y: 0, open: false } },
+        positions: { [resourceId]: { x: 0, y: 0, open: false } },
         graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
         activeGraph: graphId,
       },
     ],
-    defaultDiagram: diagramId,
+    defaultMap: mapId,
   },
-  things: [{ id: thingId, document: { title: `${title} thing`, kind: 'markdown', body: 'Body.' } }],
+  resources: [
+    { id: resourceId, document: { title: `${title} resource`, kind: 'markdown', body: 'Body.' } },
+  ],
 });
 
 /**
- * Meta, holding a Markdown Thing and three Space Things — two of which
+ * Meta, holding a Markdown Resource and three Space Resources — two of which
  * **converge** on the same target, which is legal (ADR 0078) and the case a
  * round trip is most likely to get wrong by deduplicating.
  */
@@ -79,13 +81,13 @@ const metaSpace = (): SpaceSnapshot => ({
   document: {
     version: 1,
     title: 'Meta',
-    diagrams: [
+    maps: [
       {
-        id: META_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: META_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [MARKDOWN_THING_ID]: { x: 0, y: 0, open: false },
+          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false },
           [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
           [SECOND_LINK_ID]: { x: 680, y: 0, open: true, openSize: { width: 480, height: 270 } },
           [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false },
@@ -95,17 +97,17 @@ const metaSpace = (): SpaceSnapshot => ({
             id: META_GRAPH_ID,
             title: 'Graph 1',
             color: '#1f77b4',
-            edges: [{ from: MARKDOWN_THING_ID, to: FIRST_LINK_ID }],
+            edges: [{ from: MARKDOWN_RESOURCE_ID, to: FIRST_LINK_ID }],
           },
         ],
         activeGraph: META_GRAPH_ID,
       },
     ],
-    defaultDiagram: META_DIAGRAM_ID,
+    defaultMap: META_MAP_ID,
   },
-  things: [
+  resources: [
     {
-      id: MARKDOWN_THING_ID,
+      id: MARKDOWN_RESOURCE_ID,
       document: { title: 'Opening', kind: 'markdown', body: '# Opening\n\nHello.\n' },
     },
     {
@@ -114,7 +116,7 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'To target',
         kind: 'space',
         spaceId: TARGET_SPACE_ID,
-        diagram: TARGET_DIAGRAM_ID,
+        map: TARGET_MAP_ID,
         graph: TARGET_GRAPH_ID,
       },
     },
@@ -124,7 +126,7 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'To target again',
         kind: 'space',
         spaceId: TARGET_SPACE_ID,
-        diagram: TARGET_DIAGRAM_ID,
+        map: TARGET_MAP_ID,
         graph: TARGET_GRAPH_ID,
       },
     },
@@ -134,7 +136,7 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'To second',
         kind: 'space',
         spaceId: SECOND_TARGET_ID,
-        diagram: SECOND_DIAGRAM_ID,
+        map: SECOND_MAP_ID,
         graph: SECOND_GRAPH_ID,
       },
     },
@@ -143,8 +145,8 @@ const metaSpace = (): SpaceSnapshot => ({
 
 const completeAggregate = (): readonly SpaceSnapshot[] => [
   metaSpace(),
-  targetSpace(TARGET_SPACE_ID, 'Target', TARGET_DIAGRAM_ID, TARGET_GRAPH_ID, TARGET_THING_ID),
-  targetSpace(SECOND_TARGET_ID, 'Second', SECOND_DIAGRAM_ID, SECOND_GRAPH_ID, SECOND_THING_ID),
+  targetSpace(TARGET_SPACE_ID, 'Target', TARGET_MAP_ID, TARGET_GRAPH_ID, TARGET_RESOURCE_ID),
+  targetSpace(SECOND_TARGET_ID, 'Second', SECOND_MAP_ID, SECOND_GRAPH_ID, SECOND_RESOURCE_ID),
 ];
 
 const repositoryHolding = (snapshots: readonly SpaceSnapshot[]): MemorySpaceRepository =>
@@ -211,49 +213,50 @@ describe('exporting and importing one complete aggregate', () => {
         .map(({ name }) => name)
         .sort(),
     ).toEqual([META_SPACE_ID, TARGET_SPACE_ID, SECOND_TARGET_ID].sort());
-    // A Thing is named by its own id, never by its title (ADR 0020).
-    expect(await readdir(join(destination, TARGET_SPACE_ID, 'things'))).toEqual([
-      `${TARGET_THING_ID}.md`,
+    // A Resource is named by its own id, never by its title (ADR 0020).
+    expect(await readdir(join(destination, TARGET_SPACE_ID, 'resources'))).toEqual([
+      `${TARGET_RESOURCE_ID}.md`,
     ]);
   });
 
   /*
-   * Two Space Things naming one target. Deduplicating them on the way to disk or
-   * back would lose one authored Thing while leaving a valid-looking aggregate,
+   * Two Space Resources naming one target. Deduplicating them on the way to disk or
+   * back would lose one authored Resource while leaving a valid-looking aggregate,
    * which is exactly the failure a whole-aggregate equality check above might
    * not localize — so it is asserted here by name.
    */
-  it('keeps both Space Things that converge on one target', async () => {
+  it('keeps both Space Resources that converge on one target', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
 
     await exportTo(repositoryHolding(completeAggregate()), destination);
     const reimported = await importFrom(destination);
 
     const meta = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
-    const converging = meta?.things.filter(
-      (thing) => thing.document.kind === 'space' && thing.document.spaceId === TARGET_SPACE_ID,
+    const converging = meta?.resources.filter(
+      (resource) =>
+        resource.document.kind === 'space' && resource.document.spaceId === TARGET_SPACE_ID,
     );
     expect(converging?.map(({ id }) => id).sort()).toEqual(
       [FIRST_LINK_ID, CONVERGING_LINK_ID].sort(),
     );
   });
 
-  it('preserves every selected Diagram and Graph on a Space Thing', async () => {
+  it('preserves every selected Map and Graph on a Space Resource', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
 
     await exportTo(repositoryHolding(completeAggregate()), destination);
     const reimported = await importFrom(destination);
 
     const meta = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
-    expect(meta?.things.find(({ id }) => id === SECOND_LINK_ID)?.document).toEqual({
+    expect(meta?.resources.find(({ id }) => id === SECOND_LINK_ID)?.document).toEqual({
       title: 'To second',
       kind: 'space',
       spaceId: SECOND_TARGET_ID,
-      diagram: SECOND_DIAGRAM_ID,
+      map: SECOND_MAP_ID,
       graph: SECOND_GRAPH_ID,
     });
-    expect(meta?.document.defaultDiagram).toBe(META_DIAGRAM_ID);
-    expect(meta?.document.diagrams?.[0]?.activeGraph).toBe(META_GRAPH_ID);
+    expect(meta?.document.defaultMap).toBe(META_MAP_ID);
+    expect(meta?.document.maps?.[0]?.activeGraph).toBe(META_GRAPH_ID);
   });
 
   it('re-exports over its own output without changing a byte', async () => {
@@ -270,18 +273,21 @@ describe('exporting and importing one complete aggregate', () => {
   });
 });
 
-describe('a diagramless Space', () => {
-  /** A Space before its first working load: titled, holding a Thing, no Diagram. */
-  const diagramless: SpaceSnapshot = {
+describe('a mapless Space', () => {
+  /** A Space before its first working load: titled, holding a Resource, no Map. */
+  const mapless: SpaceSnapshot = {
     id: META_SPACE_ID,
     document: { version: 1, title: 'Not yet opened' },
-    things: [
-      { id: MARKDOWN_THING_ID, document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' } },
+    resources: [
+      {
+        id: MARKDOWN_RESOURCE_ID,
+        document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' },
+      },
     ],
   };
 
   /*
-   * A Space with no Diagram is initialized on its first complete working-state
+   * A Space with no Map is initialized on its first complete working-state
    * read, and by nothing else — not by listing, import completion or export
    * (ADR 0079). So the state survives a round trip rather than being repaired by
    * one, and import never rewrites the source it read.
@@ -289,47 +295,47 @@ describe('a diagramless Space', () => {
   it('round-trips unchanged, initialized by neither export nor import', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
 
-    await exportTo(repositoryHolding([diagramless]), destination);
+    await exportTo(repositoryHolding([mapless]), destination);
     const exported = spaceFileSchema.parse(
       JSON.parse(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')),
     );
     const reimported = await importFrom(destination);
 
     expect(exported).toEqual({ version: 1, id: META_SPACE_ID, title: 'Not yet opened' });
-    expect(await storedSnapshots(reimported)).toEqual([diagramless]);
+    expect(await storedSnapshots(reimported)).toEqual([mapless]);
   });
 
   /*
    * The initialization is performed rather than assumed. Handing this a Space
-   * built already holding a Diagram proved only that export writes one — the
+   * built already holding a Map proved only that export writes one — the
    * assertion passed without `loadWorkingSpace` being involved at all, so a
    * first working load that stopped durably initializing would not have shown
    * up here.
    *
-   * So the Space goes in diagramless, `createWorkingSpaceLoader` is what gives it
-   * a Diagram and Graph, and the ids asserted are the ones that load minted.
+   * So the Space goes in mapless, `createWorkingSpaceLoader` is what gives it
+   * a Map and Graph, and the ids asserted are the ones that load minted.
    */
-  it('exports the Diagram and Graph a later initialization gave it', async () => {
+  it('exports the Map and Graph a later initialization gave it', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
-    const repository = repositoryHolding([diagramless]);
+    const repository = repositoryHolding([mapless]);
 
     const initialized = await createWorkingSpaceLoader(repository, newUuid)(META_SPACE_ID);
-    const diagram = initialized?.snapshot.document.diagrams?.[0];
-    if (diagram === undefined) throw new Error('The working load initialized no Diagram');
+    const map = initialized?.snapshot.document.maps?.[0];
+    if (map === undefined) throw new Error('The working load initialized no Map');
     await exportTo(repository, destination);
 
     const exported = spaceFileSchema.parse(
       JSON.parse(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')),
     );
-    expect(exported.defaultDiagram).toBe(diagram.id);
-    expect(exported.diagrams?.[0]?.id).toBe(diagram.id);
-    expect(exported.diagrams?.[0]?.graphs[0]?.id).toBe(diagram.graphs[0]?.id);
-    // The Diagram initialization authors is *empty* (ADR 0079) — it does not
-    // adopt the Things the Space already held — and export writes that as it is
+    expect(exported.defaultMap).toBe(map.id);
+    expect(exported.maps?.[0]?.id).toBe(map.id);
+    expect(exported.maps?.[0]?.graphs[0]?.id).toBe(map.graphs[0]?.id);
+    // The Map initialization authors is *empty* (ADR 0079) — it does not
+    // adopt the Resources the Space already held — and export writes that as it is
     // rather than placing them for it.
-    expect(exported.diagrams?.[0]?.positions).toEqual({});
-    expect(await storedSnapshots(repository).then((spaces) => spaces[0]?.things)).toEqual(
-      diagramless.things,
+    expect(exported.maps?.[0]?.positions).toEqual({});
+    expect(await storedSnapshots(repository).then((spaces) => spaces[0]?.resources)).toEqual(
+      mapless.resources,
     );
   });
 });
@@ -342,7 +348,7 @@ describe('re-exporting over an earlier export', () => {
     await exportTo(repositoryHolding(complete), destination);
     expect(await readdir(join(destination, SECOND_TARGET_ID))).not.toEqual([]);
 
-    // Meta keeps only the Thing pointing at the surviving target, or the
+    // Meta keeps only the Resource pointing at the surviving target, or the
     // aggregate it names would no longer be complete.
     const withoutSecond = complete
       .filter(({ id }) => id !== SECOND_TARGET_ID)
@@ -352,14 +358,14 @@ describe('re-exporting over an earlier export', () => {
               ...snapshot,
               document: {
                 ...snapshot.document,
-                diagrams: snapshot.document.diagrams?.map((diagram) => ({
-                  ...diagram,
+                maps: snapshot.document.maps?.map((map) => ({
+                  ...map,
                   positions: Object.fromEntries(
-                    Object.entries(diagram.positions).filter(([id]) => id !== SECOND_LINK_ID),
+                    Object.entries(map.positions).filter(([id]) => id !== SECOND_LINK_ID),
                   ),
                 })),
               },
-              things: snapshot.things.filter(({ id }) => id !== SECOND_LINK_ID),
+              resources: snapshot.resources.filter(({ id }) => id !== SECOND_LINK_ID),
             }
           : snapshot,
       );
@@ -377,14 +383,14 @@ describe('re-exporting over an earlier export', () => {
 
   /*
    * The format reads a root aggregate file and `<space-uuid>/` children, and
-   * inside a Space directory it reads `space.json`, `*.md` and `things/*.md`.
+   * inside a Space directory it reads `space.json`, `*.md` and `resources/*.md`.
    * Everything else is the author's — notes, assets — and re-export has to carry
    * it across rather than tidy it away.
    *
    * A `README.md` inside a Space directory is **not** one of those, and the
    * comments here and on `writeSpaceDirectory` used to offer it as the example of
    * what survives. It does not and must not: root `*.md` is what the reader scans
-   * for Thing files, so a README left there imports as a Thing or refuses the
+   * for Resource files, so a README left there imports as a Resource or refuses the
    * import for carrying no frontmatter. Asserted alongside, so the boundary is
    * the tested one rather than the plausible one.
    */
@@ -405,7 +411,7 @@ describe('re-exporting over an earlier export', () => {
     expect(await readdir(join(destination, META_SPACE_ID))).not.toContain('README.md');
   });
 
-  it('removes the file of a Thing the Space no longer holds', async () => {
+  it('removes the file of a Resource the Space no longer holds', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const complete = completeAggregate();
 
@@ -416,22 +422,22 @@ describe('re-exporting over an earlier export', () => {
             ...snapshot,
             document: {
               ...snapshot.document,
-              diagrams: snapshot.document.diagrams?.map((diagram) => ({
-                ...diagram,
+              maps: snapshot.document.maps?.map((map) => ({
+                ...map,
                 positions: Object.fromEntries(
-                  Object.entries(diagram.positions).filter(([id]) => id !== MARKDOWN_THING_ID),
+                  Object.entries(map.positions).filter(([id]) => id !== MARKDOWN_RESOURCE_ID),
                 ),
-                graphs: diagram.graphs.map((graph) => ({ ...graph, edges: [] })),
+                graphs: map.graphs.map((graph) => ({ ...graph, edges: [] })),
               })),
             },
-            things: snapshot.things.filter(({ id }) => id !== MARKDOWN_THING_ID),
+            resources: snapshot.resources.filter(({ id }) => id !== MARKDOWN_RESOURCE_ID),
           }
         : snapshot,
     );
     await exportTo(repositoryHolding(withoutMarkdown), destination);
 
-    expect(await readdir(join(destination, META_SPACE_ID, 'things'))).not.toContain(
-      `${MARKDOWN_THING_ID}.md`,
+    expect(await readdir(join(destination, META_SPACE_ID, 'resources'))).not.toContain(
+      `${MARKDOWN_RESOURCE_ID}.md`,
     );
   });
 });

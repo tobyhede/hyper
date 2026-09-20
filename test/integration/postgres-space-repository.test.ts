@@ -56,34 +56,34 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
 });
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const OMITTED_THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const OMITTED_RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const MISSING_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
-const MISSING_THING_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const MISSING_RESOURCE_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
-const OTHER_THING_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
+const OTHER_RESOURCE_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
-const CONCURRENT_THING_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
-const MIXED_FIRST_THING_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-const UNRESOLVED_THING_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+const CONCURRENT_RESOURCE_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
+const MIXED_FIRST_RESOURCE_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+const UNRESOLVED_RESOURCE_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
 const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
-const LINK_THING_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
-const DIAGRAM_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
-const OTHER_SPACE_DIAGRAM_ID = uuidSchema.parse('0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c');
+const LINK_RESOURCE_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
+const MAP_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
+const OTHER_MAP_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
+const OTHER_SPACE_MAP_ID = uuidSchema.parse('0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c');
 const OTHER_SPACE_GRAPH_ID = uuidSchema.parse('0d0d0d0d-0d0d-4d0d-8d0d-0d0d0d0d0d0d');
-const CONCURRENT_DIAGRAM_ID = uuidSchema.parse('0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e');
+const CONCURRENT_MAP_ID = uuidSchema.parse('0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e');
 const CONCURRENT_GRAPH_ID = uuidSchema.parse('0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f');
-const ORDERED_THING_IDS = [
+const ORDERED_RESOURCE_IDS = [
   uuidSchema.parse('eeeeeeee-1111-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
   uuidSchema.parse('eeeeeeee-3333-4eee-8eee-eeeeeeeeeeee'),
 ] as const;
 const RACE_CHILD_SPACE_ID = uuidSchema.parse('1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a');
-const RACE_CHILD_DIAGRAM_ID = uuidSchema.parse('1b1b1b1b-1b1b-4b1b-8b1b-1b1b1b1b1b1b');
+const RACE_CHILD_MAP_ID = uuidSchema.parse('1b1b1b1b-1b1b-4b1b-8b1b-1b1b1b1b1b1b');
 const RACE_CHILD_GRAPH_ID = uuidSchema.parse('1c1c1c1c-1c1c-4c1c-8c1c-1c1c1c1c1c1c');
-const RACE_LINK_THING_ID = uuidSchema.parse('1d1d1d1d-1d1d-4d1d-8d1d-1d1d1d1d1d1d');
+const RACE_LINK_RESOURCE_ID = uuidSchema.parse('1d1d1d1d-1d1d-4d1d-8d1d-1d1d1d1d1d1d');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -91,19 +91,19 @@ const snapshot: SpaceSnapshot = {
     version: 1,
     title: 'Repository space',
   },
-  things: [
+  resources: [
     {
-      id: THING_ID,
+      id: RESOURCE_ID,
       document: {
-        title: 'Stored thing',
+        title: 'Stored resource',
         kind: 'markdown',
         body: 'Stored through the repository.',
       },
     },
     {
-      id: OMITTED_THING_ID,
+      id: OMITTED_RESOURCE_ID,
       document: {
-        title: 'Thing to remove',
+        title: 'Resource to remove',
         kind: 'markdown',
         body: 'Runtime commits are authoritative.',
       },
@@ -112,23 +112,23 @@ const snapshot: SpaceSnapshot = {
 };
 
 /*
- * The Space every Space Thing below points at, carrying the Diagram and Graph
- * those Things select. A Space Thing names a Diagram of its target and a Graph
- * that Diagram owns from the moment it exists (ADR 0079), so a target with no
- * Diagram is one nothing valid can reference. The Diagram positions nothing:
- * several cases here replace this Space's Things, and what a Space Thing
- * resolves is the Diagram and the Graph rather than what that Diagram places.
+ * The Space every Space Resource below points at, carrying the Map and Graph
+ * those Resources select. A Space Resource names a Map of its target and a Graph
+ * that Map owns from the moment it exists (ADR 0079), so a target with no
+ * Map is one nothing valid can reference. The Map positions nothing:
+ * several cases here replace this Space's Resources, and what a Space Resource
+ * resolves is the Map and the Graph rather than what that Map places.
  */
 const otherSnapshot: SpaceSnapshot = {
   id: OTHER_SPACE_ID,
   document: {
     version: 1,
     title: 'Other space',
-    defaultDiagram: OTHER_SPACE_DIAGRAM_ID,
-    diagrams: [
+    defaultMap: OTHER_SPACE_MAP_ID,
+    maps: [
       {
-        id: OTHER_SPACE_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: OTHER_SPACE_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: OTHER_SPACE_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -136,11 +136,11 @@ const otherSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  things: [
+  resources: [
     {
-      id: OTHER_THING_ID,
+      id: OTHER_RESOURCE_ID,
       document: {
-        title: 'Other thing',
+        title: 'Other resource',
         kind: 'markdown',
         body: 'Owned by the other space.',
       },
@@ -154,11 +154,11 @@ const concurrentSnapshot: SpaceSnapshot = {
     version: 1,
     title: 'Concurrent space',
   },
-  things: [
+  resources: [
     {
-      id: CONCURRENT_THING_ID,
+      id: CONCURRENT_RESOURCE_ID,
       document: {
-        title: 'Concurrent thing',
+        title: 'Concurrent resource',
         kind: 'markdown',
         body: 'Owned by the concurrent space.',
       },
@@ -167,7 +167,7 @@ const concurrentSnapshot: SpaceSnapshot = {
 };
 
 /**
- * `snapshot` with the Space Thing that makes `otherSnapshot` part of the same
+ * `snapshot` with the Space Resource that makes `otherSnapshot` part of the same
  * aggregate.
  *
  * A two-Space seed is not two Spaces side by side any more. Complete aggregate
@@ -176,20 +176,20 @@ const concurrentSnapshot: SpaceSnapshot = {
  * write — so the pair that used to arrive through two insert-mode imports has
  * to arrive as one aggregate with Meta reaching the other Space (ADR 0078).
  *
- * It selects `otherSnapshot`'s own Diagram and Graph, which a Space Thing names
+ * It selects `otherSnapshot`'s own Map and Graph, which a Space Resource names
  * from the moment it exists (ADR 0079).
  */
 const linkedSnapshot: SpaceSnapshot = {
   ...snapshot,
-  things: [
-    ...snapshot.things,
+  resources: [
+    ...snapshot.resources,
     {
-      id: LINK_THING_ID,
+      id: LINK_RESOURCE_ID,
       document: {
         title: 'Other Space',
         kind: 'space',
         spaceId: OTHER_SPACE_ID,
-        diagram: OTHER_SPACE_DIAGRAM_ID,
+        map: OTHER_SPACE_MAP_ID,
         graph: OTHER_SPACE_GRAPH_ID,
       },
     },
@@ -232,13 +232,13 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   afterEach(async () => {
     await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     for (const id of createdSpaceIds) {
-      await db.orm.public.Thing.where({ spaceId: id }).deleteAll();
+      await db.orm.public.Resource.where({ spaceId: id }).deleteAll();
       await db.orm.public.Space.where({ id }).delete();
     }
     createdSpaceIds.clear();
-    await db.orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
-    await db.orm.public.Thing.where({ spaceId: OTHER_SPACE_ID }).deleteAll();
-    await db.orm.public.Thing.where({ spaceId: CONCURRENT_SPACE_ID }).deleteAll();
+    await db.orm.public.Resource.where({ spaceId: SPACE_ID }).deleteAll();
+    await db.orm.public.Resource.where({ spaceId: OTHER_SPACE_ID }).deleteAll();
+    await db.orm.public.Resource.where({ spaceId: CONCURRENT_SPACE_ID }).deleteAll();
     await db.orm.public.Space.where({ id: SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: OTHER_SPACE_ID }).delete();
     await db.orm.public.Space.where({ id: CONCURRENT_SPACE_ID }).delete();
@@ -299,7 +299,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       AggregateInvariantError,
     );
     await expect(
-      commitSpace({ id: SPACE_ID, document: { version: 1, title: 'Repaired' }, things: [] }, 0n),
+      commitSpace({ id: SPACE_ID, document: { version: 1, title: 'Repaired' }, resources: [] }, 0n),
     ).rejects.not.toBeInstanceOf(AggregateInvariantError);
   });
 
@@ -341,7 +341,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     const replacement: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'Replacement' },
-      things: [],
+      resources: [],
     };
 
     const expectReplacedBy = async (expectedMetaSpaceId: UUID | undefined) => {
@@ -504,7 +504,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     ]);
   });
 
-  it('classifies initialization when a concurrent winner takes a shared Thing identity', async () => {
+  it('classifies initialization when a concurrent winner takes a shared Resource identity', async () => {
     const winnerReady = Promise.withResolvers<undefined>();
     const releaseWinner = Promise.withResolvers<undefined>();
     const winner = db.transaction(async ({ orm }) => {
@@ -513,8 +513,8 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
         document: { version: 1, title: 'Winner' },
         revision: '0',
       });
-      await orm.public.Thing.create({
-        id: THING_ID,
+      await orm.public.Resource.create({
+        id: RESOURCE_ID,
         spaceId: SPACE_ID,
         document: { title: 'Shared', kind: 'markdown', body: 'Winner' },
       });
@@ -527,9 +527,9 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     const proposal: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
       document: { version: 1, title: 'Loser' },
-      things: [
+      resources: [
         {
-          id: THING_ID,
+          id: RESOURCE_ID,
           document: { title: 'Shared', kind: 'markdown', body: 'Loser' },
         },
       ],
@@ -691,18 +691,18 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       // already read and establish an entirely different one, before releasing
       // the lock the racing call's self-update has been waiting on all along.
       await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
-      await orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
+      await orm.public.Resource.where({ spaceId: SPACE_ID }).deleteAll();
       await orm.public.Space.where({ id: SPACE_ID }).delete();
       await orm.public.Space.create({
         id: OTHER_SPACE_ID,
         document: toJsonValue(otherSnapshot.document),
         revision: '0',
       });
-      for (const thing of otherSnapshot.things) {
-        await orm.public.Thing.create({
-          id: thing.id,
+      for (const resource of otherSnapshot.resources) {
+        await orm.public.Resource.create({
+          id: resource.id,
           spaceId: OTHER_SPACE_ID,
-          document: toJsonValue(thing.document),
+          document: toJsonValue(resource.document),
         });
       }
       await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
@@ -748,15 +748,15 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     createdSpaceIds.add(RACE_CHILD_SPACE_ID);
     const linkedOther: SpaceSnapshot = {
       ...otherSnapshot,
-      things: [
-        ...otherSnapshot.things,
+      resources: [
+        ...otherSnapshot.resources,
         {
-          id: RACE_LINK_THING_ID,
+          id: RACE_LINK_RESOURCE_ID,
           document: {
             title: 'To the race child',
             kind: 'space',
             spaceId: RACE_CHILD_SPACE_ID,
-            diagram: RACE_CHILD_DIAGRAM_ID,
+            map: RACE_CHILD_MAP_ID,
             graph: RACE_CHILD_GRAPH_ID,
           },
         },
@@ -767,11 +767,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'Race child',
-        defaultDiagram: RACE_CHILD_DIAGRAM_ID,
-        diagrams: [
+        defaultMap: RACE_CHILD_MAP_ID,
+        maps: [
           {
-            id: RACE_CHILD_DIAGRAM_ID,
-            title: 'Diagram 1',
+            id: RACE_CHILD_MAP_ID,
+            title: 'Map 1',
             kind: 'positioned',
             positions: {},
             graphs: [{ id: RACE_CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -779,7 +779,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
           },
         ],
       },
-      things: [],
+      resources: [],
     };
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [snapshot] });
 
@@ -790,18 +790,18 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       lockHeld.resolve(undefined);
       await releaseLock.promise;
       await orm.public.RepositoryState.where({ singletonId: 1 }).delete();
-      await orm.public.Thing.where({ spaceId: SPACE_ID }).deleteAll();
+      await orm.public.Resource.where({ spaceId: SPACE_ID }).deleteAll();
       await orm.public.Space.where({ id: SPACE_ID }).delete();
       await orm.public.Space.create({
         id: OTHER_SPACE_ID,
         document: toJsonValue(linkedOther.document),
         revision: '0',
       });
-      for (const thing of linkedOther.things) {
-        await orm.public.Thing.create({
-          id: thing.id,
+      for (const resource of linkedOther.resources) {
+        await orm.public.Resource.create({
+          id: resource.id,
           spaceId: OTHER_SPACE_ID,
-          document: toJsonValue(thing.document),
+          document: toJsonValue(resource.document),
         });
       }
       await orm.public.Space.create({
@@ -815,7 +815,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
 
     // Two changes -- an ordinary single-Space update takes the
     // topology-preserving fast path, which never reaches `lockMetaIdentity` at
-    // all. Both retitle only, keeping the Space Thing link intact, so the
+    // all. Both retitle only, keeping the Space Resource link intact, so the
     // candidate this proposes stays valid exactly when it is judged against
     // the identity the concurrent replacement actually established.
     const racing = repository.commit({
@@ -907,7 +907,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   it('persists first-working-load initialization for a fresh repository host', async () => {
     await seed(SPACE_ID, [snapshot]);
 
-    const ids = [DIAGRAM_ID, GRAPH_ID];
+    const ids = [MAP_ID, GRAPH_ID];
     const first = await createWorkingSpaceLoader(repository, () => {
       const id = ids.shift();
       if (id === undefined) throw new Error('initializer minted too many identities');
@@ -915,14 +915,14 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     })(SPACE_ID);
 
     // The revision alone, because `initialization` is gone: it existed so the
-    // App could reveal the Things list after New Diagram, and New Diagram now
-    // continues in the new Diagram's name instead (ADR 0089), so nothing reads
+    // App could reveal the Resources list after New Map, and New Map now
+    // continues in the new Map's name instead (ADR 0089), so nothing reads
     // it. What this file is here to prove is unchanged — the initialization was
     // *committed* rather than derived per host, which is the revision and the
-    // stored Diagram below.
+    // stored Map below.
     expectPersisted(first).toMatchObject({ revision: 1n });
-    expectPersisted(first?.snapshot.document.diagrams?.[0]).toMatchObject({
-      id: DIAGRAM_ID,
+    expectPersisted(first?.snapshot.document.maps?.[0]).toMatchObject({
+      id: MAP_ID,
       positions: {},
       activeGraph: GRAPH_ID,
     });
@@ -1108,7 +1108,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
             snapshot: {
               id: OTHER_SPACE_ID,
               document: { version: 1, title: 'Moved by the unlocked writer' },
-              things: otherSnapshot.things,
+              resources: otherSnapshot.resources,
             },
             revision: 1n,
             exportedRevision: null,
@@ -1126,11 +1126,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     const changed: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Committed space' },
-      things: [
+      resources: [
         {
-          id: THING_ID,
+          id: RESOURCE_ID,
           document: {
-            title: 'Changed thing',
+            title: 'Changed resource',
             kind: 'markdown',
             body: 'The newer complete snapshot wins.',
           },
@@ -1223,14 +1223,14 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     });
   });
 
-  it('loads the space document and things from one aggregate revision', async () => {
+  it('loads the space document and resources from one aggregate revision', async () => {
     const atRevision = (revision: number): SpaceSnapshot => ({
       ...snapshot,
       document: { ...snapshot.document, title: `Revision ${revision}` },
-      things: [
+      resources: [
         {
-          ...snapshot.things[0]!,
-          document: { ...snapshot.things[0]!.document, title: `Revision ${revision}` },
+          ...snapshot.resources[0]!,
+          document: { ...snapshot.resources[0]!.document, title: `Revision ${revision}` },
         },
       ],
     });
@@ -1254,21 +1254,21 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
 
         const marker = `Revision ${loaded.revision}`;
         expect(loaded.snapshot.document.title).toBe(marker);
-        expect(loaded.snapshot.things).toHaveLength(1);
-        expect(loaded.snapshot.things[0]?.document.title).toBe(marker);
+        expect(loaded.snapshot.resources).toHaveLength(1);
+        expect(loaded.snapshot.resources[0]?.document.title).toBe(marker);
       }
     };
 
     await Promise.all([writeRevisions(), ...Array.from({ length: 4 }, readRevisions)]);
   });
 
-  it('returns things in id order however they were stored', async () => {
-    // Thing order is now the include aggregate's ORDER BY rather than a separate
+  it('returns resources in id order however they were stored', async () => {
+    // Resource order is now the include aggregate's ORDER BY rather than a separate
     // query's, so it needs pinning at the one place that can tell the
-    // difference: things supplied in reverse id order. Every other fixture here
+    // difference: resources supplied in reverse id order. Every other fixture here
     // supplies them already sorted, where an unordered aggregate would pass.
-    const [first, second, third] = ORDERED_THING_IDS;
-    const thing = (id: UUID, title: string) => ({
+    const [first, second, third] = ORDERED_RESOURCE_IDS;
+    const resource = (id: UUID, title: string) => ({
       id,
       document: { title, kind: 'markdown' as const, body: title },
     });
@@ -1278,8 +1278,12 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       spaces: [
         {
           id: ORDERED_SPACE_ID,
-          document: { version: 1, title: 'Ordered things' },
-          things: [thing(third, 'Third'), thing(second, 'Second'), thing(first, 'First')],
+          document: { version: 1, title: 'Ordered resources' },
+          resources: [
+            resource(third, 'Third'),
+            resource(second, 'Second'),
+            resource(first, 'First'),
+          ],
         },
       ],
     });
@@ -1289,8 +1293,8 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     }
 
     const order = (stored: LoadedSpace) => ({
-      ids: stored.snapshot.things.map((thing) => thing.id),
-      titles: stored.snapshot.things.map((thing) => thing.document.title),
+      ids: stored.snapshot.resources.map((resource) => resource.id),
+      titles: stored.snapshot.resources.map((resource) => resource.document.title),
     });
     const ascending = { ids: [first, second, third], titles: ['First', 'Second', 'Third'] };
 
@@ -1311,7 +1315,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     const missing: SpaceSnapshot = {
       id: MISSING_SPACE_ID,
       document: { version: 1, title: 'Missing space' },
-      things: [],
+      resources: [],
     };
 
     expect(await commitSpace(missing, 0n)).toEqual({
@@ -1327,17 +1331,17 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       ...snapshot,
       document: {
         ...snapshot.document,
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'Owner',
             kind: 'positioned',
-            positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Dangling graph',
-                edges: [{ from: THING_ID, to: MISSING_THING_ID }],
+                edges: [{ from: RESOURCE_ID, to: MISSING_RESOURCE_ID }],
               },
             ],
           },
@@ -1355,12 +1359,12 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     });
   });
 
-  it('rejects a thing owned by another space and rolls back the whole commit', async () => {
+  it('rejects a resource owned by another space and rolls back the whole commit', async () => {
     await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
     const claimed: SpaceSnapshot = {
       ...linkedSnapshot,
       document: { ...linkedSnapshot.document, title: 'Must roll back' },
-      things: [...linkedSnapshot.things, otherSnapshot.things[0]!],
+      resources: [...linkedSnapshot.resources, otherSnapshot.resources[0]!],
     };
 
     expectPersisted(await commitSpace(claimed, 0n)).toMatchObject({
@@ -1387,11 +1391,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'First target',
-        defaultDiagram: OTHER_SPACE_DIAGRAM_ID,
-        diagrams: [
+        defaultMap: OTHER_SPACE_MAP_ID,
+        maps: [
           {
-            id: OTHER_SPACE_DIAGRAM_ID,
-            title: 'Diagram 1',
+            id: OTHER_SPACE_MAP_ID,
+            title: 'Map 1',
             kind: 'positioned',
             positions: {},
             graphs: [{ id: OTHER_SPACE_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -1399,18 +1403,18 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
           },
         ],
       },
-      things: [],
+      resources: [],
     };
     const secondTarget: SpaceSnapshot = {
       id: CONCURRENT_SPACE_ID,
       document: {
         version: 1,
         title: 'Second target',
-        defaultDiagram: CONCURRENT_DIAGRAM_ID,
-        diagrams: [
+        defaultMap: CONCURRENT_MAP_ID,
+        maps: [
           {
-            id: CONCURRENT_DIAGRAM_ID,
-            title: 'Diagram 1',
+            id: CONCURRENT_MAP_ID,
+            title: 'Map 1',
             kind: 'positioned',
             positions: {},
             graphs: [{ id: CONCURRENT_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -1418,19 +1422,19 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
           },
         ],
       },
-      things: [],
+      resources: [],
     };
     const firstLinked: SpaceSnapshot = {
       ...snapshot,
-      things: [
-        ...snapshot.things,
+      resources: [
+        ...snapshot.resources,
         {
-          id: MISSING_THING_ID,
+          id: MISSING_RESOURCE_ID,
           document: {
             title: 'First link',
             kind: 'space',
             spaceId: OTHER_SPACE_ID,
-            diagram: OTHER_SPACE_DIAGRAM_ID,
+            map: OTHER_SPACE_MAP_ID,
             graph: OTHER_SPACE_GRAPH_ID,
           },
         },
@@ -1438,15 +1442,15 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     };
     const secondLinked: SpaceSnapshot = {
       ...snapshot,
-      things: [
-        ...snapshot.things,
+      resources: [
+        ...snapshot.resources,
         {
-          id: UNRESOLVED_THING_ID,
+          id: UNRESOLVED_RESOURCE_ID,
           document: {
             title: 'Second link',
             kind: 'space',
             spaceId: CONCURRENT_SPACE_ID,
-            diagram: CONCURRENT_DIAGRAM_ID,
+            map: CONCURRENT_MAP_ID,
             graph: CONCURRENT_GRAPH_ID,
           },
         },
@@ -1510,19 +1514,19 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     await expect(repository.loadSpace(losingTargetId)).resolves.toBeUndefined();
   });
 
-  it('replaces every stored Space and Thing when the aggregate is replaced', async () => {
+  it('replaces every stored Space and Resource when the aggregate is replaced', async () => {
     await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
     const replacement: SpaceSnapshot = {
       ...snapshot,
       document: { ...snapshot.document, title: 'Only remaining space' },
-      things: [snapshot.things[0]!],
+      resources: [snapshot.resources[0]!],
     };
 
     // Authorized by the Meta identity the caller is replacing, not by a mode
-    // parameter (ADR 0078). The proposal drops both the Space Thing and the
+    // parameter (ADR 0078). The proposal drops both the Space Resource and the
     // Space it reached, which is the only way `otherSnapshot` can leave — a
     // proposal keeping the link and dropping the target would be refused as a
-    // missing Space Thing target rather than performed.
+    // missing Space Resource target rather than performed.
     await expect(
       repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, SPACE_ID),
     ).resolves.toEqual({
@@ -1554,23 +1558,23 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'Invalid later space',
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
-            title: 'Dangling diagram',
+            id: MAP_ID,
+            title: 'Dangling map',
             kind: 'positioned',
             positions: {},
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Dangling graph',
-                edges: [{ from: UNRESOLVED_THING_ID, to: MISSING_THING_ID }],
+                edges: [{ from: UNRESOLVED_RESOURCE_ID, to: MISSING_RESOURCE_ID }],
               },
             ],
           },
         ],
       },
-      things: [],
+      resources: [],
     };
 
     // Complete intake runs before the transaction opens, so "rolls back" is now
@@ -1605,21 +1609,21 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
 
   it('stores two Spaces of one aggregate that reuse a graph id', async () => {
     // A graph id is unique across the space that holds it and no wider — its
-    // owner is one diagram (ADR 0040), and the flatten a space-subject view draws
+    // owner is one map (ADR 0040), and the flatten a space-subject view draws
     // is what makes the space the scope (ADR 0045). Two spaces reusing one is
     // therefore fine.
-    // There is no graphs table and no diagrams table (ADR 0030 keeps both nested),
-    // and every query in the repository is by space id or thing id, so no lookup
-    // anywhere can be made ambiguous by the reuse below. Space and thing ids are
+    // There is no graphs table and no maps table (ADR 0030 keeps both nested),
+    // and every query in the repository is by space id or resource id, so no lookup
+    // anywhere can be made ambiguous by the reuse below. Space and resource ids are
     // rows and stay globally unique — enforced by their primary keys, which the
-    // duplicate-identity and thing-ownership rules in the shared contract cover.
+    // duplicate-identity and resource-ownership rules in the shared contract cover.
     //
     // Guards a decision, not a bug: scanning every stored document to reject
     // this would cost a full table read per Space stored and protect nothing.
     //
-    // The Space Thing sharpens it rather than merely satisfying the
-    // referenced-Space rule: it names `DIAGRAM_ID` and `GRAPH_ID` while sitting
-    // in a Space whose own Diagram and Graph carry those very ids, so a
+    // The Space Resource sharpens it rather than merely satisfying the
+    // referenced-Space rule: it names `MAP_ID` and `GRAPH_ID` while sitting
+    // in a Space whose own Map and Graph carry those very ids, so a
     // resolver that looked them up anywhere but in the target would find the
     // wrong pair and still find something.
     const first: SpaceSnapshot = {
@@ -1627,35 +1631,35 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'First space',
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [THING_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Shared graph id',
-                edges: [{ from: THING_ID, to: OMITTED_THING_ID }],
+                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
               },
             ],
           },
         ],
       },
-      things: [
-        { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
-        { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
+        { id: OMITTED_RESOURCE_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
         {
-          id: LINK_THING_ID,
+          id: LINK_RESOURCE_ID,
           document: {
             title: 'To the second space',
             kind: 'space',
             spaceId: OTHER_SPACE_ID,
-            diagram: DIAGRAM_ID,
+            map: MAP_ID,
             graph: GRAPH_ID,
           },
         },
@@ -1666,28 +1670,31 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'Second space',
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [OTHER_THING_ID]: { x: 0, y: 0, open: false },
-              [MIXED_FIRST_THING_ID]: { x: 300, y: 0, open: false },
+              [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [MIXED_FIRST_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Same graph id, other space',
-                edges: [{ from: OTHER_THING_ID, to: MIXED_FIRST_THING_ID }],
+                edges: [{ from: OTHER_RESOURCE_ID, to: MIXED_FIRST_RESOURCE_ID }],
               },
             ],
           },
         ],
       },
-      things: [
-        { id: OTHER_THING_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
-        { id: MIXED_FIRST_THING_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
+      resources: [
+        { id: OTHER_RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
+        {
+          id: MIXED_FIRST_RESOURCE_ID,
+          document: { title: 'To', kind: 'markdown', body: 'Second.' },
+        },
       ],
     };
 
@@ -1695,20 +1702,20 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
 
     expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({
       snapshot: {
-        document: { diagrams: [{ graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] }] },
+        document: { maps: [{ graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] }] },
       },
     });
     expectPersisted(await repository.loadSpace(OTHER_SPACE_ID)).toMatchObject({
       snapshot: {
         document: {
-          diagrams: [{ graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] }],
+          maps: [{ graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] }],
         },
       },
     });
   });
 
   it('refuses the same pair when nothing reaches the second Space', async () => {
-    // The pair above with the Space Thing taken out, and it is the *link* that
+    // The pair above with the Space Resource taken out, and it is the *link* that
     // the refusal is about, never the shared graph id. There is one door and
     // one collection now — the batch boundary that used to be worth contrasting
     // against a sequence of inserts no longer exists — so what this holds down
@@ -1719,28 +1726,28 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'First space',
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [THING_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Shared graph id',
-                edges: [{ from: THING_ID, to: OMITTED_THING_ID }],
+                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
               },
             ],
           },
         ],
       },
-      things: [
-        { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
-        { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
+        { id: OMITTED_RESOURCE_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
       ],
     };
     const second: SpaceSnapshot = {
@@ -1748,28 +1755,31 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       document: {
         version: 1,
         title: 'Second space',
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [OTHER_THING_ID]: { x: 0, y: 0, open: false },
-              [MIXED_FIRST_THING_ID]: { x: 300, y: 0, open: false },
+              [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [MIXED_FIRST_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Same graph id',
-                edges: [{ from: OTHER_THING_ID, to: MIXED_FIRST_THING_ID }],
+                edges: [{ from: OTHER_RESOURCE_ID, to: MIXED_FIRST_RESOURCE_ID }],
               },
             ],
           },
         ],
       },
-      things: [
-        { id: OTHER_THING_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
-        { id: MIXED_FIRST_THING_ID, document: { title: 'To', kind: 'markdown', body: 'Second.' } },
+      resources: [
+        { id: OTHER_RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
+        {
+          id: MIXED_FIRST_RESOURCE_ID,
+          document: { title: 'To', kind: 'markdown', body: 'Second.' },
+        },
       ],
     };
 
@@ -1782,37 +1792,37 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
-  it('stores a Space whose graph id equals one of its thing ids', async () => {
+  it('stores a Space whose graph id equals one of its resource ids', async () => {
     // Entity kinds do not share an identity space. Intake checks each kind
-    // separately — things among things, graphs among graphs — so a UUID naming
-    // both a thing and a graph names two different entities unambiguously.
+    // separately — resources among resources, graphs among graphs — so a UUID naming
+    // both a resource and a graph names two different entities unambiguously.
     const shared: SpaceSnapshot = {
       id: SPACE_ID,
       document: {
         version: 1,
-        title: 'Graph id equals thing id',
-        diagrams: [
+        title: 'Graph id equals resource id',
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'Owner',
             kind: 'positioned',
             positions: {
-              [THING_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
               {
-                id: THING_ID,
-                title: 'Graph named like a thing',
-                edges: [{ from: THING_ID, to: OMITTED_THING_ID }],
+                id: RESOURCE_ID,
+                title: 'Graph named like a resource',
+                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
               },
             ],
           },
         ],
       },
-      things: [
-        { id: THING_ID, document: { title: 'From', kind: 'markdown', body: 'Shared.' } },
-        { id: OMITTED_THING_ID, document: { title: 'To', kind: 'markdown', body: 'Shared.' } },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'Shared.' } },
+        { id: OMITTED_RESOURCE_ID, document: { title: 'To', kind: 'markdown', body: 'Shared.' } },
       ],
     };
 
@@ -1825,9 +1835,9 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     });
   });
 
-  it('rejects two diagrams owning a graph under one id', async () => {
+  it('rejects two maps owning a graph under one id', async () => {
     // Single-Space intake's job, and the reason nothing above it looks at graph
-    // ids at all. A graph id is unique across the space although one diagram
+    // ids at all. A graph id is unique across the space although one map
     // owns it (ADR 0045), so the collision worth catching is the one that spans
     // owners — and it is caught by the same `loadSpaceSnapshot` a commit goes
     // through, before the lifecycle door opens a transaction.
@@ -1835,29 +1845,37 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       ...snapshot,
       document: {
         ...snapshot.document,
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
+            id: MAP_ID,
             title: 'First owner',
             kind: 'positioned',
             positions: {
-              [THING_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
-              { id: GRAPH_ID, title: 'First', edges: [{ from: THING_ID, to: OMITTED_THING_ID }] },
+              {
+                id: GRAPH_ID,
+                title: 'First',
+                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
+              },
             ],
           },
           {
-            id: OTHER_DIAGRAM_ID,
+            id: OTHER_MAP_ID,
             title: 'Second owner',
             kind: 'positioned',
             positions: {
-              [THING_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_THING_ID]: { x: 300, y: 0, open: false },
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
             },
             graphs: [
-              { id: GRAPH_ID, title: 'Second', edges: [{ from: OMITTED_THING_ID, to: THING_ID }] },
+              {
+                id: GRAPH_ID,
+                title: 'Second',
+                edges: [{ from: OMITTED_RESOURCE_ID, to: RESOURCE_ID }],
+              },
             ],
           },
         ],

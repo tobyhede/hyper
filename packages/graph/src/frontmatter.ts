@@ -1,13 +1,13 @@
 /**
- * Reading a thing file's frontmatter: the fence, and the YAML inside it.
+ * Reading a resource file's frontmatter: the fence, and the YAML inside it.
  *
  * Kept separate from YAML/schema validation so the byte-level fence behavior is
  * explicit and independently testable.
  */
 
 /** The opening fence, either line ending. Written out as LF (see
- *  `serializeThingFile`); accepted as CRLF, because a Windows checkout or a
- *  `core.autocrlf` config makes every Thing file in the repository start `---\r\n`
+ *  `serializeResourceFile`); accepted as CRLF, because a Windows checkout or a
+ *  `core.autocrlf` config makes every Resource file in the repository start `---\r\n`
  *  and reading is not the place to have an opinion about that. */
 export const OPENING_FENCE = /^---\r?\n/;
 
@@ -37,7 +37,7 @@ export function splitFrontmatter(text: string): FrontmatterSplit {
     // Terminated with a newline of our own rather than by taking the closing
     // fence's. `close` sits on the `\r` of a CRLF pair whose `\n` the fence
     // match consumed, so slicing one past it handed YAML a dangling `\r` — and
-    // YAML, correctly, read it as part of the last field's value. Every thing in
+    // YAML, correctly, read it as part of the last field's value. Every resource in
     // a CRLF checkout parsed with a trailing carriage return on whichever field
     // came last. For LF this is byte-identical to what it replaced.
     yaml: text.slice(openLength, close) + '\n',

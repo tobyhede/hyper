@@ -7,36 +7,36 @@ import { ChromeContinuation } from '../src/components/ChromeContinuation';
 import { composeApp, type ComposedApp } from '../src/compose-app';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [{ id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  resources: [{ id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
 
 function open(): ComposedApp['continuation'] {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = MemorySpaceBackend.asMeta(loaded);
   const session = openSpaceSession(backend, loaded);
-  return composeApp({ spaceSession: session, selection: DIAGRAM_ID }).continuation;
+  return composeApp({ spaceSession: session, selection: MAP_ID }).continuation;
 }
 
 function Harness({
@@ -57,12 +57,12 @@ function Harness({
     <div ref={within}>
       <button
         type="button"
-        data-continuation-control="diagram-name"
+        data-continuation-control="map-name"
         aria-disabled={disabled ? 'true' : undefined}
         disabled={disabled}
         onClick={onPress}
       >
-        Diagram
+        Map
       </button>
       {onLand === undefined ? (
         <ChromeContinuation
@@ -97,11 +97,11 @@ describe('ChromeContinuation', () => {
         }}
       />,
     );
-    const dock = getByText('Diagram');
+    const dock = getByText('Map');
     const rail = document.createElement('button');
-    rail.setAttribute('data-continuation-control', 'diagram-name');
+    rail.setAttribute('data-continuation-control', 'map-name');
     rail.setAttribute('data-continuation-scope', 'nested-rail');
-    rail.setAttribute('data-continuation-subject', 'old-diagram');
+    rail.setAttribute('data-continuation-subject', 'old-map');
     rail.addEventListener('click', () => {
       railPressed += 1;
     });
@@ -110,8 +110,8 @@ describe('ChromeContinuation', () => {
       continuation.request({
         target: {
           kind: 'control',
-          name: 'diagram-name',
-          scope: { id: 'nested-rail', subject: 'created-diagram' },
+          name: 'map-name',
+          scope: { id: 'nested-rail', subject: 'created-map' },
         },
         select: false,
         then: 'rename',
@@ -120,7 +120,7 @@ describe('ChromeContinuation', () => {
     expect(railPressed).toBe(0);
     expect(dockPressed).toBe(false);
     await act(async () => {
-      rail.setAttribute('data-continuation-subject', 'created-diagram');
+      rail.setAttribute('data-continuation-subject', 'created-map');
       await Promise.resolve();
     });
     expect(railPressed).toBe(1);
@@ -145,7 +145,7 @@ describe('ChromeContinuation', () => {
 
     act(() =>
       continuation.request({
-        target: { kind: 'control', name: 'diagram-name' },
+        target: { kind: 'control', name: 'map-name' },
         select: false,
         then: 'rename',
       }),
@@ -187,7 +187,7 @@ describe('ChromeContinuation', () => {
 
     act(() =>
       continuation.request({
-        target: { kind: 'control', name: 'diagram-name' },
+        target: { kind: 'control', name: 'map-name' },
         select: false,
         then: 'rename',
       }),

@@ -6,16 +6,16 @@ import {
   PRESENTING_DURATION,
   PRESENTING_PADDING,
 } from '../camera';
-import { viewportFromFraming, type SpaceThingFraming } from '../space-thing-framing';
+import { viewportFromFraming, type SpaceResourceFraming } from '../space-resource-framing';
 
 /**
  * The camera seam (ADR 0027): the components that move React Flow's viewport
  * and the whole of what this app asks of it.
  *
  * Overview and presenting are one `fitView` call (ADR 0044). Enter from a Space
- * Thing is not: the stored framing is a Diagram-coordinate camera, and
+ * Resource is not: the stored framing is a Map-coordinate camera, and
  * `viewportFromFraming` places it on the *entered* canvas's own size so the
- * source Thing's rectangle never becomes the destination viewport.
+ * source Resource's rectangle never becomes the destination viewport.
  *
  * **A camera command is issued, never awaited (ADR 0043).** Read against
  * `@xyflow/react@12.11.2` and `@xyflow/system@0.0.79`, a camera Promise has three
@@ -78,10 +78,10 @@ export function OverviewCamera({ presenting }: { presenting: boolean }) {
 }
 
 /**
- * Moves the camera to the Thing the traversal has reached (ADR 0027).
+ * Moves the camera to the Resource the traversal has reached (ADR 0027).
  *
  * There is no second surface: presenting is this canvas, drawn close enough that
- * one thing fills the screen. One `fitView` over that one thing is the whole
+ * one resource fills the screen. One `fitView` over that one resource is the whole
  * mechanism (ADR 0044).
  *
  * It used to be two moves — pan at the wider scale, then close in — copied from
@@ -94,38 +94,38 @@ export function OverviewCamera({ presenting }: { presenting: boolean }) {
  *
  * The viewport size is a dependency rather than an argument to the fit: `fitView`
  * reads the container itself, but the effect must re-run when it changes, or a
- * resized window leaves the thing framed for the old one.
+ * resized window leaves the resource framed for the old one.
  */
-export function PresentingCamera({ activeThingId }: { activeThingId: string | null }) {
+export function PresentingCamera({ activeResourceId }: { activeResourceId: string | null }) {
   const { fitView, getNode } = useReactFlow();
   const viewportWidth = useStore((s) => s.width);
   const viewportHeight = useStore((s) => s.height);
 
   useEffect(() => {
-    if (!activeThingId || viewportWidth === 0 || viewportHeight === 0) return;
+    if (!activeResourceId || viewportWidth === 0 || viewportHeight === 0) return;
     // A `nodes` filter that matches nothing does not cancel the fit — it fits the
     // bounds of nothing, a zero-size rect at the origin, which lands the camera
-    // at `maxZoom` on empty canvas. So the thing has to be on screen first.
-    if (!getNode(activeThingId)) return;
+    // at `maxZoom` on empty canvas. So the resource has to be on screen first.
+    if (!getNode(activeResourceId)) return;
 
     void fitView({
-      nodes: [{ id: activeThingId }],
+      nodes: [{ id: activeResourceId }],
       padding: PRESENTING_PADDING,
       duration: PRESENTING_DURATION,
     });
-  }, [activeThingId, viewportWidth, viewportHeight, getNode, fitView]);
+  }, [activeResourceId, viewportWidth, viewportHeight, getNode, fitView]);
 
   return null;
 }
 
 /**
- * Places the entered canvas at a Space Thing's stored camera.
+ * Places the entered canvas at a Space Resource's stored camera.
  *
- * Uses the mounted canvas's own width and height, never the source Thing's
+ * Uses the mounted canvas's own width and height, never the source Resource's
  * rectangle. Issued, never awaited (ADR 0043), matching the two `fitView`
  * cameras above. Absent framing leaves React Flow's `fitView` prop to run.
  */
-export function OpeningFramingCamera({ framing }: { framing: SpaceThingFraming | undefined }) {
+export function OpeningFramingCamera({ framing }: { framing: SpaceResourceFraming | undefined }) {
   const { setViewport } = useReactFlow();
   const viewportWidth = useStore((s) => s.width);
   const viewportHeight = useStore((s) => s.height);

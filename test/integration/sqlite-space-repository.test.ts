@@ -41,44 +41,44 @@ spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000002');
 const MISSING_SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000003');
-const THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
-const SECOND_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
-const OTHER_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
+const RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000010');
+const SECOND_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000011');
+const OTHER_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
-const DIAGRAM_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
-const MISSING_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
-const LINK_THING_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
+const MAP_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
+const MISSING_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
+const LINK_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
 
-const thing = (id: UUID, title: string) => ({
+const resource = (id: UUID, title: string) => ({
   id,
   document: { title, kind: 'markdown' as const, body: title },
 });
 
-const space = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
+const space = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  things: thingIds.map((thingId) => thing(thingId, `${title} thing`)),
+  resources: resourceIds.map((resourceId) => resource(resourceId, `${title} resource`)),
 });
 
-const spaceThing = (
+const spaceResource = (
   id: UUID,
   target: UUID,
-  selection: { readonly diagram: UUID; readonly graph: UUID },
+  selection: { readonly map: UUID; readonly graph: UUID },
 ) => ({
   id,
   document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
 });
 
-const targetSpace = (id: UUID, title: string, thingIds: readonly UUID[]): SpaceSnapshot => ({
-  ...space(id, title, thingIds),
+const targetSpace = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({
+  ...space(id, title, resourceIds),
   document: {
     version: 1,
     title,
-    defaultDiagram: DIAGRAM_ID,
-    diagrams: [
+    defaultMap: MAP_ID,
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -93,14 +93,14 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
   document: {
     version: 1,
     title,
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
+        id: MAP_ID,
         title: 'Dangling',
         kind: 'positioned',
         positions: { [memberId]: { x: 0, y: 0, open: false } },
         graphs: [
-          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_THING_ID }] },
+          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
         ],
       },
     ],
@@ -142,7 +142,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('initializes, lists and loads a Meta-rooted aggregate', async () => {
     const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
 
     await expect(
       repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
@@ -163,7 +163,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('classifies an identical later initialization as existing and a different one as already-initialized', async () => {
     const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
 
     await expect(
       repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
@@ -185,20 +185,20 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     const first: SpaceSnapshot = {
       id: SPACE_ID,
       document: { version: 1, title: 'Meta' },
-      things: [
+      resources: [
         {
-          id: THING_ID,
-          document: { title: 'Thing', kind: 'markdown', body: 'Body' },
+          id: RESOURCE_ID,
+          document: { title: 'Resource', kind: 'markdown', body: 'Body' },
         },
       ],
     };
     const reordered: SpaceSnapshot = {
       id: SPACE_ID,
       document: { title: 'Meta', version: 1 },
-      things: [
+      resources: [
         {
-          id: THING_ID,
-          document: { body: 'Body', kind: 'markdown', title: 'Thing' },
+          id: RESOURCE_ID,
+          document: { body: 'Body', kind: 'markdown', title: 'Resource' },
         },
       ],
     };
@@ -213,8 +213,8 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('refuses an invalid aggregate and stores none of it', async () => {
     const { repository } = await opened();
-    const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
-    const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
+    const valid = space(SPACE_ID, 'Must roll back', [RESOURCE_ID]);
+    const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_RESOURCE_ID);
 
     await expect(
       repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
@@ -222,10 +222,18 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     expect(await repository.listSpaces()).toEqual([]);
   });
 
-  it("returns a Space's Things in ascending id order however they were supplied", async () => {
+  it("returns a Space's Resources in ascending id order however they were supplied", async () => {
     const { repository } = await opened();
-    const descending = space(SPACE_ID, 'Unordered', [OTHER_THING_ID, SECOND_THING_ID, THING_ID]);
-    const ascending = space(SPACE_ID, 'Unordered', [THING_ID, SECOND_THING_ID, OTHER_THING_ID]);
+    const descending = space(SPACE_ID, 'Unordered', [
+      OTHER_RESOURCE_ID,
+      SECOND_RESOURCE_ID,
+      RESOURCE_ID,
+    ]);
+    const ascending = space(SPACE_ID, 'Unordered', [
+      RESOURCE_ID,
+      SECOND_RESOURCE_ID,
+      OTHER_RESOURCE_ID,
+    ]);
 
     await expect(
       repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [descending] }),
@@ -238,7 +246,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('speaks bigint at the repository boundary and stores canonical decimal text', async () => {
     const { repository, database } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
 
     const loaded = await repository.loadSpace(SPACE_ID);
@@ -262,7 +270,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   // next revision is.
   it('raises the codec failure for an exported revision above the 2^63-1 ceiling', async () => {
     const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
 
     await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow(
@@ -273,7 +281,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('commits a topology-preserving update and reloads it', async () => {
     const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
     const changed = retitled(first, 'Changed');
 
@@ -303,7 +311,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('serves two overlapping aggregate reads through one client without waiting on each other', async () => {
     const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
     const loaded = {
       kind: 'loaded',
@@ -326,7 +334,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('settles two overlapping first initializations through one client as initialized and existing', async () => {
     const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
 
     const started = performance.now();
     const results = await Promise.allSettled([
@@ -355,7 +363,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   // does above.
   it('serialises overlapping operations across two repositories over one file handle', async () => {
     const { database } = await opened();
-    const first = space(SPACE_ID, 'One', [THING_ID]);
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
     const repositoryA = new SqlSpaceRepository(sqliteSqlStore(database));
     const repositoryB = new SqlSpaceRepository(sqliteSqlStore(database));
 
@@ -381,12 +389,12 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('serialises overlapping in-process commits at different Spaces well under the busy timeout', async () => {
     const { repository } = await opened();
-    const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+    const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID]);
     const meta = {
-      ...space(SPACE_ID, 'Meta', [THING_ID]),
-      things: [
-        thing(THING_ID, 'Meta thing'),
-        spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+      ...space(SPACE_ID, 'Meta', [RESOURCE_ID]),
+      resources: [
+        resource(RESOURCE_ID, 'Meta resource'),
+        spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
       ],
     };
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [meta, child] });
@@ -439,7 +447,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   const TURNS_BETWEEN_READS = 500;
   const linkedSpaceId = (index: number) =>
     uuidSchema.parse(`d0000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`);
-  const linkThingId = (index: number) =>
+  const linkResourceId = (index: number) =>
     uuidSchema.parse(`e0000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`);
 
   for (const commitKind of COMMIT_KINDS) {
@@ -450,12 +458,12 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
           targetSpace(linkedSpaceId(index), `Linked ${index}`, []),
         );
         const meta: SpaceSnapshot = {
-          ...space(SPACE_ID, 'Meta', [THING_ID, SECOND_THING_ID]),
-          things: [
-            thing(THING_ID, 'Meta thing'),
-            thing(SECOND_THING_ID, 'Second meta thing'),
+          ...space(SPACE_ID, 'Meta', [RESOURCE_ID, SECOND_RESOURCE_ID]),
+          resources: [
+            resource(RESOURCE_ID, 'Meta resource'),
+            resource(SECOND_RESOURCE_ID, 'Second meta resource'),
             ...linkedSpaces.map(({ id }, index) =>
-              spaceThing(linkThingId(index), id, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+              spaceResource(linkResourceId(index), id, { map: MAP_ID, graph: GRAPH_ID }),
             ),
           ],
         };
@@ -465,12 +473,12 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
             spaces: [meta, ...linkedSpaces],
           }),
         ).resolves.toMatchObject({ kind: 'initialized' });
-        const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_THING_ID]);
+        const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID]);
         const linked: SpaceSnapshot = {
           ...retitled(meta, 'Meta linked'),
-          things: [
-            ...meta.things,
-            spaceThing(LINK_THING_ID, OTHER_SPACE_ID, { diagram: DIAGRAM_ID, graph: GRAPH_ID }),
+          resources: [
+            ...meta.resources,
+            spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
           ],
         };
         const commit = () =>
@@ -529,7 +537,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     revision: '0',
   });
 
-  const proposed = space(SPACE_ID, 'Proposal', [THING_ID]);
+  const proposed = space(SPACE_ID, 'Proposal', [RESOURCE_ID]);
   const proposal = { metaSpaceId: SPACE_ID, spaces: [proposed] };
 
   const expectReadAndInitializeRefuse = async (repository: SpaceRepository): Promise<void> => {
@@ -613,7 +621,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
           {
             kind: 'update',
             spaceId: SPACE_ID,
-            snapshot: { id: SPACE_ID, document: { version: 1, title: 'Repaired' }, things: [] },
+            snapshot: { id: SPACE_ID, document: { version: 1, title: 'Repaired' }, resources: [] },
             expectedRevision: 0n,
           },
         ],
@@ -650,23 +658,23 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expectTruncatedTo(repository);
   });
 
-  it('truncates a stored Space whose Thing document is not JSON', async () => {
+  it('truncates a stored Space whose Resource document is not JSON', async () => {
     const { path, repository, database } = await opened();
     await database.orm.Space.create({
       id: OTHER_SPACE_ID,
       document: { version: 1, title: 'Orphan' },
       revision: '0',
     });
-    // Only a raw write can store Thing text that is not JSON; the ORM encodes
+    // Only a raw write can store Resource text that is not JSON; the ORM encodes
     // `document` as JSON, same as for a Space's own document above.
     const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
     const connection = new DatabaseSync(path);
     try {
       connection
         .prepare(
-          "INSERT INTO things (id, space_id, document, updated_at) VALUES (?, ?, ?, datetime('now'))",
+          "INSERT INTO resources (id, space_id, document, updated_at) VALUES (?, ?, ?, datetime('now'))",
         )
-        .run(OTHER_THING_ID, OTHER_SPACE_ID, 'not json either');
+        .run(OTHER_RESOURCE_ID, OTHER_SPACE_ID, 'not json either');
       connection
         .prepare('INSERT INTO repository_state (singleton_id, meta_space_id) VALUES (1, ?)')
         .run(OTHER_SPACE_ID);
@@ -720,7 +728,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
 
   it('still shows the established aggregate after close and reopen against the same file', async () => {
     const harness = await opened();
-    const first = space(SPACE_ID, 'Durable', [THING_ID]);
+    const first = space(SPACE_ID, 'Durable', [RESOURCE_ID]);
     await harness.repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
     await harness.database.close();
 
@@ -748,7 +756,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     const { path, repository, database } = await opened();
     await repository.initializeAggregate({
       metaSpaceId: SPACE_ID,
-      spaces: [space(SPACE_ID, 'Journalled', [THING_ID])],
+      spaces: [space(SPACE_ID, 'Journalled', [RESOURCE_ID])],
     });
 
     // A static `import 'node:sqlite'` fails to load under this Vitest's resolver.

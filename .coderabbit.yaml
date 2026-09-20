@@ -33,7 +33,7 @@ reviews:
     narrate what the code does.
   collapse_walkthrough: true
   changed_files_summary: true
-  sequence_diagrams: true
+  sequence_maps: true
   estimate_code_review_effort: true
 
   # The issue tracker is markdown under `.scratch/`, not GitHub Issues, and the
@@ -84,7 +84,7 @@ reviews:
         `test/unit/current-domain-vocabulary.test.ts` scans every tracked file
         for them, so reintroducing one fails the build rather than the review.
         ADR 0085 is BUILT too, and the same test enforces it in thirteen shape
-        arms each: a Thing is never called a Card and a Diagram is never called
+        arms each: a Resource is never called a Card and a Map is never called
         a Layout, in any compound, kebab-case refusal code, test id, CSS block
         or screaming constant. `LayoutStrategy` keeps its name, which is the
         verb rather than the entity, and React's `useLayoutEffect` and Lucide's
@@ -96,7 +96,7 @@ reviews:
         writable bare and lowercase, but capitalised, compounded, hyphenated or
         screamed it is reported.
         ADR 0088 is BUILT: `aggregate` names the complete Meta-rooted
-        collection of every Space and nothing else. One Space plus its Things
+        collection of every Space and nothing else. One Space plus its Resources
         is a Space snapshot, and the stored Meta identity is the Meta identity
         row. Do not report the word itself; the test bans the two retired
         phrases and the import alias that dodged the collision between the
@@ -109,11 +109,11 @@ reviews:
         `edges` array beside Graphs.
 
         ADR 0040 is BUILT: `.scratch/first-public-aggregate/` landed it. A
-        Diagram's `graphs` are nested owned values and its position keys are its
-        explicit Thing membership; there is no Space-level Graph collection.
+        Map's `graphs` are nested owned values and its position keys are its
+        explicit Resource membership; there is no Space-level Graph collection.
         `validateReferences` in `packages/graph/src/validate.ts` checks every
-        owned Edge endpoint against that membership (`graph-edge-missing-thing`,
-        `graph-edge-thing-outside-diagram`). Do not report the aggregate as
+        owned Edge endpoint against that membership (`graph-edge-missing-resource`,
+        `graph-edge-resource-outside-map`). Do not report the aggregate as
         unbuilt or propose reverting to a Space-owned Graph collection.
 
     - path: 'packages/core/**'
@@ -124,7 +124,7 @@ reviews:
         bypassed. Another layout engine is equally unwelcome here and the lint
         rules do not yet name it, so that one is a real finding. Geometry rides as optional fields on
         elements (ADR 0005); there is no `Arrangement` type and none should be
-        proposed. A Diagram is authored data; a LayoutStrategy is behaviour
+        proposed. A Map is authored data; a LayoutStrategy is behaviour
         living in `graph` (ADR 0014). Do not collapse them.
 
     - path: 'packages/graph/**'
@@ -152,7 +152,7 @@ reviews:
         `opacity` or `visibility`. Handle ids stay `<graphId>::out` /
         `::in` — a per-side counter breaks React Flow's own resolution (#008).
         elkjs left the repository with ADR 0086, which makes an automatic
-        arrangement an Edit over an authored Diagram rather than a render path:
+        arrangement an Edit over an authored Map rather than a render path:
         do not propose reinstating a render-time engine.
 
     - path: 'packages/http/**'
@@ -189,19 +189,19 @@ reviews:
         when a newly drawn Edge should become traversable. In `space-authoring`,
         `session.submit` is deliberately the first statement of the install
         shell and the only fallible one; do not reorder it or re-check the
-        Graph/Diagram inside that window. The install gate counts depth and
+        Graph/Map inside that window. The install gate counts depth and
         publishes in the `finally` — a boolean flag republishes part-way state.
         `beforeunload` is registered only while persistence is unsettled and
         calls `preventDefault()` alone; `event.returnValue` is deprecated.
         `resolveView` is the one seam answering the subject and the Active
         Graph, and both fallbacks live there; Navigation takes that answer as
         an argument rather than reaching for the Space's first Graph, because
-        two places answering it would disagree the moment a Diagram filters.
+        two places answering it would disagree the moment a Map filters.
         There is no *persistence* Save action: ADR 0030 retired it with file
         write-back, and every completed Edit commits on its own. That is a
         different action from ADR 0064's Save, which replaces Edit while
         Markdown editing is live and is current — do not read either one as
-        evidence against the other. Thing markdown stays behind DOMPurify.
+        evidence against the other. Resource markdown stays behind DOMPurify.
 
     - path: '{,packages/*/}*.config.ts'
       instructions: >-
@@ -340,8 +340,8 @@ reviews:
         instructions: >-
           New identifiers and prose use the vocabulary in CONTEXT.md. Retired
           terms must not reappear: the names ADR 0041 retired (Route and Walk,
-          in any compound), the two ADR 0085 retired (a Thing is not a Card, a
-          Diagram is not a Layout), the loose word for the loaded Space and its
+          in any compound), the two ADR 0085 retired (a Resource is not a Card, a
+          Map is not a Layout), the loose word for the loaded Space and its
           chrome, the retired name for the surface over the open set, the
           shipping-ledger word ADR 0010 retired for the top-level value,
           `Arrangement`, a shared `Draft`, a `cards` array in the space file,

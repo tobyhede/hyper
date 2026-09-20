@@ -10,7 +10,7 @@ const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const NOTES_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
 const EXAMPLE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
 const FIXTURE_SPACES = [
-  { id: FIXTURE_ID, title: 'Diagram fixture' },
+  { id: FIXTURE_ID, title: 'Map fixture' },
   { id: PRESENTATION_ID, title: 'Presentation' },
   { id: DEEP_DIVE_ID, title: 'Deep dive' },
   { id: NOTES_ID, title: 'Authoring notes' },
@@ -54,7 +54,7 @@ describe('e2e HTTP runtime', () => {
 
     await expect(second.loadSpace(FIXTURE_ID)).resolves.toMatchObject({
       revision: 0n,
-      snapshot: { document: { title: 'Diagram fixture' } },
+      snapshot: { document: { title: 'Map fixture' } },
     });
   });
 

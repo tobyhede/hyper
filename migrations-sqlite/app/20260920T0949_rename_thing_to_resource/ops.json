@@ -1,0 +1,124 @@
+[
+  {
+    "id": "table.resources",
+    "label": "Create table resources",
+    "summary": "Creates table resources with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "resources"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"resources\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "resources"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"resources\"",
+        "sql": "CREATE TABLE \"resources\" (\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"document\" TEXT NOT NULL,\n  \"id\" TEXT NOT NULL,\n  \"space_id\" TEXT NOT NULL,\n  \"updated_at\" TEXT NOT NULL,\n  PRIMARY KEY (\"id\"),\n  FOREIGN KEY (\"space_id\") REFERENCES \"spaces\" (\"id\") ON DELETE CASCADE\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"resources\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "resources"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.resources.resources_space_id_idx",
+    "label": "Create index resources_space_id_idx on resources",
+    "summary": "Creates index resources_space_id_idx on resources",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "index",
+        "name": "resources_space_id_idx",
+        "table": "resources"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"resources_space_id_idx\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "resources_space_id_idx"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"resources_space_id_idx\"",
+        "sql": "CREATE INDEX \"resources_space_id_idx\" ON \"resources\" (\"space_id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"resources_space_id_idx\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "resources_space_id_idx"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropTable.things",
+    "label": "Drop table things",
+    "summary": "Drops table things which is not in the contract",
+    "operationClass": "destructive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "things"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"things\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "things"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"things\"",
+        "sql": "DROP TABLE \"things\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"things\" is gone",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "things"
+        ]
+      }
+    ]
+  }
+]

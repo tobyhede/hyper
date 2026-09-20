@@ -8,41 +8,41 @@ export { openSpaceStatusLabel } from './open-space-status';
 export type { OpenSpaceStatus } from './open-space-status';
 export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
-export { ThingContent } from './ThingContent';
-export type { ThingContentProps } from './ThingContent';
-export { CanvasThing, CANVAS_THING_DRAG_TILT_DEGREES } from './CanvasThing';
+export { ResourceContent } from './ResourceContent';
+export type { ResourceContentProps } from './ResourceContent';
+export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
 export type {
-  CanvasThingBodyEditor,
-  CanvasThingFront,
-  CanvasThingProps,
-  CanvasThingState,
-} from './CanvasThing';
-export { SpaceThingSelectors } from './SpaceThingSelectors';
+  CanvasResourceBodyEditor,
+  CanvasResourceFront,
+  CanvasResourceProps,
+  CanvasResourceState,
+} from './CanvasResource';
+export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export type {
-  CanvasSpaceThingChoice,
-  CanvasSpaceThingCommands,
-  CanvasSpaceThingGraphCommands,
-  CanvasSpaceThingSelection,
-  SpaceThingSelectorsProps,
-} from './SpaceThingSelectors';
+  CanvasSpaceResourceChoice,
+  CanvasSpaceResourceCommands,
+  CanvasSpaceResourceGraphCommands,
+  CanvasSpaceResourceSelection,
+  SpaceResourceSelectorsProps,
+} from './SpaceResourceSelectors';
 export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';
-export { ThingRail } from './ThingRail';
-export type { ThingRailProps } from './ThingRail';
+export { ResourceRail } from './ResourceRail';
+export type { ResourceRailProps } from './ResourceRail';
 export {
-  ThingRailAction,
-  ThingRailActions,
-  ThingRailKindActions,
-  ThingRailSharedActions,
-} from './ThingRailActions';
+  ResourceRailAction,
+  ResourceRailActions,
+  ResourceRailKindActions,
+  ResourceRailSharedActions,
+} from './ResourceRailActions';
 export type {
-  ThingRailActionProps,
-  ThingRailActionsProps,
-  ThingRailKindActionsProps,
-  ThingRailSharedActionsProps,
-} from './ThingRailActions';
+  ResourceRailActionProps,
+  ResourceRailActionsProps,
+  ResourceRailKindActionsProps,
+  ResourceRailSharedActionsProps,
+} from './ResourceRailActions';
 export { CommandName, CommandSurface, CommandToolbar } from './CommandSurface';
 export type {
   CommandNameProps,
@@ -57,10 +57,10 @@ export type {
   ChoiceMenuSide,
   ChoiceMenuTriggerProps,
 } from './ChoiceMenu';
-export { ThingKindIcon, thingKindName } from './ThingKindIcon';
-export type { ThingKindIconProps } from './ThingKindIcon';
-export { ThingSearchCombobox } from './ThingSearchCombobox';
-export type { ThingChoice, ThingSearchComboboxProps } from './ThingSearchCombobox';
+export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
+export type { ResourceKindIconProps } from './ResourceKindIcon';
+export { ResourceSearchCombobox } from './ResourceSearchCombobox';
+export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';
 export {
   Dialog,
   DialogBackdrop,
@@ -106,7 +106,7 @@ export {
   CommitEditIcon,
   ChevronDownIcon,
   CloseIcon,
-  CloseThingIcon,
+  CloseResourceIcon,
   CopyIcon,
   DeleteIcon,
   EditIcon,
@@ -114,23 +114,23 @@ export {
   EntityActionsIcon,
   FitViewIcon,
   GraphIcon,
-  DiagramIcon,
+  MapIcon,
   LinkActionsIcon,
   MarkdownIcon,
   OpenIndependentlyIcon,
-  OpenThingIcon,
+  OpenResourceIcon,
   ParentIcon,
-  SpaceThingIcon,
+  SpaceResourceIcon,
   SpaceIcon,
   SearchIcon,
   PlusIcon,
-  RemoveFromDiagramIcon,
+  RemoveFromMapIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,
   StopPresentingIcon,
 } from './icons';
-export type { ThingBaseKind } from './icons';
+export type { ResourceBaseKind } from './icons';
 export {
   Select,
   SelectContent,
@@ -253,5 +253,5 @@ export { Toolbar, ToolbarButton, ToolbarGroup } from './components/toolbar';
 export type { ToolbarButtonProps } from './components/toolbar';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip';
 
-export { DiagramMenuActions, GraphMenuActions } from './IdentityMenuActions';
-export type { DiagramMenuActionsProps, GraphMenuActionsProps } from './IdentityMenuActions';
+export { MapMenuActions, GraphMenuActions } from './IdentityMenuActions';
+export type { MapMenuActionsProps, GraphMenuActionsProps } from './IdentityMenuActions';

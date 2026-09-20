@@ -19,7 +19,7 @@ const reportSafely = (report: (cause: unknown) => void, cause: unknown): void =>
 };
 
 /**
- * What this runtime can be handed instead of the two ambient things it
+ * What this runtime can be handed instead of the two ambient resources it
  * otherwise names, a timer and stderr (ADR 0016, ADR 0081).
  *
  * Both are optional and both defaults are the composition rather than a

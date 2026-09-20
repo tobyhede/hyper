@@ -8,18 +8,18 @@ import {
   AppShell,
   DeleteIcon,
   FALLBACK_GRAPH_COLOR,
-  RemoveFromDiagramIcon,
+  RemoveFromMapIcon,
   EnterSpaceIcon,
-  ThingKindIcon,
+  ResourceKindIcon,
   type EntityActionGroup,
   type EntityActionOutcome,
 } from '@project/ui';
 import {
   titleName,
-  type Thing,
-  type ThingId,
-  type DiagramId,
-  type DiagramPosition,
+  type Resource,
+  type ResourceId,
+  type MapId,
+  type MapPosition,
   type UUID,
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
@@ -29,48 +29,48 @@ import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
 import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
 import { authoringAvailability } from './authoring-availability';
-import { selectedThingOf, type EdgeSubject } from './render-adapter';
+import { selectedResourceOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
-  describeSpaceThingBreak,
-  describeSpaceThingCreationBreak,
-  describeSpaceThingRefusal,
+  describeSpaceResourceBreak,
+  describeSpaceResourceCreationBreak,
+  describeSpaceResourceRefusal,
 } from './authoring-refusal';
 import {
   coordinatedDeleteOk,
-  coordinatedDiagramDelete,
+  coordinatedMapDelete,
   coordinatedGraphDelete,
 } from './coordinated-context-delete';
-import { coordinatedContextCreate, createdDiagramContext } from './coordinated-context-create';
-import { useSpaceThingTargets } from './space-thing-targets';
+import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
+import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
-import { THING_HEIGHT, THING_WIDTH, thingSizeVars } from './thing';
+import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
   COPY_LINK_ACTION_ID,
-  DELETE_DIAGRAM_ACTION_ID,
+  DELETE_MAP_ACTION_ID,
   spaceEntityActions,
   type EntityCommandId,
   type SpaceChromeTitleSubject,
   type SpaceEntity,
 } from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
-import { nextSpaceTitle, nextThingTitle } from './titles';
-import { diagramThings, resolveDiagram } from './diagram-resolution';
+import { nextSpaceTitle, nextResourceTitle } from './titles';
+import { mapResources, resolveMap } from './map-resolution';
 import type { DestinationOpening } from './destination-opening';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
-import { DeleteThingConfirmation } from './components/DeleteThingConfirmation';
+import { DeleteResourceConfirmation } from './components/DeleteResourceConfirmation';
 import {
   CommandDock,
   type DockChrome,
-  type DockThingKind,
+  type DockResourceKind,
   type SpaceExitReport,
 } from './components/CommandDock';
 import { PlacementFailure } from './components/PlacementFailure';
@@ -99,20 +99,20 @@ const noOpenSpaces = (): OpenSpacesState => NO_OPEN_SPACES;
 const noOpenSpacesChanges = (): (() => void) => () => undefined;
 
 /**
- * How far a new Reference Thing steps from the Thing it was created from, as a fraction of
+ * How far a new Reference Resource steps from the Resource it was created from, as a fraction of
  * its collapsed size on both axes, plus any room its Open Target holds.
  *
  * Overlap is authored rather than avoided — a free-position search is a placement
  * algorithm, and ADR 0086 keeps those behind an Edit — so this is deliberately
  * less than a whole step. It is more than half a step because at exactly half the
- * new Reference Thing's centre lands on the Target's bottom-right corner, and the Target
- * takes the pointer there: three quarters leaves a quarter-Thing corner of
+ * new Reference Resource's centre lands on the Target's bottom-right corner, and the Target
+ * takes the pointer there: three quarters leaves a quarter-Resource corner of
  * overlap and a centre the author can reach.
  */
 const REFERENCE_OFFSET_RATIO = 0.75;
 
 export const createApp = (
-  { app: composition, session: spaceSession, spaceThings }: OpenSpace,
+  { app: composition, session: spaceSession, spaceResources }: OpenSpace,
   browserLocation: BrowserLocation,
   opening?: DestinationOpening,
 ) => {
@@ -124,7 +124,7 @@ export const createApp = (
     adapter: useRenderAdapter,
     continuation,
     edgeAuthoring,
-    thingDeletion,
+    resourceDeletion,
     reportObserverError,
   } = composition;
   /**
@@ -138,15 +138,15 @@ export const createApp = (
    */
   const reportBreak = createNonThrowingReporter(reportObserverError);
   const openingGraphId = opening?.graphId ?? null;
-  const openingPresentationThingId = opening?.presentationThingId ?? null;
-  if (openingGraphId !== null && openingPresentationThingId !== null) {
+  const openingPresentationResourceId = opening?.presentationResourceId ?? null;
+  if (openingGraphId !== null && openingPresentationResourceId !== null) {
     navigation.openPresentation(
-      navigation.getState().selectedDiagramId,
+      navigation.getState().selectedMapId,
       openingGraphId,
-      openingPresentationThingId,
+      openingPresentationResourceId,
     );
   } else if (openingGraphId !== null) {
-    navigation.openGraph(navigation.getState().selectedDiagramId, openingGraphId);
+    navigation.openGraph(navigation.getState().selectedMapId, openingGraphId);
   }
 
   function App() {
@@ -156,7 +156,7 @@ export const createApp = (
      * The session's open set, read through a subscription like every other
      * observable collaborator here.
      *
-     * Both things taken off it decide what a *hidden* Space does — `active`
+     * Both resources taken off it decide what a *hidden* Space does — `active`
      * withholds the `window`-level Presenting keys and the portalled persistence
      * dialogs, and the entries are the rows the Dock's Open Spaces menu draws,
      * which is how a hidden Space that has gone unwell is still reportable on
@@ -176,7 +176,7 @@ export const createApp = (
     );
     const active = spaces === null || openSpacesState.activeSpaceId === sessionState.working.id;
     const navigationState = authoringState.navigation;
-    const selectedDiagramId = navigationState.selectedDiagramId;
+    const selectedMapId = navigationState.selectedMapId;
     /**
      * The two facts the browser's location tells this component (ADR 0081).
      *
@@ -185,47 +185,46 @@ export const createApp = (
      * the position that module last synced to — publishing it would let this
      * decide about a position twice.
      */
-    const { addressedThingId, destinationNotFound } = useSyncExternalStore(
+    const { addressedResourceId, destinationNotFound } = useSyncExternalStore(
       browserLocation.subscribe,
       browserLocation.getState,
     );
-    // Keyed on the Diagram as well as the Thing: a deliberate move clears the
-    // published selection, and moving between two Diagrams that address
-    // the *same* Thing leaves `addressedThingId` untouched, so keying on the Thing
+    // Keyed on the Map as well as the Resource: a deliberate move clears the
+    // published selection, and moving between two Maps that address
+    // the *same* Resource leaves `addressedResourceId` untouched, so keying on the Resource
     // alone would let React bail out and never restore it. Clearing on `null` is
-    // the other half — an address that stops naming a Thing must stop selecting
-    // one, or the Thing's rail keeps offering copy commands for a Thing the URL
+    // the other half — an address that stops naming a Resource must stop selecting
+    // one, or the Resource's rail keeps offering copy commands for a Resource the URL
     // has left behind.
     useEffect(() => {
       const adapter = useRenderAdapter.getState();
-      if (addressedThingId === null) {
+      if (addressedResourceId === null) {
         adapter.clearSelection();
         return;
       }
-      adapter.selectThing(addressedThingId);
+      adapter.selectResource(addressedResourceId);
       // Centred and focused once its projection exists — the one member that
-      // touches the camera, because a Thing arrived at by URL is somewhere the
+      // touches the camera, because a Resource arrived at by URL is somewhere the
       // reader has never been. The wait is the canvas adapter's, which is what
       // replaced the component that polled the live projection for it.
       continuation.request({
-        target: { kind: 'thing', thingId: addressedThingId },
+        target: { kind: 'resource', resourceId: addressedResourceId },
         select: false,
         then: 'reveal',
       });
-    }, [addressedThingId, selectedDiagramId]);
+    }, [addressedResourceId, selectedMapId]);
     /**
-     * Whether a Thing's content edit is running, reported up by the canvas.
+     * Whether a Resource's content edit is running, reported up by the canvas.
      *
-     * Read by one control. Presenting draws the active Thing's content *instead
-     * of* the Thing (`showActiveThingContent`), so a live editor cannot survive it
+     * Read by one control. Presenting draws the active Resource's content *instead
+     * of* the Resource (`showActiveResourceContent`), so a live editor cannot survive it
      * and the draft would go without one of ADR 0064's four exits being spent.
      */
-    const [editingThingBody, setEditingThingBody] = useState(false);
-    const [editingThingTitle, setEditingThingTitle] = useState(false);
-    const [createDiagramRefusal, setCreateDiagramRefusal] = useState<AuthoringRefusal | null>(null);
-    const [diagramManagementRefusal, setDiagramManagementRefusal] =
-      useState<AuthoringRefusal | null>(null);
-    const [diagramDeleteMessage, setDiagramDeleteMessage] = useState<string | null>(null);
+    const [editingResourceBody, setEditingResourceBody] = useState(false);
+    const [editingResourceTitle, setEditingResourceTitle] = useState(false);
+    const [createMapRefusal, setCreateMapRefusal] = useState<AuthoringRefusal | null>(null);
+    const [mapManagementRefusal, setMapManagementRefusal] = useState<AuthoringRefusal | null>(null);
+    const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
     const [graphDeleteMessage, setGraphDeleteMessage] = useState<string | null>(null);
     /**
      * A Space command that broke rather than refusing, in words.
@@ -243,9 +242,9 @@ export const createApp = (
     /** Why the last Graph Edit did not run, or `null` — see `reportGraphEdit`. */
     const [graphRefusal, setGraphRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
-    const thingDeletionState = useSyncExternalStore(
-      thingDeletion.subscribe,
-      thingDeletion.getState,
+    const resourceDeletionState = useSyncExternalStore(
+      resourceDeletion.subscribe,
+      resourceDeletion.getState,
     );
     /**
      * Copy one address, answering whether it reached the clipboard.
@@ -274,7 +273,7 @@ export const createApp = (
      * Open one address in a new browsing context, answering whether `open` ran.
      *
      * The URL is the browser location's (ADR 0081); opening it is this
-     * surface's, the same split Copy link already takes. A Space Thing spends
+     * surface's, the same split Copy link already takes. A Space Resource spends
      * this on the Space it shows, at that Space's own address. With
      * `noopener`, a tab that did open and a blocked popup both return `null`,
      * so the boolean is not a success signal — only a missing `open` or a throw
@@ -284,19 +283,19 @@ export const createApp = (
       return openIndependently(browserLocation.href(destination));
     }, []);
     /**
-     * The outstanding request that the Dock disclose its Things list, if any.
+     * The outstanding request that the Dock disclose its Resources list, if any.
      *
      * **A request, not the open state** — the Dock owns whether the list is
      * open, because it owns the one slot that keeps its disclosures exclusive
-     * (`DockThingsList`). A fresh object per request is the signal; an equal one
+     * (`DockResourcesList`). A fresh object per request is the signal; an equal one
      * recomputed by an unrelated edit reopens nothing the reader has closed.
      */
-    const [discloseThings, setDiscloseThings] = useState<{
-      readonly thingId: ThingId;
+    const [discloseResources, setDiscloseResources] = useState<{
+      readonly resourceId: ResourceId;
     } | null>(null);
-    const thingsDrag = useRef<{
-      readonly thingId: ThingId;
-      readonly diagramId: DiagramId;
+    const resourcesDrag = useRef<{
+      readonly resourceId: ResourceId;
+      readonly mapId: MapId;
     } | null>(null);
     const renderedSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
@@ -304,16 +303,16 @@ export const createApp = (
     );
 
     /**
-     * Where a Thing created from a control rather than a pointer goes.
+     * Where a Resource created from a control rather than a pointer goes.
      *
      * Read at the gesture, never captured earlier: an author who pans between
-     * opening the Reference Thing picker and choosing a Target is looking somewhere else
-     * by the time the Thing is placed, and the whole point of the visible centre
+     * opening the Reference Resource picker and choosing a Target is looking somewhere else
+     * by the time the Resource is placed, and the whole point of the visible centre
      * is that it is where they are looking now.
      */
     /**
      * **State rather than a ref, and the difference is a lint rule with a point
-     * behind it.** The reporter is installed once when the canvas's `things`
+     * behind it.** The reporter is installed once when the canvas's `resources`
      * branch mounts and withdrawn once when it unmounts (`CanvasCentre`), so
      * there is no per-frame write to keep out of React's hands — and a ref read
      * by a handler that the Command Dock's chrome object carries makes that
@@ -324,7 +323,7 @@ export const createApp = (
      *
      * Set through the updater form because the value *is* a function: passing
      * it directly would have React call it as an updater and store a
-     * `DiagramPosition` where a getter belongs.
+     * `MapPosition` where a getter belongs.
      */
     const [visibleCentre, setVisibleCentre] = useState<VisibleCentre | null>(null);
     /**
@@ -339,21 +338,21 @@ export const createApp = (
     const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
       setVisibleCentre(() => centre);
     }, []);
-    // The origin is unreachable in practice — the control is withdrawn until Things
+    // The origin is unreachable in practice — the control is withdrawn until Resources
     // are on the canvas, and the reporter is mounted with them — but a created
-    // Thing must land *somewhere*, and a refusal would be the wrong answer to a
+    // Resource must land *somewhere*, and a refusal would be the wrong answer to a
     // question about geometry.
     const centreAnchor = useCallback(
-      (): DiagramPosition => visibleCentre?.() ?? { x: 0, y: 0 },
+      (): MapPosition => visibleCentre?.() ?? { x: 0, y: 0 },
       [visibleCentre],
     );
 
     /**
-     * The Spaces the Things list offers, and when they are re-read.
+     * The Spaces the Resources list offers, and when they are re-read.
      *
      * **A repository read rather than a derivation of this Space**, because the
-     * Meta Space's Spaces are not this Space's Things — ADR 0074 makes a Space
-     * reachable through the Space Things that reference it, and the list offers
+     * Meta Space's Spaces are not this Space's Resources — ADR 0074 makes a Space
+     * reachable through the Space Resources that reference it, and the list offers
      * the Spaces themselves so a reader can frame one that nothing here points
      * at yet. `referenceableSpaces` withholds the containing Space, which is
      * the one target that cannot work whatever else is stored.
@@ -373,7 +372,7 @@ export const createApp = (
      * **And the epoch invalidates rather than fetches.** One shared epoch with
      * every mounted `App` reading on it is the same defect the other way round:
      * one Edit becomes N repository reads and N state updates, for N−1 lists
-     * that cannot be opened — a hidden Space's Things trigger is not merely
+     * that cannot be opened — a hidden Space's Resources trigger is not merely
      * unread, it is unreachable. So only the drawn Space subscribes, `read`
      * compares the epoch it last answered before spending anything, and a
      * Space that was hidden across an Edit reads once, when it is shown. The
@@ -398,14 +397,14 @@ export const createApp = (
       // woken every hidden Space on every Edit.
       if (!active) return;
       const read = (): void => {
-        const epoch = spaceThings.spaceSet.getState();
+        const epoch = spaceResources.spaceSet.getState();
         if (readSpacesEpoch.current === epoch) return;
         readSpacesEpoch.current = epoch;
         const token = latestSpacesRead.current + 1;
         latestSpacesRead.current = token;
         void (async () => {
           try {
-            const spaces = await spaceThings.referenceableSpaces(currentSpace().id);
+            const spaces = await spaceResources.referenceableSpaces(currentSpace().id);
             if (latestSpacesRead.current === token) setMetaSpaces(spaces);
           } catch (failure) {
             // Reported rather than drawn: the list's own empty state says what
@@ -423,62 +422,62 @@ export const createApp = (
         })();
       };
       read();
-      return spaceThings.spaceSet.subscribe(read);
+      return spaceResources.spaceSet.subscribe(read);
     }, [active]);
 
     /**
-     * Placing a Space: the Space Thing that frames it, authored in this Diagram.
+     * Placing a Space: the Space Resource that frames it, authored in this Map.
      *
      * The same `link` the creation pane spends, from the surface that offers
      * the Space — so a reader who found it in the list never meets a second
      * picker asking which Space they meant. The Title defaults to the Space's
      * own, which is the name they just read on the row; renaming it afterwards
-     * is the ordinary inline Title edit every Thing has (ADR 0083).
+     * is the ordinary inline Title edit every Resource has (ADR 0083).
      */
-    const addSpaceThingFor = useCallback(
+    const addSpaceResourceFor = useCallback(
       async (space: { readonly id: UUID; readonly title: string }): Promise<string | null> => {
         // Answers rather than rejects, for `readReferenceableSpaces`'s reason
         // and one more: the list spends this on a press, so a rejection left to
-        // travel is a row that visibly does nothing. `resolveDiagram` is inside
+        // travel is a row that visibly does nothing. `resolveMap` is inside
         // the `try` because it is the likeliest break on this path — the list
-        // has been open across renders and the Diagram it resolves is the one
+        // has been open across renders and the Map it resolves is the one
         // drawing now.
         try {
-          const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
-          const result = await spaceThings.link({
+          const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
+          const result = await spaceResources.link({
             containingSpaceId: currentSpace().id,
-            diagramId: resolved.diagram.id,
+            mapId: resolved.map.id,
             title: space.title,
             position: centreAnchor(),
             targetSpaceId: space.id,
           });
-          return result.kind === 'refused' ? describeSpaceThingRefusal(result.refusal) : null;
+          return result.kind === 'refused' ? describeSpaceResourceRefusal(result.refusal) : null;
         } catch (failure) {
           // Both: the reader gets the sentence on the list that asked, and the
           // diagnostic still reaches the operational channel.
           reportBreak(failure);
-          return describeSpaceThingBreak(failure);
+          return describeSpaceResourceBreak(failure);
         }
       },
       [centreAnchor],
     );
 
     /**
-     * The Space Thing creation that has not settled, said in one sentence.
+     * The Space Resource creation that has not settled, said in one sentence.
      *
-     * **The Dock's refusal channel, beside `createDiagramRefusal`.** A creation
+     * **The Dock's refusal channel, beside `createMapRefusal`.** A creation
      * that completes on activation has no pane to hold its own failure against
      * the field that caused it (ADR 0089), so it reports through the surface
      * that owns the command. The sentence has to name the Space, because the
-     * author may be typing into the Thing when it goes.
+     * author may be typing into the Resource when it goes.
      */
-    const [spaceThingRefusal, setSpaceThingRefusal] = useState<string | null>(null);
+    const [spaceResourceRefusal, setSpaceResourceRefusal] = useState<string | null>(null);
 
     /**
-     * The Reference Thing creation that refused, said in one sentence.
+     * The Reference Resource creation that refused, said in one sentence.
      *
-     * **Beside `spaceThingRefusal`, for the reason that one exists.** Create
-     * Reference Thing completes on activation and closes the menu it was pressed in
+     * **Beside `spaceResourceRefusal`, for the reason that one exists.** Create
+     * Reference Resource completes on activation and closes the menu it was pressed in
      * (ADR 0089), so it has no field and no row of its own to hold a failure
      * against — the surface that owns the command is the Space chrome, and this
      * is its channel. The rows that can refuse by kind are drawn unavailable, so
@@ -486,114 +485,111 @@ export const createApp = (
      */
     const [referenceRefusal, setReferenceRefusal] = useState<string | null>(null);
 
-    const [creatingSpaceThing, setCreatingSpaceThing] = useState(false);
+    const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
 
     /**
-     * Create Space Thing: one press, one Thing, one new Space (ADR 0089).
+     * Create Space Resource: one press, one Resource, one new Space (ADR 0089).
      *
      * **Optimistic, in the one sense the lifecycle leaves open.** The
      * coordination installs its local Edit and *then* commits two snapshots, and
-     * the promise here resolves at the installation — so the Thing is drawn and
+     * the promise here resolves at the installation — so the Resource is drawn and
      * its Title editor takes the caret while the durable commit is still in
      * flight, which is the whole of what "before the commit settles" can mean
      * from out here. A refusal is delivered on that same resolution, before any
-     * Thing is installed, so there is no half-made Thing to take away: what the
+     * Resource is installed, so there is no half-made Resource to take away: what the
      * ticket calls removing a refused creation is the lifecycle leaving none
      * standing, and the sentence below is the half the author can see.
      *
-     * `Space N` is minted from this Space's own Thing titles and handed to both
-     * the Space and the Thing that names it, so the two agree at creation
+     * `Space N` is minted from this Space's own Resource titles and handed to both
+     * the Space and the Resource that names it, so the two agree at creation
      * (`titles.ts`). Referencing an *existing* Space is not this command — it is
-     * the Things list's add-Space row, which lists real Spaces with search.
+     * the Resources list's add-Space row, which lists real Spaces with search.
      */
-    const createSpaceThing = useCallback((): void => {
-      setCreatingSpaceThing(true);
-      setSpaceThingRefusal(null);
+    const createSpaceResource = useCallback((): void => {
+      setCreatingSpaceResource(true);
+      setSpaceResourceRefusal(null);
       void (async () => {
         try {
           const title = nextSpaceTitle(spaceSession.getState().working);
           // Resolved at the press rather than closed over, which is the rule the
           // pane needed for a surface open across renders and this keeps for a
           // gesture whose Edit lands one await later. `create` still refuses
-          // `diagram-not-found` on its own account, against the Diagram the
+          // `map-not-found` on its own account, against the Map the
           // coordinated Edit actually sees.
-          const resolved = resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
-          const result = await spaceThings.create({
+          const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
+          const result = await spaceResources.create({
             containingSpaceId: currentSpace().id,
-            diagramId: resolved.diagram.id,
+            mapId: resolved.map.id,
             title,
             position: centreAnchor(),
           });
           if (result.kind === 'refused') {
-            setSpaceThingRefusal(describeSpaceThingRefusal(result.refusal));
+            setSpaceResourceRefusal(describeSpaceResourceRefusal(result.refusal));
             return;
           }
           // Named rather than narrowed to "not refused": a lifecycle that
-          // changed nothing made no Thing, and continuing at one would name an
+          // changed nothing made no Resource, and continuing at one would name an
           // id nothing draws. Not reachable from `create` today.
           if (result.kind === 'unchanged') return;
-          // The id the lifecycle minted, not the Thing that appeared. Nothing
+          // The id the lifecycle minted, not the Resource that appeared. Nothing
           // prevents a Markdown creation between this press and the installed
-          // Edit — that creation lands synchronously — so "which Thing is new"
-          // answers a different question from "which Thing did this press make",
+          // Edit — that creation lands synchronously — so "which Resource is new"
+          // answers a different question from "which Resource did this press make",
           // and the two disagree exactly when it matters.
           //
           // Nothing bumps the Spaces epoch here: a created Space joins the Meta
           // Space for *every* open Space, so the lifecycle that made it is what
-          // announces it (`space-thing-lifecycle.ts`).
+          // announces it (`space-resource-lifecycle.ts`).
           continuation.request({
-            target: { kind: 'thing', thingId: result.thingId },
+            target: { kind: 'resource', resourceId: result.resourceId },
             select: true,
             then: 'rename',
           });
         } catch (failure) {
           reportBreak(failure);
-          setSpaceThingRefusal(describeSpaceThingCreationBreak(failure));
+          setSpaceResourceRefusal(describeSpaceResourceCreationBreak(failure));
         } finally {
-          setCreatingSpaceThing(false);
+          setCreatingSpaceResource(false);
         }
       })();
     }, [centreAnchor]);
 
-    const selectedDiagram = useMemo(
-      () => resolveDiagram(renderedSpace, selectedDiagramId),
-      [renderedSpace, selectedDiagramId],
+    const selectedMap = useMemo(
+      () => resolveMap(renderedSpace, selectedMapId),
+      [renderedSpace, selectedMapId],
     );
-    // This Diagram's own placement, memoised on `selectedDiagram` alone. A drag
-    // frame does not change `selectedDiagram`'s identity, so it does not change
+    // This Map's own placement, memoised on `selectedMap` alone. A drag
+    // frame does not change `selectedMap`'s identity, so it does not change
     // this either, which is what keeps `usePlacementRendering` below from
     // rebuilding its strategy and re-running layout mid-drag.
-    const diagramPlacement = useMemo(
-      () => Placement.fromDiagram(selectedDiagram.diagram),
-      [selectedDiagram],
-    );
-    // The Things this Diagram places. Memoized on the same two values the Diagram
-    // is: it is the sole dependency of Edge Authoring's Thing-title map and its
+    const mapPlacement = useMemo(() => Placement.fromMap(selectedMap.map), [selectedMap]);
+    // The Resources this Map places. Memoized on the same two values the Map
+    // is: it is the sole dependency of Edge Authoring's Resource-title map and its
     // endpoint choices, and a fresh array per render would rebuild both on every
     // intermediate drag frame — which is the identity churn
     // `edge-authoring-react.tsx` says its commands object must not have.
-    const placedThings = useMemo(
-      () => diagramThings(renderedSpace, selectedDiagram.diagram),
-      [renderedSpace, selectedDiagram],
+    const placedResources = useMemo(
+      () => mapResources(renderedSpace, selectedMap.map),
+      [renderedSpace, selectedMap],
     );
-    // Everything the canvas draws, derived once from the Space and the Diagram.
+    // Everything the canvas draws, derived once from the Space and the Map.
     // Memoized on those two alone: the interaction state below changes far more
     // often, and it is `project` that reads it rather than this.
     const projection = useMemo(
-      () => canvasProjection(renderedSpace, selectedDiagram),
-      [renderedSpace, selectedDiagram],
+      () => canvasProjection(renderedSpace, selectedMap),
+      [renderedSpace, selectedMap],
     );
 
     const { activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     useEffect(() => {
-      thingsDrag.current = null;
-    }, [selectedDiagramId, presenting, authoringState.replacementEpoch]);
-    // There is a Thing to go back to only once a traversal has left its first, and only
+      resourcesDrag.current = null;
+    }, [selectedMapId, presenting, authoringState.replacementEpoch]);
+    // There is a Resource to go back to only once a traversal has left its first, and only
     // presenting has Traversal history at all — the same narrowing the alias above already
     // makes, spent here on the value behind it rather than on the mode.
     const selectBranch = navigation.selectBranch;
-    const activeThingId = navigation.activeThingId();
+    const activeResourceId = navigation.activeResourceId();
     // Derived here rather than in a store selector: the array is rebuilt on every
     // call, so a selector would hand Zustand a new identity each render — a
     // re-render producing a new value producing a re-render, until React gives up.
@@ -601,7 +597,7 @@ export const createApp = (
     // computation and **not** memoized.
     //
     // Navigation reads the session's current working Space. Authoring an Edge from
-    // the Thing being presented leaves the navigation values unchanged, so deriving
+    // the Resource being presented leaves the navigation values unchanged, so deriving
     // moves during render makes the newly authored Edge immediately traversable.
     // A render-time call is not the selector case above — nothing subscribes to
     // this identity, so a fresh array cannot feed a re-render — and the work is a
@@ -610,30 +606,30 @@ export const createApp = (
 
     const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
     const selection = useRenderAdapter((s) => s.selection);
-    const selectedThingId = selectedThingOf(selection);
+    const selectedResourceId = selectedResourceOf(selection);
 
-    const thingsOutsideSelectedDiagram = useMemo(
+    const resourcesOutsideSelectedMap = useMemo(
       () =>
-        renderedSpace.things.filter(
-          (thing) => selectedDiagram.diagram.positions[thing.id] === undefined,
+        renderedSpace.resources.filter(
+          (resource) => selectedMap.map.positions[resource.id] === undefined,
         ),
-      [selectedDiagram, renderedSpace.things],
+      [selectedMap, renderedSpace.resources],
     );
     const liveProjection = useRenderAdapter((s) => s.projection);
     // Reported by the canvas, which is the only place it can be seen: an
-    // embedded Diagram publishes its live edits from inside the React Flow
+    // embedded Map publishes its live edits from inside the React Flow
     // subtree. Read back out of the store the canvas wrote it into, so the
     // answers derived from it reach the command surface and the canvas in one
     // render rather than an effect apart.
-    const editingEmbeddedDiagram = useRenderAdapter((s) => s.editingEmbeddedDiagram);
-    // There are Things on the canvas to interact with once placement resolves
+    const editingEmbeddedMap = useRenderAdapter((s) => s.editingEmbeddedMap);
+    // There are Resources on the canvas to interact with once placement resolves
     // and the store has taken it.
-    const hasThingsOnCanvas = liveProjection !== null;
+    const hasResourcesOnCanvas = liveProjection !== null;
     /**
      * Whether a chrome name is being renamed in place.
      *
      * A boolean where this was a whole draft — subject, text, error and the
-     * surface it began on. The draft existed because a Diagram's name was drawn
+     * surface it began on. The draft existed because a Map's name was drawn
      * **twice**, in a Sidebar row and in the canvas header, and one rename had
      * to be live in both at once and return the caret to whichever began it.
      * The Command Dock draws each name once and `InlineTitleEditor` owns the
@@ -642,14 +638,12 @@ export const createApp = (
      * canvas's own title editing beside it (`authoring-availability.ts`).
      */
     const [editingChromeTitle, setEditingChromeTitle] = useState(false);
-    /** Set when New Diagram's chrome rename continuation actually lands. */
-    const createDiagramMovedCaret = useRef(false);
+    /** Set when New Map's chrome rename continuation actually lands. */
+    const createMapMovedCaret = useRef(false);
     const onChromeContinuationLand = useCallback(() => {
-      createDiagramMovedCaret.current = true;
+      createMapMovedCaret.current = true;
     }, []);
-    const thingIsOpen = Object.values(selectedDiagram.diagram.positions).some(
-      (at) => at?.open === true,
-    );
+    const resourceIsOpen = Object.values(selectedMap.map.positions).some((at) => at?.open === true);
     /**
      * What may be authored right now — one question, answered once, spent by
      * every surface below and by the canvas (`CONTEXT.md`, Availability).
@@ -660,64 +654,64 @@ export const createApp = (
      * and a term added for one of them is added for all of them.
      */
     const availability = authoringAvailability({
-      editable: hasThingsOnCanvas,
+      editable: hasResourcesOnCanvas,
       presenting,
-      editingThingBody,
-      editingThingTitle,
-      thingIsOpen,
+      editingResourceBody,
+      editingResourceTitle,
+      resourceIsOpen,
       editingChromeTitle,
       spaceOnCanvas: active,
-      editingEmbeddedDiagram,
-      creatingSpaceThing,
+      editingEmbeddedMap,
+      creatingSpaceResource,
     });
     // A withdrawn list takes its outstanding request with it. Closing is the
     // Dock's, from the same `disabled` answer that withdraws the trigger; what
     // has to be dropped here is a request that would otherwise reopen the list
-    // the moment authoring came back — presenting and creating a Reference Thing both
+    // the moment authoring came back — presenting and creating a Reference Resource both
     // pass through here, and a list that reopened itself on the way back would
-    // take focus with it, landing the reader in the Things rather than on the
+    // take focus with it, landing the reader in the Resources rather than on the
     // canvas they returned to.
     //
     // Read during render rather than in an effect, like the rename guards below:
     // an effect drops it one frame after the presentation has already started
-    // drawing over it. `thingsView` is `!presenting` and carries nothing derived
+    // drawing over it. `resourcesView` is `!presenting` and carries nothing derived
     // from this value, so clearing it here settles in one pass.
-    if (discloseThings !== null && !availability.thingsView) setDiscloseThings(null);
-    // Reveals the list once per (Diagram, address) rather than on every
+    if (discloseResources !== null && !availability.resourcesView) setDiscloseResources(null);
+    // Reveals the list once per (Map, address) rather than on every
     // dependency change: an unrelated edit elsewhere in the Space still
-    // recomputes `thingsOutsideSelectedDiagram` with a fresh array identity, and
+    // recomputes `resourcesOutsideSelectedMap` with a fresh array identity, and
     // re-running on that alone would reopen a list the reader just closed.
-    // The Diagram is part of the key, not just the Thing id — a canonical Thing
-    // link addresses no Diagram of its own, so the same Thing can be
-    // revealed once in one Diagram and then adopt a different default Diagram
+    // The Map is part of the key, not just the Resource id — a canonical Resource
+    // link addresses no Map of its own, so the same Resource can be
+    // revealed once in one Map and then adopt a different default Map
     // that omits it, and that is a second reveal rather than a repeat.
     const [revealedAddress, setRevealedAddress] = useState<{
-      readonly diagramId: DiagramId;
-      readonly thingId: ThingId;
+      readonly mapId: MapId;
+      readonly resourceId: ResourceId;
     } | null>(null);
-    if (addressedThingId === null) {
-      // Only a real navigation clears the address — choosing a Diagram,
-      // activating a Graph, or restoring a destination that names no Thing — so
+    if (addressedResourceId === null) {
+      // Only a real navigation clears the address — choosing a Map,
+      // activating a Graph, or restoring a destination that names no Resource — so
       // leaving it is the reader moving on rather than the incidental
       // recomputation this guard absorbs. Arriving back at the same address
       // afterwards is a fresh reveal, not the repeat being suppressed.
       if (revealedAddress !== null) setRevealedAddress(null);
     } else if (
-      revealedAddress?.diagramId !== selectedDiagramId ||
-      revealedAddress.thingId !== addressedThingId
+      revealedAddress?.mapId !== selectedMapId ||
+      revealedAddress.resourceId !== addressedResourceId
     ) {
-      setRevealedAddress({ diagramId: selectedDiagramId, thingId: addressedThingId });
-      if (thingsOutsideSelectedDiagram.some(({ id }) => id === addressedThingId)) {
-        setDiscloseThings({ thingId: addressedThingId });
+      setRevealedAddress({ mapId: selectedMapId, resourceId: addressedResourceId });
+      if (resourcesOutsideSelectedMap.some(({ id }) => id === addressedResourceId)) {
+        setDiscloseResources({ resourceId: addressedResourceId });
       }
     }
     const placement = usePlacementRendering(
       projection.strategyGraph,
-      resizeDraft?.placement ?? diagramPlacement,
+      resizeDraft?.placement ?? mapPlacement,
     );
     const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
 
-    // Nothing is worth projecting before a strategy resolves — every thing would
+    // Nothing is worth projecting before a strategy resolves — every resource would
     // sit at the origin — and `project` will not take a null `LayoutStrategyGraph`,
     // so this is the whole of that gate rather than a rule the sync effect
     // remembers.
@@ -727,15 +721,15 @@ export const createApp = (
           ? null
           : projection.project(laidOut, {
               activeGraphId,
-              activeThingId,
-              selectedThingId,
+              activeResourceId,
+              selectedResourceId,
               presenting,
             }),
-      [projection, laidOut, activeGraphId, activeThingId, selectedThingId, presenting],
+      [projection, laidOut, activeGraphId, activeResourceId, selectedResourceId, presenting],
     );
 
     // Hand the complete projection to the render adapter as one state change.
-    // A Thing keeps its live position, measured size and drag state, while an Edge
+    // A Resource keeps its live position, measured size and drag state, while an Edge
     // can never become visible before the endpoint nodes declare its handles.
     const syncProjection = useRenderAdapter((s) => s.syncProjection);
     useEffect(() => {
@@ -744,29 +738,29 @@ export const createApp = (
 
     const changeNodes = useRenderAdapter((s) => s.changeNodes);
     const changeEdges = useRenderAdapter((s) => s.changeEdges);
-    const thingResize = useRenderAdapter((s) => s.thingResize);
-    const reportEmbeddedDiagramEditing = useRenderAdapter((s) => s.reportEmbeddedDiagramEditing);
-    const canvas = canvasContent(placement, hasThingsOnCanvas);
-    // Every standing refusal is about the Diagram that was selected when it was
-    // refused — the Edit New Diagram would have made, the Rename or Delete on
-    // the one it named, the Graph Edit inside it, the Thing it would not remove
-    // from it. None of them says anything about the Diagram the reader has moved
+    const resourceResize = useRenderAdapter((s) => s.resourceResize);
+    const reportEmbeddedMapEditing = useRenderAdapter((s) => s.reportEmbeddedMapEditing);
+    const canvas = canvasContent(placement, hasResourcesOnCanvas);
+    // Every standing refusal is about the Map that was selected when it was
+    // refused — the Edit New Map would have made, the Rename or Delete on
+    // the one it named, the Graph Edit inside it, the Resource it would not remove
+    // from it. None of them says anything about the Map the reader has moved
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Thing deletion refusal was outside this and cleared only when the next
-    // Delete Thing was armed, so a refused deletion stayed pinned to the shell
-    // through Diagram switches and unrelated Edits until someone pressed Delete
+    // The Resource deletion refusal was outside this and cleared only when the next
+    // Delete Resource was armed, so a refused deletion stayed pinned to the shell
+    // through Map switches and unrelated Edits until someone pressed Delete
     // again.
-    const [refusedUnder, setRefusedUnder] = useState(selectedDiagramId);
-    if (refusedUnder !== selectedDiagramId) {
-      setRefusedUnder(selectedDiagramId);
-      setCreateDiagramRefusal(null);
-      setDiagramManagementRefusal(null);
-      setDiagramDeleteMessage(null);
+    const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
+    if (refusedUnder !== selectedMapId) {
+      setRefusedUnder(selectedMapId);
+      setCreateMapRefusal(null);
+      setMapManagementRefusal(null);
+      setMapDeleteMessage(null);
       setGraphRefusal(null);
       setGraphDeleteMessage(null);
-      thingDeletion.dismissRefusal();
+      resourceDeletion.dismissRefusal();
     }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
@@ -774,7 +768,7 @@ export const createApp = (
      *
      * An effect runs after the render it reacts to, so each of these drew one
      * frame of a rename that had already stopped being available — an editor
-     * over a Diagram the reader has left, or over a Space that was replaced under
+     * over a Map the reader has left, or over a Space that was replaced under
      * them. The Dock's rename slot reads the same two facts the same way and
      * for the same reason (`useDockRenaming` in `components/CommandDock.tsx`),
      * so the surface and the composition agree about when a draft ends.
@@ -788,11 +782,11 @@ export const createApp = (
      * so the remount does not reach it.
      *
      * **This clears the report and not the editor** — the two are different
-     * things and reading them as one is what left the defect. The editor is the
+     * resources and reading them as one is what left the defect. The editor is the
      * bar's own rename slot, so the epoch is *also* handed to the Dock
      * (`replacementEpoch` below) and the slot ends the rename on it. What
-     * this branch still owes is that the withdrawal it drives — Create Thing,
-     * Present, Delete Thing, the canvas's own title editing — comes back in the
+     * this branch still owes is that the withdrawal it drives — Create Resource,
+     * Present, Delete Resource, the canvas's own title editing — comes back in the
      * same render as the replacement rather than on the commit after, when the
      * name control's effect cleanup would otherwise report it.
      */
@@ -810,12 +804,12 @@ export const createApp = (
      * The editor is `InlineTitleEditor`, mounted by the Dock's own name control,
      * and it holds a refused draft open and editable — so this returns the
      * refusal's sentence rather than swallowing it, and `null` for an Edit that
-     * landed. `unchanged` is `null` too: renaming a Diagram to the title it
+     * landed. `unchanged` is `null` too: renaming a Map to the title it
      * already has is the value the author already authored, and closing the
      * editor is the right answer to it (`space-authoring.ts`).
      *
      * **Three subjects through one seam, not three seams.** The Space joined the
-     * Diagram and the Graph here rather than beside them, because every part of
+     * Map and the Graph here rather than beside them, because every part of
      * this that is worth writing down is the same for all three: which Edit the
      * name completes is the only difference, and the answer — a sentence or
      * `null` — is what the editor spends. A second callback for the Space would
@@ -830,8 +824,8 @@ export const createApp = (
             ? // No id: the Edit writes `document.title` on the session this
               // composition is closed over, which is the Space the Dock draws.
               authoring.complete({ kind: 'renamed-space', title })
-            : subject.kind === 'diagram'
-              ? authoring.complete({ kind: 'renamed-diagram', diagramId: subject.id, title })
+            : subject.kind === 'map'
+              ? authoring.complete({ kind: 'renamed-map', mapId: subject.id, title })
               : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
@@ -841,31 +835,31 @@ export const createApp = (
     /**
      * **Stable, and the churn it replaced was paying for nothing.**
      *
-     * `thingRailActions` below hangs off this and is a dependency of the
-     * node-decoration memo in `canvas-thing-authoring.ts`, so a fresh builder
-     * rebuilt every node object, re-rendered every `ThingNode` and ran
-     * `spaceEntityActions` once per Thing on every render of this component.
+     * `resourceRailActions` below hangs off this and is a dependency of the
+     * node-decoration memo in `canvas-resource-authoring.ts`, so a fresh builder
+     * rebuilt every node object, re-rendered every `ResourceNode` and ran
+     * `spaceEntityActions` once per Resource on every render of this component.
      *
      * **What used to stand here was hearsay, and it did not reproduce.** The
-     * comment claimed that memoizing these builders makes six embedded-Diagram
+     * comment claimed that memoizing these builders makes six embedded-Map
      * tests stop drawing their target at all, and that the decoration memo's
      * dependency list is therefore incomplete. Neither half survived being
      * checked (`.scratch/command-dock/issues/14`). The audit stabilised these
      * three builders two ways — exhaustive dependencies, and then `[]` with the
      * state read live, so the identities are constant for the component's whole
      * life — and ran the app suite serially both times: 895 tests pass, the
-     * sixteen in `space-thing-embedded-diagram.test.tsx` among them. The six
+     * sixteen in `space-resource-embedded-map.test.tsx` among them. The six
      * failures were timeouts on a machine running several suites at once, where
      * the *unmodified* tree failed twelve.
      *
      * Two facts make the claim structurally impossible as well as unobserved.
      * Every identifier the decoration memo reads is in its dependency list, and
      * the one input whose contents can change behind a stable identity —
-     * `spaceThingTargets`, which reads another Space live — is refreshed at its
+     * `spaceResourceTargets`, which reads another Space live — is refreshed at its
      * source, `open-spaces.ts` minting a fresh `entries` array on every session
-     * change of every open Space. And an embedded Diagram never receives this
-     * builder at all: `EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring`
-     * without `thingEntityActions`, so the one arm of the decoration that reads
+     * change of every open Space. And an embedded Map never receives this
+     * builder at all: `EmbeddedMapAuthoring` calls `useCanvasResourceAuthoring`
+     * without `resourceEntityActions`, so the one arm of the decoration that reads
      * this identity is the one arm its nodes do not have. (It runs the rest of
      * that memo like any other canvas and publishes the decorated nodes — what
      * it lacks is the commands, not the decoration.)
@@ -891,27 +885,27 @@ export const createApp = (
           spaceTitle: renderedSpace.title,
           onCopy: copyProductDestination,
           onOpenIndependently: openProductDestination,
-          // No Rename item: the Dock renames a Diagram and a Graph from Rename
+          // No Rename item: the Dock renames a Map and a Graph from Rename
           // in that identity's own list, so a row here would be a second path
-          // to one command. The Thing rail is this builder's other consumer and
-          // a Thing has no rename here either — its title is renamed in place
+          // to one command. The Resource rail is this builder's other consumer and
+          // a Resource has no rename here either — its title is renamed in place
           // on the canvas.
           onRename: null,
-          onDeleteDiagram: availability.entityEdits
-            ? async (diagramId) => {
-                const result = await coordinatedDiagramDelete(spaceThings.deleteDiagram, {
+          onDeleteMap: availability.entityEdits
+            ? async (mapId) => {
+                const result = await coordinatedMapDelete(spaceResources.deleteMap, {
                   targetSpaceId: renderedSpace.id,
-                  diagramId,
-                  preferredDiagramId: null,
+                  mapId,
+                  preferredMapId: null,
                 });
-                setDiagramManagementRefusal(null);
-                setDiagramDeleteMessage(null);
+                setMapManagementRefusal(null);
+                setMapDeleteMessage(null);
                 if (result.kind === 'error') {
-                  setDiagramDeleteMessage(result.message);
+                  setMapDeleteMessage(result.message);
                   return false;
                 }
                 if (result.kind === 'completed') {
-                  navigation.selectDiagram(result.diagramId);
+                  navigation.selectMap(result.mapId);
                   navigation.activateGraph(result.graphId);
                 }
                 return coordinatedDeleteOk(result);
@@ -919,8 +913,8 @@ export const createApp = (
             : null,
         }),
       // `authoring` is the composition's, closed over rather than rendered, so it
-      // is not a dependency a render can move. `thingDeletion` says the same of
-      // `spaceThings`.
+      // is not a dependency a render can move. `resourceDeletion` says the same of
+      // `spaceResources`.
       [
         renderedSpace.id,
         renderedSpace.title,
@@ -931,68 +925,68 @@ export const createApp = (
     );
 
     /**
-     * What a Thing's own rail offers (ADR 0073): the addresses every Thing has,
+     * What a Resource's own rail offers (ADR 0073): the addresses every Resource has,
      * and the deletion that used to be reachable only from the Space's command
      * surface.
      *
      * The addresses are `spaceEntityActions`' answer and nothing else — the
-     * same menu the Space's surface builds for the same entity, so the Thing's
-     * two links cannot come to mean different things on the two surfaces. What
-     * is appended here is the one command that is a Thing's own rather than an
-     * address: a Thing's deletion belongs to the Thing, and the Space's surface is
-     * where it was only because the Thing had no menu of its own.
+     * same menu the Space's surface builds for the same entity, so the Resource's
+     * two links cannot come to mean different resources on the two surfaces. What
+     * is appended here is the one command that is a Resource's own rather than an
+     * address: a Resource's deletion belongs to the Resource, and the Space's surface is
+     * where it was only because the Resource had no menu of its own.
      *
-     * A Thing the drawing Diagram does not place still has commands — its own
-     * permanent address — so nothing here reads `diagram.positions`; which
-     * addresses exist is decided from the Diagram by the builder above.
+     * A Resource the drawing Map does not place still has commands — its own
+     * permanent address — so nothing here reads `map.positions`; which
+     * addresses exist is decided from the Map by the builder above.
      */
     /**
-     * Create Reference, from the Thing it points at (ADR 0089).
+     * Create Reference, from the Resource it points at (ADR 0089).
      *
      * **The gesture supplies the Target, so nothing is chosen first.** An author
-     * creating a Reference Thing is looking at the Thing they want to reference, which is why
-     * this is a row on that Thing's own command menu rather than a peer in the
+     * creating a Reference Resource is looking at the Resource they want to reference, which is why
+     * this is a row on that Resource's own command menu rather than a peer in the
      * Dock — a Target picker was answering a question the press had already
      * answered.
      *
      * **The Title is the Target's, copied once** and independent thereafter.
-     * ADR 0083 keeps the Target's name off the Thing front, so without this the
-     * author has no on-canvas indication of what the Reference Thing points at beyond the
+     * ADR 0083 keeps the Target's name off the Resource front, so without this the
+     * author has no on-canvas indication of what the Reference Resource points at beyond the
      * dotted border; copying it once keeps the two the ordinary two stored
      * values that agree at creation and diverge freely, which is the rule the
-     * Space and Space Thing pair already follows. Titles need not be unique.
+     * Space and Space Resource pair already follows. Titles need not be unique.
      *
-     * **Placement is a fixed offset from the source**, so the Reference Thing lands where
+     * **Placement is a fixed offset from the source**, so the Reference Resource lands where
      * the author is looking. A free-position search would be a placement
      * algorithm, and ADR 0086 put automatic arrangement behind an Edit and out
      * of the render path deliberately — the overlap is authored and the author
-     * drags it off. A Thing this Diagram does not place has no offset to take,
-     * so its Reference Thing lands at the visible centre like any other creation.
+     * drags it off. A Resource this Map does not place has no offset to take,
+     * so its Reference Resource lands at the visible centre like any other creation.
      *
-     * **The offset leaves the Reference Thing clear of the Target after Close.**
-     * An Open Target holds room that Close reclaims from every Thing clear of it
+     * **The offset leaves the Reference Resource clear of the Target after Close.**
+     * An Open Target holds room that Close reclaims from every Resource clear of it
      * (ADR 0084). Placement adds the growth to the collapsed offset and, when the
      * Target is Open, stays at or past the collapsed rect so Close reclaims the
-     * width alone (ADR 0093). `thing-rail-actions.test.tsx` holds that the
-     * Reference Thing stays separated after Close.
+     * width alone (ADR 0093). `resource-rail-actions.test.tsx` holds that the
+     * Reference Resource stays separated after Close.
      */
     const createReferenceFrom = useCallback(
-      (thing: Thing): EntityActionOutcome => {
-        const at = selectedDiagram.diagram.positions[thing.id];
+      (resource: Resource): EntityActionOutcome => {
+        const at = selectedMap.map.positions[resource.id];
         const growth = at?.open === true ? Placement.growth(at.openSize) : { width: 0, height: 0 };
-        const across = growth.width + Math.round(THING_WIDTH * REFERENCE_OFFSET_RATIO);
-        const down = growth.height + Math.round(THING_HEIGHT * REFERENCE_OFFSET_RATIO);
+        const across = growth.width + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO);
+        const down = growth.height + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO);
         const anchor =
           at === undefined
             ? centreAnchor()
             : {
-                x: at.x + (at.open ? Math.max(THING_WIDTH, across) : across),
-                y: at.y + (at.open ? Math.max(THING_HEIGHT, down) : down),
+                x: at.x + (at.open ? Math.max(RESOURCE_WIDTH, across) : across),
+                y: at.y + (at.open ? Math.max(RESOURCE_HEIGHT, down) : down),
               };
         const created = authoring.complete({
           kind: 'created-reference',
-          target: thing.id,
-          title: thing.title,
+          target: resource.id,
+          title: resource.title,
           anchor,
         });
         // Each arm named rather than narrowed in one comparison, so the compiler
@@ -1011,27 +1005,27 @@ export const createApp = (
         setReferenceRefusal(null);
         if (created.kind === 'queued') return 'done';
         if (created.kind === 'unchanged') return 'done';
-        if (created.createdThingId === undefined) return 'done';
+        if (created.createdResourceId === undefined) return 'done';
         continuation.request({
-          target: { kind: 'thing', thingId: created.createdThingId },
+          target: { kind: 'resource', resourceId: created.createdResourceId },
           select: true,
           then: 'rename',
         });
         return 'done';
       },
-      [selectedDiagram.diagram, centreAnchor],
+      [selectedMap.map, centreAnchor],
     );
 
-    const enterSpaceThing = useCallback(
-      (thingId: ThingId) => {
+    const enterSpaceResource = useCallback(
+      (resourceId: ResourceId) => {
         if (spaces === null) return;
-        const thing = renderedSpace.lookup.thing(thingId);
-        if (thing?.kind !== 'space') return;
-        const title = titleName(thing.title);
+        const resource = renderedSpace.lookup.resource(resourceId);
+        if (resource?.kind !== 'space') return;
+        const title = titleName(resource.title);
         setSpaceCommandBreak(null);
         void (async () => {
           try {
-            await spaces.enter(thing.spaceId, thing.diagram, thing.graph, thing.framing);
+            await spaces.enter(resource.spaceId, resource.map, resource.graph, resource.framing);
           } catch (failure) {
             reportBreak(failure);
             setSpaceCommandBreak(`${title} could not be entered.`);
@@ -1041,84 +1035,84 @@ export const createApp = (
       [spaces, renderedSpace],
     );
 
-    const thingRailActions = useCallback(
-      (thingId: ThingId): readonly EntityActionGroup[] => {
-        const thing = renderedSpace.lookup.thing(thingId);
-        // A node the projection is still drawing for a Thing the working Space no
+    const resourceRailActions = useCallback(
+      (resourceId: ResourceId): readonly EntityActionGroup[] => {
+        const resource = renderedSpace.lookup.resource(resourceId);
+        // A node the projection is still drawing for a Resource the working Space no
         // longer has. No commands rather than commands that name nothing.
-        if (thing === undefined) return [];
-        const addresses = entityActions({ kind: 'thing', thing, diagram: selectedDiagram.diagram });
+        if (resource === undefined) return [];
+        const addresses = entityActions({ kind: 'resource', resource, map: selectedMap.map });
         const terminal =
-          thing.kind === 'reference' ? 'A Reference Thing cannot be referenced.' : null;
-        const reference: readonly EntityActionGroup[] = availability.addThing
+          resource.kind === 'reference' ? 'A Reference Resource cannot be referenced.' : null;
+        const reference: readonly EntityActionGroup[] = availability.addResource
           ? [
               [
                 {
                   id: 'create-reference',
                   // "Create Reference", matching the vocabulary the other creations
-                  // use. `Create Reference of <title>` is the shape `Delete Thing`
-                  // already rejected, the menu being named for its Thing.
+                  // use. `Create Reference of <title>` is the shape `Delete Resource`
+                  // already rejected, the menu being named for its Resource.
                   label: 'Create Reference',
                   disabled: terminal !== null,
                   description: terminal ?? undefined,
-                  icon: <ThingKindIcon kind="reference" decorative />,
+                  icon: <ResourceKindIcon kind="reference" decorative />,
                   // **No `report`, and that is what closes the menu.** A
                   // reporting item is held open to show its word
                   // (`EntityActionsMenu`), and this command puts the caret in
-                  // the new Reference Thing's Title editor on the canvas — so the menu it
+                  // the new Reference Resource's Title editor on the canvas — so the menu it
                   // was pressed in stayed up with its Base UI backdrop
                   // intercepting every pointer event, over an editor the author
-                  // could not click into. The creation says itself: a Thing
+                  // could not click into. The creation says itself: a Resource
                   // appears with the caret in it. A refusal has nowhere to
                   // report in a menu that has gone, so it takes the standing
                   // notice below, which is where ADR 0089 puts the outcome of a
                   // creation that completes on activation.
-                  onSelect: () => createReferenceFrom(thing),
+                  onSelect: () => createReferenceFrom(resource),
                 },
               ],
             ]
           : [];
         /**
-         * Remove from Diagram is the canvas key's availability, not Delete
-         * Thing's. Delete is withdrawn while a Thing is Open so Open state
-         * cannot outlive the Thing; Remove reclaims that room and stays
-         * offered — `thing-rail-actions.test.tsx` (`still offers Remove from
-         * Diagram while the Thing is Open`).
+         * Remove from Map is the canvas key's availability, not Delete
+         * Resource's. Delete is withdrawn while a Resource is Open so Open state
+         * cannot outlive the Resource; Remove reclaims that room and stays
+         * offered — `resource-rail-actions.test.tsx` (`still offers Remove from
+         * Map while the Resource is Open`).
          */
-        const canRemoveFromDiagram = availability.authorOnCanvas && !editingThingBody;
+        const canRemoveFromMap = availability.authorOnCanvas && !editingResourceBody;
         const leaving: EntityActionGroup = [
-          ...(canRemoveFromDiagram
+          ...(canRemoveFromMap
             ? [
                 {
-                  id: 'remove-from-diagram',
-                  label: 'Remove from Diagram',
-                  icon: <RemoveFromDiagramIcon />,
+                  id: 'remove-from-map',
+                  label: 'Remove from Map',
+                  icon: <RemoveFromMapIcon />,
                   onSelect: (): EntityActionOutcome => {
                     const result = authoring.complete({
-                      kind: 'removed-thing-from-diagram',
-                      thingId: thing.id,
+                      kind: 'removed-resource-from-map',
+                      resourceId: resource.id,
                     });
                     if (result.kind === 'refused') {
-                      thingDeletion.reportRefusal(describeAuthoringRefusal(result.refusal));
+                      resourceDeletion.reportRefusal(describeAuthoringRefusal(result.refusal));
                     }
                     return 'done';
                   },
                 },
               ]
             : []),
-          ...(availability.deleteThing
+          ...(availability.deleteResource
             ? [
                 {
-                  id: 'delete-thing',
+                  id: 'delete-resource',
                   // "Delete from Space", not "Delete from Space <title>": the menu
-                  // that draws this item is already named for the Thing it belongs
-                  // to, and the Diagram menu's own destructive command is spelled
+                  // that draws this item is already named for the Resource it belongs
+                  // to, and the Map menu's own destructive command is spelled
                   // the same way.
                   label: 'Delete from Space',
                   icon: <DeleteIcon />,
                   variant: 'destructive' as const,
-                  // **It asks, and the confirmation runs it.** Deleting a Thing is
-                  // not undoable in V1, and deleting a Space Thing can take the Space
+                  // **It asks, and the confirmation runs it.** Deleting a Resource is
+                  // not undoable in V1, and deleting a Space Resource can take the Space
                   // it references and every Space below it that nothing else
                   // references (ADR 0074) — so the command that used to sit behind
                   // the Sidebar's own `AlertDialog` keeps one. The dialog is drawn
@@ -1129,22 +1123,22 @@ export const createApp = (
                   // **And it carries no `report`.** An item that names words has
                   // its menu held open and its label swapped to the word its
                   // outcome picks — machinery for a command that *runs* on the
-                  // press. This one raises a question, so `done` said "Thing deleted"
+                  // press. This one raises a question, so `done` said "Resource deleted"
                   // beside a dialog still asking whether to, and announced it to a
                   // reader who might then press Cancel. What the deletion did is the
                   // canvas's to report; why it did not is the confirmation's, which
                   // prints it into the shell's standing notice.
                   onSelect: (): EntityActionOutcome => {
-                    thingDeletion.arm(thing);
+                    resourceDeletion.arm(resource);
                     return 'done';
                   },
                 },
               ]
             : []),
         ];
-        if (thing.kind === 'space') {
-          // The Title edits in place on the Thing front; this menu authors
-          // neither the Thing's name nor the target Space's.
+        if (resource.kind === 'space') {
+          // The Title edits in place on the Resource front; this menu authors
+          // neither the Resource's name nor the target Space's.
           const links = addresses.flat();
           const enter: EntityActionGroup =
             spaces === null
@@ -1155,7 +1149,7 @@ export const createApp = (
                     label: 'Enter',
                     icon: <EnterSpaceIcon />,
                     onSelect: () => {
-                      enterSpaceThing(thing.id);
+                      enterSpaceResource(resource.id);
                       return 'done';
                     },
                   },
@@ -1164,41 +1158,41 @@ export const createApp = (
             reference.flat(),
             [...enter, ...links.filter((action) => action.id === 'open-independently')],
             links.filter((action) => action.id !== 'open-independently'),
-            // `leaving` already holds only `remove-from-diagram` and
-            // `delete-thing`, whichever of the two is available, so it is
+            // `leaving` already holds only `remove-from-map` and
+            // `delete-resource`, whichever of the two is available, so it is
             // passed through rather than filtered a second time.
             leaving,
           ];
         }
         // Create Reference leads (`.scratch/dock-menu-reorganisation/issues/03`):
         // creation, then its addresses together, then the two commands that
-        // leave the Thing behind — Remove from Diagram and Delete from Space
+        // leave the Resource behind — Remove from Map and Delete from Space
         // sharing the trailing destructive group.
         return [...reference, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
       },
       [
         renderedSpace,
         entityActions,
-        selectedDiagram.diagram,
-        availability.addThing,
+        selectedMap.map,
+        availability.addResource,
         availability.authorOnCanvas,
-        availability.deleteThing,
-        editingThingBody,
+        availability.deleteResource,
+        editingResourceBody,
         createReferenceFrom,
         spaces,
-        enterSpaceThing,
+        enterSpaceResource,
       ],
     );
 
     /**
-     * Choosing a Diagram, including the one already drawing.
+     * Choosing a Map, including the one already drawing.
      *
      * One act now. Discarding the chrome title draft used to be paired with it,
      * because the draft was the application's and outlived the control it was
-     * begun from; the Dock's editor is the control, so choosing another Diagram
+     * begun from; the Dock's editor is the control, so choosing another Map
      * unmounts it and there is nothing here to discard.
      */
-    const selectDiagram = browserLocation.chooseDiagram;
+    const selectMap = browserLocation.chooseMap;
 
     const present = navigation.present;
     const advance = navigation.advance;
@@ -1222,10 +1216,10 @@ export const createApp = (
     }, [sessionState.persistence.kind]);
 
     // The two selection writes the canvas makes that are not React Flow's own —
-    // continuing at a connected Thing, and the focus-to-selection bridge for an
+    // continuing at a connected Resource, and the focus-to-selection bridge for an
     // Edge. Both are plain store writes with nothing to decide.
-    const selectThing = useCallback((thingId: ThingId) => {
-      useRenderAdapter.getState().selectThing(thingId);
+    const selectResource = useCallback((resourceId: ResourceId) => {
+      useRenderAdapter.getState().selectResource(resourceId);
     }, []);
 
     const selectEdge = useCallback((subject: EdgeSubject) => {
@@ -1235,28 +1229,28 @@ export const createApp = (
     /**
      * The refusal goes back to the caller, and only the caller can place it.
      *
-     * Both `added-thing-to-diagram` outcomes this can produce
-     * (`thing-already-in-diagram`, `thing-not-found`) mean the Thing just left
-     * `thingsOutsideSelectedDiagram`, so the row the reader activated is already
+     * Both `added-resource-to-map` outcomes this can produce
+     * (`resource-already-in-map`, `resource-not-found`) mean the Resource just left
+     * `resourcesOutsideSelectedMap`, so the row the reader activated is already
      * gone. The drawer is still on screen though, and it is the surface that
      * asked — so it keeps the sentence, in the `Alert` above its list.
      *
-     * `dropExistingThing` below discards the same string on purpose: a drop
-     * ends on the canvas, and by then the drawer that named the Thing may be
+     * `dropExistingResource` below discards the same string on purpose: a drop
+     * ends on the canvas, and by then the drawer that named the Resource may be
      * dismissed, leaving nowhere the sentence belongs.
      */
-    const addExistingThing = useCallback(
-      (thingId: ThingId, anchor: DiagramPosition, focus: boolean): string | null => {
-        const result = authoring.complete({ kind: 'added-thing-to-diagram', thingId, anchor });
+    const addExistingResource = useCallback(
+      (resourceId: ResourceId, anchor: MapPosition, focus: boolean): string | null => {
+        const result = authoring.complete({ kind: 'added-resource-to-map', resourceId, anchor });
         if (result.kind === 'refused') return describeAuthoringRefusal(result.refusal);
         if (result.kind !== 'completed') return null;
-        useRenderAdapter.getState().selectThing(thingId);
-        // The Thing is not drawn yet — the projection carrying this Edit arrives
+        useRenderAdapter.getState().selectResource(resourceId);
+        // The Resource is not drawn yet — the projection carrying this Edit arrives
         // a strategy later — so the continuation waits for it rather than this
         // component polling the live projection, which is what it used to do.
         if (focus) {
           continuation.request({
-            target: { kind: 'thing', thingId },
+            target: { kind: 'resource', resourceId },
             select: false,
             then: 'focus',
           });
@@ -1266,67 +1260,67 @@ export const createApp = (
       [],
     );
 
-    const dropExistingThing = useCallback(
-      (thingId: ThingId, anchor: DiagramPosition): void => {
-        const drag = thingsDrag.current;
-        thingsDrag.current = null;
-        if (drag?.thingId !== thingId || drag.diagramId !== selectedDiagramId) return;
-        addExistingThing(thingId, anchor, false);
+    const dropExistingResource = useCallback(
+      (resourceId: ResourceId, anchor: MapPosition): void => {
+        const drag = resourcesDrag.current;
+        resourcesDrag.current = null;
+        if (drag?.resourceId !== resourceId || drag.mapId !== selectedMapId) return;
+        addExistingResource(resourceId, anchor, false);
       },
-      [addExistingThing, selectedDiagramId],
+      [addExistingResource, selectedMapId],
     );
 
     /**
-     * Add Thing: one completed Edit, and then the naming continuation.
+     * Add Resource: one completed Edit, and then the naming continuation.
      *
      * **This is the one operation whose refusal no surface shows, and that is a
      * decision rather than an oversight.** A refusal carries a sentence for the
      * author (ADR 0042), which is worth showing exactly where the author can act
      * on it. Every other creation has somewhere: `createReferenceFrom` and
-     * `createSpaceThing` both complete on activation and both close or leave the
+     * `createSpaceResource` both complete on activation and both close or leave the
      * surface that ran them, so each reports through a standing notice on the
-     * Space chrome. Add Thing takes no input at all, cannot refuse against a
+     * Space chrome. Add Resource takes no input at all, cannot refuse against a
      * choice the author made, and leaves nothing standing that a sentence could
      * correct — so it has nothing to say and no field to say it on.
      *
-     * The toolbar remains available for an empty authored Diagram: it is the
-     * zero-Thing Space's way to create the first Thing. Canvas-local authoring is
-     * still gated on a resolved placement — `hasThingsOnCanvas`, which reaches
+     * The toolbar remains available for an empty authored Map: it is the
+     * zero-Resource Space's way to create the first Resource. Canvas-local authoring is
+     * still gated on a resolved placement — `hasResourcesOnCanvas`, which reaches
      * the canvas as `availability.authorOnCanvas` — because there is no
-     * projected node surface to receive its shortcut until that first Thing
+     * projected node surface to receive its shortcut until that first Resource
      * exists.
      *
      * What that argument does *not* license is a catch-all, so each outcome is
-     * named below. If Add Thing ever grows an input — a kind, a title, a
+     * named below. If Add Resource ever grows an input — a kind, a title, a
      * placement mode — it grows a surface with it, and the refusal goes there.
      */
-    const addThing = useCallback(() => {
-      const created = authoring.complete({ kind: 'created-thing', anchor: centreAnchor() });
+    const addResource = useCallback(() => {
+      const created = authoring.complete({ kind: 'created-resource', anchor: centreAnchor() });
       // Each outcome named rather than caught. `refused` is the paragraph
       // above. `queued` is an Edit that will still be performed, whose
-      // projection draws the Thing without help from here. `unchanged` this
+      // projection draws the Resource without help from here. `unchanged` this
       // operation cannot answer — it mints unconditionally — but the shared
       // completion union carries it, so it is narrowed rather than asserted
       // away, and the day one of these grows an answer the compiler asks here.
       if (created.kind === 'refused') return;
       if (created.kind === 'queued') return;
       if (created.kind === 'unchanged') return;
-      if (created.createdThingId === undefined) return;
-      // Selected as well as named: the storyboard's created Thing is the selected
-      // one, so continued authoring — a connection, a second Thing — carries on
+      if (created.createdResourceId === undefined) return;
+      // Selected as well as named: the storyboard's created Resource is the selected
+      // one, so continued authoring — a connection, a second Resource — carries on
       // from it. Both are the one continuation, spent when the projection that
-      // draws the Thing arrives.
+      // draws the Resource arrives.
       continuation.request({
-        target: { kind: 'thing', thingId: created.createdThingId },
+        target: { kind: 'resource', resourceId: created.createdResourceId },
         select: true,
         then: 'rename',
       });
     }, [centreAnchor]);
 
     /**
-     * The Thing whose inline Title editor a creation opens.
+     * The Resource whose inline Title editor a creation opens.
      *
-     * `rename` reaches `CanvasThing` as a prop rather than through the module:
+     * `rename` reaches `CanvasResource` as a prop rather than through the module:
      * `@project/ui` owns that editor and depends only on `core`, so it cannot
      * import this — and it should not. A component refocusing its own control
      * after its own edit is genuine locality.
@@ -1336,25 +1330,31 @@ export const createApp = (
       continuation.getState,
     ).pending;
     const nameOnCreation =
-      pendingContinuation?.then === 'rename' && pendingContinuation.target.kind === 'thing'
-        ? pendingContinuation.target.thingId
+      pendingContinuation?.then === 'rename' && pendingContinuation.target.kind === 'resource'
+        ? pendingContinuation.target.resourceId
         : null;
 
     // Scans every title in the Space, so it must not re-run on every drag
     // frame — `projection` (and this component) re-renders on each
     // intermediate drag position, but `sessionState.working` only changes on
     // a completed Edit.
-    const newThingTitle = useMemo(
-      () => nextThingTitle(sessionState.working),
+    const newResourceTitle = useMemo(
+      () => nextResourceTitle(sessionState.working),
       [sessionState.working],
     );
-    // One read per set of referenced Spaces, shared by the canvas and the Things
-    // collection so a Space Thing names the same Space wherever it is drawn.
-    const readSpaceThingTarget = useCallback((spaceId: UUID) => spaceThings.target(spaceId), []);
-    const spaceThingTargets = useSpaceThingTargets(renderedSpace.things, readSpaceThingTarget);
+    // One read per set of referenced Spaces, shared by the canvas and the Resources
+    // collection so a Space Resource names the same Space wherever it is drawn.
+    const readSpaceResourceTarget = useCallback(
+      (spaceId: UUID) => spaceResources.target(spaceId),
+      [],
+    );
+    const spaceResourceTargets = useSpaceResourceTargets(
+      renderedSpace.resources,
+      readSpaceResourceTarget,
+    );
     const spaceTitleById = useMemo(
-      () => new Map([...spaceThingTargets].map(([id, target]) => [id, target.title])),
-      [spaceThingTargets],
+      () => new Map([...spaceResourceTargets].map(([id, target]) => [id, target.title])),
+      [spaceResourceTargets],
     );
     // Inactive Spaces keep their traversal mounted without receiving global keys.
     usePresentingKeys(active && presenting, {
@@ -1406,14 +1406,14 @@ export const createApp = (
     const meta = spaces === null ? null : spaces.meta();
 
     /**
-     * The one Diagram refusal there is anywhere to put, now that Add Diagram and
-     * Delete Diagram report in the same place.
+     * The one Map refusal there is anywhere to put, now that Add Map and
+     * Delete Map report in the same place.
      *
-     * Both were drawn under Add Diagram in the Sidebar and both are about the
-     * Diagram that was selected when they were refused, which is why moving
-     * between Diagrams already clears them together.
+     * Both were drawn under Add Map in the Sidebar and both are about the
+     * Map that was selected when they were refused, which is why moving
+     * between Maps already clears them together.
      */
-    const diagramRefusal = createDiagramRefusal ?? diagramManagementRefusal;
+    const mapRefusal = createMapRefusal ?? mapManagementRefusal;
 
     /**
      * Where a refused Graph Edit is drawn, which is the notice every other
@@ -1481,8 +1481,8 @@ export const createApp = (
      * One command out of an entity's own menu, spent by a cluster that draws its
      * own.
      *
-     * The Dock's Diagram, Graph and Space clusters are menus with a radio group in
-     * them, so they cannot render an `EntityActionGroup[]` whole the way a Thing's
+     * The Dock's Map, Graph and Space clusters are menus with a radio group in
+     * them, so they cannot render an `EntityActionGroup[]` whole the way a Resource's
      * rail does — but *which* address each entity offers is a decision this
      * application makes once, in `entity-actions.tsx`. This reads that decision
      * out by id rather than rebuilding the destination beside it, so the two
@@ -1502,16 +1502,16 @@ export const createApp = (
     /**
      * The Graph the Dock's cluster names, or nothing to name.
      *
-     * A Diagram always owns at least one Graph — ADR 0079 mints one with every
-     * Diagram and Authoring refuses the Edit that would empty it — but the type
+     * A Map always owns at least one Graph — ADR 0079 mints one with every
+     * Map and Authoring refuses the Edit that would empty it — but the type
      * does not say so, and a surface that asserted it would be asserting a
      * domain rule from the outside. `null` is drawn as no Dock at all, which is
-     * the same answer the canvas gives for a Diagram it cannot resolve.
+     * the same answer the canvas gives for a Map it cannot resolve.
      *
      * **It is the Active Graph or it is nothing — there is no falling back to
      * the first visible one.** That fallback used to sit here, and what it
      * bought was a Dock that went on drawing while Navigation named a Graph the
-     * Diagram no longer owned. The cost was not the label: `CommandDock` passes
+     * Map no longer owned. The cost was not the label: `CommandDock` passes
      * `graph.active.id` to Delete, Rename and Recolor — the row list only
      * activates — so Delete Graph reached a Graph `SpaceCanvas`, handed the raw
      * `activeGraphId`, was not drawing as active, Present was enabled on the
@@ -1545,7 +1545,7 @@ export const createApp = (
               meta,
               opener,
               openSpaces: openSpaceRows,
-              // Behind `chromeTitleEdit` exactly as the Diagram and Graph names
+              // Behind `chromeTitleEdit` exactly as the Map and Graph names
               // are below, and for the one reason the guard exists: all three
               // names are withdrawn together while something else owns the caret
               // or the canvas has no placement to edit against. A Space rename
@@ -1589,25 +1589,25 @@ export const createApp = (
               onDismissExitReport: () => setExitReport(null),
             },
             canvas: {
-              diagrams: renderedSpace.diagrams,
-              selected: selectedDiagram.diagram,
-              onSelect: selectDiagram,
+              maps: renderedSpace.maps,
+              selected: selectedMap.map,
+              onSelect: selectMap,
               onRename: availability.chromeTitleEdit
-                ? (diagramId, title) => renameChromeTitle({ kind: 'diagram', id: diagramId }, title)
+                ? (mapId, title) => renameChromeTitle({ kind: 'map', id: mapId }, title)
                 : null,
-              createDisabled: !availability.createDiagram,
-              // The same answer `onDeleteDiagram` above is built from, said on
+              createDisabled: !availability.createMap,
+              // The same answer `onDeleteMap` above is built from, said on
               // the row as well: when entity Edits are withdrawn the
-              // `delete-diagram` action is not built at all, and a row that did
+              // `delete-map` action is not built at all, and a row that did
               // not know it dispatched into nothing.
               deleteDisabled: !availability.entityEdits,
               /**
                * **It opens nothing, and the author continues in the name.**
                *
-               * One Edit creates and selects an empty Diagram with its one empty
+               * One Edit creates and selects an empty Map with its one empty
                * Graph (ADR 0079); no list, no pane and no naming step in front of
-               * it. What an author does with a brand-new Diagram is say what it
-               * is for, and `Diagram 4` is a placeholder nobody wants — so the
+               * it. What an author does with a brand-new Map is say what it
+               * is for, and `Map 4` is a placeholder nobody wants — so the
                * caret lands in its name, which is also what makes a mis-press
                * self-announcing in a product with no undo
                * (`.scratch/command-dock/issues/13`).
@@ -1615,20 +1615,17 @@ export const createApp = (
               onCreate: () => {
                 void coordinatedContextCreate({
                   create: () => {
-                    const result = authoring.complete({ kind: 'created-diagram' });
-                    setCreateDiagramRefusal(result.kind === 'refused' ? result.refusal : null);
-                    setDiagramManagementRefusal(null);
-                    createDiagramMovedCaret.current = false;
+                    const result = authoring.complete({ kind: 'created-map' });
+                    setCreateMapRefusal(result.kind === 'refused' ? result.refusal : null);
+                    setMapManagementRefusal(null);
+                    createMapMovedCaret.current = false;
                     return result;
                   },
                   createdOf: () =>
-                    createdDiagramContext(
-                      currentSpace().diagrams,
-                      navigation.getState().selectedDiagramId,
-                    ),
+                    createdMapContext(currentSpace().maps, navigation.getState().selectedMapId),
                   afterCreated: () => {
                     continuation.request({
-                      target: { kind: 'control', name: 'diagram-name' },
+                      target: { kind: 'control', name: 'map-name' },
                       select: false,
                       then: 'rename',
                     });
@@ -1636,19 +1633,17 @@ export const createApp = (
                   },
                 });
               },
-              didCreateMoveCaret: () => createDiagramMovedCaret.current,
-              // The Dock's Delete names the Diagram its cluster is showing, which is
+              didCreateMoveCaret: () => createMapMovedCaret.current,
+              // The Dock's Delete names the Map its cluster is showing, which is
               // the drawing one — resolved from the id it hands back rather than
               // closed over, so the command and the name it carries cannot come apart.
-              onDelete: (diagramId) => {
-                const diagram = renderedSpace.diagrams.find(
-                  (candidate) => candidate.id === diagramId,
-                );
-                if (diagram === undefined) return;
-                runEntityCommand({ kind: 'diagram', diagram }, DELETE_DIAGRAM_ACTION_ID)();
+              onDelete: (mapId) => {
+                const map = renderedSpace.maps.find((candidate) => candidate.id === mapId);
+                if (map === undefined) return;
+                runEntityCommand({ kind: 'map', map }, DELETE_MAP_ACTION_ID)();
               },
               onCopyLink: runEntityCommand(
-                { kind: 'diagram', diagram: selectedDiagram.diagram },
+                { kind: 'map', map: selectedMap.map },
                 COPY_LINK_ACTION_ID,
               ),
             },
@@ -1661,10 +1656,10 @@ export const createApp = (
               onRename: availability.chromeTitleEdit
                 ? (graphId, title) => renameChromeTitle({ kind: 'graph', id: graphId }, title)
                 : null,
-              // **Answered, not swallowed** — the same shape the Diagram arm
+              // **Answered, not swallowed** — the same shape the Map arm
               // above spends, and for the same reason. A Graph Edit can be
               // refused for reasons no surface can see coming (`graph-not-owned`
-              // for a Graph a second Diagram owns), and a command that discards
+              // for a Graph a second Map owns), and a command that discards
               // that answer closes its menu having changed nothing, said nothing
               // and logged nothing.
               onRecolor: (graphId, color) => {
@@ -1676,9 +1671,9 @@ export const createApp = (
               onDelete: (graphId) => {
                 void (async () => {
                   setGraphDeleteMessage(null);
-                  const result = await coordinatedGraphDelete(spaceThings.deleteGraph, {
+                  const result = await coordinatedGraphDelete(spaceResources.deleteGraph, {
                     targetSpaceId: renderedSpace.id,
-                    diagramId: selectedDiagram.diagram.id,
+                    mapId: selectedMap.map.id,
                     graphId,
                     preferredGraphId: null,
                   });
@@ -1693,7 +1688,7 @@ export const createApp = (
               },
               editsDisabled: !availability.entityEdits,
               onCopyLink: runEntityCommand(
-                { kind: 'graph', graph: activeGraph, diagram: selectedDiagram.diagram },
+                { kind: 'graph', graph: activeGraph, map: selectedMap.map },
                 COPY_LINK_ACTION_ID,
               ),
               presenting,
@@ -1707,56 +1702,56 @@ export const createApp = (
               presentDisabled:
                 !presenting && (!availability.present || activeGraph.edges.length === 0),
             },
-            things: {
+            resources: {
               /* The Dock draws this list and owns whether it is open, so what
                  crosses here is what the list shows and what a row does —
                  never an `open` flag the two could come to disagree about
-                 (`DockThingsList`). */
+                 (`DockResourcesList`). */
               list: {
-                things: thingsOutsideSelectedDiagram,
-                allThings: renderedSpace.things,
+                resources: resourcesOutsideSelectedMap,
+                allResources: renderedSpace.resources,
                 spaceTitleById,
                 spaces: metaSpaces,
-                onAddSpace: addSpaceThingFor,
-                disabled: !availability.thingsView,
-                disclose: discloseThings,
-                revealedThingId: addressedThingId,
+                onAddSpace: addSpaceResourceFor,
+                disabled: !availability.resourcesView,
+                disclose: discloseResources,
+                revealedResourceId: addressedResourceId,
                 /* **No focus continuation, and that is the surface's own
                    change.** The drawer this replaced took a keyboard Add to
-                   the placed Thing on the canvas; an anchored list keeps the
-                   reader in it, so adding several Things costs one disclosure
+                   the placed Resource on the canvas; an anchored list keeps the
+                   reader in it, so adding several Resources costs one disclosure
                    rather than one each, and the caret lands back in the filter
-                   (`ThingsPopover`). Escape is the way out to the canvas, and
+                   (`ResourcesPopover`). Escape is the way out to the canvas, and
                    it returns focus to the trigger the list hangs off. */
-                onAdd: (thing) => addExistingThing(thing.id, centreAnchor(), false),
-                onDragStart: (thingId) => {
-                  thingsDrag.current = { thingId, diagramId: selectedDiagramId };
+                onAdd: (resource) => addExistingResource(resource.id, centreAnchor(), false),
+                onDragStart: (resourceId) => {
+                  resourcesDrag.current = { resourceId, mapId: selectedMapId };
                 },
                 onDragEnd: () => {
-                  thingsDrag.current = null;
+                  resourcesDrag.current = null;
                 },
               },
               // Both kinds complete their Edit on the press (ADR 0089): nothing
               // is chosen first, so there is no pane and nothing to cancel.
               //
               // **Each kind names its own press, rather than one arm and a
-              // fall-through.** `THING_KINDS` is the list the cluster draws its
+              // fall-through.** `RESOURCE_KINDS` is the list the cluster draws its
               // controls from, so a kind added there already has a control, a
               // glyph and an accessible name whatever this says; an exhaustive
-              // record is what stops it inheriting the Space Thing's press in
+              // record is what stops it inheriting the Space Resource's press in
               // silence. ADR 0089 records that a kind which genuinely cannot
               // complete on activation is a decision refining it — this is where
               // that decision is asked for.
               onCreate: (kind) => {
                 const create = {
-                  markdown: addThing,
-                  space: createSpaceThing,
-                } satisfies Record<DockThingKind, () => void>;
+                  markdown: addResource,
+                  space: createSpaceResource,
+                } satisfies Record<DockResourceKind, () => void>;
                 create[kind]();
               },
               createDisabled: {
-                markdown: !availability.addThing,
-                space: !availability.createSpaceThing,
+                markdown: !availability.addResource,
+                space: !availability.createSpaceResource,
               },
             },
             persistence: {
@@ -1770,7 +1765,7 @@ export const createApp = (
 
     return (
       <AppShell
-        // No inset. The Things list is a Popover anchored to its trigger and
+        // No inset. The Resources list is a Popover anchored to its trigger and
         // floats over the canvas, so it yields no width — which is the
         // occlusion the surface comparison held against the drawer it replaced
         // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
@@ -1781,46 +1776,43 @@ export const createApp = (
                 {clipboardFailure}
               </ShellNotice>
             )}
-            {thingDeletionState.refusal === null ? null : (
-              <ShellNotice title="Thing not deleted" onDismiss={thingDeletion.dismissRefusal}>
-                {thingDeletionState.refusal}
+            {resourceDeletionState.refusal === null ? null : (
+              <ShellNotice title="Resource not deleted" onDismiss={resourceDeletion.dismissRefusal}>
+                {resourceDeletionState.refusal}
               </ShellNotice>
             )}
-            {diagramRefusal === null ? null : (
+            {mapRefusal === null ? null : (
               <ShellNotice
                 /* Named for the command that was refused rather than for the
-                   Diagram, because a refused *creation* left no Diagram to be
-                   unchanged — "Diagram unchanged" told the author an existing
-                   Diagram had been left alone when none had been made. */
-                title={createDiagramRefusal === null ? 'Diagram unchanged' : 'Diagram not created'}
+                   Map, because a refused *creation* left no Map to be
+                   unchanged — "Map unchanged" told the author an existing
+                   Map had been left alone when none had been made. */
+                title={createMapRefusal === null ? 'Map unchanged' : 'Map not created'}
                 // Both, because the one that is standing is whichever was
                 // written last and the reader is dismissing what they can see.
                 onDismiss={() => {
-                  setCreateDiagramRefusal(null);
-                  setDiagramManagementRefusal(null);
+                  setCreateMapRefusal(null);
+                  setMapManagementRefusal(null);
                 }}
               >
-                {describeAuthoringRefusal(diagramRefusal)}
+                {describeAuthoringRefusal(mapRefusal)}
               </ShellNotice>
             )}
-            {diagramDeleteMessage === null ? null : (
-              <ShellNotice
-                title="Diagram not deleted"
-                onDismiss={() => setDiagramDeleteMessage(null)}
-              >
-                {diagramDeleteMessage}
+            {mapDeleteMessage === null ? null : (
+              <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
+                {mapDeleteMessage}
               </ShellNotice>
             )}
-            {spaceThingRefusal === null ? null : (
+            {spaceResourceRefusal === null ? null : (
               <ShellNotice
-                /* It names what died. A Space Thing's placement is optimistic
-                   (ADR 0089), so the author may be typing into the Thing when
+                /* It names what died. A Space Resource's placement is optimistic
+                   (ADR 0089), so the author may be typing into the Resource when
                    the lifecycle answers — "Space not created" is the sentence
-                   that makes a Thing vanishing from under the caret legible. */
+                   that makes a Resource vanishing from under the caret legible. */
                 title="Space not created"
-                onDismiss={() => setSpaceThingRefusal(null)}
+                onDismiss={() => setSpaceResourceRefusal(null)}
               >
-                {spaceThingRefusal}
+                {spaceResourceRefusal}
               </ShellNotice>
             )}
             {referenceRefusal === null ? null : (
@@ -1828,7 +1820,7 @@ export const createApp = (
                 /* It names what was not made. The menu the command was pressed
                    in has closed by the time this can be shown, so this is the
                    only place the author learns the press did nothing. */
-                title="Reference Thing not created"
+                title="Reference Resource not created"
                 onDismiss={() => setReferenceRefusal(null)}
               >
                 {referenceRefusal}
@@ -1859,7 +1851,7 @@ export const createApp = (
                 stale location to be corrected (`browser-location.ts`), so a
                 dismissal would be a move dressed as an acknowledgement. It is
                 answered by the first move the reader makes — including opening
-                a Thing on the canvas, which the notice never covers. */}
+                a Resource on the canvas, which the notice never covers. */}
             {destinationNotFound ? (
               <Alert variant="destructive">
                 <AlertIcon />
@@ -1896,18 +1888,18 @@ export const createApp = (
             ? 'Persisted'
             : sessionState.persistence.kind}
         </span>
-        {thingDeletionState.pending === null ? null : (
-          <DeleteThingConfirmation
-            thing={thingDeletionState.pending}
-            deleting={thingDeletionState.deleting}
-            onConfirm={thingDeletion.confirm}
-            onDismiss={thingDeletion.cancel}
+        {resourceDeletionState.pending === null ? null : (
+          <DeleteResourceConfirmation
+            resource={resourceDeletionState.pending}
+            deleting={resourceDeletionState.deleting}
+            onConfirm={resourceDeletion.confirm}
+            onDismiss={resourceDeletion.cancel}
           />
         )}
-        {/* One child, not a row: the Things list portals over this rather than
-            sitting beside it, so a toggle that says nothing about the Diagram no
-            longer re-flows the canvas and re-measures every Thing on it. */}
-        <div ref={graphArea} className="graph-area size-full min-w-0" style={thingSizeVars}>
+        {/* One child, not a row: the Resources list portals over this rather than
+            sitting beside it, so a toggle that says nothing about the Map no
+            longer re-flows the canvas and re-measures every Resource on it. */}
+        <div ref={graphArea} className="graph-area size-full min-w-0" style={resourceSizeVars}>
           {/* **The Space's one command surface, over the canvas rather than
               beside it** (ADR 0082). It docks to this element: the twelve slots
               are its edges and stops, and every measurement the drag makes is
@@ -1923,7 +1915,7 @@ export const createApp = (
           )}
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
-          ) : canvas.kind === 'things' ? (
+          ) : canvas.kind === 'resources' ? (
             <ReactFlowProvider>
               {/* Inside the provider and outside the canvas: it reads React
                   Flow's viewport for controls that live in the toolbar and in
@@ -1935,10 +1927,10 @@ export const createApp = (
                   provider because `reveal` moves the camera and because an Edge
                   subject becomes an element only through the projection React
                   Flow is drawing. Its chrome half is mounted at the root, since
-                  this subtree is conditional on there being Things at all. */}
+                  this subtree is conditional on there being Resources at all. */}
               <CanvasContinuation
                 continuation={continuation}
-                onSelectThing={selectThing}
+                onSelectResource={selectResource}
                 onSelectEdge={selectEdge}
               />
               <SpaceCanvas
@@ -1946,46 +1938,46 @@ export const createApp = (
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but
-                // an open title editor is the graph's own: it names a Thing from
+                // an open title editor is the graph's own: it names a Resource from
                 // a Space that is gone, and its raised invalid guard would go on
                 // swallowing clicks in the one that replaced it.
                 key={authoringState.replacementEpoch}
                 nodes={liveProjection?.nodes ?? []}
                 edges={liveProjection?.edges ?? []}
                 // Null while a replacement placement resolves. The canvas keeps
-                // drawing the Things on screen through that window — deliberately, so
+                // drawing the Resources on screen through that window — deliberately, so
                 // a gesture is never interrupted — so a connection is reachable
                 // with no fresh projection to hand over, and the store keeps its
                 // live nodes rather than reconciling against nothing.
                 projectedNodes={projected?.nodes ?? null}
-                activeThingId={activeThingId}
+                activeResourceId={activeResourceId}
                 presenting={presenting}
-                placementReady={hasThingsOnCanvas}
+                placementReady={hasResourcesOnCanvas}
                 availability={availability}
                 onNodesChange={changeNodes}
                 onEdgesChange={changeEdges}
                 edgeAuthoring={edgeAuthoring}
                 selection={selection}
-                onSelectThing={selectThing}
+                onSelectResource={selectResource}
                 onSelectEdge={selectEdge}
-                placedThings={placedThings}
-                newThingTitle={newThingTitle}
-                onAddThing={addThing}
-                onAddExistingThing={dropExistingThing}
+                placedResources={placedResources}
+                newResourceTitle={newResourceTitle}
+                onAddResource={addResource}
+                onAddExistingResource={dropExistingResource}
                 nameOnCreation={nameOnCreation}
                 authoring={authoring}
                 spaceSession={spaceSession}
-                onBodyEditingChange={setEditingThingBody}
-                onTitleEditingChange={setEditingThingTitle}
-                thingResize={thingResize}
-                reportEmbeddedDiagramEditing={reportEmbeddedDiagramEditing}
+                onBodyEditingChange={setEditingResourceBody}
+                onTitleEditingChange={setEditingResourceTitle}
+                resourceResize={resourceResize}
+                reportEmbeddedMapEditing={reportEmbeddedMapEditing}
                 spaceTitle={renderedSpace.title}
-                diagramTitle={selectedDiagram.diagram.title}
+                mapTitle={selectedMap.map.title}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
-                spaceThingTargets={spaceThingTargets}
-                thingEntityActions={thingRailActions}
+                spaceResourceTargets={spaceResourceTargets}
+                resourceEntityActions={resourceRailActions}
               />
             </ReactFlowProvider>
           ) : (
@@ -2001,16 +1993,16 @@ export const createApp = (
               onRetreat={retreat}
               onExit={exitPresenting}
               onCopyLink={() => {
-                if (activeGraphId === null || activeThingId === null) return;
+                if (activeGraphId === null || activeResourceId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with
                 // no label to swap, so it has nothing to do with the outcome
                 // beyond the alert `copyProductDestination` already renders.
                 void copyProductDestination({
                   kind: 'presentation',
                   spaceId: renderedSpace.id,
-                  diagramId: selectedDiagramId,
+                  mapId: selectedMapId,
                   graphId: activeGraphId,
-                  thingId: activeThingId,
+                  resourceId: activeResourceId,
                 });
               }}
             />

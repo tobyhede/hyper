@@ -25,13 +25,13 @@ import { cn } from './lib/utils';
  * focusable while unavailable and so carries `aria-disabled` and *not* the
  * property (`components/toolbar.tsx`) — which `:disabled` does not match, and
  * `disabled:opacity-50` therefore never reached a single command on the Command
- * Dock or on a Thing's rail. Left there, an unavailable command was drawn at full
+ * Dock or on a Resource's rail. Left there, an unavailable command was drawn at full
  * ink and still took the hover fill, so it read as operable and did nothing:
  * Close during a Markdown edit is exactly that control (ADR 0064 keeps its slot
  * and makes it unavailable). The quieting is the same opacity the property gets,
  * in the base recipe below; what belongs here is withdrawing the *feedback*, so
  * an unavailable control does not light up under a pointer that cannot use it.
- * The Thing used to correct this from `canvas-thing.css` with a box of its own,
+ * The Resource used to correct this from `canvas-resource.css` with a box of its own,
  * which is why one surface had it and the other never did.
  */
 const quietFeedback =

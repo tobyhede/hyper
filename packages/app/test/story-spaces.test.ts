@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { DiagramId } from '@project/core';
-import { graphStartThing, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
-import { requireDefaultDiagram } from '../src/diagram-resolution';
+import type { MapId } from '@project/core';
+import { graphStartResource, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
+import { requireDefaultMap } from '../src/map-resolution';
 import {
   authoredSnapshot,
   authoredSpace,
@@ -21,78 +21,76 @@ import {
  *
  * ADR 0052 makes a stable story evidence about the UI Hyper ships, and its
  * negative to remember forbids making one possible by "translating its state in
- * the harness". Where a Space opens is `requireDefaultDiagram` reading
- * `space.defaultDiagram` — so the story fixture must not answer that question
+ * the harness". Where a Space opens is `requireDefaultMap` reading
+ * `space.defaultMap` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
  * That is what this file pins. `issue-14-space-sidebar.spec.ts` proves the
  * rendered story presses Collection 1; this proves the story is entitled to,
  * because the Space says so through the same call production makes. Delete the
- * `defaultDiagram` and this fails here rather than in a browser.
+ * `defaultMap` and this fails here rather than in a browser.
  */
-/** The title of the Diagram an id names, asked of the Space that declares it. */
-const openedDiagramTitle = (space: Space, id: DiagramId): string | undefined =>
-  space.lookup.diagram(id)?.diagram.title;
+/** The title of the Map an id names, asked of the Space that declares it. */
+const openedMapTitle = (space: Space, id: MapId): string | undefined =>
+  space.lookup.map(id)?.map.title;
 
 describe('the story Spaces', () => {
-  it('opens the authored Space on the Diagram its stories press', () => {
-    const opens = requireDefaultDiagram(authoredSpace);
+  it('opens the authored Space on the Map its stories press', () => {
+    const opens = requireDefaultMap(authoredSpace);
 
-    expect(opens).toBe(authoredSpace.defaultDiagram);
-    expect(openedDiagramTitle(authoredSpace, opens)).toBe('Collection 1');
+    expect(opens).toBe(authoredSpace.defaultMap);
+    expect(openedMapTitle(authoredSpace, opens)).toBe('Collection 1');
   });
 
   /**
-   * The Things list's Refused story needs a Diagram that is *missing* Things, and
-   * it must not find one by indexing into `diagrams` — that follows array order,
-   * so inserting a Diagram would silently move the story to a different one.
+   * The Resources list's Refused story needs a Map that is *missing* Resources, and
+   * it must not find one by indexing into `maps` — that follows array order,
+   * so inserting a Map would silently move the story to a different one.
    */
-  it('opens the sparse authored Space on a Diagram some Things are absent from', () => {
+  it('opens the sparse authored Space on a Map some Resources are absent from', () => {
     const space = loadSpaceSnapshot(sparseAuthoredSnapshot);
     if (!space.ok) throw new Error('sparse story Space did not load');
-    const opens = requireDefaultDiagram(space.space);
+    const opens = requireDefaultMap(space.space);
 
-    expect(opens).toBe(space.space.defaultDiagram);
-    const diagram = space.space.lookup.diagram(opens)?.diagram;
-    expect(openedDiagramTitle(space.space, opens)).toBe('Collection 2');
+    expect(opens).toBe(space.space.defaultMap);
+    const map = space.space.lookup.map(opens)?.map;
+    expect(openedMapTitle(space.space, opens)).toBe('Collection 2');
     expect(
-      space.space.things.filter((thing) => diagram?.positions[thing.id] === undefined),
+      space.space.resources.filter((resource) => map?.positions[resource.id] === undefined),
     ).not.toHaveLength(0);
   });
 
   /** ADR 0080 makes a newly created Space complete before it is first opened. */
-  it('opens the newly created Space on its authored Diagram', () => {
-    const opens = requireDefaultDiagram(newSpaceFixture);
+  it('opens the newly created Space on its authored Map', () => {
+    const opens = requireDefaultMap(newSpaceFixture);
 
-    expect(opens).toEqual(newSpaceFixture.diagrams[0]?.id);
-    expect(newSpaceFixture.diagrams).toHaveLength(1);
+    expect(opens).toEqual(newSpaceFixture.maps[0]?.id);
+    expect(newSpaceFixture.maps).toHaveLength(1);
     expect(newSpaceFixture.graphs).toHaveLength(1);
-    expect(openedDiagramTitle(newSpaceFixture, opens)).toBe('Diagram 1');
+    expect(openedMapTitle(newSpaceFixture, opens)).toBe('Map 1');
   });
 
   /**
    * The retryable story hands the fixture a Space that changes: it opens on
    * `authoredSnapshot` and submits `editedSnapshot`. The fixture seeds `selected`
-   * once and never reconciles it, so an Edit withdrawing the opened Diagram would
-   * leave the sidebar with no Diagram to press — a blank story rather than a
+   * once and never reconciles it, so an Edit withdrawing the opened Map would
+   * leave the sidebar with no Map to press — a blank story rather than a
    * degraded one. The Edit appends, and this is what says so, at `verify` rather
    * than in a browser — including that it appends *something*, since an
    * `editedSnapshot` that stopped differing from what the session loaded would
    * leave the story's claim with nothing to show.
    */
-  it('keeps the opened Diagram when the retryable story submits its Edit', () => {
+  it('keeps the opened Map when the retryable story submits its Edit', () => {
     const edited = loadSpaceSnapshot(editedSnapshot);
     if (!edited.ok) throw new Error(edited.errors.map((error) => error.message).join('\n'));
 
-    const opens = requireDefaultDiagram(authoredSpace);
+    const opens = requireDefaultMap(authoredSpace);
 
-    expect(openedDiagramTitle(edited.space, opens)).toBe('Collection 1');
-    expect(edited.space.diagrams.slice(0, authoredSpace.diagrams.length)).toEqual(
-      authoredSpace.diagrams,
-    );
-    expect(
-      edited.space.diagrams.slice(authoredSpace.diagrams.length).map((diagram) => diagram.title),
-    ).toEqual(['Collection 3']);
+    expect(openedMapTitle(edited.space, opens)).toBe('Collection 1');
+    expect(edited.space.maps.slice(0, authoredSpace.maps.length)).toEqual(authoredSpace.maps);
+    expect(edited.space.maps.slice(authoredSpace.maps.length).map((map) => map.title)).toEqual([
+      'Collection 3',
+    ]);
   });
 
   /**
@@ -117,8 +115,8 @@ describe('the story Spaces', () => {
       authoredSnapshot.id,
       ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace, commandDockSpace].flatMap(
         (space) => [
-          ...space.things.map((thing) => thing.id),
-          ...space.diagrams.map((diagram) => diagram.id),
+          ...space.resources.map((resource) => resource.id),
+          ...space.maps.map((map) => map.id),
           ...space.graphs.map((graph) => graph.id),
         ],
       ),
@@ -152,19 +150,19 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The traversal Spaces open where they say, on the one Graph their Diagram
+   * The traversal Spaces open where they say, on the one Graph their Map
    * owns — so a presenting story calls `present()` and nothing else, and the
-   * Graph it presents is the one `requireDefaultDiagram` and ADR 0026 answer rather
+   * Graph it presents is the one `requireDefaultMap` and ADR 0026 answer rather
    * than one the harness picked.
    */
-  it('opens each traversal Space on the Diagram and Graph it declares', () => {
+  it('opens each traversal Space on the Map and Graph it declares', () => {
     for (const [space, title] of [
       [traversalSpace, 'Traversal'],
       [deepDiveSpace, 'Deep dive'],
     ] as const) {
-      const opens = requireDefaultDiagram(space);
-      expect(opens).toBe(space.defaultDiagram);
-      expect(openedDiagramTitle(space, opens)).toBe(title);
+      const opens = requireDefaultMap(space);
+      expect(opens).toBe(space.defaultMap);
+      expect(openedMapTitle(space, opens)).toBe(title);
       expect(space.graphs.map((graph) => graph.title)).toEqual([title]);
     }
   });
@@ -174,15 +172,15 @@ describe('the story Spaces', () => {
    *
    * The E2E fixture's Graphs are deliberately all lines and the sidebar's Space
    * is four more of them, so nothing already in the tree gives the presenting
-   * chrome a Thing with a real choice at it. This is the assertion that the fork
+   * chrome a Resource with a real choice at it. This is the assertion that the fork
    * story is a fork — and that the line beside it is still the degenerate one
    * rather than a second kind (ADR 0024).
    */
-  it('gives the fork story a Thing with several ways on, and the line exactly one', () => {
+  it('gives the fork story a Resource with several ways on, and the line exactly one', () => {
     const outDegree = (space: Space): number => {
       const graph = space.graphs[0];
       if (graph === undefined) throw new Error('The traversal Space owns no Graph.');
-      const start = graphStartThing(graph);
+      const start = graphStartResource(graph);
       if (start === undefined) throw new Error('The traversal Space has nowhere to begin.');
       return outgoingEdges(graph, start).length;
     };
@@ -194,7 +192,7 @@ describe('the story Spaces', () => {
   /**
    * The Graph colours the sidebar draws are derived, not transcribed. The four
    * Graphs carry no colour of their own, so each takes a palette slot by its
-   * position in the flatten across Diagrams (ADR 0045) — which is what let the
+   * position in the flatten across Maps (ADR 0045) — which is what let the
    * fixture's four hex literals go.
    */
   it('carries no Graph colour of its own, leaving the palette to answer', () => {
@@ -210,52 +208,52 @@ describe('the story Spaces', () => {
   /**
    * The Command Dock's Space, held to the three values it exists to supply.
    *
-   * The prototype it feeds compares list surfaces, Diagram switching and Graph
+   * The prototype it feeds compares list surfaces, Map switching and Graph
    * emphasis, and each of those needs a shape no other fixture has: **more
-   * unplaced Things than a popover can comfortably hold**, **two Diagrams**, and
+   * unplaced Resources than a popover can comfortably hold**, **two Maps**, and
    * **three Graphs over the opening one** so emphasis is a real choice rather
    * than a one-member list. Pinned here because all three are quietly easy to
-   * lose — a Thing placed while adjusting the fixture empties the Things list,
+   * lose — a Resource placed while adjusting the fixture empties the Resources list,
    * and a Graph removed makes emphasis unjudgeable — and the loss would show up
    * as a prototype that reads fine and settles nothing.
    */
-  it('gives the Command Dock two Diagrams, three Graphs over the first, and Things outside it', () => {
-    const opens = requireDefaultDiagram(commandDockSpace);
-    const diagram = commandDockSpace.lookup.diagram(opens)?.diagram;
+  it('gives the Command Dock two Maps, three Graphs over the first, and Resources outside it', () => {
+    const opens = requireDefaultMap(commandDockSpace);
+    const map = commandDockSpace.lookup.map(opens)?.map;
 
-    expect(opens).toBe(commandDockSpace.defaultDiagram);
-    expect(openedDiagramTitle(commandDockSpace, opens)).toBe('Collection 1');
-    expect(commandDockSpace.diagrams.map((entry) => entry.title)).toEqual([
+    expect(opens).toBe(commandDockSpace.defaultMap);
+    expect(openedMapTitle(commandDockSpace, opens)).toBe('Collection 1');
+    expect(commandDockSpace.maps.map((entry) => entry.title)).toEqual([
       'Collection 1',
       'Collection 2',
     ]);
-    expect(diagram?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
+    expect(map?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
 
-    const unplaced = commandDockSpace.things.filter(
-      (thing) => diagram?.positions[thing.id] === undefined,
+    const unplaced = commandDockSpace.resources.filter(
+      (resource) => map?.positions[resource.id] === undefined,
     );
-    expect(unplaced.length).toBeGreaterThan(Object.keys(diagram?.positions ?? {}).length * 4);
+    expect(unplaced.length).toBeGreaterThan(Object.keys(map?.positions ?? {}).length * 4);
   });
 
   /**
-   * All three Thing kinds, in one Space, on both sides of placement.
+   * All three Resource kinds, in one Space, on both sides of placement.
    *
-   * The Dock draws `ThingKindIcon` on every list row while the canvas draws the
-   * production `ThingNode`, so a fixture whose placed Things were all markdown
+   * The Dock draws `ResourceKindIcon` on every list row while the canvas draws the
+   * production `ResourceNode`, so a fixture whose placed Resources were all markdown
    * would let the list and the canvas disagree about a kind without either
    * being wrong.
    */
-  it('carries every Thing kind on the Command Dock canvas and in its Things list', () => {
-    const opens = requireDefaultDiagram(commandDockSpace);
-    const diagram = commandDockSpace.lookup.diagram(opens)?.diagram;
-    const kinds = (things: readonly { readonly kind: string }[]): readonly string[] =>
-      [...new Set(things.map((thing) => thing.kind))].sort();
+  it('carries every Resource kind on the Command Dock canvas and in its Resources list', () => {
+    const opens = requireDefaultMap(commandDockSpace);
+    const map = commandDockSpace.lookup.map(opens)?.map;
+    const kinds = (resources: readonly { readonly kind: string }[]): readonly string[] =>
+      [...new Set(resources.map((resource) => resource.kind))].sort();
 
-    const placed = commandDockSpace.things.filter(
-      (thing) => diagram?.positions[thing.id] !== undefined,
+    const placed = commandDockSpace.resources.filter(
+      (resource) => map?.positions[resource.id] !== undefined,
     );
-    const unplaced = commandDockSpace.things.filter(
-      (thing) => diagram?.positions[thing.id] === undefined,
+    const unplaced = commandDockSpace.resources.filter(
+      (resource) => map?.positions[resource.id] === undefined,
     );
 
     expect(kinds(placed)).toEqual(['markdown', 'reference', 'space']);
@@ -271,22 +269,22 @@ describe('the story Spaces', () => {
     expect(commandDockSpace.graphs.filter((graph) => graph.color !== undefined)).toEqual([]);
   });
   /**
-   * **A Space, its Diagrams and its Graphs are four kinds of entity with one
+   * **A Space, its Maps and its Graphs are four kinds of entity with one
    * spelling for identity, so a fixture that reuses a value hides the mistake
    * a real reader would make.** Meta's own Id was written as a literal and its
-   * Catalogue Diagram as `metaId(0)`, which is the same UUID — so the product
-   * URL ADR 0069 builds for it read `/spaces/<X>/diagrams/<X>`, and any assertion
-   * that a Diagram is not its Space passed here without meaning anything.
+   * Catalogue Map as `metaId(0)`, which is the same UUID — so the product
+   * URL ADR 0069 builds for it read `/spaces/<X>/maps/<X>`, and any assertion
+   * that a Map is not its Space passed here without meaning anything.
    */
-  it('gives the Meta Space an identity none of its own Diagrams or Graphs shares', () => {
-    const { diagrams } = metaSnapshot.document;
-    if (diagrams === undefined) throw new Error('The Meta Space declares no Diagram.');
-    const diagramIds = diagrams.map(({ id }) => id);
-    const graphIds = diagrams.flatMap(({ graphs }) => graphs.map(({ id }) => id));
-    const owned = [...diagramIds, ...graphIds];
+  it('gives the Meta Space an identity none of its own Maps or Graphs shares', () => {
+    const { maps } = metaSnapshot.document;
+    if (maps === undefined) throw new Error('The Meta Space declares no Map.');
+    const mapIds = maps.map(({ id }) => id);
+    const graphIds = maps.flatMap(({ graphs }) => graphs.map(({ id }) => id));
+    const owned = [...mapIds, ...graphIds];
 
     expect(owned).not.toContain(metaSnapshot.id);
-    // And the Diagrams and Graphs are distinct from each other, which is the
+    // And the Maps and Graphs are distinct from each other, which is the
     // same rule one level down.
     expect(new Set(owned).size).toBe(owned.length);
   });

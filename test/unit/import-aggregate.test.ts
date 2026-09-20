@@ -26,7 +26,7 @@ const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_META_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const ORDINARY_SPACE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const GRAPH_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const DIAGRAM_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const MAP_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
 /**
  * Which seam call an import made, in order, over the behavioural double behind
@@ -124,7 +124,7 @@ const writeMetaOnlyAggregate = (
     {
       name: metaSpaceId,
       spaceFile: JSON.stringify({ version: 1, id: metaSpaceId, title }),
-      things: { 'opening.md': '---\ntitle: Opening\n---\nHello.\n' },
+      resources: { 'opening.md': '---\ntitle: Opening\n---\nHello.\n' },
     },
   ]);
 
@@ -158,7 +158,7 @@ describe('importAggregate', () => {
   });
 
   it('refuses a version 2 space directory rather than migrating it', async () => {
-    // The disposable pre-release shape: graphs beside the diagrams instead of
+    // The disposable pre-release shape: graphs beside the maps instead of
     // inside them. Hyper is unreleased, so it has no compatibility claim on the
     // first-public document and never enters (ADR 0040).
     //
@@ -177,7 +177,7 @@ describe('importAggregate', () => {
           id: META_SPACE_ID,
           title: 'Pre-release talk',
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
-          diagrams: [{ id: DIAGRAM_ID, title: 'Working', positions: {} }],
+          maps: [{ id: MAP_ID, title: 'Working', positions: {} }],
         }),
       },
     ]);
@@ -325,7 +325,7 @@ describe('importAggregate', () => {
     const stored = new MemorySpaceRepository();
     await stored.initializeAggregate({
       metaSpaceId: META_SPACE_ID,
-      spaces: [{ id: META_SPACE_ID, document: { version: 1, title: 'Raced in' }, things: [] }],
+      spaces: [{ id: META_SPACE_ID, document: { version: 1, title: 'Raced in' }, resources: [] }],
     });
     const repository = new RecordingRepository(stored);
     // The repository was empty when it was read, and holds a Meta Space by the
@@ -353,7 +353,11 @@ describe('importAggregate', () => {
   it('truncates Spaces stored without a Meta identity and imports in their place', async () => {
     const stored = MemorySpaceRepository.withoutMetaIdentity([
       {
-        snapshot: { id: ORDINARY_SPACE_ID, document: { version: 1, title: 'Orphan' }, things: [] },
+        snapshot: {
+          id: ORDINARY_SPACE_ID,
+          document: { version: 1, title: 'Orphan' },
+          resources: [],
+        },
         revision: 0n,
         exportedRevision: null,
       },
@@ -372,7 +376,7 @@ describe('importAggregate', () => {
     const stored = new MemorySpaceRepository(
       [
         {
-          snapshot: { id: OTHER_META_ID, document: { version: 1, title: 'Meta' }, things: [] },
+          snapshot: { id: OTHER_META_ID, document: { version: 1, title: 'Meta' }, resources: [] },
           revision: 0n,
           exportedRevision: null,
         },
@@ -380,7 +384,7 @@ describe('importAggregate', () => {
           snapshot: {
             id: ORDINARY_SPACE_ID,
             document: { version: 1, title: 'Unreferenced' },
-            things: [],
+            resources: [],
           },
           revision: 0n,
           exportedRevision: null,

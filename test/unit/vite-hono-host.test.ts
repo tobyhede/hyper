@@ -13,7 +13,7 @@ import {
   decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
-  type SpaceResourceRepository,
+  type StoredSpaceRepository,
 } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
@@ -22,16 +22,16 @@ import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const MINTED_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const MINTED_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MINTED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 const updateCommit = {
   changes: [
@@ -52,7 +52,7 @@ interface RunningHost {
 
 const hosts: RunningHost[] = [];
 
-const repository = (): SpaceResourceRepository => ({
+const repository = (): StoredSpaceRepository => ({
   listSpaces: () => Promise.resolve([]),
   loadSpace: () => Promise.resolve(undefined),
   loadAggregate: () =>
@@ -315,12 +315,12 @@ describe('Vite Hono host', () => {
   });
 
   it('mints working-load initialization from the identity source it was composed with', async () => {
-    // The host's `newId` reaches both things it composes that mint, not just
-    // the root address. A stored diagramless Space is durably initialized on
-    // first working load (ADR 0079), and that Diagram and Graph are the ones
+    // The host's `newId` reaches both collaborators it composes that mint, not just
+    // the root address. A stored mapless Space is durably initialized on
+    // first working load (ADR 0079), and that Map and Graph are the ones
     // this composition named — not the ambient generator's, which is what
     // `createSpaceHttpApp`'s own default would have supplied.
-    const ids = [MINTED_DIAGRAM_ID, MINTED_GRAPH_ID];
+    const ids = [MINTED_MAP_ID, MINTED_GRAPH_ID];
     const spaceRepository = new MemorySpaceRepository(
       [{ snapshot, revision: 0n, exportedRevision: null }],
       SPACE_ID,
@@ -336,10 +336,10 @@ describe('Vite Hono host', () => {
 
     expect(response.status).toBe(200);
     expect(decodeLoadedSpace(await response.json()).snapshot.document).toMatchObject({
-      defaultDiagram: MINTED_DIAGRAM_ID,
-      diagrams: [
+      defaultMap: MINTED_MAP_ID,
+      maps: [
         {
-          id: MINTED_DIAGRAM_ID,
+          id: MINTED_MAP_ID,
           graphs: [{ id: MINTED_GRAPH_ID }],
           activeGraph: MINTED_GRAPH_ID,
         },
@@ -462,7 +462,7 @@ describe('Vite Hono host', () => {
     });
 
     const response = await fetch(
-      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}`,
+      `${host.url}/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}`,
     );
 
     expect(response.status).toBe(404);
@@ -502,7 +502,7 @@ describe('Vite Hono host', () => {
     expect(malformed.status).toBe(400);
     await expect(malformed.text()).resolves.toBe('');
 
-    const missing = await fetch(`${host.url}/spaces/${encodeCompactUuid(THING_ID)}`, {
+    const missing = await fetch(`${host.url}/spaces/${encodeCompactUuid(RESOURCE_ID)}`, {
       method: 'HEAD',
     });
     expect(missing.status).toBe(404);

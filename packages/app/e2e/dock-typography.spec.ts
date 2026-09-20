@@ -16,9 +16,9 @@ test(
   async ({ page }) => {
     await page.goto('/');
     const space = page.getByTestId('space-title');
-    const diagram = page.getByTestId('selected-canvas');
+    const map = page.getByTestId('selected-canvas');
     await expect(space).toBeVisible();
-    await expect(diagram).toBeVisible();
+    await expect(map).toBeVisible();
     await expect(page.getByTestId('active-graph')).toBeVisible();
     /**
      * **All three read in one frame, and that is the assertion rather than a
@@ -53,14 +53,14 @@ test(
     expect(others).toHaveLength(2);
     for (const identity of others) expect(identity).toEqual(reference);
     await expect(page.getByRole('button', { name: /^Space:/ })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /^Diagram:/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Map:/ })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Active Graph:/ })).toHaveCount(1);
-    await diagram.click({ delay: 120 });
+    await map.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
-    await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(diagram).toBeFocused();
+    await expect(map).toBeFocused();
     // The Space's own, because the identity that used to be a label had no way
     // to owe the caret at all.
     await space.click({ delay: 120 });
@@ -92,38 +92,38 @@ const identityMenu = (page: Page, testId: 'space-title' | 'selected-canvas' | 'a
     testId === 'space-title'
       ? 'Copy link to Space'
       : testId === 'selected-canvas'
-        ? 'New Diagram'
+        ? 'New Map'
         : 'New Graph';
   return page.getByRole('menu').filter({
     has: page.getByRole('menuitem', { name: marker, exact: true }),
   });
 };
 
-/** A refused Thing-title draft the chrome-rename guard recognises. */
-async function beginRefusedThingTitleEdit(page: Page) {
+/** A refused Resource-title draft the chrome-rename guard recognises. */
+async function beginRefusedResourceTitleEdit(page: Page) {
   await dismissOpenMenus(page);
-  const thing = nodeByTitle(page, 'A').first();
-  await thing.getByRole('button', { name: 'Edit Title A' }).click();
-  const thingTitle = page.getByRole('textbox', { name: 'Thing title' });
-  await thingTitle.fill('   ');
-  await thingTitle.press('Enter');
-  await expect(page.getByRole('alert')).toHaveText('A Thing title is required.');
-  return thingTitle;
+  const resource = nodeByTitle(page, 'A').first();
+  await resource.getByRole('button', { name: 'Edit Title A' }).click();
+  const resourceTitle = page.getByRole('textbox', { name: 'Resource title' });
+  await resourceTitle.fill('   ');
+  await resourceTitle.press('Enter');
+  await expect(page.getByRole('alert')).toHaveText('A Resource title is required.');
+  return resourceTitle;
 }
 
 /**
  * Switching stays reachable while Rename is withdrawn.
  *
- * Creating a Thing opens its title editor, which takes the caret and withdraws
+ * Creating a Resource opens its title editor, which takes the caret and withdraws
  * all three chrome renames together (`authoring-availability.ts`). The name is
  * the disclosure, so that withdrawal is the Rename row, not the trigger.
  *
  * Each identity is exercised with its own refused draft: opening one list and
- * dismissing it can end the Thing title edit in a real browser, so chaining all
+ * dismissing it can end the Resource title edit in a real browser, so chaining all
  * three against one editor would read withdrawal on the first and availability
- * on the rest (`thing-authoring.test.tsx`, ADR 0065).
+ * on the rest (`resource-authoring.test.tsx`, ADR 0065).
  */
-test('Rename is withdrawn on every identity while a Thing title editor is open', async ({
+test('Rename is withdrawn on every identity while a Resource title editor is open', async ({
   page,
 }) => {
   await page.goto('/');
@@ -136,16 +136,16 @@ test('Rename is withdrawn on every identity while a Thing title editor is open',
   await page.keyboard.press('Escape');
 
   for (const testId of ['space-title', 'selected-canvas', 'active-graph'] as const) {
-    const thingTitle = await beginRefusedThingTitleEdit(page);
+    const resourceTitle = await beginRefusedResourceTitleEdit(page);
     await page.getByTestId(testId).click({ delay: 120 });
     await expect(
       identityMenu(page, testId).getByRole('menuitem', { name: 'Rename' }),
     ).toHaveAttribute('aria-disabled', 'true');
-    await expect(thingTitle).toBeVisible();
+    await expect(resourceTitle).toBeVisible();
     await dismissOpenMenus(page);
-    if (await thingTitle.isVisible()) {
-      await thingTitle.press('Escape');
-      await expect(thingTitle).toHaveCount(0);
+    if (await resourceTitle.isVisible()) {
+      await resourceTitle.press('Escape');
+      await expect(resourceTitle).toHaveCount(0);
     }
   }
 });

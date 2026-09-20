@@ -4,11 +4,11 @@ import { titleName, type Graph, type SpaceSnapshot } from '@project/core';
  * The neutral titles the app mints for structure the author did not name.
  *
  * It sits in its own module so every authoring operation shares one numbering
- * rule for Things, Spaces, Diagrams and Graphs.
+ * rule for Resources, Spaces, Maps and Graphs.
  *
  * Four named operations rather than one helper taking a prefix. What a caller
  * knows is *what it is naming*; the `<Prefix> N` arithmetic and the prefix
- * literal are this module's, so no call site can spell "Diagram" a second way or
+ * literal are this module's, so no call site can spell "Map" a second way or
  * number one kind of entity differently from another. This is a deterministic
  * rule and stays one — it is not injected, because there is nothing about it a
  * test would want to replace.
@@ -36,42 +36,42 @@ function nextNumberedTitle(prefix: string, titles: Iterable<string>): string {
 }
 
 /**
- * What an Edit calls the Thing it creates.
+ * What an Edit calls the Resource it creates.
  *
- * The scan reads **first lines** (ADR 0083). A Thing whose Title opens `Thing 3`
- * and continues onto further Title Lines is still the Thing called `Thing 3`, so
+ * The scan reads **first lines** (ADR 0083). A Resource whose Title opens `Resource 3`
+ * and continues onto further Title Lines is still the Resource called `Resource 3`, so
  * it occupies 3 and the next Edit mints 4 — otherwise adding a subtitle to a
- * minted Thing would silently free its number for a duplicate.
+ * minted Resource would silently free its number for a duplicate.
  */
-export const nextThingTitle = (snapshot: SpaceSnapshot): string =>
+export const nextResourceTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
-    'Thing',
-    snapshot.things.map((thing) => titleName(thing.document.title)),
+    'Resource',
+    snapshot.resources.map((resource) => titleName(resource.document.title)),
   );
 
 /**
- * What Create Space Thing calls the Space it mints, and the Thing that names it.
+ * What Create Space Resource calls the Space it mints, and the Resource that names it.
  *
- * **Numbered over the containing Space's Thing titles, which is the only source
+ * **Numbered over the containing Space's Resource titles, which is the only source
  * that can be read synchronously.** The names of the Spaces already stored come
  * from a repository read, and the creation gesture completes on activation
  * (ADR 0089) with nothing to wait on — so a globally unique name would have to
- * be minted inside the lifecycle and would disagree with the Thing's from the
- * outset. One string is handed to both the Space and the Space Thing, so they
+ * be minted inside the lifecycle and would disagree with the Resource's from the
+ * outset. One string is handed to both the Space and the Space Resource, so they
  * agree at creation exactly as the retired pane's typed title did. Collisions
  * across Spaces are accepted: a title is not an identifier (ADR 0016).
  */
 export const nextSpaceTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
     'Space',
-    snapshot.things.map((thing) => titleName(thing.document.title)),
+    snapshot.resources.map((resource) => titleName(resource.document.title)),
   );
 
-/** What an Edit calls the next Diagram it creates. */
-export const nextDiagramTitle = (snapshot: SpaceSnapshot): string =>
+/** What an Edit calls the next Map it creates. */
+export const nextMapTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
-    'Diagram',
-    (snapshot.document.diagrams ?? []).map((diagram) => diagram.title),
+    'Map',
+    (snapshot.document.maps ?? []).map((map) => map.title),
   );
 
 /** What an Edit calls the next Graph in the supplied collection. */

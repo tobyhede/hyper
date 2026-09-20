@@ -71,33 +71,33 @@ const idAt = (seed: number, offset: number): UUID =>
   );
 
 /**
- * The Diagram and the Graph a generated Space owns, keyed off the offset its own
+ * The Map and the Graph a generated Space owns, keyed off the offset its own
  * id came from.
  *
- * A Space Thing names a Diagram of its target and a Graph that Diagram owns
+ * A Space Resource names a Map of its target and a Graph that Map owns
  * (ADR 0079), so a generated aggregate has to mint both alongside every Space it
- * mints. Deriving them from the target's offset is what lets a Space Thing built
+ * mints. Deriving them from the target's offset is what lets a Space Resource built
  * anywhere in this fixture select a pair that genuinely resolves, without
  * threading the target's snapshot to the site that points at it.
  */
-const diagramIdAt = (seed: number, offset: number): UUID => idAt(seed, 100 + offset);
+const mapIdAt = (seed: number, offset: number): UUID => idAt(seed, 100 + offset);
 const graphIdAt = (seed: number, offset: number): UUID => idAt(seed, 150 + offset);
 
 /**
- * A generated Space's document: one positioned Diagram owning one Graph.
+ * A generated Space's document: one positioned Map owning one Graph.
  *
- * The Diagram positions nothing on purpose. Several scenarios below replace a
- * Space's Things wholesale, and a Diagram that placed the Things it started with
+ * The Map positions nothing on purpose. Several scenarios below replace a
+ * Space's Resources wholesale, and a Map that placed the Resources it started with
  * would fail intake for a reason the scenario is not about.
  */
 const spaceDocument = (seed: number, offset: number, title: string) => ({
   version: 1 as const,
   title,
-  defaultDiagram: diagramIdAt(seed, offset),
-  diagrams: [
+  defaultMap: mapIdAt(seed, offset),
+  maps: [
     {
-      id: diagramIdAt(seed, offset),
-      title: 'Diagram 1',
+      id: mapIdAt(seed, offset),
+      title: 'Map 1',
       kind: 'positioned' as const,
       positions: {},
       graphs: [{ id: graphIdAt(seed, offset), title: 'Graph 1', edges: [] }],
@@ -106,14 +106,14 @@ const spaceDocument = (seed: number, offset: number, title: string) => ({
   ],
 });
 
-/** A Space Thing selecting the one Diagram and Graph the Space at `offset` owns. */
-const spaceThing = (id: UUID, title: string, spaceId: UUID, seed: number, offset: number) => ({
+/** A Space Resource selecting the one Map and Graph the Space at `offset` owns. */
+const spaceResource = (id: UUID, title: string, spaceId: UUID, seed: number, offset: number) => ({
   id,
   document: {
     title,
     kind: 'space' as const,
     spaceId,
-    diagram: diagramIdAt(seed, offset),
+    map: mapIdAt(seed, offset),
     graph: graphIdAt(seed, offset),
   },
 });
@@ -150,25 +150,25 @@ const fixtureFor = ({
     idAt(seed, 11 + index),
   );
   const newSpaceId = idAt(seed, 15);
-  const newSpaceThingId = idAt(seed, 240);
+  const newSpaceResourceId = idAt(seed, 240);
 
   const meta: SpaceSnapshot = {
     id: metaSpaceId,
     document: spaceDocument(seed, 0, `Meta ${seed}`),
-    things: [
+    resources: [
       ...parentSpaceIds.map((spaceId, index) =>
-        spaceThing(idAt(seed, 20 + index), `Parent ${index}`, spaceId, seed, 1 + index),
+        spaceResource(idAt(seed, 20 + index), `Parent ${index}`, spaceId, seed, 1 + index),
       ),
       ...extraSpaceIds.map((spaceId, index) =>
-        spaceThing(idAt(seed, 30 + index), `Extra ${index}`, spaceId, seed, 11 + index),
+        spaceResource(idAt(seed, 30 + index), `Extra ${index}`, spaceId, seed, 11 + index),
       ),
     ],
   };
   const parents: SpaceSnapshot[] = parentSpaceIds.map((id, parentIndex) => ({
     id,
     document: spaceDocument(seed, 1 + parentIndex, `Parent ${parentIndex} seed ${seed}`),
-    things: Array.from({ length: referencesPerParent }, (_, referenceIndex) =>
-      spaceThing(
+    resources: Array.from({ length: referencesPerParent }, (_, referenceIndex) =>
+      spaceResource(
         idAt(seed, 40 + parentIndex * 10 + referenceIndex),
         `Shared ${referenceIndex}`,
         sharedSpaceId,
@@ -185,12 +185,12 @@ const fixtureFor = ({
   const shared: SpaceSnapshot = {
     id: sharedSpaceId,
     document: spaceDocument(seed, 10, `Shared ${seed}`),
-    things: [],
+    resources: [],
   };
   const extras: SpaceSnapshot[] = extraSpaceIds.map((id, index) => ({
     id,
     document: spaceDocument(seed, 11 + index, `Extra ${index} seed ${seed}`),
-    things: [],
+    resources: [],
   }));
   const snapshots = [meta, ...parents, shared, ...extras];
   const update = (snapshot: SpaceSnapshot) => ({
@@ -219,13 +219,16 @@ const fixtureFor = ({
       const created: SpaceSnapshot = {
         id: newSpaceId,
         document: spaceDocument(seed, 15, `Created ${seed}`),
-        things: [],
+        resources: [],
       };
       commit = {
         changes: orderedChanges(
           update({
             ...meta,
-            things: [...meta.things, spaceThing(newSpaceThingId, 'Created', newSpaceId, seed, 15)],
+            resources: [
+              ...meta.resources,
+              spaceResource(newSpaceResourceId, 'Created', newSpaceId, seed, 15),
+            ],
           }),
           [{ kind: 'create', spaceId: newSpaceId, snapshot: created }],
           reverseChanges,
@@ -256,9 +259,9 @@ const fixtureFor = ({
     case 'complete-deletion':
       commit = {
         changes: orderedChanges(
-          update({ ...firstParent, things: [] }),
+          update({ ...firstParent, resources: [] }),
           [
-            ...parents.slice(1).map((parent) => update({ ...parent, things: [] })),
+            ...parents.slice(1).map((parent) => update({ ...parent, resources: [] })),
             { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
           ],
           reverseChanges,
@@ -273,7 +276,7 @@ const fixtureFor = ({
             document: { ...firstParent.document, title: `Still linked ${seed}` },
           }),
           [
-            ...parents.slice(1).map((parent) => update({ ...parent, things: [] })),
+            ...parents.slice(1).map((parent) => update({ ...parent, resources: [] })),
             { kind: 'delete', spaceId: sharedSpaceId, expectedRevision: 0n },
           ],
           reverseChanges,

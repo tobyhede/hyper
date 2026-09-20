@@ -13,7 +13,7 @@ import {
   metaSnapshot,
   newSpaceFixture,
   platformSnapshot,
-  spaceThingDocument,
+  spaceResourceDocument,
   traversalSnapshot,
 } from './spaces';
 
@@ -102,11 +102,11 @@ export async function openDockStory(scenario: DockScenario) {
     const snapshot = snapshotFromSpace(newSpaceFixture);
     const meta = {
       ...metaSnapshot,
-      things: [
-        ...metaSnapshot.things,
+      resources: [
+        ...metaSnapshot.resources,
         {
           id: newUuid(),
-          document: spaceThingDocument(snapshot.document.title, snapshot),
+          document: spaceResourceDocument(snapshot.document.title, snapshot),
         },
       ],
     };
@@ -165,17 +165,17 @@ export async function openDockStory(scenario: DockScenario) {
         message: 'Network unavailable',
       });
     }
-    // A real Edit creates the failed commit; the same Diagram and title remain
+    // A real Edit creates the failed commit; the same Map and title remain
     // on screen so recovery can be compared without changing the scenario.
-    const thing = stored.working.things[0];
-    if (thing === undefined) throw new Error('The failure scenario needs an editable Thing.');
+    const resource = stored.working.resources[0];
+    if (resource === undefined) throw new Error('The failure scenario needs an editable Resource.');
     const result = target.app.authoring.complete({
-      kind: 'edited-thing',
-      thingId: thing.id,
+      kind: 'edited-resource',
+      resourceId: resource.id,
       document:
-        thing.document.kind === 'markdown'
-          ? { ...thing.document, body: `${thing.document.body}\nStory edit` }
-          : { ...thing.document, title: `${thing.document.title} edited` },
+        resource.document.kind === 'markdown'
+          ? { ...resource.document, body: `${resource.document.body}\nStory edit` }
+          : { ...resource.document, title: `${resource.document.title} edited` },
     });
     if (result.kind !== 'completed')
       throw new Error('The failure scenario did not complete an Edit.');

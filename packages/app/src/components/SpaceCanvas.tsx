@@ -26,60 +26,60 @@ import {
 import {
   titleName,
   uuidSchema,
-  type Thing,
-  type ThingId,
+  type Resource,
+  type ResourceId,
   type Graph,
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import { CANVAS_THING_DRAG_TILT_DEGREES, type EntityActionGroup } from '@project/ui';
+import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type EntityActionGroup } from '@project/ui';
 import {
   nodeTypes,
   GraphConnectionLine,
   GraphHud,
   ZoomSlider,
-  type ThingFlowNode,
+  type ResourceFlowNode,
 } from '@project/react-flow-adapter';
 import { activeGraphColor } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringAvailability } from '../authoring-availability';
-import { useCanvasThingAuthoring } from '../canvas-thing-authoring';
-import type { SpaceThingTargets } from '../space-thing-targets';
+import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
+import type { SpaceResourceTargets } from '../space-resource-targets';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
-import type { CanvasSelection, ThingResize, EdgeSubject } from '../render-adapter';
+import type { CanvasSelection, ResourceResize, EdgeSubject } from '../render-adapter';
 import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
-import { THING_SIZE } from '../thing';
-import { THING_DRAG_TYPE } from './ThingsPopover';
+import { RESOURCE_SIZE } from '../resource';
+import { RESOURCE_DRAG_TYPE } from './ResourcesPopover';
 import { OverviewCamera, PresentingCamera, OpeningFramingCamera } from './cameras';
 import {
   canvasNodeConnection,
   clipEmbeddedNode,
   embeddedClipId,
   parseEmbeddedNodeId,
-} from '../embedded-diagram';
+} from '../embedded-map';
 import {
   embeddedAuthoringEnabled,
   editingPortalAncestor,
   embeddingIsPortalEditing,
-} from '../embedded-open-space-thing';
-import { useEmbeddedOpenSpaceThings } from '../use-embedded-open-space-things';
+} from '../embedded-open-space-resource';
+import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
-import { EmbeddedDiagramAuthoring } from './EmbeddedDiagramAuthoring';
+import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import type { Continuation } from '../continuation';
 import {
   framingFromFit,
   panFraming,
   zoomFraming,
-  type SpaceThingFraming,
-} from '../space-thing-framing';
+  type SpaceResourceFraming,
+} from '../space-resource-framing';
 
 /**
  * What the graph tells assistive technology it can do.
  *
  * React Flow's defaults describe its own local deletion. Hyper instead routes
- * both Things and Edges through the completed Space Edit lifecycle, so these
+ * both Resources and Edges through the completed Space Edit lifecycle, so these
  * labels describe the application-owned commands rather than a local array
  * mutation.
  *
@@ -89,18 +89,19 @@ import {
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
-    'Press enter or space to open a Thing, backspace or delete to remove it from this Diagram, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
   'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Thing, backspace or delete to remove it from this Diagram, the arrow keys to move it, and escape to cancel.',
+    'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
 
-/** A pending placement keeps Things readable without advertising authored gestures. */
+/** A pending placement keeps Resources readable without advertising authored gestures. */
 const PENDING_ARIA_LABEL_CONFIG = {
   ...ARIA_LABEL_CONFIG,
-  'node.a11yDescription.default': 'This Thing is unavailable while placement is pending.',
-  'node.a11yDescription.keyboardDisabled': 'This Thing is unavailable while placement is pending.',
+  'node.a11yDescription.default': 'This Resource is unavailable while placement is pending.',
+  'node.a11yDescription.keyboardDisabled':
+    'This Resource is unavailable while placement is pending.',
 } as const;
 
 /**
@@ -111,7 +112,7 @@ const PENDING_ARIA_LABEL_CONFIG = {
  * announcement and the binding are one fact, and two copies of it can drift
  * without anything failing.
  */
-export const ADD_THING_KEY = 'C';
+export const ADD_RESOURCE_KEY = 'C';
 
 const subscribeToNothing = (): (() => void) => () => undefined;
 
@@ -123,7 +124,7 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  * present in the other makes the same element a command target for one key and
  * not for the other. They disagreed — `C` named only text entry — and the canvas
  * zoom controls render *inside* the wrapper both are bound to, so a `c` with
- * Zoom in focused added a Thing.
+ * Zoom in focused added a Resource.
  *
  * `button` and `select` are here for a different reason from `input`,
  * `textarea` and `contenteditable`: those are places an author is typing the
@@ -136,7 +137,7 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  * Reading the same marker is what stops this list drifting into a second,
  * hand-maintained copy of an exclusion the components already declare: a
  * surface has to opt out once, not once per listener. The roles below stay for
- * the surfaces that carry no marker of their own — `ThingSearchCombobox`'s popup
+ * the surfaces that carry no marker of their own — `ResourceSearchCombobox`'s popup
  * is `role="presentation"`, not `dialog`, because its input sits outside the
  * popup, so the marker rather than a role is what covers it.
  *
@@ -150,27 +151,30 @@ const NOT_A_CANVAS_COMMAND =
   '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
 
 /**
- * The Thing a key came from, or `null` if it came from anywhere else.
+ * The Resource a key came from, or `null` if it came from anywhere else.
  *
  * Answered from the projection rather than from the DOM id alone, which is what
- * keeps a second canvas's node — a story, a catalogue page — from naming a Thing
- * this Diagram is not drawing.
+ * keeps a second canvas's node — a story, a catalogue page — from naming a Resource
+ * this Map is not drawing.
  */
-const focusedThing = (target: Element, nodes: readonly ThingFlowNode[]): ThingId | null => {
+const focusedResource = (
+  target: Element,
+  nodes: readonly ResourceFlowNode[],
+): ResourceId | null => {
   const element = target.closest<HTMLElement>('.react-flow__node[data-id]');
   if (element === null) return null;
   const id = element.dataset['id'];
-  return nodes.find((node) => node.id === id)?.data.thingId ?? null;
+  return nodes.find((node) => node.id === id)?.data.resourceId ?? null;
 };
 
 export interface SpaceCanvasProps {
   readonly continuation: Continuation;
-  nodes: ThingFlowNode[];
+  nodes: ResourceFlowNode[];
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
-  projectedNodes: readonly ThingFlowNode[] | null;
-  /** The Thing the traversal has reached, or `null` in overview. */
-  activeThingId: string | null;
+  projectedNodes: readonly ResourceFlowNode[] | null;
+  /** The Resource the traversal has reached, or `null` in overview. */
+  activeResourceId: string | null;
   /**
    * That a traversal is running — the Navigation mode, not an availability
    * answer. Two consumers read it, and neither is an authoring operation: the
@@ -181,16 +185,16 @@ export interface SpaceCanvasProps {
    */
   presenting: boolean;
   /**
-   * That the selected Diagram's placement has resolved and the store has taken
+   * That the selected Map's placement has resolved and the store has taken
    * it — the fact, not an operation, and read by one consumer: the aria
    * description React Flow gives every node.
    *
    * It is here rather than folded into `availability` because that description
    * is a *statement about the placement* and its withheld form says so in
-   * words: "This Thing is unavailable while placement is pending." Any
+   * words: "This Resource is unavailable while placement is pending." Any
    * availability answer would make it false somewhere — `connectOnCanvas`
    * announces "pending" over a placement that resolved long ago the moment an
-   * author begins an inline Diagram rename on the Dock, which is a lie told
+   * author begins an inline Map rename on the Dock, which is a lie told
    * to exactly the readers who depend on it, and told while the canvas behind
    * that rename is fully reachable (nothing about a chrome rename covers the
    * graph or traps focus).
@@ -209,32 +213,32 @@ export interface SpaceCanvasProps {
    * (`CONTEXT.md`, Availability).
    */
   availability: AuthoringAvailability;
-  onNodesChange: OnNodesChange<ThingFlowNode>;
+  onNodesChange: OnNodesChange<ResourceFlowNode>;
   onEdgesChange: OnEdgesChange;
   /** The whole Edge interaction lifecycle, which this canvas composes rather than interprets. */
   edgeAuthoring: EdgeAuthoring;
   selection: CanvasSelection;
-  onSelectThing: (thingId: ThingId) => void;
+  onSelectResource: (resourceId: ResourceId) => void;
   onSelectEdge: (subject: EdgeSubject) => void;
-  /** The Things this Diagram places — what an Edge picker may offer. */
-  placedThings: readonly Thing[];
+  /** The Resources this Map places — what an Edge picker may offer. */
+  placedResources: readonly Resource[];
   /** Exact neutral title shown by the transient empty-drop preview. */
-  newThingTitle: string;
+  newResourceTitle: string;
   /**
-   * Create a detached Thing at the visible centre — the graph-focused `C`, whose
+   * Create a detached Resource at the visible centre — the graph-focused `C`, whose
    * toolbar twin lives outside this component.
    */
-  onAddThing: () => void;
-  /** Complete an external Things View drop at an authored top-left anchor. */
-  onAddExistingThing: (
-    thingId: ThingId,
+  onAddResource: () => void;
+  /** Complete an external Resources View drop at an authored top-left anchor. */
+  onAddExistingResource: (
+    resourceId: ResourceId,
     anchor: { readonly x: number; readonly y: number },
   ) => void;
   /**
-   * The Thing a completed creation asks to be named, or `null`.
+   * The Resource a completed creation asks to be named, or `null`.
    *
    * The identity, not a flag: each creation mints a fresh one, so a *change* is
-   * what says a Thing has just been created — which is how the naming
+   * what says a Resource has just been created — which is how the naming
    * continuation survives being a prop rather than a command. A remount takes
    * nothing with it, because the initial state is whatever arrives with it.
    */
@@ -245,42 +249,42 @@ export interface SpaceCanvasProps {
    * Whether a content edit is running, for the one control outside this canvas
    * that has to know: Present.
    *
-   * Presenting replaces the Thing with its content rather than drawing content on
+   * Presenting replaces the Resource with its content rather than drawing content on
    * it, so an editor cannot survive it and the draft would go with no exit
    * spent. The caret stays this component's (`spec.md` §6) — what leaves is the
    * one bit a sibling surface needs to stay out of the way.
    */
   onBodyEditingChange?: (editing: boolean) => void;
-  /** Reports the Thing title draft so sibling naming surfaces stay withdrawn. */
+  /** Reports the Resource title draft so sibling naming surfaces stay withdrawn. */
   onTitleEditingChange?: (editing: boolean) => void;
-  thingResize: ThingResize;
+  resourceResize: ResourceResize;
   /**
-   * Report whether some embedded Diagram on this canvas is running a Thing edit.
+   * Report whether some embedded Map on this canvas is running a Resource edit.
    *
    * The one availability fact that is produced *inside* this subtree: an
-   * embedded Diagram publishes its live edits from within React Flow, so nothing
+   * embedded Map publishes its live edits from within React Flow, so nothing
    * above can see one without being told. It goes into the render adapter
    * rather than up a chain of `useState` because that store re-renders the
    * Space's command surface and this canvas together, and the answer derived
    * from it comes back down as `availability.authorOnCanvas` — one answer, not
    * a term recombined here (`authoring-availability.ts`).
    */
-  reportEmbeddedDiagramEditing: (editing: boolean) => void;
+  reportEmbeddedMapEditing: (editing: boolean) => void;
   /** Identity of the authored surface this canvas and its HUD are drawing. */
   spaceTitle: string;
-  diagramTitle: string;
+  mapTitle: string;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
-  /** What each Space Thing's target offers it, for the Things of kind `space` on this canvas. */
-  spaceThingTargets?: SpaceThingTargets;
+  /** What each Space Resource's target offers it, for the Resources of kind `space` on this canvas. */
+  spaceResourceTargets?: SpaceResourceTargets;
   /**
-   * What commands each Thing on this canvas offers — copy an address, delete it
-   * — drawn on the Thing's own rail (ADR 0073).
+   * What commands each Resource on this canvas offers — copy an address, delete it
+   * — drawn on the Resource's own rail (ADR 0073).
    *
-   * Passed straight through to `useCanvasThingAuthoring`, which is where every
-   * other per-Thing operation is attached. Absent on a canvas whose Things have
-   * no such commands to run, which is how an embedded Diagram draws none.
+   * Passed straight through to `useCanvasResourceAuthoring`, which is where every
+   * other per-Resource operation is attached. Absent on a canvas whose Resources have
+   * no such commands to run, which is how an embedded Map draws none.
    *
    * A command list is built afresh on every render of the composition that owns
    * it — an address and an Edit both read state that has just changed — so this
@@ -289,7 +293,7 @@ export interface SpaceCanvasProps {
    * Correctness is unaffected, and closing it is the same per-node cache that
    * note already names.
    */
-  thingEntityActions?: (thingId: ThingId) => readonly EntityActionGroup[];
+  resourceEntityActions?: (resourceId: ResourceId) => readonly EntityActionGroup[];
 }
 
 export function SpaceCanvas({
@@ -297,7 +301,7 @@ export function SpaceCanvas({
   nodes,
   edges,
   projectedNodes,
-  activeThingId,
+  activeResourceId,
   presenting,
   placementReady,
   availability,
@@ -305,26 +309,26 @@ export function SpaceCanvas({
   onEdgesChange,
   edgeAuthoring,
   selection,
-  onSelectThing,
+  onSelectResource,
   onSelectEdge,
-  placedThings,
-  newThingTitle,
-  onAddThing,
-  onAddExistingThing,
+  placedResources,
+  newResourceTitle,
+  onAddResource,
+  onAddExistingResource,
   nameOnCreation,
   authoring,
   spaceSession,
   onBodyEditingChange,
   onTitleEditingChange,
-  thingResize,
-  reportEmbeddedDiagramEditing,
+  resourceResize,
+  reportEmbeddedMapEditing,
   spaceTitle,
-  diagramTitle,
+  mapTitle,
   graphs,
   colorByGraphId,
   activeGraphId,
-  spaceThingTargets,
-  thingEntityActions,
+  spaceResourceTargets,
+  resourceEntityActions,
 }: SpaceCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -333,7 +337,7 @@ export function SpaceCanvas({
   const activeSpaceId = useSyncExternalStore(spaces?.subscribe ?? subscribeToNothing, () =>
     spaces === null ? null : spaces.getState().activeSpaceId,
   );
-  const readThisCanvasOpeningFraming = (): SpaceThingFraming | undefined => {
+  const readThisCanvasOpeningFraming = (): SpaceResourceFraming | undefined => {
     if (spaces === null) return undefined;
     const entry = spaces.entry(thisSpaceId);
     return entry === undefined ? undefined : spaces.openingFraming(entry);
@@ -349,7 +353,7 @@ export function SpaceCanvas({
     setOpeningFraming(readThisCanvasOpeningFraming());
   }
   /**
-   * The Things a gesture is moving, read from React Flow's `nodeLookup`.
+   * The Resources a gesture is moving, read from React Flow's `nodeLookup`.
    */
   const draggingKey = useStore((flow) =>
     [...flow.nodeLookup.values()]
@@ -373,14 +377,14 @@ export function SpaceCanvas({
     onPortalEditingChange,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceThings(nodes, spaces, draggingIds);
+  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds);
 
   const editingEmbeddingIds = new Set(
     embeddedRequests.flatMap((request) => {
       const value = embeddedPublications.get(request.parent.id);
       return value !== undefined &&
         request.entry === value.entry &&
-        value.diagramId === request.diagramId &&
+        value.mapId === request.mapId &&
         (value.bodyEditing || value.titleEditing)
         ? [request.parent.id]
         : [];
@@ -391,7 +395,7 @@ export function SpaceCanvas({
    * that answers with it.
    *
    * *Whether* an embedding is editing is the fact; *which* one stays here, in
-   * the Set above, because it is a question about a Thing of this canvas rather
+   * the Set above, because it is a question about a Resource of this canvas rather
    * than about what is in progress. A layout effect rather than an ordinary
    * one: the answer comes back through the store in the same commit, so no
    * frame is painted with authoring still offered over a live embedded edit.
@@ -399,34 +403,34 @@ export function SpaceCanvas({
    * Every reason the answers carry lives in `authoring-availability.ts`, beside
    * the answer it governs — including why the Edge lifecycle reads
    * `authorOnCanvas` rather than the shorter rule it once had, and why a
-   * connection is reachable on the presented Thing that `authorOnCanvas`
+   * connection is reachable on the presented Resource that `authorOnCanvas`
    * withdraws.
    */
   const embeddedEditing = editingEmbeddingIds.size > 0;
   useLayoutEffect(() => {
-    reportEmbeddedDiagramEditing(embeddedEditing);
-    return () => reportEmbeddedDiagramEditing(false);
-  }, [embeddedEditing, reportEmbeddedDiagramEditing]);
-  const thingAuthoring = useCanvasThingAuthoring({
+    reportEmbeddedMapEditing(embeddedEditing);
+    return () => reportEmbeddedMapEditing(false);
+  }, [embeddedEditing, reportEmbeddedMapEditing]);
+  const resourceAuthoring = useCanvasResourceAuthoring({
     continuation,
     nodes,
     availability,
     nameOnCreation,
     authoring,
     spaceSession,
-    thingResize,
-    onSelectThing,
-    spaceThingTargets,
-    thingEntityActions,
+    resourceResize,
+    onSelectResource,
+    spaceResourceTargets,
+    resourceEntityActions,
     portalEditing: editingPortals,
     onPortalEditingChange,
   });
   const {
     bodyEditing,
-    openThing: onOpenThing,
+    openResource: onOpenResource,
     beginTitleEditing,
-    completeSpaceThingFraming,
-  } = thingAuthoring;
+    completeSpaceResourceFraming,
+  } = resourceAuthoring;
 
   const embeddedBodyEditing = embeddedRequests.some(
     (request) =>
@@ -442,37 +446,37 @@ export function SpaceCanvas({
     onBodyEditingChange?.(bodyEditing || embeddedBodyEditing);
   }, [bodyEditing, embeddedBodyEditing, onBodyEditingChange]);
   useEffect(() => {
-    onTitleEditingChange?.(thingAuthoring.titleEditing || embeddedTitleEditing);
+    onTitleEditingChange?.(resourceAuthoring.titleEditing || embeddedTitleEditing);
     return () => onTitleEditingChange?.(false);
-  }, [thingAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
+  }, [resourceAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
   const liveEmbeddings = useMemo(
     () =>
       embeddedRequests.flatMap((request) => {
         const value = embeddedPublications.get(request.parent.id);
-        if (value?.diagramId !== request.diagramId) return [];
+        if (value?.mapId !== request.mapId) return [];
         if (request.entry === value.entry) return [value];
         return [
           {
             ...value,
             changeNodes: () => undefined,
-            // The three Thing commands aimed at a retained read answer it the
+            // The three Resource commands aimed at a retained read answer it the
             // same way: reopen the target's session so the next press acts.
-            // The canvas still announces that delete removes the focused Thing
-            // from its Diagram, and this drawing is still focusable, so an
+            // The canvas still announces that delete removes the focused Resource
+            // from its Map, and this drawing is still focusable, so an
             // answer of `null` alone consumed the key and did nothing at all.
             // There is no refusal to report either — the target is not open,
             // which is a state this press ends rather than a refused Edit.
-            removeThing: () => {
+            removeResource: () => {
               void resumeEmbedded(request.spaceId);
               return null;
             },
-            nodes: value.nodes.map((node): ThingFlowNode => ({
+            nodes: value.nodes.map((node): ResourceFlowNode => ({
               ...clipEmbeddedNode(node, request.bounds),
               draggable: false,
               data: {
                 ...node.data,
                 readOnly: true,
-                onEditThing: () => {
+                onEditResource: () => {
                   void resumeEmbedded(request.spaceId);
                   return 'retained';
                 },
@@ -487,13 +491,15 @@ export function SpaceCanvas({
     [embeddedRequests, embeddedPublications, resumeEmbedded],
   );
 
-  const embedConnectFrom = useRef<{ parentId: string; from: ThingId } | null>(null);
+  const embedConnectFrom = useRef<{ parentId: string; from: ResourceId } | null>(null);
   const mayOfferEmbedded = useCallback(
-    (thingId: ThingId) => {
+    (resourceId: ResourceId) => {
       const session = embedConnectFrom.current;
       if (session === null) return false;
       return (
-        embeddedPublications.get(session.parentId)?.mayConnectThings(session.from, thingId) === true
+        embeddedPublications
+          .get(session.parentId)
+          ?.mayConnectResources(session.from, resourceId) === true
       );
     },
     [embeddedPublications],
@@ -505,8 +511,8 @@ export function SpaceCanvas({
     selection,
     activeGraphId,
     graphs,
-    placedThings,
-    newThingTitle,
+    placedResources,
+    newResourceTitle,
     enabled: availability.authorOnCanvas,
     onSelectEdge,
     mayOfferAlso: mayOfferEmbedded,
@@ -522,13 +528,13 @@ export function SpaceCanvas({
   // `userNode === internals.userNode` fast path misses and all of them re-render
   // rather than the one being dragged. Correctness is unaffected. Closing it
   // needs a per-node cache or the callbacks moved into context — more machinery
-  // than a ten-Thing fixture asks for, so read it as a measured exception rather
+  // than a ten-Resource fixture asks for, so read it as a measured exception rather
   // than an oversight.
 
-  // No pointer gesture on a Thing's body opens it (ADR 0036). A click is left to
+  // No pointer gesture on a Resource's body opens it (ADR 0036). A click is left to
   // React Flow, which selects; the Title is its own one-activation control
   // (ADR 0065), whose events stop before this canvas handler. Opening is the
-  // affordance and the Thing-level keyboard command.
+  // affordance and the Resource-level keyboard command.
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -536,27 +542,27 @@ export function SpaceCanvas({
       if (event.key === 'Enter' || event.key === ' ') {
         if (bodyEditing) return;
         // The same exclusion the `C` branch below makes, and now load-bearing
-        // rather than defensive: an Expanded Thing draws its editor *inside* the
+        // rather than defensive: an Expanded Resource draws its editor *inside* the
         // node, so a Space typed into it would otherwise be cancelled here
         // before the document ever received the character.
         if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-        const thing = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
-        if (thing === null || !event.currentTarget.contains(thing)) return;
-        const thingId = thing.dataset['id'];
-        if (thingId === undefined) return;
+        const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
+        if (resource === null || !event.currentTarget.contains(resource)) return;
+        const resourceId = resource.dataset['id'];
+        if (resourceId === undefined) return;
         event.preventDefault();
         const embedded = liveEmbeddings
           .flatMap((value) => value.nodes)
-          .find((node) => node.id === thingId);
-        if (embedded === undefined) onOpenThing(thingId);
-        else embedded.data.onEditThing?.(true);
+          .find((node) => node.id === resourceId);
+        if (embedded === undefined) onOpenResource(resourceId);
+        else embedded.data.onEditResource?.(true);
         return;
       }
-      // `C` adds a Thing, and it is the only unmodified authoring shortcut there
+      // `C` adds a Resource, and it is the only unmodified authoring shortcut there
       // is. Answered here rather than on the window, so "graph focused" is a
       // fact about where the event came from rather than a guess: this handler
       // sits on React Flow's own wrapper, so a key pressed in the toolbar, in a
-      // pane over the graph or in the Things View never reaches it.
+      // pane over the graph or in the Resources View never reaches it.
       //
       // Three exclusions, and each names a different way the key is not a
       // command. A modifier makes it a browser or OS shortcut. A repeat is one
@@ -564,7 +570,7 @@ export function SpaceCanvas({
       // is somewhere the author is *typing* a c — the inline title editor stops
       // its own key events before they get here, so this covers whatever text
       // entry the canvas gains next rather than a case that exists today.
-      if (event.key.toUpperCase() !== ADD_THING_KEY) return;
+      if (event.key.toUpperCase() !== ADD_RESOURCE_KEY) return;
       // `shiftKey` belongs here for a reason the others do not share: matching
       // case-insensitively is what lets Caps Lock work, and it lets Shift
       // through in the same breath, since both arrive as `C`. Only the flag
@@ -580,14 +586,14 @@ export function SpaceCanvas({
       // rather than the mode alone, so every branch below is already behind it.
       if (bodyEditing) return;
       event.preventDefault();
-      onAddThing();
+      onAddResource();
     },
-    [onOpenThing, availability.authorOnCanvas, bodyEditing, onAddThing, liveEmbeddings],
+    [onOpenResource, availability.authorOnCanvas, bodyEditing, onAddResource, liveEmbeddings],
   );
 
-  // `F2` renames the selected Thing, and this is the *only* handler that answers
+  // `F2` renames the selected Resource, and this is the *only* handler that answers
   // it. A React Flow `onKeyDown` branch used to answer it first and ask nothing
-  // about the target, so the key typed into a control renamed whichever Thing
+  // about the target, so the key typed into a control renamed whichever Resource
   // happened to be selected — a different one, once focus had moved. Two
   // handlers for one key means one of them is the unguarded one; don't add a
   // second back.
@@ -617,16 +623,16 @@ export function SpaceCanvas({
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
   const deleteEdges = edgeSurface.deleteEdges;
-  const editableNodes = thingAuthoring.nodes;
+  const editableNodes = resourceAuthoring.nodes;
   /**
-   * The canvas React Flow draws: this Space's Things, then the Diagrams its
-   * Open Space Things embed (ADR 0068).
+   * The canvas React Flow draws: this Space's Resources, then the Maps its
+   * Open Space Resources embed (ADR 0068).
    *
    * Concatenated here and nowhere earlier. React Flow requires a parent to be
    * declared before its children, which appending satisfies for free; and every
    * rule above — deletion, the title-editing selection, focus, Edge authoring —
-   * is written over this Space's own Things, so an embedded node mixed into
-   * `editableNodes` would put another Space's Thing inside each of them.
+   * is written over this Space's own Resources, so an embedded node mixed into
+   * `editableNodes` would put another Space's Resource inside each of them.
    */
   const canvasNodes = useMemo(
     () =>
@@ -638,13 +644,13 @@ export function SpaceCanvas({
                 ...node,
                 data: { ...node.data, onBodyHeightChange: reportBodyHeight },
               };
-        if (!editingPortals.has(withHeight.data.thingId) || withHeight.data.kind !== 'space') {
+        if (!editingPortals.has(withHeight.data.resourceId) || withHeight.data.kind !== 'space') {
           return withHeight;
         }
-        // `nopan` only: an Open Thing does not take `nowheel` (ADR 0064).
+        // `nopan` only: an Open Resource does not take `nowheel` (ADR 0064).
         // Portal wheel is the capture listener below;
-        // `space-thing-embedded-diagram.test.tsx` ('does not put nowheel on an
-        // Open Space Thing in portal Edit, and wheel still authors its framing')
+        // `space-resource-embedded-map.test.tsx` ('does not put nowheel on an
+        // Open Space Resource in portal Edit, and wheel still authors its framing')
         // holds both that class and that the wheel still frames.
         const classes = [withHeight.className, 'nopan'].filter(
           (value): value is string => value !== undefined && value !== '',
@@ -658,7 +664,7 @@ export function SpaceCanvas({
     [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals],
   );
   const portalNodesById = useMemo(() => {
-    const map = new Map<string, ThingFlowNode>();
+    const map = new Map<string, ResourceFlowNode>();
     for (const node of nodes) map.set(node.id, node);
     for (const value of liveEmbeddings) {
       for (const child of value.nodes) map.set(child.id, child);
@@ -669,7 +675,7 @@ export function SpaceCanvas({
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
     [edgeSurface.edges, liveEmbeddings],
   );
-  const changeCanvasNodes: OnNodesChange<ThingFlowNode> = useCallback(
+  const changeCanvasNodes: OnNodesChange<ResourceFlowNode> = useCallback(
     (changes) => {
       onNodesChange(changes);
       for (const value of liveEmbeddings) value.changeNodes(changes);
@@ -683,7 +689,7 @@ export function SpaceCanvas({
     portalDraft,
     embeddedPublications,
     embeddedRequests,
-    completeSpaceThingFraming,
+    completeSpaceResourceFraming,
     screenToFlowPosition,
     authorOnCanvas: availability.authorOnCanvas,
   });
@@ -697,7 +703,7 @@ export function SpaceCanvas({
       portalDraft,
       embeddedPublications,
       embeddedRequests,
-      completeSpaceThingFraming,
+      completeSpaceResourceFraming,
       screenToFlowPosition,
       authorOnCanvas: availability.authorOnCanvas,
     };
@@ -707,7 +713,7 @@ export function SpaceCanvas({
     portalDraft,
     embeddedPublications,
     embeddedRequests,
-    completeSpaceThingFraming,
+    completeSpaceResourceFraming,
     screenToFlowPosition,
     availability.authorOnCanvas,
   ]);
@@ -718,37 +724,40 @@ export function SpaceCanvas({
 
     let pan: {
       pointerId: number;
-      thingId: ThingId;
+      resourceId: ResourceId;
       lastX: number;
       lastY: number;
-      framing: SpaceThingFraming;
+      framing: SpaceResourceFraming;
     } | null = null;
-    const zoomPending = new Map<ThingId, SpaceThingFraming>();
-    const zoomTimers = new Map<ThingId, ReturnType<typeof setTimeout>>();
+    const zoomPending = new Map<ResourceId, SpaceResourceFraming>();
+    const zoomTimers = new Map<ResourceId, ReturnType<typeof setTimeout>>();
 
-    const persist = (thingId: ThingId, framing: SpaceThingFraming, dropDraft = true) => {
+    const persist = (resourceId: ResourceId, framing: SpaceResourceFraming, dropDraft = true) => {
       if (dropDraft) {
         setPortalDraft((previous) => {
           const next = new Map(previous);
-          next.delete(thingId);
+          next.delete(resourceId);
           return next;
         });
       }
-      portalGestureSnapshot.current.completeSpaceThingFraming(thingId, framing);
+      portalGestureSnapshot.current.completeSpaceResourceFraming(resourceId, framing);
     };
 
-    const flushPendingZoom = (thingId: ThingId, dropDraft = true) => {
-      const pending = zoomPending.get(thingId);
-      const timer = zoomTimers.get(thingId);
+    const flushPendingZoom = (resourceId: ResourceId, dropDraft = true) => {
+      const pending = zoomPending.get(resourceId);
+      const timer = zoomTimers.get(resourceId);
       if (timer !== undefined) clearTimeout(timer);
-      zoomPending.delete(thingId);
-      zoomTimers.delete(thingId);
-      if (pending !== undefined) persist(thingId, pending, dropDraft);
+      zoomPending.delete(resourceId);
+      zoomTimers.delete(resourceId);
+      if (pending !== undefined) persist(resourceId, pending, dropDraft);
     };
 
-    const framingOf = (thingId: ThingId, parentId: string): SpaceThingFraming | undefined => {
+    const framingOf = (
+      resourceId: ResourceId,
+      parentId: string,
+    ): SpaceResourceFraming | undefined => {
       const session = portalGestureSnapshot.current;
-      const drafted = session.portalDraft.get(thingId);
+      const drafted = session.portalDraft.get(resourceId);
       if (drafted !== undefined) return drafted;
       const parent = session.portalNodesById.get(parentId);
       const stored = parent?.data.spaceContent?.framing;
@@ -761,7 +770,7 @@ export function SpaceCanvas({
       return framingFromFit(published.origin, request.bounds);
     };
 
-    const portalParent = (target: EventTarget | null): ThingFlowNode | undefined => {
+    const portalParent = (target: EventTarget | null): ResourceFlowNode | undefined => {
       if (!(target instanceof Element)) return undefined;
       if (
         target.closest('.nokey, button, [role="toolbar"], .react-flow__resize-control') !== null
@@ -775,11 +784,11 @@ export function SpaceCanvas({
       const node = portalGestureSnapshot.current.portalNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
       if (node.data.kind !== 'space') return undefined;
-      if (!portalGestureSnapshot.current.editingPortals.has(node.data.thingId)) return undefined;
+      if (!portalGestureSnapshot.current.editingPortals.has(node.data.resourceId)) return undefined;
       return node;
     };
 
-    const portalUnder = (target: EventTarget | null): ThingFlowNode | undefined => {
+    const portalUnder = (target: EventTarget | null): ResourceFlowNode | undefined => {
       if (!(target instanceof Element)) return undefined;
       const nodeEl = target.closest<HTMLElement>('.react-flow__node[data-id]');
       if (nodeEl === null) return undefined;
@@ -798,18 +807,18 @@ export function SpaceCanvas({
       if (!portalGestureSnapshot.current.authorOnCanvas) return;
       const parent = portalParent(event.target);
       if (parent === undefined) return;
-      const thingId = parent.data.thingId;
-      const existingTimer = zoomTimers.get(thingId);
+      const resourceId = parent.data.resourceId;
+      const existingTimer = zoomTimers.get(resourceId);
       if (existingTimer !== undefined) clearTimeout(existingTimer);
-      zoomTimers.delete(thingId);
-      const pendingZoom = zoomPending.get(thingId);
-      if (pendingZoom !== undefined) zoomPending.delete(thingId);
-      const framing = pendingZoom ?? framingOf(thingId, parent.id);
+      zoomTimers.delete(resourceId);
+      const pendingZoom = zoomPending.get(resourceId);
+      if (pendingZoom !== undefined) zoomPending.delete(resourceId);
+      const framing = pendingZoom ?? framingOf(resourceId, parent.id);
       if (framing === undefined) return;
       event.preventDefault();
       pan = {
         pointerId: event.pointerId,
-        thingId,
+        resourceId,
         lastX: event.clientX,
         lastY: event.clientY,
         framing,
@@ -828,19 +837,19 @@ export function SpaceCanvas({
         y: event.clientY,
       });
       const next = panFraming(pan.framing, { x: to.x - from.x, y: to.y - from.y });
-      const thingId = pan.thingId;
+      const resourceId = pan.resourceId;
       pan = { ...pan, lastX: event.clientX, lastY: event.clientY, framing: next };
       setPortalDraft((previous) => {
-        if (previous.get(thingId) === next) return previous;
+        if (previous.get(resourceId) === next) return previous;
         const drafted = new Map(previous);
-        drafted.set(thingId, next);
+        drafted.set(resourceId, next);
         return drafted;
       });
     };
 
     const onPointerUp = (event: PointerEvent) => {
       if (pan?.pointerId !== event.pointerId) return;
-      persist(pan.thingId, pan.framing);
+      persist(pan.resourceId, pan.framing);
       pan = null;
     };
 
@@ -850,22 +859,22 @@ export function SpaceCanvas({
       if (parent === undefined) return;
       event.preventDefault();
       event.stopPropagation();
-      const thingId = parent.data.thingId;
-      const current = zoomPending.get(thingId) ?? framingOf(thingId, parent.id);
+      const resourceId = parent.data.resourceId;
+      const current = zoomPending.get(resourceId) ?? framingOf(resourceId, parent.id);
       if (current === undefined) return;
       const next = zoomFraming(current, event.deltaY < 0 ? 1.1 : 1 / 1.1);
-      zoomPending.set(thingId, next);
+      zoomPending.set(resourceId, next);
       setPortalDraft((previous) => {
         const drafted = new Map(previous);
-        drafted.set(thingId, next);
+        drafted.set(resourceId, next);
         return drafted;
       });
-      const existing = zoomTimers.get(thingId);
+      const existing = zoomTimers.get(resourceId);
       if (existing !== undefined) clearTimeout(existing);
       zoomTimers.set(
-        thingId,
+        resourceId,
         setTimeout(() => {
-          flushPendingZoom(thingId);
+          flushPendingZoom(resourceId);
         }, 160),
       );
     };
@@ -881,7 +890,7 @@ export function SpaceCanvas({
       root.removeEventListener('pointerup', onPointerUp);
       root.removeEventListener('pointercancel', onPointerUp);
       root.removeEventListener('wheel', onWheel, { capture: true });
-      for (const thingId of [...zoomPending.keys()]) flushPendingZoom(thingId, false);
+      for (const resourceId of [...zoomPending.keys()]) flushPendingZoom(resourceId, false);
     };
   }, [setPortalDraft]);
 
@@ -889,8 +898,8 @@ export function SpaceCanvas({
    * What a refused canvas command left the author with, or `null`.
    *
    * The Edge half of this key has surfaces of its own to land a refusal on —
-   * the selected Edge's controls and its endpoint editor. The Thing half has
-   * none: the press is over and the Thing it named may not even be on screen, so
+   * the selected Edge's controls and its endpoint editor. The Resource half has
+   * none: the press is over and the Resource it named may not even be on screen, so
    * this sentence is the whole of what the author is told. It is the same case
    * `edge-authoring-react.tsx` calls a `gesture` refusal, and it shares that
    * announcement's placement.
@@ -899,7 +908,7 @@ export function SpaceCanvas({
   // A refusal names the selection it was made against, so a selection that moves
   // takes it with it — the same rule Edge Authoring applies to a retained
   // `deletion` refusal. Adjusted during render rather than in an effect, the way
-  // `canvas-thing-authoring.ts` drops a caret when authoring is withdrawn: the
+  // `canvas-resource-authoring.ts` drops a caret when authoring is withdrawn: the
   // stale sentence never reaches the DOM, and no cascading render is scheduled.
   const [refusalSelection, setRefusalSelection] = useState(selection);
   if (refusalSelection !== selection) {
@@ -969,24 +978,25 @@ export function SpaceCanvas({
       const embeddedId = focusedNodeId ?? embedded?.nodes.find((node) => node.selected)?.id;
       if (embedded !== undefined && embeddedId !== undefined) {
         event.preventDefault();
-        setCommandRefusal(embedded.removeThing(embeddedId));
+        setCommandRefusal(embedded.removeResource(embeddedId));
         return;
       }
-      // The Thing the key was *aimed at* wins over the one selected before it.
+      // The Resource the key was *aimed at* wins over the one selected before it.
       // React Flow never selects a node on focus — its `onFocus` only auto-pans
       // — and only the Edge half of this canvas bridges the two, so a Tab to
-      // another Thing leaves the selection behind while that Thing's assistive
+      // another Resource leaves the selection behind while that Resource's assistive
       // description promises Delete removes *it*. The open branch above already
-      // resolves its Thing this way; the selection is the fallback for a press
+      // resolves its Resource this way; the selection is the fallback for a press
       // that came from the pane rather than from a node.
-      const focusedThingId = focusedThing(event.target, current.nodes);
+      const focusedResourceId = focusedResource(event.target, current.nodes);
       const { selection } = current;
-      const thingId = focusedThingId ?? (selection.kind === 'thing' ? selection.thingId : null);
-      if (thingId !== null) {
+      const resourceId =
+        focusedResourceId ?? (selection.kind === 'resource' ? selection.resourceId : null);
+      if (resourceId !== null) {
         event.preventDefault();
         const result = current.authoring.complete({
-          kind: 'removed-thing-from-diagram',
-          thingId,
+          kind: 'removed-resource-from-map',
+          resourceId,
         });
         setCommandRefusal(
           result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null,
@@ -1033,7 +1043,7 @@ export function SpaceCanvas({
     (event, params) => {
       const parsed = parseEmbeddedNodeId(params.nodeId ?? '');
       if (parsed !== undefined) {
-        embedConnectFrom.current = { parentId: parsed.parentId, from: parsed.thingId };
+        embedConnectFrom.current = { parentId: parsed.parentId, from: parsed.resourceId };
         return;
       }
       embedConnectFrom.current = null;
@@ -1045,7 +1055,7 @@ export function SpaceCanvas({
     (connection) => {
       const routed = canvasNodeConnection(connection.source, connection.target);
       if (routed.kind === 'embedded') {
-        embeddedPublications.get(routed.parentId)?.connectThings(routed.from, routed.to);
+        embeddedPublications.get(routed.parentId)?.connectResources(routed.from, routed.to);
         return;
       }
       if (routed.kind === 'host') onConnect(connection);
@@ -1065,7 +1075,7 @@ export function SpaceCanvas({
       if (routed.kind === 'invalid') return false;
       if (routed.kind === 'embedded') {
         return (
-          embeddedPublications.get(routed.parentId)?.mayConnectThings(routed.from, routed.to) ===
+          embeddedPublications.get(routed.parentId)?.mayConnectResources(routed.from, routed.to) ===
           true
         );
       }
@@ -1076,7 +1086,7 @@ export function SpaceCanvas({
 
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
-      if (!availability.authorOnCanvas || !event.dataTransfer.types.includes(THING_DRAG_TYPE))
+      if (!availability.authorOnCanvas || !event.dataTransfer.types.includes(RESOURCE_DRAG_TYPE))
         return;
       if (!(event.target instanceof Element) || event.target.closest('.react-flow__pane') === null)
         return;
@@ -1090,20 +1100,20 @@ export function SpaceCanvas({
     (event: ReactDragEvent<HTMLDivElement>) => {
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.target.closest('.react-flow__pane') === null) return;
-      const thingId = uuidSchema.safeParse(event.dataTransfer.getData(THING_DRAG_TYPE));
-      if (!thingId.success) return;
+      const resourceId = uuidSchema.safeParse(event.dataTransfer.getData(RESOURCE_DRAG_TYPE));
+      if (!resourceId.success) return;
       event.preventDefault();
       const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      onAddExistingThing(thingId.data, {
-        x: point.x - THING_SIZE.width / 2,
-        y: point.y - THING_SIZE.height / 2,
+      onAddExistingResource(resourceId.data, {
+        x: point.x - RESOURCE_SIZE.width / 2,
+        y: point.y - RESOURCE_SIZE.height / 2,
       });
     },
-    [availability.authorOnCanvas, onAddExistingThing, screenToFlowPosition],
+    [availability.authorOnCanvas, onAddExistingResource, screenToFlowPosition],
   );
 
   const embeddedEvents = useMemo(() => {
-    const props: Pick<ReactFlowProps<ThingFlowNode>, 'onNodeClick'> = {};
+    const props: Pick<ReactFlowProps<ResourceFlowNode>, 'onNodeClick'> = {};
     if (!presenting) {
       props.onNodeClick = (_event, node) => {
         const request = embeddedRequests.find((candidate) => candidate.parent.id === node.parentId);
@@ -1154,14 +1164,14 @@ export function SpaceCanvas({
       tabIndex={-1}
       fitView={openingFraming === undefined}
       fitViewOptions={OVERVIEW_FIT}
-      // Nothing on a Thing answers a double click. ADR 0065 made the Title a
+      // Nothing on a Resource answers a double click. ADR 0065 made the Title a
       // one-activation control, so the second click of a pair lands in the field
       // the first one opened — and that field, like the control, carries
-      // `.nopan`, the one class React Flow's zoom filter exempts. The Thing body
+      // `.nopan`, the one class React Flow's zoom filter exempts. The Resource body
       // carries no such class, so a double click there would zoom the canvas
-      // while meaning nothing to the Thing. Off for the whole canvas rather than
+      // while meaning nothing to the Resource. Off for the whole canvas rather than
       // per node, so the gesture does not change meaning two pixels away from a
-      // Thing.
+      // Resource.
       zoomOnDoubleClick={false}
       // While presenting the arrow keys control traversal, so React Flow must not
       // also read them as moving or selecting a node.
@@ -1170,7 +1180,7 @@ export function SpaceCanvas({
       elementsSelectable={availability.selectNodes}
       // Half of a pair, and useless without the other half. React Flow resolves
       // this into `NodeProps.isConnectable` and hands it to the node, enforcing
-      // nothing itself on a handle it did not render — so `ThingNode` forwards it
+      // nothing itself on a handle it did not render — so `ResourceNode` forwards it
       // to the four authoring handles, and only then does this line mean
       // anything beyond whether the connection line draws.
       //
@@ -1190,7 +1200,7 @@ export function SpaceCanvas({
       connectionLineStyle={connectionLineStyle}
       connectionLineComponent={GraphConnectionLine}
       minZoom={0.2}
-      // Presenting draws one thing full-screen, which is far closer than React
+      // Presenting draws one resource full-screen, which is far closer than React
       // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
       // outside its own extent and the first wheel tick yanks it back.
       maxZoom={MAX_ZOOM}
@@ -1205,7 +1215,7 @@ export function SpaceCanvas({
                 y={absolute.y + bounds.top}
                 width={Math.max(0, bounds.right - bounds.left)}
                 height={Math.max(0, bounds.bottom - bounds.top)}
-                // The window leans with the Thing it is cut out of. Written as
+                // The window leans with the Resource it is cut out of. Written as
                 // SVG's own `rotate(angle cx cy)`, which carries its centre and
                 // so needs none of the `transform-box` reasoning the Edge layer
                 // does — this `<clipPath>` lives in a 0x0 `<svg>` of its own,
@@ -1213,7 +1223,7 @@ export function SpaceCanvas({
                 transform={
                   tiltCenter === undefined
                     ? undefined
-                    : `rotate(${CANVAS_THING_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
+                    : `rotate(${CANVAS_RESOURCE_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
                 }
               />
             </clipPath>
@@ -1222,15 +1232,15 @@ export function SpaceCanvas({
       </svg>
       {embeddedRequests.map((request) =>
         request.entry === undefined ? null : (
-          <EmbeddedDiagramAuthoring
+          <EmbeddedMapAuthoring
             continuation={continuation}
-            key={`${request.parent.id}:${request.diagramId}`}
+            key={`${request.parent.id}:${request.mapId}`}
             parent={request.parent}
             entry={request.entry}
-            diagramId={request.diagramId}
+            mapId={request.mapId}
             graphId={request.graphId}
             // Two answers and one membership test, and each is here for its own
-            // reason. `authorInEmbeddedDiagram` is every way this canvas is not
+            // reason. `authorInEmbeddedMap` is every way this canvas is not
             // being authored *except* an embedded edit; `authorOnCanvas` adds
             // that one, so it is false the moment any embedding is editing —
             // and the membership test is that same fact read the other way
@@ -1248,14 +1258,14 @@ export function SpaceCanvas({
                 portalNodesById,
                 editingPortals,
               ),
-              authorInEmbeddedDiagram: availability.authorInEmbeddedDiagram,
+              authorInEmbeddedMap: availability.authorInEmbeddedMap,
               authorOnCanvas: availability.authorOnCanvas,
               thisEmbeddingEditing: editingEmbeddingIds.has(request.parent.id),
               hostBodyEditing: bodyEditing,
-              hostTitleEditing: thingAuthoring.titleEditing,
+              hostTitleEditing: resourceAuthoring.titleEditing,
             })}
             framing={
-              portalDraft.get(request.parent.data.thingId) ??
+              portalDraft.get(request.parent.data.resourceId) ??
               request.parent.data.spaceContent?.framing
             }
             bounds={request.bounds}
@@ -1267,10 +1277,10 @@ export function SpaceCanvas({
         ),
       )}
       {/*
-        A failed read is announced on the Space Thing that asked for it, named by
-        the Title the author gave that Thing: the canvas can hold several
+        A failed read is announced on the Space Resource that asked for it, named by
+        the Title the author gave that Resource: the canvas can hold several
         embeddings, and a sentence naming none of them says nothing about which
-        one is empty. Drawn from the standing requests, so a Thing that is Closed
+        one is empty. Drawn from the standing requests, so a Resource that is Closed
         takes its announcement with it.
       */}
       {embeddedRequests.flatMap(({ parent, spaceId }) => {
@@ -1297,14 +1307,14 @@ export function SpaceCanvas({
       {graphs.length > 0 && (
         <GraphHud
           spaceTitle={spaceTitle}
-          diagramTitle={diagramTitle}
+          mapTitle={mapTitle}
           graphs={graphs}
           colorByGraphId={colorByGraphId}
           activeGraphId={activeGraphId}
         />
       )}
       <OverviewCamera presenting={presenting} />
-      <PresentingCamera activeThingId={activeThingId} />
+      <PresentingCamera activeResourceId={activeResourceId} />
       <OpeningFramingCamera framing={openingFraming} />
       {edgeSurface.layer}
     </ReactFlow>,

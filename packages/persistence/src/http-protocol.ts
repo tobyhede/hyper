@@ -445,44 +445,44 @@ export interface CommitRefusalBody {
         readonly snapshotIndexes: readonly number[];
       }
     | {
-        readonly kind: 'duplicate-thing-id';
-        readonly thingId: string;
+        readonly kind: 'duplicate-resource-id';
+        readonly resourceId: string;
         readonly spaceIds: readonly string[];
       }
     | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: string }
     | {
-        readonly kind: 'space-thing-target-missing';
+        readonly kind: 'space-resource-target-missing';
         readonly spaceId: string;
-        readonly thingId: string;
+        readonly resourceId: string;
         readonly targetSpaceId: string;
       }
     | {
-        readonly kind: 'space-thing-reference-cycle';
+        readonly kind: 'space-resource-reference-cycle';
         readonly spaceId: string;
-        readonly thingId: string;
+        readonly resourceId: string;
         readonly targetSpaceId: string;
       }
     | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: string }
     | {
-        readonly kind: 'space-thing-diagram-missing';
+        readonly kind: 'space-resource-map-missing';
         readonly spaceId: string;
-        readonly thingId: string;
+        readonly resourceId: string;
         readonly targetSpaceId: string;
-        readonly diagramId: string;
+        readonly mapId: string;
       }
     | {
-        readonly kind: 'space-thing-graph-missing';
+        readonly kind: 'space-resource-graph-missing';
         readonly spaceId: string;
-        readonly thingId: string;
+        readonly resourceId: string;
         readonly targetSpaceId: string;
         readonly graphId: string;
       }
     | {
-        readonly kind: 'space-thing-graph-outside-diagram';
+        readonly kind: 'space-resource-graph-outside-map';
         readonly spaceId: string;
-        readonly thingId: string;
+        readonly resourceId: string;
         readonly targetSpaceId: string;
-        readonly diagramId: string;
+        readonly mapId: string;
         readonly graphId: string;
       }
   )[];
@@ -530,28 +530,28 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'unterminated-frontmatter':
     case 'invalid-yaml':
     case 'invalid-frontmatter': {
-      const error = exactRecord(value, ['kind', 'path', 'message'], 'Thing file error');
+      const error = exactRecord(value, ['kind', 'path', 'message'], 'Resource file error');
       return {
         kind,
-        path: requiredString(error['path'], 'Thing file path'),
-        message: requiredString(error['message'], 'Thing file message'),
+        path: requiredString(error['path'], 'Resource file path'),
+        message: requiredString(error['message'], 'Resource file message'),
       };
     }
-    case 'duplicate-thing-id':
+    case 'duplicate-resource-id':
     case 'duplicate-graph-id':
-    case 'duplicate-diagram-id':
-    case 'diagram-member-missing-thing':
-    case 'diagram-active-graph-missing':
-    case 'diagram-active-graph-outside-diagram':
-    case 'graph-edge-missing-thing':
-    case 'graph-edge-thing-outside-diagram':
-    case 'unresolved-default-diagram':
+    case 'duplicate-map-id':
+    case 'map-member-missing-resource':
+    case 'map-active-graph-missing':
+    case 'map-active-graph-outside-map':
+    case 'graph-edge-missing-resource':
+    case 'graph-edge-resource-outside-map':
+    case 'unresolved-default-map':
     case 'duplicate-graph-edge':
     case 'unresolved-reference-target':
     case 'reference-targets-self':
     case 'reference-targets-reference':
     case 'reference-target-must-own-content':
-    case 'space-thing-reference-cycle': {
+    case 'space-resource-reference-cycle': {
       const error = exactRecord(value, ['kind', 'ref', 'message'], 'Space reference error');
       return {
         kind,
@@ -564,10 +564,10 @@ const decodeSpaceError = (value: unknown): SpaceError => {
   }
 };
 
-const decodeSpaceThingLocation = (record: Record<string, unknown>) => ({
-  spaceId: requiredUuid(record['spaceId'], 'Space Thing Space id'),
-  thingId: requiredUuid(record['thingId'], 'Space Thing id'),
-  targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Thing target Space id'),
+const decodeSpaceResourceLocation = (record: Record<string, unknown>) => ({
+  spaceId: requiredUuid(record['spaceId'], 'Space Resource Space id'),
+  resourceId: requiredUuid(record['resourceId'], 'Space Resource id'),
+  targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Resource target Space id'),
 });
 
 const decodeAggregateError = (value: unknown): SpaceAggregateError => {
@@ -605,67 +605,71 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
         ),
       };
     }
-    case 'duplicate-thing-id': {
-      const error = exactRecord(value, ['kind', 'thingId', 'spaceIds'], 'duplicate Thing refusal');
+    case 'duplicate-resource-id': {
+      const error = exactRecord(
+        value,
+        ['kind', 'resourceId', 'spaceIds'],
+        'duplicate Resource refusal',
+      );
       if (!Array.isArray(error['spaceIds'])) throw new Error('Space ids must be an array');
       return {
         kind,
-        thingId: requiredUuid(error['thingId'], 'duplicate Thing id'),
-        spaceIds: error['spaceIds'].map((id) => requiredUuid(id, 'duplicate Thing Space id')),
+        resourceId: requiredUuid(error['resourceId'], 'duplicate Resource id'),
+        spaceIds: error['spaceIds'].map((id) => requiredUuid(id, 'duplicate Resource Space id')),
       };
     }
     case 'meta-space-missing': {
       const error = exactRecord(value, ['kind', 'metaSpaceId'], 'missing Meta Space refusal');
       return { kind, metaSpaceId: requiredUuid(error['metaSpaceId'], 'Meta Space id') };
     }
-    case 'space-thing-target-missing':
-    case 'space-thing-reference-cycle': {
+    case 'space-resource-target-missing':
+    case 'space-resource-reference-cycle': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'thingId', 'targetSpaceId'],
-        'Space Thing refusal',
+        ['kind', 'spaceId', 'resourceId', 'targetSpaceId'],
+        'Space Resource refusal',
       );
-      return { kind, ...decodeSpaceThingLocation(error) };
+      return { kind, ...decodeSpaceResourceLocation(error) };
     }
     case 'ordinary-space-unreferenced': {
       const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
       return { kind, spaceId: requiredUuid(error['spaceId'], 'unreferenced Space id') };
     }
-    case 'space-thing-diagram-missing': {
+    case 'space-resource-map-missing': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'thingId', 'targetSpaceId', 'diagramId'],
-        'Space Thing Diagram refusal',
+        ['kind', 'spaceId', 'resourceId', 'targetSpaceId', 'mapId'],
+        'Space Resource Map refusal',
       );
       return {
         kind,
-        ...decodeSpaceThingLocation(error),
-        diagramId: requiredUuid(error['diagramId'], 'Space Thing Diagram id'),
+        ...decodeSpaceResourceLocation(error),
+        mapId: requiredUuid(error['mapId'], 'Space Resource Map id'),
       };
     }
-    case 'space-thing-graph-missing': {
+    case 'space-resource-graph-missing': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'thingId', 'targetSpaceId', 'graphId'],
-        'Space Thing Graph refusal',
+        ['kind', 'spaceId', 'resourceId', 'targetSpaceId', 'graphId'],
+        'Space Resource Graph refusal',
       );
       return {
         kind,
-        ...decodeSpaceThingLocation(error),
-        graphId: requiredUuid(error['graphId'], 'Space Thing Graph id'),
+        ...decodeSpaceResourceLocation(error),
+        graphId: requiredUuid(error['graphId'], 'Space Resource Graph id'),
       };
     }
-    case 'space-thing-graph-outside-diagram': {
+    case 'space-resource-graph-outside-map': {
       const error = exactRecord(
         value,
-        ['kind', 'spaceId', 'thingId', 'targetSpaceId', 'diagramId', 'graphId'],
-        'Space Thing Graph membership refusal',
+        ['kind', 'spaceId', 'resourceId', 'targetSpaceId', 'mapId', 'graphId'],
+        'Space Resource Graph membership refusal',
       );
       return {
         kind,
-        ...decodeSpaceThingLocation(error),
-        diagramId: requiredUuid(error['diagramId'], 'Space Thing Diagram id'),
-        graphId: requiredUuid(error['graphId'], 'Space Thing Graph id'),
+        ...decodeSpaceResourceLocation(error),
+        mapId: requiredUuid(error['mapId'], 'Space Resource Map id'),
+        graphId: requiredUuid(error['graphId'], 'Space Resource Graph id'),
       };
     }
     default:

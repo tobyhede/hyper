@@ -8,14 +8,19 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
-import type { ThingId, GraphId, DiagramId } from '@project/core';
+import type { ResourceId, GraphId, MapId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
   type LayoutStrategyGraph,
   type Space,
 } from '@project/graph';
-import { nodeTypes, edgeTypes, ZoomSlider, type ThingFlowNode } from '@project/react-flow-adapter';
+import {
+  nodeTypes,
+  edgeTypes,
+  ZoomSlider,
+  type ResourceFlowNode,
+} from '@project/react-flow-adapter';
 import { spaceEntityActions } from '#src/entity-actions';
 import { MAX_ZOOM, OVERVIEW_FIT } from '#src/camera';
 import {
@@ -23,48 +28,48 @@ import {
   type CanvasInteraction,
   type CanvasNodesAndEdges,
 } from '#src/canvas-projection';
-import { THING_SIZE, thingSizeVars } from '#src/thing';
-import { resolveDiagram } from '#src/diagram-resolution';
-import { thingIds, graphIds, diagramId, space } from './fixture';
+import { RESOURCE_SIZE, resourceSizeVars } from '#src/resource';
+import { resolveMap } from '#src/map-resolution';
+import { resourceIds, graphIds, mapId, space } from './fixture';
 
 /**
- * Which authored Diagram of which Space a fixture draws.
+ * Which authored Map of which Space a fixture draws.
  *
  * A parameter rather than a module constant because the catalogue now draws
  * more than one Space: the inventory's own fixture answers most stories, and
- * the Command Dock's prototype needs a Space with two Diagrams and three Graphs
+ * the Command Dock's prototype needs a Space with two Maps and three Graphs
  * over one of them. Both go through the same derivation, so a story cannot draw
  * a canvas the application would build differently.
  */
-export interface DrawnDiagram {
+export interface DrawnMap {
   readonly space: Space;
-  readonly diagramId: DiagramId;
+  readonly mapId: MapId;
 }
 
-/** What a fixture draws unless it names another Diagram. */
-const INVENTORY_DIAGRAM: DrawnDiagram = { space, diagramId };
+/** What a fixture draws unless it names another Map. */
+const INVENTORY_MAP: DrawnMap = { space, mapId };
 
 interface Derivation {
   readonly pending: ReturnType<typeof canvasProjection>;
   readonly laidOut: Promise<LayoutStrategyGraph>;
 }
 
-const derive = ({ space: drawn, diagramId: id }: DrawnDiagram): Derivation => {
-  const resolved = resolveDiagram(drawn, id);
+const derive = ({ space: drawn, mapId: id }: DrawnMap): Derivation => {
+  const resolved = resolveMap(drawn, id);
   const pending = canvasProjection(drawn, resolved);
   return {
     pending,
-    laidOut: positionedStrategy(Placement.fromDiagram(resolved.diagram))(pending.strategyGraph),
+    laidOut: positionedStrategy(Placement.fromMap(resolved.map))(pending.strategyGraph),
   };
 };
 
 const interaction = (
   activeGraphId: GraphId | null,
-  selectedThingId: ThingId | null = null,
+  selectedResourceId: ResourceId | null = null,
 ): CanvasInteraction => ({
   activeGraphId,
-  activeThingId: null,
-  selectedThingId,
+  activeResourceId: null,
+  selectedResourceId,
   presenting: false,
 });
 
@@ -72,7 +77,7 @@ type ProjectedCanvas = CanvasNodesAndEdges;
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
-export interface FixtureCanvasThing {
+export interface FixtureCanvasResource {
   readonly id: string;
   readonly title: string;
   readonly x: number;
@@ -87,19 +92,19 @@ export interface FixtureCanvasThing {
  */
 export function useProjection(
   activeGraphId: GraphId | null,
-  selectedThingId: ThingId | null = null,
-  drawn: DrawnDiagram = INVENTORY_DIAGRAM,
+  selectedResourceId: ResourceId | null = null,
+  drawn: DrawnMap = INVENTORY_MAP,
 ): ProjectedCanvas | Error | null {
   const [projected, setProjected] = useState<ProjectedCanvas | Error | null>(null);
   // Keyed on the two inputs that decide the whole derivation, so a story that
   // re-renders on every Active Graph change does not lay the Space out again.
   // Destructured first because the identity of `drawn` itself is not what
   // decides a re-layout, and a dependency on the object would make an inline
-  // `{ space, diagramId }` at a call site lay the Space out on every render.
-  const { space: drawnSpace, diagramId: drawnDiagramId } = drawn;
+  // `{ space, mapId }` at a call site lay the Space out on every render.
+  const { space: drawnSpace, mapId: drawnMapId } = drawn;
   const { pending, laidOut } = useMemo(
-    () => derive({ space: drawnSpace, diagramId: drawnDiagramId }),
-    [drawnSpace, drawnDiagramId],
+    () => derive({ space: drawnSpace, mapId: drawnMapId }),
+    [drawnSpace, drawnMapId],
   );
 
   useEffect(() => {
@@ -108,7 +113,7 @@ export function useProjection(
       try {
         const resolved = await laidOut;
         if (mounted.current)
-          setProjected(pending.project(resolved, interaction(activeGraphId, selectedThingId)));
+          setProjected(pending.project(resolved, interaction(activeGraphId, selectedResourceId)));
       } catch (error) {
         if (mounted.current)
           setProjected(error instanceof Error ? error : new Error(String(error)));
@@ -117,7 +122,7 @@ export function useProjection(
     return () => {
       mounted.current = false;
     };
-  }, [pending, laidOut, activeGraphId, selectedThingId]);
+  }, [pending, laidOut, activeGraphId, selectedResourceId]);
 
   return projected;
 }
@@ -148,10 +153,10 @@ export interface StoryCanvasProps {
   readonly viewport: StoryCanvasViewport;
   readonly minZoom?: number;
   readonly maxZoom?: number;
-  /** Production Things only: connect-by-drag and the same ceiling `SpaceCanvas` uses. */
+  /** Production Resources only: connect-by-drag and the same ceiling `SpaceCanvas` uses. */
   readonly interactive?: boolean;
   /**
-   * Whether a Thing on this canvas can be moved by a pointer.
+   * Whether a Resource on this canvas can be moved by a pointer.
    *
    * A story that asks for it hands its nodes over as `defaultNodes`, because
    * React Flow drops every change — the position, the Selection and the
@@ -171,12 +176,12 @@ export interface StoryCanvasProps {
  * The one real React Flow instance every canvas-hosting story mounts.
  *
  * Every fixture that puts nodes on a real canvas — the HUD, the selected Edge
- * controls, the Thing specimens, the zoom control, the Diagram preview — goes
+ * controls, the Resource specimens, the zoom control, the Map preview — goes
  * through this rather than instantiating `<ReactFlow>` itself. `Background`,
  * `minZoom`/`maxZoom` defaults, `proOptions` and whether `ReactFlowProvider`
  * wraps the flow are this component's decisions so a new fixture cannot drift
- * from them by omission. `thingSizeVars` is applied unconditionally: a fixture
- * that mounts the production `ThingNode` needs it to size correctly and one
+ * from them by omission. `resourceSizeVars` is applied unconditionally: a fixture
+ * that mounts the production `ResourceNode` needs it to size correctly and one
  * that doesn't is unaffected, so there is no reason to make a caller ask for it.
  */
 export function StoryCanvas({
@@ -197,7 +202,7 @@ export function StoryCanvas({
   if (edgeTypesProp !== undefined) typeProps.edgeTypes = edgeTypesProp;
 
   return (
-    <div className={className} style={thingSizeVars}>
+    <div className={className} style={resourceSizeVars}>
       <ReactFlowProvider>
         <ReactFlow
           {...(draggable ? { defaultNodes: [...nodes] } : { nodes: [...nodes] })}
@@ -262,7 +267,7 @@ function RealReactFlow({
   draggable = false,
   viewport = { fit: true },
 }: {
-  readonly nodes: readonly ThingFlowNode[];
+  readonly nodes: readonly ResourceFlowNode[];
   readonly edges: readonly Edge[];
   readonly className: string;
   readonly controls?: boolean;
@@ -294,7 +299,7 @@ export function ZoomSliderSpecimen() {
 
   return (
     <RealReactFlow
-      className="inv-thing-node-stage inv-thing-node-stage--large"
+      className="inv-resource-node-stage inv-resource-node-stage--large"
       nodes={projected.nodes}
       edges={projected.edges}
       controls
@@ -304,33 +309,33 @@ export function ZoomSliderSpecimen() {
 
 /**
  * The real React Flow canvas, adapter nodes, Edges, background and zoom control
- * for application-framed Ladle stories. Extra Things reuse the production
- * ThingNode projection; stories supply only identity, title and placement.
+ * for application-framed Ladle stories. Extra Resources reuse the production
+ * ResourceNode projection; stories supply only identity, title and placement.
  *
  * `drawn` and `activeGraphId` default to the inventory's own Space and its Long
  * Graph, which is what every story here drew when there was only one Space to
- * draw. A story that names another Diagram — the Command Dock's, which switches
+ * draw. A story that names another Map — the Command Dock's, which switches
  * between two of them — gets the same derivation over its own Space rather than
  * a second canvas beside this one, and switching the Active Graph re-projects
  * without laying the Space out again.
  *
  * The camera is {@link StoryCanvasViewport} rather than an optional `zoom`,
- * because a default and "fit this Diagram to the frame" are both spelled
+ * because a default and "fit this Map to the frame" are both spelled
  * `undefined` in that shape — a full-viewport story asking to fit would silently
  * get the pinned camera instead.
  */
 /** Where the application-framed canvas sits when a story does not say. */
-const PINNED_DIAGRAM_VIEWPORT: StoryCanvasViewport = { fit: false, x: 0, y: 0, zoom: 0.65 };
+const PINNED_MAP_VIEWPORT: StoryCanvasViewport = { fit: false, x: 0, y: 0, zoom: 0.65 };
 
-export function DiagramCanvasFixture({
-  things = [],
+export function MapCanvasFixture({
+  resources = [],
   drawn,
   activeGraphId = graphIds.long,
-  viewport = PINNED_DIAGRAM_VIEWPORT,
+  viewport = PINNED_MAP_VIEWPORT,
 }: {
-  readonly things?: readonly FixtureCanvasThing[];
-  /** Which Diagram of which Space; the inventory's own when absent. */
-  readonly drawn?: DrawnDiagram;
+  readonly resources?: readonly FixtureCanvasResource[];
+  /** Which Map of which Space; the inventory's own when absent. */
+  readonly drawn?: DrawnMap;
   /** The Graph the canvas emphasises, or `null` for none. */
   readonly activeGraphId?: GraphId | null;
   /** The camera, through the same union `StoryCanvas` takes. */
@@ -343,12 +348,12 @@ export function DiagramCanvasFixture({
   const additions =
     template === undefined
       ? []
-      : things.map((thing): ThingFlowNode => ({
+      : resources.map((resource): ResourceFlowNode => ({
           ...template,
-          id: thing.id,
-          position: { x: thing.x, y: thing.y },
+          id: resource.id,
+          position: { x: resource.x, y: resource.y },
           selected: true,
-          data: { ...template.data, title: thing.title },
+          data: { ...template.data, title: resource.title },
         }));
 
   return (
@@ -362,12 +367,12 @@ export function DiagramCanvasFixture({
   );
 }
 
-export interface CanvasThingNodeSpecimenProps {
-  readonly thingId?: ThingId;
+export interface CanvasResourceNodeSpecimenProps {
+  readonly resourceId?: ResourceId;
   readonly selected?: boolean;
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
-  readonly thingEditingEnabled?: boolean;
+  readonly resourceEditingEnabled?: boolean;
   readonly nodeSize?: { readonly width: number; readonly height: number };
   readonly expanded?: boolean;
   readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -382,15 +387,15 @@ export interface CanvasThingNodeSpecimenProps {
 }
 
 /**
- * A typed one-node React Flow harness. It supplies fixture state only; ThingNode
+ * A typed one-node React Flow harness. It supplies fixture state only; ResourceNode
  * remains responsible for presentation state, controls, handles and geometry.
  */
-export function CanvasThingNodeSpecimen({
-  thingId = thingIds.strategies,
+export function CanvasResourceNodeSpecimen({
+  resourceId = resourceIds.strategies,
   selected = false,
   editingTitle = false,
   graphColor,
-  thingEditingEnabled,
+  resourceEditingEnabled,
   nodeSize,
   expanded,
   onOpenChange,
@@ -401,20 +406,20 @@ export function CanvasThingNodeSpecimen({
   body,
   readOnly = false,
   draggable = false,
-}: CanvasThingNodeSpecimenProps) {
+}: CanvasResourceNodeSpecimenProps) {
   const projected = useProjection(graphIds.long);
   if (projected === null) return null;
   if (projected instanceof Error) return <PlacementFailure reason={projected} />;
 
-  const source = projected.nodes.find(({ id }) => id === thingId);
-  if (source === undefined) throw new Error(`Missing fixture Thing ${thingId}`);
+  const source = projected.nodes.find(({ id }) => id === resourceId);
+  if (source === undefined) throw new Error(`Missing fixture Resource ${resourceId}`);
 
-  const thing = space.things.find((candidate) => candidate.id === thingId);
-  const diagram = space.diagrams.find((candidate) => candidate.id === diagramId);
-  if (thing === undefined || diagram === undefined)
-    throw new Error('Missing fixture Thing or Diagram');
+  const resource = space.resources.find((candidate) => candidate.id === resourceId);
+  const map = space.maps.find((candidate) => candidate.id === mapId);
+  if (resource === undefined || map === undefined)
+    throw new Error('Missing fixture Resource or Map');
 
-  const data: ThingFlowNode['data'] = {
+  const data: ResourceFlowNode['data'] = {
     ...source.data,
     entityActions: spaceEntityActions({
       spaceId: space.id,
@@ -422,12 +427,12 @@ export function CanvasThingNodeSpecimen({
       onCopy: () => true,
       onOpenIndependently: null,
       onRename: null,
-      onDeleteDiagram: null,
-    })({ kind: 'thing', thing, diagram }),
+      onDeleteMap: null,
+    })({ kind: 'resource', resource, map }),
     readOnly,
     titleEditingEnabled: true,
-    thingEditingEnabled: thingEditingEnabled ?? source.data.kind === 'markdown',
-    onEditThing: onOpenChange ?? (() => 'completed'),
+    resourceEditingEnabled: resourceEditingEnabled ?? source.data.kind === 'markdown',
+    onEditResource: onOpenChange ?? (() => 'completed'),
     onBeginTitleEditing: () => undefined,
   };
   if (expanded !== undefined) data.expanded = expanded;
@@ -439,13 +444,13 @@ export function CanvasThingNodeSpecimen({
     data.titleEditor = { onComplete: () => null, onCancel: () => undefined };
   }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
-  // Set exactly the way `SpaceCanvas` sets it: resize is Thing behaviour, not
+  // Set exactly the way `SpaceCanvas` sets it: resize is Resource behaviour, not
   // kind behaviour, so its presence follows Open state alone.
   if (expanded === true) {
     if (onResize !== undefined) {
       data.resize = {
-        minWidth: THING_SIZE.width,
-        minHeight: THING_SIZE.height,
+        minWidth: RESOURCE_SIZE.width,
+        minHeight: RESOURCE_SIZE.height,
         onResizeStart: () => undefined,
         onResize,
         onResizeEnd: () => undefined,
@@ -455,7 +460,7 @@ export function CanvasThingNodeSpecimen({
   }
 
   const nodePosition = zoom === undefined ? source.position : { x: 40, y: 40 };
-  const node: ThingFlowNode = {
+  const node: ResourceFlowNode = {
     ...source,
     position: nodePosition,
     ...nodeSize,
@@ -465,7 +470,7 @@ export function CanvasThingNodeSpecimen({
 
   return (
     <RealReactFlow
-      className={`inv-thing-node-stage ${stageClassName}`}
+      className={`inv-resource-node-stage ${stageClassName}`}
       nodes={[node]}
       edges={[]}
       draggable={draggable}

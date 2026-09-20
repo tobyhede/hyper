@@ -7,7 +7,7 @@ import { expect } from 'vitest';
  * Primitives are passed through before the object arm, which is what keeps a
  * branded id — `string & { __brand }`, an intersection the object arm would
  * otherwise map over — assignable from the plain value a fixture writes. Arrays
- * recurse element-wise, so a Diagram named inside a Space's `diagrams` is held
+ * recurse element-wise, so a Map named inside a Space's `maps` is held
  * to the same rule the Space is.
  */
 type PersistenceContract<T> = T extends

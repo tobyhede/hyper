@@ -18,33 +18,33 @@ import { createConnectionCompletion } from '../src/connection-completion';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
-        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] }],
+        graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
@@ -73,14 +73,14 @@ describe('the composed working Space', () => {
 
     expect(
       authoring.complete({
-        kind: 'edited-thing',
-        thingId: THING_A,
+        kind: 'edited-resource',
+        resourceId: RESOURCE_A,
         document: { title: 'Renamed', kind: 'markdown', body: 'A' },
       }),
     ).toMatchObject({ kind: 'completed' });
 
     expect(currentSpace()).not.toBe(before);
-    expect(currentSpace().lookup.thing(THING_A)?.title).toBe('Renamed');
+    expect(currentSpace().lookup.resource(RESOURCE_A)?.title).toBe('Renamed');
   });
 
   /** The reader is returned as well as closed over, so the render path shares it. */
@@ -96,16 +96,16 @@ describe('what the composition opens on', () => {
   it('opens in the Space default when no selection is named', () => {
     const { navigation } = composeCore({ spaceSession: openSession() });
 
-    expect(navigation.getState().selectedDiagramId).toEqual(DIAGRAM_ID);
+    expect(navigation.getState().selectedMapId).toEqual(MAP_ID);
   });
 
-  it('opens a selected Diagram on the placement that Diagram already authored', () => {
+  it('opens a selected Map on the placement that Map already authored', () => {
     const { authoring } = composeApp({ spaceSession: openSession() });
 
-    expect(authoring.diagramPlacement()).toEqual(
+    expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
-        [THING_A, { x: 10, y: 20, open: false }],
-        [THING_B, { x: 300, y: 40, open: false }],
+        [RESOURCE_A, { x: 10, y: 20, open: false }],
+        [RESOURCE_B, { x: 300, y: 40, open: false }],
       ]),
     );
   });

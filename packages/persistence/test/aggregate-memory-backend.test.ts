@@ -7,18 +7,18 @@ import { MemorySpaceBackend } from '../src/memory';
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const MISSING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const MISSING_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const HIGH_META_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
-const THING_ONE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const THING_TWO_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const RESOURCE_ONE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const RESOURCE_TWO_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
 const snapshot = (id = META_ID, title = 'Meta'): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  things: [],
+  resources: [],
 });
 
 const loaded = (id = META_ID, revision = 3n): LoadedSpace => ({
@@ -28,10 +28,10 @@ const loaded = (id = META_ID, revision = 3n): LoadedSpace => ({
 });
 
 /**
- * The Space a Space Thing here points at, complete enough to be pointed at.
+ * The Space a Space Resource here points at, complete enough to be pointed at.
  *
- * A Space Thing names a Diagram of its target and a Graph that Diagram owns
- * (ADR 0079), so a target with no Diagram is not a Space any valid Space Thing
+ * A Space Resource names a Map of its target and a Graph that Map owns
+ * (ADR 0079), so a target with no Map is not a Space any valid Space Resource
  * can select — which is why the cases below that link to `OTHER_ID` build it
  * through this rather than through the structureless `snapshot`.
  */
@@ -40,11 +40,11 @@ const otherSnapshot = (): SpaceSnapshot => ({
   document: {
     version: 1,
     title: 'Other',
-    defaultDiagram: OTHER_DIAGRAM_ID,
-    diagrams: [
+    defaultMap: OTHER_MAP_ID,
+    maps: [
       {
-        id: OTHER_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: OTHER_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -97,19 +97,19 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     });
   });
 
-  it('answers loadSpace and loadAggregate with a snapshot’s Things in ascending id order', async () => {
+  it('answers loadSpace and loadAggregate with a snapshot’s Resources in ascending id order', async () => {
     const unordered: SpaceSnapshot = {
       ...snapshot(),
-      things: [
-        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
-        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+      resources: [
+        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
       ],
     };
     const ordered: SpaceSnapshot = {
       ...unordered,
-      things: [
-        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
-        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+      resources: [
+        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
       ],
     };
     const backend = new MemorySpaceBackend(META_ID, [
@@ -132,23 +132,23 @@ describe('MemorySpaceBackend aggregate persistence', () => {
 
   /*
    * A conflict's `current` is a stored Space too, and every other read answers
-   * its Things ascending by id (ADR 0078) — the SQL adapters read `current` off
-   * the same `orderBy(thing.id.asc())` query as every other read, so a conflict
+   * its Resources ascending by id (ADR 0078) — the SQL adapters read `current` off
+   * the same `orderBy(resource.id.asc())` query as every other read, so a conflict
    * is not a second, unsorted path to the same Space.
    */
-  it('answers a conflict’s current Space with its Things in ascending id order too', async () => {
+  it('answers a conflict’s current Space with its Resources in ascending id order too', async () => {
     const unordered: SpaceSnapshot = {
       ...snapshot(),
-      things: [
-        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
-        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+      resources: [
+        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
       ],
     };
     const ordered: SpaceSnapshot = {
       ...unordered,
-      things: [
-        { id: THING_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
-        { id: THING_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+      resources: [
+        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
       ],
     };
     const backend = new MemorySpaceBackend(META_ID, [
@@ -254,14 +254,14 @@ describe('MemorySpaceBackend aggregate persistence', () => {
   it('names a refused snapshot by its position in ascending id order', async () => {
     const linkedMeta: SpaceSnapshot = {
       ...snapshot(HIGH_META_ID),
-      things: [
+      resources: [
         {
-          id: SPACE_THING_ID,
+          id: SPACE_RESOURCE_ID,
           document: {
             title: 'Other',
             kind: 'space',
             spaceId: OTHER_ID,
-            diagram: OTHER_DIAGRAM_ID,
+            map: OTHER_MAP_ID,
             graph: OTHER_GRAPH_ID,
           },
         },
@@ -272,18 +272,18 @@ describe('MemorySpaceBackend aggregate persistence', () => {
       document: {
         version: 1,
         title: 'Other',
-        defaultDiagram: OTHER_DIAGRAM_ID,
-        diagrams: [
+        defaultMap: OTHER_MAP_ID,
+        maps: [
           {
-            id: OTHER_DIAGRAM_ID,
-            title: 'Diagram 1',
+            id: OTHER_MAP_ID,
+            title: 'Map 1',
             kind: 'positioned',
             positions: {},
             graphs: [
               {
                 id: OTHER_GRAPH_ID,
                 title: 'Graph 1',
-                edges: [{ from: MISSING_THING_ID, to: MISSING_THING_ID }],
+                edges: [{ from: MISSING_RESOURCE_ID, to: MISSING_RESOURCE_ID }],
               },
             ],
             activeGraph: OTHER_GRAPH_ID,
@@ -317,14 +317,14 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     const backend = new MemorySpaceBackend(META_ID, [loaded()]);
     const linkedMeta: SpaceSnapshot = {
       ...snapshot(),
-      things: [
+      resources: [
         {
-          id: SPACE_THING_ID,
+          id: SPACE_RESOURCE_ID,
           document: {
             title: 'Other',
             kind: 'space',
             spaceId: OTHER_ID,
-            diagram: OTHER_DIAGRAM_ID,
+            map: OTHER_MAP_ID,
             graph: OTHER_GRAPH_ID,
           },
         },
@@ -379,14 +379,14 @@ describe('MemorySpaceBackend aggregate persistence', () => {
   it('conflicts an incomplete deletion when authoritative state still references the Space', async () => {
     const linkedMeta: SpaceSnapshot = {
       ...snapshot(),
-      things: [
+      resources: [
         {
-          id: SPACE_THING_ID,
+          id: SPACE_RESOURCE_ID,
           document: {
             title: 'Other',
             kind: 'space',
             spaceId: OTHER_ID,
-            diagram: OTHER_DIAGRAM_ID,
+            map: OTHER_MAP_ID,
             graph: OTHER_GRAPH_ID,
           },
         },

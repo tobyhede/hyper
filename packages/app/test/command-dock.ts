@@ -5,14 +5,14 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
  *
  * Every one of these was a single control on the Space Sidebar and is a
  * disclosure on the Command Dock: the Sidebar had room for a permanent `Add
- * Thing`, a permanent `Add Diagram` and a Present button because it was a column
+ * Resource`, a permanent `Add Map` and a Present button because it was a column
  * sixteen rem wide, and the Dock is a strip over the canvas that finds room by
  * disclosure instead (ADR 0082). So a test that used to press one button now
  * opens a menu and presses a row.
  *
  * They live here rather than in each suite because the *surface* changed and the
  * claims did not: twenty tests across six files assert what happens after Add
- * Thing, and none of them is about how Add Thing is reached. One module is what
+ * Resource, and none of them is about how Add Resource is reached. One module is what
  * stops the next change to the Dock being a change to twenty files — and what
  * stops six of them quietly settling on six different ways to press it.
  *
@@ -34,7 +34,7 @@ export const unavailable = (control: HTMLElement): boolean =>
 /**
  * Begin the inline rename of a Dock identity, once it may begin.
  *
- * All three names are renameable now — `renamed-space` joined `renamed-diagram`
+ * All three names are renameable now — `renamed-space` joined `renamed-map`
  * and `renamed-graph` — and all three are withdrawn together, by the one
  * `chromeTitleEdit` guard. The name itself is the identity's disclosure, so a
  * test that used to press the word now opens that list and chooses Rename
@@ -64,7 +64,7 @@ export const beginRename = async (
 
 const IDENTITY_EDITOR = {
   'space-title': 'Space name',
-  'selected-canvas': 'Diagram name',
+  'selected-canvas': 'Map name',
   'active-graph': 'Graph name',
 } as const;
 
@@ -73,7 +73,7 @@ const IDENTITY_MENU = {
     openSpaceMenu(title);
   },
   'selected-canvas': (title: string) => {
-    openDiagramMenu(title);
+    openMapMenu(title);
   },
   'active-graph': (title: string) => {
     openGraphMenu(title);
@@ -89,17 +89,17 @@ export const identityRenameItem = (
 };
 
 /**
- * When New Diagram may continue in the new name.
+ * When New Map may continue in the new name.
  *
- * Waited on the continuation address rather than by opening the Diagram list:
+ * Waited on the continuation address rather than by opening the Map list:
  * a Base UI menu returns focus to its trigger in a microtask after it closes,
  * and a poll that opened and dismissed this one would steal the caret from
  * the editor the continuation opens.
  */
-export const waitUntilDiagramContinuationReady = async (): Promise<void> => {
+export const waitUntilMapContinuationReady = async (): Promise<void> => {
   await waitFor(() => {
     const control = document.querySelector<HTMLButtonElement>(
-      '[data-continuation-control="diagram-name"]',
+      '[data-continuation-control="map-name"]',
     );
     expect(control).not.toBeNull();
     expect(control?.disabled).toBe(false);
@@ -110,47 +110,47 @@ export const waitUntilDiagramContinuationReady = async (): Promise<void> => {
 export const dock = (): HTMLElement => screen.getByRole('toolbar', { name: 'Command Dock' });
 
 /**
- * Create a Thing of one kind.
+ * Create a Resource of one kind.
  *
- * The two kinds are peer controls in the Things cluster — the kind is chosen at
+ * The two kinds are peer controls in the Resources cluster — the kind is chosen at
  * creation, so neither is a default, and no disclosure stands in front of them.
  * One press per creation, whichever kind, and the Edit completes on that press
- * (ADR 0089). A Reference Thing is not among them: it is created from the Thing it points
- * at, through that Thing's own command menu.
+ * (ADR 0089). A Reference Resource is not among them: it is created from the Resource it points
+ * at, through that Resource's own command menu.
  */
-export const createThing = (kind: ThingKindName): void => {
-  fireEvent.click(createThingControl(kind));
+export const createResource = (kind: ResourceKindName): void => {
+  fireEvent.click(createResourceControl(kind));
 };
 
 /** The kinds the Dock offers, named as their controls announce them. */
-export type ThingKindName = 'Markdown Thing' | 'Space Thing';
+export type ResourceKindName = 'Markdown Resource' | 'Space Resource';
 
 /**
  * One kind's Create control.
  *
- * Each peer withdraws on its own answer — Add Markdown Thing on `addThing`,
- * Create Space Thing also while its coordinated Edit is in flight — so name the
+ * Each peer withdraws on its own answer — Add Markdown Resource on `addResource`,
+ * Create Space Resource also while its coordinated Edit is in flight — so name the
  * kind when asserting availability.
  */
-export const createThingControl = (kind: ThingKindName = 'Markdown Thing'): HTMLElement =>
+export const createResourceControl = (kind: ResourceKindName = 'Markdown Resource'): HTMLElement =>
   within(dock()).getByRole('button', { name: `Create ${kind}` });
 
 /**
- * The Diagram cluster's disclosure: the authored Diagrams, then the commands on
+ * The Map cluster's disclosure: the authored Maps, then the commands on
  * the one that is drawing.
  *
- * Named for the Diagram it is showing, which is what the cluster announces.
+ * Named for the Map it is showing, which is what the cluster announces.
  */
-export const openDiagramMenu = (title: string): void => {
+export const openMapMenu = (title: string): void => {
   // Dismissed first if something else in the bar is open. At most one Dock
   // disclosure is open at a time — one open id under the whole row — so a press
   // on this trigger while another is open is an *outside* press that Base UI
   // spends on dismissing, and the menu this asked for never appears.
   //
-  // `hidden: true`, because a Thing title editor marks the rest of the tree
+  // `hidden: true`, because a Resource title editor marks the rest of the tree
   // inert and a role query otherwise cannot see the menu it has to dismiss.
   dismissOpenMenu();
-  fireEvent.click(within(dock()).getByRole('button', { name: `Diagram: ${title}` }));
+  fireEvent.click(within(dock()).getByRole('button', { name: `Map: ${title}` }));
 };
 
 const dismissOpenMenu = (): void => {
@@ -158,15 +158,15 @@ const dismissOpenMenu = (): void => {
   if (open !== null) fireEvent.keyDown(open, { key: 'Escape' });
 };
 
-/** New Diagram, and whether it may run — its availability is its own (ADR 0065). */
-export const newDiagramItem = (diagramTitle: string): HTMLElement => {
-  openDiagramMenu(diagramTitle);
-  return screen.getByRole('menuitem', { name: 'New Diagram' });
+/** New Map, and whether it may run — its availability is its own (ADR 0065). */
+export const newMapItem = (mapTitle: string): HTMLElement => {
+  openMapMenu(mapTitle);
+  return screen.getByRole('menuitem', { name: 'New Map' });
 };
 
-/** New Diagram, which creates and selects an empty Diagram owning one empty Graph. */
-export const newDiagram = (title: string): void => {
-  fireEvent.click(newDiagramItem(title));
+/** New Map, which creates and selects an empty Map owning one empty Graph. */
+export const newMap = (title: string): void => {
+  fireEvent.click(newMapItem(title));
 };
 
 /**
@@ -207,29 +207,29 @@ export const openSpaceRow = (title: RegExp | string): HTMLElement =>
  * cannot see the bar behind it — and a reader cannot press it either. The claim
  * a test spends this on is not that the control is reachable; it is what the
  * application does *when* a presentation begins, which is also reachable by
- * Back onto a presenting Thing's URL with the pane still up. Naming the exception
+ * Back onto a presenting Resource's URL with the pane still up. Naming the exception
  * here keeps it one exception rather than a habit.
  */
 export const presentControlBehindAModal = (graphTitle: string): HTMLElement =>
   screen.getByRole('button', { name: `Present ${graphTitle}`, hidden: true });
 
 /**
- * Delete, on the Diagram the cluster is showing.
+ * Delete, on the Map the cluster is showing.
  *
- * Two rules meet on this one row and neither implies the other: the last Diagram
+ * Two rules meet on this one row and neither implies the other: the last Map
  * cannot be deleted (ADR 0079), and *no* entity Edit may run while a title
  * editor or a live content edit owns the caret. A row that reads only the first
  * is drawn available for a command the application has already withdrawn.
  */
-export const deleteDiagramItem = (diagramTitle: string): HTMLElement => {
-  openDiagramMenu(diagramTitle);
-  return screen.getByRole('menuitem', { name: `Delete ${diagramTitle}` });
+export const deleteMapItem = (mapTitle: string): HTMLElement => {
+  openMapMenu(mapTitle);
+  return screen.getByRole('menuitem', { name: `Delete ${mapTitle}` });
 };
 
 /**
- * The Graph cluster's disclosure: the Graphs this Diagram owns, then its commands.
+ * The Graph cluster's disclosure: the Graphs this Map owns, then its commands.
  *
- * Dismissed first for the reason {@link openDiagramMenu} is: one open id under
+ * Dismissed first for the reason {@link openMapMenu} is: one open id under
  * the whole row means a press on this trigger while another cluster is open is
  * an outside press Base UI spends on dismissing.
  */
@@ -253,7 +253,7 @@ export const deleteGraphItem = (graphTitle: string): HTMLElement => {
 /**
  * The Space cluster's disclosure: Rename, Copy link to Space, then Exit Space.
  *
- * Dismissed first for the reason {@link openDiagramMenu} is.
+ * Dismissed first for the reason {@link openMapMenu} is.
  */
 export const openSpaceMenu = (title: string): void => {
   dismissOpenMenu();

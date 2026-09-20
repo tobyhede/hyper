@@ -116,7 +116,7 @@
       // schema itself rather than a hand-copied literal (see each file's own
       // docstring for why the duplication would be worse than the exception).
       "files": [
-        "packages/core/test/thing-document-equality.test.ts",
+        "packages/core/test/resource-document-equality.test.ts",
         "test/unit/import-decoding.test.ts"
       ],
       "rules": {
@@ -134,7 +134,7 @@
       // SqlStore/http-protocol exceptions above but for a vendored render
       // dependency rather than a wire format.
       // `RoutedEdge.test.tsx` is the same seam read the other way: the Edge asks
-      // React Flow's store where its two Things are now, and the stand-in is what
+      // React Flow's store where its two Resources are now, and the stand-in is what
       // lets a test put them somewhere. The rule the answer feeds is pure and
       // tested without any of this in `edge-attachment.test.ts`; what is left
       // here is the reading, which has no in-repo implementation to inject.
@@ -144,7 +144,7 @@
       // the component already hands over.
       "files": [
         "packages/ui/test/Button.test.tsx",
-        "packages/react-flow-adapter/test/ThingNode.test.tsx",
+        "packages/react-flow-adapter/test/ResourceNode.test.tsx",
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "packages/react-flow-adapter/test/RoutedEdge.test.tsx",
         "packages/app/test/cameras.test.tsx"
@@ -172,7 +172,7 @@
       }
     },
     {
-      // `graphColorMap` builds its map at runtime, keyed by however many graphs
+      // `graphColorsByGraphId` builds its map at runtime, keyed by however many graphs
       // a Space holds — there is no static literal for `satisfies` to check and
       // no narrower key type escapes the rule's own unconditional `Record<...>`
       // = "open dictionary" classification (see `tools/oxlint/anti-slop/shared/
@@ -185,10 +185,10 @@
       }
     },
     {
-      // `DIAGRAM_ONLY` is genuinely sparse: indexed by the full
+      // `MAP_ONLY` is genuinely sparse: indexed by the full
       // `AuthoringCompletion['kind']` union at its one call site
-      // (`DIAGRAM_ONLY[completion.kind]`), it lists only the completion kinds
-      // that need a Diagram, not every kind that union has. `Partial<Record<...>>`
+      // (`MAP_ONLY[completion.kind]`), it lists only the completion kinds
+      // that need a Map, not every kind that union has. `Partial<Record<...>>`
       // is what makes that indexing return `string | undefined` safely; a named
       // interface would have to enumerate every kind as optional, which
       // duplicates (and can drift from) the union instead of tracking it.
@@ -367,7 +367,7 @@
       // error-reporting seam, the same case as the override below — kept here
       // rather than folded in because it shares a file with the genuine
       // external-contract case above.
-      "files": ["packages/graph/src/thing-file.ts"],
+      "files": ["packages/graph/src/resource-file.ts"],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"
       }
@@ -493,7 +493,7 @@
       // opening a fifth: it reads `packages/app/package.json` to learn the
       // `#components/*` subpath patterns a story's imports resolve through, and
       // reading them is the point — a second copy of that mapping kept in the
-      // checker would be the thing that drifts. It decodes through the same
+      // checker would be the copy that drifts. It decodes through the same
       // named predicate returning a named contract, and passes
       // `no-runtime-typeof` and `no-unsafe-dictionary-type` unaided.
       "files": [

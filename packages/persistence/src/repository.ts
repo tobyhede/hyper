@@ -22,7 +22,7 @@ import type {
  * message prose.
  *
  * It lives here, beside `loadAggregate`, rather than on the server-only
- * superset that used to declare it. `loadAggregate` is `SpaceResourceRepository`'s,
+ * superset that used to declare it. `loadAggregate` is `StoredSpaceRepository`'s,
  * so the failure it raises is the shared seam's too — declared once for both
  * consumers, the way the seam itself is. On the superset, `@project/http` could
  * not name the identity of the error its own repository handed it.
@@ -66,7 +66,7 @@ export type RepositoryCommitResult =
   CommitOutcome | { kind: 'rejected'; code: 'invalid-commit'; message: string };
 
 /** The narrow stored seam consumed by the Fetch application. */
-export interface SpaceResourceRepository {
+export interface StoredSpaceRepository {
   listSpaces(): Promise<readonly SpaceSummary[]>;
   loadSpace(id: UUID): Promise<LoadedSpace | undefined>;
   loadAggregate(): Promise<AggregateLoadResult>;

@@ -2,15 +2,15 @@ import type { Node, NodeHandle } from '@xyflow/react';
 import { MarkerType, Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import type {
-  CanvasThingBodyEditor,
-  CanvasSpaceThingSelection,
+  CanvasResourceBodyEditor,
+  CanvasSpaceResourceSelection,
   EntityActionGroup,
 } from '@project/ui';
-import type { Thing, ThingId, GraphId } from '@project/core';
-import { resolveContentThing } from '@project/graph';
+import type { Resource, ResourceId, GraphId } from '@project/core';
+import { resolveContentResource } from '@project/graph';
 import type {
   GraphRenderEdge,
-  LayoutStrategyThing,
+  LayoutStrategyResource,
   LayoutStrategyGraph,
   Space,
 } from '@project/graph';
@@ -28,76 +28,76 @@ const FALLBACK_COLOR = '#8a94a6';
 export const OTHER_GRAPH_OPACITY = 0.35;
 
 /** What ends an inline title edit. Answers a refusal reason, or `null` when the
- *  new title was accepted — the same contract `CanvasThing`'s editor reads, where
+ *  new title was accepted — the same contract `CanvasResource`'s editor reads, where
  *  `null` keeps the editor closed and a string keeps it open beside the message. */
-export type ThingTitleEditor = {
+export type ResourceTitleEditor = {
   onComplete: (title: string) => string | null;
   onCancel: () => void;
 };
 
-/** Data carried by each custom thing node. Kept as a type alias so it satisfies
+/** Data carried by each custom resource node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
-export type ThingNodeData = {
+export type ResourceNodeData = {
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
-  thingId: ThingId;
+  resourceId: ResourceId;
   title: string;
-  /** Whether the Thing's reusable component must withhold authoring affordances. */
+  /** Whether the Resource's reusable component must withhold authoring affordances. */
   readOnly: boolean;
   /** False withholds hover-reveal; omitted or true offers the host-canvas handles. */
   connectionAuthoringEnabled?: boolean;
   /**
-   * What kind of Thing this is, drawn as a persistent glyph on the Front.
+   * What kind of Resource this is, drawn as a persistent glyph on the Front.
    *
    * Carried rather than inferred from whether this node's content resolved
-   * elsewhere: that answers the Thing's kind by proxy, which is exactly what
+   * elsewhere: that answers the Resource's kind by proxy, which is exactly what
    * goes wrong for the next kind that resolves its content elsewhere too.
    */
-  kind: Thing['kind'];
-  /** Local Thing-authoring controls supplied by the application composition. */
+  kind: Resource['kind'];
+  /** Local Resource-authoring controls supplied by the application composition. */
   titleEditingEnabled?: boolean;
   /**
-   * Whether Thing-level authoring is offered here: this Thing is in the working
+   * Whether Resource-level authoring is offered here: this Resource is in the working
    * Space and the canvas is authorable.
    *
-   * **Not "owns content to edit"**, which is what it meant while a Reference Thing had no
-   * Open front. It gates `onEditThing`, and a Reference Thing Opens and Closes through
-   * that same operation (ADR 0070), so a Reference Thing sets it exactly as a Markdown
-   * Thing does. What separates the kinds is `onBeginBodyEditing`, which the
+   * **Not "owns content to edit"**, which is what it meant while a Reference Resource had no
+   * Open front. It gates `onEditResource`, and a Reference Resource Opens and Closes through
+   * that same operation (ADR 0070), so a Reference Resource sets it exactly as a Markdown
+   * Resource does. What separates the kinds is `onBeginBodyEditing`, which the
    * application withholds from everything but `markdown`.
    */
-  thingEditingEnabled?: boolean;
-  onEditThing?: (open: boolean) => 'completed' | 'retained';
+  resourceEditingEnabled?: boolean;
+  onEditResource?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
   /**
-   * The inline title editor this Thing is currently showing, absent on one that
+   * The inline title editor this Resource is currently showing, absent on one that
    * is not being renamed. Its presence *is* the editing state, and it carries
    * the two operations that end the edit — so a composition cannot ask for the
    * editor without also saying what completes and cancels it.
    *
-   * This is the pairing `CanvasThingProps` already makes for its own
+   * This is the pairing `CanvasResourceProps` already makes for its own
    * `state: 'editing'`, held one layer up. Split into a boolean and two
    * independent optional callbacks, the adapter had to manufacture total
    * functions out of partial data, and an absent completion answered `null` —
-   * which `CanvasThing` reads as *accepted*, closing the editor on a rename that
+   * which `CanvasResource` reads as *accepted*, closing the editor on a rename that
    * never happened.
    */
-  titleEditor?: ThingTitleEditor;
+  titleEditor?: ResourceTitleEditor;
   /**
-   * Whether the Diagram has Opened this Thing, so it draws its content on the Thing
+   * Whether the Map has Opened this Resource, so it draws its content on the Resource
    * rather than its title alone (ADR 0064).
    *
-   * Authored, not derived: it is a fact about the Diagram, and the Thing's rect
+   * Authored, not derived: it is a fact about the Map, and the Resource's rect
    * follows from it rather than the other way round. The adapter cannot read it
-   * off the geometry — a Thing is not Open just because it is large.
+   * off the geometry — a Resource is not Open just because it is large.
    *
-   * An Open Reference Thing draws its immutable Target's content through the same front.
+   * An Open Reference Resource draws its immutable Target's content through the same front.
    */
   expanded?: boolean;
   /** Present only when activating the Open body may place a caret. */
   onBeginBodyEditing?: () => void;
   /**
-   * The live body edit, absent on a Thing whose rendered Markdown is at rest.
+   * The live body edit, absent on a Resource whose rendered Markdown is at rest.
    *
    * Its presence *is* the caret, carrying the two operations that end the edit —
    * the same pairing `titleEditor` above makes, for the same reason: a
@@ -110,29 +110,29 @@ export type ThingNodeData = {
    * the editor mounted. A composition that gave `onEnd` the abandon meaning
    * would undo every accepted save.
    *
-   * Independent of `titleEditor` on purpose. Expansion is what the Diagram
-   * authored and the caret is a gesture the author just made, so a Thing can be
+   * Independent of `titleEditor` on purpose. Expansion is what the Map
+   * authored and the caret is a gesture the author just made, so a Resource can be
    * Expanded while its *title* is being renamed (ADR 0064).
    */
-  bodyEditor?: CanvasThingBodyEditor;
+  bodyEditor?: CanvasResourceBodyEditor;
   /**
-   * Resizing this Expanded Thing, absent on one that may not be resized.
+   * Resizing this Expanded Resource, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
    * the two editors above carry their own completions: the collapsed size is
-   * `THING_SIZE`, which belongs to the composition and not to this package —
+   * `RESOURCE_SIZE`, which belongs to the composition and not to this package —
    * an adapter that hardcoded a minimum would be a second opinion about a
    * constant `app` already owns.
    *
-   * `onResize` previews a size and no origin. Displacement moves Things and does
+   * `onResize` previews a size and no origin. Displacement moves Resources and does
    * not scale them, so a reported size needs no inversion — which is what keeps
    * this out of the family of gestures that must go back through the authored
-   * placement. If a resize is ever allowed to move the Thing's top-left, it joins
+   * placement. If a resize is ever allowed to move the Resource's top-left, it joins
    * that family.
    *
    * The lifecycle travels as one capability: the composition supplies every
    * operation together because a resize gesture begun on an
-   * unselected Thing has to select it before there is anything for `onResize`
+   * unselected Resource has to select it before there is anything for `onResize`
    * to complete against — one control, one drag, and Selection is not a second
    * Edit (ADR 0066).
    */
@@ -145,18 +145,18 @@ export type ThingNodeData = {
     onResizeCancel: () => void;
   };
   /**
-   * This Thing's own commands — copy an address it can be reached by, delete it
-   * — drawn as one more control on the Thing's rail (ADR 0073, ADR 0082).
+   * This Resource's own commands — copy an address it can be reached by, delete it
+   * — drawn as one more control on the Resource's rail (ADR 0073, ADR 0082).
    *
    * Built by the composition and carried whole, exactly as the operations above
    * are: an address comes from the product destination table and a deletion
    * runs a completed Edit, neither of which this package can reach. Absent
-   * means no control rather than an empty menu, which is the rule `CanvasThing`
+   * means no control rather than an empty menu, which is the rule `CanvasResource`
    * already applies to the value it is handed.
    */
   entityActions?: readonly EntityActionGroup[];
   /**
-   * For a space thing, what the Space it references offers its selections to be
+   * For a space resource, what the Space it references offers its selections to be
    * chosen from.
    *
    * Not derived here, and it could not be: it describes a *second* Space, which
@@ -164,52 +164,52 @@ export type ThingNodeData = {
    * that read the target supplies it, exactly as it supplies every other
    * operation on this node (ADR 0068, ADR 0074).
    */
-  spaceSelection?: CanvasSpaceThingSelection;
+  spaceSelection?: CanvasSpaceResourceSelection;
   /**
-   * Diagram and Graph clusters for an Open Space Thing, assembled by the
-   * application and inserted at the head of the Thing rail.
+   * Map and Graph clusters for an Open Space Resource, assembled by the
+   * application and inserted at the head of the Resource rail.
    *
    * Not derived here: it describes a second Space's choices, which this
-   * projection has no reader for. Absent while the Thing is closed, the surface
+   * projection has no reader for. Absent while the Resource is closed, the surface
    * is read-only, or the target has not been read yet (ADR 0068, ADR 0074).
    */
   spaceRail?: ReactNode;
   /**
-   * The Read/Edit boundary for an Open Space Thing's embedded target canvas.
+   * The Read/Edit boundary for an Open Space Resource's embedded target canvas.
    *
-   * Presence is the capability. The containing canvas owns which Things are in
-   * Edit because the embedding is sibling nodes, not markup inside the Thing.
+   * Presence is the capability. The containing canvas owns which Resources are in
+   * Edit because the embedding is sibling nodes, not markup inside the Resource.
    */
   portal?: {
     readonly editing: boolean;
     readonly onEditingChange: (editing: boolean) => void;
   };
   /**
-   * A refusal or busy notice from this Thing's context commands. Absent or null
+   * A refusal or busy notice from this Resource's context commands. Absent or null
    * leaves the alert region unmounted.
    */
   contextNotice?: string | null;
-  /** The resolved content kind, including a Space Thing reached through a Reference Thing. */
-  spaceContent?: Extract<Thing, { kind: 'space' }>;
+  /** The resolved content kind, including a Space Resource reached through a Reference Resource. */
+  spaceContent?: Extract<Resource, { kind: 'space' }>;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /**
-   * Draw the thing's content rather than its title. ADR 0006 deferred a "show
+   * Draw the resource's content rather than its title. ADR 0006 deferred a "show
    * full content" view and left it a View's choice; presenting is that view (ADR
-   * 0027). Set on the active thing alone, never on the whole graph.
+   * 0027). Set on the active resource alone, never on the whole graph.
    */
   showContent: boolean;
-  /** The Markdown to draw when `showContent`, resolved through a reference thing to its
+  /** The Markdown to draw when `showContent`, resolved through a reference resource to its
    *  target's body. Absent otherwise — content is not embedded in every node
-   *  (ADR 0006), which is the constraint that made this per-thing.
+   *  (ADR 0006), which is the constraint that made this per-resource.
    *
-   *  **An Expanded Thing carries one too.** ADR 0064 narrows ADR 0006 rather
-   *  than lifting it — an Expanded Thing carries its source because the author
-   *  asked for that one, not because every Thing does. `openThingIds` is what
-   *  tells this projection which Things the Diagram Expanded, and `body` is
-   *  resolved for them in the same pass: `ThingNode` reads `data.body ?? ''`, so
-   *  a Thing resolved into one set and not the other would draw an empty
+   *  **An Expanded Resource carries one too.** ADR 0064 narrows ADR 0006 rather
+   *  than lifting it — an Expanded Resource carries its source because the author
+   *  asked for that one, not because every Resource does. `openResourceIds` is what
+   *  tells this projection which Resources the Map Expanded, and `body` is
+   *  resolved for them in the same pass: `ResourceNode` reads `data.body ?? ''`, so
+   *  a Resource resolved into one set and not the other would draw an empty
    *  document over a working editor rather than fail. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -217,12 +217,12 @@ export type ThingNodeData = {
   /** The active Graph's colour, used by graph-independent authoring handles. */
   activeGraphColor: string;
   /**
-   * Whether this Thing leans because a Thing framing it is being dragged.
+   * Whether this Resource leans because a Resource framing it is being dragged.
    *
-   * Only an *embedded* Thing carries it; a Thing dragged directly leans from its
-   * own `state`. The lean is about this Thing's own centre and says nothing
+   * Only an *embedded* Resource carries it; a Resource dragged directly leans from its
+   * own `state`. The lean is about this Resource's own centre and says nothing
    * about where the frame is, because the application has already rotated this
-   * Thing's *position* about the dragged Thing's centre (`embedded-diagram.ts`)
+   * Resource's *position* about the dragged Resource's centre (`embedded-map.ts`)
    * — translating a rect along a rotation and then turning it in place is the
    * same rigid motion as turning it about that distant point, and expressing it
    * that way is what lets React Flow draw the Edges itself.
@@ -230,40 +230,40 @@ export type ThingNodeData = {
   dragTilted?: boolean;
 };
 
-export type ThingFlowNode = Node<ThingNodeData, 'thing'>;
+export type ResourceFlowNode = Node<ResourceNodeData, 'resource'>;
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
-export interface ProjectThingNodesOptions {
-  /** Draw Things without any Thing-owned authoring controls. The four anchors of
+export interface ProjectResourceNodesOptions {
+  /** Draw Resources without any Resource-owned authoring controls. The four anchors of
    *  each role are declared and rendered either way — an Edge attaches to one,
-   *  and React Flow draws no Edge at all for a Thing whose handles it cannot
+   *  and React Flow draws no Edge at all for a Resource whose handles it cannot
    *  resolve (ADR 0087) — so this withholds the affordance, not the anchor. */
   readOnly?: boolean;
-  /** Thing id reached during traversal, if any, to flag as active. */
-  activeThingId?: ThingId | null;
+  /** Resource id reached during traversal, if any, to flag as active. */
+  activeResourceId?: ResourceId | null;
   /** Ordinary renderer selection used to expose continued-authoring handles. */
-  selectedThingId?: ThingId | null;
+  selectedResourceId?: ResourceId | null;
   /**
-   * Draw the active thing's content instead of its title — what presenting does
-   * (ADR 0027). Only the active thing is affected, so this costs one thing's body
-   * in the projection rather than every thing's.
+   * Draw the active resource's content instead of its title — what presenting does
+   * (ADR 0027). Only the active resource is affected, so this costs one resource's body
+   * in the projection rather than every resource's.
    */
-  showActiveThingContent?: boolean;
+  showActiveResourceContent?: boolean;
   /** The graph to emphasise, if any. */
   activeGraphId?: GraphId | null;
   /** The active Graph's resolved colour for graph authoring controls. */
   activeGraphColor?: string;
-  /** The laid-out graph; the things' positions come from here when present. */
+  /** The laid-out graph; the resources' positions come from here when present. */
   strategyGraph?: LayoutStrategyGraph;
-  /** Restrict the projection to these thing ids (e.g. one graph's things). */
-  thingIds?: readonly ThingId[];
-  /** Diagram-authored Expanded Things whose Markdown body is drawn in place. */
-  openThingIds?: ReadonlySet<ThingId>;
+  /** Restrict the projection to these resource ids (e.g. one graph's resources). */
+  resourceIds?: readonly ResourceId[];
+  /** Map-authored Expanded Resources whose Markdown body is drawn in place. */
+  openResourceIds?: ReadonlySet<ResourceId>;
 }
 
 /**
- * The four anchors a Thing declares on each role, one per side.
+ * The four anchors a Resource declares on each role, one per side.
  *
  * An Edge attaches to whichever of them faces its neighbour, chosen while it is
  * drawn (ADR 0087) — so what is declared here is every side an Edge could ever
@@ -274,9 +274,9 @@ export interface ProjectThingNodesOptions {
  * Declared rather than measured. `parseHandles` prefers what is on `node.handles`
  * to anything in the DOM, and nothing may force a remeasure: the forced path
  * rebuilds the bounds from `getHandleBounds`, which reads only the elements the
- * DOM draws. `ThingNode` records the same rule from the other side.
+ * DOM draws. `ResourceNode` records the same rule from the other side.
  */
-function declaredHandles(thing: LayoutStrategyThing): NodeHandle[] {
+function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
   const radius = AUTHORING_HANDLE_DIAMETER / 2;
   const anchor = (type: 'source' | 'target', side: Position, x: number, y: number): NodeHandle => ({
     id: `authoring-${type}-${side}`,
@@ -288,72 +288,72 @@ function declaredHandles(thing: LayoutStrategyThing): NodeHandle[] {
     height: AUTHORING_HANDLE_DIAMETER,
   });
   return (['source', 'target'] as const).flatMap((type) => [
-    anchor(type, Position.Top, thing.width / 2 - radius, -radius),
-    anchor(type, Position.Right, thing.width - radius, thing.height / 2 - radius),
-    anchor(type, Position.Bottom, thing.width / 2 - radius, thing.height - radius),
-    anchor(type, Position.Left, -radius, thing.height / 2 - radius),
+    anchor(type, Position.Top, resource.width / 2 - radius, -radius),
+    anchor(type, Position.Right, resource.width - radius, resource.height / 2 - radius),
+    anchor(type, Position.Bottom, resource.width / 2 - radius, resource.height - radius),
+    anchor(type, Position.Left, -radius, resource.height / 2 - radius),
   ]);
 }
 
 /**
- * Map things → React Flow thing nodes, each declaring the four anchors an Edge
- * may attach to on every side. The thing id is the React Flow node id.
+ * Map resources → React Flow resource nodes, each declaring the four anchors an Edge
+ * may attach to on every side. The resource id is the React Flow node id.
  *
  * It took the Space's Graph colours too until ADR 0087, for the per-Graph
- * anchors it coloured one by one. A Thing's anchors are Graph-independent, and
- * the one colour left on a Thing is the Active Graph's, which the composition
+ * anchors it coloured one by one. A Resource's anchors are Graph-independent, and
+ * the one colour left on a Resource is the Active Graph's, which the composition
  * resolves and passes as `activeGraphColor`.
  *
- * A node carries its thing's *title*, not its content (ADR 0006) — the content is
- * loaded when a thing is opened or presented, not embedded in every node.
+ * A node carries its resource's *title*, not its content (ADR 0006) — the content is
+ * loaded when a resource is opened or presented, not embedded in every node.
  */
-export function projectThingNodes(
+export function projectResourceNodes(
   space: Space,
-  options: ProjectThingNodesOptions = {},
-): ThingFlowNode[] {
-  const activeThingId = options.activeThingId ?? null;
-  const showActiveThingContent = options.showActiveThingContent ?? false;
+  options: ProjectResourceNodesOptions = {},
+): ResourceFlowNode[] {
+  const activeResourceId = options.activeResourceId ?? null;
+  const showActiveResourceContent = options.showActiveResourceContent ?? false;
   const activeGraphId = options.activeGraphId ?? null;
-  const visible = options.thingIds ? new Set(options.thingIds) : null;
-  const laidOut = new Map((options.strategyGraph?.things ?? []).map((t) => [t.id, t]));
+  const visible = options.resourceIds ? new Set(options.resourceIds) : null;
+  const laidOut = new Map((options.strategyGraph?.resources ?? []).map((r) => [r.id, r]));
 
-  const source = visible ? space.things.filter((t) => visible.has(t.id)) : space.things;
+  const source = visible ? space.resources.filter((r) => visible.has(r.id)) : space.resources;
 
-  return source.map((thing) => {
-    const placedThing = laidOut.get(thing.id);
-    const active = thing.id === activeThingId;
-    const showContent = active && showActiveThingContent;
-    // Every Thing kind Opens, so the Diagram's Open set is the whole answer and
+  return source.map((resource) => {
+    const placedResource = laidOut.get(resource.id);
+    const active = resource.id === activeResourceId;
+    const showContent = active && showActiveResourceContent;
+    // Every Resource kind Opens, so the Map's Open set is the whole answer and
     // there is no kind guard beside it. The guard this replaced named the two
-    // kinds that had a front to draw when Open; a Space Thing gained one with
+    // kinds that had a front to draw when Open; a Space Resource gained one with
     // `entity-url-addressability/07` (ADR 0068), which left the third arm the
-    // only thing standing between a stored Open state and the Thing that state
+    // only condition standing between a stored Open state and the Resource that state
     // is about.
-    const open = options.openThingIds?.has(thing.id) === true;
-    // A reference thing shows its target's content under its own title (ADR 0009).
-    const content = resolveContentThing(space, thing.id);
+    const open = options.openResourceIds?.has(resource.id) === true;
+    // A reference resource shows its target's content under its own title (ADR 0009).
+    const content = resolveContentResource(space, resource.id);
     const body =
       showContent || open ? (content?.kind === 'markdown' ? content.body : '') : undefined;
-    const node: ThingFlowNode = {
-      id: thing.id,
-      type: 'thing',
-      position: { x: placedThing?.x ?? 0, y: placedThing?.y ?? 0 },
+    const node: ResourceFlowNode = {
+      id: resource.id,
+      type: 'resource',
+      position: { x: placedResource?.x ?? 0, y: placedResource?.y ?? 0 },
       data: {
-        thingId: thing.id,
-        title: thing.title,
+        resourceId: resource.id,
+        title: resource.title,
         readOnly: options.readOnly ?? false,
-        kind: thing.kind,
+        kind: resource.kind,
         active,
-        selectedForAuthoring: thing.id === (options.selectedThingId ?? null),
+        selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         showContent,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },
-      className: active ? 'rf-thing-node rf-thing-node--active' : 'rf-thing-node',
+      className: active ? 'rf-resource-node rf-resource-node--active' : 'rf-resource-node',
     };
-    // Carry the diagram's dimensions through when it has placed the thing. Every
-    // strategy works at a fixed `THING_SIZE`, so declaring width/height
-    // here means React Flow renders the node at exactly the size the diagram
+    // Carry the map's dimensions through when it has placed the resource. Every
+    // strategy works at a fixed `RESOURCE_SIZE`, so declaring width/height
+    // here means React Flow renders the node at exactly the size the map
     // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
     // view chooses one) resolves correctly on first paint. Absent before the
     // layout resolves, so React Flow falls back to measuring, as before.
@@ -361,15 +361,15 @@ export function projectThingNodes(
     // `measured` is deliberately *not* set alongside them. React Flow documents
     // it as an output it writes after measuring, and it is redundant as an
     // input: `nodeHasDimensions` reads `measured?.width ?? width ?? initialWidth`,
-    // so width/height already answer it, and a Thing counts as initialized on
+    // so width/height already answer it, and a Resource counts as initialized on
     // those plus its declared `handles`. What supplying it would change is that
     // React Flow preserves cached `handleBounds` instead of resetting them for
     // re-measure — a distinction with no meaning here, because the bounds come
     // from `declaredHandles` either way.
-    if (placedThing) {
-      node.width = placedThing.width;
-      node.height = placedThing.height;
-      node.handles = declaredHandles(placedThing);
+    if (placedResource) {
+      node.width = placedResource.width;
+      node.height = placedResource.height;
+      node.handles = declaredHandles(placedResource);
     }
     if (content?.kind === 'space') node.data.spaceContent = content;
     if (body !== undefined) node.data.body = body;
