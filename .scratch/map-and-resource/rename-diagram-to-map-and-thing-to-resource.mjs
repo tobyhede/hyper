@@ -277,6 +277,24 @@ const tracked = execFileSync('git', ['ls-files', '--stage', '-z'], {
 const BINARY = /\.(png|jpg|jpeg|gif|ico|woff2?|pdf)$/i;
 const RETIRED = /diagram|thing/i;
 
+/**
+ * The content gate, which `RETIRED` alone is too narrow to be.
+ *
+ * A file whose only retired-name hits are `PRE_REWRITES` keys contains neither
+ * word and is skipped entirely, keeping the old names while every other file
+ * gets the pre-rewrite. `test/unit/space-resource-repository.test.ts` is exactly
+ * that file today — 8 `SpaceResourceRepository` references and zero
+ * case-insensitive `diagram` or `thing` hits — and a full sweep leaves it
+ * importing a type `packages/persistence/src/repository.ts` no longer exports.
+ *
+ * The keys are read off the table rather than written out again, so the gate
+ * cannot fall behind it. Every key is an identifier, so none needs escaping.
+ */
+const SWEEPABLE = new RegExp(
+  [RETIRED.source, ...PRE_REWRITES.map(([from]) => from)].join('|'),
+  'i',
+);
+
 let changedFiles = 0;
 const citations = new Map();
 const prose = [];
@@ -285,7 +303,7 @@ for (const file of tracked) {
   const absolute = join(repoRoot, file);
   if (!existsSync(absolute)) continue;
   const before = readFileSync(absolute, 'utf8');
-  if (!RETIRED.test(before)) continue;
+  if (!SWEEPABLE.test(before)) continue;
   const after = rewrite(before);
   if (after === before) continue;
 
