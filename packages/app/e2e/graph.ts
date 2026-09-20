@@ -498,7 +498,6 @@ export async function dragBy(
   dx: number,
   dy: number,
   whileDragging?: () => Promise<void>,
-  grabAt?: { readonly x: number; readonly y: number },
 ): Promise<void> {
   await settled(page);
   const box = (await node.boundingBox())!;
@@ -506,7 +505,7 @@ export async function dragBy(
 
   // Grab the thing's header rather than its centre: the body scrolls its markdown
   // and the ports sit at the edges.
-  await page.mouse.move(box.x + (grabAt?.x ?? box.width / 2), box.y + (grabAt?.y ?? 12));
+  await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
   // The opening nudge is its own move, and it is the difference between a Thing
   // that lands where the delta says and one that lands ninety per cent of the
@@ -524,8 +523,8 @@ export async function dragBy(
   // wider or a viewport narrower, which is precisely the shape of assertion
   // that passes until the day it does not.
   const from = {
-    x: box.x + (grabAt?.x ?? box.width / 2) + Math.sign(dx) * NUDGE,
-    y: box.y + (grabAt?.y ?? 12) + Math.sign(dy) * NUDGE,
+    x: box.x + box.width / 2 + Math.sign(dx) * NUDGE,
+    y: box.y + 12 + Math.sign(dy) * NUDGE,
   };
   await page.mouse.move(from.x, from.y);
   // A single jump can still be swallowed, so the travel itself moves twice.

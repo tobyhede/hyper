@@ -206,6 +206,56 @@ test(
 );
 
 /**
+ * The HUD's key sits over the canvas without taking it.
+ *
+ * A `.react-flow__panel` is `position: absolute` with no `pointer-events` rule
+ * of React Flow's own, so a Panel swallows every gesture over its box — and the
+ * HUD stands in the corner a Thing's bottom-right resize control lives in,
+ * which is the harm `command-dock.css`'s bottom-edge offset already names for
+ * the Dock. The key holds no control, so it hands the pointer back; the two
+ * clipped names keep theirs, because their `title` is the only place a name
+ * `truncate` has ellipsised can still be read.
+ *
+ * The three gestures this buys back are asserted where they live rather than
+ * restated here — the Open Thing drag in `editing.spec.ts`, Reference Thing A′'s
+ * resize below, and the Space Thing padding probe in `space-thing.spec.ts` all
+ * reach past the HUD to the canvas. This is the mechanism under them.
+ */
+test(
+  'the canvas HUD key hands the canvas back every pointer it does not need',
+  { tag: '@parity:graph-hud-key-hands-back-the-pointers-it-does-not-need' },
+  async ({ page }) => {
+    await page.goto('/');
+    await settled(page);
+
+    /** What a press at this point would land on. */
+    const topmostAt = (x: number, y: number): Promise<string> =>
+      page.evaluate(
+        ([px, py]: readonly number[]) => {
+          const element = document.elementFromPoint(px ?? 0, py ?? 0);
+          if (element === null) return 'nothing';
+          if (element.closest('[data-testid="hud-space"], [data-testid="hud-diagram"]') !== null)
+            return 'name';
+          if (element.closest('.react-flow__panel') !== null) return 'hud';
+          return 'canvas';
+        },
+        [x, y],
+      );
+
+    const key = await boxOf(page.getByTestId('graph-legend'), "the HUD's Graph key");
+    expect(await topmostAt(key.x + key.width / 2, key.y + key.height / 2)).toBe('canvas');
+    expect(await topmostAt(key.x + 4, key.y + 4)).toBe('canvas');
+
+    // The clipped names are the exception, so their `title` can be read.
+    const name = page.getByTestId('hud-space');
+    const nameBox = await boxOf(name, "the HUD's Space name");
+    expect(await topmostAt(nameBox.x + 4, nameBox.y + nameBox.height / 2)).toBe('name');
+    await expect(name).toHaveAttribute('title', 'Diagram fixture');
+    await expect(page.getByTestId('hud-diagram')).toHaveAttribute('title', 'Collection 1');
+  },
+);
+
+/**
  * The two surfaces that name a Graph, held to the same answer.
  *
  * The Command Dock's Graph cluster discloses every Graph the selected Diagram
@@ -539,9 +589,6 @@ test(
     }));
     await page.getByRole('button', { name: 'Zoom out' }).click();
     await settled(page);
-    // Widening moves the fixed HUD away without changing the authored node
-    // position, leaving the last Thing's resize handle reachable.
-    await page.setViewportSize({ width: 1600, height: 720 });
     const resizeBox = await boxOf(resizeControl, "Reference Thing A′'s resize control");
     // The drag has to end **inside the viewport**: a `mousemove` past the
     // window's edge is clamped, and the gesture then ends where it never went

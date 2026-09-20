@@ -1,9 +1,10 @@
 # 01 — The canvas HUD's minimap draws the Diagram to scale
 
 Status: resolved
-Superseded by: 04 — the numeric width this introduced is deleted there, because the
-nesting that made a width necessary is what ticket 04 removes. The regression
-assertion added here survives unchanged.
+Superseded by: 04 — the panel-width coupling this introduced is deleted there,
+because the nesting that made that coupling necessary is what ticket 04 removes.
+Ticket 04 supplies React Flow's stock 200×150 dimensions directly instead. The
+regression assertion added here survives unchanged.
 Blocked by: nothing — can start immediately. It blocks nothing either; ticket 03
 touches the same component, so whoever goes second rebases.
 
@@ -61,8 +62,23 @@ prove a bug fix against the defect, not against a test written afterwards).
 
 ## Acceptance
 
-- [ ] The minimap's `viewBox` is four finite numbers, and its mask path holds no `NaN`
-- [ ] A Thing's rect on the minimap is smaller than the minimap, at every Diagram in the catalogue
-- [ ] The new assertion fails on the pre-fix build — demonstrate it, do not assume it
-- [ ] The panel's width and the number React Flow divides by cannot drift apart
-- [ ] `pnpm e2e:ladle` green; `pnpm verify` green
+- [x] The minimap's `viewBox` is four finite numbers, and its mask path holds no `NaN`
+- [x] A Thing's rect on the minimap is smaller than the minimap, at every Diagram in the catalogue
+- [x] The new assertion fails on the pre-fix build — demonstrate it, do not assume it
+- [x] The panel's width and the number React Flow divides by cannot drift apart
+- [x] `pnpm e2e:ladle` green; `pnpm verify` green
+
+## Answer
+
+The regression was reproduced against the nested HUD: its percentage width
+reached React Flow's numeric division and produced a non-finite `viewBox`. The
+Ladle proof now reads all four `viewBox` values, rejects a `NaN` mask and checks
+that every Thing remains smaller than and contained by the MiniMap at multiple
+viewport zoom levels.
+
+Ticket 04 subsequently removed the containing card altogether. The production
+MiniMap now receives React Flow's stock numeric 200×150 dimensions through
+`style`, the input its geometry calculation reads. There is therefore no parent
+panel width for that divisor to drift from; the dependency was eliminated
+rather than synchronized. The finished tree passed `pnpm verify`,
+`pnpm e2e:ladle` and `pnpm e2e`.

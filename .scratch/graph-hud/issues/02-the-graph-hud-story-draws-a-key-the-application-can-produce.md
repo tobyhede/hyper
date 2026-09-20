@@ -37,8 +37,21 @@ the Diagram's" visible rather than merely asserted.
 
 ## Acceptance
 
-- [ ] The story's key holds the open Diagram's Graphs and no others
-- [ ] The fixture's doc comment describes what it now does, with no claim left behind about flattening across Diagrams
-- [ ] The spec's claim is the rule, not a transcription of the current fixture's titles
-- [ ] A second Diagram is on show, so a key that changes with the Diagram is visible
-- [ ] `pnpm e2e:ladle` green; `pnpm verify` green
+- [x] The story's key holds the open Diagram's Graphs and no others
+- [x] The fixture's doc comment describes what it now does, with no claim left behind about flattening across Diagrams
+- [x] The spec's claim is the rule, not a transcription of the current fixture's titles
+- [x] A second Diagram is on show, so a key that changes with the Diagram is visible
+- [x] `pnpm e2e:ladle` green; `pnpm verify` green
+
+## Answer
+
+`GraphHudFixture` now resolves the selected Diagram before it builds the HUD and
+passes only that Diagram's Graphs, with colours resolved through the same
+`graphColorMap` seam as the application. The retained story opens Collection 1;
+the added sparse story opens Collection 2, so the catalogue demonstrates that
+the key follows the Diagram rather than flattening the Space.
+
+The Ladle parity claim derives the expected titles and Active Graph from the
+story's authored snapshot instead of transcribing fixture labels. It proves the
+key contains exactly those Graphs, in Diagram order, with exactly one Active
+Graph. The finished tree passed `pnpm verify`, `pnpm e2e:ladle` and `pnpm e2e`.

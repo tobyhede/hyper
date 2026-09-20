@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Diagram, Graph, SpaceSnapshot } from '@project/core';
 import { authoredSnapshot, sparseAuthoredSnapshot } from '../stories/support/spaces';
 
@@ -46,6 +46,74 @@ const resolveToken = (locator: Locator, token: string): Promise<string> =>
     probe.remove();
     return value;
   }, token);
+
+/** Where the canvas is, read off the element React Flow writes the transform on. */
+const canvasTransform = (page: Page): Promise<string> =>
+  page.locator('.react-flow__viewport').evaluate((element) => getComputedStyle(element).transform);
+
+/**
+ * React Flow keeps every MiniMap mark finite and clipped at several canvas zooms.
+ *
+ * Ticket 01's original failure left the nodes and mask in the DOM, but wrote
+ * `NaN` into their coordinate system. Checking every node against the SVG's
+ * visible box holds both halves of "drawn to scale": none can become the old
+ * full-size canvas rect, and none can escape the map while remaining smaller
+ * than it.
+ *
+ * **The zoom the wheel asks for is asserted, not assumed.** The MiniMap's SVG
+ * has d3-zoom called on it whether or not it is `zoomable`, and d3-zoom's wheel
+ * handler `preventDefault`s either way — so a wheel here reaches nothing else on
+ * the page, and against a map that is not `zoomable` this loop would check one
+ * unmoved drawing three times over while its own name said "several canvas
+ * zooms".
+ */
+const expectMinimapDrawnToScale = async (page: Page): Promise<void> => {
+  const minimap = page.locator('.react-flow__minimap');
+  const svg = page.locator('.react-flow__minimap-svg');
+  const nodes = page.locator('.react-flow__minimap-node');
+  const mask = page.locator('.react-flow__minimap-mask');
+
+  const expectFiniteContainedDrawing = async (): Promise<void> => {
+    const viewBoxAttribute = await svg.getAttribute('viewBox');
+    if (viewBoxAttribute === null) throw new Error('The minimap SVG drew no viewBox.');
+    const viewBoxNumbers = viewBoxAttribute.trim().split(/\s+/).map(Number);
+    expect(viewBoxNumbers).toHaveLength(4);
+    for (const value of viewBoxNumbers) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+
+    await expect(mask).not.toHaveAttribute('d', /NaN/);
+
+    const svgBox = await svg.boundingBox();
+    if (svgBox === null) throw new Error('The minimap SVG drew no measurable box.');
+    const nodeBoxes = await nodes.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      }),
+    );
+    expect(nodeBoxes.length).toBeGreaterThan(0);
+    for (const box of nodeBoxes) {
+      expect(box.width).toBeLessThan(svgBox.width);
+      expect(box.height).toBeLessThan(svgBox.height);
+      expect(box.x).toBeGreaterThanOrEqual(svgBox.x - 0.5);
+      expect(box.y).toBeGreaterThanOrEqual(svgBox.y - 0.5);
+      expect(box.x + box.width).toBeLessThanOrEqual(svgBox.x + svgBox.width + 0.5);
+      expect(box.y + box.height).toBeLessThanOrEqual(svgBox.y + svgBox.height + 0.5);
+    }
+  };
+
+  await expect(minimap).toBeVisible();
+  await expectFiniteContainedDrawing();
+
+  for (const deltaY of [-300, 600]) {
+    const before = await canvasTransform(page);
+    await minimap.hover();
+    await page.mouse.wheel(0, deltaY);
+    await expect.poll(() => canvasTransform(page)).not.toBe(before);
+    await expectFiniteContainedDrawing();
+  }
+};
 
 test(
   'the selected Edge controls offer Edit and Delete, and open nothing on their own',
@@ -294,7 +362,9 @@ test(
     // the fixture supplies no substitute for it and no geometry of its own.
     const minimap = page.locator('.react-flow__minimap');
     await expect(minimap).toBeVisible();
-    await expect(page.locator('.react-flow__minimap-node')).toHaveCount(5);
+    await expect(page.locator('.react-flow__minimap-node')).toHaveCount(
+      Object.keys(diagram.positions).length,
+    );
 
     // The key and MiniMap are sibling Panels meeting at one edge. This catches
     // both the old nested MiniMap and two bottom-right Panels overlapping.
@@ -308,43 +378,7 @@ test(
     expect(map.width).toBe(200);
     expect(map.height).toBe(150);
 
-    // **Scale, because a `NaN` viewBox passes every assertion above.** React
-    // Flow's `MiniMap` reads its width and height off `style` rather than a
-    // prop, divides the Diagram's bounding box by them to find its scale, and
-    // writes the result straight into the SVG's `viewBox` — an invalid
-    // `viewBox` makes the browser fall back to 1:1, so the first node (260 by
-    // 146 user units) paints over the whole map (ticket 01). A finite viewBox
-    // and a node rect smaller than the map are what a 1:1 fallback cannot
-    // produce.
-    const viewBoxAttribute = await page.locator('.react-flow__minimap-svg').getAttribute('viewBox');
-    if (viewBoxAttribute === null) throw new Error('The minimap SVG drew no viewBox.');
-    const viewBoxNumbers = viewBoxAttribute.trim().split(/\s+/).map(Number);
-    expect(viewBoxNumbers).toHaveLength(4);
-    for (const value of viewBoxNumbers) {
-      expect(Number.isFinite(value)).toBe(true);
-    }
-
-    const nodeBox = await page.locator('.react-flow__minimap-node').first().boundingBox();
-    if (nodeBox === null) throw new Error('The minimap drew no node.');
-    expect(nodeBox.width).toBeLessThan(map.width);
-    expect(nodeBox.height).toBeLessThan(map.height);
-
-    // MiniMap zoom changes the canvas viewport, not the authored Diagram. At
-    // several viewport scales its own drawing must remain finite and clipped
-    // to the same 200×150 frame.
-    for (const deltaY of [-300, 600]) {
-      await minimap.hover();
-      await page.mouse.wheel(0, deltaY);
-      const changedViewBox = await page.locator('.react-flow__minimap-svg').getAttribute('viewBox');
-      if (changedViewBox === null) throw new Error('The minimap SVG lost its viewBox.');
-      for (const value of changedViewBox.trim().split(/\s+/).map(Number)) {
-        expect(Number.isFinite(value)).toBe(true);
-      }
-      const changedNodeBox = await page.locator('.react-flow__minimap-node').first().boundingBox();
-      if (changedNodeBox === null) throw new Error('The minimap lost its first node.');
-      expect(changedNodeBox.width).toBeLessThan(map.width);
-      expect(changedNodeBox.height).toBeLessThan(map.height);
-    }
+    await expectMinimapDrawnToScale(page);
 
     // Exactly one, and the others are dimmed rather than dropped.
     await expect(key.locator('li[data-active="true"]')).toHaveCount(1);
@@ -354,6 +388,54 @@ test(
       .locator('[aria-hidden="true"]')
       .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
     expect(new Set(stripes).size).toBe(titles.length);
+  },
+);
+
+/**
+ * The key panel is a read-out, so the canvas keeps the pointers over it.
+ *
+ * A `.react-flow__panel` has no `pointer-events` rule of React Flow's own, so
+ * a Panel swallows every gesture over its box — and this HUD stands in the
+ * corner a Thing's bottom-right resize control lives in. The key holds no
+ * control, so it hands them back; the two clipped names keep theirs, because
+ * their `title` is the only place a truncated name can be read. The MiniMap
+ * beside it is excluded on purpose: it pans and zooms, so it is *meant* to
+ * take what lands on it.
+ */
+test(
+  'the Graph HUD key hands the canvas back every pointer it does not need',
+  { tag: '@parity:graph-hud-key-hands-back-the-pointers-it-does-not-need' },
+  async ({ page }) => {
+    await page.goto(story('surfaces--graph-hud--retained'));
+
+    /** What a press at this point would land on. */
+    const topmostAt = (x: number, y: number): Promise<string> =>
+      page.evaluate(
+        ([px, py]: readonly number[]) => {
+          const element = document.elementFromPoint(px ?? 0, py ?? 0);
+          if (element === null) return 'nothing';
+          if (element.closest('[data-testid="hud-space"], [data-testid="hud-diagram"]') !== null)
+            return 'name';
+          if (element.closest('.react-flow__panel') !== null) return 'hud';
+          return 'canvas';
+        },
+        [x, y],
+      );
+
+    const key = page.getByTestId('graph-legend');
+    const keyBox = await key.boundingBox();
+    const name = page.getByTestId('hud-space');
+    const nameBox = await name.boundingBox();
+    if (keyBox === null || nameBox === null) throw new Error('The HUD drew no measurable box.');
+
+    // The key's own rows, which are the widest part of the panel.
+    expect(await topmostAt(keyBox.x + keyBox.width / 2, keyBox.y + keyBox.height / 2)).toBe(
+      'canvas',
+    );
+    expect(await topmostAt(keyBox.x + 4, keyBox.y + 4)).toBe('canvas');
+    // The clipped name still answers, so its `title` can be read.
+    expect(await topmostAt(nameBox.x + 4, nameBox.y + nameBox.height / 2)).toBe('name');
+    await expect(name).toHaveAttribute('title', await name.innerText());
   },
 );
 
@@ -384,5 +466,13 @@ test(
     expect(await items.allInnerTexts()).toEqual(titles);
     await expect(items.first()).toHaveAttribute('data-active', 'true');
     await expect(items.first()).toHaveText(active.title);
+    await expect(page.locator('.react-flow__minimap-node')).toHaveCount(
+      Object.keys(diagram.positions).length,
+    );
+
+    // Ticket 01 requires the scale proof at every catalogue Diagram. This
+    // sparse second Diagram has a different authored extent, so it catches a
+    // map that happens to be valid only for Collection 1's five-node spine.
+    await expectMinimapDrawnToScale(page);
   },
 );

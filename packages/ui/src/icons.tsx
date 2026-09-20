@@ -37,8 +37,15 @@ type CanvasControlIconProps = ComponentProps<typeof Minus>;
  * content well, which is a *web page chrome* and describes nothing the product
  * does. A Diagram is authored placement (ADR 0014 — placement is authored, not
  * computed), so the glyph is the placements.
+ *
+ * `size` exists for the same reason `SpaceIcon` and `GraphIcon` carry one: a
+ * surface that draws two identity glyphs in one column has to draw them at one
+ * size, and the canvas HUD draws this one beside a 13px Space cube. The default
+ * is the 16 every other call site was already getting.
  */
-export const DiagramIcon = () => <LayoutGrid size={16} />;
+export const DiagramIcon = ({ size = 16 }: { size?: number | undefined }) => (
+  <LayoutGrid size={size} />
+);
 
 /**
  * A directed Graph, including its branches and joins.

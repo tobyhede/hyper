@@ -912,9 +912,7 @@ test('opening a Thing displaces its neighbours once, and dragging it never displ
   expect(at(dragged, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(opened, NEIGHBOUR));
   expect(at(dragged, BEHIND), 'the Thing behind moved at release').toEqual(at(opened, BEHIND));
 
-  // The first drag leaves this large Open Thing partly behind the fixed HUD.
-  // Take hold of its clear left edge for the return gesture.
-  await dragBy(page, subject, -340, -280, roomKept, { x: 40, y: 12 });
+  await dragBy(page, subject, -340, -280, roomKept);
 
   const returned = await allPositions(page);
   expect(at(returned, SUBJECT).x).toBeCloseTo(at(opened, SUBJECT).x, -1);

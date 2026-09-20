@@ -38,11 +38,16 @@ So the fix is not another override. It is to stop containing the component.
 
 Two siblings inside `<ReactFlow>`, each doing its own job:
 
-- **The minimap, stock.** React Flow's visual and interaction defaults — no
-  colour props, no `pannable` or `zoomable`, no `className`, no position
-  override and no wrapper. Its numeric 200×150 default dimensions are repeated
-  through `style` because that is the sizing input React Flow reads when it
-  calculates the viewBox. The accessible product name remains.
+- **The minimap, stock in skin and interactive in behaviour.** React Flow's
+  visual defaults — no colour props, no `className`, no position override and
+  no wrapper. Its numeric 200×150 default dimensions are repeated through
+  `style` because that is the sizing input React Flow reads when it calculates
+  the viewBox. The accessible product name remains. **`pannable` and `zoomable`
+  are kept**, which this ticket originally dropped as "interaction defaults":
+  `XYMinimap.update` attaches d3-zoom to the minimap's SVG unconditionally and
+  gates only the handlers, so dropping them bought back no canvas and cost the
+  pan and the zoom — the box captured the gesture either way. Reviewed and
+  reversed after the fact; see the review follow-up below.
 - **The key panel**, carrying what the canvas is drawing:
 
 ```
@@ -81,8 +86,10 @@ problem.** There it existed only to make a child match the parent it was
 fighting. Here both uses are the same fact — the map is that tall, and the key
 sits that far up — so they cannot disagree about anything.
 
-To make the two read as one card rather than two: give them a common background
-through the minimap's CSS variable, and round only the key's top corners.
+Their aligned edges make them read as one HUD while their skins remain separate:
+the key uses the product card surface and the MiniMap keeps React Flow's stock
+theme variables. Only the key's top corners are rounded by product code; no
+MiniMap colour or class override is introduced.
 
 ## What moves with it
 
@@ -99,10 +106,64 @@ through the minimap's CSS variable, and round only the key's top corners.
 
 ## Acceptance
 
-- [ ] `<MiniMap>` keeps React Flow's default colours and interactions, with only its accessible
-      name and numeric 200×150 default dimensions supplied; no `className` or wrapper element
-- [ ] The only shared number is the map's own height, and both its uses are that same fact
-- [ ] The key panel names the Space and the open Diagram above the Graph key, and neither line presses
-- [ ] The HUD stays in the corner it occupies today, with the key attached above the map
-- [ ] The minimap draws the Diagram at a sane scale at several zoom levels, and nothing overflows its box
-- [ ] `pnpm verify`, `pnpm e2e:ladle` and `pnpm e2e` green, each run once on the finished state
+- [x] `<MiniMap>` keeps React Flow's default colours, with its accessible name, its numeric
+      200×150 default dimensions and `pannable`/`zoomable` supplied; no `className` or wrapper
+      element. **Amended:** this line first read "default colours and interactions" and was
+      checked against a MiniMap with neither prop. That was wrong — see the follow-up below.
+- [x] The only shared number is the map's own height, and both its uses are that same fact
+- [x] The key panel names the Space and the open Diagram above the Graph key, and neither line presses
+- [x] The HUD stays in the corner it occupies today, with the key attached above the map
+- [x] The minimap draws the Diagram at a sane scale at several zoom levels, and nothing overflows its box
+- [x] `pnpm verify`, `pnpm e2e:ladle` and `pnpm e2e` green, each run once on the finished state
+
+## Answer
+
+`GraphHud` now renders two bottom-right React Flow siblings. The key is a normal
+`Panel`, offset upward by the MiniMap's 150-pixel height plus React Flow's
+15-pixel panel inset. The `MiniMap` renders itself with only its accessible name
+numeric 200×150 dimensions and `pannable`/`zoomable`; it has no wrapper, class,
+colour or mask override. Its stock theme is deliberately independent of the
+product card surface above it.
+
+The key names the current Space and Diagram as read-only text, then lists the
+open Diagram's Graphs with the Active Graph emphasised. Ladle coverage holds the
+sibling geometry, identity semantics, finite MiniMap geometry and scale across
+multiple zoom levels; application E2E holds the same identity on the real
+canvas. The finished tree passed `pnpm verify`, `pnpm e2e:ladle` and `pnpm e2e`.
+
+## Review follow-up
+
+Two acceptance lines above were checked against code that did not do what they
+claimed, and PR #248's review caught both.
+
+**Interaction was not a default worth taking.** The ticket reasoned that passing
+no `pannable` and no `zoomable` left "React Flow's interaction defaults". It
+does — but the defaults leave a capturing dead zone rather than a pass-through
+one. In `@xyflow/system`, `XYMinimap.update` ends with
+`selection.call(zoomAndPanHandler, {})`, attaching d3-zoom to the SVG whatever
+the props say, and gates only the handlers
+(`.on('zoom', pannable ? panHandler : null)`). d3-zoom's own wheel and mousedown
+handlers `preventDefault` and `stopImmediatePropagation` regardless. So the
+stock minimap swallowed the gesture and did nothing with it. Both props are
+restored.
+
+The Ladle assertion that covered this was hollow in the same way: it hovered the
+minimap and wheeled under a comment saying "at several canvas zooms", but
+asserted only on the minimap's own drawing, which never changed. It now asserts
+`.react-flow__viewport`'s computed transform actually moves.
+
+**The key panel hands back the pointers it does not need.** Un-nesting roughly
+doubled the HUD's height, and `.react-flow__panel` carries no `pointer-events`
+rule of React Flow's own, so the key covered the bottom-right corner of anything
+drawn under it — which is where a Thing's resize control lives, the same harm
+`command-dock.css` already offsets the bottom-edge Dock to avoid. The key panel
+takes `pointer-events: none`, with `pointer-events: auto` on the two truncated
+name spans so their `title` stays hoverable. The minimap keeps its pointers,
+being genuinely interactive again.
+
+Three E2E tests had been edited to work around the occlusion — a `{x: 40}` grab
+offset, a 1600px viewport widening and an extra zoom-out. All three are reverted
+and pass at the default viewport, and the `grabAt` parameter added to `dragBy`
+for the first of them is removed. The new parity claim
+`graph-hud-key-hands-back-the-pointers-it-does-not-need` holds the mechanism at
+both levels.

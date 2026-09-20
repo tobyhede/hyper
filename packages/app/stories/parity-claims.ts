@@ -717,6 +717,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'The canvas HUD names the current Space and open Diagram read-only, keys every Graph that Diagram owns and emphasises the active one, attached above a real MiniMap.',
   },
   {
+    id: 'graph-hud-key-hands-back-the-pointers-it-does-not-need',
+    storyFile: 'surfaces/graph-hud.stories.tsx',
+    storyExport: 'Retained',
+    claim:
+      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Thing’s resize control lives in — while the two clipped identity names keep the pointer, because their title is the only place a truncated name can be read.',
+  },
+  {
     id: 'graph-hud-key-follows-the-open-diagram',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'SparseDiagram',
