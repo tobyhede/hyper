@@ -3,14 +3,14 @@ import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
   exercisePortalEditHostCanvas,
-  exerciseSpaceEndpointPadding,
-  exerciseSpaceEndpointFooter,
+  exerciseSpaceResourcePadding,
+  exerciseSpaceResourceFooter,
   exerciseFloatingResourceDock,
   hostGraphEdgeCount,
 } from '../e2e/space-resource-frame';
 import {
-  exerciseSpaceEndpointContextMenus,
-  exerciseSpaceEndpointEntityMenu,
+  exerciseSpaceResourceContextMenus,
+  exerciseSpaceResourceEntityMenu,
 } from '../e2e/space-resource-context-menu';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectEmbeddedResourceToFollowDrag } from '../e2e/support/embedded-drag';
@@ -324,7 +324,7 @@ test(
   { tag: '@parity:space-resource-context-menus-share-dock-actions' },
   async ({ page }) => {
     await open(page);
-    await exerciseSpaceEndpointContextMenus(page, spaceResource(page));
+    await exerciseSpaceResourceContextMenus(page, spaceResource(page));
   },
 );
 
@@ -333,7 +333,7 @@ test(
   { tag: '@parity:space-resource-entity-menu' },
   async ({ page }) => {
     await open(page);
-    await exerciseSpaceEndpointEntityMenu(page, spaceResource(page));
+    await exerciseSpaceResourceEntityMenu(page, spaceResource(page));
   },
 );
 
@@ -342,7 +342,7 @@ test(
   { tag: '@parity:space-resource-canvas-padding' },
   async ({ page }) => {
     await open(page);
-    await exerciseSpaceEndpointPadding(page, spaceResource(page), embeddedNodes(page).first());
+    await exerciseSpaceResourcePadding(page, spaceResource(page), embeddedNodes(page).first());
   },
 );
 
@@ -352,7 +352,7 @@ test(
   async ({ page }) => {
     await open(page);
     const resource = spaceResource(page);
-    await exerciseSpaceEndpointFooter(page, resource, embeddedNodes(page).first());
+    await exerciseSpaceResourceFooter(page, resource, embeddedNodes(page).first());
   },
 );
 
@@ -454,7 +454,7 @@ test(
   { tag: '@parity:space-resource-portal-framing' },
   async ({ page }) => {
     await page.goto(
-      '/?story=surfaces--space-resource-embedded-map--entered-from-space-endpoint&mode=preview',
+      '/?story=surfaces--space-resource-embedded-map--entered-from-space-resource&mode=preview',
     );
     await expect(page.locator('[data-testid="space-title"]:visible')).toContainText(
       'Architecture',

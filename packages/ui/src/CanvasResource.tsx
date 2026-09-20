@@ -16,9 +16,9 @@ import {
 } from './ResourceRailActions';
 import { ResourceContentEditProvider, type ResourceContentEdit } from './resource-content-edit';
 import {
-  SpaceEndpointSelectors,
-  type CanvasSpaceEndpointSelection,
-} from './SpaceEndpointSelectors';
+  SpaceResourceSelectors,
+  type CanvasSpaceResourceSelection,
+} from './SpaceResourceSelectors';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail } from './ResourceRail';
 import { Card, CardContent, CardTitle } from './components/card';
@@ -91,7 +91,7 @@ export type CanvasResourceFront =
        * Graphs of the selected one, and this Resource's own selections. Absent while
        * the target Space has not been read yet.
        */
-      readonly selection?: CanvasSpaceEndpointSelection;
+      readonly selection?: CanvasSpaceResourceSelection;
       /**
        * Map and Graph clusters, assembled by the application and inserted
        * at the head of this Resource's rail. Absent while the Resource is closed, the
@@ -410,7 +410,7 @@ export function CanvasResource(props: CanvasResourceProps) {
           data-testid="canvas-resource-actions"
         >
           {spaceSelection !== undefined && (
-            <SpaceEndpointSelectors {...spaceSelection} onReport={setContextNotice} />
+            <SpaceResourceSelectors {...spaceSelection} onReport={setContextNotice} />
           )}
           {spaceRail}
           {actionableEntityActions && (

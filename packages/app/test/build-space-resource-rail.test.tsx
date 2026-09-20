@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ResourceDocument } from '@project/core';
 import { ResourceRailActions } from '@project/ui';
-import { buildSpaceEndpointRail } from '../src/build-space-resource-rail';
-import type { SpaceEndpointTarget } from '../src/space-resource-lifecycle';
+import { buildSpaceResourceRail } from '../src/build-space-resource-rail';
+import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 
 beforeAll(() => {
   HTMLElement.prototype.hasPointerCapture = () => false;
@@ -22,7 +22,7 @@ const THIRD_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000027');
 const FOURTH_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000028');
 const FIFTH_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000029');
 
-const target: SpaceEndpointTarget = {
+const target: SpaceResourceTarget = {
   id: TARGET_ID,
   title: 'Architecture',
   maps: [
@@ -62,13 +62,13 @@ const documentOf = (
   graph,
 });
 
-const mountRail = (rail: ReturnType<typeof buildSpaceEndpointRail>) =>
+const mountRail = (rail: ReturnType<typeof buildSpaceResourceRail>) =>
   render(<ResourceRailActions aria-label="Resource rail">{rail}</ResourceRailActions>);
 
-describe('buildSpaceEndpointRail', () => {
+describe('buildSpaceResourceRail', () => {
   it('seeds both selectors from the Resource’s stored selection', () => {
     mountRail(
-      buildSpaceEndpointRail({
+      buildSpaceResourceRail({
         target,
         document: documentOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
         disabled: false,
@@ -90,7 +90,7 @@ describe('buildSpaceEndpointRail', () => {
   it('completes a chosen Map with that Map’s Active Graph', () => {
     const complete = vi.fn(() => null);
     mountRail(
-      buildSpaceEndpointRail({
+      buildSpaceResourceRail({
         target,
         document: documentOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
         disabled: false,
@@ -111,7 +111,7 @@ describe('buildSpaceEndpointRail', () => {
 
   it('draws a selection the target no longer holds as unavailable', () => {
     mountRail(
-      buildSpaceEndpointRail({
+      buildSpaceResourceRail({
         target,
         document: documentOf(
           uuidSchema.parse('00000000-0000-4000-8000-000000000099'),

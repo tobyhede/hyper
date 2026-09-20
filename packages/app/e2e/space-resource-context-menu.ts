@@ -2,7 +2,7 @@ import { expectMenuGroups, resourceControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Exercise the same target commands through the application and its production story. */
-export async function exerciseSpaceEndpointContextMenus(
+export async function exerciseSpaceResourceContextMenus(
   page: Page,
   resource: Locator,
 ): Promise<void> {
@@ -119,7 +119,7 @@ export async function exerciseSpaceEndpointContextMenus(
 }
 
 /** The Space Resource entity menu and its Reference Resource creation, through both production hosts. */
-export async function exerciseSpaceEndpointEntityMenu(
+export async function exerciseSpaceResourceEntityMenu(
   page: Page,
   resource: Locator,
 ): Promise<void> {
@@ -167,7 +167,7 @@ export async function exerciseSpaceEndpointEntityMenu(
   ).toBeVisible();
   await menu();
   // No Delete from Space here: `resourceNode` is Open — both callers reach it
-  // through `openSpaceEndpointOnItsMap`, which presses Enter on it so its
+  // through `openSpaceResourceOnItsMap`, which presses Enter on it so its
   // Map and Graph menus have something to exercise — and Delete from
   // Space is withdrawn while any Resource on the Map is Open
   // (`authoring-availability.ts`'s `deleteResource`), so that Open state cannot

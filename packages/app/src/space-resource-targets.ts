@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Resource, UUID } from '@project/core';
-import { spaceResourceTarget, type SpaceEndpointTarget } from './space-resource-lifecycle';
+import { spaceResourceTarget, type SpaceResourceTarget } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 
 const NO_ENTRIES = [] as const;
@@ -8,10 +8,10 @@ const noSubscription = () => () => undefined;
 const noEntries = () => NO_ENTRIES;
 
 /** What every Space Resource on a canvas needs from the Spaces it references. */
-export type SpaceEndpointTargets = ReadonlyMap<UUID, SpaceEndpointTarget>;
+export type SpaceResourceTargets = ReadonlyMap<UUID, SpaceResourceTarget>;
 
 /** No Space Resource in this Space, or none read yet — one shared empty value. */
-export const NO_SPACE_RESOURCE_TARGETS: SpaceEndpointTargets = new Map();
+export const NO_SPACE_RESOURCE_TARGETS: SpaceResourceTargets = new Map();
 
 /** The distinct Spaces the Space Resources of one Space reference, in authored order. */
 const referencedSpaceIds = (resources: readonly Resource[]): readonly UUID[] => [
@@ -29,7 +29,7 @@ const referencedSpaceIds = (resources: readonly Resource[]): readonly UUID[] => 
  * Space — and rejects when the transport could not get one at all.
  */
 type TargetRead =
-  | { readonly id: UUID; readonly answered: true; readonly target: SpaceEndpointTarget | undefined }
+  | { readonly id: UUID; readonly answered: true; readonly target: SpaceResourceTarget | undefined }
   | { readonly id: UUID; readonly answered: false };
 
 /**
@@ -41,9 +41,9 @@ type TargetRead =
  */
 const nextTargets = (
   reads: readonly TargetRead[],
-  previous: SpaceEndpointTargets,
-): SpaceEndpointTargets => {
-  const next = new Map<UUID, SpaceEndpointTarget>();
+  previous: SpaceResourceTargets,
+): SpaceResourceTargets => {
+  const next = new Map<UUID, SpaceResourceTarget>();
   for (const entry of reads) {
     const target = entry.answered ? entry.target : previous.get(entry.id);
     if (target !== undefined) next.set(entry.id, target);
@@ -65,17 +65,17 @@ const nextTargets = (
  * Reads fill the unopened targets. Open Spaces publishes changes to its live
  * entries, and their current working Spaces override those reads immediately.
  */
-export const useSpaceEndpointTargets = (
+export const useSpaceResourceTargets = (
   resources: readonly Resource[],
-  read: (spaceId: UUID) => Promise<SpaceEndpointTarget | undefined>,
-): SpaceEndpointTargets => {
+  read: (spaceId: UUID) => Promise<SpaceResourceTarget | undefined>,
+): SpaceResourceTargets => {
   const spaces = useOpenSpaces();
   const getEntries = useCallback(() => spaces?.getState().entries ?? NO_ENTRIES, [spaces]);
   const entries = useSyncExternalStore(
     spaces?.subscribe ?? noSubscription,
     spaces === null ? noEntries : getEntries,
   );
-  const [targets, setTargets] = useState<SpaceEndpointTargets>(NO_SPACE_RESOURCE_TARGETS);
+  const [targets, setTargets] = useState<SpaceResourceTargets>(NO_SPACE_RESOURCE_TARGETS);
   /**
    * Which set of targets has been asked for, and which answer is still wanted.
    *

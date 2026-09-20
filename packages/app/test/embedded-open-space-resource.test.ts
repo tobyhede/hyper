@@ -5,7 +5,7 @@ import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from '../src/drag-tilt';
 import { embeddedMap } from '../src/embedded-map';
 import {
-  discoverEmbeddedOpenSpaceEndpoints,
+  discoverEmbeddedOpenSpaceResources,
   embedBounds,
   embeddedAuthoringEnabled,
   editingPortalAncestor,
@@ -56,7 +56,7 @@ const spaceContent = (
   graph,
 });
 
-const openSpaceEndpoint = (
+const openSpaceResource = (
   resourceId: typeof HOST,
   target: { readonly spaceId: typeof TARGET; readonly map: typeof MAP },
   geometry: {
@@ -116,8 +116,8 @@ describe('embed bounds', () => {
 
 describe('embedded open Space Resource discovery', () => {
   it('does not nest a Map already crossed on the path', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
-    const nested = openSpaceEndpoint(
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
+    const nested = openSpaceResource(
       NESTED,
       { spaceId: TARGET, map: MAP },
       {
@@ -126,7 +126,7 @@ describe('embedded open Space Resource discovery', () => {
         height: 300,
       },
     );
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -137,13 +137,13 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('discovers a nested Open Space Resource on a Map the path has not crossed', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
-    const nested = openSpaceEndpoint(
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
+    const nested = openSpaceResource(
       NESTED,
       { spaceId: TARGET, map: OTHER_MAP },
       { position: { x: 50, y: 60 }, width: 400, height: 300 },
     );
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -161,13 +161,13 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('leans every embedding under a dragged Resource about that Resource, not about its own parent', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
-    const nested = openSpaceEndpoint(
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
+    const nested = openSpaceResource(
       NESTED,
       { spaceId: TARGET, map: OTHER_MAP },
       { position: { x: 50, y: 60 }, width: 400, height: 300 },
     );
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -185,10 +185,10 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('builds a nested window from the authored origin when the publication has already leaned', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const authored = { x: 50, y: 60 };
     const size = { width: 400, height: 300 };
-    const nested = openSpaceEndpoint(
+    const nested = openSpaceResource(
       NESTED,
       { spaceId: TARGET, map: OTHER_MAP },
       {
@@ -200,7 +200,7 @@ describe('embedded open Space Resource discovery', () => {
         height: size.height,
       },
     );
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([
@@ -225,7 +225,7 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('places Resources inside a nested window relative to where that window is drawn', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const authored = { x: 50, y: 60 };
     const size = { width: 400, height: 300 };
     const hostTilt = {
@@ -233,7 +233,7 @@ describe('embedded open Space Resource discovery', () => {
       parentAbsolute: { x: 100, y: 200 },
     };
     const nestedLeaned = lean(authored, size, hostTilt);
-    const nested = openSpaceEndpoint(
+    const nested = openSpaceResource(
       NESTED,
       { spaceId: TARGET, map: OTHER_MAP },
       {
@@ -242,7 +242,7 @@ describe('embedded open Space Resource discovery', () => {
         height: size.height,
       },
     );
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([
@@ -319,8 +319,8 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('leans nothing while no Resource is being moved', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map(),
@@ -331,13 +331,13 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('marks a Reference Resource embedding and everything nested under it read-only', () => {
-    const parent = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP }, { kind: 'reference' });
-    const nested = openSpaceEndpoint(
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { kind: 'reference' });
+    const nested = openSpaceResource(
       NESTED,
       { spaceId: TARGET, map: OTHER_MAP },
       { position: { x: 50, y: 60 }, width: 400, height: 300 },
     );
-    const requests = discoverEmbeddedOpenSpaceEndpoints({
+    const requests = discoverEmbeddedOpenSpaceResources({
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -348,7 +348,7 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('does not discover a closed Space Resource or one without space content', () => {
-    const closed = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP }, { expanded: false });
+    const closed = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { expanded: false });
     const markdown: ResourceFlowNode = {
       id: CHILD_RESOURCE,
       type: 'resource',
@@ -367,7 +367,7 @@ describe('embedded open Space Resource discovery', () => {
       },
     };
     expect(
-      discoverEmbeddedOpenSpaceEndpoints({
+      discoverEmbeddedOpenSpaceResources({
         nodes: [closed, markdown],
         entries: [],
         publications: new Map(),
@@ -383,9 +383,9 @@ const nodesById = (...nodes: readonly ResourceFlowNode[]) =>
 
 describe('edit portal ancestry', () => {
   it('finds the nearest Open Space Resource currently in portal Edit', () => {
-    const host = openSpaceEndpoint(HOST, { spaceId: TARGET, map: MAP });
+    const host = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const nested = {
-      ...openSpaceEndpoint(NESTED, { spaceId: TARGET, map: OTHER_MAP }),
+      ...openSpaceResource(NESTED, { spaceId: TARGET, map: OTHER_MAP }),
       parentId: HOST,
     };
     const byId = nodesById(host, nested);
@@ -449,7 +449,7 @@ describe('edit portal state lives in the pipeline', () => {
       encoding: 'utf8',
     });
     expect(source).not.toMatch(/useState<ReadonlySet<ResourceId>>/);
-    expect(source).not.toMatch(/useState<ReadonlyMap<ResourceId, SpaceEndpointFraming>>/);
+    expect(source).not.toMatch(/useState<ReadonlyMap<ResourceId, SpaceResourceFraming>>/);
   });
 
   it('does not let the embed lifecycle hook import from the components tree', () => {

@@ -3,36 +3,36 @@ import {
   createObservableState,
   type ObserverErrorReporter,
   type SpaceBackend,
-  type SpaceEndpointLifecycle,
+  type SpaceResourceLifecycle,
   type SpaceSessionRegistry,
   type SpaceSummary,
 } from '@project/persistence';
 import type { GraphId, Map, UUID } from '@project/core';
 
 export type {
-  CreateSpaceEndpointInput,
-  DeleteSpaceEndpointInput,
-  LinkSpaceEndpointInput,
-  SpaceEndpointCreationResult,
-  SpaceEndpointContextDeletionResult,
-  SpaceEndpointDeletionResult,
-  SpaceEndpointLifecycle,
-  SpaceEndpointRefusal,
-  SpaceEndpointTargetUnavailableReason,
+  CreateSpaceResourceInput,
+  DeleteSpaceResourceInput,
+  LinkSpaceResourceInput,
+  SpaceResourceCreationResult,
+  SpaceResourceContextDeletionResult,
+  SpaceResourceDeletionResult,
+  SpaceResourceLifecycle,
+  SpaceResourceRefusal,
+  SpaceResourceTargetUnavailableReason,
 } from '@project/persistence';
 
 /** The target's choices; rendering uses its live Space's production projection. */
-export interface SpaceEndpointTargetMap {
+export interface SpaceResourceTargetMap {
   readonly id: UUID;
   readonly title: string;
   readonly graphs: readonly { readonly id: GraphId; readonly title: string }[];
   readonly activeGraph?: GraphId;
 }
 
-export interface SpaceEndpointTarget {
+export interface SpaceResourceTarget {
   readonly id: UUID;
   readonly title: string;
-  readonly maps: readonly SpaceEndpointTargetMap[];
+  readonly maps: readonly SpaceResourceTargetMap[];
 }
 
 /**
@@ -46,7 +46,7 @@ export interface SpaceEndpointTarget {
  * them would be composing its own answer to a question this module already
  * owns.
  */
-export interface SpaceEndpointAuthoring extends SpaceEndpointLifecycle {
+export interface SpaceResourceAuthoring extends SpaceResourceLifecycle {
   /**
    * The Spaces a new Space Resource in this Space may reference.
    *
@@ -65,7 +65,7 @@ export interface SpaceEndpointAuthoring extends SpaceEndpointLifecycle {
    * Read through the live session where one is open, so a Map authored in a
    * Space this browser also has open is selectable before it has committed.
    */
-  readonly target: (spaceId: UUID) => Promise<SpaceEndpointTarget | undefined>;
+  readonly target: (spaceId: UUID) => Promise<SpaceResourceTarget | undefined>;
   /**
    * That the set {@link referenceableSpaces} answers may have changed.
    *
@@ -96,7 +96,7 @@ export interface SpaceSetChanges {
   readonly subscribe: (listener: () => void) => () => void;
 }
 
-export interface SpaceEndpointLifecycleOptions {
+export interface SpaceResourceLifecycleOptions {
   readonly backend: SpaceBackend;
   readonly registry: SpaceSessionRegistry;
   readonly newId: () => UUID;
@@ -110,7 +110,7 @@ export interface SpaceEndpointLifecycleOptions {
   readonly reportObserverError: ObserverErrorReporter;
 }
 
-const targetMap = (map: Map): SpaceEndpointTargetMap => {
+const targetMap = (map: Map): SpaceResourceTargetMap => {
   const read = {
     id: map.id,
     title: map.title,
@@ -119,12 +119,12 @@ const targetMap = (map: Map): SpaceEndpointTargetMap => {
   return map.activeGraph === undefined ? read : { ...read, activeGraph: map.activeGraph };
 };
 
-export function createSpaceEndpointLifecycle({
+export function createSpaceResourceLifecycle({
   backend,
   registry,
   newId,
   reportObserverError,
-}: SpaceEndpointLifecycleOptions): SpaceEndpointAuthoring {
+}: SpaceResourceLifecycleOptions): SpaceResourceAuthoring {
   const lifecycle = registry.spaceResources(newId);
   const epoch = createObservableState(0, reportObserverError);
   /**
@@ -134,7 +134,7 @@ export function createSpaceEndpointLifecycle({
    * completed. A `link` changes no Space set and is announced anyway — one
    * announcement costs the drawn Space one repository read and no other Space
    * anything, which is less than a rule two surfaces would have to agree on.
-   * That is a claim about {@link SpaceEndpointAuthoring.spaceSet} being an
+   * That is a claim about {@link SpaceResourceAuthoring.spaceSet} being an
    * invalidation rather than a fan-out, and it would stop holding the day every
    * mounted reader answered a bump. A refusal announces nothing, having changed
    * nothing, and a break leaves the epoch where the failed write left the
@@ -172,7 +172,7 @@ export function createSpaceEndpointLifecycle({
   };
 }
 
-export function spaceResourceTarget(space: Space): SpaceEndpointTarget {
+export function spaceResourceTarget(space: Space): SpaceResourceTarget {
   return {
     id: space.id,
     title: space.title,

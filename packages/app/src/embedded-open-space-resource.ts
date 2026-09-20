@@ -31,7 +31,7 @@ export interface EmbeddedPublicationSnapshot {
   readonly nodes: readonly ResourceFlowNode[];
 }
 
-export interface DiscoverEmbeddedOpenSpaceEndpointsInput<
+export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   Entry extends { readonly id: ResourceId },
 > {
   readonly nodes: readonly ResourceFlowNode[];
@@ -49,7 +49,7 @@ export interface DiscoverEmbeddedOpenSpaceEndpointsInput<
   readonly draggingIds: ReadonlySet<string>;
 }
 
-export interface EmbeddedOpenSpaceEndpointRequest<Entry extends { readonly id: ResourceId }> {
+export interface EmbeddedOpenSpaceResourceRequest<Entry extends { readonly id: ResourceId }> {
   readonly parent: ResourceFlowNode;
   readonly spaceId: ResourceId;
   readonly mapId: MapId;
@@ -164,10 +164,10 @@ export function embedBounds(
  * publication snapshot. A Map already on the path is skipped so a mutual
  * pair cannot deepen one level per commit.
  */
-export function discoverEmbeddedOpenSpaceEndpoints<Entry extends { readonly id: ResourceId }>(
-  input: DiscoverEmbeddedOpenSpaceEndpointsInput<Entry>,
-): readonly EmbeddedOpenSpaceEndpointRequest<Entry>[] {
-  const requests: EmbeddedOpenSpaceEndpointRequest<Entry>[] = [];
+export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: ResourceId }>(
+  input: DiscoverEmbeddedOpenSpaceResourcesInput<Entry>,
+): readonly EmbeddedOpenSpaceResourceRequest<Entry>[] {
+  const requests: EmbeddedOpenSpaceResourceRequest<Entry>[] = [];
   const queue: {
     parent: ResourceFlowNode;
     origin: MapPosition;

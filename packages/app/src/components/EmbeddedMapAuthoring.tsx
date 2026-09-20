@@ -16,11 +16,11 @@ import {
 } from '../embedded-map';
 import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
-import { useSpaceEndpointTargets } from '../space-resource-targets';
+import { useSpaceResourceTargets } from '../space-resource-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { Continuation } from '../continuation';
 import type { EmbeddedPublication } from '../embedded-publication';
-import { authoredFromDrawn, type SpaceEndpointFraming } from '../space-resource-framing';
+import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
 import { spaceResourceEmbedCamera } from '../camera';
 
 export type { EmbeddedPublication };
@@ -55,7 +55,7 @@ export function EmbeddedMapAuthoring({
    */
   readonly graphId: GraphId;
   readonly enabled: boolean;
-  readonly framing: SpaceEndpointFraming | undefined;
+  readonly framing: SpaceResourceFraming | undefined;
   readonly bounds: EmbeddedBounds;
   /** This Resource's authored top-left in canvas coordinates. */
   readonly absolute: MapPosition;
@@ -112,7 +112,7 @@ export function EmbeddedMapAuthoring({
       composition.adapter.getState().syncProjection(projected.nodes, projected.edges);
   }, [composition, projected]);
   const readTarget = useCallback((id: ResourceId) => entry.spaceResources.target(id), [entry]);
-  const targets = useSpaceEndpointTargets(space.resources, readTarget);
+  const targets = useSpaceResourceTargets(space.resources, readTarget);
   /**
    * This embedding's own answers, from the one module that owns them.
    *
@@ -135,7 +135,7 @@ export function EmbeddedMapAuthoring({
         resourceIsOpen: false,
         editingChromeTitle: false,
         spaceOnCanvas: enabled,
-        creatingSpaceEndpoint: false,
+        creatingSpaceResource: false,
         // Never this embedding's own fact. A Space Resource *inside* this Map is
         // drawn by the containing `SpaceCanvas` too — its queue descends into
         // the nodes this one publishes — so a nested edit is reported into that

@@ -4,13 +4,13 @@ import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
-  decorateSpaceEndpointNode,
+  decorateSpaceResourceNode,
   type CanvasResourceDecorationContext,
 } from '../src/canvas-resource-decoration';
 import { RESOURCE_SIZE } from '../src/resource';
 import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
-import type { SpaceEndpointTarget } from '../src/space-resource-lifecycle';
+import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -21,7 +21,7 @@ const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 
-const target: SpaceEndpointTarget = {
+const target: SpaceResourceTarget = {
   id: TARGET_SPACE_ID,
   title: 'Architecture',
   maps: [
@@ -93,7 +93,7 @@ const context = (
   spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
   spaces: null,
   continuation: undefined,
-  completeSpaceEndpointSelection: () => null,
+  completeSpaceResourceSelection: () => null,
   completeEmbedded: completeEmbeddedAuthoring,
   portalEditing: undefined,
   onPortalEditingChange: undefined,
@@ -211,30 +211,30 @@ describe('decorateMarkdownResourceNode', () => {
   });
 });
 
-describe('decorateSpaceEndpointNode', () => {
+describe('decorateSpaceResourceNode', () => {
   it('omits the rail while closed, unread, or read-only', () => {
     expect(
-      decorateSpaceEndpointNode(projectionNode(SPACE_RESOURCE_ID, 'space'), context()).spaceRail,
+      decorateSpaceResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space'), context()).spaceRail,
     ).toBeUndefined();
     expect(
-      decorateSpaceEndpointNode(
+      decorateSpaceResourceNode(
         projectionNode(SPACE_RESOURCE_ID, 'space', true),
         context({ spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS }),
       ).spaceRail,
     ).toBeUndefined();
     expect(
-      decorateSpaceEndpointNode(projectionNode(SPACE_RESOURCE_ID, 'space', true, true), context())
+      decorateSpaceResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space', true, true), context())
         .spaceRail,
     ).toBeUndefined();
   });
 
   it('builds the rail for an Open Space Resource whose target is read, and still when authoring is withdrawn', () => {
     expect(
-      decorateSpaceEndpointNode(projectionNode(SPACE_RESOURCE_ID, 'space', true), context())
+      decorateSpaceResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space', true), context())
         .spaceRail,
     ).toBeDefined();
     expect(
-      decorateSpaceEndpointNode(
+      decorateSpaceResourceNode(
         projectionNode(SPACE_RESOURCE_ID, 'space', true),
         context({ authorOnCanvas: false }),
       ).spaceRail,
@@ -243,15 +243,15 @@ describe('decorateSpaceEndpointNode', () => {
 
   it('leaves markdown and Reference Resource nodes untouched', () => {
     expect(
-      decorateSpaceEndpointNode(projectionNode(RESOURCE_ID, 'markdown', true), context()),
+      decorateSpaceResourceNode(projectionNode(RESOURCE_ID, 'markdown', true), context()),
     ).toEqual({});
     expect(
-      decorateSpaceEndpointNode(projectionNode(REFERENCE_ID, 'reference', true), context()),
+      decorateSpaceResourceNode(projectionNode(REFERENCE_ID, 'reference', true), context()),
     ).toEqual({});
   });
 
   it('withholds context notice when the rail is absent', () => {
-    const patch = decorateSpaceEndpointNode(
+    const patch = decorateSpaceResourceNode(
       projectionNode(SPACE_RESOURCE_ID, 'space'),
       context({ contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]) }),
     );
@@ -260,7 +260,7 @@ describe('decorateSpaceEndpointNode', () => {
 
   it('carries a context notice and portal Edit once the rail is present', () => {
     const onPortalEditingChange = vi.fn();
-    const patch = decorateSpaceEndpointNode(
+    const patch = decorateSpaceResourceNode(
       projectionNode(SPACE_RESOURCE_ID, 'space', true),
       context({
         contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]),

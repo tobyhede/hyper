@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Resource } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { OpenSpace } from '../src/open-spaces';
-import type { SpaceEndpointFraming } from '../src/space-resource-framing';
+import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import {
-  useEmbeddedOpenSpaceEndpoints,
+  useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-resources';
 
@@ -60,7 +60,7 @@ const reader = (
   embed,
 });
 
-describe('useEmbeddedOpenSpaceEndpoints', () => {
+describe('useEmbeddedOpenSpaceResources', () => {
   it('asks for each visible embedding once, and again only when the Map changes', async () => {
     const asked: (typeof TARGET)[] = [];
     const spaces = reader((spaceId) => {
@@ -68,7 +68,7 @@ describe('useEmbeddedOpenSpaceEndpoints', () => {
       return Promise.resolve(undefined);
     });
     const { rerender } = renderHook(
-      ({ nodes }) => useEmbeddedOpenSpaceEndpoints(nodes, spaces, NO_DRAG),
+      ({ nodes }) => useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG),
       {
         initialProps: { nodes: [spaceResource(HOST, MAP)] },
       },
@@ -90,7 +90,7 @@ describe('useEmbeddedOpenSpaceEndpoints', () => {
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceEndpoints([spaceResource(HOST, MAP)], spaces, NO_DRAG),
+      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG),
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
     fail = false;
@@ -103,7 +103,7 @@ describe('useEmbeddedOpenSpaceEndpoints', () => {
   it('drops a failure whose embedding is no longer standing', async () => {
     const spaces = reader(() => Promise.reject(new Error('Target missing')));
     const { result, rerender } = renderHook(
-      ({ nodes }) => useEmbeddedOpenSpaceEndpoints(nodes, spaces, NO_DRAG),
+      ({ nodes }) => useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG),
       { initialProps: { nodes: [spaceResource(HOST, MAP)] } },
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
@@ -114,7 +114,7 @@ describe('useEmbeddedOpenSpaceEndpoints', () => {
   it('measures the title footer into embed bounds', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceEndpoints([spaceResource(HOST, MAP)], spaces, NO_DRAG),
+      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(396);
@@ -127,10 +127,10 @@ describe('useEmbeddedOpenSpaceEndpoints', () => {
   it('owns portal Edit membership and the in-flight framing draft', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceEndpoints([spaceResource(HOST, MAP)], spaces, NO_DRAG),
+      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
-    const framing: SpaceEndpointFraming = { centreX: 200, centreY: 100, zoom: 2 };
+    const framing: SpaceResourceFraming = { centreX: 200, centreY: 100, zoom: 2 };
     act(() => {
       result.current.onPortalEditingChange(HOST, true);
       result.current.setPortalDraft(new Map([[HOST, framing]]));

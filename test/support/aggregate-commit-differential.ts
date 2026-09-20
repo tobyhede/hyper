@@ -150,7 +150,7 @@ const fixtureFor = ({
     idAt(seed, 11 + index),
   );
   const newSpaceId = idAt(seed, 15);
-  const newSpaceEndpointId = idAt(seed, 240);
+  const newSpaceResourceId = idAt(seed, 240);
 
   const meta: SpaceSnapshot = {
     id: metaSpaceId,
@@ -227,7 +227,7 @@ const fixtureFor = ({
             ...meta,
             resources: [
               ...meta.resources,
-              spaceResource(newSpaceEndpointId, 'Created', newSpaceId, seed, 15),
+              spaceResource(newSpaceResourceId, 'Created', newSpaceId, seed, 15),
             ],
           }),
           [{ kind: 'create', spaceId: newSpaceId, snapshot: created }],

@@ -17,7 +17,7 @@ export interface SpaceAggregate {
   readonly [SPACE_AGGREGATE_INTAKE]: true;
 }
 
-interface SpaceEndpointLocation {
+interface SpaceResourceLocation {
   readonly spaceId: UUID;
   readonly resourceId: UUID;
   readonly targetSpaceId: UUID;
@@ -40,22 +40,22 @@ export type SpaceAggregateError =
       readonly spaceIds: readonly UUID[];
     }
   | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: UUID }
-  | ({ readonly kind: 'space-resource-target-missing' } & SpaceEndpointLocation)
-  | ({ readonly kind: 'space-resource-reference-cycle' } & SpaceEndpointLocation)
+  | ({ readonly kind: 'space-resource-target-missing' } & SpaceResourceLocation)
+  | ({ readonly kind: 'space-resource-reference-cycle' } & SpaceResourceLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | ({
       readonly kind: 'space-resource-map-missing';
       readonly mapId: UUID;
-    } & SpaceEndpointLocation)
+    } & SpaceResourceLocation)
   | ({
       readonly kind: 'space-resource-graph-missing';
       readonly graphId: UUID;
-    } & SpaceEndpointLocation)
+    } & SpaceResourceLocation)
   | ({
       readonly kind: 'space-resource-graph-outside-map';
       readonly mapId: UUID;
       readonly graphId: UUID;
-    } & SpaceEndpointLocation);
+    } & SpaceResourceLocation);
 
 export type LoadSpaceAggregateResult =
   | { readonly ok: true; readonly aggregate: SpaceAggregate }

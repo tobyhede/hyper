@@ -8,7 +8,7 @@ import { InlineTitleEditor } from './InlineTitleEditor';
 import type { PaletteColorEntry } from './PaletteColorPicker';
 
 /** One entity a Space Resource's selectors can be pointed at, named as an author reads it. */
-export interface CanvasSpaceEndpointChoice {
+export interface CanvasSpaceResourceChoice {
   readonly id: string;
   readonly title: string;
 }
@@ -19,7 +19,7 @@ export interface CanvasSpaceEndpointChoice {
  * Rename, create, delete and copy — the same verbs the Dock spends on that
  * entity, addressed here to the context this Resource stores.
  */
-export interface CanvasSpaceEndpointCommands {
+export interface CanvasSpaceResourceCommands {
   readonly onRename: (title: string) => string | null;
   readonly onCreate: (renameScope: string) => Promise<string | null>;
   readonly onDelete: () => Promise<string | null>;
@@ -27,7 +27,7 @@ export interface CanvasSpaceEndpointCommands {
   readonly deleteDisabled: boolean;
 }
 
-export interface CanvasSpaceEndpointGraphCommands extends CanvasSpaceEndpointCommands {
+export interface CanvasSpaceResourceGraphCommands extends CanvasSpaceResourceCommands {
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
@@ -43,12 +43,12 @@ export interface CanvasSpaceEndpointGraphCommands extends CanvasSpaceEndpointCom
  * Map this Resource no longer shows. Which Maps and Graphs exist is the target
  * Space's business and neither is derived here.
  */
-export interface CanvasSpaceEndpointSelection {
+export interface CanvasSpaceResourceSelection {
   readonly onEditingChange?: (editing: boolean) => void;
-  readonly mapCommands?: CanvasSpaceEndpointCommands;
-  readonly graphCommands?: CanvasSpaceEndpointGraphCommands;
-  readonly maps: readonly CanvasSpaceEndpointChoice[];
-  readonly graphs: readonly CanvasSpaceEndpointChoice[];
+  readonly mapCommands?: CanvasSpaceResourceCommands;
+  readonly graphCommands?: CanvasSpaceResourceGraphCommands;
+  readonly maps: readonly CanvasSpaceResourceChoice[];
+  readonly graphs: readonly CanvasSpaceResourceChoice[];
   /** The selected Map, or `null` where the Resource selects none. */
   readonly mapId: string | null;
   readonly graphId: string | null;
@@ -67,7 +67,7 @@ export interface CanvasSpaceEndpointSelection {
 }
 
 /**
- * What {@link SpaceEndpointSelectors} needs to draw Map and Graph on a Space
+ * What {@link SpaceResourceSelectors} needs to draw Map and Graph on a Space
  * Resource rail, minus portal Read/Edit which stays on the Resource front.
  *
  * The one shape both an embedded canvas Resource (`CanvasResource`'s own rail) and
@@ -75,7 +75,7 @@ export interface CanvasSpaceEndpointSelection {
  * clusters are a different operation over the same primitive and are not
  * built from this type (`docs/agents/ui.md`, `command-surface-sharing.test.ts`).
  */
-export interface SpaceEndpointSelectorsProps extends CanvasSpaceEndpointSelection {
+export interface SpaceResourceSelectorsProps extends CanvasSpaceResourceSelection {
   readonly onReport: (message: string | null) => void;
 }
 
@@ -83,7 +83,7 @@ export interface SpaceEndpointSelectorsProps extends CanvasSpaceEndpointSelectio
  * Map and Graph kind commands extend the Resource's one rail toolbar.
  * They share the Dock's clusters and choices while writing this Resource's selection.
  */
-export function SpaceEndpointSelectors({
+export function SpaceResourceSelectors({
   onEditingChange,
   onReport,
   mapCommands,
@@ -95,7 +95,7 @@ export function SpaceEndpointSelectors({
   onMapChange,
   onGraphChange,
   disabled,
-}: SpaceEndpointSelectorsProps) {
+}: SpaceResourceSelectorsProps) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -104,7 +104,7 @@ export function SpaceEndpointSelectors({
   }, [renaming, busy, onEditingChange]);
   return (
     <>
-      <SpaceEndpointSelector
+      <SpaceResourceSelector
         label="Map"
         commands={mapCommands}
         onBusy={setBusy}
@@ -118,7 +118,7 @@ export function SpaceEndpointSelectors({
         disabled={disabled === true || busy}
         onChoose={onMapChange}
       />
-      <SpaceEndpointSelector
+      <SpaceResourceSelector
         label="Graph"
         commands={graphCommands}
         onBusy={setBusy}
@@ -136,16 +136,16 @@ export function SpaceEndpointSelectors({
   );
 }
 
-interface SpaceEndpointSelectorProps {
+interface SpaceResourceSelectorProps {
   readonly onBusy: (busy: boolean) => void;
-  readonly commands: CanvasSpaceEndpointCommands | CanvasSpaceEndpointGraphCommands | undefined;
+  readonly commands: CanvasSpaceResourceCommands | CanvasSpaceResourceGraphCommands | undefined;
   readonly renaming: boolean;
   readonly onRenaming: (editing: boolean) => void;
   readonly onReport: (message: string | null) => void;
   readonly label: string;
   readonly icon: ReactNode;
   readonly testId: string;
-  readonly choices: readonly CanvasSpaceEndpointChoice[];
+  readonly choices: readonly CanvasSpaceResourceChoice[];
   readonly chosen: string | null;
   /** Authoring is withdrawn from this canvas; the selection itself is known. */
   readonly disabled: boolean;
@@ -187,7 +187,7 @@ interface SpaceEndpointSelectorProps {
  * unmounted while closed, so nothing has registered a title at the moment the
  * trigger first has to display one.
  */
-function SpaceEndpointSelector({
+function SpaceResourceSelector({
   onBusy,
   commands,
   renaming,
@@ -200,7 +200,7 @@ function SpaceEndpointSelector({
   chosen,
   disabled,
   onChoose,
-}: SpaceEndpointSelectorProps) {
+}: SpaceResourceSelectorProps) {
   const selected = choices.find((choice) => choice.id === chosen);
   const renameScope = useId();
   const [menuOpen, setMenuOpen] = useState(false);

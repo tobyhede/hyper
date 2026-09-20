@@ -25,7 +25,7 @@ const resourceSheet = read('packages/ui/src/canvas-resource.css');
 const railSheet = read('packages/ui/src/resource-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const resourceRailActions = read('packages/ui/src/ResourceRailActions.tsx');
-const spaceResourceSelectors = read('packages/ui/src/SpaceEndpointSelectors.tsx');
+const spaceResourceSelectors = read('packages/ui/src/SpaceResourceSelectors.tsx');
 const spaceResourceRail = read('packages/app/src/build-space-resource-rail.tsx');
 const canvasResource = read('packages/ui/src/CanvasResource.tsx');
 
@@ -141,18 +141,18 @@ describe('choosing a Map or a Graph', () => {
   /**
    * And an Open Space Resource's two choices are themselves **one** control,
    * mounted by both surfaces that draw them, rather than a control copied
-   * twice: `@project/ui`'s `SpaceEndpointSelectors` is the sole place a Map or
+   * twice: `@project/ui`'s `SpaceResourceSelectors` is the sole place a Map or
    * Graph choice is turned into a `ChoiceMenu`, an embedded canvas Resource's own
    * rail (`CanvasResource`) and the application's Space Resource rail
-   * (`buildSpaceEndpointRail`) each mount it rather than restating it.
+   * (`buildSpaceResourceRail`) each mount it rather than restating it.
    */
   it('is owned once by @project/ui, not copied onto the canvas Resource or the app rail', () => {
     expect(spaceResourceRail).toContain("from '@project/ui'");
     expect(spaceResourceRail).not.toContain('<ChoiceMenu');
-    expect(spaceResourceRail).not.toMatch(/function SpaceEndpointSelector/u);
+    expect(spaceResourceRail).not.toMatch(/function SpaceResourceSelector/u);
 
-    expect(canvasResource).toContain("from './SpaceEndpointSelectors'");
+    expect(canvasResource).toContain("from './SpaceResourceSelectors'");
     expect(canvasResource).not.toContain('<ChoiceMenu');
-    expect(canvasResource).not.toMatch(/function SpaceEndpointSelector/u);
+    expect(canvasResource).not.toMatch(/function SpaceResourceSelector/u);
   });
 });

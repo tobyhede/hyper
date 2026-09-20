@@ -19,14 +19,14 @@ export type {
   CanvasResourceProps,
   CanvasResourceState,
 } from './CanvasResource';
-export { SpaceEndpointSelectors } from './SpaceEndpointSelectors';
+export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export type {
-  CanvasSpaceEndpointChoice,
-  CanvasSpaceEndpointCommands,
-  CanvasSpaceEndpointGraphCommands,
-  CanvasSpaceEndpointSelection,
-  SpaceEndpointSelectorsProps,
-} from './SpaceEndpointSelectors';
+  CanvasSpaceResourceChoice,
+  CanvasSpaceResourceCommands,
+  CanvasSpaceResourceGraphCommands,
+  CanvasSpaceResourceSelection,
+  SpaceResourceSelectorsProps,
+} from './SpaceResourceSelectors';
 export { usePresence } from './use-presence';
 export type { Presence, PresenceState } from './use-presence';
 export { ResourceRail } from './ResourceRail';
@@ -120,7 +120,7 @@ export {
   OpenIndependentlyIcon,
   OpenResourceIcon,
   ParentIcon,
-  SpaceEndpointIcon,
+  SpaceResourceIcon,
   SpaceIcon,
   SearchIcon,
   PlusIcon,

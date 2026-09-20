@@ -4,10 +4,10 @@ import {
   type ObserverErrorReporter,
   type ObservableState,
 } from '@project/persistence';
-import { describeAuthoringRefusal, describeSpaceEndpointRefusal } from './authoring-refusal';
+import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
 import { failureMessage } from './failure-message';
 import type { SpaceAuthoring } from './space-authoring';
-import type { SpaceEndpointAuthoring } from './space-resource-lifecycle';
+import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 
 /**
  * Delete Resource: the whole confirmation interaction, in one module.
@@ -47,7 +47,7 @@ export interface ResourceDeletion {
 export interface ResourceDeletionDependencies {
   readonly authoring: SpaceAuthoring;
   readonly currentSpace: () => { readonly id: UUID };
-  readonly spaceResources?: SpaceEndpointAuthoring | undefined;
+  readonly spaceResources?: SpaceResourceAuthoring | undefined;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 
@@ -98,7 +98,7 @@ export function createResourceDeletion({
           containingSpaceId: currentSpace().id,
           resourceId: resource.id,
         });
-        return result.kind === 'refused' ? describeSpaceEndpointRefusal(result.refusal) : null;
+        return result.kind === 'refused' ? describeSpaceResourceRefusal(result.refusal) : null;
       }
       const result = authoring.complete({ kind: 'deleted-resource', resourceId: resource.id });
       return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;

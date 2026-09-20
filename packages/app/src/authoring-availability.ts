@@ -31,7 +31,7 @@
  * `creatingResource` — a creation pane is open — went with the panes themselves:
  * every Resource creation now completes its Edit on activation (ADR 0089), so
  * there is no modal surface for the rest of the product to stand out of the way
- * of. `creatingSpaceEndpoint` is the one async creation that remains: its
+ * of. `creatingSpaceResource` is the one async creation that remains: its
  * coordinated Edit lands one await after the press, and the Space Resource peer is
  * withdrawn for that window rather than swallowing a second press silently.
  */
@@ -91,7 +91,7 @@ export interface AuthoringInProgress {
    */
   readonly editingEmbeddedMap: boolean;
   /** A Space Resource coordinated Edit is in flight (command-dock issue 23). */
-  readonly creatingSpaceEndpoint: boolean;
+  readonly creatingSpaceResource: boolean;
 }
 
 /** What each authoring operation answers to the surfaces that offer it. */
@@ -109,7 +109,7 @@ export interface AuthoringAvailability {
   /** A Resource may be created — from the toolbar, or by the canvas's own `C`. */
   readonly addResource: boolean;
   /** The Create Space Resource peer may run — withdrawn while its Edit is in flight. */
-  readonly createSpaceEndpoint: boolean;
+  readonly createSpaceResource: boolean;
   /** A Map may be created. */
   readonly createMap: boolean;
   /** The canvas's Resource controls and the whole Edge lifecycle may run. */
@@ -136,7 +136,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     editingChromeTitle,
     spaceOnCanvas,
     editingEmbeddedMap,
-    creatingSpaceEndpoint,
+    creatingSpaceResource,
   } = inProgress;
 
   /**
@@ -266,7 +266,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * synchronous and stays on `addResource`; only this peer is withdrawn for the
    * window.
    */
-  const createSpaceEndpoint = addResource && !creatingSpaceEndpoint;
+  const createSpaceResource = addResource && !creatingSpaceResource;
 
   /**
    * Add Map needs its naming continuation available as well as Add Resource.
@@ -398,7 +398,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     deleteResource,
     present,
     addResource,
-    createSpaceEndpoint,
+    createSpaceResource,
     createMap,
     authorOnCanvas,
     authorInEmbeddedMap,

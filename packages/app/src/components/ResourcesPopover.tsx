@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
-import { describeSpaceEndpointBreak, type SpaceEndpointBreak } from '../authoring-refusal';
+import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
 import {
   Button,
   Alert,
@@ -25,7 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   SearchIcon,
-  SpaceEndpointIcon,
+  SpaceResourceIcon,
   SpaceIcon,
   ToggleGroup,
   ToggleGroupItem,
@@ -100,7 +100,7 @@ const FILTER_NAMES = {
 const FILTER_GLYPHS = {
   markdown: MarkdownIcon,
   reference: ReferenceIcon,
-  space: SpaceEndpointIcon,
+  space: SpaceResourceIcon,
   spaces: ParentIcon,
 } satisfies Record<ResourcesFilter, ComponentType>;
 
@@ -495,13 +495,13 @@ export function ResourcesPopover({
     };
   /**
    * The rejection arm of a Space placement, hoisted so the caught value takes
-   * its type from {@link SpaceEndpointBreak} rather than from an annotation written
+   * its type from {@link SpaceResourceBreak} rather than from an annotation written
    * at the `then`.
    */
   const showBreak =
-    (asked: number): SpaceEndpointBreak =>
+    (asked: number): SpaceResourceBreak =>
     (failure) => {
-      const said = describeSpaceEndpointBreak(failure);
+      const said = describeSpaceResourceBreak(failure);
       showSettlement(asked)(said);
       return said;
     };

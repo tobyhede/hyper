@@ -100,7 +100,7 @@ const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 /** A Space Resource with a target that the test backend also stores. */
-const withSpaceEndpoint: SpaceSnapshot = spaceSnapshotSchema.parse({
+const withSpaceResource: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
     ...snapshot.document,
@@ -600,7 +600,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * an extra row if it were not.
    */
   it('groups Create Reference, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
-    const session = mount(undefined, undefined, withSpaceEndpoint);
+    const session = mount(undefined, undefined, withSpaceResource);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
     const menu = await screen.findByRole('menu');
@@ -620,7 +620,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * front's own control directly rather than through the menu.
    */
   it('still edits a Space Resource’s Title on the Resource front, not through the menu', async () => {
-    const session = mount(undefined, undefined, withSpaceEndpoint);
+    const session = mount(undefined, undefined, withSpaceResource);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A space' }));
     const editor = screen.getByRole('textbox', { name: 'Resource title' });
@@ -642,7 +642,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * a command that is still available (`availability.deleteResource`).
    */
   it('offers Delete from Space on a Space Resource when deletion is available', async () => {
-    const session = mount(undefined, undefined, withSpaceEndpoint);
+    const session = mount(undefined, undefined, withSpaceResource);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
 
@@ -653,7 +653,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
   it('offers a Space Resource the target Space’s address and opens it independently', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(window);
-    const session = mount(undefined, undefined, withSpaceEndpoint);
+    const session = mount(undefined, undefined, withSpaceResource);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
     expect(await screen.findByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
@@ -671,7 +671,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   it('creates a Reference Resource from a Space Resource', async () => {
-    const session = mount(undefined, undefined, withSpaceEndpoint);
+    const session = mount(undefined, undefined, withSpaceResource);
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
     const row = await screen.findByRole('menuitem', { name: 'Create Reference' });
     expect(row).not.toHaveAttribute('aria-disabled', 'true');

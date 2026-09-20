@@ -12,10 +12,10 @@ import { RESOURCE_SIZE } from '../src/resource';
 import { authoringAvailability } from '../src/authoring-availability';
 import { useCanvasResourceAuthoring } from '../src/canvas-resource-authoring';
 import { composeApp } from '../src/compose-app';
-import type { SpaceEndpointTarget } from '../src/space-resource-lifecycle';
+import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import {
   NO_SPACE_RESOURCE_TARGETS,
-  type SpaceEndpointTargets,
+  type SpaceResourceTargets,
 } from '../src/space-resource-targets';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -155,7 +155,7 @@ const mountAuthoring = (
           editingChromeTitle: !enabled,
           spaceOnCanvas: true,
           editingEmbeddedMap: false,
-          creatingSpaceEndpoint: false,
+          creatingSpaceResource: false,
         }),
         nameOnCreation,
         authoring,
@@ -524,7 +524,7 @@ describe('canvas Resource authoring', () => {
 });
 
 describe('canvas Resource authoring Space rail', () => {
-  const target: SpaceEndpointTarget = {
+  const target: SpaceResourceTarget = {
     id: TARGET_SPACE_ID,
     title: 'Architecture',
     maps: [
@@ -557,7 +557,7 @@ describe('canvas Resource authoring Space rail', () => {
           editingChromeTitle: !enabled,
           spaceOnCanvas: true,
           editingEmbeddedMap: false,
-          creatingSpaceEndpoint: false,
+          creatingSpaceResource: false,
         }),
         nameOnCreation: null,
         authoring,
@@ -601,7 +601,7 @@ describe('canvas Resource authoring decoration identity', () => {
   const referenceNode = node(false, REFERENCE_ID, 'reference');
   const space = node(true, SPACE_RESOURCE_ID, 'space');
   const projection = [markdownNode, referenceNode, space];
-  const target: SpaceEndpointTarget = {
+  const target: SpaceResourceTarget = {
     id: TARGET_SPACE_ID,
     title: 'Architecture',
     maps: [
@@ -614,7 +614,7 @@ describe('canvas Resource authoring decoration identity', () => {
   };
 
   interface IdentityProps {
-    readonly spaceResourceTargets: SpaceEndpointTargets;
+    readonly spaceResourceTargets: SpaceResourceTargets;
     readonly portalEditing: ReadonlySet<ResourceId>;
   }
 
@@ -664,7 +664,7 @@ describe('canvas Resource authoring decoration identity', () => {
             editingChromeTitle: false,
             spaceOnCanvas: true,
             editingEmbeddedMap: false,
-            creatingSpaceEndpoint: false,
+            creatingSpaceResource: false,
           }),
           nameOnCreation: null,
           authoring,

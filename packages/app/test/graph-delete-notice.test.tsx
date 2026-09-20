@@ -5,7 +5,7 @@ import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/co
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import type { SpaceEndpointAuthoring } from '../src/space-resource-lifecycle';
+import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { deleteGraphItem } from './command-dock';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
@@ -53,7 +53,7 @@ const graphsOf = (session: SpaceSession): readonly string[] =>
  * lifecycle. That is the sequence the Dock notice has to survive: a standing
  * error, then a different attempt that must not keep showing it.
  */
-const refuseFirstGraphDelete = (spaceResources: SpaceEndpointAuthoring): SpaceEndpointAuthoring => {
+const refuseFirstGraphDelete = (spaceResources: SpaceResourceAuthoring): SpaceResourceAuthoring => {
   let refuseNext = true;
   return {
     ...spaceResources,

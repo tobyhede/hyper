@@ -772,7 +772,7 @@ describe('Add Reference Resource', () => {
   });
 
   it('creates a Reference Resource whose Target is a Space Resource', () => {
-    const withSpaceEndpoint: SpaceSnapshot = {
+    const withSpaceResource: SpaceSnapshot = {
       ...positionedSnapshot,
       resources: [
         positionedSnapshot.resources[0]!,
@@ -788,7 +788,7 @@ describe('Add Reference Resource', () => {
         },
       ],
     };
-    const { authoring, session } = open(withSpaceEndpoint);
+    const { authoring, session } = open(withSpaceResource);
 
     expect(
       authoring.complete({ kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }).kind,

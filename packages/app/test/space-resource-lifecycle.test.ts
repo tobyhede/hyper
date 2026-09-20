@@ -6,7 +6,7 @@ import {
   MemorySpaceBackendTestControl,
   type ObserverErrorReporter,
 } from '@project/persistence';
-import { createSpaceEndpointLifecycle } from '../src/space-resource-lifecycle';
+import { createSpaceResourceLifecycle } from '../src/space-resource-lifecycle';
 
 /*
  * The three writes are the registry's and are proved in
@@ -103,7 +103,7 @@ describe('what a Space Resource may reference', () => {
       { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
-    const lifecycle = createSpaceEndpointLifecycle({
+    const lifecycle = createSpaceResourceLifecycle({
       backend,
       registry,
       newId: idSource([]),
@@ -151,7 +151,7 @@ describe('what a Space Resource may reference', () => {
       { snapshot: twoMaps, revision: 7n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
-    const lifecycle = createSpaceEndpointLifecycle({
+    const lifecycle = createSpaceResourceLifecycle({
       backend,
       registry,
       newId: idSource([]),
@@ -193,7 +193,7 @@ describe('what a Space Resource may reference', () => {
       { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
     ]);
     const registry = createSpaceSessionRegistry(backend);
-    const lifecycle = createSpaceEndpointLifecycle({
+    const lifecycle = createSpaceResourceLifecycle({
       backend,
       registry,
       newId: idSource([]),
@@ -228,7 +228,7 @@ describe('what a Space Resource may reference', () => {
       revision: 7n,
       exportedRevision: null,
     });
-    const lifecycle = createSpaceEndpointLifecycle({
+    const lifecycle = createSpaceResourceLifecycle({
       backend,
       registry,
       newId: idSource([]),

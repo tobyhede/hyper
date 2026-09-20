@@ -13,13 +13,13 @@
  */
 import type { MapPosition } from '@project/core';
 import type { EmbeddedBounds } from './embedded-map';
-import { embedCamera, type SpaceEndpointFraming } from './space-resource-framing';
+import { embedCamera, type SpaceResourceFraming } from './space-resource-framing';
 
 /** Places an embedded Map at a Space Resource's stored camera offset. */
 export function spaceResourceEmbedCamera(
   bounds: EmbeddedBounds,
   origin: MapPosition,
-  framing: SpaceEndpointFraming | undefined,
+  framing: SpaceResourceFraming | undefined,
 ) {
   return embedCamera(bounds, origin, framing);
 }

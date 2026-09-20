@@ -2,7 +2,7 @@ import type { MapPosition, ResourceDocument } from '@project/core';
 import type { EmbeddedBounds } from './embedded-map';
 
 /** The Map-coordinate centre and scale a Space Resource stores for its window. */
-export type SpaceEndpointFraming = NonNullable<
+export type SpaceResourceFraming = NonNullable<
   Extract<ResourceDocument, { kind: 'space' }>['framing']
 >;
 
@@ -17,7 +17,7 @@ export type SpaceEndpointFraming = NonNullable<
 export function embedCamera(
   bounds: EmbeddedBounds,
   origin: MapPosition,
-  framing: SpaceEndpointFraming | undefined,
+  framing: SpaceResourceFraming | undefined,
 ) {
   if (framing === undefined) {
     return {
@@ -52,7 +52,7 @@ export function authoredFromDrawn(
  * The framing that matches the default origin-fit, so the first pan or zoom can
  * start from what is already on screen rather than jumping to a stored centre.
  */
-export function framingFromFit(origin: MapPosition, bounds: EmbeddedBounds): SpaceEndpointFraming {
+export function framingFromFit(origin: MapPosition, bounds: EmbeddedBounds): SpaceResourceFraming {
   const width = bounds.right - bounds.left;
   const height = bounds.bottom - bounds.top;
   return {
@@ -64,9 +64,9 @@ export function framingFromFit(origin: MapPosition, bounds: EmbeddedBounds): Spa
 
 /** Shift the camera by a drawn-space delta, keeping authored coordinates still. */
 export function panFraming(
-  framing: SpaceEndpointFraming,
+  framing: SpaceResourceFraming,
   delta: MapPosition,
-): SpaceEndpointFraming {
+): SpaceResourceFraming {
   return {
     centreX: framing.centreX - delta.x / framing.zoom,
     centreY: framing.centreY - delta.y / framing.zoom,
@@ -78,7 +78,7 @@ const MIN_PORTAL_ZOOM = 0.2;
 const MAX_PORTAL_ZOOM = 8;
 
 /** Scale the camera, clamped to the portal's own zoom extent. */
-export function zoomFraming(framing: SpaceEndpointFraming, factor: number): SpaceEndpointFraming {
+export function zoomFraming(framing: SpaceResourceFraming, factor: number): SpaceResourceFraming {
   const zoom = Math.min(MAX_PORTAL_ZOOM, Math.max(MIN_PORTAL_ZOOM, framing.zoom * factor));
   return { centreX: framing.centreX, centreY: framing.centreY, zoom };
 }
@@ -89,7 +89,7 @@ export function zoomFraming(framing: SpaceEndpointFraming, factor: number): Spac
  * Enter spends this on the entered canvas's own size so it does not inherit
  * the portal's geometry — held by `packages/app/test/cameras.test.tsx`.
  */
-export function viewportFromFraming(framing: SpaceEndpointFraming, width: number, height: number) {
+export function viewportFromFraming(framing: SpaceResourceFraming, width: number, height: number) {
   return {
     x: width / 2 - framing.centreX * framing.zoom,
     y: height / 2 - framing.centreY * framing.zoom,

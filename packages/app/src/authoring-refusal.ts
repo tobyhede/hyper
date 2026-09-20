@@ -2,8 +2,8 @@ import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
 import type {
-  SpaceEndpointRefusal,
-  SpaceEndpointTargetUnavailableReason,
+  SpaceResourceRefusal,
+  SpaceResourceTargetUnavailableReason,
 } from './space-resource-lifecycle';
 import { failureMessage } from './failure-message';
 
@@ -14,7 +14,7 @@ import { failureMessage } from './failure-message';
  * three operations no longer share a result type, and a union reachable through
  * `create` alone would be a second reading of a refusal `delete` can also make.
  */
-export type { SpaceEndpointRefusal };
+export type { SpaceResourceRefusal };
 
 type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
@@ -398,10 +398,10 @@ const TARGET_UNAVAILABLE_REASONS = {
   unreadable: 'That Space could not be read, so nothing was created.',
   'not-initialized':
     'That Space could not be prepared to be shown here, so nothing was created. Try again.',
-} satisfies Record<SpaceEndpointTargetUnavailableReason, string>;
+} satisfies Record<SpaceResourceTargetUnavailableReason, string>;
 
 /** Why a coordinated Space Resource operation refused, in the author's terms. */
-export const describeSpaceEndpointRefusal = (refusal: SpaceEndpointRefusal): string => {
+export const describeSpaceResourceRefusal = (refusal: SpaceResourceRefusal): string => {
   switch (refusal.code) {
     case 'map-not-found':
       return MAP_NO_LONGER_IN_SPACE;
@@ -443,10 +443,10 @@ export const describeSpaceEndpointRefusal = (refusal: SpaceEndpointRefusal): str
  * arm take it without writing the annotation those rules reserve for an I/O
  * boundary.
  */
-export type SpaceEndpointBreak = (failure: unknown) => string;
+export type SpaceResourceBreak = (failure: unknown) => string;
 
-/** @see SpaceEndpointBreak */
-export const describeSpaceEndpointBreak: SpaceEndpointBreak = (failure) =>
+/** @see SpaceResourceBreak */
+export const describeSpaceResourceBreak: SpaceResourceBreak = (failure) =>
   `This Space Resource was not added: ${failureMessage(failure)}`;
 
 /**
@@ -458,5 +458,5 @@ export const describeSpaceEndpointBreak: SpaceEndpointBreak = (failure) =>
  * glyph and is told a Resource "was not added" has to work out what was supposed
  * to have been added to what.
  */
-export const describeSpaceEndpointCreationBreak: SpaceEndpointBreak = (failure) =>
+export const describeSpaceResourceCreationBreak: SpaceResourceBreak = (failure) =>
   `This Resource was not created: ${failureMessage(failure)}`;

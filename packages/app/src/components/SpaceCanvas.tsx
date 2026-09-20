@@ -44,7 +44,7 @@ import { activeGraphColor } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringAvailability } from '../authoring-availability';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
-import type { SpaceEndpointTargets } from '../space-resource-targets';
+import type { SpaceResourceTargets } from '../space-resource-targets';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import type { EdgeAuthoring } from '../edge-authoring';
 import type { CanvasSelection, ResourceResize, EdgeSubject } from '../render-adapter';
@@ -64,7 +64,7 @@ import {
   editingPortalAncestor,
   embeddingIsPortalEditing,
 } from '../embedded-open-space-resource';
-import { useEmbeddedOpenSpaceEndpoints } from '../use-embedded-open-space-resources';
+import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import type { Continuation } from '../continuation';
@@ -72,7 +72,7 @@ import {
   framingFromFit,
   panFraming,
   zoomFraming,
-  type SpaceEndpointFraming,
+  type SpaceResourceFraming,
 } from '../space-resource-framing';
 
 /**
@@ -277,7 +277,7 @@ export interface SpaceCanvasProps {
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
   /** What each Space Resource's target offers it, for the Resources of kind `space` on this canvas. */
-  spaceResourceTargets?: SpaceEndpointTargets;
+  spaceResourceTargets?: SpaceResourceTargets;
   /**
    * What commands each Resource on this canvas offers — copy an address, delete it
    * — drawn on the Resource's own rail (ADR 0073).
@@ -337,7 +337,7 @@ export function SpaceCanvas({
   const activeSpaceId = useSyncExternalStore(spaces?.subscribe ?? subscribeToNothing, () =>
     spaces === null ? null : spaces.getState().activeSpaceId,
   );
-  const readThisCanvasOpeningFraming = (): SpaceEndpointFraming | undefined => {
+  const readThisCanvasOpeningFraming = (): SpaceResourceFraming | undefined => {
     if (spaces === null) return undefined;
     const entry = spaces.entry(thisSpaceId);
     return entry === undefined ? undefined : spaces.openingFraming(entry);
@@ -377,7 +377,7 @@ export function SpaceCanvas({
     onPortalEditingChange,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceEndpoints(nodes, spaces, draggingIds);
+  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds);
 
   const editingEmbeddingIds = new Set(
     embeddedRequests.flatMap((request) => {
@@ -429,7 +429,7 @@ export function SpaceCanvas({
     bodyEditing,
     openResource: onOpenResource,
     beginTitleEditing,
-    completeSpaceEndpointFraming,
+    completeSpaceResourceFraming,
   } = resourceAuthoring;
 
   const embeddedBodyEditing = embeddedRequests.some(
@@ -689,7 +689,7 @@ export function SpaceCanvas({
     portalDraft,
     embeddedPublications,
     embeddedRequests,
-    completeSpaceEndpointFraming,
+    completeSpaceResourceFraming,
     screenToFlowPosition,
     authorOnCanvas: availability.authorOnCanvas,
   });
@@ -703,7 +703,7 @@ export function SpaceCanvas({
       portalDraft,
       embeddedPublications,
       embeddedRequests,
-      completeSpaceEndpointFraming,
+      completeSpaceResourceFraming,
       screenToFlowPosition,
       authorOnCanvas: availability.authorOnCanvas,
     };
@@ -713,7 +713,7 @@ export function SpaceCanvas({
     portalDraft,
     embeddedPublications,
     embeddedRequests,
-    completeSpaceEndpointFraming,
+    completeSpaceResourceFraming,
     screenToFlowPosition,
     availability.authorOnCanvas,
   ]);
@@ -727,12 +727,12 @@ export function SpaceCanvas({
       resourceId: ResourceId;
       lastX: number;
       lastY: number;
-      framing: SpaceEndpointFraming;
+      framing: SpaceResourceFraming;
     } | null = null;
-    const zoomPending = new Map<ResourceId, SpaceEndpointFraming>();
+    const zoomPending = new Map<ResourceId, SpaceResourceFraming>();
     const zoomTimers = new Map<ResourceId, ReturnType<typeof setTimeout>>();
 
-    const persist = (resourceId: ResourceId, framing: SpaceEndpointFraming, dropDraft = true) => {
+    const persist = (resourceId: ResourceId, framing: SpaceResourceFraming, dropDraft = true) => {
       if (dropDraft) {
         setPortalDraft((previous) => {
           const next = new Map(previous);
@@ -740,7 +740,7 @@ export function SpaceCanvas({
           return next;
         });
       }
-      portalGestureSnapshot.current.completeSpaceEndpointFraming(resourceId, framing);
+      portalGestureSnapshot.current.completeSpaceResourceFraming(resourceId, framing);
     };
 
     const flushPendingZoom = (resourceId: ResourceId, dropDraft = true) => {
@@ -755,7 +755,7 @@ export function SpaceCanvas({
     const framingOf = (
       resourceId: ResourceId,
       parentId: string,
-    ): SpaceEndpointFraming | undefined => {
+    ): SpaceResourceFraming | undefined => {
       const session = portalGestureSnapshot.current;
       const drafted = session.portalDraft.get(resourceId);
       if (drafted !== undefined) return drafted;

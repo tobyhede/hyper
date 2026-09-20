@@ -1,14 +1,14 @@
 import type { GraphId, ResourceDocument, UUID } from '@project/core';
-import { SpaceEndpointSelectors, type SpaceEndpointSelectorsProps } from '@project/ui';
+import { SpaceResourceSelectors, type SpaceResourceSelectorsProps } from '@project/ui';
 import type { Continuation } from './continuation';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import { spaceResourceContextCommands } from './space-resource-context-commands';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
-import type { SpaceEndpointTarget, SpaceEndpointTargetMap } from './space-resource-lifecycle';
+import type { SpaceResourceTarget, SpaceResourceTargetMap } from './space-resource-lifecycle';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
-export interface SpaceEndpointRailContext {
+export interface SpaceResourceRailContext {
   readonly entry: OpenSpace;
   readonly spaces: OpenSpaces;
   readonly containingSpaceId: UUID;
@@ -28,17 +28,17 @@ export interface SpaceEndpointRailContext {
  * previous Map's (ADR 0040, ADR 0068). Context commands stay sourced from
  * {@link spaceResourceContextCommands}.
  */
-export interface BuildSpaceEndpointRailInput {
-  readonly target: SpaceEndpointTarget;
+export interface BuildSpaceResourceRailInput {
+  readonly target: SpaceResourceTarget;
   readonly document: Extract<ResourceDocument, { kind: 'space' }> | undefined;
   readonly disabled: boolean;
-  readonly complete: (map: Pick<SpaceEndpointTargetMap, 'id'>, graphId: GraphId) => string | null;
+  readonly complete: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null;
   readonly onEditingChange?: (editing: boolean) => void;
   readonly onReport: (message: string | null) => void;
-  readonly context: SpaceEndpointRailContext | undefined;
+  readonly context: SpaceResourceRailContext | undefined;
 }
 
-export function buildSpaceEndpointRail({
+export function buildSpaceResourceRail({
   target,
   document,
   disabled,
@@ -46,9 +46,9 @@ export function buildSpaceEndpointRail({
   onEditingChange,
   onReport,
   context,
-}: BuildSpaceEndpointRailInput) {
+}: BuildSpaceResourceRailInput) {
   const selectedMap = target.maps.find((map) => map.id === document?.map);
-  const mapOf = (id: string): SpaceEndpointTargetMap | undefined =>
+  const mapOf = (id: string): SpaceResourceTargetMap | undefined =>
     target.maps.find((map) => map.id === id);
   const commands =
     context === undefined || document === undefined
@@ -63,7 +63,7 @@ export function buildSpaceEndpointRail({
           context.complete,
         );
   const optional: Mutable<
-    Pick<SpaceEndpointSelectorsProps, 'onEditingChange' | 'mapCommands' | 'graphCommands'>
+    Pick<SpaceResourceSelectorsProps, 'onEditingChange' | 'mapCommands' | 'graphCommands'>
   > = {};
   if (onEditingChange !== undefined) optional.onEditingChange = onEditingChange;
   if (commands !== undefined) {
@@ -71,7 +71,7 @@ export function buildSpaceEndpointRail({
     if (commands.graphCommands !== undefined) optional.graphCommands = commands.graphCommands;
   }
   return (
-    <SpaceEndpointSelectors
+    <SpaceResourceSelectors
       onReport={onReport}
       maps={target.maps.map(({ id, title }) => ({ id, title }))}
       graphs={(selectedMap?.graphs ?? []).map(({ id, title }) => ({ id, title }))}

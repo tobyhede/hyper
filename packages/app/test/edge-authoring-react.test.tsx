@@ -352,7 +352,7 @@ function CanvasHarness({
           editingChromeTitle: covered,
           spaceOnCanvas: true,
           editingEmbeddedMap: false,
-          creatingSpaceEndpoint: false,
+          creatingSpaceResource: false,
         })}
         onNodesChange={adapter.getState().changeNodes}
         onEdgesChange={adapter.getState().changeEdges}

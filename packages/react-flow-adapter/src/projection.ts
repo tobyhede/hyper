@@ -3,7 +3,7 @@ import { MarkerType, Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import type {
   CanvasResourceBodyEditor,
-  CanvasSpaceEndpointSelection,
+  CanvasSpaceResourceSelection,
   EntityActionGroup,
 } from '@project/ui';
 import type { Resource, ResourceId, GraphId } from '@project/core';
@@ -164,7 +164,7 @@ export type ResourceNodeData = {
    * that read the target supplies it, exactly as it supplies every other
    * operation on this node (ADR 0068, ADR 0074).
    */
-  spaceSelection?: CanvasSpaceEndpointSelection;
+  spaceSelection?: CanvasSpaceResourceSelection;
   /**
    * Map and Graph clusters for an Open Space Resource, assembled by the
    * application and inserted at the head of the Resource rail.

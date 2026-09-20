@@ -10,7 +10,7 @@ import {
   importReferenceResourceFrontmatterSchema,
   importResourceFrontmatterSchema,
   importMarkdownResourceFrontmatterSchema,
-  importSpaceEndpointFrontmatterSchema,
+  importSpaceResourceFrontmatterSchema,
   markdownResourceFrontmatterSchema,
   normalizeTitle,
   positionedMapSchema,
@@ -93,7 +93,7 @@ const kindSchemas: readonly {
   },
   {
     label: 'imported space resource',
-    schema: importSpaceEndpointFrontmatterSchema,
+    schema: importSpaceResourceFrontmatterSchema,
     frontmatter: spaceFrontmatter,
   },
 ];

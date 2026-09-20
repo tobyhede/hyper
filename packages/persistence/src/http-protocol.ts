@@ -564,7 +564,7 @@ const decodeSpaceError = (value: unknown): SpaceError => {
   }
 };
 
-const decodeSpaceEndpointLocation = (record: Record<string, unknown>) => ({
+const decodeSpaceResourceLocation = (record: Record<string, unknown>) => ({
   spaceId: requiredUuid(record['spaceId'], 'Space Resource Space id'),
   resourceId: requiredUuid(record['resourceId'], 'Space Resource id'),
   targetSpaceId: requiredUuid(record['targetSpaceId'], 'Space Resource target Space id'),
@@ -629,7 +629,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
         ['kind', 'spaceId', 'resourceId', 'targetSpaceId'],
         'Space Resource refusal',
       );
-      return { kind, ...decodeSpaceEndpointLocation(error) };
+      return { kind, ...decodeSpaceResourceLocation(error) };
     }
     case 'ordinary-space-unreferenced': {
       const error = exactRecord(value, ['kind', 'spaceId'], 'unreferenced Space refusal');
@@ -643,7 +643,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       );
       return {
         kind,
-        ...decodeSpaceEndpointLocation(error),
+        ...decodeSpaceResourceLocation(error),
         mapId: requiredUuid(error['mapId'], 'Space Resource Map id'),
       };
     }
@@ -655,7 +655,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       );
       return {
         kind,
-        ...decodeSpaceEndpointLocation(error),
+        ...decodeSpaceResourceLocation(error),
         graphId: requiredUuid(error['graphId'], 'Space Resource Graph id'),
       };
     }
@@ -667,7 +667,7 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       );
       return {
         kind,
-        ...decodeSpaceEndpointLocation(error),
+        ...decodeSpaceResourceLocation(error),
         mapId: requiredUuid(error['mapId'], 'Space Resource Map id'),
         graphId: requiredUuid(error['graphId'], 'Space Resource Graph id'),
       };

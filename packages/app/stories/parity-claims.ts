@@ -690,7 +690,7 @@ export const parityClaims: readonly ParityClaim[] = [
   {
     id: 'space-resource-portal-framing',
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
-    storyExport: 'EnteredFromSpaceEndpoint',
+    storyExport: 'EnteredFromSpaceResource',
     claim:
       'A Space Resource stores camera framing independently of other Resources on the same target; Done, Close, reopen and Return restore it, Enter uses the browser-sized canvas rather than the source Resource rectangle, Map fallback clears framing and Graph fallback keeps it.',
   },

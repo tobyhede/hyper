@@ -150,7 +150,7 @@ export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatt
 export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
-export const importSpaceEndpointFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
+export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
 export const importResourceFrontmatterSchema = z.preprocess(
@@ -158,7 +158,7 @@ export const importResourceFrontmatterSchema = z.preprocess(
   z.discriminatedUnion('kind', [
     importMarkdownResourceFrontmatterSchema,
     importReferenceResourceFrontmatterSchema,
-    importSpaceEndpointFrontmatterSchema,
+    importSpaceResourceFrontmatterSchema,
   ]),
 );
 

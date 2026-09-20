@@ -9,13 +9,13 @@ import {
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import type { EntityActionGroup } from '@project/ui';
-import { buildSpaceEndpointRail, type SpaceEndpointRailContext } from './build-space-resource-rail';
+import { buildSpaceResourceRail, type SpaceResourceRailContext } from './build-space-resource-rail';
 import type { Continuation } from './continuation';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { ResourceResize } from './render-adapter';
 import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
-import type { SpaceEndpointTargetMap } from './space-resource-lifecycle';
-import type { SpaceEndpointTargets } from './space-resource-targets';
+import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
+import type { SpaceResourceTargets } from './space-resource-targets';
 import { snapResourceSizeToClose, RESOURCE_SIZE } from './resource';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -61,12 +61,12 @@ export interface CanvasResourceDecorationContext {
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
   readonly containingSpaceId: UUID;
   readonly spaceDocuments: ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>;
-  readonly spaceResourceTargets: SpaceEndpointTargets;
+  readonly spaceResourceTargets: SpaceResourceTargets;
   readonly spaces: OpenSpaces | null;
   readonly continuation: Continuation | undefined;
-  readonly completeSpaceEndpointSelection: (
+  readonly completeSpaceResourceSelection: (
     resourceId: ResourceId,
-    map: Pick<SpaceEndpointTargetMap, 'id'>,
+    map: Pick<SpaceResourceTargetMap, 'id'>,
     graphId: GraphId,
   ) => string | null;
   readonly completeEmbedded: (
@@ -117,7 +117,7 @@ type MarkdownResourceDecorationContext = Pick<
   | 'clearCaret'
 >;
 
-type SpaceEndpointDecorationContext = Pick<
+type SpaceResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
   | 'editableResourceIds'
@@ -126,7 +126,7 @@ type SpaceEndpointDecorationContext = Pick<
   | 'spaceResourceTargets'
   | 'spaces'
   | 'continuation'
-  | 'completeSpaceEndpointSelection'
+  | 'completeSpaceResourceSelection'
   | 'completeEmbedded'
   | 'portalEditing'
   | 'onPortalEditingChange'
@@ -243,9 +243,9 @@ export function decorateMarkdownResourceNode(
   return patch;
 }
 
-export function decorateSpaceEndpointNode(
+export function decorateSpaceResourceNode(
   node: ResourceFlowNode,
-  context: SpaceEndpointDecorationContext,
+  context: SpaceResourceDecorationContext,
 ): CanvasResourceDataPatch {
   if (node.data.kind !== 'space') return {};
   const patch: Mutable<Pick<ResourceNodeData, 'spaceRail' | 'contextNotice' | 'portal'>> = {};
@@ -261,7 +261,7 @@ export function decorateSpaceEndpointNode(
   // put every Open Space Resource back to reporting a wait that had already ended.
   if (node.data.expanded === true && !node.data.readOnly && target !== undefined) {
     const resourceId = node.data.resourceId;
-    let railContext: SpaceEndpointRailContext | undefined;
+    let railContext: SpaceResourceRailContext | undefined;
     if (
       context.spaces !== null &&
       context.continuation !== undefined &&
@@ -284,11 +284,11 @@ export function decorateSpaceEndpointNode(
         };
       }
     }
-    patch.spaceRail = buildSpaceEndpointRail({
+    patch.spaceRail = buildSpaceResourceRail({
       target,
       document: spaceDocument,
       disabled: !(resourceBelongsToWorkingSpace && context.authorOnCanvas),
-      complete: (map, graphId) => context.completeSpaceEndpointSelection(resourceId, map, graphId),
+      complete: (map, graphId) => context.completeSpaceResourceSelection(resourceId, map, graphId),
       onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
       onReport: (message) => context.onContextReport(resourceId, message),
       context: railContext,

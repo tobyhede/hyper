@@ -2,8 +2,8 @@ import { StrictMode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Resource, type UUID } from '@project/core';
-import type { SpaceEndpointTarget } from '../src/space-resource-lifecycle';
-import { useSpaceEndpointTargets } from '../src/space-resource-targets';
+import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
+import { useSpaceResourceTargets } from '../src/space-resource-targets';
 
 const SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -14,7 +14,7 @@ const OTHER_TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const OTHER_TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
-const target: SpaceEndpointTarget = {
+const target: SpaceResourceTarget = {
   id: TARGET_ID,
   title: 'Architecture',
   maps: [
@@ -26,7 +26,7 @@ const target: SpaceEndpointTarget = {
   ],
 };
 
-const otherTarget: SpaceEndpointTarget = {
+const otherTarget: SpaceResourceTarget = {
   id: OTHER_TARGET_ID,
   title: 'Roadmap',
   maps: [
@@ -64,7 +64,7 @@ const twoResources = (): readonly Resource[] => [
 ];
 
 interface ProbeProps {
-  readonly read: (spaceId: UUID) => Promise<SpaceEndpointTarget | undefined>;
+  readonly read: (spaceId: UUID) => Promise<SpaceResourceTarget | undefined>;
   readonly resources: readonly Resource[];
 }
 
@@ -72,7 +72,7 @@ interface ProbeProps {
 function Probe({ read, resources: value }: ProbeProps) {
   // `read` is one stable reference for the life of a test, exactly as the
   // production callback is for the life of a composition.
-  const targets = useSpaceEndpointTargets(value, read);
+  const targets = useSpaceResourceTargets(value, read);
   return <p data-testid="titles">{[...targets.values()].map(({ title }) => title).join(' ')}</p>;
 }
 
@@ -111,7 +111,7 @@ describe('reading the Spaces a canvas references', () => {
    */
   it('asks again after a read that rejected', async () => {
     const read = vi
-      .fn<(spaceId: UUID) => Promise<SpaceEndpointTarget | undefined>>()
+      .fn<(spaceId: UUID) => Promise<SpaceResourceTarget | undefined>>()
       .mockRejectedValueOnce(new Error('the transport timed out'))
       .mockResolvedValue(target);
 

@@ -1,5 +1,5 @@
 import type { ResourceDocument, GraphId, UUID } from '@project/core';
-import type { CanvasSpaceEndpointCommands, CanvasSpaceEndpointGraphCommands } from '@project/ui';
+import type { CanvasSpaceResourceCommands, CanvasSpaceResourceGraphCommands } from '@project/ui';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
@@ -12,14 +12,14 @@ import {
 import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
-import type { SpaceEndpointTargetMap } from './space-resource-lifecycle';
+import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 
 const refusalOf = (result: AuthoringResult): string | null =>
   result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 
-interface SpaceEndpointContextCommands {
-  readonly mapCommands: CanvasSpaceEndpointCommands;
-  readonly graphCommands?: CanvasSpaceEndpointGraphCommands;
+interface SpaceResourceContextCommands {
+  readonly mapCommands: CanvasSpaceResourceCommands;
+  readonly graphCommands?: CanvasSpaceResourceGraphCommands;
 }
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
@@ -28,17 +28,17 @@ export function spaceResourceContextCommands(
   spaces: OpenSpaces,
   containingSpaceId: UUID,
   document: Extract<ResourceDocument, { kind: 'space' }>,
-  select: (map: Pick<SpaceEndpointTargetMap, 'id'>, graphId: GraphId) => string | null,
+  select: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   continuation: Continuation,
   complete: (
     completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
   ) => AuthoringResult,
-): SpaceEndpointContextCommands {
+): SpaceResourceContextCommands {
   const location = spaces.browserLocation;
   const settled = async () =>
     (await spaces.waitForPersistence(entry.id)) &&
     (await spaces.waitForPersistence(containingSpaceId));
-  const selectAndSave = async (next: Pick<SpaceEndpointTargetMap, 'id'>, nextGraph: GraphId) => {
+  const selectAndSave = async (next: Pick<SpaceResourceTargetMap, 'id'>, nextGraph: GraphId) => {
     const refusal = select(next, nextGraph);
     if (refusal !== null) return refusal;
     return (await spaces.waitForPersistence(containingSpaceId)) ? null : PERSISTENCE_UNSETTLED;
@@ -47,7 +47,7 @@ export function spaceResourceContextCommands(
   const space = entry.app.currentSpace();
   const map = space.maps.find((each) => each.id === mapId);
   const graph = map?.graphs.find((each) => each.id === graphId);
-  const mapCommands: CanvasSpaceEndpointCommands = {
+  const mapCommands: CanvasSpaceResourceCommands = {
     deleteDisabled: space.maps.length <= 1 || map === undefined,
     onRename: (title) => refusalOf(complete({ kind: 'renamed-map', mapId, title })),
     onCreate: async (scope) =>

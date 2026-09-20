@@ -959,7 +959,7 @@ describe('Space Resource lifecycle', () => {
   /*
    * `v1-release/17`, criterion 4: the backend itself refuses the coordinated
    * aggregate — not the client-side pre-flight `loadSpaceAggregate` check
-   * `coordinateSpaceEndpointLifecycle` runs before ever calling `backend.commit`.
+   * `coordinateSpaceResourceLifecycle` runs before ever calling `backend.commit`.
    * The candidate this builds (a fresh Target Space linked from Meta) passes
    * that local check cleanly, so the queued `aggregate-refused` can only be
    * answered by the mocked backend — mirroring a real repository's own

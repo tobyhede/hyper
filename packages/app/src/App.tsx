@@ -34,9 +34,9 @@ import { canvasProjection } from './canvas-projection';
 import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
-  describeSpaceEndpointBreak,
-  describeSpaceEndpointCreationBreak,
-  describeSpaceEndpointRefusal,
+  describeSpaceResourceBreak,
+  describeSpaceResourceCreationBreak,
+  describeSpaceResourceRefusal,
 } from './authoring-refusal';
 import {
   coordinatedDeleteOk,
@@ -44,7 +44,7 @@ import {
   coordinatedGraphDelete,
 } from './coordinated-context-delete';
 import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
-import { useSpaceEndpointTargets } from './space-resource-targets';
+import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
@@ -434,7 +434,7 @@ export const createApp = (
      * own, which is the name they just read on the row; renaming it afterwards
      * is the ordinary inline Title edit every Resource has (ADR 0083).
      */
-    const addSpaceEndpointFor = useCallback(
+    const addSpaceResourceFor = useCallback(
       async (space: { readonly id: UUID; readonly title: string }): Promise<string | null> => {
         // Answers rather than rejects, for `readReferenceableSpaces`'s reason
         // and one more: the list spends this on a press, so a rejection left to
@@ -451,12 +451,12 @@ export const createApp = (
             position: centreAnchor(),
             targetSpaceId: space.id,
           });
-          return result.kind === 'refused' ? describeSpaceEndpointRefusal(result.refusal) : null;
+          return result.kind === 'refused' ? describeSpaceResourceRefusal(result.refusal) : null;
         } catch (failure) {
           // Both: the reader gets the sentence on the list that asked, and the
           // diagnostic still reaches the operational channel.
           reportBreak(failure);
-          return describeSpaceEndpointBreak(failure);
+          return describeSpaceResourceBreak(failure);
         }
       },
       [centreAnchor],
@@ -471,7 +471,7 @@ export const createApp = (
      * that owns the command. The sentence has to name the Space, because the
      * author may be typing into the Resource when it goes.
      */
-    const [spaceResourceRefusal, setSpaceEndpointRefusal] = useState<string | null>(null);
+    const [spaceResourceRefusal, setSpaceResourceRefusal] = useState<string | null>(null);
 
     /**
      * The Reference Resource creation that refused, said in one sentence.
@@ -485,7 +485,7 @@ export const createApp = (
      */
     const [referenceRefusal, setReferenceRefusal] = useState<string | null>(null);
 
-    const [creatingSpaceEndpoint, setCreatingSpaceEndpoint] = useState(false);
+    const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
 
     /**
      * Create Space Resource: one press, one Resource, one new Space (ADR 0089).
@@ -505,9 +505,9 @@ export const createApp = (
      * (`titles.ts`). Referencing an *existing* Space is not this command — it is
      * the Resources list's add-Space row, which lists real Spaces with search.
      */
-    const createSpaceEndpoint = useCallback((): void => {
-      setCreatingSpaceEndpoint(true);
-      setSpaceEndpointRefusal(null);
+    const createSpaceResource = useCallback((): void => {
+      setCreatingSpaceResource(true);
+      setSpaceResourceRefusal(null);
       void (async () => {
         try {
           const title = nextSpaceTitle(spaceSession.getState().working);
@@ -524,7 +524,7 @@ export const createApp = (
             position: centreAnchor(),
           });
           if (result.kind === 'refused') {
-            setSpaceEndpointRefusal(describeSpaceEndpointRefusal(result.refusal));
+            setSpaceResourceRefusal(describeSpaceResourceRefusal(result.refusal));
             return;
           }
           // Named rather than narrowed to "not refused": a lifecycle that
@@ -547,9 +547,9 @@ export const createApp = (
           });
         } catch (failure) {
           reportBreak(failure);
-          setSpaceEndpointRefusal(describeSpaceEndpointCreationBreak(failure));
+          setSpaceResourceRefusal(describeSpaceResourceCreationBreak(failure));
         } finally {
-          setCreatingSpaceEndpoint(false);
+          setCreatingSpaceResource(false);
         }
       })();
     }, [centreAnchor]);
@@ -662,7 +662,7 @@ export const createApp = (
       editingChromeTitle,
       spaceOnCanvas: active,
       editingEmbeddedMap,
-      creatingSpaceEndpoint,
+      creatingSpaceResource,
     });
     // A withdrawn list takes its outstanding request with it. Closing is the
     // Dock's, from the same `disabled` answer that withdraws the trigger; what
@@ -1016,7 +1016,7 @@ export const createApp = (
       [selectedMap.map, centreAnchor],
     );
 
-    const enterSpaceEndpoint = useCallback(
+    const enterSpaceResource = useCallback(
       (resourceId: ResourceId) => {
         if (spaces === null) return;
         const resource = renderedSpace.lookup.resource(resourceId);
@@ -1149,7 +1149,7 @@ export const createApp = (
                     label: 'Enter',
                     icon: <EnterSpaceIcon />,
                     onSelect: () => {
-                      enterSpaceEndpoint(resource.id);
+                      enterSpaceResource(resource.id);
                       return 'done';
                     },
                   },
@@ -1180,7 +1180,7 @@ export const createApp = (
         editingResourceBody,
         createReferenceFrom,
         spaces,
-        enterSpaceEndpoint,
+        enterSpaceResource,
       ],
     );
 
@@ -1277,7 +1277,7 @@ export const createApp = (
      * decision rather than an oversight.** A refusal carries a sentence for the
      * author (ADR 0042), which is worth showing exactly where the author can act
      * on it. Every other creation has somewhere: `createReferenceFrom` and
-     * `createSpaceEndpoint` both complete on activation and both close or leave the
+     * `createSpaceResource` both complete on activation and both close or leave the
      * surface that ran them, so each reports through a standing notice on the
      * Space chrome. Add Resource takes no input at all, cannot refuse against a
      * choice the author made, and leaves nothing standing that a sentence could
@@ -1344,13 +1344,13 @@ export const createApp = (
     );
     // One read per set of referenced Spaces, shared by the canvas and the Resources
     // collection so a Space Resource names the same Space wherever it is drawn.
-    const readSpaceEndpointTarget = useCallback(
+    const readSpaceResourceTarget = useCallback(
       (spaceId: UUID) => spaceResources.target(spaceId),
       [],
     );
-    const spaceResourceTargets = useSpaceEndpointTargets(
+    const spaceResourceTargets = useSpaceResourceTargets(
       renderedSpace.resources,
-      readSpaceEndpointTarget,
+      readSpaceResourceTarget,
     );
     const spaceTitleById = useMemo(
       () => new Map([...spaceResourceTargets].map(([id, target]) => [id, target.title])),
@@ -1712,7 +1712,7 @@ export const createApp = (
                 allResources: renderedSpace.resources,
                 spaceTitleById,
                 spaces: metaSpaces,
-                onAddSpace: addSpaceEndpointFor,
+                onAddSpace: addSpaceResourceFor,
                 disabled: !availability.resourcesView,
                 disclose: discloseResources,
                 revealedResourceId: addressedResourceId,
@@ -1745,13 +1745,13 @@ export const createApp = (
               onCreate: (kind) => {
                 const create = {
                   markdown: addResource,
-                  space: createSpaceEndpoint,
+                  space: createSpaceResource,
                 } satisfies Record<DockResourceKind, () => void>;
                 create[kind]();
               },
               createDisabled: {
                 markdown: !availability.addResource,
-                space: !availability.createSpaceEndpoint,
+                space: !availability.createSpaceResource,
               },
             },
             persistence: {
@@ -1810,7 +1810,7 @@ export const createApp = (
                    the lifecycle answers — "Space not created" is the sentence
                    that makes a Resource vanishing from under the caret legible. */
                 title="Space not created"
-                onDismiss={() => setSpaceEndpointRefusal(null)}
+                onDismiss={() => setSpaceResourceRefusal(null)}
               >
                 {spaceResourceRefusal}
               </ShellNotice>

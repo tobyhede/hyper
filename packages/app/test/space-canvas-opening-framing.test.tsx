@@ -11,7 +11,7 @@ import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
 import { OpenSpacesContext } from '../src/open-spaces-context';
 import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces';
-import type { SpaceEndpointFraming } from '../src/space-resource-framing';
+import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -20,8 +20,8 @@ const HOST_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
-const HOST_FRAMING: SpaceEndpointFraming = { centreX: 1, centreY: 1, zoom: 9 };
-const TARGET_FRAMING: SpaceEndpointFraming = { centreX: 100, centreY: 50, zoom: 2 };
+const HOST_FRAMING: SpaceResourceFraming = { centreX: 1, centreY: 1, zoom: 9 };
+const TARGET_FRAMING: SpaceResourceFraming = { centreX: 100, centreY: 50, zoom: 2 };
 
 const snapshot = spaceSnapshotSchema.parse({
   id: TARGET_ID,
@@ -143,8 +143,8 @@ describe('opening framing on a mounted canvas', () => {
     const hostEntry = stubEntry(HOST_ID, spaceSession, app, spaceResources);
     const targetEntry = stubEntry(TARGET_ID, spaceSession, app, spaceResources);
     const asked: UUID[] = [];
-    const seeds: (SpaceEndpointFraming | undefined)[] = [];
-    const framingByEntry = new Map<OpenSpace, SpaceEndpointFraming>([[hostEntry, HOST_FRAMING]]);
+    const seeds: (SpaceResourceFraming | undefined)[] = [];
+    const framingByEntry = new Map<OpenSpace, SpaceResourceFraming>([[hostEntry, HOST_FRAMING]]);
     const listeners = new Set<() => void>();
     const entries: readonly OpenSpace[] = [];
     let state: OpenSpacesState = {
@@ -214,7 +214,7 @@ describe('opening framing on a mounted canvas', () => {
                 editingChromeTitle: false,
                 spaceOnCanvas: true,
                 editingEmbeddedMap: false,
-                creatingSpaceEndpoint: false,
+                creatingSpaceResource: false,
               })}
               onNodesChange={() => undefined}
               onEdgesChange={() => undefined}
@@ -345,7 +345,7 @@ describe('opening framing on a mounted canvas', () => {
               editingChromeTitle: false,
               spaceOnCanvas: true,
               editingEmbeddedMap: false,
-              creatingSpaceEndpoint: false,
+              creatingSpaceResource: false,
             })}
             onNodesChange={() => undefined}
             onEdgesChange={() => undefined}

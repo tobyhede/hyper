@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   CanvasResource,
-  type CanvasSpaceEndpointSelection,
+  type CanvasSpaceResourceSelection,
   type CanvasResourceFront,
 } from '../src';
 
@@ -1010,8 +1010,8 @@ describe('CanvasResource open Markdown front', () => {
 
 describe('CanvasResource Space front', () => {
   const selection = (
-    over: Partial<CanvasSpaceEndpointSelection> = {},
-  ): CanvasSpaceEndpointSelection => ({
+    over: Partial<CanvasSpaceResourceSelection> = {},
+  ): CanvasSpaceResourceSelection => ({
     maps: [
       { id: 'l1', title: 'Collection 1' },
       { id: 'l2', title: 'Collection 2' },

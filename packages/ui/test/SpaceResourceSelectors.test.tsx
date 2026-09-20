@@ -3,9 +3,9 @@ import { type ReactNode } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-  SpaceEndpointSelectors,
+  SpaceResourceSelectors,
   ResourceRailActions,
-  type SpaceEndpointSelectorsProps,
+  type SpaceResourceSelectorsProps,
 } from '../src';
 
 /**
@@ -40,19 +40,19 @@ const menuItemLabels = (menu: HTMLElement): readonly string[] =>
     ).trim(),
   );
 
-const mount = (props: SpaceEndpointSelectorsProps, extra?: ReactNode) =>
+const mount = (props: SpaceResourceSelectorsProps, extra?: ReactNode) =>
   render(
     <>
       <ResourceRailActions aria-label="Resource rail">
-        <SpaceEndpointSelectors {...props} />
+        <SpaceResourceSelectors {...props} />
       </ResourceRailActions>
       {extra}
     </>,
   );
 
 const clusters = (
-  over: Partial<SpaceEndpointSelectorsProps> = {},
-): SpaceEndpointSelectorsProps => ({
+  over: Partial<SpaceResourceSelectorsProps> = {},
+): SpaceResourceSelectorsProps => ({
   maps: [
     { id: 'l1', title: 'Collection 1' },
     { id: 'l2', title: 'Collection 2' },
@@ -66,7 +66,7 @@ const clusters = (
   ...over,
 });
 
-describe('SpaceEndpointSelectors', () => {
+describe('SpaceResourceSelectors', () => {
   it('keeps focus on the destination when a context rename completes on blur', async () => {
     const onRename = vi.fn(() => null);
     mount(

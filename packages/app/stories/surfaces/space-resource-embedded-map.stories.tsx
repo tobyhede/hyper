@@ -144,7 +144,7 @@ SelectedMap.meta = { iframed: true };
 
 const PORTAL_FRAMING = { centreX: 80, centreY: 40, zoom: 1.4 };
 
-const openEnteredFromSpaceEndpoint = async () => {
+const openEnteredFromSpaceResource = async () => {
   const spaces = storySpaces(HOME_ID, [home, target]);
   await spaces.open(HOME_ID);
   return storyOpening(
@@ -157,10 +157,10 @@ const openEnteredFromSpaceEndpoint = async () => {
  * Enter from a Space Resource: the target is the canvas, at the stored framing
  * and the browser's size, with Return naming the containing Space.
  */
-export const EnteredFromSpaceEndpoint: Story = () => (
-  <Application resolve={openEnteredFromSpaceEndpoint} />
+export const EnteredFromSpaceResource: Story = () => (
+  <Application resolve={openEnteredFromSpaceResource} />
 );
-EnteredFromSpaceEndpoint.meta = { iframed: true };
+EnteredFromSpaceResource.meta = { iframed: true };
 
 const PAIR_HOME_ID = id('000000000020');
 const PAIR_HOME_MAP_ID = id('000000000021');

@@ -2,9 +2,9 @@ import type { UUID } from '@project/core';
 import type {
   DeleteReferencedMapInput,
   DeleteReferencedGraphInput,
-  SpaceEndpointContextDeletionResult,
+  SpaceResourceContextDeletionResult,
 } from '@project/persistence';
-import { describeSpaceEndpointRefusal } from './authoring-refusal';
+import { describeSpaceResourceRefusal } from './authoring-refusal';
 
 /**
  * Why a coordinated context command did not run: a Space in the Edit had not
@@ -30,7 +30,7 @@ export const coordinatedDeleteOk = (result: CoordinatedContextDeleteResult): boo
   result.kind !== 'error';
 
 const run = async (
-  del: () => Promise<SpaceEndpointContextDeletionResult>,
+  del: () => Promise<SpaceResourceContextDeletionResult>,
   waitBefore: (() => Promise<boolean>) | undefined,
 ): Promise<CoordinatedContextDeleteResult> => {
   if (waitBefore !== undefined && !(await waitBefore())) {
@@ -38,7 +38,7 @@ const run = async (
   }
   const result = await del();
   if (result.kind === 'refused') {
-    return { kind: 'error', message: describeSpaceEndpointRefusal(result.refusal) };
+    return { kind: 'error', message: describeSpaceResourceRefusal(result.refusal) };
   }
   if (result.kind === 'completed') {
     return {
@@ -52,14 +52,14 @@ const run = async (
 
 /** Coordinated Map deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
 export const coordinatedMapDelete = (
-  deleteMap: (input: DeleteReferencedMapInput) => Promise<SpaceEndpointContextDeletionResult>,
+  deleteMap: (input: DeleteReferencedMapInput) => Promise<SpaceResourceContextDeletionResult>,
   input: DeleteReferencedMapInput,
   waitBefore?: () => Promise<boolean>,
 ): Promise<CoordinatedContextDeleteResult> => run(() => deleteMap(input), waitBefore);
 
 /** Coordinated Graph deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
 export const coordinatedGraphDelete = (
-  deleteGraph: (input: DeleteReferencedGraphInput) => Promise<SpaceEndpointContextDeletionResult>,
+  deleteGraph: (input: DeleteReferencedGraphInput) => Promise<SpaceResourceContextDeletionResult>,
   input: DeleteReferencedGraphInput,
   waitBefore?: () => Promise<boolean>,
 ): Promise<CoordinatedContextDeleteResult> => run(() => deleteGraph(input), waitBefore);

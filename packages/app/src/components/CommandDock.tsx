@@ -323,7 +323,7 @@ export interface DockSpace {
    * there is nothing here for this surface to keep in step — the Open Spaces
    * rows and the Opener control each read their own session's title and redraw on
    * its publication (`open-spaces.ts`). Renaming *another* Space, from a Space
-   * Resource or from a row of that menu, is a `SpaceEndpointLifecycle` operation over
+   * Resource or from a row of that menu, is a `SpaceResourceLifecycle` operation over
    * a second session (ADR 0076) and is deliberately not this.
    *
    * Nullable rather than optional so both callers state it, and `null` now means

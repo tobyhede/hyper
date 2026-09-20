@@ -6,7 +6,7 @@ import {
   PRESENTING_DURATION,
   PRESENTING_PADDING,
 } from '../camera';
-import { viewportFromFraming, type SpaceEndpointFraming } from '../space-resource-framing';
+import { viewportFromFraming, type SpaceResourceFraming } from '../space-resource-framing';
 
 /**
  * The camera seam (ADR 0027): the components that move React Flow's viewport
@@ -125,7 +125,7 @@ export function PresentingCamera({ activeResourceId }: { activeResourceId: strin
  * rectangle. Issued, never awaited (ADR 0043), matching the two `fitView`
  * cameras above. Absent framing leaves React Flow's `fitView` prop to run.
  */
-export function OpeningFramingCamera({ framing }: { framing: SpaceEndpointFraming | undefined }) {
+export function OpeningFramingCamera({ framing }: { framing: SpaceResourceFraming | undefined }) {
   const { setViewport } = useReactFlow();
   const viewportWidth = useStore((s) => s.width);
   const viewportHeight = useStore((s) => s.height);

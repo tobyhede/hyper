@@ -44,7 +44,7 @@ const loaded = (result: LoadSpaceResult | LoadSpaceSnapshotResult): Space => {
 };
 
 /** One Map of a target Space and one Graph that Map owns — what every Space Resource stores. */
-interface SpaceEndpointSelection {
+interface SpaceResourceSelection {
   readonly map: UUID;
   readonly graph: GraphId;
 }
@@ -61,7 +61,7 @@ interface SpaceEndpointSelection {
  * (`packages/persistence/src/session-registry.ts`), which is what keeps a
  * fixture Space Resource indistinguishable from an authored one.
  */
-const opensOn = (target: SpaceSnapshot): SpaceEndpointSelection => {
+const opensOn = (target: SpaceSnapshot): SpaceResourceSelection => {
   const map = (target.document.maps ?? []).find(({ id }) => id === target.document.defaultMap);
   if (map === undefined)
     throw new Error(`Story Space ${target.document.title} declares no opening Map`);

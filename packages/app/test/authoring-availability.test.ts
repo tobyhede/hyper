@@ -20,7 +20,7 @@ const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editingChromeTitle: false,
   spaceOnCanvas: true,
   editingEmbeddedMap: false,
-  creatingSpaceEndpoint: false,
+  creatingSpaceResource: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
@@ -30,7 +30,7 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   deleteResource: true,
   present: true,
   addResource: true,
-  createSpaceEndpoint: true,
+  createSpaceResource: true,
   createMap: true,
   authorOnCanvas: true,
   authorInEmbeddedMap: true,
@@ -72,7 +72,7 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteResource: false,
         addResource: false,
-        createSpaceEndpoint: false,
+        createSpaceResource: false,
         createMap: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
@@ -91,7 +91,7 @@ describe('authoring availability', () => {
         deleteResource: false,
         present: false,
         addResource: false,
-        createSpaceEndpoint: false,
+        createSpaceResource: false,
         createMap: false,
       },
     ],
@@ -116,7 +116,7 @@ describe('authoring availability', () => {
         deleteResource: false,
         present: false,
         addResource: false,
-        createSpaceEndpoint: false,
+        createSpaceResource: false,
         createMap: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
@@ -140,8 +140,8 @@ describe('authoring availability', () => {
     ],
     [
       'a Space Resource creation in flight',
-      { creatingSpaceEndpoint: true },
-      { ...ALL_AVAILABLE, createSpaceEndpoint: false },
+      { creatingSpaceResource: true },
+      { ...ALL_AVAILABLE, createSpaceResource: false },
     ],
   ])('withdraws what %s takes away', (_what, inProgress, expected) => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress })).toStrictEqual(
@@ -163,10 +163,10 @@ describe('authoring availability', () => {
     it('withholds only Create Space Resource while its coordinated Edit is in flight', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
-        creatingSpaceEndpoint: true,
+        creatingSpaceResource: true,
       });
 
-      expect(availability.createSpaceEndpoint).toBe(false);
+      expect(availability.createSpaceResource).toBe(false);
       expect(availability.addResource).toBe(true);
     });
 

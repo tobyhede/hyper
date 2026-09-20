@@ -14,10 +14,10 @@ import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import {
-  createSpaceEndpointLifecycle,
-  type SpaceEndpointAuthoring,
+  createSpaceResourceLifecycle,
+  type SpaceResourceAuthoring,
 } from './space-resource-lifecycle';
-import type { SpaceEndpointFraming } from './space-resource-framing';
+import type { SpaceResourceFraming } from './space-resource-framing';
 
 export interface OpenSpace {
   readonly id: UUID;
@@ -33,7 +33,7 @@ export interface OpenSpace {
    * is required rather than optional, and why an app is never composed half
    * able to author a Space Resource.
    */
-  readonly spaceResources: SpaceEndpointAuthoring;
+  readonly spaceResources: SpaceResourceAuthoring;
 }
 
 export interface OpenSpacesState {
@@ -109,7 +109,7 @@ export interface OpenSpaces {
     spaceId: UUID,
     selection?: MapId,
     graph?: GraphId,
-    framing?: SpaceEndpointFraming,
+    framing?: SpaceResourceFraming,
   ) => Promise<OpenSpace>;
   /**
    * The camera Enter asked the first canvas showing to take, or `undefined`.
@@ -118,13 +118,13 @@ export interface OpenSpaces {
    * second read still answers the same seed, and that a later Enter of a Space
    * already shown does not write one.
    */
-  readonly openingFraming: (entry: OpenSpace) => SpaceEndpointFraming | undefined;
+  readonly openingFraming: (entry: OpenSpace) => SpaceResourceFraming | undefined;
   readonly switchTo: (spaceId: UUID) => Promise<OpenSpace>;
   readonly exit: (
     spaceId: UUID,
     confirmation?: RejectedExitConfirmation,
   ) => Promise<ExitSpaceResult>;
-  readonly spaceResources: SpaceEndpointAuthoring;
+  readonly spaceResources: SpaceResourceAuthoring;
   /**
    * The browser's location, following whichever Space is on the canvas.
    *
@@ -162,7 +162,7 @@ interface ValidatedLoadedSpace {
 interface FirstCanvasSeed {
   selection?: MapId;
   graph?: GraphId;
-  framing?: SpaceEndpointFraming;
+  framing?: SpaceResourceFraming;
 }
 
 const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
@@ -190,7 +190,7 @@ export function createOpenSpaces({
   // Opening a Space is a working load, so it initializes a stored mapless
   // Space before anything composes against it (ADR 0079).
   const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
-  const spaceResources = createSpaceEndpointLifecycle({
+  const spaceResources = createSpaceResourceLifecycle({
     backend,
     registry,
     newId,
@@ -211,7 +211,7 @@ export function createOpenSpaces({
    * live selection, which that file's already-open case holds.
    */
   const shownOnCanvas = new WeakSet<OpenSpace>();
-  const openingFramingByEntry = new WeakMap<OpenSpace, SpaceEndpointFraming>();
+  const openingFramingByEntry = new WeakMap<OpenSpace, SpaceResourceFraming>();
   const browserLocation = createBrowserLocation(history, report, async (pathname) => {
     await openPath(pathname);
   });
@@ -485,7 +485,7 @@ export function createOpenSpaces({
     spaceId: UUID,
     selection?: MapId,
     graph?: GraphId,
-    framing?: SpaceEndpointFraming,
+    framing?: SpaceResourceFraming,
   ): Promise<OpenSpace> => {
     const firstDisplay: FirstCanvasSeed = {};
     if (selection !== undefined) firstDisplay.selection = selection;

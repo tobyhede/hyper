@@ -11,12 +11,12 @@ import {
 import type { ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
-  discoverEmbeddedOpenSpaceEndpoints,
-  type EmbeddedOpenSpaceEndpointRequest,
+  discoverEmbeddedOpenSpaceResources,
+  type EmbeddedOpenSpaceResourceRequest,
 } from './embedded-open-space-resource';
 import type { EmbeddedPublication } from './embedded-publication';
 import type { OpenSpace } from './open-spaces';
-import type { SpaceEndpointFraming } from './space-resource-framing';
+import type { SpaceResourceFraming } from './space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
 const EMPTY_PORTALS: ReadonlySet<ResourceId> = new Set();
@@ -32,8 +32,8 @@ export interface EmbeddedTargetReader {
   readonly embed: (spaceId: ResourceId) => Promise<OpenSpace | undefined>;
 }
 
-export interface EmbeddedOpenSpaceEndpoints {
-  readonly embeddedRequests: readonly EmbeddedOpenSpaceEndpointRequest<OpenSpace>[];
+export interface EmbeddedOpenSpaceResources {
+  readonly embeddedRequests: readonly EmbeddedOpenSpaceResourceRequest<OpenSpace>[];
   readonly embeddedPublications: ReadonlyMap<string, EmbeddedPublication>;
   readonly embeddedFailures: ReadonlyMap<ResourceId, string>;
   readonly resumeEmbedded: (spaceId: ResourceId) => Promise<void>;
@@ -41,19 +41,19 @@ export interface EmbeddedOpenSpaceEndpoints {
   readonly reportBodyHeight: (id: string, height: number | null) => void;
   readonly editingPortals: ReadonlySet<ResourceId>;
   readonly onPortalEditingChange: (resourceId: ResourceId, editing: boolean) => void;
-  readonly portalDraft: ReadonlyMap<ResourceId, SpaceEndpointFraming>;
-  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<ResourceId, SpaceEndpointFraming>>>;
+  readonly portalDraft: ReadonlyMap<ResourceId, SpaceResourceFraming>;
+  readonly setPortalDraft: Dispatch<SetStateAction<ReadonlyMap<ResourceId, SpaceResourceFraming>>>;
 }
 
 /**
  * Target-read scheduling, embed failures, publication registry, and edit-portal
  * state for nested Open Space Resources. Mounting and clip-path stay with the canvas.
  */
-export function useEmbeddedOpenSpaceEndpoints(
+export function useEmbeddedOpenSpaceResources(
   nodes: readonly ResourceFlowNode[],
   spaces: EmbeddedTargetReader | null,
   draggingIds: ReadonlySet<string>,
-): EmbeddedOpenSpaceEndpoints {
+): EmbeddedOpenSpaceResources {
   const getEntries = useCallback(() => spaces?.getState().entries ?? EMPTY_ENTRIES, [spaces]);
   const entries = useSyncExternalStore(spaces?.subscribe ?? emptySubscription, getEntries);
   const [embeddedPublications, setEmbeddedPublications] = useState<
@@ -74,7 +74,7 @@ export function useEmbeddedOpenSpaceEndpoints(
   );
   const [bodyHeights, setBodyHeights] = useState<ReadonlyMap<string, number>>(new Map());
   const [editingPortals, setEditingPortals] = useState<ReadonlySet<ResourceId>>(EMPTY_PORTALS);
-  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<ResourceId, SpaceEndpointFraming>>(
+  const [portalDraft, setPortalDraft] = useState<ReadonlyMap<ResourceId, SpaceResourceFraming>>(
     () => new Map(),
   );
   const onPortalEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {
@@ -100,7 +100,7 @@ export function useEmbeddedOpenSpaceEndpoints(
   }, []);
   const embeddedRequests = useMemo(
     () =>
-      discoverEmbeddedOpenSpaceEndpoints({
+      discoverEmbeddedOpenSpaceResources({
         nodes,
         entries,
         publications: embeddedPublications,

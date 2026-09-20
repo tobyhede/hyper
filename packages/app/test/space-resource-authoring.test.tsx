@@ -26,7 +26,7 @@ import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
-import type { SpaceEndpointAuthoring } from '../src/space-resource-lifecycle';
+import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { createResource, createResourceControl, unavailable } from './command-dock';
 
 /**
@@ -290,7 +290,7 @@ interface Mounted {
  */
 function mount(
   otherSnapshot: SpaceSnapshot = other,
-  broken: Partial<SpaceEndpointAuthoring> = {},
+  broken: Partial<SpaceResourceAuthoring> = {},
   reportObserverError?: ObserverErrorReporter,
   /**
    * The two injections only some tests name: the minter a coordinated Edit
@@ -314,7 +314,7 @@ function mount(
     stored,
     newId,
   );
-  const spaceResources: SpaceEndpointAuthoring = { ...authoring, ...broken };
+  const spaceResources: SpaceResourceAuthoring = { ...authoring, ...broken };
   const app = composeApp({ spaceSession: session, reportObserverError });
   let view: RenderResult | undefined;
   mountSpace(
@@ -366,7 +366,7 @@ async function readyToAuthor(): Promise<void> {
  * before the coordination has installed anything, and the state it installs
  * arrives on a later tick.
  */
-async function createSpaceEndpoint(): Promise<void> {
+async function createSpaceResource(): Promise<void> {
   await readyToAuthor();
   await act(async () => {
     createResource('Space Resource');
@@ -436,12 +436,12 @@ afterAll(() => vi.unstubAllGlobals());
 describe('Create Space Resource', () => {
   it('numbers each new Space from the Space Resources already on the Map', async () => {
     const { session } = mount();
-    await createSpaceEndpoint();
+    await createSpaceResource();
     await settled(session);
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     expect(editor).toHaveValue('Space 1');
     fireEvent.keyDown(editor, { key: 'Escape' });
-    await createSpaceEndpoint();
+    await createSpaceResource();
     await settled(session);
     expect(spaceResourcesOf(session).map((resource) => resource.document.title)).toEqual([
       'Space 1',
@@ -464,7 +464,7 @@ describe('Create Space Resource', () => {
   it('creates a Space Resource and the new Space it names from one Space N', async () => {
     const { backend, session } = mount();
 
-    await createSpaceEndpoint();
+    await createSpaceResource();
 
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(1));
     const created = spaceResourcesOf(session);
@@ -491,7 +491,7 @@ describe('Create Space Resource', () => {
   it('continues in the created Resource’s own Title editor', async () => {
     const { session } = mount();
 
-    await createSpaceEndpoint();
+    await createSpaceResource();
 
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     expect(editor).toHaveValue('Space 1');
@@ -500,8 +500,8 @@ describe('Create Space Resource', () => {
   });
 
   it('withdraws Create Space Resource while its coordinated Edit is in flight', async () => {
-    let resolveCreate!: (value: Awaited<ReturnType<SpaceEndpointAuthoring['create']>>) => void;
-    const createDeferred = new Promise<Awaited<ReturnType<SpaceEndpointAuthoring['create']>>>(
+    let resolveCreate!: (value: Awaited<ReturnType<SpaceResourceAuthoring['create']>>) => void;
+    const createDeferred = new Promise<Awaited<ReturnType<SpaceResourceAuthoring['create']>>>(
       (resolve) => {
         resolveCreate = resolve;
       },
@@ -578,7 +578,7 @@ describe('Create Space Resource', () => {
    */
   it('leaves the target Space’s title alone when the Resource is renamed', async () => {
     const { backend, session } = mount();
-    await createSpaceEndpoint();
+    await createSpaceResource();
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(1));
     const targetId = spaceResourcesOf(session)[0]!.document.spaceId;
 
@@ -610,7 +610,7 @@ describe('Create Space Resource', () => {
         Promise.resolve({ kind: 'refused', refusal: { code: 'persistence-read-failed' } }),
     });
 
-    await createSpaceEndpoint();
+    await createSpaceResource();
 
     expect(await screen.findByText('Space not created')).toBeVisible();
     expect(spaceResourcesOf(session)).toEqual([]);
@@ -623,7 +623,7 @@ describe('Create Space Resource', () => {
     'allows another attempt after a %s creation',
     async (outcome) => {
       const create = vi
-        .fn<SpaceEndpointAuthoring['create']>()
+        .fn<SpaceResourceAuthoring['create']>()
         .mockImplementationOnce(() =>
           outcome === 'refused'
             ? Promise.resolve({ kind: 'refused', refusal: { code: 'persistence-read-failed' } })
@@ -631,9 +631,9 @@ describe('Create Space Resource', () => {
         )
         .mockResolvedValue({ kind: 'unchanged' });
       const { session } = mount(other, { create }, vi.fn());
-      await createSpaceEndpoint();
+      await createSpaceResource();
       expect(await screen.findByText('Space not created')).toBeVisible();
-      await createSpaceEndpoint();
+      await createSpaceResource();
       expect(create).toHaveBeenCalledTimes(2);
       expect(screen.queryByText('Space not created')).toBeNull();
       await settled(session);
@@ -643,18 +643,18 @@ describe('Create Space Resource', () => {
   /**
    * A lifecycle that changed nothing did not create a Resource.
    *
-   * `SpaceEndpointCreationResult` has three arms and only `refused` says something
+   * `SpaceResourceCreationResult` has three arms and only `refused` says something
    * is wrong, so an `unchanged` answered as a creation would open a Title editor
    * over a Resource that was never made. Named the way the other arms are, so the
    * compiler asks again the day a fourth joins the union.
    */
   it('creates nothing and reports nothing when the lifecycle answers unchanged', async () => {
-    const create = vi.fn<SpaceEndpointAuthoring['create']>(() =>
+    const create = vi.fn<SpaceResourceAuthoring['create']>(() =>
       Promise.resolve({ kind: 'unchanged' }),
     );
     const { session } = mount(other, { create });
 
-    await createSpaceEndpoint();
+    await createSpaceResource();
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(spaceResourcesOf(session)).toHaveLength(0);
@@ -680,7 +680,7 @@ describe('Create Space Resource', () => {
       create: () => Promise.reject(new Error('the coordination lost a session')),
     });
 
-    await createSpaceEndpoint();
+    await createSpaceResource();
 
     expect(
       await screen.findByText('This Resource was not created: the coordination lost a session'),
@@ -705,7 +705,7 @@ describe('Create Space Resource', () => {
       reported,
     );
 
-    await createSpaceEndpoint();
+    await createSpaceResource();
 
     expect(
       await screen.findByText('This Resource was not created: the coordination lost a session'),
@@ -951,7 +951,7 @@ describe('referencing an existing Space', () => {
     await settled(session);
 
     const stored = await backend.loadSpace(HOME_ID);
-    const storedSpaceEndpoints = (stored?.snapshot.resources ?? []).flatMap((resource) =>
+    const storedSpaceResources = (stored?.snapshot.resources ?? []).flatMap((resource) =>
       resource.document.kind === 'space' ? [{ id: resource.id, document: resource.document }] : [],
     );
     // The backend answers Resources in ascending id order (ticket 30), which need
@@ -961,7 +961,7 @@ describe('referencing an existing Space', () => {
     // document that landed on the wrong Resource.
     const ascendingById = <T extends { id: UUID }>(entries: readonly T[]): T[] =>
       [...entries].sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
-    expect(ascendingById(storedSpaceEndpoints)).toEqual(ascendingById(spaceResourcesOf(session)));
+    expect(ascendingById(storedSpaceResources)).toEqual(ascendingById(spaceResourcesOf(session)));
   });
 
   /**

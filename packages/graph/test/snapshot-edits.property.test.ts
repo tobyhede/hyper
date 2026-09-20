@@ -106,7 +106,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     // the room an Open Resource holds, so the Resources that were never opened land
     // in the same place whether or not the deleted Resource was ever Open —
     // `deleteFromSpace`'s own use of `Placement.reclaim` is what makes this
-    // hold, and it is exactly the call the registry's old `removeSpaceEndpoint`
+    // hold, and it is exactly the call the registry's old `removeSpaceResource`
     // skipped.
     fc.assert(
       fc.property(

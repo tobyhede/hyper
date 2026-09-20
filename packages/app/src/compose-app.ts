@@ -5,7 +5,7 @@ import { createConnectionCompletion, type ConnectionCompletion } from './connect
 import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
-import type { SpaceEndpointAuthoring } from './space-resource-lifecycle';
+import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
@@ -83,7 +83,7 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    */
   readonly connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
   /** Coordinated Space Resource deletion for the Delete Resource interaction. */
-  readonly spaceResources?: SpaceEndpointAuthoring | undefined;
+  readonly spaceResources?: SpaceResourceAuthoring | undefined;
 }
 
 /** The pair a connection completion is written in terms of. */

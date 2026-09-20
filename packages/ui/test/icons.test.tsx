@@ -4,7 +4,7 @@ import {
   ReferenceIcon,
   ParentIcon,
   SpaceIcon,
-  SpaceEndpointIcon,
+  SpaceResourceIcon,
   ResourceKindIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -50,7 +50,7 @@ describe('the public icon facade', () => {
           <SpaceIcon size={16} />
         </span>
         <span data-testid="space-resource">
-          <SpaceEndpointIcon size={16} />
+          <SpaceResourceIcon size={16} />
         </span>
         <ResourceKindIcon kind="space" size={16} />
       </>,

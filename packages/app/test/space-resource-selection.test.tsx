@@ -266,7 +266,7 @@ const settled = (session: SpaceSession): Promise<void> =>
  * it: the reopening test mounts one that does, and pressing Open there would
  * close the Resource this helper is asked to open.
  */
-async function openSpaceEndpoint(): Promise<HTMLElement> {
+async function openSpaceResource(): Promise<HTMLElement> {
   const control = await screen.findByRole('button', { name: /^(Open|Close) Resource Elsewhere$/ });
   if (control.getAttribute('aria-label') === 'Open Resource Elsewhere') fireEvent.click(control);
   await screen.findByTestId('space-resource-map');
@@ -328,7 +328,7 @@ describe('an Open Space Resource', () => {
   it('draws both of its selectors', async () => {
     const session = mount();
 
-    const resource = await openSpaceEndpoint();
+    const resource = await openSpaceResource();
 
     // Both are live from the first render, and both name what they hold. A
     // Space Resource selects a Map and a Graph from the moment it exists (ADR
@@ -347,7 +347,7 @@ describe('an Open Space Resource', () => {
    */
   it('writes the chosen Map and re-seeds the Graph from it', async () => {
     const session = mount();
-    await openSpaceEndpoint();
+    await openSpaceResource();
 
     choose('space-resource-map', 'Collection 2');
 
@@ -373,7 +373,7 @@ describe('an Open Space Resource', () => {
    */
   it('seeds the Graph from the chosen Map’s Active Graph', async () => {
     const session = mount();
-    await openSpaceEndpoint();
+    await openSpaceResource();
 
     choose('space-resource-map', 'Collection 3');
 
@@ -396,7 +396,7 @@ describe('an Open Space Resource', () => {
         graph: FIRST_GRAPH_ID,
       }),
     );
-    await openSpaceEndpoint();
+    await openSpaceResource();
 
     choose('space-resource-graph', 'Detail');
 
@@ -418,7 +418,7 @@ describe('an Open Space Resource', () => {
    */
   it('keeps both selections in the snapshot, and shows them selected on reopening', async () => {
     const session = mount();
-    await openSpaceEndpoint();
+    await openSpaceResource();
     choose('space-resource-map', 'Collection 2');
     await waitFor(() =>
       expect(spaceResourceDocument(session)).toMatchObject({
@@ -432,7 +432,7 @@ describe('an Open Space Resource', () => {
 
     const reopened = mount(written);
 
-    const resource = await openSpaceEndpoint();
+    const resource = await openSpaceResource();
     expect(within(resource).getByTestId('space-resource-map')).toHaveTextContent('Collection 2');
     expect(within(resource).getByTestId('space-resource-graph')).toHaveTextContent('Second pass');
     await settled(reopened);
@@ -446,7 +446,7 @@ describe('an Open Space Resource', () => {
   it('offers no way to change the Space it references', async () => {
     const session = mount();
 
-    const resource = await openSpaceEndpoint();
+    const resource = await openSpaceResource();
 
     // Entity actions plus Map and Graph; no fourth menu for retargeting.
     expect(railMenuControls(resource)).toHaveLength(3);

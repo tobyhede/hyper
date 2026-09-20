@@ -30,12 +30,12 @@ import {
   type SpaceSessionOptions,
 } from './session';
 
-type SpaceEndpointLifecycleChange =
+type SpaceResourceLifecycleChange =
   | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
   /**
    * `update`'s snapshot is the participant's whole next value, not a delta to
    * apply later. Every `plan` decides it against the Spaces its own wait
-   * produced (`SpaceEndpointCoordinatedOperation`), with nothing suspending
+   * produced (`SpaceResourceCoordinatedOperation`), with nothing suspending
    * before the coordination installs the result, so there is nothing left to
    * recompute at commit time: the value is carried directly rather than a
    * closure that would derive it again from whatever the participant's
@@ -54,12 +54,12 @@ type SpaceEndpointLifecycleChange =
  * before its result is installed, which is what makes a plan-level refusal
  * trustworthy against the Spaces `prepare` waited to see.
  */
-type SpaceEndpointPlanOutcome =
+type SpaceResourcePlanOutcome =
   | { readonly kind: 'unchanged' }
-  | SpaceEndpointRefused
+  | SpaceResourceRefused
   | {
       readonly kind: 'changes';
-      readonly changes: readonly [SpaceEndpointLifecycleChange, ...SpaceEndpointLifecycleChange[]];
+      readonly changes: readonly [SpaceResourceLifecycleChange, ...SpaceResourceLifecycleChange[]];
     };
 
 /**
@@ -69,10 +69,10 @@ type SpaceEndpointPlanOutcome =
  * directly rather than through a closure-captured variable. An operation with
  * nothing to carry parameterizes this with `undefined`.
  */
-type SpaceEndpointPreparationOutcome<P> =
+type SpaceResourcePreparationOutcome<P> =
   | { readonly kind: 'proceed'; readonly prepared: P }
   | { readonly kind: 'unchanged' }
-  | SpaceEndpointRefused;
+  | SpaceResourceRefused;
 
 /**
  * A coordinated operation in the `prepare`/`plan` shape: `prepare` is async and
@@ -90,20 +90,20 @@ type SpaceEndpointPreparationOutcome<P> =
  * Resource deletion, Map/Graph deletion and a coordinated recovery retry's
  * replay (`startRecovery`, below) all reach the coordination through this.
  */
-interface SpaceEndpointCoordinatedOperation<P = undefined> {
-  readonly prepare: () => Promise<SpaceEndpointPreparationOutcome<P>>;
+interface SpaceResourceCoordinatedOperation<P = undefined> {
+  readonly prepare: () => Promise<SpaceResourcePreparationOutcome<P>>;
   readonly plan: (
     spaces: ReadonlyMap<UUID, SpaceSnapshot>,
     aggregate: LoadedAggregate,
     prepared: P,
-  ) => SpaceEndpointPlanOutcome;
+  ) => SpaceResourcePlanOutcome;
 }
 
-type SpaceEndpointCoordinationResult =
+type SpaceResourceCoordinationResult =
   | CommitResult
   | { readonly kind: 'persistence-read-failed' }
   /** A refusal `plan` answered, installed the same way as the other two. */
-  | SpaceEndpointRefused;
+  | SpaceResourceRefused;
 
 export interface ProvisionalSpaceSession {
   readonly kind: 'provisional';
@@ -136,11 +136,11 @@ export interface SpaceSessionRegistry {
   readonly release: (spaceId: UUID) => boolean;
   readonly session: (spaceId: UUID) => SpaceSession | undefined;
   readonly entry: (spaceId: UUID) => SpaceSessionRegistryEntry | undefined;
-  readonly spaceResources: (newId: () => UUID) => SpaceEndpointLifecycle;
+  readonly spaceResources: (newId: () => UUID) => SpaceResourceLifecycle;
 }
 
 /** What a Space Resource selects in the Space it shows: one Map and one of its Graphs. */
-interface SpaceEndpointSelection {
+interface SpaceResourceSelection {
   readonly map: UUID;
   readonly graph: UUID;
 }
@@ -155,7 +155,7 @@ interface SpaceEndpointSelection {
  * them. A single code would have told an author facing a failed commit
  * something that reads like a dead end.
  */
-export type SpaceEndpointTargetUnavailableReason =
+export type SpaceResourceTargetUnavailableReason =
   /** The Space is not there: deleted between the listing that offered it and this Edit. */
   | 'missing'
   /** Its stored state does not load as a valid Space, so nothing can be read off it. */
@@ -165,10 +165,10 @@ export type SpaceEndpointTargetUnavailableReason =
 
 /** A target's selection, or why it has none. */
 type TargetSelection =
-  | { readonly kind: 'selected'; readonly selection: SpaceEndpointSelection }
-  | { readonly kind: 'unavailable'; readonly reason: SpaceEndpointTargetUnavailableReason };
+  | { readonly kind: 'selected'; readonly selection: SpaceResourceSelection }
+  | { readonly kind: 'unavailable'; readonly reason: SpaceResourceTargetUnavailableReason };
 
-export interface CreateSpaceEndpointInput {
+export interface CreateSpaceResourceInput {
   readonly containingSpaceId: UUID;
   readonly mapId: UUID;
   readonly title: string;
@@ -186,10 +186,10 @@ export interface CreateSpaceEndpointInput {
  * so an optional override here would be a seam nothing could fill honestly.
  * Choosing differently is an Edit on the Resource afterwards (ADR 0068).
  */
-export interface LinkSpaceEndpointInput extends CreateSpaceEndpointInput {
+export interface LinkSpaceResourceInput extends CreateSpaceResourceInput {
   readonly targetSpaceId: UUID;
 }
-export interface DeleteSpaceEndpointInput {
+export interface DeleteSpaceResourceInput {
   readonly containingSpaceId: UUID;
   readonly resourceId: UUID;
 }
@@ -205,7 +205,7 @@ export interface DeleteReferencedGraphInput {
   readonly preferredGraphId: UUID | null;
 }
 /** Why a coordinated Space Resource lifecycle operation refused (ADR 0076). */
-export type SpaceEndpointRefusal =
+export type SpaceResourceRefusal =
   | { readonly code: 'map-not-found'; readonly mapId: UUID }
   | { readonly code: 'space-resource-not-found'; readonly resourceId: UUID }
   /**
@@ -226,7 +226,7 @@ export type SpaceEndpointRefusal =
    * The target could not be made working, so it supplies no Map and
    * Graph for the Resource to select (ADR 0079).
    *
-   * One code carrying {@link SpaceEndpointTargetUnavailableReason}, rather
+   * One code carrying {@link SpaceResourceTargetUnavailableReason}, rather
    * than three codes: what the Edit did is identical in all three — it did
    * not begin — and only the advice differs, which is what a reason is
    * for. It stays separate from `persistence-read-failed`, which is about
@@ -236,46 +236,46 @@ export type SpaceEndpointRefusal =
   | {
       readonly code: 'space-resource-target-unavailable';
       readonly spaceId: UUID;
-      readonly reason: SpaceEndpointTargetUnavailableReason;
+      readonly reason: SpaceResourceTargetUnavailableReason;
     };
 
 /** The Edit did not land, said the two ways every operation here can say it. */
-type SpaceEndpointLifecycleUnsettled =
+type SpaceResourceLifecycleUnsettled =
   | { readonly kind: 'unchanged' }
-  | { readonly kind: 'refused'; readonly refusal: SpaceEndpointRefusal };
+  | { readonly kind: 'refused'; readonly refusal: SpaceResourceRefusal };
 
 /**
  * What an operation that authors a Space Resource answers: the Resource it made.
  *
- * **Split from {@link SpaceEndpointDeletionResult} rather than carrying an optional
+ * **Split from {@link SpaceResourceDeletionResult} rather than carrying an optional
  * id on one shared arm.** Both `create` and `link` mint the Resource's id locally,
  * so the value exists the moment the result is built, and `delete` creates no
  * Resource to name. An optional field on one `completed` arm would put "is it
  * there?" at every call site — which is the cost the surface was already paying
  * when it inferred the id from a before/after set difference instead.
  */
-export type SpaceEndpointCreationResult =
-  { readonly kind: 'completed'; readonly resourceId: UUID } | SpaceEndpointLifecycleUnsettled;
+export type SpaceResourceCreationResult =
+  { readonly kind: 'completed'; readonly resourceId: UUID } | SpaceResourceLifecycleUnsettled;
 
 /** What deletion answers: that it landed, and nothing a caller could continue at. */
-export type SpaceEndpointDeletionResult =
-  { readonly kind: 'completed' } | SpaceEndpointLifecycleUnsettled;
+export type SpaceResourceDeletionResult =
+  { readonly kind: 'completed' } | SpaceResourceLifecycleUnsettled;
 
 /** What context deletion answers so navigation can follow the coordinated choice. */
-export type SpaceEndpointContextDeletionResult =
+export type SpaceResourceContextDeletionResult =
   | { readonly kind: 'completed'; readonly mapId: UUID; readonly graphId: UUID }
-  | SpaceEndpointLifecycleUnsettled;
+  | SpaceResourceLifecycleUnsettled;
 
-export interface SpaceEndpointLifecycle {
-  readonly create: (input: CreateSpaceEndpointInput) => Promise<SpaceEndpointCreationResult>;
-  readonly link: (input: LinkSpaceEndpointInput) => Promise<SpaceEndpointCreationResult>;
-  readonly delete: (input: DeleteSpaceEndpointInput) => Promise<SpaceEndpointDeletionResult>;
+export interface SpaceResourceLifecycle {
+  readonly create: (input: CreateSpaceResourceInput) => Promise<SpaceResourceCreationResult>;
+  readonly link: (input: LinkSpaceResourceInput) => Promise<SpaceResourceCreationResult>;
+  readonly delete: (input: DeleteSpaceResourceInput) => Promise<SpaceResourceDeletionResult>;
   readonly deleteMap: (
     input: DeleteReferencedMapInput,
-  ) => Promise<SpaceEndpointContextDeletionResult>;
+  ) => Promise<SpaceResourceContextDeletionResult>;
   readonly deleteGraph: (
     input: DeleteReferencedGraphInput,
-  ) => Promise<SpaceEndpointContextDeletionResult>;
+  ) => Promise<SpaceResourceContextDeletionResult>;
 }
 
 /**
@@ -293,7 +293,7 @@ export interface SpaceEndpointLifecycle {
  * an initialized Space records a `defaultMap`, and a Map owning no
  * Graph fails `buildSpaceLookup` before it can be asked.
  */
-const selectionOf = (space: Space): SpaceEndpointSelection | undefined => {
+const selectionOf = (space: Space): SpaceResourceSelection | undefined => {
   if (space.defaultMap === undefined) return undefined;
   const resolved = space.lookup.map(space.defaultMap);
   return resolved === undefined
@@ -301,7 +301,7 @@ const selectionOf = (space: Space): SpaceEndpointSelection | undefined => {
     : { map: resolved.map.id, graph: resolved.activeGraph.id };
 };
 
-const unavailableTarget = (reason: SpaceEndpointTargetUnavailableReason): TargetSelection => ({
+const unavailableTarget = (reason: SpaceResourceTargetUnavailableReason): TargetSelection => ({
   kind: 'unavailable',
   reason,
 });
@@ -326,10 +326,10 @@ const clone = <T>(value: T): T => structuredClone(value);
 const completed = { kind: 'completed' } as const;
 /**
  * The refused arm on its own: the shape a `prepare` or `plan` answers as a
- * value (`SpaceEndpointPlanOutcome`, `SpaceEndpointPreparationOutcome`,
- * `SpaceEndpointCoordinationResult`).
+ * value (`SpaceResourcePlanOutcome`, `SpaceResourcePreparationOutcome`,
+ * `SpaceResourceCoordinationResult`).
  */
-type SpaceEndpointRefused = { readonly kind: 'refused'; readonly refusal: SpaceEndpointRefusal };
+type SpaceResourceRefused = { readonly kind: 'refused'; readonly refusal: SpaceResourceRefusal };
 
 /**
  * The completion a creating operation built when it minted its Resource's id.
@@ -340,7 +340,7 @@ type SpaceEndpointRefused = { readonly kind: 'refused'; readonly refusal: SpaceE
  * already answered by the time this is reached. So there is no third resource to
  * say, and saying `unchanged` would name an outcome neither operation produces.
  */
-const completedCreation = (completion: SpaceEndpointCreationResult | undefined) => {
+const completedCreation = (completion: SpaceResourceCreationResult | undefined) => {
   if (completion === undefined)
     throw new Error('A completed Space Resource Edit named no Resource');
   return completion;
@@ -351,9 +351,9 @@ const completedCreation = (completion: SpaceEndpointCreationResult | undefined) 
  * so the caller's own success value applies, or the one refusal it maps to
  * otherwise.
  */
-const asSpaceEndpointRefusal = (
-  result: SpaceEndpointCoordinationResult,
-): SpaceEndpointRefused | undefined => {
+const asSpaceResourceRefusal = (
+  result: SpaceResourceCoordinationResult,
+): SpaceResourceRefused | undefined => {
   if (result.kind === 'persistence-read-failed') {
     return { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
   }
@@ -371,15 +371,15 @@ const asSpaceEndpointRefusal = (
  * The only refusal `createInMap` can answer here is `map-not-found`
  * — `resource-not-found` and `resource-has-references` belong to `deleteFromSpace`.
  */
-const planSpaceEndpointCreation = (
+const planSpaceResourceCreation = (
   source: SpaceSnapshot,
   containingMapId: UUID,
   resourceId: UUID,
   targetSpaceId: UUID,
   title: string,
-  selection: SpaceEndpointSelection,
+  selection: SpaceResourceSelection,
   position: MapPosition,
-): SpaceEndpointRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
+): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
   const document: ResourceDocument = {
     title,
     kind: 'space',
@@ -451,7 +451,7 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
     })),
   };
 };
-const replaceSpaceEndpointSelection = (
+const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
   targetSpaceId: UUID,
   matches: (document: Extract<ResourceDocument, { kind: 'space' }>) => boolean,
@@ -541,9 +541,9 @@ export function createSpaceSessionRegistry(
     }
   };
 
-  const runSpaceEndpointCoordination = async <P>(
-    operation: SpaceEndpointCoordinatedOperation<P>,
-    installed: (result?: SpaceEndpointCoordinationResult) => void,
+  const runSpaceResourceCoordination = async <P>(
+    operation: SpaceResourceCoordinatedOperation<P>,
+    installed: (result?: SpaceResourceCoordinationResult) => void,
     /**
      * Whether this turn is `recovery.retry`/`keepLocal` resubmitting a change
      * set an earlier turn already decided and pre-checked, rather than a fresh
@@ -563,7 +563,7 @@ export function createSpaceSessionRegistry(
      * this turn's redundant pre-check loses no safety.
      */
     isRetry = false,
-  ): Promise<SpaceEndpointCoordinationResult> => {
+  ): Promise<SpaceResourceCoordinationResult> => {
     const previous = lifecycleTail;
     let releaseTurn = (): void => undefined;
     lifecycleTail = new Promise<void>((resolve) => {
@@ -666,7 +666,7 @@ export function createSpaceSessionRegistry(
        * `create` participant with no session yet falls back to the planned
        * snapshot either way.
        */
-      const backendChange = (change: SpaceEndpointLifecycleChange): SpaceChange => {
+      const backendChange = (change: SpaceResourceLifecycleChange): SpaceChange => {
         if (change.kind === 'create') {
           const managed = participants.get(change.snapshot.id);
           return {
@@ -744,18 +744,18 @@ export function createSpaceSessionRegistry(
        * the value below, rather than this recipe carrying a value or a
        * closure that would derive one.
        */
-      type SpaceEndpointRetryItem =
+      type SpaceResourceRetryItem =
         | { readonly kind: 'create'; readonly snapshot: SpaceSnapshot }
         | { readonly kind: 'update'; readonly spaceId: UUID }
         | { readonly kind: 'delete'; readonly spaceId: UUID };
-      const toRetryItem = (change: SpaceEndpointLifecycleChange): SpaceEndpointRetryItem =>
+      const toRetryItem = (change: SpaceResourceLifecycleChange): SpaceResourceRetryItem =>
         change.kind === 'update' ? { kind: 'update', spaceId: change.spaceId } : change;
       let conflictCurrents = new Map<UUID, LoadedSpace | undefined>();
       let recoveryStarted = false;
       const startRecovery = (recoverConflict: boolean): void => {
         if (recoveryStarted) return;
         recoveryStarted = true;
-        const retryItems = changes.flatMap((change): SpaceEndpointRetryItem[] => {
+        const retryItems = changes.flatMap((change): SpaceResourceRetryItem[] => {
           if (!recoverConflict) return [toRetryItem(change)];
           const id = change.kind === 'create' ? change.snapshot.id : change.spaceId;
           if (!conflictCurrents.has(id)) return [toRetryItem(change)];
@@ -778,7 +778,7 @@ export function createSpaceSessionRegistry(
         });
         const [firstItem, ...remainingItems] = retryItems;
         if (firstItem === undefined) return;
-        void coordinateSpaceEndpoint(
+        void coordinateSpaceResource(
           {
             // No wait of its own: every retried item was already decided above,
             // synchronously, from the failed attempt's own state. Only `update`
@@ -786,7 +786,7 @@ export function createSpaceSessionRegistry(
             // Spaces the *retried* coordination's own aggregate read produces.
             prepare: () => Promise.resolve({ kind: 'proceed', prepared: undefined } as const),
             plan: (spaces) => {
-              const resolve = (item: SpaceEndpointRetryItem): SpaceEndpointLifecycleChange => {
+              const resolve = (item: SpaceResourceRetryItem): SpaceResourceLifecycleChange => {
                 if (item.kind !== 'update') return item;
                 const snapshot = spaces.get(item.spaceId);
                 if (snapshot === undefined)
@@ -992,16 +992,16 @@ export function createSpaceSessionRegistry(
 
   /**
    * Run a coordinated operation in the `prepare`/`plan` shape (see
-   * {@link SpaceEndpointCoordinatedOperation}) — the only shape there is. Space
+   * {@link SpaceResourceCoordinatedOperation}) — the only shape there is. Space
    * Resource create, link, deletion, Map/Graph deletion and a coordinated
    * recovery retry's replay (`startRecovery`) all call this.
    */
-  const coordinateSpaceEndpoint = async <P>(
-    operation: SpaceEndpointCoordinatedOperation<P>,
+  const coordinateSpaceResource = async <P>(
+    operation: SpaceResourceCoordinatedOperation<P>,
     isRetry = false,
-  ): Promise<SpaceEndpointCoordinationResult> => {
-    const installation = Promise.withResolvers<SpaceEndpointCoordinationResult>();
-    void runSpaceEndpointCoordination(
+  ): Promise<SpaceResourceCoordinationResult> => {
+    const installation = Promise.withResolvers<SpaceResourceCoordinationResult>();
+    void runSpaceResourceCoordination(
       operation,
       (result) =>
         installation.resolve(result ?? { kind: 'committed', revisions: [], deletedSpaceIds: [] }),
@@ -1010,7 +1010,7 @@ export function createSpaceSessionRegistry(
     return installation.promise;
   };
 
-  const spaceResources = (newId: () => UUID): SpaceEndpointLifecycle => {
+  const spaceResources = (newId: () => UUID): SpaceResourceLifecycle => {
     const loadWorkingSpace = createWorkingSpaceLoader(backend, newId);
     /**
      * Make the target working, then read the selection it opens on.
@@ -1104,7 +1104,7 @@ export function createSpaceSessionRegistry(
       if (session === undefined) throw new Error(`Space ${id} has no live session`);
       return session.getState().working;
     };
-    const recoveryRefusal = (spaceId: UUID): SpaceEndpointRefused | undefined => {
+    const recoveryRefusal = (spaceId: UUID): SpaceResourceRefused | undefined => {
       const persistence = sessions.get(spaceId)?.session.getState().persistence;
       if (persistence?.kind === 'failed') {
         return {
@@ -1145,7 +1145,7 @@ export function createSpaceSessionRegistry(
       aggregate: LoadedAggregate,
       exempt: ReadonlySet<UUID>,
       affects: (snapshot: SpaceSnapshot) => boolean,
-    ): SpaceEndpointRefused | undefined => {
+    ): SpaceResourceRefused | undefined => {
       for (const [id, managed] of sessions) {
         if (exempt.has(id)) continue;
         const recovery = recoveryRefusal(id);
@@ -1170,11 +1170,11 @@ export function createSpaceSessionRegistry(
      * that read is what the decision sees rather than something re-applied
      * afterward.
      */
-    const link = async (input: LinkSpaceEndpointInput): Promise<SpaceEndpointCreationResult> => {
-      let completion: SpaceEndpointCreationResult | undefined;
+    const link = async (input: LinkSpaceResourceInput): Promise<SpaceResourceCreationResult> => {
+      let completion: SpaceResourceCreationResult | undefined;
       type LinkPrepared = { readonly resourceId: UUID };
-      const result = await coordinateSpaceEndpoint<LinkPrepared>({
-        prepare: async (): Promise<SpaceEndpointPreparationOutcome<LinkPrepared>> => {
+      const result = await coordinateSpaceResource<LinkPrepared>({
+        prepare: async (): Promise<SpaceResourcePreparationOutcome<LinkPrepared>> => {
           const recovery = recoveryRefusal(input.containingSpaceId);
           if (recovery !== undefined) return recovery;
           const source = working(input.containingSpaceId);
@@ -1237,7 +1237,7 @@ export function createSpaceSessionRegistry(
               },
             };
           }
-          const created = planSpaceEndpointCreation(
+          const created = planSpaceResourceCreation(
             source,
             input.mapId,
             data.resourceId,
@@ -1256,7 +1256,7 @@ export function createSpaceSessionRegistry(
           };
         },
       });
-      const refusal = asSpaceEndpointRefusal(result);
+      const refusal = asSpaceResourceRefusal(result);
       if (refusal !== undefined) return refusal;
       return completedCreation(completion);
     };
@@ -1278,10 +1278,10 @@ export function createSpaceSessionRegistry(
      */
     const deleteContext = async (
       input: DeleteReferencedMapInput | DeleteReferencedGraphInput,
-    ): Promise<SpaceEndpointContextDeletionResult> => {
+    ): Promise<SpaceResourceContextDeletionResult> => {
       let selection: { mapId: UUID; graphId: UUID } | undefined;
-      const result = await coordinateSpaceEndpoint({
-        prepare: (): Promise<SpaceEndpointPreparationOutcome<undefined>> => {
+      const result = await coordinateSpaceResource({
+        prepare: (): Promise<SpaceResourcePreparationOutcome<undefined>> => {
           const recovery = recoveryRefusal(input.targetSpaceId);
           if (recovery !== undefined) return Promise.resolve(recovery);
           const target = working(input.targetSpaceId);
@@ -1382,7 +1382,7 @@ export function createSpaceSessionRegistry(
           if (deletingMap && target.document.defaultMap === input.mapId) {
             targetDocument.defaultMap = replacementMap.id;
           }
-          const targetChange: SpaceEndpointLifecycleChange = {
+          const targetChange: SpaceResourceLifecycleChange = {
             kind: 'update',
             spaceId: input.targetSpaceId,
             snapshot: { ...target, document: targetDocument },
@@ -1392,10 +1392,10 @@ export function createSpaceSessionRegistry(
           // snapshot for one opened just above.
           const referenceChanges = affected
             .filter((snapshot) => snapshot.id !== input.targetSpaceId)
-            .map((snapshot): SpaceEndpointLifecycleChange => ({
+            .map((snapshot): SpaceResourceLifecycleChange => ({
               kind: 'update',
               spaceId: snapshot.id,
-              snapshot: replaceSpaceEndpointSelection(
+              snapshot: replaceSpaceResourceSelection(
                 spaces.get(snapshot.id) ?? snapshot,
                 input.targetSpaceId,
                 selectsDeletedContext,
@@ -1408,7 +1408,7 @@ export function createSpaceSessionRegistry(
           return { kind: 'changes', changes: [targetChange, ...referenceChanges] };
         },
       });
-      const refusal = asSpaceEndpointRefusal(result);
+      const refusal = asSpaceResourceRefusal(result);
       if (refusal !== undefined) return refusal;
       return selection !== undefined ? { kind: 'completed', ...selection } : { kind: 'unchanged' };
     };
@@ -1424,14 +1424,14 @@ export function createSpaceSessionRegistry(
        * re-applied afterward.
        */
       create: async (input) => {
-        let completion: SpaceEndpointCreationResult | undefined;
+        let completion: SpaceResourceCreationResult | undefined;
         type CreatePrepared = {
           readonly target: SpaceSnapshot;
-          readonly selection: SpaceEndpointSelection;
+          readonly selection: SpaceResourceSelection;
           readonly resourceId: UUID;
         };
-        const result = await coordinateSpaceEndpoint<CreatePrepared>({
-          prepare: (): Promise<SpaceEndpointPreparationOutcome<CreatePrepared>> => {
+        const result = await coordinateSpaceResource<CreatePrepared>({
+          prepare: (): Promise<SpaceResourcePreparationOutcome<CreatePrepared>> => {
             const recovery = recoveryRefusal(input.containingSpaceId);
             if (recovery !== undefined) return Promise.resolve(recovery);
             const source = working(input.containingSpaceId);
@@ -1464,7 +1464,7 @@ export function createSpaceSessionRegistry(
             if (source === undefined) {
               throw new Error(`Space ${input.containingSpaceId} has no live session`);
             }
-            const created = planSpaceEndpointCreation(
+            const created = planSpaceResourceCreation(
               source,
               input.mapId,
               data.resourceId,
@@ -1484,7 +1484,7 @@ export function createSpaceSessionRegistry(
             };
           },
         });
-        const refusal = asSpaceEndpointRefusal(result);
+        const refusal = asSpaceResourceRefusal(result);
         if (refusal !== undefined) return refusal;
         return completedCreation(completion);
       },
@@ -1503,12 +1503,12 @@ export function createSpaceSessionRegistry(
        * rather than something re-applied afterward.
        */
       delete: async (input) => {
-        const result = await coordinateSpaceEndpoint({
+        const result = await coordinateSpaceResource({
           // No wait of its own: the coordination's own aggregate read is what
           // `plan` decides against, so the only early exit worth taking here
           // is one that needs no read at all.
           prepare: () =>
-            Promise.resolve<SpaceEndpointPreparationOutcome<undefined>>(
+            Promise.resolve<SpaceResourcePreparationOutcome<undefined>>(
               recoveryRefusal(input.containingSpaceId) ?? { kind: 'proceed', prepared: undefined },
             ),
           plan: (spaces, aggregate) => {
@@ -1639,7 +1639,7 @@ export function createSpaceSessionRegistry(
             };
           },
         });
-        const refusal = asSpaceEndpointRefusal(result);
+        const refusal = asSpaceResourceRefusal(result);
         if (refusal !== undefined) return refusal;
         return completed;
       },

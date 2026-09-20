@@ -116,7 +116,7 @@ export async function exercisePortalEditHostCanvas(
 }
 
 /** Measure the visible embedding through the browser, independent of projection constants. */
-export async function exerciseSpaceEndpointPadding(page: Page, parent: Locator, child: Locator) {
+export async function exerciseSpaceResourcePadding(page: Page, parent: Locator, child: Locator) {
   await beginPortalEdit(page, parent);
   const outer = await boxOf(parent, 'Space Resource');
   const inner = await boxOf(child, 'embedded Resource');
@@ -152,7 +152,7 @@ export async function exerciseSpaceEndpointPadding(page: Page, parent: Locator, 
   expect(await belongsToChild(outer.x + outer.width - 14 * zoom)).toBe(false);
 }
 
-export async function exerciseSpaceEndpointFooter(page: Page, placement: Locator, child: Locator) {
+export async function exerciseSpaceResourceFooter(page: Page, placement: Locator, child: Locator) {
   const id = await placement.getAttribute('data-id');
   const parent = page.locator(`.react-flow__node[data-id="${id}"]`);
   const footer = parent.locator('.canvas-resource__body');

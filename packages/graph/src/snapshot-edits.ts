@@ -17,15 +17,15 @@ import { Placement } from './placement';
  * loaded `Space` (the registry would have to parse every snapshot to edit it)
  * or a bare `Placement` (a caller would keep assembling snapshots around it,
  * which is where the registry's copy of these rules diverged from Authoring's:
- * `session-registry.ts`'s own `removeSpaceEndpoint` never called
+ * `session-registry.ts`'s own `removeSpaceResource` never called
  * {@link Placement.reclaim}, so an Open Space Resource's room stayed displaced
- * after it was deleted, and `addSpaceEndpoint` never stepped off an occupied
+ * after it was deleted, and `addSpaceResource` never stepped off an occupied
  * point the way a menu-created Markdown Resource does).
  *
  * Every operation answers `completed(snapshot) | unchanged | refused(code)`,
  * never a throw for a domain rule (ADR 0057). This module declares its own
  * small refusal union carrying codes and typed context only — wording stays in
- * `app`, which maps a code into `AuthoringRefusal` or `SpaceEndpointRefusal`.
+ * `app`, which maps a code into `AuthoringRefusal` or `SpaceResourceRefusal`.
  *
  * Operations arrive with their first real caller rather than ahead of one:
  * `createInMap` and `deleteFromSpace` are what the session registry needs

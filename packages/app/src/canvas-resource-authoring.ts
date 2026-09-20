@@ -14,17 +14,17 @@ import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
-import type { SpaceEndpointTargetMap } from './space-resource-lifecycle';
+import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import { completeEmbeddedAuthoring } from './embedded-authoring';
 import type { Continuation } from './continuation';
-import { NO_SPACE_RESOURCE_TARGETS, type SpaceEndpointTargets } from './space-resource-targets';
-import type { SpaceEndpointFraming } from './space-resource-framing';
+import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
+import type { SpaceResourceFraming } from './space-resource-framing';
 import {
   applyResourceDataPatch,
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
-  decorateSpaceEndpointNode,
+  decorateSpaceResourceNode,
 } from './canvas-resource-decoration';
 
 type Caret =
@@ -66,7 +66,7 @@ const spaceDocumentsKeyOf = (
  * Selection and framing both write that one Edit; they differ only in which
  * fields they patch and the sentence a failed parse returns.
  */
-const completeEditedSpaceEndpoint = (
+const completeEditedSpaceResource = (
   authoring: Pick<SpaceAuthoring, 'complete'>,
   spaceSession: SpaceSession,
   resourceId: ResourceId,
@@ -108,7 +108,7 @@ export interface CanvasResourceAuthoringInput {
    * Absent, or missing an entry, means the target has not been read yet — the
    * Resource still draws, without the rail an Open one carries (ADR 0068).
    */
-  readonly spaceResourceTargets?: SpaceEndpointTargets | undefined;
+  readonly spaceResourceTargets?: SpaceResourceTargets | undefined;
   /**
    * What commands each Resource on this canvas offers, asked one Resource at a time.
    *
@@ -140,9 +140,9 @@ export interface CanvasResourceAuthoring {
   readonly titleEditing: boolean;
   readonly openResource: (resourceId: string) => 'completed' | 'retained';
   readonly beginTitleEditing: (resourceId: string) => void;
-  readonly completeSpaceEndpointFraming: (
+  readonly completeSpaceResourceFraming: (
     resourceId: ResourceId,
-    framing: SpaceEndpointFraming,
+    framing: SpaceResourceFraming,
   ) => string | null;
 }
 
@@ -348,13 +348,13 @@ export function useCanvasResourceAuthoring({
    * surface at all: it is chosen once, at creation (ADR 0068), and Space
    * Authoring refuses a changed one on its own account.
    */
-  const completeSpaceEndpointSelection = useCallback(
+  const completeSpaceResourceSelection = useCallback(
     (
       resourceId: ResourceId,
-      map: Pick<SpaceEndpointTargetMap, 'id'>,
+      map: Pick<SpaceResourceTargetMap, 'id'>,
       graphId: GraphId,
     ): string | null =>
-      completeEditedSpaceEndpoint(
+      completeEditedSpaceResource(
         authoring,
         spaceSession,
         resourceId,
@@ -372,9 +372,9 @@ export function useCanvasResourceAuthoring({
     [authoring, spaceSession],
   );
 
-  const completeSpaceEndpointFraming = useCallback(
-    (resourceId: ResourceId, framing: SpaceEndpointFraming): string | null =>
-      completeEditedSpaceEndpoint(
+  const completeSpaceResourceFraming = useCallback(
+    (resourceId: ResourceId, framing: SpaceResourceFraming): string | null =>
+      completeEditedSpaceResource(
         authoring,
         spaceSession,
         resourceId,
@@ -488,7 +488,7 @@ export function useCanvasResourceAuthoring({
       spaceResourceTargets,
       spaces,
       continuation,
-      completeSpaceEndpointSelection,
+      completeSpaceResourceSelection,
       completeEmbedded: completeEmbeddedAuthoring,
       portalEditing,
       onPortalEditingChange,
@@ -504,7 +504,7 @@ export function useCanvasResourceAuthoring({
       spaceResourceTargets,
       spaces,
       continuation,
-      completeSpaceEndpointSelection,
+      completeSpaceResourceSelection,
       portalEditing,
       onPortalEditingChange,
       contextNotices,
@@ -538,7 +538,7 @@ export function useCanvasResourceAuthoring({
       if (node.data.kind === 'space') {
         next.set(
           node.id,
-          applyResourceDataPatch(node, decorateSpaceEndpointNode(node, spaceContext)),
+          applyResourceDataPatch(node, decorateSpaceResourceNode(node, spaceContext)),
         );
       }
     }
@@ -558,6 +558,6 @@ export function useCanvasResourceAuthoring({
     titleEditing: editingTitleResourceId !== null || contextEditingIds.size > 0,
     openResource,
     beginTitleEditing,
-    completeSpaceEndpointFraming,
+    completeSpaceResourceFraming,
   };
 }

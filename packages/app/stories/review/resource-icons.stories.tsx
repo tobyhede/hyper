@@ -43,7 +43,7 @@
  * symbol name.
  *
  * **This is now built.** `MapIcon`, `GraphIcon`, `MarkdownIcon` and
- * `SpaceEndpointIcon` draw these glyphs, and `ReferenceIcon` composes the badge over a
+ * `SpaceResourceIcon` draw these glyphs, and `ReferenceIcon` composes the badge over a
  * base rather than being a glyph of its own; `ResourceKindIcon` takes `referenceOf` and
  * composes rather than switching on a table. What is *not* built is the
  * plumbing: no call site supplies `referenceOf` yet, because the Target's kind is

@@ -8,15 +8,15 @@ import {
   type SpaceSessionRegistry,
 } from '@project/persistence';
 import {
-  createSpaceEndpointLifecycle,
-  type SpaceEndpointAuthoring,
+  createSpaceResourceLifecycle,
+  type SpaceResourceAuthoring,
 } from '../src/space-resource-lifecycle';
 
 export interface TestOpenedSpace {
   /** The registry the session was opened through, for tests that open siblings. */
   readonly registry: SpaceSessionRegistry;
   readonly spaceSession: SpaceSession;
-  readonly spaceResources: SpaceEndpointAuthoring;
+  readonly spaceResources: SpaceResourceAuthoring;
 }
 
 /**
@@ -56,6 +56,6 @@ export const openTestSpace = (
   return {
     registry,
     spaceSession: registry.open(loaded),
-    spaceResources: createSpaceEndpointLifecycle({ backend, registry, newId, reportObserverError }),
+    spaceResources: createSpaceResourceLifecycle({ backend, registry, newId, reportObserverError }),
   };
 };

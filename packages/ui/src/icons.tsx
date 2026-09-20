@@ -227,7 +227,7 @@ export const SpaceIcon = ({ size = 14 }: { size?: number | undefined }) => (
 );
 
 /** Space Resources share the Space cube, including when used as a Reference Resource base. */
-export const SpaceEndpointIcon = SpaceIcon;
+export const SpaceResourceIcon = SpaceIcon;
 
 /**
  * The Resource kinds that own what they draw, and so have a glyph of their own.
@@ -246,7 +246,7 @@ export type ResourceBaseKind = Exclude<Resource['kind'], 'reference'>;
 /** The silhouette each Resource kind that owns one draws. */
 export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
-  space: SpaceEndpointIcon,
+  space: SpaceResourceIcon,
 } satisfies Record<ResourceBaseKind, ComponentType<{ size?: number }>>;
 
 /**

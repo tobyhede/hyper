@@ -664,7 +664,7 @@ describe('ResourcesPopover', () => {
   /**
    * A break is not a refusal, and this surface is the only one that can say so.
    *
-   * `addSpaceEndpointFor` resolves the Map and spends a coordinated Edit across
+   * `addSpaceResourceFor` resolves the Map and spends a coordinated Edit across
    * Spaces, neither of which is inside a `try` on its side — so a missing
    * Map or a failed transport *rejects* rather than answering a refusal.
    * Without an arm here the promise is dropped: the row press does visibly

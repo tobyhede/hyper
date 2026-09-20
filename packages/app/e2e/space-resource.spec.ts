@@ -3,14 +3,14 @@ import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
   exercisePortalEditHostCanvas,
-  exerciseSpaceEndpointPadding,
-  exerciseSpaceEndpointFooter,
+  exerciseSpaceResourcePadding,
+  exerciseSpaceResourceFooter,
   exerciseFloatingResourceDock,
   hostGraphEdgeCount,
 } from './space-resource-frame';
 import {
-  exerciseSpaceEndpointContextMenus,
-  exerciseSpaceEndpointEntityMenu,
+  exerciseSpaceResourceContextMenus,
+  exerciseSpaceResourceEntityMenu,
 } from './space-resource-context-menu';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
@@ -90,7 +90,7 @@ const exitSpace = async (page: Page): Promise<void> => {
  * Resource's Title and the title of the Space it references agree only at creation
  * (`CONTEXT.md`), and a rename here is what makes that divergence visible.
  */
-const createSpaceEndpointNamed = async (page: Page, title: string): Promise<void> => {
+const createSpaceResourceNamed = async (page: Page, title: string): Promise<void> => {
   await createResource(page, 'Space Resource');
   const editor = page.getByRole('textbox', { name: 'Resource title' });
   await expect(editor).toBeFocused();
@@ -162,7 +162,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await createSpaceEndpointNamed(page, 'Architecture');
+    await createSpaceResourceNamed(page, 'Architecture');
 
     await page.getByRole('button', { name: 'Resources' }).click();
     const list = page.getByRole('dialog', { name: 'Resources' });
@@ -214,7 +214,7 @@ test('stops offering a Space the moment the last Space Resource referencing it i
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  await createSpaceEndpointNamed(page, 'Architecture');
+  await createSpaceResourceNamed(page, 'Architecture');
 
   const openList = async () => {
     await page.getByRole('button', { name: 'Resources' }).click();
@@ -267,7 +267,7 @@ test('a second Space Resource may reference the Space the first one created', as
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createSpaceEndpointNamed(page, 'Architecture');
+  await createSpaceResourceNamed(page, 'Architecture');
   await settled(page);
 
   // The Space itself is still `Space 1` — the rename above was the Resource's — so
@@ -281,7 +281,7 @@ test('a second Space Resource may reference the Space the first one created', as
   // Space rather than a second copy of it.
   await expect(nodeByTitle(page, 'Space 1')).toHaveCount(1);
   // Three Edits, not two: the creation completes on activation and the Title is
-  // typed into the Resource afterwards (ADR 0089), so `createSpaceEndpointNamed` spends
+  // typed into the Resource afterwards (ADR 0089), so `createSpaceResourceNamed` spends
   // a creation *and* a rename where the retired pane collected the Title first
   // and spent one. The third is this Resource, authored against the Space that
   // creation made.
@@ -327,7 +327,7 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
-    await createSpaceEndpointNamed(page, 'Architecture');
+    await createSpaceResourceNamed(page, 'Architecture');
     await settled(page);
 
     // Opened from the keyboard rather than from the Resource's own control, because
@@ -433,7 +433,7 @@ test('deleting the last Space Resource deletes the Space it referenced', async (
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await createSpaceEndpointNamed(page, 'Architecture');
+  await createSpaceResourceNamed(page, 'Architecture');
   await settled(page);
 
   // Deleting a Resource is the Resource's own rail (ADR 0073), reached by hovering it —
@@ -484,7 +484,7 @@ test('removing a Space Resource from the Map leaves the Resource and its target 
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  await createSpaceEndpointNamed(page, 'Architecture');
+  await createSpaceResourceNamed(page, 'Architecture');
   await settled(page);
 
   const created = nodeByTitle(page, 'Architecture');
@@ -557,13 +557,13 @@ const embeddedNodes = (page: Page): Locator =>
  * (ADR 0079), so the Open gesture is the whole of what these tests need to set
  * up, and the selector is read rather than clicked.
  */
-async function openSpaceEndpointOnItsMap(page: Page): Promise<Locator> {
+async function openSpaceResourceOnItsMap(page: Page): Promise<Locator> {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createSpaceEndpointNamed(page, 'Architecture');
+  await createSpaceResourceNamed(page, 'Architecture');
   await settled(page);
 
   const resource = nodeByTitle(page, 'Architecture');
@@ -596,7 +596,7 @@ test(
   'selecting a Map draws the target Space inside the Open Space Resource',
   { tag: '@parity:open-space-resource-draws-its-selected-map' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
+    const resource = await openSpaceResourceOnItsMap(page);
 
     await expect(embeddedNodes(page)).toHaveCount(1);
     await expect(embeddedNodes(page).getByRole('heading', { name: 'Resource 1' })).toBeVisible();
@@ -630,7 +630,7 @@ test(
   'dragging an Open Space Resource keeps its embedded Map aligned',
   { tag: '@parity:open-space-resource-drag-keeps-embedded-map-aligned' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
+    const resource = await openSpaceResourceOnItsMap(page);
     await expect(embeddedNodes(page)).toHaveCount(1);
     await expectEmbeddedResourceToFollowDrag(page, resource, embeddedNodes(page));
   },
@@ -640,7 +640,7 @@ test(
   'editing inside an Open Space Resource saves the target and refuses cross-Space connections',
   { tag: '@parity:embedded-map-resources-author-target' },
   async ({ page }) => {
-    await openSpaceEndpointOnItsMap(page);
+    await openSpaceResourceOnItsMap(page);
     const parent = nodeByTitle(page, 'Architecture');
     await beginPortalEdit(page, parent);
     const embedded = embeddedNodes(page);
@@ -681,7 +681,7 @@ test(
 test('a connect between two embedded Resources authors the shown Graph, not the host Graph', async ({
   page,
 }) => {
-  const parent = await openSpaceEndpointOnItsMap(page);
+  const parent = await openSpaceResourceOnItsMap(page);
   await beginPortalEdit(page, parent);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
@@ -713,7 +713,7 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
  * by it.
  */
 test('closing a Space Resource removes the embedded Map it was drawing', async ({ page }) => {
-  const resource = await openSpaceEndpointOnItsMap(page);
+  const resource = await openSpaceResourceOnItsMap(page);
   await expect(embeddedNodes(page)).toHaveCount(1);
 
   await resource.hover();
@@ -733,7 +733,7 @@ test('closing a Space Resource removes the embedded Map it was drawing', async (
 test('an embedded Resource can move, open with the keyboard and resize in its target Map', async ({
   page,
 }) => {
-  const parent = await openSpaceEndpointOnItsMap(page);
+  const parent = await openSpaceResourceOnItsMap(page);
   await beginPortalEdit(page, parent);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
@@ -800,7 +800,7 @@ test(
   'entering a Space names the Space it was entered from, and Exit returns',
   { tag: '@parity:command-dock-marks-the-space-one-crossing-up' },
   async ({ page }) => {
-    await openSpaceEndpointOnItsMap(page);
+    await openSpaceResourceOnItsMap(page);
 
     // Two Spaces open and neither entered, so the bar carries the Open Spaces
     // menu and no Opener control: there is nothing above `Map fixture`.
@@ -862,7 +862,7 @@ test(
   'the Open Spaces menu lists Meta first and opens it from a Space opened by its own address',
   { tag: '@parity:command-dock-always-reaches-meta' },
   async ({ page }) => {
-    await openSpaceEndpointOnItsMap(page);
+    await openSpaceResourceOnItsMap(page);
     await switchToSpace(page, 'Space 1');
     await page.goto(page.url());
     await expect(showingSpace(page)).toContainText('Space 1');
@@ -896,7 +896,7 @@ test(
     await selectCanvas(page, 'Collection 1');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
-    await createSpaceEndpointNamed(page, 'Architecture');
+    await createSpaceResourceNamed(page, 'Architecture');
     await settled(page);
 
     const resource = nodeByTitle(page, 'Architecture');
@@ -995,7 +995,7 @@ test(
 );
 
 test('a Space Resource resizes to Close and remembers its Open Size', async ({ page }) => {
-  const parent = await openSpaceEndpointOnItsMap(page);
+  const parent = await openSpaceResourceOnItsMap(page);
   await parent.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
@@ -1042,7 +1042,7 @@ test(
     tag: '@parity:command-dock-names-an-unwell-open-space',
   },
   async ({ page }) => {
-    await openSpaceEndpointOnItsMap(page);
+    await openSpaceResourceOnItsMap(page);
     await switchToSpace(page, 'Space 1');
     await settled(page);
     // Only the next Edit is failed, while `Space 1` is the working Space.
@@ -1073,8 +1073,8 @@ test(
   'Space Resource context menus author the target with the Dock commands',
   { tag: '@parity:space-resource-context-menus-share-dock-actions' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
-    await exerciseSpaceEndpointContextMenus(page, resource);
+    const resource = await openSpaceResourceOnItsMap(page);
+    await exerciseSpaceResourceContextMenus(page, resource);
     await page.reload();
     const reopened = nodeByTitle(page, 'Architecture');
     await expect(
@@ -1099,8 +1099,8 @@ test(
   'Space Resource entity menu groups commands and creates a Space Reference Resource',
   { tag: '@parity:space-resource-entity-menu' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
-    await exerciseSpaceEndpointEntityMenu(page, resource);
+    const resource = await openSpaceResourceOnItsMap(page);
+    await exerciseSpaceResourceEntityMenu(page, resource);
     await settled(page);
     await page.reload();
     await expect(nodeByTitle(page, 'Space Resource reference')).toBeVisible();
@@ -1111,8 +1111,8 @@ test(
   'Space Resource canvas has equal top and side padding',
   { tag: '@parity:space-resource-canvas-padding' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
-    await exerciseSpaceEndpointPadding(page, resource, embeddedNodes(page).first());
+    const resource = await openSpaceResourceOnItsMap(page);
+    await exerciseSpaceResourcePadding(page, resource, embeddedNodes(page).first());
   },
 );
 
@@ -1120,8 +1120,8 @@ test(
   'Space Resource title footer follows its content',
   { tag: '@parity:space-resource-content-sized-footer' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
-    await exerciseSpaceEndpointFooter(page, resource, embeddedNodes(page).first());
+    const resource = await openSpaceResourceOnItsMap(page);
+    await exerciseSpaceResourceFooter(page, resource, embeddedNodes(page).first());
   },
 );
 
@@ -1129,7 +1129,7 @@ test(
   'Resource dock floats eight pixels inside the border above embedded content',
   { tag: '@parity:resource-dock-floats' },
   async ({ page }) => {
-    const resource = await openSpaceEndpointOnItsMap(page);
+    const resource = await openSpaceResourceOnItsMap(page);
     await exerciseFloatingResourceDock(page, resource);
   },
 );
@@ -1138,7 +1138,7 @@ test(
   'Edit, Done and keyboard toggle the portal without discarding target edits',
   { tag: '@parity:space-resource-portal-read-edit' },
   async ({ page }) => {
-    const parent = await openSpaceEndpointOnItsMap(page);
+    const parent = await openSpaceResourceOnItsMap(page);
     const embedded = embeddedNodes(page);
     await expect(embedded).toHaveCount(1);
     await expect(embedded.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
@@ -1183,7 +1183,7 @@ test(
   'portal framing survives Done, Close, reopen and reload, and Enter uses the canvas size',
   { tag: '@parity:space-resource-portal-framing' },
   async ({ page }) => {
-    const parent = await openSpaceEndpointOnItsMap(page);
+    const parent = await openSpaceResourceOnItsMap(page);
     const embedded = embeddedNodes(page);
     await beginPortalEdit(page, parent);
     const before = await boxOf(embedded, 'embedded Resource');
@@ -1253,13 +1253,13 @@ test(
   'portal zoom frames authored coordinates without stretching Resources or painting outside',
   { tag: '@parity:space-resource-portal-edit-is-the-host-canvas' },
   async ({ page }) => {
-    const parent = await openSpaceEndpointOnItsMap(page);
+    const parent = await openSpaceResourceOnItsMap(page);
     await exercisePortalEditHostCanvas(page, parent, embeddedNodes(page));
   },
 );
 
 test('deleting the selected Map clears framing; deleting a Graph keeps it', async ({ page }) => {
-  const parent = await openSpaceEndpointOnItsMap(page);
+  const parent = await openSpaceResourceOnItsMap(page);
   const embedded = embeddedNodes(page);
   await beginPortalEdit(page, parent);
   await panPortal(page, parent);
