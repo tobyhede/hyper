@@ -48,6 +48,9 @@ test-results/
 !.scratch/thing-and-diagram/rename-*.mjs
 # ADR 0092's rename codemod, tracked for the same reason.
 !.scratch/reference-thing/rename-*.mjs
+# ADR 0101's, likewise — one script for both words this time, so there is one
+# entry rather than two.
+!.scratch/map-and-resource/rename-*.mjs
 
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in

@@ -3,7 +3,7 @@
 Status: accepted
 Refines: 0001, 0002, 0004, 0005, 0009, 0014, 0018, 0020, 0024, 0036, 0038, 0039, 0040, 0046, 0051, 0064, 0065, 0066, 0068, 0069, 0070, 0073, 0074, 0076, 0079, 0080
 Related: 0010, 0041, 0047, 0050, 0054, 0056
-Refined by: 0092
+Refined by: 0092, 0101
 
 The first-public domain calls the single addressable piece of a Space a
 **Thing**, and calls the authored thing-to-rect map a **Diagram**. Both are
