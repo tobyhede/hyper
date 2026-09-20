@@ -637,6 +637,30 @@ export const spaceRepositoryContract = (
     });
   });
 
+  /*
+   * The SQL repository's shared `#writeUpdate` helper (`sql-space-repository.ts`,
+   * ticket 24) runs an unconditional `deleteExcept` after every update it
+   * writes, including on the fast path -- whose own `preservesSnapshotBoundary`
+   * never lets the Thing set change before reaching it, so that delete keeps
+   * nothing out. This pins the invariant its own doc comment states: a
+   * topology-preserving commit over several Things, changing none of their
+   * membership, leaves every one of them in place.
+   */
+  it(`${name} keeps every Thing through a topology-preserving commit's own delete`, async () => {
+    await withHarness(async (repository) => {
+      const first = space(SPACE_ID, 'Three things', [THING_ID, SECOND_THING_ID, OTHER_THING_ID]);
+      await seed(repository, first);
+
+      const changed = retitled(first, 'Renamed, same Things');
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: 1n }],
+        deletedSpaceIds: [],
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
+    });
+  });
+
   it(`${name} refuses to create a new unreachable Space by removing its last reference alone`, async () => {
     await withHarness(async (repository) => {
       const target = targetSpace(OTHER_SPACE_ID, 'Target', [OTHER_THING_ID]);

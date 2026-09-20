@@ -123,6 +123,27 @@ const encodeNextRevisionReclassified = (spaceId: UUID, value: bigint): string =>
 };
 
 /**
+ * `encodeStoredRevision`, reclassifying a `RevisionCodecError` it raises as
+ * `AggregateInvariantError` -- used only by `markExported`'s own `revision`
+ * argument, "the revision projected by a completed external export"
+ * (`SpaceRepository.markExported`'s own doc comment). Not the same claim as
+ * either sibling above: it is not `#writeUpdate`'s own next revision, and
+ * unlike `storedRevisionInvariant`'s decode side it is not a value already
+ * sitting in a stored column either -- it is the exported revision about to
+ * be written to `exportedRevision`, so the message names that.
+ */
+const encodeExportedRevisionReclassified = (spaceId: UUID, value: bigint): string => {
+  try {
+    return encodeStoredRevision(value);
+  } catch (error) {
+    if (!(error instanceof RevisionCodecError)) throw error;
+    throw new AggregateInvariantError(`Space ${spaceId}'s exported revision is not usable`, {
+      cause: error,
+    });
+  }
+};
+
+/**
  * `commit`'s fast path's own decision (ADR 0095), which may also hand the
  * commit to the complete-aggregate decision.
  */
@@ -332,7 +353,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   markExported(id: UUID, revision: bigint): Promise<void> {
     return this.#store.serialise(async () => {
       const tables = this.#store.tables(this.#store.orm);
-      const updated = await tables.Space.setExportedRevision(id, encodeStoredRevision(revision));
+      const updated = await tables.Space.setExportedRevision(
+        id,
+        encodeExportedRevisionReclassified(id, revision),
+      );
       if (!updated) throw new Error(`Space ${id} does not exist`);
     });
   }

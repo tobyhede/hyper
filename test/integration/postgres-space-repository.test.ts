@@ -2,6 +2,7 @@ import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
   createWorkingSpaceLoader,
+  REVISION_CEILING,
   type LoadedSpace,
 } from '@project/persistence';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
@@ -1166,6 +1167,25 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       snapshot: changed,
       revision: 1n,
       exportedRevision: 0n,
+    });
+  });
+
+  // `markExported`'s own `revision` argument is a caller-supplied `bigint`,
+  // the same shape `#writeUpdate`'s own next revision took before
+  // `encodeNextRevisionReclassified` was added for it -- so a value the
+  // shared codec refuses on the way out has to raise the same identifiable
+  // `AggregateInvariantError` here too, rather than letting
+  // `RevisionCodecError` escape unclassified.
+  it('raises an identifiable invariant failure for an exported revision above the 2^63-1 ceiling', async () => {
+    await seed(SPACE_ID, [snapshot]);
+
+    await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow(
+      AggregateInvariantError,
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot,
+      revision: 0n,
+      exportedRevision: null,
     });
   });
 

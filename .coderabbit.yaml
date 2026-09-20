@@ -241,11 +241,23 @@ reviews:
         job generates and masks its own password so forked pull requests need no
         repository secret; do not propose a secret in its place.
 
-    - path: '{migrations/**,src/prisma/**,src/sqlite/**}'
+    - path: '{migrations/**/migration.ts,src/prisma/contract.prisma,src/prisma/db.ts,src/prisma/sql-store.ts,src/sqlite/contract.prisma,src/sqlite/db.ts,src/sqlite/sql-store.ts,src/sqlite/serialise.ts}'
       instructions: >-
-        Prisma Next 0.16.0 emits these artifacts and owns their shape — do not
-        suggest editing them; raise a concern about the source schema instead.
-        One pinned workaround is deliberate and documented in
+        Hand-written, not generated — `path_filters` above already excludes
+        every generated contract and migration snapshot
+        (`contract.json`/`contract.d.ts` per database, `migrations/**/*.json`,
+        `migrations/**/*.d.ts`) from context entirely, so nothing reaches this
+        review as a Prisma Next artifact. What is left under
+        `migrations/**`, `src/prisma/**` and `src/sqlite/**` is the Prisma
+        Next schema (`contract.prisma`), a migration's own `operations`
+        (`migrations/**/migration.ts` — e.g. an `alterColumnType`'s implicit
+        `USING` cast, or a `dropDefault` needed ahead of one to keep a
+        recast default's quoting), and the small per-database `SqlStore`
+        ADR 0095 describes — table access, transaction handling, stored
+        document decode, duplicate-key detection, and (SQLite) the per-handle
+        serialise queue (`db.ts`, `sql-store.ts`, `src/sqlite/serialise.ts`).
+        All of it is ordinary source; review it.
+        One pinned workaround stays deliberate and documented in
         `docs/agents/editing-and-persistence.md`: every `@prisma-next/*`
         package a generated `contract.d.ts` imports types from is an exact
         `0.16.0` root devDependency, only so generated types resolve under

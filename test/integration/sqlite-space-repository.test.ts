@@ -1,5 +1,5 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { AggregateInvariantError } from '@project/persistence';
+import { AggregateInvariantError, REVISION_CEILING } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
@@ -243,6 +243,23 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     // trip identically on both databases now that `revision` is TEXT on
     // PostgreSQL too — proved once in `repository-contract.ts` (ticket 22)
     // rather than repeated per database here.
+  });
+
+  // `markExported`'s own `revision` argument is a caller-supplied `bigint`,
+  // the same shape `#writeUpdate`'s own next revision took before
+  // `encodeNextRevisionReclassified` was added for it -- so a value the
+  // shared codec refuses on the way out has to raise the same identifiable
+  // `AggregateInvariantError` here too, rather than letting
+  // `RevisionCodecError` escape unclassified.
+  it('raises an identifiable invariant failure for an exported revision above the 2^63-1 ceiling', async () => {
+    const { repository } = await opened();
+    const first = space(SPACE_ID, 'One', [THING_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+
+    await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow(
+      AggregateInvariantError,
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
   });
 
   it('commits a topology-preserving update and reloads it', async () => {
