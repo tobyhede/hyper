@@ -23,21 +23,21 @@ export const REVISION_CEILING = 9_223_372_036_854_775_807n;
  * The codec's own error identity, distinct from a bare `RangeError` so a
  * caller reading broken stored state (ADR 0095) can catch exactly this and
  * nothing else — an unrelated `RangeError` elsewhere in a read path must not
- * be misread as a canonical-revision failure. PostgreSQL's aggregate read
- * (`src/persistence/postgres-space-repository.ts`'s `loadEverySpace`) admits
- * this alongside its own `SnapshotValidationError` rather than widening its
- * catch to every error.
+ * be misread as a canonical-revision failure. The one SQL repository's
+ * aggregate read (`src/persistence/sql-space-repository.ts`'s
+ * `SqlSpaceRepository.#loadEverySpace`) admits this alongside its own
+ * `SnapshotValidationError` rather than widening its catch to every error.
  */
 export class RevisionCodecError extends RangeError {}
 
 /**
  * Decode a stored Revision column's text into the domain `bigint`.
  *
- * Shared by both database adapters (ADR 0095) so the canonical-decimal format
- * and the ceiling are checked identically on read, whichever database the row
- * came from. Throws `RevisionCodecError` — never widened, never silently
- * clamped — because a value a live database actually holds that fails this
- * check is broken stored state, not a value to coerce.
+ * Read and written by the one SQL repository (ADR 0095) so the
+ * canonical-decimal format and the ceiling are checked identically on read,
+ * whichever database the row came from. Throws `RevisionCodecError` — never
+ * widened, never silently clamped — because a value a live database actually
+ * holds that fails this check is broken stored state, not a value to coerce.
  */
 export const decodeStoredRevision = (value: string): bigint => {
   if (!CANONICAL_DECIMAL.test(value)) {

@@ -92,51 +92,48 @@ export interface SqlLoadedSpaceRow {
  * composed once, inside each database module's own `tables()`, rather than a
  * chain this interface exposes for the repository to compose generically.
  * `.include`'s own generated signature carries a *second* opaque type — the
- * relation's refined collection, called `Include` in the ADR 0095 typing
- * experiment (2026-09-17, `tsc` 7.0.2, since deleted) — and every way tried
- * here of keeping it opaque across this module boundary (backward inference
- * through one call solving for both parameters at once, backward inference
- * split across two calls, conditional-type `infer` extraction, a
- * method-scoped generic related directly against the ORM's own signature,
- * constrained and unconstrained) left it `Collection<Contract, never, …>` or
- * refused the covariant return check outright — `unknown` is not assignable
- * to it, same as `OrderByItem`, but unlike `OrderByItem` nothing here can
- * name a concrete stand-in without depending on `@prisma-next/sql-orm-client`
- * internals no package.json lists directly. Composing `.include(...)` inside
- * the database module — ordinary forward-typed code, the same shape
- * `loadStoredSpace` already ran in both adapters that existed then -- sidesteps
- * the cross-module generic relation entirely; only its *result* crosses this
- * interface, typed as the concrete `SqlLoadedSpaceRow`.
+ * relation's refined collection — that cannot be named without depending on
+ * `@prisma-next/sql-orm-client` internals no package.json lists directly, and
+ * cannot be kept opaque across this module boundary either; ticket 22's
+ * Answer (`.scratch/database-persistence/issues/22-…`) records what was
+ * tried. Composing `.include(...)` inside the database module — ordinary
+ * forward-typed code, the same shape `loadStoredSpace` already ran in both
+ * adapters that existed then — sidesteps the cross-module generic relation
+ * entirely; only its *result* crosses this interface, typed as the concrete
+ * `SqlLoadedSpaceRow`.
  *
- * Ticket 23 grew this the same way, for the Meta lifecycle: every added
- * member is either a plain, already-composed CRUD operation over one row (no
- * relation, no `Order`, ordinary forward-typed code identical in shape to
- * what both existing adapters already run) or, for `Space.loadEvery`, a
- * second already-composed read that carries the *same* raw-document
- * treatment `loadWithThings` does not need but the aggregate-wide read always
- * has: a document that fails even to parse as JSON must reach the repository
- * as data to classify (`AggregateInvariantError`, ADR 0094's truncation of
+ * Beyond `loadWithThings`, every other member is either a plain,
+ * already-composed CRUD operation with a shared implementation in this file
+ * (no relation, no `Order`, ordinary forward-typed code both database
+ * modules call with their own generated collection — see the exported
+ * functions below `SqlStore`) or, for `Space.loadEvery`, a second
+ * already-composed read that carries the *same* raw-document treatment
+ * `loadWithThings` does not need but the aggregate-wide read always has: a
+ * document that fails even to parse as JSON must reach the repository as
+ * data to classify (`AggregateInvariantError`, ADR 0094's truncation of
  * broken stored state), never as a driver codec's own thrown `TypeError`. On
  * PostgreSQL that is nothing special -- `jsonb` refuses non-JSON text before
  * it is ever stored, so `loadEvery` reads through the ordinary ORM the same
  * way `loadWithThings` does. On SQLite it is not: `document` decodes through
  * the driver's json codec on *any* ORM-level read that selects it, throwing
  * on text that is not JSON, so `Space.loadEvery` there reads through the
- * lower-level `sql`/`execute` builder instead (exactly as the pre-ticket-23
- * `SqliteSpaceRepository.loadEverySpace` did), which can override a column's
- * codec on the way out and hand back the raw text for the repository's own
- * per-row classification to parse and catch. That lower-level `execute` is
- * why SQLite's own `Handle` (`src/sqlite/sql-store.ts`) is not the bare `Orm`
- * ticket 22 left it as -- see that module's doc comment.
+ * lower-level `sql`/`execute` builder instead (the same technique the
+ * deleted `SqliteSpaceRepository.loadEverySpace` used), which can override a
+ * column's codec on the way out and hand back the raw text for the
+ * repository's own per-row classification to parse and catch. That
+ * lower-level `execute` is why SQLite's own `Handle`
+ * (`src/sqlite/sql-store.ts`) carries more than the bare `Orm` -- see that
+ * module's doc comment.
  *
- * Ticket 24 grew this once more, for `commit`: `Space.writeDocumentUnderLock`/
- * `setRevision`, `Thing.upsert` and `Thing.deleteExcept` are the same kind of
- * plain, already-composed CRUD ticket 23 added -- no relation, no `Order` --
- * and `Space.deleteById` gained a `boolean` answer so the write loop can tell
- * a `delete` change's row was actually there to remove. `commit`'s own write
- * path is one helper shared by the fast (topology-preserving) path and the
- * complete-aggregate path, absorbed from the now-deleted
- * `src/persistence/topology-preserving-update.ts` -- see
+ * `Thing.deleteExcept` is the one CRUD member each database module still
+ * implements for itself: its second `.where(...)` call takes a query-builder
+ * callback (`(thing) => thing.id.notIn(keepIds)`) whose filter-expression
+ * type comes from the same ORM-client internals `.include` cannot be named
+ * from either, so it stays local rather than joining the shared functions
+ * below. `commit`'s own write path (`Space.writeDocumentUnderLock`/
+ * `setRevision`, `Thing.upsert`) is one helper shared by the fast
+ * (topology-preserving) path and the complete-aggregate path, absorbed from
+ * the deleted `src/persistence/topology-preserving-update.ts` -- see
  * `SqlSpaceRepository`'s own doc comment for the write order that helper
  * keeps.
  */
@@ -283,3 +280,257 @@ export interface SqlStore<Handle, Order> {
   serialise<T>(operation: () => Promise<T>): Promise<T>;
   close(): Promise<void>;
 }
+
+/**
+ * The plain CRUD member implementations both database modules ran
+ * identically (ADR 0095): each is declared here once, over a structural
+ * slice of the raw generated collection named for exactly the calls it
+ * makes — property syntax, no optional field — so the same "assignable
+ * without a cast" proof `SqlTables` itself rests on covers these too.
+ * `src/prisma/sql-store.ts` and `src/sqlite/sql-store.ts` each call these
+ * with their own generated `Space`/`Thing`/`RepositoryState`, and keep only
+ * `loadWithThings`, `loadEvery`, `orderBy` and `deleteExcept`'s query-builder
+ * `.notIn(...)` call local — the members `SqlTables`'s own doc comment
+ * explains cannot cross this boundary generically, or whose filter callback
+ * this module cannot name without depending on the same ORM-client internals
+ * that block `.include`.
+ */
+
+/** What `Space.where({ id })` answers on either database. */
+interface SpaceByIdQuery {
+  readonly update: (patch: {
+    readonly document?: JsonValue;
+    readonly revision?: string;
+    readonly exportedRevision?: string;
+  }) => Promise<{ readonly revision: string } | null>;
+  readonly deleteCount: () => Promise<number>;
+}
+
+interface SpaceWithId {
+  readonly where: (filter: { readonly id: string }) => SpaceByIdQuery;
+}
+
+interface SpaceCreatable {
+  readonly create: (input: {
+    readonly id: string;
+    readonly document: JsonValue;
+    readonly revision: string;
+  }) => Promise<unknown>;
+}
+
+interface SpaceIdListable {
+  readonly select: (field: 'id') => {
+    readonly all: () => PromiseLike<readonly { readonly id: string }[]>;
+  };
+}
+
+/** What `Space.select('id', 'revision')` answers, for some database's own `Order`. */
+interface SpaceRevisionListable<Order> {
+  readonly select: (
+    fieldA: 'id',
+    fieldB: 'revision',
+  ) => {
+    readonly orderBy: (build: (space: { readonly id: { readonly asc: () => Order } }) => Order) => {
+      readonly all: () => PromiseLike<readonly SqlSpaceRevisionRow[]>;
+    };
+  };
+}
+
+interface ThingCreatable {
+  readonly create: (input: {
+    readonly id: string;
+    readonly spaceId: string;
+    readonly document: JsonValue;
+  }) => Promise<unknown>;
+}
+
+interface ThingUpsertable {
+  readonly upsert: (input: {
+    readonly create: {
+      readonly id: string;
+      readonly spaceId: string;
+      readonly document: JsonValue;
+    };
+    readonly update: { readonly document: JsonValue };
+  }) => Promise<{ readonly spaceId: string }>;
+}
+
+interface ThingDeletableForSpace {
+  readonly where: (filter: { readonly spaceId: string }) => {
+    readonly deleteCount: () => Promise<number>;
+  };
+}
+
+interface RepositoryStateQuery {
+  readonly first: () => Promise<{ readonly metaSpaceId: string } | null>;
+  readonly update: (patch: {
+    readonly metaSpaceId: string;
+  }) => Promise<{ readonly metaSpaceId: string } | null>;
+  readonly delete: () => Promise<unknown>;
+}
+
+interface RepositoryStateWithSingleton {
+  readonly where: (filter: { readonly singletonId: 1 }) => RepositoryStateQuery;
+  readonly create: (input: {
+    readonly singletonId: 1;
+    readonly metaSpaceId: string;
+  }) => Promise<unknown>;
+}
+
+/** `SqlTables.Space.relock`'s own doc comment explains the placeholder `document`. */
+export const relockSpace = async (space: SpaceWithId, id: string): Promise<string | undefined> => {
+  const locked = await space.where({ id }).update({ document: toJsonValue({}) });
+  return locked === null ? undefined : locked.revision;
+};
+
+export const createSpaceRow = async (
+  space: SpaceCreatable,
+  input: { readonly id: string; readonly document: unknown; readonly revision: string },
+): Promise<void> => {
+  await space.create({
+    id: input.id,
+    document: toJsonValue(input.document),
+    revision: input.revision,
+  });
+};
+
+export const listSpaceIds = async (space: SpaceIdListable): Promise<readonly string[]> => {
+  const rows = await space.select('id').all();
+  return rows.map((row) => row.id);
+};
+
+/** `SqlTables.Space.loadAllForReplacement`'s own doc comment explains why `document` is never selected. */
+export const loadAllForReplacement = <Order>(
+  space: SpaceRevisionListable<Order>,
+): PromiseLike<readonly SqlSpaceRevisionRow[]> =>
+  space
+    .select('id', 'revision')
+    .orderBy((row) => row.id.asc())
+    .all();
+
+/**
+ * `deleteCount()` rather than `delete()`: the latter returns the deleted row,
+ * decoded `document` included, and a truncation this answers for (ADR 0094)
+ * deletes whatever is stored whether or not `document` parses — so this must
+ * never decode it, the same requirement `deleteThingsExcept`/
+ * `deleteThingsForSpace` below carry for Things.
+ */
+export const deleteSpaceById = async (space: SpaceWithId, id: string): Promise<boolean> => {
+  const deleted = await space.where({ id }).deleteCount();
+  return deleted > 0;
+};
+
+export const setExportedRevision = async (
+  space: SpaceWithId,
+  id: string,
+  revision: string,
+): Promise<boolean> => {
+  const updated = await space.where({ id }).update({ exportedRevision: revision });
+  return updated !== null;
+};
+
+/** `SqlTables.Space.writeDocumentUnderLock`'s own doc comment explains the row lock. */
+export const writeDocumentUnderLock = async (
+  space: SpaceWithId,
+  id: string,
+  document: unknown,
+): Promise<string | undefined> => {
+  const locked = await space.where({ id }).update({ document: toJsonValue(document) });
+  return locked === null ? undefined : locked.revision;
+};
+
+export const setSpaceRevision = async (
+  space: SpaceWithId,
+  id: string,
+  revision: string,
+): Promise<void> => {
+  await space.where({ id }).update({ revision });
+};
+
+export const createThingRow = async (
+  thing: ThingCreatable,
+  input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
+): Promise<void> => {
+  await thing.create({
+    id: input.id,
+    spaceId: input.spaceId,
+    document: toJsonValue(input.document),
+  });
+};
+
+/** `SqlTables.Thing.upsert`'s own doc comment explains the ownership answer. */
+export const upsertThingRow = async (
+  thing: ThingUpsertable,
+  input: { readonly id: string; readonly spaceId: string; readonly document: unknown },
+): Promise<{ readonly spaceId: string }> => {
+  const stored = await thing.upsert({
+    create: { id: input.id, spaceId: input.spaceId, document: toJsonValue(input.document) },
+    update: { document: toJsonValue(input.document) },
+  });
+  return { spaceId: stored.spaceId };
+};
+
+/**
+ * `deleteCount()` rather than `deleteAll()`, for the same reason
+ * `deleteSpaceById` above does: `#truncateHyperContent` calls this over
+ * stored state it has not validated (ADR 0094), and `deleteAll()` returns the
+ * deleted rows — decoded `document` included — which would decode exactly
+ * the broken content truncation exists to remove without reading.
+ */
+export const deleteThingsForSpace = async (
+  thing: ThingDeletableForSpace,
+  spaceId: string,
+): Promise<void> => {
+  await thing.where({ spaceId }).deleteCount();
+};
+
+export const readRepositoryState = async (
+  state: RepositoryStateWithSingleton,
+): Promise<{ readonly metaSpaceId: string } | null> => {
+  const row = await state.where({ singletonId: 1 }).first();
+  return row === null ? null : { metaSpaceId: row.metaSpaceId };
+};
+
+export const relockRepositoryState = async (
+  state: RepositoryStateWithSingleton,
+  metaSpaceId: string,
+): Promise<boolean> => {
+  const locked = await state.where({ singletonId: 1 }).update({ metaSpaceId });
+  return locked !== null;
+};
+
+export const createRepositoryState = async (
+  state: RepositoryStateWithSingleton,
+  metaSpaceId: string,
+): Promise<void> => {
+  await state.create({ singletonId: 1, metaSpaceId });
+};
+
+export const deleteRepositoryState = async (state: RepositoryStateWithSingleton): Promise<void> => {
+  await state.where({ singletonId: 1 }).delete();
+};
+
+/**
+ * The one member `SqlTables`'s doc comment says crosses the module boundary
+ * structurally: `Space.orderBy(...).all()`. Both database modules probe
+ * their own generated `Space` through this to name their own `Order`
+ * (`src/prisma/sql-store.ts`, `src/sqlite/sql-store.ts`) — a generic identity
+ * function rather than an assertion, so an accidental mismatch (a misspelled
+ * column, a wrong revision type) fails to compile instead of being cast
+ * away.
+ */
+export interface Orderable<Order> {
+  readonly orderBy: (build: (space: { readonly id: { readonly asc: () => Order } }) => Order) => {
+    readonly all: () => PromiseLike<readonly SqlSpaceListRow[]>;
+  };
+}
+
+export const asOrderable = <Order>(space: Orderable<Order>): Orderable<Order> => space;
+
+/**
+ * `Handle`/`Order` are inferred from what is passed rather than written out,
+ * so nothing here asserts a shape the object literal does not actually have.
+ */
+export const defineSqlStore = <Handle, Order>(
+  store: SqlStore<Handle, Order>,
+): SqlStore<Handle, Order> => store;

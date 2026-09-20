@@ -1270,7 +1270,11 @@ export const spaceRepositoryContract = (
   // does on the way in (ADR 0095): a Space already sitting at the ceiling —
   // constructed here the only way one legitimately could, since no ordinary
   // commit ever reaches it — refuses the commit that would carry it one past
-  // rather than storing a value the codec could not read back.
+  // rather than storing a value the codec could not read back. The failure is
+  // named (`AggregateInvariantError`, the same identity a stored row that
+  // fails intake raises) rather than merely asserted to exist, and the
+  // refused commit is proven to have left the stored revision exactly where
+  // it was — "refused rather than stored".
   it(`${name} refuses to store a revision above the 2^63-1 ceiling`, async () => {
     await withRawRevisionHarness(async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
@@ -1279,7 +1283,24 @@ export const spaceRepositoryContract = (
 
       await expect(
         commitUpdate(repository, retitled(first, 'Past the ceiling'), REVISION_CEILING),
-      ).rejects.toThrow();
+      ).rejects.toThrow(AggregateInvariantError);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
+        stored(first, REVISION_CEILING, null),
+      );
+    });
+  });
+
+  // The codec's ceiling applies to a value already sitting in the column, not
+  // only to one a commit would produce: a stored revision past 2^63−1 is
+  // broken stored state exactly as a non-canonical one is (the case above
+  // this one), and an aggregate read of it raises the same identity.
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling`, async () => {
+    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: (REVISION_CEILING + 1n).toString() });
+
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     });
   });
 };

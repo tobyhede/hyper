@@ -271,6 +271,33 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
   });
 
+  // `commit`'s fast path reads its candidate through `#loadStoredSpaceRow`,
+  // the same private helper `loadSpace` calls directly, so a stored document
+  // that fails intake escapes a fast-path `commit` exactly as unclassified as
+  // it escapes `loadSpace` for the same row -- neither is
+  // `AggregateInvariantError`, unlike `loadAggregate` immediately above.
+  it("commit's fast path leaves a broken stored document as unclassified as loadSpace does", async () => {
+    createdSpaceIds.add(SPACE_ID);
+    await db.transaction(async ({ orm }) => {
+      await orm.public.Space.create({
+        // Same construction as "raises an identifiable invariant failure for
+        // a stored document that cannot be parsed" above: `title` is
+        // required, so this row parses as JSON and fails intake.
+        id: SPACE_ID,
+        document: { version: 1 },
+        revision: '0',
+      });
+      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
+    });
+
+    await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
+      AggregateInvariantError,
+    );
+    await expect(
+      commitSpace({ id: SPACE_ID, document: { version: 1, title: 'Repaired' }, things: [] }, 0n),
+    ).rejects.not.toBeInstanceOf(AggregateInvariantError);
+  });
+
   // PostgreSQL's `document` column is `jsonb`, so it refuses text that is not
   // JSON before it is ever stored — unlike SQLite's TEXT column, which stores
   // anything (`sqlite-space-repository.test.ts`'s "truncates a stored Space

@@ -69,6 +69,39 @@ const ascendingSnapshotId = (left: SpaceSnapshot, right: SpaceSnapshot): number 
 type UpdateChange = Extract<SpaceChange, { kind: 'update' }>;
 
 /**
+ * `decodeStoredRevision`/`encodeStoredRevision`, reclassified for
+ * `#writeUpdate`: a revision the codec refuses -- stored text that is not
+ * canonical decimal, or a value past the 2^63-1 ceiling on either side of the
+ * round trip -- is broken stored state (ADR 0095), the same identity
+ * `#loadEverySpace`'s own decode step already raises it as. `#writeUpdate`
+ * reads and writes a Space's revision under the row lock it just took,
+ * outside `#loadEverySpace`'s complete read, so it is the other place a
+ * stored or about-to-be-stored revision can raise `RevisionCodecError` and
+ * needs the same reclassification rather than escaping a commit unclassified
+ * as a defect no retry cures answered `persistence-unavailable`.
+ */
+const revisionInvariant = (spaceId: UUID, error: unknown): AggregateInvariantError =>
+  new AggregateInvariantError(`Stored Space ${spaceId}'s revision is not usable`, { cause: error });
+
+const decodeRevisionInvariant = (spaceId: UUID, value: string): bigint => {
+  try {
+    return decodeStoredRevision(value);
+  } catch (error) {
+    if (!(error instanceof RevisionCodecError)) throw error;
+    throw revisionInvariant(spaceId, error);
+  }
+};
+
+const encodeRevisionInvariant = (spaceId: UUID, value: bigint): string => {
+  try {
+    return encodeStoredRevision(value);
+  } catch (error) {
+    if (!(error instanceof RevisionCodecError)) throw error;
+    throw revisionInvariant(spaceId, error);
+  }
+};
+
+/**
  * `commit`'s fast path's own decision (ADR 0095), which may also hand the
  * commit to the complete-aggregate decision.
  */
@@ -387,10 +420,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     newRevision: bigint,
   ): Promise<void> {
     const priorRevision = await tables.Space.writeDocumentUnderLock(snapshot.id, snapshot.document);
-    if (priorRevision === undefined || decodeStoredRevision(priorRevision) !== expectedRevision) {
+    if (
+      priorRevision === undefined ||
+      decodeRevisionInvariant(snapshot.id, priorRevision) !== expectedRevision
+    ) {
       throw new StaleSpaceRevisionError(snapshot.id);
     }
-    await tables.Space.setRevision(snapshot.id, encodeStoredRevision(newRevision));
+    await tables.Space.setRevision(snapshot.id, encodeRevisionInvariant(snapshot.id, newRevision));
     await this.#upsertThings(tables, snapshot);
     await tables.Thing.deleteExcept(
       snapshot.id,

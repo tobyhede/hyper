@@ -564,6 +564,37 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expectTruncatedTo(repository);
   });
 
+  // `commit`'s fast path reads its candidate through `#loadStoredSpaceRow`,
+  // the same private helper `loadSpace` calls directly, so a stored document
+  // that fails intake escapes a fast-path `commit` exactly as unclassified as
+  // it escapes `loadSpace` for the same row -- neither is
+  // `AggregateInvariantError`, unlike `loadAggregate`/`initializeAggregate`/
+  // `replaceAggregate` (through `#loadEverySpace`) two cases above this one.
+  it("commit's fast path leaves a broken stored document as unclassified as loadSpace does", async () => {
+    const { repository, database } = await opened();
+    // `title` is required, so this row is JSON that fails Space intake -- the
+    // same construction as "truncates a stored Space whose document does not
+    // parse" above.
+    await database.orm.Space.create(storedRow(SPACE_ID, { version: 1 }));
+    await database.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
+
+    await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
+      AggregateInvariantError,
+    );
+    await expect(
+      repository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: { id: SPACE_ID, document: { version: 1, title: 'Repaired' }, things: [] },
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    ).rejects.not.toBeInstanceOf(AggregateInvariantError);
+  });
+
   it('truncates a stored Space whose document is not JSON', async () => {
     const { path, repository } = await opened();
     // The ORM encodes `document` as JSON, so only a raw write can store text
