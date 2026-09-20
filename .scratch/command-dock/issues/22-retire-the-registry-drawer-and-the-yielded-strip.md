@@ -10,7 +10,7 @@
 > it — the comment carried the dangling pre-rename path until this correction
 > caught it.
 
-Status: needs-triage
+Status: resolved
 Blocked by: nothing. `10` is what left all three without a consumer.
 
 **The decision to take:** delete `drawer.tsx`'s `Drawer`, its `DRAWER_WIDTH`, and
@@ -207,3 +207,36 @@ that gap). Anyone taking the decision should re-derive this list by grep rather
 than trusting it.
 
 `08`'s own handoff table is left as history and points here for the decision.
+
+## Answer — 2026-09-21
+
+**All three are deleted.** `packages/ui/src/components/drawer.tsx` and its test,
+the eleven values and three types it exported from `packages/ui/src/index.ts`,
+its inventory entry, and `AppShell`'s `insetEnd` with the inline
+`paddingInlineEnd` it set. The shell now does two things rather than three, and
+its doc comment says so.
+
+The reason is that they are old and obsolete, and the argument above for keeping
+turned out to be weaker than it was written. "Deleting it costs a rewrite of the
+Base UI wrapper" ignores version control: the file is recoverable from history,
+and the only real cost of bringing it back is whatever Base UI's API has moved by
+then. That leaves no consumer, no planned consumer, a recorded decision (`10`)
+against a screen-edge drawer for the one surface that had one, and a test, an
+inventory reason and three comments that each had to be kept true for nothing.
+
+Comments rewritten rather than deleted, because a clause of each outlived the
+strip: `AppShell`'s function-level doc comment, the `shell__area` JSX comment,
+the `.shell__area` CSS comment (both now say only that it is the containing
+block the notice resolves against), and the Dock's docking-box comment in
+`packages/app/src/App.tsx`, which said a drawer at the end edge narrowed the
+area. Both paragraphs above `.shell__main` in `styles.css` went whole: the
+second was the case for not animating a strip that no longer exists.
+
+Left alone, and not this ticket's: `App.tsx`'s `addExistingResource` comment,
+`canvas-projection.ts` and `entity-actions.tsx` still call the Resources Popover
+"the drawer" — stale naming for a surface that exists, not a reference to the
+deleted module. `08` and `10` are resolved and keep their pointers here as
+history. The four sibling primitives above are still undecided.
+
+This ticket's body predates the Thing → Resource and Diagram → Map rename and is
+left in the vocabulary it was written in; this Answer uses the current names.

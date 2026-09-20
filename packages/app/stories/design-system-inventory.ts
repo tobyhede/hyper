@@ -55,11 +55,6 @@ export const uncataloguedComponents = [
       'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `ResourceSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
-    module: 'packages/ui/src/components/drawer.tsx',
-    reason:
-      'Without a consumer since `.scratch/command-dock/issues/10-decide-the-cards-surface.md` restored the Resources surface decision: `ResourcesDrawer` was its only one, and the Resources list is a `Popover` anchored to the Dock’s own trigger — which is what the prototype’s three-surface comparison chose, on the ground that a screen-edge drawer occludes the canvas edge you are dropping onto. `Drawer` and `DRAWER_WIDTH` are what is left, and `AppShell`’s `insetEnd` is left standing with them. `Drawer` is not a registry component: it composes Base UI’s own `Drawer` primitive rather than the shadcn registry’s vaul-based one, so recovering it if it were deleted means rewriting that Base UI wrapper, not regenerating it from shadcn. `08-retire-the-sidebar-era-primitives.md` took the Sidebar-era primitives while this one still had a consumer, so it did not take this; retiring this primitive is a foundation decision rather than a surface one, and `22-retire-the-registry-drawer-and-the-yielded-strip.md` is the decision of its own that owns taking the three.',
-  },
-  {
     module: 'packages/ui/src/Dialog.tsx',
     reason:
       'Without a consumer since ADR 0089 retired the two Resource creation panes: `ResourcePane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Resource deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',

@@ -200,20 +200,6 @@ export {
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
 export {
-  DRAWER_WIDTH,
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerPopup,
-  DrawerPortal,
-  DrawerTitle,
-  DrawerTrigger,
-  DrawerViewport,
-} from './components/drawer';
-export type { DrawerHeaderProps, DrawerPopupProps, DrawerSide } from './components/drawer';
-export {
   Empty,
   EmptyContent,
   EmptyDescription,

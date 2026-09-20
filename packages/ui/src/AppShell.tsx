@@ -7,31 +7,6 @@ export interface AppShellProps {
    * dialog would overstate by blocking the work that caused it.
    */
   notice?: ReactNode;
-  /**
-   * A width the main area yields at its end edge, for a surface overlaying it.
-   *
-   * The shell positions its own chrome, so it is the shell that has to know
-   * something covers that edge — the canvas is pinned to it, and so is the
-   * notice above. Yielding the strip rather than layering over it is what keeps
-   * a Resource the reader is dragging, the Graph key and a standing notice all
-   * visible beside the panel instead of behind it. Any CSS length; omitted
-   * means nothing overlays and the main area is full-bleed.
-   *
-   * **This is not the command surface taking room.** ADR 0082 binds that the
-   * Space's command surface takes no layout space from the canvas, and the
-   * Command Dock takes none — it floats over `.shell__area`.
-   *
-   * **Nothing sets it.** The strip was the Resources drawer's, and that drawer is
-   * gone: the Resources list is a Popover anchored to its trigger, which overlays
-   * the canvas rather than displacing it. Retiring this prop along with
-   * `Drawer` and its `DRAWER_WIDTH` is one undecided foundation decision —
-   * and not a cheap one: `components/drawer.tsx`'s own doc comment says why,
-   * and the short version is that nothing regenerates it with `shadcn add`.
-   * Owned by
-   * `.scratch/command-dock/issues/22-retire-the-registry-drawer-and-the-yielded-strip.md`.
-   * Not `08`, which is resolved and ran while the drawer still had a consumer.
-   */
-  insetEnd?: string | undefined;
   children: ReactNode;
 }
 
@@ -49,21 +24,17 @@ export interface AppShellProps {
  * `skeleton.tsx` and `use-mobile.ts` behind it
  * (`.scratch/command-dock/issues/08`), so there is nothing left to compose back.
  *
- * What is left is three responsibilities a canvas cannot fulfil itself: pin the viewport
- * so the page never scrolls, yield the strip a drawer overlays, and give the
- * standing notice a containing block that strip has already been taken out of.
- * That is thinner than it was, and it is still the frame — the alternative is
- * every mount repeating the same three rules around its own canvas.
+ * What is left is two responsibilities a canvas cannot fulfil itself: pin the
+ * viewport so the page never scrolls, and give the standing notice a containing
+ * block to be positioned against. That is thinner than it was, and it is still the
+ * frame — the alternative is every mount repeating the same rules around its
+ * own canvas.
  */
-export function AppShell({ notice, insetEnd, children }: AppShellProps) {
+export function AppShell({ notice, children }: AppShellProps) {
   return (
     <div className="shell">
-      <div className="shell__main" style={{ paddingInlineEnd: insetEnd }}>
-        {/* The padding is the yielded strip, and this fills what is left of it.
-            An absolutely positioned box resolves against its containing block's
-            *padding* box, so the notice below would ignore that padding and sit
-            under the overlay — this element is what gives it a containing block
-            the strip has already been taken out of. */}
+      <div className="shell__main">
+        {/* The containing block the notice below is positioned against. */}
         <div className="shell__area">
           {children}
           {/* The slot is unconditional and its own CSS hides it while the notice

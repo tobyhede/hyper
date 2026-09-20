@@ -60,7 +60,7 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [19](issues/19-space-thing-creation-answers-the-thing-it-created.md) | Space Thing creation answers the Thing it created | resolved |
 | [20](issues/20-the-create-dispatch-names-every-thing-kind.md) | The Create dispatch names every Thing kind | resolved |
 | [21](issues/21-the-postgres-suite-fails-at-the-compiler.md) | Removing a persistence field fails at the compiler, not only in CI | resolved |
-| [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the Drawer and the strip the shell yields to it | needs-triage |
+| [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the Drawer and the strip the shell yields to it | resolved |
 | [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | resolved |
 | [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | resolved |
 | [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |

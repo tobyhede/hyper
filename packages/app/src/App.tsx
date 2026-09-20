@@ -330,9 +330,8 @@ export const createApp = (
      * The box the Command Dock docks to.
      *
      * The canvas's own element, so the twelve slots are the slots of the paper
-     * rather than of the window: a drawer opening at the end edge narrows the
-     * area and the Dock's right-edge stops move with it, which is what a reader
-     * would expect of furniture sitting on the canvas.
+     * rather than of the window, which is what a reader would expect of
+     * furniture sitting on the canvas.
      */
     const graphArea = useRef<HTMLDivElement | null>(null);
     const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
