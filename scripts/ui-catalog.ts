@@ -21,7 +21,7 @@ export interface UncataloguedComponent {
 /**
  * A class block `packages/app/src/styles.css` still declares, and the React Flow
  * or integration requirement that keeps it out of `@project/ui`. The block is the
- * BEM root — `rf-thing-node` covers `rf-thing-node__inner` and `rf-thing-node--active`.
+ * BEM root — `rf-resource-node` covers `rf-resource-node__inner` and `rf-resource-node--active`.
  */
 export interface HandRolledStyle {
   readonly block: string;
@@ -609,7 +609,7 @@ const declaredClasses = (css: string): ReadonlySet<string> =>
 
 /**
  * A rule that names no class at all still styles something, and the inventory
- * could not see it: `styles.css` carries `[data-thing-search-combobox] { … }`
+ * could not see it: `styles.css` carries `[data-resource-search-combobox] { … }`
  * rule sets that no block covered. Such a rule is keyed by its leading
  * attribute or id instead, so one entry covers the family.
  */
@@ -641,15 +641,15 @@ const declaredNonClassSubjects = (css: string): ReadonlySet<string> =>
       .filter((subject) => subject !== ''),
   );
 
-/** The BEM root: `rf-thing-node` owns `rf-thing-node__inner` and `--active` alike. */
+/** The BEM root: `rf-resource-node` owns `rf-resource-node__inner` and `--active` alike. */
 const blockOf = (className: string): string => className.split(/__|--/u)[0] ?? className;
 
 /**
  * The class names a module could be writing.
  *
  * `whole` is what a plain string literal says outright. `partial` is what a
- * template literal says up to its first interpolation — `ThingNode` builds
- * ``rf-thing-node__authoring-handle--${role}``, so the class exists in the source
+ * template literal says up to its first interpolation — `ResourceNode` builds
+ * ``rf-resource-node__authoring-handle--${role}``, so the class exists in the source
  * only as the stem before the substitution, and a whole-token comparison would
  * report the rule that styles it as dead.
  */
@@ -671,9 +671,9 @@ const CLASS_STEM = /^[a-zA-Z][\w-]*$/u;
  * Where a class name is actually written: a `className`/`class` JSX attribute,
  * a `className` property (React Flow node objects carry one), or a `cn`/`clsx`
  * call. Reading *every* string literal instead made domain values look like
- * class names — `.thing` was held live by `{ kind: 'thing' }` in `render-adapter`
- * and `type: 'thing'` in `projection`, none of which is a class, so deleting the
- * real `className="thing"` would have left the rule reported as named.
+ * class names — `.resource` was held live by `{ kind: 'resource' }` in `render-adapter`
+ * and `type: 'resource'` in `projection`, none of which is a class, so deleting the
+ * real `className="resource"` would have left the rule reported as named.
  */
 const CLASS_BUILDERS = new Set(['cn', 'clsx', 'classNames', 'twMerge']);
 
@@ -966,8 +966,8 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
 
   /**
    * The dead-rule half of the ratchet, over the stylesheets that live beside their
-   * component rather than in `styles.css` — `canvas-thing.css` beside `CanvasThing`,
-   * `thing-search-combobox.css` beside `ThingSearchCombobox`,
+   * component rather than in `styles.css` — `canvas-resource.css` beside `CanvasResource`,
+   * `resource-search-combobox.css` beside `ResourceSearchCombobox`,
    * `markdown-source-editor.css` beside `MarkdownSourceEditor`, and
    * `command-dock.css` beside `CommandDock`, which is the first of them under
    * `packages/app/src` rather than `packages/ui/src`. The walk is over
@@ -976,7 +976,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
    *
    * Only that half. Colocation is the *approved* home for product appearance, so these
    * owe no inventory entry — recording them would turn the inventory into a list of
-   * things that are fine. But a rule no production module names is dead wherever it
+   * resources that are fine. But a rule no production module names is dead wherever it
    * lives, and without this, moving a block out of `styles.css` and beside its component
    * is a way to stop the ratchet reading it at all.
    *

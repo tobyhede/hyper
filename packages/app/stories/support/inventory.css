@@ -1,25 +1,25 @@
 /*
- * The locked thing design — option `8a`, "Flat" — plus the paper canvas it sits
+ * The locked resource design — option `8a`, "Flat" — plus the paper canvas it sits
  * on. Written from the design handoff's token table and geometry section.
  *
- * Thing visuals come from the same `@project/ui` CanvasThing that ThingNode uses.
+ * Resource visuals come from the same `@project/ui` CanvasResource that ResourceNode uses.
  * This stylesheet owns only the paper catalogue and explanatory furniture.
  *
  * Two deliberate departures from the handoff's numbers, both recorded rather
  * than silently taken:
  *
- *  - **Thing size is 260x146, not the prototype's 230x129.** The handoff says
+ *  - **Resource size is 260x146, not the prototype's 230x129.** The handoff says
  *    "pick one size and derive the rest", and 260x146 is the repo's own
- *    `thing.ts` constant, which placement is authored against and which every
- *    drawn Thing takes its box from. Both are 16:9; taking the prototype's would
+ *    `resource.ts` constant, which placement is authored against and which every
+ *    drawn Resource takes its box from. Both are 16:9; taking the prototype's would
  *    mean changing the layout seam to match a drawing.
  *  - **Dark mode is absent.** Three candidates exist and none is chosen, so
  *    there is nothing here to render one from. See `.ladle/components.tsx`.
  */
 
 .inv {
-  --thing-title: #12161c;
-  --thing-title-muted: #4a505c;
+  --resource-title: #12161c;
+  --resource-title-muted: #4a505c;
   --canvas: #efe9dc;
 }
 
@@ -35,14 +35,14 @@
  */
 .inv-sheet {
   font-family: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
-  color: var(--thing-title);
+  color: var(--resource-title);
 }
 
 .inv-mono {
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.inv-thing-node-stage {
+.inv-resource-node-stage {
   width: 320px;
   height: 210px;
   position: relative;
@@ -50,14 +50,14 @@
   background: var(--canvas);
 }
 
-/* Open and resizable specimens need enough room for the authored Thing rect plus
-   React Flow's fit-view padding, so the Thing remains legible and draggable. */
-.inv-thing-node-stage--large {
+/* Open and resizable specimens need enough room for the authored Resource rect plus
+   React Flow's fit-view padding, so the Resource remains legible and draggable. */
+.inv-resource-node-stage--large {
   width: 720px;
   height: 540px;
 }
 
-/* Canvas-thing visuals live with CanvasThing in the shared UI package. Ladle owns only the catalogue furniture below. */
+/* Canvas-resource visuals live with CanvasResource in the shared UI package. Ladle owns only the catalogue furniture below. */
 
 /* ---- Inventory page furniture ----
    Not part of the design. The frame the specimens are shown in. */
@@ -83,7 +83,7 @@
   margin: 0 0 4px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--thing-title-muted);
+  color: var(--resource-title-muted);
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
@@ -93,7 +93,7 @@
   margin: 0 0 18px;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--thing-title-muted);
+  color: var(--resource-title-muted);
 }
 
 .inv-row {
@@ -112,11 +112,11 @@
 .inv-specimen__label {
   font-size: 11px;
   font-weight: 500;
-  color: var(--thing-title-muted);
+  color: var(--resource-title-muted);
   letter-spacing: 0.04em;
 }
 
-/* Room for the handles and the drag shadow, which both sit outside the thing. */
+/* Room for the handles and the drag shadow, which both sit outside the resource. */
 .inv-specimen__stage {
   padding: 20px;
 }

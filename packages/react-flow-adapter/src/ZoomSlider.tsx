@@ -63,7 +63,7 @@ export function ZoomSlider({ className, position = 'bottom-left', ...props }: Zo
         getAriaLabel={() => 'Zoom'}
         // The track's own units, so `aria-valuenow` would otherwise announce a
         // fraction of a track nobody can see. `getAriaValueText` answers the
-        // magnification instead, which is the thing being changed.
+        // magnification instead, which is the value being changed.
         getAriaValueText={(_formatted, value) =>
           `${Math.round(zoomAtTrackPosition(value, minZoom, maxZoom) * 100)}%`
         }

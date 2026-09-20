@@ -27,7 +27,7 @@ Since ADR 0062 a narrowing assertion faces two gates doing different jobs, and s
 - `anti-slop/require-safety-comment-for-type-assertion` (oxlint) **demands a reason**. Unchanged, and it applies to every assertion still in the tree, including the ones the baseline below records.
 - `@typescript-eslint/no-unsafe-type-assertion` (ESLint, type-aware) **caps the count**. A narrowing assertion is an error anywhere in the repository.
 
-Do not weaken either to reduce the overlap. ADR 0062's reasoning is that a `SAFETY:` comment is satisfied by prose, prose is the cheapest thing an agent produces, and a comment does not survive the refactoring that moves the code it justifies — so the comment rule was never going to be the gate on new code. Equally, a count with no stated reason tells a reviewer nothing. Each rule is the other's blind spot.
+Do not weaken either to reduce the overlap. ADR 0062's reasoning is that a `SAFETY:` comment is satisfied by prose, prose is the cheapest artifact an agent produces, and a comment does not survive the refactoring that moves the code it justifies — so the comment rule was never going to be the gate on new code. Equally, a count with no stated reason tells a reviewer nothing. Each rule is the other's blind spot.
 
 ### The suppressions baseline
 

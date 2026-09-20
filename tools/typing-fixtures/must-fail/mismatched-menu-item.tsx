@@ -26,16 +26,16 @@ import {
   DropdownMenuRadioItem,
 } from '../../../packages/ui/src/components/dropdown-menu';
 
-/** A branded id, as `DiagramId` and `GraphId` are — the shape the Dock's menus deal in. */
-type DiagramId = string & { readonly __brand: 'DiagramId' };
+/** A branded id, as `MapId` and `GraphId` are — the shape the Dock's menus deal in. */
+type MapId = string & { readonly __brand: 'MapId' };
 
-declare const diagramId: DiagramId;
+declare const mapId: MapId;
 
 /** Bound once, the way a surface rendering several items binds it. */
-const DiagramItem = DropdownMenuRadioItem<DiagramId>;
+const MapItem = DropdownMenuRadioItem<MapId>;
 
 export const menu = (
-  <DropdownMenuRadioGroup<DiagramId> value={diagramId}>
-    <DiagramItem value="none">Not a DiagramId</DiagramItem>
+  <DropdownMenuRadioGroup<MapId> value={mapId}>
+    <MapItem value="none">Not a MapId</MapItem>
   </DropdownMenuRadioGroup>
 );

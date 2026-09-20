@@ -1,19 +1,19 @@
 import { useEffect } from 'react';
 import { useStoreApi } from '@xyflow/react';
-import type { DiagramPosition } from '@project/core';
-import { THING_SIZE } from '../thing';
+import type { MapPosition } from '@project/core';
+import { RESOURCE_SIZE } from '../resource';
 
-/** Where a Thing created from a menu or a keystroke lands, in flow coordinates. */
-export type VisibleCentre = () => DiagramPosition;
+/** Where a Resource created from a menu or a keystroke lands, in flow coordinates. */
+export type VisibleCentre = () => MapPosition;
 
 /**
  * Reports where the middle of the visible canvas currently is.
  *
- * Add Thing and Add Reference Thing place at the centre of what the author is looking at,
+ * Add Resource and Add Reference Resource place at the centre of what the author is looking at,
  * and neither is invoked from inside the flow: one is a toolbar control and the
  * other a pane over the graph. So the answer has to be *readable* from outside,
  * and it has to be read at the moment of the gesture rather than at any earlier
- * render — an author who panned after opening the Reference Thing picker is looking
+ * render — an author who panned after opening the Reference Resource picker is looking
  * somewhere else by the time they choose a Target.
  *
  * Hence a getter handed upwards rather than a value: this component subscribes
@@ -37,7 +37,7 @@ export type VisibleCentre = () => DiagramPosition;
  * `ReactFlowProvider`. It draws nothing.
  *
  * **Not a camera.** It issues no command and moves nothing (ADR 0043): creating
- * a Thing leaves the viewport exactly where it was, which is what makes the
+ * a Resource leaves the viewport exactly where it was, which is what makes the
  * centre the right place to put one.
  */
 export function CanvasCentre({ report }: { report: (centre: VisibleCentre | null) => void }) {
@@ -48,17 +48,17 @@ export function CanvasCentre({ report }: { report: (centre: VisibleCentre | null
       const { width, height, transform } = store.getState();
       const [panX, panY, zoom] = transform;
       // A zoom of zero is not a viewport React Flow produces, but it is the one
-      // value that would answer with `Infinity` and place a Thing nowhere.
+      // value that would answer with `Infinity` and place a Resource nowhere.
       const scale = zoom === 0 ? 1 : zoom;
       return {
-        x: (-panX + width / 2) / scale - THING_SIZE.width / 2,
-        y: (-panY + height / 2) / scale - THING_SIZE.height / 2,
+        x: (-panX + width / 2) / scale - RESOURCE_SIZE.width / 2,
+        y: (-panY + height / 2) / scale - RESOURCE_SIZE.height / 2,
       };
     });
     // Withdrawn on the way out, because the reader outlives the reporter. This
-    // component is inside the canvas's `things` branch — it needs React Flow's store —
+    // component is inside the canvas's `resources` branch — it needs React Flow's store —
     // and both controls that read the centre are outside it: the toolbar's Add
-    // Thing, and the Reference Thing creation pane. A placement failure or a Space replaced
+    // Resource, and the Reference Resource creation pane. A placement failure or a Space replaced
     // under the canvas unmounts this and leaves them holding a getter closed over
     // an unmounted provider's store, which is not a viewport and must not answer
     // as one. `App` falls back to the origin, exactly as it does before the first

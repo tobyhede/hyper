@@ -1,11 +1,11 @@
 import { expect, test, type Page } from './fixtures';
 import {
-  activeThing,
+  activeResource,
   activeGraph,
   authoringHandle,
   connectHandles,
   connectToEmptyWithAlt,
-  createThingControl,
+  createResourceControl,
   dragBy,
   nodeByTitle,
   positionOf,
@@ -13,26 +13,26 @@ import {
   selectedCanvas,
   settled,
 } from './graph';
-import { seedPositionedDiagram, type HttpLoadedSpace } from './seed';
+import { seedPositionedMap, type HttpLoadedSpace } from './seed';
 
 /**
- * Opening the app with nothing to open gives a new space: one thing (ADR 0018).
+ * Opening the app with nothing to open gives a new space: one resource (ADR 0018).
  *
  * This project drives its own empty HTTP repository. Server-side database
- * startup creates the one-thing Space once, and reloads reopen that durable UUID.
+ * startup creates the one-resource Space once, and reloads reopen that durable UUID.
  */
 
-const seedNewSpaceDiagram = (page: Page) =>
-  seedPositionedDiagram(page, 'Authored Diagram', (snapshot) => {
-    const thingId = snapshot.things[0]?.id;
-    if (thingId === undefined) throw new Error('The new Space must hold Thing 1.');
-    return { [thingId]: { x: 0, y: 0, open: false } };
+const seedNewSpaceMap = (page: Page) =>
+  seedPositionedMap(page, 'Authored Map', (snapshot) => {
+    const resourceId = snapshot.resources[0]?.id;
+    if (resourceId === undefined) throw new Error('The new Space must hold Resource 1.');
+    return { [resourceId]: { x: 0, y: 0, open: false } };
   });
 
-/** A new Space already owns its complete first Diagram and centered Thing. */
-const createDiagram = async (page: Page): Promise<void> => {
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+/** A new Space already owns its complete first Map and centered Resource. */
+const createMap = async (page: Page): Promise<void> => {
+  await expect(selectedCanvas(page)).toContainText('Map 1');
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
   await settled(page);
 };
@@ -47,7 +47,9 @@ const createDiagram = async (page: Page): Promise<void> => {
  * distinguishes "fitted once" from "fitted, then moved" — a final-state check
  * passes either way, since both end up correctly framed.
  */
-test('centres its first thing without animating it in from the canvas origin', async ({ page }) => {
+test('centres its first resource without animating it in from the canvas origin', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     const transforms: string[] = [];
     Object.defineProperty(window, '__hyperOverviewTransforms', { value: transforms });
@@ -74,7 +76,7 @@ test('centres its first thing without animating it in from the canvas origin', a
   });
 
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
   await settled(page);
 
   // SAFETY: `__hyperOverviewTransforms` is a debug array this same spec sets
@@ -90,45 +92,43 @@ test('centres its first thing without animating it in from the canvas origin', a
   expect(transforms.length).toBeLessThanOrEqual(2);
 });
 
-test('shows one thing, and it is the only thing on screen', async ({ page }) => {
+test('shows one resource, and it is the only resource on screen', async ({ page }) => {
   await page.goto('/');
 
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   // No graphs means no edges to draw.
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
-test('starts in a complete authored Diagram with its first empty Active Graph', async ({
-  page,
-}) => {
+test('starts in a complete authored Map with its first empty Active Graph', async ({ page }) => {
   await page.goto('/');
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
-  await thing.hover();
+  await resource.hover();
 
-  const handles = thing.locator('.rf-thing-node__authoring-handle--source');
+  const handles = resource.locator('.rf-resource-node__authoring-handle--source');
   await expect(handles).toHaveCount(4);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
-  await expect(createThingControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(selectedCanvas(page)).toContainText('Map 1');
+  await expect(createResourceControl(page)).not.toHaveAttribute('aria-disabled', 'true');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('Alt toggles a transient Thing 2 preview during an empty connection drag', async ({
+test('Alt toggles a transient Resource 2 preview during an empty connection drag', async ({
   page,
 }) => {
   await page.goto('/');
-  await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  await createMap(page);
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
-  await thing.hover();
+  await resource.hover();
 
-  const source = authoringHandle(thing, 'source', 'right');
+  const source = authoringHandle(resource, 'source', 'right');
   const from = (await source.boundingBox())!;
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
@@ -136,38 +136,38 @@ test('Alt toggles a transient Thing 2 preview during an empty connection drag', 
     steps: 4,
   });
 
-  await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
+  await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await page.keyboard.up('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
+  await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
   await page.keyboard.up('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
+  await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   await page.mouse.up();
 
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('Alt empty-drop creates, connects and selects Thing 2 at the previewed position', async ({
+test('Alt empty-drop creates, connects and selects Resource 2 at the previewed position', async ({
   page,
 }) => {
   await page.goto('/');
-  await createDiagram(page);
-  const sourceThing = nodeByTitle(page, 'Thing 1');
-  await expect(sourceThing).toBeVisible();
+  await createMap(page);
+  const sourceResource = nodeByTitle(page, 'Resource 1');
+  await expect(sourceResource).toBeVisible();
   await settled(page);
-  await sourceThing.hover();
+  await sourceResource.hover();
 
-  const source = authoringHandle(sourceThing, 'source', 'right');
+  const source = authoringHandle(sourceResource, 'source', 'right');
   const from = (await source.boundingBox())!;
   // Up and to the right, not down: the canvas HUD is anchored bottom-right and
-  // is some 218px tall once its Graph key and minimap are both drawn, so a Thing
+  // is some 218px tall once its Graph key and minimap are both drawn, so a Resource
   // dropped below the source's line lands under it — and the hover further down
-  // this test, which reveals the created Thing's own controls, then never reaches
+  // this test, which reveals the created Resource's own controls, then never reaches
   // it. The direction is incidental to what this proves; the collision is not.
   const dropPoint = {
     x: Math.floor(from.x + from.width / 2 + 220),
@@ -177,65 +177,65 @@ test('Alt empty-drop creates, connects and selects Thing 2 at the previewed posi
   await page.mouse.down();
   await page.mouse.move(dropPoint.x, dropPoint.y, { steps: 4 });
   await page.keyboard.down('Alt');
-  const preview = page.getByTestId('new-thing-preview');
-  await expect(preview).toContainText('Thing 2');
+  const preview = page.getByTestId('new-resource-preview');
+  await expect(preview).toContainText('Resource 2');
   const previewBox = (await preview.boundingBox())!;
   expect(previewBox.x + previewBox.width / 2).toBeCloseTo(dropPoint.x, 0);
   expect(previewBox.y + previewBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await page.mouse.up();
   await page.keyboard.up('Alt');
 
-  const created = nodeByTitle(page, 'Thing 2');
+  const created = nodeByTitle(page, 'Resource 2');
   await expect(created).toBeVisible();
   const createdBox = (await created.boundingBox())!;
   expect(createdBox.x + createdBox.width / 2).toBeCloseTo(dropPoint.x, 0);
   expect(createdBox.y + createdBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
+  await expect(selectedCanvas(page)).toContainText('Map 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
 
   await settled(page);
   await created.hover();
   const continuedSource = authoringHandle(created, 'source', 'left');
-  await connectHandles(page, continuedSource, authoringHandle(sourceThing, 'target', 'right'));
+  await connectHandles(page, continuedSource, authoringHandle(sourceResource, 'target', 'right'));
   await expect(page.locator('.react-flow__edge')).toHaveCount(2);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 /**
- * A selected Diagram always has a Graph to author into.
+ * A selected Map always has a Graph to author into.
  *
- * Creating a Diagram creates its initial Active Graph in the same Edit (ADR
- * 0040), so the seeded Diagram owns one from the start — empty, exactly as a
- * conversion leaves it. What the drop does is put the Diagram's *first Edge* in
+ * Creating a Map creates its initial Active Graph in the same Edit (ADR
+ * 0040), so the seeded Map owns one from the start — empty, exactly as a
+ * conversion leaves it. What the drop does is put the Map's *first Edge* in
  * the Graph it already owns, rather than minting a second one beside it.
  */
-test('Alt empty-drop authors the first Edge into the Graph a selected Diagram owns', async ({
+test('Alt empty-drop authors the first Edge into the Graph a selected Map owns', async ({
   page,
 }) => {
-  const seeded = await seedNewSpaceDiagram(page);
+  const seeded = await seedNewSpaceMap(page);
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
 
-  const sourceThing = nodeByTitle(page, 'Thing 1');
-  await expect(sourceThing).toBeVisible();
-  await expect(selectedCanvas(page)).toContainText('Authored Diagram');
+  const sourceResource = nodeByTitle(page, 'Resource 1');
+  await expect(sourceResource).toBeVisible();
+  await expect(selectedCanvas(page)).toContainText('Authored Map');
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await settled(page);
-  await sourceThing.hover();
+  await sourceResource.hover();
 
-  await connectToEmptyWithAlt(page, authoringHandle(sourceThing, 'source', 'right'));
+  await connectToEmptyWithAlt(page, authoringHandle(sourceResource, 'source', 'right'));
 
-  await expect(nodeByTitle(page, 'Thing 2')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Authored Diagram');
+  await expect(selectedCanvas(page)).toContainText('Authored Map');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
@@ -243,26 +243,26 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Diagram ow
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
-  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
-  await expect(nodeByTitle(page, 'Thing 2')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Authored Diagram');
+  await expect(selectedCanvas(page)).toContainText('Authored Map');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute(
     'data-revision',
     persistedRevision,
   );
 });
 
-test('an Alt-drop released off the canvas creates no Thing', async ({ page }) => {
+test('an Alt-drop released off the canvas creates no Resource', async ({ page }) => {
   await page.goto('/');
-  await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  await createMap(page);
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
-  await thing.hover();
+  await resource.hover();
 
-  const source = authoringHandle(thing, 'source', 'right');
+  const source = authoringHandle(resource, 'source', 'right');
   const from = (await source.boundingBox())!;
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
@@ -270,11 +270,11 @@ test('an Alt-drop released off the canvas creates no Thing', async ({ page }) =>
     steps: 4,
   });
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
 
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
-  // only thing that may author a Thing.
+  // only fact that may author a Resource.
   // Chrome over the canvas rather than beside it: the header this used went with
   // the Sidebar (ADR 0082), and the Command Dock is the surface a release lands
   // on without the flow ever seeing it.
@@ -284,84 +284,80 @@ test('an Alt-drop released off the canvas creates no Thing', async ({ page }) =>
   // screen over a point that would author nothing. Without this the test would
   // pass just as well if the preview correctly vanished, and the disagreement
   // the two suppliers are priced against would go unmeasured.
-  await expect(page.getByTestId('new-thing-preview')).toContainText('Thing 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
   await page.mouse.up();
   await page.keyboard.up('Alt');
 
-  await expect(nodeByTitle(page, 'Thing 2')).toHaveCount(0);
+  await expect(nodeByTitle(page, 'Resource 2')).toHaveCount(0);
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('the first self-connection authors into the Graph the explicit Diagram owns', async ({
-  page,
-}) => {
+test('the first self-connection authors into the Graph the explicit Map owns', async ({ page }) => {
   await page.goto('/');
-  await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  await createMap(page);
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
-  const before = await positionOf(thing);
-  await thing.hover();
+  const before = await positionOf(resource);
+  await resource.hover();
 
   await connectHandles(
     page,
-    authoringHandle(thing, 'source', 'right'),
-    authoringHandle(thing, 'target', 'left'),
+    authoringHandle(resource, 'source', 'right'),
+    authoringHandle(resource, 'target', 'left'),
   );
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
+  await expect(selectedCanvas(page)).toContainText('Map 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  // Authoring the Edge must not move the Thing already placed in the Diagram.
+  // Authoring the Edge must not move the Resource already placed in the Map.
   await settled(page);
-  expect(await positionOf(thing)).toEqual(before);
+  expect(await positionOf(resource)).toEqual(before);
 });
 
-test('the Graph the explicit Diagram owns can be self-connected and presented', async ({
-  page,
-}) => {
+test('the Graph the explicit Map owns can be self-connected and presented', async ({ page }) => {
   await page.goto('/');
-  await createDiagram(page);
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  await createMap(page);
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
-  const thingId = await thing.getAttribute('data-id');
-  expect(thingId).not.toBeNull();
-  await thing.hover();
+  const resourceId = await resource.getAttribute('data-id');
+  expect(resourceId).not.toBeNull();
+  await resource.hover();
 
   await connectHandles(
     page,
-    authoringHandle(thing, 'source', 'right'),
-    authoringHandle(thing, 'target', 'left'),
+    authoringHandle(resource, 'source', 'right'),
+    authoringHandle(resource, 'target', 'left'),
   );
   await expect(activeGraph(page)).toHaveText('Graph 1');
 
-  // Every Thing a fully cyclic Graph holds is arrived at, so it has no entry
-  // Thing. The control is enabled because a Graph *is* active, and presenting
+  // Every Resource a fully cyclic Graph holds is arrived at, so it has no entry
+  // Resource. The control is enabled because a Graph *is* active, and presenting
   // used to return before changing anything — the click went nowhere.
   await presentControl(page).click();
 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeThing(page)).toHaveAttribute('data-id', thingId!);
+  await expect(activeResource(page)).toHaveAttribute('data-id', resourceId!);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveCount(1);
-  await expect(moves).toHaveText('Thing 1');
+  await expect(moves).toHaveText('Resource 1');
 });
 
 test(
   'shows the empty initial Graph and its graph HUD',
-  { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
+  { tag: '@parity:command-dock-names-a-new-spaces-initial-map-and-graph' },
   async ({ page }) => {
     await page.goto('/');
-    await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+    await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
 
     await expect(activeGraph(page)).toHaveText('Graph 1');
-    await expect(selectedCanvas(page)).toContainText('Diagram 1');
+    await expect(selectedCanvas(page)).toContainText('Map 1');
     // `aria-disabled` rather than the attribute — a toolbar item stays focusable
     // while it is unavailable (ADR 0073).
     await expect(presentControl(page)).toHaveAttribute('aria-disabled', 'true');
@@ -369,28 +365,28 @@ test(
   },
 );
 
-test('its one centered authored Thing is draggable', async ({ page }) => {
+test('its one centered authored Resource is draggable', async ({ page }) => {
   await page.goto('/');
-  await createDiagram(page);
+  await createMap(page);
 
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
 
-  const before = await positionOf(thing);
-  await dragBy(page, thing, 0, 200);
-  const after = await positionOf(thing);
+  const before = await positionOf(resource);
+  await dragBy(page, resource, 0, 200);
+  const after = await positionOf(resource);
 
   expect(after.y).toBeGreaterThan(before.y + 80);
 });
 
 test('renders at natural size rather than filling the screen', async ({ page }) => {
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
   await settled(page);
 
   // The overview fit caps at `maxZoom: 1`. Without the cap React Flow's default
-  // max of 2 applies, and a lone thing is scaled to 2x — padding reserves margin,
+  // max of 2 applies, and a lone resource is scaled to 2x — padding reserves margin,
   // it does not cap zoom. This is the one place that cap is reachable, because
   // it takes a space small enough for the fit to want to zoom in.
   const zoom = await page.evaluate(() => {
@@ -402,21 +398,21 @@ test('renders at natural size rather than filling the screen', async ({ page }) 
 
 test('persists a completed edit through the backend session', async ({ page }) => {
   await page.goto('/');
-  await createDiagram(page);
+  await createMap(page);
 
-  const thing = nodeByTitle(page, 'Thing 1');
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'Resource 1');
+  await expect(resource).toBeVisible();
   await settled(page);
-  const before = await positionOf(thing);
-  await dragBy(page, thing, 0, 220);
-  expect((await positionOf(thing)).y).toBeGreaterThan(before.y + 80);
+  const before = await positionOf(resource);
+  await dragBy(page, resource, 0, 220);
+  expect((await positionOf(resource)).y).toBeGreaterThan(before.y + 80);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
 
 test('a completed edit and space identity survive reload', async ({ page }) => {
   await page.goto('/');
-  await createDiagram(page);
-  const first = nodeByTitle(page, 'Thing 1');
+  await createMap(page);
+  const first = nodeByTitle(page, 'Resource 1');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
   // Without this, two missing attributes compare equal after the reload and the
@@ -429,7 +425,7 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
 
   await page.reload();
 
-  const second = nodeByTitle(page, 'Thing 1');
+  const second = nodeByTitle(page, 'Resource 1');
   await expect(second).toBeVisible();
   await settled(page);
   expect(await second.getAttribute('data-id')).toBe(firstId);
@@ -440,14 +436,14 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
 /**
  * Open Spaces validates the backend's response before opening it
  * (`open-spaces.ts`) — a real backend can return a snapshot referencing a
- * thing it does not hold (a partial write, a migration gap), and this proves
+ * resource it does not hold (a partial write, a migration gap), and this proves
  * that reaches `StartupFailure` rather than an unhandled rejection. The
  * response is wire-valid (it parses as a `SpaceSnapshot`) and only fails
  * domain intake, so this is the real client boundary rather than a decode
  * error.
  */
 test(
-  'a backend snapshot naming a thing its own Graph does not hold fails startup with the real diagnostic',
+  'a backend snapshot naming a resource its own Graph does not hold fails startup with the real diagnostic',
   { tag: '@parity:operational-feedback-startup-failure' },
   async ({ page }) => {
     const summariesResponse = await page.request.get('/api/spaces');
@@ -465,12 +461,12 @@ test(
     // `/api/spaces/:id` response — the server producing it is this same
     // codebase, not third-party JSON.
     const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
-    const thingId = loaded.snapshot.things[0]?.id;
-    if (thingId === undefined) throw new Error('The new Space must hold Thing 1.');
+    const resourceId = loaded.snapshot.resources[0]?.id;
+    if (resourceId === undefined) throw new Error('The new Space must hold Resource 1.');
 
-    const diagramId = '00000000-0000-4000-8000-0000000000fe';
+    const mapId = '00000000-0000-4000-8000-0000000000fe';
     const graphId = '00000000-0000-4000-8000-0000000000fd';
-    const missingThingId = '00000000-0000-4000-8000-0000000000ff';
+    const missingResourceId = '00000000-0000-4000-8000-0000000000ff';
     await page.route('**/api/spaces/*', async (route) => {
       const request = route.request();
       const isLoadOne =
@@ -489,18 +485,22 @@ test(
             ...loaded.snapshot,
             document: {
               ...loaded.snapshot.document,
-              diagrams: [
+              maps: [
                 {
-                  id: diagramId,
-                  title: 'Diagram',
+                  id: mapId,
+                  title: 'Map',
                   kind: 'positioned',
-                  positions: { [thingId]: { x: 0, y: 0, open: false } },
+                  positions: { [resourceId]: { x: 0, y: 0, open: false } },
                   graphs: [
-                    { id: graphId, title: 'Graph', edges: [{ from: thingId, to: missingThingId }] },
+                    {
+                      id: graphId,
+                      title: 'Graph',
+                      edges: [{ from: resourceId, to: missingResourceId }],
+                    },
                   ],
                 },
               ],
-              defaultDiagram: diagramId,
+              defaultMap: mapId,
             },
           },
         }),
@@ -510,6 +510,6 @@ test(
     await page.goto('/');
     const alert = page.getByRole('alert');
     await expect(alert.getByText('Application could not start')).toBeVisible();
-    await expect(alert).toContainText(missingThingId);
+    await expect(alert).toContainText(missingResourceId);
   },
 );

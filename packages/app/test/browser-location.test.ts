@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   uuidSchema,
-  type ThingId,
+  type ResourceId,
   type GraphId,
-  type DiagramId,
+  type MapId,
   type SpaceSnapshot,
 } from '@project/core';
 import { productDestinationPath } from '@project/http';
@@ -28,69 +28,69 @@ import { recordingHistory } from './browser-history';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const SECOND_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-/** Named by no Diagram in the Space: the dead address a Back can land on. */
-const MISSING_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+/** Named by no Map in the Space: the dead address a Back can land on. */
+const MISSING_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram',
+        id: MAP_ID,
+        title: 'Map',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 20, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 20, open: false },
         },
         graphs: [
-          { id: GRAPH_ID, title: 'Graph', edges: [{ from: THING_A, to: THING_B }] },
+          { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
           { id: SECOND_GRAPH_ID, title: 'Second Graph', edges: [] },
         ],
       },
       {
-        id: OTHER_DIAGRAM_ID,
-        title: 'Other Diagram',
+        id: OTHER_MAP_ID,
+        title: 'Other Map',
         kind: 'positioned',
-        positions: { [THING_A]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
-/** One Thing whose Graph leaves it by an Edge back to itself. */
+/** One Resource whose Graph leaves it by an Edge back to itself. */
 const selfEdge: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram',
+        id: MAP_ID,
+        title: 'Map',
         kind: 'positioned',
-        positions: { [THING_A]: { x: 10, y: 20, open: false } },
-        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: THING_A, to: THING_A }] }],
+        positions: { [RESOURCE_A]: { x: 10, y: 20, open: false } },
+        graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_A, to: RESOURCE_A }] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [{ id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  resources: [{ id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
 
 const compose = (opened: SpaceSnapshot = snapshot) => {
@@ -98,24 +98,24 @@ const compose = (opened: SpaceSnapshot = snapshot) => {
   return composeApp({ spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded) });
 };
 
-const diagramPath = (diagramId: DiagramId): string =>
-  productDestinationPath({ kind: 'diagram', spaceId: SPACE_ID, diagramId });
+const mapPath = (mapId: MapId): string =>
+  productDestinationPath({ kind: 'map', spaceId: SPACE_ID, mapId });
 
-const diagramGraphPath = (diagramId: DiagramId, graphId: GraphId): string =>
-  productDestinationPath({ kind: 'diagram-graph', spaceId: SPACE_ID, diagramId, graphId });
+const mapGraphPath = (mapId: MapId, graphId: GraphId): string =>
+  productDestinationPath({ kind: 'map-graph', spaceId: SPACE_ID, mapId, graphId });
 
 const presentationPath = productDestinationPath({
   kind: 'presentation',
   spaceId: SPACE_ID,
-  diagramId: DIAGRAM_ID,
+  mapId: MAP_ID,
   graphId: GRAPH_ID,
-  thingId: THING_A,
+  resourceId: RESOURCE_A,
 });
 
-const thingPath = (diagramId: DiagramId, thingId: ThingId): string =>
-  productDestinationPath({ kind: 'diagram-thing', spaceId: SPACE_ID, diagramId, thingId });
+const resourcePath = (mapId: MapId, resourceId: ResourceId): string =>
+  productDestinationPath({ kind: 'map-resource', spaceId: SPACE_ID, mapId, resourceId });
 
-const deadPath = diagramPath(MISSING_DIAGRAM_ID);
+const deadPath = mapPath(MISSING_MAP_ID);
 
 describe('the browser location', () => {
   /**
@@ -126,13 +126,13 @@ describe('the browser location', () => {
    */
   it('writes nothing when it begins following, whatever the location says', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(OTHER_DIAGRAM_ID));
+    const history = recordingHistory(mapPath(OTHER_MAP_ID));
     const location = createBrowserLocation(history);
 
     location.follow(app);
 
     expect(history.writes).toEqual([]);
-    expect(history.pathname()).toBe(diagramPath(OTHER_DIAGRAM_ID));
+    expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
     location.dispose();
   });
 
@@ -145,14 +145,14 @@ describe('the browser location', () => {
    */
   it('writes nothing when the same position is decided a second time', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(OTHER_DIAGRAM_ID));
+    const history = recordingHistory(mapPath(OTHER_MAP_ID));
     const location = createBrowserLocation(history);
 
     location.follow(app);
     location.follow(app);
     // Navigation republishing the selection it already holds: the notification
     // arrives, the position has not moved, and nothing is written.
-    app.navigation.selectDiagram(DIAGRAM_ID);
+    app.navigation.selectMap(MAP_ID);
 
     expect(history.writes).toEqual([]);
     location.dispose();
@@ -164,7 +164,7 @@ describe('the browser location', () => {
    */
   it('reports a Back onto a dead address rather than correcting it', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
 
@@ -177,7 +177,7 @@ describe('the browser location', () => {
   });
 
   /**
-   * Restoring through Open Spaces refuses two different things with the same
+   * Restoring through Open Spaces refuses two different resources with the same
    * rejection, and only one of them is a destination that failed to resolve.
    *
    * A pathname outside product addressing is refused because it is not an
@@ -188,7 +188,7 @@ describe('the browser location', () => {
    */
   it('leaves a Back onto a location outside product addressing alone', async () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const refusal = Promise.reject(new Error('The URL is outside product addressing.'));
     const settled = refusal.catch(() => undefined);
     const location = createBrowserLocation(history, undefined, () => refusal);
@@ -205,7 +205,7 @@ describe('the browser location', () => {
   /** The half that must survive the one above: a dead product address reports. */
   it('reports a Back onto a dead address the Space could not be opened for', async () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const refusal = Promise.reject(new Error('The product URL does not resolve.'));
     const settled = refusal.catch(() => undefined);
     const location = createBrowserLocation(history, undefined, () => refusal);
@@ -222,22 +222,22 @@ describe('the browser location', () => {
   /**
    * A cleared report and a corrected location are one repair, not two.
    *
-   * The choice is the Diagram already selected, so the position does not move
+   * The choice is the Map already selected, so the position does not move
    * and no entry is earned — while the location the reader is still on is the
    * one that could not be resolved, which reloads into a host 404. Reporting it
    * as answered and leaving it in the address bar is the half-fix.
    */
-  it('corrects an unresolved location when a repeated Diagram choice answers the report', () => {
+  it('corrects an unresolved location when a repeated Map choice answers the report', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
     history.popTo(deadPath);
 
-    location.chooseDiagram(DIAGRAM_ID);
+    location.chooseMap(MAP_ID);
 
     expect(location.getState().destinationNotFound).toBe(false);
-    expect(history.writes).toEqual([{ method: 'replace', path: diagramPath(DIAGRAM_ID) }]);
+    expect(history.writes).toEqual([{ method: 'replace', path: mapPath(MAP_ID) }]);
     location.dispose();
   });
 
@@ -250,7 +250,7 @@ describe('the browser location', () => {
    */
   it('clears the report and takes one entry when presenting moves off an unresolved location', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
     history.popTo(deadPath);
@@ -270,7 +270,7 @@ describe('the browser location', () => {
    */
   it('takes one entry for a presentation a self-Edge never moves', () => {
     const app = compose(selfEdge);
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
 
@@ -283,60 +283,60 @@ describe('the browser location', () => {
   });
 
   /**
-   * Activating a Graph makes the same deliberate move a Diagram choice does — it
-   * clears the addressed Thing and answers the report — and differs in exactly
+   * Activating a Graph makes the same deliberate move a Map choice does — it
+   * clears the addressed Resource and answers the report — and differs in exactly
    * one operation, which is the reason it may not simply call the same operation:
-   * it does not change the Diagram, so the published projection stays.
+   * it does not change the Map, so the published projection stays.
    */
   it('answers the report from an activated Graph without disturbing the render adapter', () => {
     const app = compose();
     const history = recordingHistory(
       productDestinationPath({
-        kind: 'diagram-thing',
+        kind: 'map-resource',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
-        thingId: THING_A,
+        mapId: MAP_ID,
+        resourceId: RESOURCE_A,
       }),
     );
     const location = createBrowserLocation(history);
     location.follow(app);
     app.adapter.getState().syncProjection([], []);
-    expect(location.getState().addressedThingId).toBe(THING_A);
+    expect(location.getState().addressedResourceId).toBe(RESOURCE_A);
     history.popTo(deadPath);
     expect(location.getState().destinationNotFound).toBe(true);
 
     location.activateGraph(SECOND_GRAPH_ID);
 
-    expect(location.getState()).toEqual({ addressedThingId: null, destinationNotFound: false });
+    expect(location.getState()).toEqual({ addressedResourceId: null, destinationNotFound: false });
     expect(history.writes).toEqual([
-      { method: 'push', path: diagramGraphPath(DIAGRAM_ID, SECOND_GRAPH_ID) },
+      { method: 'push', path: mapGraphPath(MAP_ID, SECOND_GRAPH_ID) },
     ]);
     expect(app.adapter.getState().projection).not.toBeNull();
     location.dispose();
   });
 
-  /** The contrast the test above rests on: a Diagram choice *does* clear it. */
-  it('clears the published projection when a choice changes the Diagram', () => {
+  /** The contrast the test above rests on: a Map choice *does* clear it. */
+  it('clears the published projection when a choice changes the Map', () => {
     const app = compose();
-    const location = createBrowserLocation(recordingHistory(diagramPath(DIAGRAM_ID)));
+    const location = createBrowserLocation(recordingHistory(mapPath(MAP_ID)));
     location.follow(app);
     app.adapter.getState().syncProjection([], []);
 
-    location.chooseDiagram(OTHER_DIAGRAM_ID);
+    location.chooseMap(OTHER_MAP_ID);
 
     expect(app.adapter.getState().projection).toBeNull();
-    expect(app.navigation.getState().selectedDiagramId).toBe(OTHER_DIAGRAM_ID);
+    expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
     location.dispose();
   });
 
   it('resolves a destination against the current location for the clipboard', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
 
-    expect(location.href({ kind: 'diagram', spaceId: SPACE_ID, diagramId: OTHER_DIAGRAM_ID })).toBe(
-      new URL(diagramPath(OTHER_DIAGRAM_ID), history.href()).href,
+    expect(location.href({ kind: 'map', spaceId: SPACE_ID, mapId: OTHER_MAP_ID })).toBe(
+      new URL(mapPath(OTHER_MAP_ID), history.href()).href,
     );
     location.dispose();
   });
@@ -344,28 +344,28 @@ describe('the browser location', () => {
   /**
    * The Back that lands somewhere real, which every other Back here does not.
    *
-   * It is the one path that both moves Navigation and names a Thing, so it is
-   * where the order of the two matters: the Thing is known the moment the
+   * It is the one path that both moves Navigation and names a Resource, so it is
+   * where the order of the two matters: the Resource is known the moment the
    * restoration resolves, and moving Navigation before recording it would
-   * notify against a position still carrying the Thing the reader is leaving.
+   * notify against a position still carrying the Resource the reader is leaving.
    * The sync that notification triggers would then see an address that moved
    * and take an entry over the one the browser has just navigated to — which is
    * the entry ADR 0081's `none` outcome exists to refuse.
    */
-  it('restores a Back onto a resolvable Thing location without earning an entry', () => {
+  it('restores a Back onto a resolvable Resource location without earning an entry', () => {
     const app = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(app);
-    location.chooseDiagram(OTHER_DIAGRAM_ID);
-    expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
+    location.chooseMap(OTHER_MAP_ID);
+    expect(history.writes).toEqual([{ method: 'push', path: mapPath(OTHER_MAP_ID) }]);
 
-    history.popTo(thingPath(DIAGRAM_ID, THING_B));
+    history.popTo(resourcePath(MAP_ID, RESOURCE_B));
 
-    expect(app.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
-    expect(location.getState().addressedThingId).toBe(THING_B);
+    expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+    expect(location.getState().addressedResourceId).toBe(RESOURCE_B);
     expect(location.getState().destinationNotFound).toBe(false);
-    expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
+    expect(history.writes).toEqual([{ method: 'push', path: mapPath(OTHER_MAP_ID) }]);
     location.dispose();
   });
 
@@ -380,21 +380,21 @@ describe('the browser location', () => {
   it('sends a later operation to the composition it followed last', () => {
     const first = compose();
     const second = compose();
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
 
     location.follow(first);
     location.follow(second);
-    location.chooseDiagram(OTHER_DIAGRAM_ID);
+    location.chooseMap(OTHER_MAP_ID);
 
-    expect(second.navigation.getState().selectedDiagramId).toBe(OTHER_DIAGRAM_ID);
-    expect(first.navigation.getState().selectedDiagramId).toBe(DIAGRAM_ID);
-    expect(history.writes).toEqual([{ method: 'push', path: diagramPath(OTHER_DIAGRAM_ID) }]);
+    expect(second.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+    expect(first.navigation.getState().selectedMapId).toBe(MAP_ID);
+    expect(history.writes).toEqual([{ method: 'push', path: mapPath(OTHER_MAP_ID) }]);
     location.dispose();
   });
 
   it('releases the Back listener it registered when disposed', () => {
-    const history = recordingHistory(diagramPath(DIAGRAM_ID));
+    const history = recordingHistory(mapPath(MAP_ID));
     const location = createBrowserLocation(history);
     location.follow(compose());
     expect(history.listenerCount()).toBe(1);
@@ -405,25 +405,25 @@ describe('the browser location', () => {
   });
 
   /**
-   * The location follows exactly one Space, and the Thing it addresses is a fact
+   * The location follows exactly one Space, and the Resource it addresses is a fact
    * about that pair rather than about a mounted component's lifetime.
    */
-  it('reads the addressed Thing off the location of the Space it follows', () => {
+  it('reads the addressed Resource off the location of the Space it follows', () => {
     const app = compose();
     const location = createBrowserLocation(
       recordingHistory(
         productDestinationPath({
-          kind: 'diagram-thing',
+          kind: 'map-resource',
           spaceId: SPACE_ID,
-          diagramId: DIAGRAM_ID,
-          thingId: THING_B,
+          mapId: MAP_ID,
+          resourceId: RESOURCE_B,
         }),
       ),
     );
 
     location.follow(app);
 
-    expect(location.getState().addressedThingId).toBe(THING_B);
+    expect(location.getState().addressedResourceId).toBe(RESOURCE_B);
     location.dispose();
   });
 });

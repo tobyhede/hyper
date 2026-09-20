@@ -2,7 +2,7 @@ import type { SpaceSnapshot, UUID } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import type { LoadedSpace } from './backend';
 import type { CommitResult, SpaceCommit } from './backend';
-import type { RepositoryCommitResult, SpaceResourceRepository } from './repository';
+import type { RepositoryCommitResult, StoredSpaceRepository } from './repository';
 
 /**
  * The two methods initialization needs, taken from the stored seam rather than
@@ -13,7 +13,7 @@ import type { RepositoryCommitResult, SpaceResourceRepository } from './reposito
  * `RepositoryCommitResult` does not, so this loader serves both by accepting
  * either. Narrowing it to the repository's own result would reject the browser.
  */
-interface WorkingSpaceStore extends Pick<SpaceResourceRepository, 'loadSpace'> {
+interface WorkingSpaceStore extends Pick<StoredSpaceRepository, 'loadSpace'> {
   readonly commit: (request: SpaceCommit) => Promise<CommitResult | RepositoryCommitResult>;
 }
 
@@ -21,34 +21,33 @@ const initializedSnapshot = (
   snapshot: SpaceSnapshot,
   newId: () => UUID,
 ): SpaceSnapshot | undefined => {
-  const diagrams = snapshot.document.diagrams ?? [];
-  if (diagrams.length > 0) {
-    if (snapshot.document.defaultDiagram !== undefined) return undefined;
-    const firstDiagram = diagrams[0];
-    if (firstDiagram === undefined)
-      throw new Error('A non-empty Diagram list lost its first value');
+  const maps = snapshot.document.maps ?? [];
+  if (maps.length > 0) {
+    if (snapshot.document.defaultMap !== undefined) return undefined;
+    const firstMap = maps[0];
+    if (firstMap === undefined) throw new Error('A non-empty Map list lost its first value');
     return {
       ...snapshot,
-      document: { ...snapshot.document, defaultDiagram: firstDiagram.id },
+      document: { ...snapshot.document, defaultMap: firstMap.id },
     };
   }
-  const diagramId = newId();
+  const mapId = newId();
   const graphId = newId();
   return {
     ...snapshot,
     document: {
       ...snapshot.document,
-      diagrams: [
+      maps: [
         {
-          id: diagramId,
-          title: 'Diagram 1',
+          id: mapId,
+          title: 'Map 1',
           kind: 'positioned',
           positions: {},
           graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
           activeGraph: graphId,
         },
       ],
-      defaultDiagram: diagramId,
+      defaultMap: mapId,
     },
   };
 };

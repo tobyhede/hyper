@@ -6,7 +6,7 @@ import {
   type ImportSpace,
   type ImportSpaceFile,
 } from '@project/core';
-import { documentRefusal, parseImportThingFile } from '@project/graph';
+import { documentRefusal, parseImportResourceFile } from '@project/graph';
 import { compareOrdinal } from '../ordinal';
 
 type AggregateDirectoryErrorKind = 'discovery' | 'parsing';
@@ -44,11 +44,11 @@ const markdownFilesIn = async (directory: string): Promise<string[]> =>
 export const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
-const discoverThingFiles = async (spaceDirectory: string): Promise<string[]> => {
+const discoverResourceFiles = async (spaceDirectory: string): Promise<string[]> => {
   const rootFiles = await markdownFilesIn(spaceDirectory);
   let nestedFiles: string[];
   try {
-    nestedFiles = await markdownFilesIn(join(spaceDirectory, 'things'));
+    nestedFiles = await markdownFilesIn(join(spaceDirectory, 'resources'));
   } catch (error) {
     if (!isMissingFile(error)) throw error;
     nestedFiles = [];
@@ -61,34 +61,34 @@ const discoverThingFiles = async (spaceDirectory: string): Promise<string[]> => 
 
 export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> => {
   let spaceFile: string;
-  let thingPaths: string[];
+  let resourcePaths: string[];
   try {
     spaceFile = await resolveSpaceFile(inputPath);
     const spaceDirectory = dirname(spaceFile);
-    thingPaths = await discoverThingFiles(spaceDirectory);
+    resourcePaths = await discoverResourceFiles(spaceDirectory);
   } catch (error) {
     throw new AggregateDirectoryError('discovery', [String(error)]);
   }
 
-  const readPaths = [spaceFile, ...thingPaths];
+  const readPaths = [spaceFile, ...resourcePaths];
   const readResults = await Promise.allSettled(readPaths.map((path) => readFile(path, 'utf8')));
   const readDiagnostics: string[] = [];
   let spaceText: string | undefined;
-  const thingTexts: string[] = [];
+  const resourceTexts: string[] = [];
   readResults.forEach((result, index) => {
     if (result.status === 'rejected') {
       readDiagnostics.push(`${readPaths[index] ?? spaceFile}: ${String(result.reason)}`);
     } else if (index === 0) {
       spaceText = result.value;
     } else {
-      thingTexts.push(result.value);
+      resourceTexts.push(result.value);
     }
   });
 
-  // Read apart from the things, and before the read failures are answered,
+  // Read apart from the resources, and before the read failures are answered,
   // because the refusal below is decided from this document alone. An
   // unparseable space file leaves `spaceJson` undefined, which `documentRefusal`
-  // answers `null` for — so a bad JSON diagnostic still travels with the thing
+  // answers `null` for — so a bad JSON diagnostic still travels with the resource
   // files' own, as it always did.
   let spaceJson: unknown = undefined;
   let spaceJsonDiagnostic: string | undefined;
@@ -100,7 +100,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
     }
   }
 
-  // One answer, and nothing behind it — not the things, and not even a file that
+  // One answer, and nothing behind it — not the resources, and not even a file that
   // could not be read. `documentRefusal`'s docblock is where the argument for
   // one composed gate lives; two facts are only known at this call site.
   //
@@ -109,7 +109,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   // it cannot read, and silence for a retired space-level `graphs`.
   //
   // And it is asked before the read failures below, because a document refused
-  // outright was never going to load. Answering the unreadable thing first sends
+  // outright was never going to load. Answering the unreadable resource first sends
   // its author to fix a file permission and only then tells them the work was
   // pointless. The mirror holds and is why this is not hoisted above the read
   // itself: with no space file there is no document, so `documentRefusal`
@@ -140,13 +140,13 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
     }
   }
 
-  const things = thingPaths.flatMap((path, index) => {
-    const parsed = parseImportThingFile({ path, text: thingTexts[index] ?? '' });
+  const resources = resourcePaths.flatMap((path, index) => {
+    const parsed = parseImportResourceFile({ path, text: resourceTexts[index] ?? '' });
     if (!parsed.ok) {
       diagnostics.push(...parsed.errors.map((error) => error.message));
       return [];
     }
-    return [parsed.thing];
+    return [parsed.resource];
   });
 
   if (diagnostics.length > 0 || parsedSpaceFile === undefined) {
@@ -155,6 +155,6 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
 
   const { id, ...document } = parsedSpaceFile;
   return importSpaceSchema.parse(
-    id === undefined ? { document, things } : { id, document, things },
+    id === undefined ? { document, resources } : { id, document, resources },
   );
 };

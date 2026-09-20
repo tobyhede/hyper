@@ -5,13 +5,13 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
-import { createThing, unavailable } from './command-dock';
+import { createResource, unavailable } from './command-dock';
 
 /**
- * The Spaces the Things list offers, across every open Space.
+ * The Spaces the Resources list offers, across every open Space.
  *
  * The set is a repository read rather than a derivation of the Space drawing
- * it, so the one Edit that changes it — the coordinated Space Thing lifecycle
+ * it, so the one Edit that changes it — the coordinated Space Resource lifecycle
  * (ADR 0074, ADR 0076) — is registry-wide while the surfaces reading it are one
  * per open Space. A reader who creates a Space in one Space and crosses back to
  * another has to find it offered there: every open Space stays mounted
@@ -19,20 +19,20 @@ import { createThing, unavailable } from './command-dock';
  */
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const META_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const META_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const META_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const META_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const META_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const META_TO_OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
-const HOME_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
-const HOME_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+const HOME_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const HOME_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const HOME_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
 
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
-const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 
 /** Meta references both ordinary Spaces, which is what makes the aggregate valid. */
@@ -41,30 +41,30 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Meta',
-    diagrams: [
+    maps: [
       {
-        id: META_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: META_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_THING_ID]: { x: 0, y: 0, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
           [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
           [META_TO_OTHER_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
-    defaultDiagram: META_DIAGRAM_ID,
+    defaultMap: META_MAP_ID,
   },
-  things: [
-    { id: META_THING_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+  resources: [
+    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
     {
       id: META_TO_HOME_ID,
       document: {
         title: 'Home',
         kind: 'space',
         spaceId: HOME_ID,
-        diagram: HOME_DIAGRAM_ID,
+        map: HOME_MAP_ID,
         graph: HOME_GRAPH_ID,
       },
     },
@@ -74,7 +74,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Other',
         kind: 'space',
         spaceId: OTHER_ID,
-        diagram: OTHER_DIAGRAM_ID,
+        map: OTHER_MAP_ID,
         graph: OTHER_GRAPH_ID,
       },
     },
@@ -86,18 +86,20 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Home',
-    diagrams: [
+    maps: [
       {
-        id: HOME_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: HOME_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
-        positions: { [HOME_THING_ID]: { x: 10, y: 20, open: false } },
+        positions: { [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false } },
         graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
-    defaultDiagram: HOME_DIAGRAM_ID,
+    defaultMap: HOME_MAP_ID,
   },
-  things: [{ id: HOME_THING_ID, document: { title: 'Start here', kind: 'markdown', body: '' } }],
+  resources: [
+    { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+  ],
 });
 
 const other: SpaceSnapshot = spaceSnapshotSchema.parse({
@@ -105,18 +107,20 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Other',
-    diagrams: [
+    maps: [
       {
-        id: OTHER_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: OTHER_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
-        positions: { [OTHER_THING_ID]: { x: 10, y: 20, open: false } },
+        positions: { [OTHER_RESOURCE_ID]: { x: 10, y: 20, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
     ],
-    defaultDiagram: OTHER_DIAGRAM_ID,
+    defaultMap: OTHER_MAP_ID,
   },
-  things: [{ id: OTHER_THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
+  resources: [
+    { id: OTHER_RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+  ],
 });
 
 beforeAll(() => {
@@ -146,26 +150,26 @@ afterAll(() => vi.unstubAllGlobals());
 
 /** Wait for the canvas to be authorable, which is what makes the Dock's commands available. */
 async function readyToAuthor(): Promise<void> {
-  const create = await screen.findByRole('button', { name: 'Create Markdown Thing' });
+  const create = await screen.findByRole('button', { name: 'Create Markdown Resource' });
   await waitFor(() => expect(unavailable(create)).toBe(false));
 }
 
-/** Open the Things list of whichever Space is showing, and answer its popup. */
-async function openThingsList(): Promise<HTMLElement> {
-  fireEvent.click(screen.getByRole('button', { name: 'Things' }));
-  return await screen.findByRole('dialog', { name: 'Things' });
+/** Open the Resources list of whichever Space is showing, and answer its popup. */
+async function openResourcesList(): Promise<HTMLElement> {
+  fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
+  return await screen.findByRole('dialog', { name: 'Resources' });
 }
 
-const closeThingsList = async (popup: HTMLElement): Promise<void> => {
+const closeResourcesList = async (popup: HTMLElement): Promise<void> => {
   fireEvent.keyDown(popup, { key: 'Escape' });
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Things' })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Resources' })).toBeNull());
 };
 
 /** The count the Spaces switch announces, which is the size of the offered set. */
 const offeredSpaces = (): HTMLElement =>
   screen.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ });
 
-describe('the Spaces a Things list offers', () => {
+describe('the Spaces a Resources list offers', () => {
   /**
    * Space A and Space B are both open; the Space is created in B; A has to see
    * it. Both applications stay mounted across the crossing, so A's Spaces read
@@ -193,32 +197,32 @@ describe('the Spaces a Things list offers', () => {
     // Home offers Meta and Other: `referenceableSpaces` withholds only the
     // containing Space.
     await readyToAuthor();
-    const before = await openThingsList();
+    const before = await openResourcesList();
     expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 2');
-    await closeThingsList(before);
+    await closeResourcesList(before);
 
     // Cross to Other and create a Space there — one press, which mints the Space
-    // and the Thing that names it from one `Space N` (ADR 0089). Other holds
-    // `Thing 1` and no `Space N`, so the new pair is called `Space 1`.
+    // and the Resource that names it from one `Space N` (ADR 0089). Other holds
+    // `Resource 1` and no `Space N`, so the new pair is called `Space 1`.
     await act(async () => {
       await spaces.switchTo(OTHER_ID);
     });
     await readyToAuthor();
     await act(async () => {
-      createThing('Space Thing');
+      createResource('Space Resource');
       await Promise.resolve();
     });
-    await screen.findByRole('textbox', { name: 'Thing title' });
+    await screen.findByRole('textbox', { name: 'Resource title' });
 
     // Back in Home, the list has to offer the Space that now exists.
     await act(async () => {
       await spaces.switchTo(HOME_ID);
     });
-    await openThingsList();
+    await openResourcesList();
     await waitFor(() =>
       expect(offeredSpaces()).toHaveAccessibleName('Spaces in this Meta Space, 3'),
     );
-    expect(screen.getByRole('button', { name: 'Add Space 1 to Diagram' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Space 1 to Map' })).toBeInTheDocument();
   }, 15_000);
 });
 

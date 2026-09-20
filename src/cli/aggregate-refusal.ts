@@ -8,7 +8,7 @@ import type { SpaceAggregateError } from '@project/graph';
  * A refusal arrives as structured `SpaceAggregateError`s and every one of them
  * names the entities involved. Printing only `error.kind` throws all of that
  * away: `invalid-space-snapshot` becomes a single word for a fault that could be
- * any of a Space's Things, and the colliding ids in `duplicate-thing-id` — the
+ * any of a Space's Resources, and the colliding ids in `duplicate-resource-id` — the
  * only part an operator can search a directory for — never reach the terminal.
  * So the structure survives as far as here and is rendered once, at the edge.
  *
@@ -32,8 +32,8 @@ export const describeAggregateRefusal = (
     const snapshot = spaces[index];
     return snapshot === undefined ? `the space at position ${index}` : `Space ${snapshot.id}`;
   };
-  const spaceThing = (error: { readonly spaceId: UUID; readonly thingId: UUID }): string =>
-    `Space Thing ${error.thingId} in Space ${error.spaceId}`;
+  const spaceResource = (error: { readonly spaceId: UUID; readonly resourceId: UUID }): string =>
+    `Space Resource ${error.resourceId} in Space ${error.spaceId}`;
 
   return errors.map((error) => {
     switch (error.kind) {
@@ -43,22 +43,22 @@ export const describeAggregateRefusal = (
           .join('\n  ')}`;
       case 'duplicate-space-id':
         return `Space ${error.spaceId} is declared ${error.snapshotIndexes.length} times`;
-      case 'duplicate-thing-id':
-        return `Thing ${error.thingId} is claimed by more than one Space: ${error.spaceIds.join(', ')}`;
+      case 'duplicate-resource-id':
+        return `Resource ${error.resourceId} is claimed by more than one Space: ${error.spaceIds.join(', ')}`;
       case 'meta-space-missing':
         return `The aggregate names Meta Space ${error.metaSpaceId}, which it does not contain`;
       case 'ordinary-space-unreferenced':
-        return `Space ${error.spaceId} is not the Meta Space and no Space Thing points at it`;
-      case 'space-thing-target-missing':
-        return `${spaceThing(error)} points at Space ${error.targetSpaceId}, which the aggregate does not contain`;
-      case 'space-thing-reference-cycle':
-        return `${spaceThing(error)} closes a reference cycle through Space ${error.targetSpaceId}`;
-      case 'space-thing-diagram-missing':
-        return `${spaceThing(error)} selects Diagram ${error.diagramId}, which Space ${error.targetSpaceId} does not have`;
-      case 'space-thing-graph-missing':
-        return `${spaceThing(error)} selects Graph ${error.graphId}, which Space ${error.targetSpaceId} does not have`;
-      case 'space-thing-graph-outside-diagram':
-        return `${spaceThing(error)} selects Graph ${error.graphId}, which Space ${error.targetSpaceId} has but Diagram ${error.diagramId} does not own`;
+        return `Space ${error.spaceId} is not the Meta Space and no Space Resource points at it`;
+      case 'space-resource-target-missing':
+        return `${spaceResource(error)} points at Space ${error.targetSpaceId}, which the aggregate does not contain`;
+      case 'space-resource-reference-cycle':
+        return `${spaceResource(error)} closes a reference cycle through Space ${error.targetSpaceId}`;
+      case 'space-resource-map-missing':
+        return `${spaceResource(error)} selects Map ${error.mapId}, which Space ${error.targetSpaceId} does not have`;
+      case 'space-resource-graph-missing':
+        return `${spaceResource(error)} selects Graph ${error.graphId}, which Space ${error.targetSpaceId} does not have`;
+      case 'space-resource-graph-outside-map':
+        return `${spaceResource(error)} selects Graph ${error.graphId}, which Space ${error.targetSpaceId} has but Map ${error.mapId} does not own`;
     }
   });
 };

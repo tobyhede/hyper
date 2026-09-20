@@ -209,7 +209,7 @@ describe('DropdownMenu', () => {
   /**
    * A union survives the round trip, which is what `String()` destroyed: the
    * value came back as a bare `string` and had to be parsed again into one of
-   * the things the menu had itself just rendered.
+   * the resources the menu had itself just rendered.
    */
   it('preserves a union value type through the group', () => {
     const chosen: ('left' | 'right')[] = [];

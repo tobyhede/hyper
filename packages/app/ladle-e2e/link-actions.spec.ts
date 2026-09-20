@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-/** Canonical Thing address — not the contextual Diagram one. */
-const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
+/** Canonical Resource address — not the contextual Map one. */
+const RESOURCE_COPY_LINK = /^Copy link to Resource(?! in Map)/;
 
 /**
  * The entity-actions menu, in a real browser, because jsdom cannot fail this.
@@ -17,7 +17,7 @@ const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
  * `space-sidebar-entity-actions-menu` — described a menu "reached two ways from
  * a Sidebar row". The Command Dock has clusters rather than rows and no
  * `onContextMenu` anywhere, so that behaviour did not move: it belongs to the
- * Thing rail (ADR 0073), which is what the last two tests in this file press.
+ * Resource rail (ADR 0073), which is what the last two tests in this file press.
  * What is left of the Sidebar's half is the one choice the Dock still decides
  * about the Space's own menu — which address it offers, and that Rename is a
  * command in it — restated below in the Dock's own words and untagged, the claim
@@ -29,7 +29,7 @@ const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
  * own rather than a side-effect of Rename living here too.
  *
  * The address is the Space's **own**, and that is a departure rather than the
- * rule: a second address does exist — the drawing Diagram's, which is what
+ * rule: a second address does exist — the drawing Map's, which is what
  * reproduces the screen and what the Graph cluster copies. The Space menu
  * deliberately does not offer it, because copying it would stop the Space's link
  * meaning the Space. Which of the two a Space title means is a product decision
@@ -40,7 +40,7 @@ const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
  * the editor is begun from the list
  * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
  * `spaceEntityActions` is still handed `onRename: null` by the application
- * (`entity-actions.tsx`): that is the Thing rail's menu, not this cluster's.
+ * (`entity-actions.tsx`): that is the Resource rail's menu, not this cluster's.
  */
 test('the Space cluster discloses from the name and offers one address plus Rename', async ({
   page,
@@ -51,9 +51,7 @@ test('the Space cluster discloses from the name and offers one address plus Rena
   await expect(title).toContainText('Rendering');
   await expect(title).toHaveJSProperty('tagName', 'BUTTON');
   await expect(page.getByRole('button', { name: 'Space: Rendering', exact: true })).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Diagram: Collection 1', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Map: Collection 1', exact: true })).toBeVisible();
 
   // `delay` is the whole reason this test is in a browser: a default Playwright
   // click puts mousedown and mouseup in the same tick, and the dismissal that
@@ -75,7 +73,7 @@ test('the Space cluster discloses from the name and offers one address plus Rena
 /**
  * A copy confirms by swapping the item's own label, without the menu closing.
  *
- * **This is the Thing rail's and no longer the chrome's.** `EntityActionsMenu`
+ * **This is the Resource rail's and no longer the chrome's.** `EntityActionsMenu`
  * swaps a pressed item's words because the Sidebar's menus were drawn inside a
  * Sheet over the area a pinned notice renders in, and on a phone the reader
  * could not see the report any other way. The Command Dock has no Sheet and
@@ -83,38 +81,38 @@ test('the Space cluster discloses from the name and offers one address plus Rena
  * instead; the rail keeps the swap, being a menu on the canvas itself.
  */
 test('a copy command confirms in the rail menu it was pressed in', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--thing-rail&mode=preview');
+  await page.goto('/?story=review--link-actions--resource-rail&mode=preview');
 
-  await page.getByRole('button', { name: 'Actions for Thing Thing 2' }).click({ delay: 120 });
+  await page.getByRole('button', { name: 'Actions for Resource Resource 2' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
-  await menu.getByRole('menuitem', { name: THING_COPY_LINK }).click();
+  await menu.getByRole('menuitem', { name: RESOURCE_COPY_LINK }).click();
 
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Copied' })).toBeVisible();
 });
 
-test('a Thing rail opens its actions menu from the actions control', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--thing-rail&mode=preview');
+test('a Resource rail opens its actions menu from the actions control', async ({ page }) => {
+  await page.goto('/?story=review--link-actions--resource-rail&mode=preview');
 
-  await page.getByRole('button', { name: 'Actions for Thing Thing 2' }).click({ delay: 120 });
+  await page.getByRole('button', { name: 'Actions for Resource Resource 2' }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
-  await menu.getByRole('menuitem', { name: 'Copy link to Thing in Diagram' }).click();
+  await menu.getByRole('menuitem', { name: 'Copy link to Resource in Map' }).click();
   await expect(
-    page.getByText(/Copied → .*\/diagrams\/AAAAAAAAQACAAAAAAAAAIA\/things\//),
+    page.getByText(/Copied → .*\/maps\/AAAAAAAAQACAAAAAAAAAIA\/resources\//),
   ).toBeVisible();
 });
 
-test('a Thing opens the same actions menu from a right click', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--thing-rail&mode=preview');
+test('a Resource opens the same actions menu from a right click', async ({ page }) => {
+  await page.goto('/?story=review--link-actions--resource-rail&mode=preview');
 
-  await page.getByRole('article', { name: 'Thing 2' }).click({ button: 'right' });
+  await page.getByRole('article', { name: 'Resource 2' }).click({ button: 'right' });
 
   const menu = page.getByRole('menu');
-  // No Rename: a Thing's title is renamed in place on its Front, so the menu
+  // No Rename: a Resource's title is renamed in place on its Front, so the menu
   // production would supply here holds its two addresses and nothing else.
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Copy link to Thing in Diagram' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: THING_COPY_LINK })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Copy link to Resource in Map' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: RESOURCE_COPY_LINK })).toBeVisible();
 });

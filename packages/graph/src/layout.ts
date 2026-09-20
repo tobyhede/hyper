@@ -1,35 +1,35 @@
 /**
- * The LayoutStrategy contract: a named strategy for arranging a space's things.
+ * The LayoutStrategy contract: a named strategy for arranging a space's resources.
  *
- * A strategy is behaviour; a **Diagram** (`@project/core`) is the authored data
+ * A strategy is behaviour; a **Map** (`@project/core`) is the authored data
  * one of them reads. ADR 0005 gave the strategy the noun that is now the
- * Diagram's, which ADR 0014 corrected once the authored kind became a value
+ * Map's, which ADR 0014 corrected once the authored kind became a value
  * you can hold.
  *
- * Geometry lives as *optional fields on the elements* — a thing carries `x`/`y`
+ * Geometry lives as *optional fields on the elements* — a resource carries `x`/`y`
  * — and a strategy takes a layout-strategy graph and returns the same value with
  * those fields populated. There is no separate arranged-result type;
  * `CONTEXT.md` lists "arrangement" under _Avoid_ and ADR 0005 records why.
  *
- * **A strategy answers positions and nothing else (ADR 0086).** A Diagram stores
- * a Thing and its position, so there is nowhere for a port offset or an Edge's
+ * **A strategy answers positions and nothing else (ADR 0086).** A Map stores
+ * a Resource and its position, so there is nowhere for a port offset or an Edge's
  * waypoints to land — routed geometry could only ever have been render-time,
- * and an automatic arrangement is an Edit over a Diagram rather than a render
+ * and an automatic arrangement is an Edit over a Map rather than a render
  * path. An Edge's two endpoint references went the same way with ADR 0087: an
  * Edge names no handle, and the side it attaches to is chosen while it is drawn
- * from where its two Things are at that moment. So an Edge reaches a strategy as
- * the pair of Things it joins, which is all a strategy ever read.
+ * from where its two Resources are at that moment. So an Edge reaches a strategy as
+ * the pair of Resources it joins, which is all a strategy ever read.
  *
- * Which things a strategy arranges is decided by the view before it runs. A
+ * Which resources a strategy arranges is decided by the view before it runs. A
  * strategy is free to ignore parts of the graph it has no use for — a grid never
  * looks at the edges.
  */
 
-import type { ThingId } from '@project/core';
+import type { ResourceId } from '@project/core';
 import type { GraphRenderEdge } from './graph-rendering';
 
-export interface LayoutStrategyThing {
-  id: ThingId;
+export interface LayoutStrategyResource {
+  id: ResourceId;
   width: number;
   height: number;
   x?: number;
@@ -38,12 +38,12 @@ export interface LayoutStrategyThing {
 
 export interface LayoutStrategyEdge {
   id: string;
-  source: ThingId;
-  target: ThingId;
+  source: ResourceId;
+  target: ResourceId;
 }
 
 export interface LayoutStrategyGraph {
-  things: LayoutStrategyThing[];
+  resources: LayoutStrategyResource[];
   edges: LayoutStrategyEdge[];
 }
 
@@ -62,20 +62,20 @@ export interface LayoutStrategyGraph {
 export type LayoutStrategy = (strategyGraph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
 
 /**
- * Assemble the graph to arrange, from things the view has already chosen plus the
+ * Assemble the graph to arrange, from resources the view has already chosen plus the
  * edges derived from the graphs running through them.
  */
 export function buildLayoutStrategyGraph(
-  thingIds: readonly ThingId[],
+  resourceIds: readonly ResourceId[],
   edges: readonly GraphRenderEdge[],
-  sizeOf: (thingId: ThingId) => { width: number; height: number },
+  sizeOf: (resourceId: ResourceId) => { width: number; height: number },
 ): LayoutStrategyGraph {
-  const visible = new Set(thingIds);
+  const visible = new Set(resourceIds);
 
   return {
-    things: thingIds.map((id) => {
-      const thingSize = sizeOf(id);
-      return { id, width: thingSize.width, height: thingSize.height };
+    resources: resourceIds.map((id) => {
+      const resourceSize = sizeOf(id);
+      return { id, width: resourceSize.width, height: resourceSize.height };
     }),
     edges: edges
       .filter((e) => visible.has(e.source) && visible.has(e.target))

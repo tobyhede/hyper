@@ -5,14 +5,14 @@ import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/co
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import type { SpaceThingAuthoring } from '../src/space-thing-lifecycle';
+import type { SpaceEndpointAuthoring } from '../src/space-resource-lifecycle';
 import { deleteGraphItem } from './command-dock';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
@@ -22,21 +22,21 @@ const twoGraphs: SpaceSnapshot = spaceSnapshotSchema.parse({
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram',
+        id: MAP_ID,
+        title: 'Map',
         kind: 'positioned',
-        positions: { [THING_ID]: { x: 10, y: 20, open: false } },
+        positions: { [RESOURCE_ID]: { x: 10, y: 20, open: false } },
         graphs: [
           { id: GRAPH_ID, title: 'Graph', edges: [] },
           { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
         ],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } }],
+  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } }],
 });
 
 const runtime = (value: SpaceSnapshot) => {
@@ -46,44 +46,44 @@ const runtime = (value: SpaceSnapshot) => {
 };
 
 const graphsOf = (session: SpaceSession): readonly string[] =>
-  session.getState().working.document.diagrams?.[0]?.graphs.map((graph) => graph.id) ?? [];
+  session.getState().working.document.maps?.[0]?.graphs.map((graph) => graph.id) ?? [];
 
 /**
  * The first Graph delete is a coordinated refusal; later attempts run the real
  * lifecycle. That is the sequence the Dock notice has to survive: a standing
  * error, then a different attempt that must not keep showing it.
  */
-const refuseFirstGraphDelete = (spaceThings: SpaceThingAuthoring): SpaceThingAuthoring => {
+const refuseFirstGraphDelete = (spaceResources: SpaceEndpointAuthoring): SpaceEndpointAuthoring => {
   let refuseNext = true;
   return {
-    ...spaceThings,
+    ...spaceResources,
     deleteGraph: async (input) => {
       if (refuseNext) {
         refuseNext = false;
         return {
           kind: 'refused',
-          refusal: { code: 'diagram-not-found', diagramId: input.diagramId },
+          refusal: { code: 'map-not-found', mapId: input.mapId },
         };
       }
-      return spaceThings.deleteGraph(input);
+      return spaceResources.deleteGraph(input);
     },
   };
 };
 
 function mount(): SpaceSession {
   const stored = { snapshot: twoGraphs, revision: 0n, exportedRevision: null };
-  const { spaceSession: session, spaceThings } = openTestSpace(
+  const { spaceSession: session, spaceResources } = openTestSpace(
     MemorySpaceBackend.asMeta(stored),
     stored,
   );
-  const wrapped = refuseFirstGraphDelete(spaceThings);
+  const wrapped = refuseFirstGraphDelete(spaceResources);
   let view: RenderResult | undefined;
   mountSpace(
     {
       id: runtime(twoGraphs).id,
       session,
-      app: composeApp({ spaceSession: session, spaceThings: wrapped }),
-      spaceThings: wrapped,
+      app: composeApp({ spaceSession: session, spaceResources: wrapped }),
+      spaceResources: wrapped,
     },
     (app) => {
       if (view === undefined) view = render(app);
@@ -130,9 +130,7 @@ describe('Graph deletion notice', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Graph not deleted');
     });
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'This Diagram is no longer part of the Space.',
-    );
+    expect(screen.getByRole('alert')).toHaveTextContent('This Map is no longer part of the Space.');
     expect(graphsOf(session)).toHaveLength(2);
 
     fireEvent.click(deleteGraphItem('Graph'));

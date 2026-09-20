@@ -3,7 +3,7 @@
 import { expect, test, type Page } from './fixtures';
 import {
   activateGraph,
-  activeThing,
+  activeResource,
   authoringHandle,
   connectHandles,
   dock,
@@ -15,7 +15,7 @@ import {
 } from './graph';
 
 // Presenting is the graph canvas under camera control (ADR 0027): the same
-// things, the same coordinates, drawn close enough that one fills the screen.
+// resources, the same coordinates, drawn close enough that one fills the screen.
 // These tests assert that — that the space is still there, that the camera
 // moved, and that traversal follows Edges rather than an index.
 //
@@ -40,8 +40,8 @@ async function camera(page: Page): Promise<{ x: number; y: number; zoom: number 
  * The chrome appearing is not arrival — it renders as soon as presenting starts,
  * while the camera is still moving. Every caller here assumes the destination,
  * and one of them acted on the way there: at the overview zoom the whole space is
- * on screen, at the presenting zoom one thing fills it, so a click aimed at any
- * other thing hit or missed depending on how far the animation had run. That
+ * on screen, at the presenting zoom one resource fills it, so a click aimed at any
+ * other resource hit or missed depending on how far the animation had run. That
  * failed about half the time.
  */
 async function present(page: Page): Promise<void> {
@@ -56,44 +56,46 @@ async function present(page: Page): Promise<void> {
 test('traverses the graph, and the space is still what you are looking at', async ({ page }) => {
   await present(page);
 
-  // No second surface (ADR 0027): every thing is still drawn, on the same canvas.
+  // No second surface (ADR 0027): every resource is still drawn, on the same canvas.
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 
-  // Long starts at A — the thing no edge arrives at, not the first in any list.
-  await expect(activeThing(page)).toHaveAttribute(
+  // Long starts at A — the resource no edge arrives at, not the first in any list.
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000002',
   );
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000003',
   );
 
   await page.keyboard.press('ArrowLeft');
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000002',
   );
 });
 
-test('the active thing draws its content rendered, and only that thing does', async ({ page }) => {
+test('the active resource draws its content rendered, and only that resource does', async ({
+  page,
+}) => {
   await present(page);
 
   // Opening shows Markdown source (ADR 0011); presenting is the other half of
-  // that distinction and is where a thing is drawn *rendered*. A's body carries
+  // that distinction and is where a resource is drawn *rendered*. A's body carries
   // `**A**`, so the markers must be gone and the emphasis present.
-  const content = page.getByTestId('thing-content');
+  const content = page.getByTestId('resource-content');
   await expect(content).toHaveCount(1);
   await expect(content).not.toContainText('**A**');
   await expect(content.locator('strong')).toHaveText('A');
 
   // Content is not embedded in every node (ADR 0006) — the other five still draw
   // their titles. Counted inside the nodes: the Alt-drop preview draws the same
-  // `CanvasThing`, so an unscoped count would include a Thing that does not exist.
-  await expect(page.locator('.react-flow__node').getByTestId('thing')).toHaveCount(5);
+  // `CanvasResource`, so an unscoped count would include a Resource that does not exist.
+  await expect(page.locator('.react-flow__node').getByTestId('resource')).toHaveCount(5);
 });
 
 test('a body heading is just a heading, drawn once alongside the title (ADR 0020)', async ({
@@ -101,30 +103,30 @@ test('a body heading is just a heading, drawn once alongside the title (ADR 0020
 }) => {
   await present(page);
 
-  // C's body opens with `# Where Short ends`. A thing is one file, so its title
+  // C's body opens with `# Where Short ends`. A resource is one file, so its title
   // and its body live together and a leading heading cannot repeat a title held
   // elsewhere. TraversalHistory A → B → C.
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000005',
   );
 
-  const content = page.getByTestId('thing-content');
-  await expect(content.locator('.thing__title')).toHaveText('C');
+  const content = page.getByTestId('resource-content');
+  await expect(content.locator('.resource__title')).toHaveText('C');
   await expect(content.locator('h1')).toHaveText('Where Short ends');
   await expect(content.locator('h1')).toHaveCount(1);
 
   // Sized in container units against the 260px frame the camera magnifies, not
   // in pixels against a box about to be scaled by an arbitrary factor (ADR
-  // 0027). 5cqw of 260px is 13px; `.thing--full .thing__title`'s fixed 1.3rem has
+  // 0027). 5cqw of 260px is 13px; `.resource--full .resource__title`'s fixed 1.3rem has
   // the same specificity, so the two are separated only by their order in
   // `styles.css` and this is what says which order that has to be.
-  await expect(content.locator('.thing__title')).toHaveCSS('font-size', '13px');
+  await expect(content.locator('.resource__title')).toHaveCSS('font-size', '13px');
 });
 
-test('the camera closes in on the active thing, and pulls back on exit', async ({ page }) => {
+test('the camera closes in on the active resource, and pulls back on exit', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
   await settled(page);
@@ -134,7 +136,7 @@ test('the camera closes in on the active thing, and pulls back on exit', async (
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await settled(page);
 
-  // One thing filling the screen is a much closer zoom than the whole space
+  // One resource filling the screen is a much closer zoom than the whole space
   // fitted — the camera is the entire difference between the two views.
   const presenting = await camera(page);
   expect(presenting.zoom).toBeGreaterThan(overview.zoom * 2);
@@ -164,7 +166,7 @@ test(
     await present(page);
     // **The whole surface goes, rather than its commands one at a time.** The
     // Sidebar withdrew authoring item by item and this test named which items
-    // left a Diagram row's menu; the Dock is furniture over the paper, so
+    // left a Map row's menu; the Dock is furniture over the paper, so
     // presenting removes the furniture and there is no menu left to withdraw
     // anything from. What the audience is left with is the canvas and
     // `PresentingChrome`, which carries the way out.
@@ -182,7 +184,7 @@ test(
     await expect(page.getByTestId('selected-canvas')).toBeHidden();
     await expect(page.getByTestId('exit-presenting')).toBeVisible();
 
-    // A line gives a one-member choice at each thing — the degenerate fork, not a
+    // A line gives a one-member choice at each resource — the degenerate fork, not a
     // second mode (ADR 0024).
     const moves = page.getByTestId('presenting-moves').getByRole('button');
     await expect(moves).toHaveCount(1);
@@ -197,7 +199,7 @@ test(
 
     // Long is A → B → C → D → A′: four moves, then a sink.
     for (const _ of [0, 1, 2, 3]) await page.keyboard.press('ArrowRight');
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-00000000000c',
     );
@@ -206,7 +208,7 @@ test(
     // Advancing past the end stays put rather than wrapping to the start, which is
     // what a sequence would do.
     await page.keyboard.press('ArrowRight');
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-00000000000c',
     );
@@ -214,34 +216,34 @@ test(
 );
 
 /**
- * No pointer gesture on a Thing's body opens it (ADR 0036), and presenting does
+ * No pointer gesture on a Resource's body opens it (ADR 0036), and presenting does
  * not make an exception. It holds twice over, and the two are worth separating
  * because only the second is ours.
  *
  * React Flow makes a node inert when it is neither selectable nor draggable and
  * carries none of its own pointer handlers (`hasPointerEvents` in `NodeWrapper`).
- * All of those are off while presenting, so a Thing is `pointer-events: none` and
- * the pane takes the click — a real click cannot reach a Thing at all, which is
+ * All of those are off while presenting, so a Resource is `pointer-events: none` and
+ * the pane takes the click — a real click cannot reach a Resource at all, which is
  * why aiming one here is not a problem to work around.
  *
  * The second assertion is what survives if that ever changes: the event is
  * dispatched straight to the element, past `pointer-events` and past the
- * viewport requirement a real click has, and still nothing opens. Both Things
+ * viewport requirement a real click has, and still nothing opens. Both Resources
  * get it, because at the presenting zoom the active one fills the screen and
  * every other one is far outside it — which was the flake, not a detail: this
- * test used to aim a forced click at a Thing that was only in the viewport while
+ * test used to aim a forced click at a Resource that was only in the viewport while
  * the camera was still moving, and failed about half the time.
  */
-test('clicking a thing while presenting does not open it', async ({ page }) => {
+test('clicking a resource while presenting does not open it', async ({ page }) => {
   await present(page);
 
-  await expect(activeThing(page)).toHaveCSS('pointer-events', 'none');
+  await expect(activeResource(page)).toHaveCSS('pointer-events', 'none');
   await expect(nodeByTitle(page, 'D')).toHaveCSS('pointer-events', 'none');
 
-  await activeThing(page).dispatchEvent('click');
+  await activeResource(page).dispatchEvent('click');
   await nodeByTitle(page, 'D').dispatchEvent('click');
 
-  await expect(page.getByRole('button', { name: /^Close Thing/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Close Resource/ })).toHaveCount(0);
 });
 
 test('returning to the overview restores the space and its gestures', async ({ page }) => {
@@ -249,24 +251,24 @@ test('returning to the overview restores the space and its gestures', async ({ p
   await page.getByTestId('exit-presenting').click();
 
   await expect(page.getByTestId('presenting-chrome')).toHaveCount(0);
-  // No thing is active, so every node is back to drawing its title.
-  await expect(activeThing(page)).toHaveCount(0);
-  await expect(page.locator('.react-flow__node').getByTestId('thing')).toHaveCount(6);
+  // No resource is active, so every node is back to drawing its title.
+  await expect(activeResource(page)).toHaveCount(0);
+  await expect(page.locator('.react-flow__node').getByTestId('resource')).toHaveCount(6);
 
-  // Opening works again — through the Thing's own control, which is the only
+  // Opening works again — through the Resource's own control, which is the only
   // pointer graph to it (ADR 0036, 0037).
   await selectCanvas(page, 'Collection 1');
   const b = nodeByTitle(page, 'B');
   await b.hover();
-  await b.getByRole('button', { name: 'Open Thing B' }).click();
-  await expect(b.getByRole('button', { name: 'Close Thing B' })).toBeVisible();
+  await b.getByRole('button', { name: 'Open Resource B' }).click();
+  await expect(b.getByRole('button', { name: 'Close Resource B' })).toBeVisible();
 });
 
 /**
  * A focused control and the global Traversal keys, on one press.
  *
  * A button activates itself on Space and the window listener sees the press
- * first. Advancing there as well moved two Things for one press, and preventing
+ * first. Advancing there as well moved two Resources for one press, and preventing
  * the default instead stopped the button firing at all — so landing on C is the
  * first defect, staying on A is the second, and B is the answer.
  */
@@ -279,7 +281,7 @@ test(
     await page.getByRole('button', { name: 'Go to B' }).focus();
     await page.keyboard.press('Space');
 
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-000000000003',
     );
@@ -289,7 +291,7 @@ test(
     // Arrow keys are nobody's native activation, so they stay global and still
     // reach a presenter whose focus is on a chrome control.
     await page.keyboard.press('ArrowLeft');
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-000000000002',
     );
@@ -317,7 +319,7 @@ test('Space advances on the first press after entering with the pointer', async 
   await page.keyboard.press('Space');
 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000003',
   );
@@ -350,10 +352,10 @@ test('Space on the presenting chrome exit control leaves presentation rather tha
  *
  * Back is the same Navigation operation Arrow Left performs, exposed to pointer
  * and assistive-technology users rather than added beside it — which is why the
- * Thing it recovers is the one the arrow key would have.
+ * Resource it recovers is the one the arrow key would have.
  */
 test(
-  'a sink announces the end of the Graph and Back recovers the Thing before it',
+  'a sink announces the end of the Graph and Back recovers the Resource before it',
   { tag: '@parity:presenting-sink-ends-the-graph-and-can-retreat' },
   async ({ page }) => {
     await present(page);
@@ -368,7 +370,7 @@ test(
 
     await page.getByRole('button', { name: 'Back' }).click();
 
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-000000000006',
     );
@@ -383,10 +385,10 @@ test(
  * not change that — so it draws the second outgoing Edge itself, through the
  * Edge Authoring surface an author uses, in the memory repository this test
  * owns. `Short` runs A → B → C, so an authored A → C makes A the fork: two ways
- * on from the Thing the traversal begins at.
+ * on from the Resource the traversal begins at.
  *
  * What it proves that a story cannot: the camera. Choosing a branch selects it
- * and moves nothing, because the Thing being presented has not changed (ADR
+ * and moves nothing, because the Resource being presented has not changed (ADR
  * 0044); committing is what moves.
  */
 test(
@@ -397,7 +399,7 @@ test(
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
     await settled(page);
 
-    // An authored Diagram, so the Edge joins a Graph that already holds one out
+    // An authored Map, so the Edge joins a Graph that already holds one out
     // of A rather than the empty Graph a conversion would mint (ADR 0045).
     await selectCanvas(page, 'Collection 1');
     await activateGraph(page, 'Short');
@@ -411,7 +413,7 @@ test(
       authoringHandle(a, 'source', 'right'),
       authoringHandle(c, 'target', 'top'),
     );
-    // Attached rather than visible: A and C sit on the same row of this Diagram,
+    // Attached rather than visible: A and C sit on the same row of this Map,
     // so the Edge is a flat line whose box has no height — which Playwright
     // reads as hidden.
     await expect(page.getByLabel(/^Edge from A to C in Short$/)).toBeAttached();
@@ -430,11 +432,11 @@ test(
 
     await page.getByRole('button', { name: 'Choose C' }).click();
 
-    // Selecting is the whole of what that click did: the verbs swap, the Thing
+    // Selecting is the whole of what that click did: the verbs swap, the Resource
     // being presented is still A, and the camera has not moved.
     await expect(moves.first()).toHaveAccessibleName('Choose B');
     await expect(moves.last()).toHaveAccessibleName('Go to C');
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-000000000002',
     );
@@ -444,7 +446,7 @@ test(
 
     // Committed down the Edge chosen, and not down the one the traversal opened
     // on.
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-000000000005',
     );
@@ -459,7 +461,7 @@ test(
  * Presenting removes the Dock, so at this width nothing is left over the canvas
  * to reopen or to take a keypress before the traversal does. The primary
  * Traversal choices stay choices: their own full-width row, not a menu, and not
- * a block wrapped over the Thing being presented.
+ * a block wrapped over the Resource being presented.
  */
 test.describe('at a phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -491,7 +493,7 @@ test.describe('at a phone width', () => {
     // gets it, which is the whole of what the Sheet's arbitration was for.
     await page.keyboard.press('ArrowRight');
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-    await expect(activeThing(page)).toHaveAttribute(
+    await expect(activeResource(page)).toHaveAttribute(
       'data-id',
       '00000000-0000-4000-8000-000000000003',
     );
@@ -550,7 +552,7 @@ test.describe('at a phone width', () => {
 
       // And what it lists is really bound at this width too.
       await page.keyboard.press('ArrowLeft');
-      await expect(activeThing(page)).toHaveAttribute(
+      await expect(activeResource(page)).toHaveAttribute(
         'data-id',
         '00000000-0000-4000-8000-000000000002',
       );

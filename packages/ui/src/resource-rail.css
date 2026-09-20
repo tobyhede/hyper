@@ -1,0 +1,52 @@
+/* The band across the top of a Resource, beside the component that draws it.
+
+   Geometry only, and deliberately no colour at all.
+
+   **The band used to carry the Active Graph's colour and no longer does**
+   (`.scratch/command-dock/issues/12`). What a Resource reveals on hover is a command
+   strip, and a strip of commands is chrome — so it is drawn as the product draws
+   chrome everywhere else: the neutral `.command-surface` the Command Dock
+   wears, mounted here by `ResourceRailActions`. A coloured band behind it would have
+   been a second surface treatment on one Resource and a second answer to what the
+   Graph's colour means. The colour has not left the canvas: the Resource's handles
+   and the Edges of each Graph still carry it, which is where a colour that says
+   *which Graph* belongs.
+
+   So the rail is a row, a height and nothing else. The height is what reserves
+   the strip's room inside a Resource whose size is authored — it is read by
+   `packages/ui/test/canvas-resource-title-ladder.test.ts` and
+   `canvas-resource-embedded-map.test.ts`, each of which holds the room left over
+   to something the domain states. A Resource that hides its own strip at rest — the
+   canvas Resource does, revealing it with the Resource itself — says so from its own
+   stylesheet, because when the strip shows is the Resource's state and not the
+   rail's. */
+.resource-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Exactly the command strip's own height: a 28px control in the shared
+     surface's 4px padding inside its 1px border. The strip is seated in the
+     band rather than floating over the Resource's content, which is what keeps an
+     Open Resource's Markdown clear of it. */
+  height: 38px;
+  min-height: 38px;
+  padding: 0 6px;
+  border-radius: 0;
+}
+
+.resource-rail__kind {
+  display: flex;
+  align-items: center;
+  color: inherit;
+  transition: opacity var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
+}
+
+.resource-rail__kind [data-resource-kind] {
+  color: currentcolor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resource-rail__kind {
+    transition: none;
+  }
+}

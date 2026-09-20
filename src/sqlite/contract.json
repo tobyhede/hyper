@@ -12,8 +12,8 @@
       "model": "Space",
       "namespace": "__unbound__"
     },
-    "things": {
-      "model": "Thing",
+    "resources": {
+      "model": "Resource",
       "namespace": "__unbound__"
     }
   },
@@ -129,7 +129,7 @@
                   "namespace": "__unbound__"
                 }
               },
-              "things": {
+              "resources": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -140,7 +140,7 @@
                   ]
                 },
                 "to": {
-                  "model": "Thing",
+                  "model": "Resource",
                   "namespace": "__unbound__"
                 }
               }
@@ -170,7 +170,7 @@
               "table": "spaces"
             }
           },
-          "Thing": {
+          "Resource": {
             "fields": {
               "createdAt": {
                 "nullable": false,
@@ -244,7 +244,7 @@
                 }
               },
               "namespaceId": "__unbound__",
-              "table": "things"
+              "table": "resources"
             }
           }
         }
@@ -357,7 +357,7 @@
               },
               "uniques": []
             },
-            "things": {
+            "resources": {
               "columns": {
                 "created_at": {
                   "codecId": "sqlite/datetime@1",
@@ -397,7 +397,7 @@
                       "space_id"
                     ],
                     "namespaceId": "__unbound__",
-                    "tableName": "things"
+                    "tableName": "resources"
                   },
                   "target": {
                     "columns": [
@@ -460,7 +460,7 @@
           "ref": {
             "column": "updated_at",
             "namespace": "__unbound__",
-            "table": "things"
+            "table": "resources"
           }
         }
       ]

@@ -8,11 +8,11 @@ import type { EdgeAttachment } from './edge-attachment';
  * How far apart, in flow units, two neighbouring lanes run.
  *
  * Enough to clear a 3-unit stroke with a visible gap, close enough that a
- * bundle of a Diagram's few Graphs reads as one connection.
+ * bundle of a Map's few Graphs reads as one connection.
  */
 export const GRAPH_LANE_SPACING = 8;
 
-/** The Edge facts lanes are decided from: which Things it joins, and for which Graph. */
+/** The Edge facts lanes are decided from: which Resources it joins, and for which Graph. */
 export interface LaneEdge {
   readonly id: string;
   readonly source: string;
@@ -35,7 +35,7 @@ export interface GraphLane {
 /**
  * The lane of every Edge, keyed by Edge id.
  *
- * Every Edge joins two Things, and each attaches from where those Things are
+ * Every Edge joins two Resources, and each attaches from where those Resources are
  * (ADR 0087) rather than from which Graph it belongs to, so every Graph's Edge
  * between the same pair lands on the same two anchors and draws the same curve.
  * Edges sharing a pair — in either direction — are therefore given lanes. The
@@ -52,7 +52,7 @@ export interface GraphLane {
 export function graphLanes(
   edges: readonly LaneEdge[],
   activeGraphId: GraphId | null,
-): Map<string, GraphLane> {
+): ReadonlyMap<string, GraphLane> {
   const bundles = new Map<string, LaneEdge[]>();
   for (const edge of edges) {
     const key = pairKey(edge);
@@ -107,7 +107,7 @@ export const DETACHED_END_TRIM = 0.2;
  * The Edge a lane draws: the lone Edge's own curve, moved sideways, with
  * `endTrim` of its length left undrawn at each end.
  *
- * Each anchor moves along the side of the Thing it sits on, and the curve
+ * Each anchor moves along the side of the Resource it sits on, and the curve
  * between them is `getBezierPath` over the moved anchors. Where the two sides
  * are on one axis both anchors move by the same vector, and React Flow places
  * its control points relative to the anchors, so the curve is an exact
@@ -120,12 +120,12 @@ export const DETACHED_END_TRIM = 0.2;
  * sit on, whichever way the Edge travels; a negative one runs above or left. A self-Edge's two sides are on different
  * axes, so no one vector keeps both anchors on their sides: each anchor moves
  * along its own side, away from the corner the loop goes round, so an
- * arrowhead still lands on its Thing. The lane is then a loop of its own
+ * arrowhead still lands on its Resource. The lane is then a loop of its own
  * rather than a translate, and the lanes are not kept from crossing.
  *
  * The trim cuts that same curve rather than moving its ends, so what is drawn
  * is the middle of the curve a connecting Edge would draw, whatever its shape
- * and however close its Things. It is measured along the curve, so both ends
+ * and however close its Resources. It is measured along the curve, so both ends
  * lose the same length, and the midpoint the label sits at does not move.
  */
 export function laneBezier(attachment: EdgeAttachment, offset: number, endTrim = 0): LaneGeometry {
@@ -218,7 +218,7 @@ function trimmed(curve: Cubic, fraction: number): Cubic {
   return split(head, start / end)[1];
 }
 
-/** A distance along the direction a side of a Thing faces. */
+/** A distance along the direction a side of a Resource faces. */
 function outward(side: Position, distance: number): [number, number] {
   switch (side) {
     case Position.Left:

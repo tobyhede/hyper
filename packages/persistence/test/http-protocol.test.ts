@@ -29,11 +29,11 @@ import type { CommitRefusalBody, HyperProblemCode, HyperProblemType } from '../s
 import { REVISION_CEILING } from '../src/revision-codec';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 
 /** The wire is JSON, so a round trip that skips it would not prove anything. */
@@ -199,9 +199,9 @@ describe('aggregate wire protocol', () => {
       kind: 'aggregate-refused' as const,
       errors: [
         {
-          kind: 'space-thing-target-missing' as const,
+          kind: 'space-resource-target-missing' as const,
           spaceId: SPACE_ID,
-          thingId: THING_ID,
+          resourceId: RESOURCE_ID,
           targetSpaceId: secondId,
         },
       ],
@@ -216,41 +216,41 @@ describe('aggregate wire protocol', () => {
       { kind: 'invalid-shape', message: 'message' },
       { kind: 'unsupported-version', message: 'message' },
       { kind: 'retired-space-graphs', message: 'message' },
-      { kind: 'missing-frontmatter', path: 'thing.md', message: 'message' },
-      { kind: 'unterminated-frontmatter', path: 'thing.md', message: 'message' },
-      { kind: 'invalid-yaml', path: 'thing.md', message: 'message' },
-      { kind: 'invalid-frontmatter', path: 'thing.md', message: 'message' },
-      { kind: 'duplicate-thing-id', ...described },
+      { kind: 'missing-frontmatter', path: 'resource.md', message: 'message' },
+      { kind: 'unterminated-frontmatter', path: 'resource.md', message: 'message' },
+      { kind: 'invalid-yaml', path: 'resource.md', message: 'message' },
+      { kind: 'invalid-frontmatter', path: 'resource.md', message: 'message' },
+      { kind: 'duplicate-resource-id', ...described },
       { kind: 'duplicate-graph-id', ...described },
-      { kind: 'duplicate-diagram-id', ...described },
-      { kind: 'diagram-member-missing-thing', ...described },
-      { kind: 'diagram-active-graph-missing', ...described },
-      { kind: 'diagram-active-graph-outside-diagram', ...described },
-      { kind: 'graph-edge-missing-thing', ...described },
-      { kind: 'graph-edge-thing-outside-diagram', ...described },
-      { kind: 'unresolved-default-diagram', ...described },
+      { kind: 'duplicate-map-id', ...described },
+      { kind: 'map-member-missing-resource', ...described },
+      { kind: 'map-active-graph-missing', ...described },
+      { kind: 'map-active-graph-outside-map', ...described },
+      { kind: 'graph-edge-missing-resource', ...described },
+      { kind: 'graph-edge-resource-outside-map', ...described },
+      { kind: 'unresolved-default-map', ...described },
       { kind: 'duplicate-graph-edge', ...described },
       { kind: 'unresolved-reference-target', ...described },
       { kind: 'reference-targets-self', ...described },
       { kind: 'reference-targets-reference', ...described },
       { kind: 'reference-target-must-own-content', ...described },
-      { kind: 'space-thing-reference-cycle', ...described },
+      { kind: 'space-resource-reference-cycle', ...described },
     ];
-    const location = { spaceId: SPACE_ID, thingId: THING_ID, targetSpaceId: secondId };
+    const location = { spaceId: SPACE_ID, resourceId: RESOURCE_ID, targetSpaceId: secondId };
     const errors: SpaceAggregateError[] = [
       { kind: 'invalid-space-snapshot', snapshotIndex: 0, errors: intakeErrors },
       { kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: [0, 2] },
-      { kind: 'duplicate-thing-id', thingId: THING_ID, spaceIds: [SPACE_ID, secondId] },
+      { kind: 'duplicate-resource-id', resourceId: RESOURCE_ID, spaceIds: [SPACE_ID, secondId] },
       { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
-      { kind: 'space-thing-target-missing', ...location },
-      { kind: 'space-thing-reference-cycle', ...location },
+      { kind: 'space-resource-target-missing', ...location },
+      { kind: 'space-resource-reference-cycle', ...location },
       { kind: 'ordinary-space-unreferenced', spaceId: secondId },
-      { kind: 'space-thing-diagram-missing', ...location, diagramId: secondId },
-      { kind: 'space-thing-graph-missing', ...location, graphId: secondId },
+      { kind: 'space-resource-map-missing', ...location, mapId: secondId },
+      { kind: 'space-resource-graph-missing', ...location, graphId: secondId },
       {
-        kind: 'space-thing-graph-outside-diagram',
+        kind: 'space-resource-graph-outside-map',
         ...location,
-        diagramId: SPACE_ID,
+        mapId: SPACE_ID,
         graphId: secondId,
       },
     ];
@@ -259,14 +259,14 @@ describe('aggregate wire protocol', () => {
     expect(decodeCommitRefusal(encodeCommitRefusal(refusal))).toEqual(refusal);
   });
 
-  it('declares the Space Thing Diagram refusal the way its decoder reads it', () => {
-    type WireDiagramMissing = Extract<
+  it('declares the Space Resource Map refusal the way its decoder reads it', () => {
+    type WireMapMissing = Extract<
       CommitRefusalBody['errors'][number],
-      { readonly kind: 'space-thing-diagram-missing' }
+      { readonly kind: 'space-resource-map-missing' }
     >;
     // `decodeCommitRefusal` reads this key with `requiredUuid`, so a body
     // omitting it is refused rather than decoded.
-    expectTypeOf<WireDiagramMissing['diagramId']>().toEqualTypeOf<string>();
+    expectTypeOf<WireMapMissing['mapId']>().toEqualTypeOf<string>();
   });
 
   it('rejects unknown aggregate refusal identities and fields', () => {
@@ -320,7 +320,7 @@ describe('aggregate wire protocol', () => {
             },
           ],
         },
-        'Thing file path must be a string',
+        'Resource file path must be a string',
       ],
       [
         {
@@ -328,7 +328,7 @@ describe('aggregate wire protocol', () => {
             {
               kind: 'invalid-space-snapshot',
               snapshotIndex: 0,
-              errors: [{ kind: 'duplicate-thing-id', ref: 7, message: 'message' }],
+              errors: [{ kind: 'duplicate-resource-id', ref: 7, message: 'message' }],
             },
           ],
         },
@@ -355,7 +355,7 @@ describe('aggregate wire protocol', () => {
         'snapshot index must be a non-negative safe integer',
       ],
       [
-        { errors: [{ kind: 'duplicate-thing-id', thingId: THING_ID, spaceIds: 'nope' }] },
+        { errors: [{ kind: 'duplicate-resource-id', resourceId: RESOURCE_ID, spaceIds: 'nope' }] },
         'Space ids must be an array',
       ],
     ];

@@ -24,7 +24,7 @@ export interface ChoiceMenuChoice<Id extends string> {
 export type ChoiceMenuSide = 'top' | 'right' | 'bottom' | 'left';
 
 export interface ChoiceMenuProps<Id extends string> {
-  /** What the set is, captioning the list: `Diagrams`, `Graphs in Collection 1`. */
+  /** What the set is, captioning the list: `Maps`, `Graphs in Collection 1`. */
   readonly label: ReactNode;
   readonly choices: readonly ChoiceMenuChoice<Id>[];
   /** The chosen member, or `null` where the caller has chosen none. */
@@ -33,11 +33,11 @@ export interface ChoiceMenuProps<Id extends string> {
   /** The control this list hangs off, drawn by the caller. */
   readonly trigger: ReactNode;
   /**
-   * Commands on the named thing, drawn below the set behind a rule.
+   * Commands on the named resource, drawn below the set behind a rule.
    *
    * The one separator between the set and this content is this component's;
    * any further groups and separators within it are the caller's own —
-   * `DiagramMenuActions` and `GraphMenuActions` draw several groups rather
+   * `MapMenuActions` and `GraphMenuActions` draw several groups rather
    * than one, so this does not additionally wrap the whole of `children` in a
    * second enclosing group.
    */
@@ -55,11 +55,11 @@ export interface ChoiceMenuProps<Id extends string> {
   /**
    * Whether closing this list takes the caret back to the control it hangs off.
    *
-   * Answered **at close time** rather than read off a render, because the thing
+   * Answered **at close time** rather than read off a render, because the state
    * it depends on is what the reader just pressed. A menu ordinarily returns
    * focus to its trigger, and should: the command is over and the reader is
    * back where they were. A command that *moves* the caret on purpose — the
-   * Dock's New Diagram, which continues in the new Diagram's name — is the
+   * Dock's New Map, which continues in the new Map's name — is the
    * exception, and without this the restoration lands a frame after the editor
    * has focused itself, blurs it, and completes the rename nobody typed.
    *
@@ -69,20 +69,20 @@ export interface ChoiceMenuProps<Id extends string> {
 }
 
 /**
- * One of a named set, chosen from a list — the Command Dock's Diagram and Graph
- * clusters, and the Diagram and Graph an Open Space Thing selects.
+ * One of a named set, chosen from a list — the Command Dock's Map and Graph
+ * clusters, and the Map and Graph an Open Space Resource selects.
  *
  * **What is shared is the list and what is not is the operation.** The set on
  * offer, which member is chosen and what choosing one does all arrive from the
- * caller, because they are nothing alike: the Dock's Diagram list moves the
- * canvas the reader is looking at, and a Space Thing's writes which Diagram that
- * Thing shows into the Thing. What is genuinely shared is how a bound
+ * caller, because they are nothing alike: the Dock's Map list moves the
+ * canvas the reader is looking at, and a Space Resource's writes which Map that
+ * Resource shows into the Resource. What is genuinely shared is how a bound
  * single choice is *drawn and operated* — a labelled radio group, one mark on
  * the member you are on, the menu's own roving focus, type-ahead and dismissal
  * — and that is what lives here rather than at each surface.
  *
  * The commands a surface carries alongside the set go in `children`, below a
- * rule. The Dock and Space Thing share their Diagram and Graph command rows;
+ * rule. The Dock and Space Resource share their Map and Graph command rows;
  * the caller supplies which Space those commands author.
  *
  * **The generic binds the group and its items together.** Base UI types both
@@ -168,7 +168,7 @@ export type ChoiceMenuTriggerProps = Omit<
  *
  * One component for both shapes the product draws, so a chevron means "there is
  * a list behind this" everywhere it appears. The Dock's identity clusters and
- * an Open Space Thing both take the named form — the name discloses, and
+ * an Open Space Resource both take the named form — the name discloses, and
  * Rename (where there is one) is a command in the list. The bare form remains
  * for a disclosure that is only a chevron.
  *

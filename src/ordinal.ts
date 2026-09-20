@@ -2,8 +2,8 @@
  * Order two strings by code unit, not by locale.
  *
  * `localeCompare` reads the host's collation, so the same directory could import
- * its Spaces and their Things in a different order on a different machine.
- * Import order is observable — it is the order Spaces and Things are inserted
+ * its Spaces and their Resources in a different order on a different machine.
+ * Import order is observable — it is the order Spaces and Resources are inserted
  * and the order a canonical export will emit — so it has to come from the bytes
  * alone.
  *

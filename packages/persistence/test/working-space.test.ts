@@ -4,17 +4,17 @@ import {
   createWorkingSpaceLoader,
   type CommitResult,
   type RepositoryCommitResult,
-  type SpaceResourceRepository,
+  type StoredSpaceRepository,
 } from '../src/index';
 
 const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const diagramless: SpaceSnapshot = {
+const mapless: SpaceSnapshot = {
   id: SPACE,
   document: { version: 1, title: 'Imported' },
-  things: [{ id: THING, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [{ id: RESOURCE, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 
 const loadWorkingSpace = (
@@ -24,12 +24,12 @@ const loadWorkingSpace = (
 ) => createWorkingSpaceLoader(store, newId)(id);
 
 interface RepositoryHarness {
-  readonly store: SpaceResourceRepository;
+  readonly store: StoredSpaceRepository;
   readonly commits: SpaceSnapshot[];
 }
 
 const repository = (): RepositoryHarness => {
-  let current = { snapshot: structuredClone(diagramless), revision: 7n, exportedRevision: 5n };
+  let current = { snapshot: structuredClone(mapless), revision: 7n, exportedRevision: 5n };
   const commits: SpaceSnapshot[] = [];
   return {
     commits,
@@ -54,9 +54,9 @@ const repository = (): RepositoryHarness => {
 };
 
 describe('loadWorkingSpace', () => {
-  it('persists an empty default Diagram before returning a diagramless stored Space', async () => {
+  it('persists an empty default Map before returning a mapless stored Space', async () => {
     const { store, commits } = repository();
-    const ids = [DIAGRAM, GRAPH];
+    const ids = [MAP, GRAPH];
 
     const loaded = await loadWorkingSpace(store, SPACE, () => {
       const id = ids.shift();
@@ -68,20 +68,20 @@ describe('loadWorkingSpace', () => {
     expect(commits).toHaveLength(1);
     expect(loaded).toEqual({
       snapshot: {
-        ...diagramless,
+        ...mapless,
         document: {
-          ...diagramless.document,
-          diagrams: [
+          ...mapless.document,
+          maps: [
             {
-              id: DIAGRAM,
-              title: 'Diagram 1',
+              id: MAP,
+              title: 'Map 1',
               kind: 'positioned',
               positions: {},
               graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
               activeGraph: GRAPH,
             },
           ],
-          defaultDiagram: DIAGRAM,
+          defaultMap: MAP,
         },
       },
       revision: 8n,
@@ -89,14 +89,14 @@ describe('loadWorkingSpace', () => {
     });
   });
 
-  it('adopts the first existing Diagram without creating another Diagram or Graph', async () => {
+  it('adopts the first existing Map without creating another Map or Graph', async () => {
     const existing = {
-      ...diagramless,
+      ...mapless,
       document: {
-        ...diagramless.document,
-        diagrams: [
+        ...mapless.document,
+        maps: [
           {
-            id: DIAGRAM,
+            id: MAP,
             title: 'First',
             kind: 'positioned' as const,
             positions: {},
@@ -107,7 +107,7 @@ describe('loadWorkingSpace', () => {
       },
     };
     let committed: SpaceSnapshot | undefined;
-    const store: SpaceResourceRepository = {
+    const store: StoredSpaceRepository = {
       listSpaces: () => Promise.resolve([]),
       loadSpace: () =>
         Promise.resolve({ snapshot: existing, revision: 2n, exportedRevision: null }),
@@ -129,18 +129,18 @@ describe('loadWorkingSpace', () => {
       throw new Error('default adoption must not mint identities');
     });
 
-    expect(committed?.document.diagrams).toEqual(existing.document.diagrams);
-    expect(committed?.document.defaultDiagram).toBe(DIAGRAM);
+    expect(committed?.document.maps).toEqual(existing.document.maps);
+    expect(committed?.document.defaultMap).toBe(MAP);
   });
 
-  it('does not write a Space that already has a durable default Diagram', async () => {
+  it('does not write a Space that already has a durable default Map', async () => {
     const complete = {
-      ...diagramless,
+      ...mapless,
       document: {
-        ...diagramless.document,
-        diagrams: [
+        ...mapless.document,
+        maps: [
           {
-            id: DIAGRAM,
+            id: MAP,
             title: 'First',
             kind: 'positioned' as const,
             positions: {},
@@ -148,7 +148,7 @@ describe('loadWorkingSpace', () => {
             activeGraph: GRAPH,
           },
         ],
-        defaultDiagram: DIAGRAM,
+        defaultMap: MAP,
       },
     };
     const commit = vi.fn();
@@ -158,7 +158,7 @@ describe('loadWorkingSpace', () => {
       commit,
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).resolves.toMatchObject({
+    await expect(loadWorkingSpace(store, SPACE, () => MAP)).resolves.toMatchObject({
       snapshot: complete,
       revision: 3n,
     });
@@ -167,25 +167,24 @@ describe('loadWorkingSpace', () => {
 
   it('accepts a concurrently initialized winner as ordinary working state', async () => {
     const winner = {
-      ...diagramless,
+      ...mapless,
       document: {
-        ...diagramless.document,
-        diagrams: [
+        ...mapless.document,
+        maps: [
           {
-            id: DIAGRAM,
-            title: 'Diagram 1',
+            id: MAP,
+            title: 'Map 1',
             kind: 'positioned' as const,
             positions: {},
             graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
             activeGraph: GRAPH,
           },
         ],
-        defaultDiagram: DIAGRAM,
+        defaultMap: MAP,
       },
     };
     const store = {
-      loadSpace: () =>
-        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: 5n }),
+      loadSpace: () => Promise.resolve({ snapshot: mapless, revision: 7n, exportedRevision: 5n }),
       commit: () =>
         Promise.resolve({
           kind: 'conflict' as const,
@@ -198,22 +197,21 @@ describe('loadWorkingSpace', () => {
         }),
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).resolves.toEqual({
+    await expect(loadWorkingSpace(store, SPACE, () => MAP)).resolves.toEqual({
       snapshot: winner,
       revision: 8n,
       exportedRevision: 5n,
     });
   });
 
-  it('retries initialization after an unrelated diagramless edit wins the conflict', async () => {
+  it('retries initialization after an unrelated mapless edit wins the conflict', async () => {
     const concurrentlyEdited = {
-      ...diagramless,
-      document: { ...diagramless.document, title: 'Renamed while opening' },
+      ...mapless,
+      document: { ...mapless.document, title: 'Renamed while opening' },
     };
     let commits = 0;
     const store = {
-      loadSpace: () =>
-        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
+      loadSpace: () => Promise.resolve({ snapshot: mapless, revision: 7n, exportedRevision: null }),
       commit: () => {
         commits += 1;
         if (commits === 1) {
@@ -239,7 +237,7 @@ describe('loadWorkingSpace', () => {
       },
     };
     const ids = [
-      DIAGRAM,
+      MAP,
       GRAPH,
       uuidSchema.parse('00000000-0000-4000-8000-000000000005'),
       uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -267,8 +265,7 @@ describe('loadWorkingSpace', () => {
    */
   it('answers undefined when the conflict reports the Space deleted', async () => {
     const store = {
-      loadSpace: () =>
-        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
+      loadSpace: () => Promise.resolve({ snapshot: mapless, revision: 7n, exportedRevision: null }),
       commit: () =>
         Promise.resolve({
           kind: 'conflict' as const,
@@ -276,14 +273,13 @@ describe('loadWorkingSpace', () => {
         }),
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).resolves.toBeUndefined();
+    await expect(loadWorkingSpace(store, SPACE, () => MAP)).resolves.toBeUndefined();
   });
 
   it('throws when the conflict never names the Space it refused', async () => {
     const other = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
     const store = {
-      loadSpace: () =>
-        Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
+      loadSpace: () => Promise.resolve({ snapshot: mapless, revision: 7n, exportedRevision: null }),
       commit: () =>
         Promise.resolve({
           kind: 'conflict' as const,
@@ -291,7 +287,7 @@ describe('loadWorkingSpace', () => {
         }),
     };
 
-    await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).rejects.toThrow(
+    await expect(loadWorkingSpace(store, SPACE, () => MAP)).rejects.toThrow(
       'changed without returning its current working state',
     );
   });
@@ -305,11 +301,11 @@ describe('loadWorkingSpace', () => {
     async (result) => {
       const store = {
         loadSpace: () =>
-          Promise.resolve({ snapshot: diagramless, revision: 7n, exportedRevision: null }),
+          Promise.resolve({ snapshot: mapless, revision: 7n, exportedRevision: null }),
         commit: () => Promise.resolve(result),
       };
 
-      await expect(loadWorkingSpace(store, SPACE, () => DIAGRAM)).rejects.toThrow(
+      await expect(loadWorkingSpace(store, SPACE, () => MAP)).rejects.toThrow(
         `could not initialize its working state: ${result.kind}`,
       );
     },

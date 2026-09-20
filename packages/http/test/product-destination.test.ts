@@ -8,31 +8,31 @@ import {
 } from '../src';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const loaded: LoadedSpace = {
   snapshot: spaceSnapshotSchema.parse({
     id: SPACE_ID,
     document: {
       version: 1,
       title: 'Space',
-      diagrams: [
+      maps: [
         {
-          id: DIAGRAM_ID,
-          title: 'Diagram',
+          id: MAP_ID,
+          title: 'Map',
           kind: 'positioned',
-          positions: { [THING_ID]: { x: 10, y: 20, open: false } },
+          positions: { [RESOURCE_ID]: { x: 10, y: 20, open: false } },
           graphs: [
-            { id: GRAPH_ID, title: 'Graph', edges: [{ from: THING_ID, to: OTHER_THING_ID }] },
+            { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }] },
           ],
         },
       ],
     },
-    things: [
-      { id: THING_ID, document: { title: 'Thing', kind: 'markdown', body: '' } },
-      { id: OTHER_THING_ID, document: { title: 'Other', kind: 'markdown', body: '' } },
+    resources: [
+      { id: RESOURCE_ID, document: { title: 'Resource', kind: 'markdown', body: '' } },
+      { id: OTHER_RESOURCE_ID, document: { title: 'Other', kind: 'markdown', body: '' } },
     ],
   }),
   revision: 7n,
@@ -47,51 +47,51 @@ const missingLoader = (): Pick<SpaceBackend, 'loadSpace'> => ({
 });
 
 describe('product destinations', () => {
-  it('formats canonical Space and explicit Diagram destinations', () => {
+  it('formats canonical Space and explicit Map destinations', () => {
     expect(productDestinationPath({ kind: 'space', spaceId: SPACE_ID })).toBe(
       `/spaces/${encodeCompactUuid(SPACE_ID)}`,
     );
-    expect(
-      productDestinationPath({ kind: 'diagram', spaceId: SPACE_ID, diagramId: DIAGRAM_ID }),
-    ).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}`);
+    expect(productDestinationPath({ kind: 'map', spaceId: SPACE_ID, mapId: MAP_ID })).toBe(
+      `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}`,
+    );
   });
 
-  it('formats and resolves canonical and contextual Thing destinations', async () => {
-    const canonical = `/spaces/${encodeCompactUuid(SPACE_ID)}/things/${encodeCompactUuid(THING_ID)}`;
-    const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/things/${encodeCompactUuid(THING_ID)}`;
+  it('formats and resolves canonical and contextual Resource destinations', async () => {
+    const canonical = `/spaces/${encodeCompactUuid(SPACE_ID)}/resources/${encodeCompactUuid(RESOURCE_ID)}`;
+    const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/resources/${encodeCompactUuid(RESOURCE_ID)}`;
 
-    expect(productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: THING_ID })).toBe(
-      canonical,
-    );
+    expect(
+      productDestinationPath({ kind: 'resource', spaceId: SPACE_ID, resourceId: RESOURCE_ID }),
+    ).toBe(canonical);
     expect(
       productDestinationPath({
-        kind: 'diagram-thing',
+        kind: 'map-resource',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
-        thingId: THING_ID,
+        mapId: MAP_ID,
+        resourceId: RESOURCE_ID,
       }),
     ).toBe(contextual);
     await expect(resolveProductDestination(loader(), canonical)).resolves.toMatchObject({
       kind: 'resolved',
-      destination: { kind: 'thing', spaceId: SPACE_ID, thingId: THING_ID },
+      destination: { kind: 'resource', spaceId: SPACE_ID, resourceId: RESOURCE_ID },
     });
     await expect(resolveProductDestination(loader(), contextual)).resolves.toMatchObject({
       kind: 'resolved',
       destination: {
-        kind: 'diagram-thing',
+        kind: 'map-resource',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
-        thingId: THING_ID,
+        mapId: MAP_ID,
+        resourceId: RESOURCE_ID,
       },
     });
     await expect(
       resolveProductDestination(
         loader(),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
       ),
     ).resolves.toMatchObject({
       kind: 'resolved',
-      destination: { kind: 'diagram-graph', diagramId: DIAGRAM_ID },
+      destination: { kind: 'map-graph', mapId: MAP_ID },
     });
   });
 
@@ -101,13 +101,13 @@ describe('product destinations', () => {
     await expect(
       resolveProductDestination(
         loader(),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/not-a-compact-uuid`,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/not-a-compact-uuid`,
       ),
     ).resolves.toEqual({ kind: 'malformed' });
     await expect(
       resolveProductDestination(
         loader(),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/not-graphs/${encodeCompactUuid(GRAPH_ID)}`,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/not-graphs/${encodeCompactUuid(GRAPH_ID)}`,
       ),
     ).resolves.toEqual({ kind: 'malformed' });
     await expect(
@@ -120,16 +120,16 @@ describe('product destinations', () => {
 
   it('formats and resolves canonical and contextual Graph destinations', async () => {
     const canonical = `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`;
-    const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`;
+    const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}`;
 
     expect(productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID })).toBe(
       canonical,
     );
     expect(
       productDestinationPath({
-        kind: 'diagram-graph',
+        kind: 'map-graph',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
       }),
     ).toBe(contextual);
@@ -140,24 +140,24 @@ describe('product destinations', () => {
     await expect(resolveProductDestination(loader(), contextual)).resolves.toMatchObject({
       kind: 'resolved',
       destination: {
-        kind: 'diagram-graph',
+        kind: 'map-graph',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
       },
     });
   });
 
   it('formats and resolves an exact contextual presentation destination', async () => {
-    const presentation = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(THING_ID)}`;
+    const presentation = `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_ID)}`;
 
     expect(
       productDestinationPath({
         kind: 'presentation',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
-        thingId: THING_ID,
+        resourceId: RESOURCE_ID,
       }),
     ).toBe(presentation);
     await expect(resolveProductDestination(loader(), presentation)).resolves.toMatchObject({
@@ -165,9 +165,9 @@ describe('product destinations', () => {
       destination: {
         kind: 'presentation',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
-        thingId: THING_ID,
+        resourceId: RESOURCE_ID,
       },
     });
     expect(resolveProductDestinationInSnapshot(loaded.snapshot, presentation)).toEqual({
@@ -175,62 +175,65 @@ describe('product destinations', () => {
       destination: {
         kind: 'presentation',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
-        thingId: THING_ID,
+        resourceId: RESOURCE_ID,
       },
     });
   });
 
   it.each([
-    ['an unknown Thing', '00000000-0000-4000-8000-000000000099', false],
-    ['a Thing outside the Graph', '00000000-0000-4000-8000-000000000006', true],
-  ])('does not resolve a presentation destination for %s', async (_name, thingValue, isStored) => {
-    const thingId = uuidSchema.parse(thingValue);
-    const withOutsideThing: LoadedSpace = {
-      ...loaded,
-      snapshot: {
-        ...loaded.snapshot,
-        things: isStored
-          ? [
-              ...loaded.snapshot.things,
-              { id: thingId, document: { title: 'Outside', kind: 'markdown', body: '' } },
-            ]
-          : loaded.snapshot.things,
-      },
-    };
-    const presentation = `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(thingId)}`;
+    ['an unknown Resource', '00000000-0000-4000-8000-000000000099', false],
+    ['a Resource outside the Graph', '00000000-0000-4000-8000-000000000006', true],
+  ])(
+    'does not resolve a presentation destination for %s',
+    async (_name, resourceValue, isStored) => {
+      const resourceId = uuidSchema.parse(resourceValue);
+      const withOutsideResource: LoadedSpace = {
+        ...loaded,
+        snapshot: {
+          ...loaded.snapshot,
+          resources: isStored
+            ? [
+                ...loaded.snapshot.resources,
+                { id: resourceId, document: { title: 'Outside', kind: 'markdown', body: '' } },
+              ]
+            : loaded.snapshot.resources,
+        },
+      };
+      const presentation = `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(resourceId)}`;
 
-    await expect(
-      resolveProductDestination(loader(withOutsideThing), presentation),
-    ).resolves.toEqual({
-      kind: 'unresolved',
-    });
-  });
+      await expect(
+        resolveProductDestination(loader(withOutsideResource), presentation),
+      ).resolves.toEqual({
+        kind: 'unresolved',
+      });
+    },
+  );
 
   it.each([
-    `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/not-a-compact-uuid`,
-    `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(THING_ID)}/extra`,
-    `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(THING_ID)}`,
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/not-a-compact-uuid`,
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_ID)}/extra`,
+    `/spaces/${encodeCompactUuid(SPACE_ID)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_ID)}`,
   ])('classifies the invalid presentation path %s as malformed', async (path) => {
     await expect(resolveProductDestination(loader(), path)).resolves.toEqual({ kind: 'malformed' });
   });
 
-  it('does not resolve a contextual Diagram-and-Graph destination when the Diagram does not own the Graph', async () => {
-    const otherDiagram = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-    const withOtherDiagram: LoadedSpace = {
+  it('does not resolve a contextual Map-and-Graph destination when the Map does not own the Graph', async () => {
+    const otherMap = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+    const withOtherMap: LoadedSpace = {
       ...loaded,
       snapshot: {
         ...loaded.snapshot,
         document: {
           ...loaded.snapshot.document,
-          diagrams: [
-            ...(loaded.snapshot.document.diagrams ?? []),
+          maps: [
+            ...(loaded.snapshot.document.maps ?? []),
             {
-              id: otherDiagram,
-              title: 'Other Diagram',
+              id: otherMap,
+              title: 'Other Map',
               kind: 'positioned',
-              positions: { [THING_ID]: { x: 30, y: 40, open: false } },
+              positions: { [RESOURCE_ID]: { x: 30, y: 40, open: false } },
               graphs: [],
             },
           ],
@@ -240,26 +243,26 @@ describe('product destinations', () => {
 
     await expect(
       resolveProductDestination(
-        loader(withOtherDiagram),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(otherDiagram)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
+        loader(withOtherMap),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(otherMap)}/graphs/${encodeCompactUuid(GRAPH_ID)}`,
       ),
     ).resolves.toEqual({ kind: 'unresolved' });
     await expect(
       resolveProductDestination(
-        loader(withOtherDiagram),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(otherDiagram)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(THING_ID)}`,
+        loader(withOtherMap),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(otherMap)}/graphs/${encodeCompactUuid(GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_ID)}`,
       ),
     ).resolves.toEqual({ kind: 'unresolved' });
   });
 
-  it('does not resolve a contextual Diagram-and-Thing destination when the Diagram omits the Thing', async () => {
+  it('does not resolve a contextual Map-and-Resource destination when the Map omits the Resource', async () => {
     const omitted = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-    const withOmittedThing: LoadedSpace = {
+    const withOmittedResource: LoadedSpace = {
       ...loaded,
       snapshot: {
         ...loaded.snapshot,
-        things: [
-          ...loaded.snapshot.things,
+        resources: [
+          ...loaded.snapshot.resources,
           { id: omitted, document: { title: 'Omitted', kind: 'markdown', body: '' } },
         ],
       },
@@ -267,19 +270,19 @@ describe('product destinations', () => {
 
     await expect(
       resolveProductDestination(
-        loader(withOmittedThing),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/things/${encodeCompactUuid(omitted)}`,
+        loader(withOmittedResource),
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/resources/${encodeCompactUuid(omitted)}`,
       ),
     ).resolves.toEqual({ kind: 'unresolved' });
   });
 
-  it('classifies a malformed contextual Thing id without loading the Space', async () => {
+  it('classifies a malformed contextual Resource id without loading the Space', async () => {
     const backend = loader();
 
     await expect(
       resolveProductDestination(
         backend,
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}/things/not-a-compact-uuid`,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/resources/not-a-compact-uuid`,
       ),
     ).resolves.toEqual({ kind: 'malformed' });
     expect(backend.loadSpace).not.toHaveBeenCalled();
@@ -289,11 +292,11 @@ describe('product destinations', () => {
     expect(
       resolveProductDestinationInSnapshot(
         loaded.snapshot,
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/things/${encodeCompactUuid(THING_ID)}`,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/resources/${encodeCompactUuid(RESOURCE_ID)}`,
       ),
     ).toEqual({
       kind: 'resolved',
-      destination: { kind: 'thing', spaceId: SPACE_ID, thingId: THING_ID },
+      destination: { kind: 'resource', spaceId: SPACE_ID, resourceId: RESOURCE_ID },
     });
   });
 
@@ -315,18 +318,18 @@ describe('product destinations', () => {
       destination: { kind: 'space' as const, spaceId: SPACE_ID },
     },
     {
-      name: 'Diagram',
-      path: `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}`,
+      name: 'Map',
+      path: `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}`,
       destination: {
-        kind: 'diagram' as const,
+        kind: 'map' as const,
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
       },
     },
     {
-      name: 'Diagram',
-      path: `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(DIAGRAM_ID)}`,
-      destination: { kind: 'diagram' as const, spaceId: SPACE_ID, diagramId: DIAGRAM_ID },
+      name: 'Map',
+      path: `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}`,
+      destination: { kind: 'map' as const, spaceId: SPACE_ID, mapId: MAP_ID },
     },
   ])('loads and resolves a $name destination', async ({ path, destination }) => {
     const backend = loader();
@@ -367,13 +370,13 @@ describe('product destinations', () => {
     ).resolves.toEqual({ kind: 'unresolved' });
   });
 
-  it('classifies an unknown Diagram as unresolved', async () => {
+  it('classifies an unknown Map as unresolved', async () => {
     const missing = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
 
     await expect(
       resolveProductDestination(
         loader(),
-        `/spaces/${encodeCompactUuid(SPACE_ID)}/diagrams/${encodeCompactUuid(missing)}`,
+        `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(missing)}`,
       ),
     ).resolves.toEqual({ kind: 'unresolved' });
   });

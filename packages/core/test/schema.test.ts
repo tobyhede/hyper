@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { thingFrontmatterSchema, thingSchema, spaceFileSchema } from '../src/index';
+import { resourceFrontmatterSchema, resourceSchema, spaceFileSchema } from '../src/index';
 
 const MAIN = {
   id: '00000000-0000-4000-8000-000000000004',
@@ -9,7 +9,7 @@ const MAIN = {
   ],
 };
 
-/** The Diagram that owns `MAIN`; positions are its Thing membership (ADR 0040). */
+/** The Map that owns `MAIN`; positions are its Resource membership (ADR 0040). */
 const WORKING = {
   id: '00000000-0000-4000-8000-000000000010',
   title: 'Working',
@@ -25,18 +25,18 @@ const validSpaceFile = {
   version: 1,
   id: '00000000-0000-4000-8000-000000000001',
   title: 'Test deck',
-  diagrams: [WORKING],
+  maps: [WORKING],
 };
 
-/** A diagram carrying one graph, for cases that vary only the graph. */
+/** A map carrying one graph, for cases that vary only the graph. */
 const withGraphs = (graphs: unknown[]) => ({
   ...validSpaceFile,
-  diagrams: [{ ...WORKING, graphs }],
+  maps: [{ ...WORKING, graphs }],
 });
 
 describe('space file schema', () => {
-  it('nests a Graph under the Diagram that owns it, with no Space-level collection', () => {
-    // ADR 0040: a Graph is an owned value of one Diagram. The Space-level array
+  it('nests a Graph under the Map that owns it, with no Space-level collection', () => {
+    // ADR 0040: a Graph is an owned value of one Map. The Space-level array
     // is gone, and a file carrying one is rejected rather than half-read — by
     // `loadSpace`, not here. This schema is a plain object, so it *strips* a key
     // it does not declare, and declaring the retired one would put it in the
@@ -46,7 +46,7 @@ describe('space file schema', () => {
       version: 1,
       id: '00000000-0000-4000-8000-000000000001',
       title: 'Test deck',
-      diagrams: [
+      maps: [
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
@@ -71,7 +71,7 @@ describe('space file schema', () => {
     });
 
     expect('graphs' in file).toBe(false);
-    expect(file.diagrams?.[0]?.graphs.map((graph) => graph.title)).toEqual(['Main']);
+    expect(file.maps?.[0]?.graphs.map((graph) => graph.title)).toEqual(['Main']);
   });
 
   it('requires the space to name itself', () => {
@@ -90,13 +90,13 @@ describe('space file schema', () => {
   it('parses a valid space file', () => {
     const file = spaceFileSchema.parse(validSpaceFile);
     expect(file.title).toBe('Test deck');
-    expect(file.diagrams?.[0]?.graphs).toHaveLength(1);
+    expect(file.maps?.[0]?.graphs).toHaveLength(1);
   });
 
-  it('rejects an undeclared key rather than opening on a Diagram its author did not name', () => {
+  it('rejects an undeclared key rather than opening on a Map its author did not name', () => {
     // What answers the opening selection ADR 0079 renamed. Stripped, a file
     // still carrying the old spelling reaches `workingSpace`, which adopts
-    // `diagrams[0]` and commits it — the author's stated Diagram silently
+    // `maps[0]` and commits it — the author's stated Map silently
     // replaced and then written back.
     //
     // The key below is arbitrary on purpose. Rejection is by policy and not by
@@ -110,17 +110,19 @@ describe('space file schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('holds no things — a thing exists because its file does (ADR 0020)', () => {
+  it('holds no resources — a resource exists because its file does (ADR 0020)', () => {
     // Strict, so the array is refused rather than dropped, and nothing can
     // half-load from it.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      things: [{ id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'things/a.md' }],
+      resources: [
+        { id: '00000000-0000-4000-8000-000000000002', title: 'A', content: 'resources/a.md' },
+      ],
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects version 2, which put the graphs beside the diagrams instead of in them', () => {
+  it('rejects version 2, which put the graphs beside the maps instead of in them', () => {
     // The disposable pre-release shape. Hyper is unreleased, so it has no
     // compatibility claim on the first-public one and is rejected, not migrated
     // (ADR 0040). `loadSpace` says so in one error; here it is the literal.
@@ -129,7 +131,7 @@ describe('space file schema', () => {
       id: '00000000-0000-4000-8000-000000000001',
       title: 'Old space',
       graphs: [MAIN],
-      diagrams: [
+      maps: [
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
@@ -149,7 +151,7 @@ describe('space file schema', () => {
       version: 1,
       id: 'space',
       title: 'Old space',
-      diagrams: [
+      maps: [
         {
           id: 'working',
           title: 'Working',
@@ -157,14 +159,14 @@ describe('space file schema', () => {
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
-      defaultDiagram: 'working',
+      defaultMap: 'working',
     });
     expect(result.success).toBe(false);
   });
 
   it('rejects a top-level edges array, which graphs replaced', () => {
     // ADR 0007 deleted the structural layer beside graphs; a graph's own `edges`
-    // (ADR 0032) are a different thing that happens to share the word. An older
+    // (ADR 0032) are a different concept that happens to share the word. An older
     // file carrying the old array is refused rather than read past.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
@@ -179,33 +181,33 @@ describe('space file schema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('accepts a space file with no diagrams — a new space has no structure yet', () => {
-    // ADR 0015. It renders; it cannot be presented. A Diagram owns at least one
-    // Graph (ADR 0040), so having no Diagrams is what having no Graphs now is.
-    const { diagrams: _diagrams, ...withoutDiagrams } = validSpaceFile;
-    expect(spaceFileSchema.safeParse(withoutDiagrams).success).toBe(true);
-    expect(spaceFileSchema.safeParse({ ...validSpaceFile, diagrams: [] }).success).toBe(true);
+  it('accepts a space file with no maps — a new space has no structure yet', () => {
+    // ADR 0015. It renders; it cannot be presented. A Map owns at least one
+    // Graph (ADR 0040), so having no Maps is what having no Graphs now is.
+    const { maps: _maps, ...withoutMaps } = validSpaceFile;
+    expect(spaceFileSchema.safeParse(withoutMaps).success).toBe(true);
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, maps: [] }).success).toBe(true);
   });
 
-  it('rejects a diagram that owns no graphs — one is the fewest it is created with', () => {
-    // Creating a Diagram creates its initial Graph in the same Edit, and Graph
+  it('rejects a map that owns no graphs — one is the fewest it is created with', () => {
+    // Creating a Map creates its initial Graph in the same Edit, and Graph
     // management cannot delete the last (ADR 0040), so none is a state no
     // gesture produces.
     expect(spaceFileSchema.safeParse(withGraphs([])).success).toBe(false);
   });
 
-  it('requires the graphs key on a diagram, so a dropped array is a shape error', () => {
+  it('requires the graphs key on a map, so a dropped array is a shape error', () => {
     const { graphs: _graphs, ...withoutGraphs } = WORKING;
-    expect(
-      spaceFileSchema.safeParse({ ...validSpaceFile, diagrams: [withoutGraphs] }).success,
-    ).toBe(false);
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, maps: [withoutGraphs] }).success).toBe(
+      false,
+    );
   });
 
-  it('accepts a graph with no edges — a Diagram mints its initial Graph empty', () => {
-    // Creating a Diagram creates its initial empty Active Graph in the same Edit
+  it('accepts a graph with no edges — a Map mints its initial Graph empty', () => {
+    // Creating a Map creates its initial empty Active Graph in the same Edit
     // (ADR 0040), and the Flow view converts by returning exactly that (ADR
     // 0045), so an edge-less Graph is a state the product produces on the first
-    // Thing the author moves. Deleting the last Edge of a Graph leaves the same
+    // Resource the author moves. Deleting the last Edge of a Graph leaves the same
     // shape. The superseded rule read a Graph as minted *by* drawing an Edge.
     const result = spaceFileSchema.safeParse(
       withGraphs([{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }]),
@@ -259,30 +261,30 @@ describe('space file schema', () => {
   });
 });
 
-describe('thing frontmatter schema', () => {
-  it('rejects an empty thing id', () => {
-    expect(thingFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
+describe('resource frontmatter schema', () => {
+  it('rejects an empty resource id', () => {
+    expect(resourceFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
   });
 
-  it('defaults a thing with no kind to markdown, so the common thing declares neither', () => {
-    const thing = thingFrontmatterSchema.parse({
+  it('defaults a resource with no kind to markdown, so the common resource declares neither', () => {
+    const resource = resourceFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
     });
-    expect(thing.kind).toBe('markdown');
+    expect(resource.kind).toBe('markdown');
   });
 
   it('holds no content key — the file the frontmatter sits in is the content', () => {
-    const thing = thingFrontmatterSchema.parse({
+    const resource = resourceFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
-      content: 'things/a.md',
+      content: 'resources/a.md',
     });
-    expect('content' in thing).toBe(false);
+    expect('content' in resource).toBe(false);
   });
 
-  it('parses a reference thing, which points at a target instead of holding content', () => {
-    const reference = thingFrontmatterSchema.parse({
+  it('parses a reference resource, which points at a target instead of holding content', () => {
+    const reference = resourceFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'reference',
@@ -294,8 +296,8 @@ describe('thing frontmatter schema', () => {
     );
   });
 
-  it('gives a reference thing no body field at all', () => {
-    const reference = thingSchema.parse({
+  it('gives a reference resource no body field at all', () => {
+    const reference = resourceSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'reference',
@@ -305,51 +307,51 @@ describe('thing frontmatter schema', () => {
     expect('body' in reference).toBe(false);
   });
 
-  it('parses a Space Thing that names both the Diagram and the Graph it selects', () => {
-    const selected = thingFrontmatterSchema.parse({
+  it('parses a Space Resource that names both the Map and the Graph it selects', () => {
+    const selected = resourceFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000006',
       title: 'Nested space',
       kind: 'space',
       spaceId: '00000000-0000-4000-8000-000000000007',
-      diagram: '00000000-0000-4000-8000-000000000008',
+      map: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
 
     expect(selected).toMatchObject({
       kind: 'space',
-      diagram: '00000000-0000-4000-8000-000000000008',
+      map: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
     });
   });
 
   /**
-   * The selection is part of what a Space Thing **is**, not an option on it
-   * (ADR 0079). A Space Thing names a Diagram of its target and a Graph that
-   * Diagram owns from the moment it exists: creating one against a diagramless
+   * The selection is part of what a Space Resource **is**, not an option on it
+   * (ADR 0079). A Space Resource names a Map of its target and a Graph that
+   * Map owns from the moment it exists: creating one against a mapless
    * target initializes that target first and stores what initialization mints,
-   * and `spaceFileSchema` already guarantees every Diagram owns at least one
+   * and `spaceFileSchema` already guarantees every Map owns at least one
    * Graph, so there is always a pair to name. That leaves the schema with no
-   * shape for an unmade choice — an absent `diagram` or `graph` is malformed
-   * frontmatter rather than a Thing inheriting its target's opening selection.
+   * shape for an unmade choice — an absent `map` or `graph` is malformed
+   * frontmatter rather than a Resource inheriting its target's opening selection.
    */
-  it('rejects a Space Thing that leaves either half of its selection unwritten', () => {
+  it('rejects a Space Resource that leaves either half of its selection unwritten', () => {
     const nested = {
       id: '00000000-0000-4000-8000-000000000010',
       title: 'Nested space',
       kind: 'space',
       spaceId: '00000000-0000-4000-8000-000000000007',
     };
-    const diagram = '00000000-0000-4000-8000-000000000008';
+    const map = '00000000-0000-4000-8000-000000000008';
     const graph = '00000000-0000-4000-8000-000000000009';
 
-    expect(thingFrontmatterSchema.safeParse(nested).success).toBe(false);
-    expect(thingFrontmatterSchema.safeParse({ ...nested, diagram }).success).toBe(false);
-    expect(thingFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
+    expect(resourceFrontmatterSchema.safeParse(nested).success).toBe(false);
+    expect(resourceFrontmatterSchema.safeParse({ ...nested, map }).success).toBe(false);
+    expect(resourceFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
   });
 
-  it('rejects a reference thing with no target', () => {
+  it('rejects a reference resource with no target', () => {
     expect(
-      thingFrontmatterSchema.safeParse({
+      resourceFrontmatterSchema.safeParse({
         id: '00000000-0000-4000-8000-000000000002',
         title: 'A',
         kind: 'reference',
@@ -357,37 +359,37 @@ describe('thing frontmatter schema', () => {
     ).toBe(false);
   });
 
-  it('does not make Description part of the shared Thing contract', () => {
-    const thing = thingFrontmatterSchema.parse({
+  it('does not make Description part of the shared Resource contract', () => {
+    const resource = resourceFrontmatterSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       description: 'What A is',
     });
-    expect('description' in thing).toBe(false);
+    expect('description' in resource).toBe(false);
   });
 });
 
-describe('space file diagrams', () => {
+describe('space file maps', () => {
   const working = WORKING;
 
-  it('parses a file that declares no diagrams — the hand-authored case', () => {
-    const { diagrams: _diagrams, ...withoutDiagrams } = validSpaceFile;
-    const file = spaceFileSchema.parse(withoutDiagrams);
-    expect(file.diagrams).toBeUndefined();
-    expect(file.defaultDiagram).toBeUndefined();
+  it('parses a file that declares no maps — the hand-authored case', () => {
+    const { maps: _maps, ...withoutMaps } = validSpaceFile;
+    const file = spaceFileSchema.parse(withoutMaps);
+    expect(file.maps).toBeUndefined();
+    expect(file.defaultMap).toBeUndefined();
   });
 
-  it('parses a positioned diagram and its positions', () => {
-    const file = spaceFileSchema.parse({ ...validSpaceFile, diagrams: [working] });
-    const diagram = file.diagrams?.[0];
-    expect(diagram?.kind).toBe('positioned');
-    expect(diagram?.positions).toEqual({
+  it('parses a positioned map and its positions', () => {
+    const file = spaceFileSchema.parse({ ...validSpaceFile, maps: [working] });
+    const map = file.maps?.[0];
+    expect(map?.kind).toBe('positioned');
+    expect(map?.positions).toEqual({
       '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
       '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
     });
   });
 
-  it('requires an Expanded Thing to be at least the Closed Thing size', () => {
+  it('requires an Expanded Resource to be at least the Closed Resource size', () => {
     const positions = (width: number, height: number) => ({
       '00000000-0000-4000-8000-000000000002': {
         x: 0,
@@ -400,27 +402,27 @@ describe('space file diagrams', () => {
     expect(
       spaceFileSchema.safeParse({
         ...validSpaceFile,
-        diagrams: [{ ...working, positions: positions(259, 146) }],
+        maps: [{ ...working, positions: positions(259, 146) }],
       }).success,
     ).toBe(false);
     expect(
       spaceFileSchema.safeParse({
         ...validSpaceFile,
-        diagrams: [{ ...working, positions: positions(260, 145) }],
+        maps: [{ ...working, positions: positions(260, 145) }],
       }).success,
     ).toBe(false);
     expect(
       spaceFileSchema.safeParse({
         ...validSpaceFile,
-        diagrams: [{ ...working, positions: positions(260, 146) }],
+        maps: [{ ...working, positions: positions(260, 146) }],
       }).success,
     ).toBe(true);
   });
 
-  it('defaults a diagram with no kind to positioned, so one can be hand-written', () => {
+  it('defaults a map with no kind to positioned, so one can be hand-written', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      diagrams: [
+      maps: [
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
@@ -429,15 +431,15 @@ describe('space file diagrams', () => {
         },
       ],
     });
-    expect(file.diagrams?.[0]?.kind).toBe('positioned');
+    expect(file.maps?.[0]?.kind).toBe('positioned');
   });
 
   it('accepts an empty position map — positions are sparse, and none is the limit', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      diagrams: [{ ...working, positions: {} }],
+      maps: [{ ...working, positions: {} }],
     });
-    expect(file.diagrams?.[0]?.positions).toEqual({});
+    expect(file.maps?.[0]?.positions).toEqual({});
   });
 
   it('rejects a position that is not a point', () => {
@@ -447,24 +449,23 @@ describe('space file diagrams', () => {
       { '00000000-0000-4000-8000-000000000002': { x: '0', y: '0', open: false } },
     ]) {
       expect(
-        spaceFileSchema.safeParse({ ...validSpaceFile, diagrams: [{ ...working, positions }] })
-          .success,
+        spaceFileSchema.safeParse({ ...validSpaceFile, maps: [{ ...working, positions }] }).success,
       ).toBe(false);
     }
   });
 
-  it('rejects a position keyed by an empty thing id', () => {
+  it('rejects a position keyed by an empty resource id', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      diagrams: [{ ...working, positions: { '': { x: 0, y: 0, open: false } } }],
+      maps: [{ ...working, positions: { '': { x: 0, y: 0, open: false } } }],
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects a diagram kind it does not know', () => {
+  it('rejects a map kind it does not know', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      diagrams: [
+      maps: [
         {
           id: '00000000-0000-4000-8000-000000000098',
           title: 'Auto',
@@ -477,45 +478,45 @@ describe('space file diagrams', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects a diagram whose graphs are ids rather than owned values', () => {
-    // The version 2 filter, which named the graphs a diagram drew. It shares a
-    // key with the collection a diagram now owns, so the shape check is what
+  it('rejects a map whose graphs are ids rather than owned values', () => {
+    // The version 2 filter, which named the graphs a map drew. It shares a
+    // key with the collection a map now owns, so the shape check is what
     // tells them apart — a file saying "draw only these" is not one owning them.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      diagrams: [{ ...working, graphs: ['00000000-0000-4000-8000-000000000011'] }],
+      maps: [{ ...working, graphs: ['00000000-0000-4000-8000-000000000011'] }],
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects a key the diagram does not declare, rather than stripping it', () => {
+  it('rejects a key the map does not declare, rather than stripping it', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      diagrams: [{ ...working, hidden: ['00000000-0000-4000-8000-000000000011'] }],
+      maps: [{ ...working, hidden: ['00000000-0000-4000-8000-000000000011'] }],
     });
     expect(result.success).toBe(false);
   });
 
-  it('parses the graph a diagram opens active', () => {
+  it('parses the graph a map opens active', () => {
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      diagrams: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000012' }],
+      maps: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000012' }],
     });
-    expect(file.diagrams?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000012');
+    expect(file.maps?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000012');
   });
 
   it('leaves it absent — the first graph is active', () => {
     // Absent is the meaningful case, not a missing field to be filled in: it is
-    // how a diagram defers the active graph (ADR 0026).
-    const file = spaceFileSchema.parse({ ...validSpaceFile, diagrams: [working] });
-    expect(file.diagrams?.[0]?.activeGraph).toBeUndefined();
+    // how a map defers the active graph (ADR 0026).
+    const file = spaceFileSchema.parse({ ...validSpaceFile, maps: [working] });
+    expect(file.maps?.[0]?.activeGraph).toBeUndefined();
   });
 
   it('rejects an activeGraph that is not an id', () => {
     expect(
       spaceFileSchema.safeParse({
         ...validSpaceFile,
-        diagrams: [{ ...working, activeGraph: '' }],
+        maps: [{ ...working, activeGraph: '' }],
       }).success,
     ).toBe(false);
   });
@@ -525,20 +526,20 @@ describe('space file diagrams', () => {
     // space in view (@project/graph).
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      diagrams: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000099' }],
+      maps: [{ ...working, activeGraph: '00000000-0000-4000-8000-000000000099' }],
     });
-    expect(file.diagrams?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
+    expect(file.maps?.[0]?.activeGraph).toBe('00000000-0000-4000-8000-000000000099');
   });
 
-  it('accepts defaultDiagram as a durable Diagram id', () => {
+  it('accepts defaultMap as a durable Map id', () => {
     // Shape only: whether the name resolves is a reference check, since it needs
-    // the declared diagrams in view.
+    // the declared maps in view.
     const file = spaceFileSchema.parse({
       ...validSpaceFile,
-      defaultDiagram: '00000000-0000-4000-8000-000000000010',
+      defaultMap: '00000000-0000-4000-8000-000000000010',
     });
-    expect(file.defaultDiagram).toBe('00000000-0000-4000-8000-000000000010');
-    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultDiagram: 'flow' }).success).toBe(
+    expect(file.defaultMap).toBe('00000000-0000-4000-8000-000000000010');
+    expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultMap: 'flow' }).success).toBe(
       false,
     );
   });

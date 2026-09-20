@@ -8,20 +8,20 @@ import { describe, expect, it } from 'vitest';
  *
  * That is the cost the ADR accepts, and this is what it is paid with: the
  * reading of a Title is a named domain operation in `@project/core` rather than
- * a `split('\n')` at each of the surfaces that draw, list or search a Thing. The
+ * a `split('\n')` at each of the surfaces that draw, list or search a Resource. The
  * compiler cannot help — every one of those call sites has a `string` in hand
  * and every one of them would compile — so the containment is read off the
  * source, in the idiom `codemirror-encapsulation.test.ts` already established
  * here for an encapsulation a type cannot express.
  *
- * Two rules, and they are the same rule twice: **only the Thing front reads a
+ * Two rules, and they are the same rule twice: **only the Resource front reads a
  * Title's later lines.** Everywhere else shows the name, which is `titleName`,
  * and `titleName` is deliberately unrestricted — it is the answer, not the
- * thing being contained.
+ * constraint being contained.
  *
  * Scoped to the packages' `src` trees, which is where a surface lives. A test
  * that writes a two-line Title and splits the rendered result apart is reading
- * its own output rather than a Thing's Title, and a rule that reported it would
+ * its own output rather than a Resource's Title, and a rule that reported it would
  * be teaching nothing.
  */
 
@@ -30,18 +30,18 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * Where a Title's later lines may be read.
  *
- * Two files, and nothing wider. The Thing front draws the ladder and is the only
+ * Two files, and nothing wider. The Resource front draws the ladder and is the only
  * surface that does (ADR 0083); `@project/core`'s own module is where the rule
  * lives and is what every other reader goes through. The render adapter mounts
  * that front on the canvas and once held a whole-tree permission for it, which
- * it never spent — it hands `CanvasThing` a Title and reads no line of one — so
+ * it never spent — it hands `CanvasResource` a Title and reads no line of one — so
  * the permission went rather than standing as a region-wide hole with a reason
  * attached to it. Every entry here is asserted below to still be reading a
  * Title's lines, which is what a tree could not be held to file by file.
  */
 const LADDER_READERS: readonly string[] = [
   'packages/core/src/title.ts',
-  'packages/ui/src/CanvasThing.tsx',
+  'packages/ui/src/CanvasResource.tsx',
 ];
 
 /**
@@ -52,7 +52,7 @@ const LADDER_READERS: readonly string[] = [
  * this file exists. It is asserted below to still be earning itself, so
  * deleting the split deletes the exemption rather than leaving a hole.
  */
-const NOT_A_TITLE: readonly string[] = ['packages/graph/src/thing-file.ts'];
+const NOT_A_TITLE: readonly string[] = ['packages/graph/src/resource-file.ts'];
 
 /**
  * Reading a Title apart at a line break, however the break is found.
@@ -102,7 +102,7 @@ const reaching = (files: readonly string[], pattern: RegExp): readonly string[] 
 
 const isLadderReader = (file: string): boolean => LADDER_READERS.includes(file);
 
-describe('only the Thing front reads a Title’s later lines', () => {
+describe('only the Resource front reads a Title’s later lines', () => {
   const sources = packageSources();
 
   it('reads every package’s own source tree', () => {
@@ -123,9 +123,9 @@ describe('only the Thing front reads a Title’s later lines', () => {
     expect(NEWLINE_READ.test(String.raw`const break_ = title.indexOf('\n');`)).toBe(true);
     expect(NEWLINE_READ.test(String.raw`title.lastIndexOf('\n')`)).toBe(true);
     expect(NEWLINE_READ.test(String.raw`title.split(', ')`)).toBe(false);
-    expect(NEWLINE_READ.test(String.raw`titles.indexOf(thing.title)`)).toBe(false);
-    expect(LADDER_CALL.test('const lines = titleLines(thing.title);')).toBe(true);
-    expect(LADDER_CALL.test('const name = titleName(thing.title);')).toBe(false);
+    expect(NEWLINE_READ.test(String.raw`titles.indexOf(resource.title)`)).toBe(false);
+    expect(LADDER_CALL.test('const lines = titleLines(resource.title);')).toBe(true);
+    expect(LADDER_CALL.test('const name = titleName(resource.title);')).toBe(false);
   });
 
   it('reads a Title apart at a newline nowhere else', () => {
@@ -174,12 +174,12 @@ describe('only the Thing front reads a Title’s later lines', () => {
   });
 
   /**
-   * And the Thing front is still the thing being permitted. A permission granted
+   * And the Resource front is still the subject being permitted. A permission granted
    * to a file that stopped drawing the ladder is a hole with a name on it.
    */
-  it('keeps the Thing front drawing the ladder', () => {
+  it('keeps the Resource front drawing the ladder', () => {
     expect(
-      LADDER_CALL.test(readFileSync(join(repoRoot, 'packages/ui/src/CanvasThing.tsx'), 'utf8')),
+      LADDER_CALL.test(readFileSync(join(repoRoot, 'packages/ui/src/CanvasResource.tsx'), 'utf8')),
     ).toBe(true);
   });
 });

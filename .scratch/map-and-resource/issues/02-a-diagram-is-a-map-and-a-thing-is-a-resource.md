@@ -1,6 +1,6 @@
 # 02 — A Diagram is a Map and a Thing is a Resource
 
-**Status:** ready-for-agent
+**Status:** resolved
 **Blocked by:** 01 — Free the English prose the sweep would corrupt.
 
 **What to build:** Run `.scratch/map-and-resource/rename-diagram-to-map-and-thing-to-resource.mjs`, then `pnpm exec prettier --write .`, then make by hand the six edits the script deliberately does not produce. One commit.
@@ -38,4 +38,35 @@ It currently reports one, and that one is **already broken**: `docs/agents/ui.md
 
 ## Answer
 
-<!-- Filled in as the work lands. -->
+Resolved in one stacked implementation commit. The codemod rewrote the current
+source and renamed 128 paths, after which Prettier reformatted the complete
+tree. Its finished-state dry run reports zero files and zero paths.
+
+The manual sweep corrections are included: Resource and Map collection
+callbacks use `(r)` and `(m)`; the sorted lifecycle and resource-discovery
+expectations follow their renamed order; the current documentation retains the
+meaning of the earlier vocabulary decisions; the four built-in `Map<…>` type
+positions are explicit as `ReadonlyMap` or `globalThis.Map`; and
+`docs/agents/ui.md` again resolves `space-cards/04`. The prerequisite's
+`SpaceEndpointSelectors` filename and `EnteredFromSpaceEndpoint` story address
+were also preserved where the path sweep encountered their earlier Thing-based
+names.
+
+Review found that the determiner-focused preparation report had not covered
+every ordinary-English use of the old noun. The 49 additional comments and
+current-document phrases it exposed have been reworded as their actual concept
+— fact, rule, value, evidence, condition, proposal, operation or surface — so
+the sweep leaves no lowercase `resource` pretending to name one of those.
+
+The vocabulary guard and the two database migrations remain deliberately
+owned by tickets 04 and 03 respectively; this commit does not cross those
+ticket boundaries.
+
+Verification:
+
+- `pnpm verify` — passed: 229 files, 2,880 tests passed and 5 skipped.
+- `pnpm e2e` — passed: 223 tests, with no behavioural test added or removed.
+- `pnpm e2e:ladle` — passed: 112 tests. The first cold run exposed missing
+  Vite optimiser chunks; after cache population, four affected Command Dock
+  cases passed. One repeatable story-address mismatch was corrected before the
+  complete green run.

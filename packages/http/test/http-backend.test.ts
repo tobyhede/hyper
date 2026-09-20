@@ -13,11 +13,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 const loaded = { snapshot, revision: 4n, exportedRevision: 2n };
 const commit: SpaceCommit = {
@@ -93,9 +93,9 @@ describe('HTTP Space backend aggregate protocol', () => {
       kind: 'aggregate-refused' as const,
       errors: [
         {
-          kind: 'space-thing-target-missing' as const,
+          kind: 'space-resource-target-missing' as const,
           spaceId: SPACE_ID,
-          thingId: THING_ID,
+          resourceId: RESOURCE_ID,
           targetSpaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
         },
       ],

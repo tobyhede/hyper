@@ -2,8 +2,8 @@ import { uuidSchema, type ImportSpace, type SpaceSnapshot, type UUID } from '@pr
 import { describe, expect, it } from 'vitest';
 import { describeSchemaFailure, identifySpace } from '../../src/aggregate-directory';
 
-const THING_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const SECOND_THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const RESOURCE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
+const SECOND_RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
@@ -22,9 +22,9 @@ const countingIds = (): (() => UUID) => {
 
 describe('identifySpace', () => {
   /*
-   * Two id-less diagrams, because minting under one owner reads the same whether
-   * the pass walks diagrams or flattens them, and only a second owner tells those
-   * apart. A graph is reached only through the diagram that owns it (ADR 0040),
+   * Two id-less maps, because minting under one owner reads the same whether
+   * the pass walks maps or flattens them, and only a second owner tells those
+   * apart. A graph is reached only through the map that owns it (ADR 0040),
    * so both ids are minted in the same pass.
    */
   it('mints every identity the input leaves out and keeps every explicit one', () => {
@@ -32,50 +32,54 @@ describe('identifySpace', () => {
       document: {
         version: 1,
         title: 'Partly identified',
-        diagrams: [
+        maps: [
           {
-            title: 'Minted diagram',
+            title: 'Minted map',
             kind: 'positioned',
             positions: {
-              [THING_ID]: { x: 4, y: 8, open: false },
-              [SECOND_THING_ID]: { x: 12, y: 16, open: false },
+              [RESOURCE_ID]: { x: 4, y: 8, open: false },
+              [SECOND_RESOURCE_ID]: { x: 12, y: 16, open: false },
             },
-            graphs: [{ title: 'Minted graph', edges: [{ from: THING_ID, to: SECOND_THING_ID }] }],
+            graphs: [
+              { title: 'Minted graph', edges: [{ from: RESOURCE_ID, to: SECOND_RESOURCE_ID }] },
+            ],
           },
           {
-            title: 'Second minted diagram',
+            title: 'Second minted map',
             kind: 'positioned',
-            positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: GRAPH_ID, title: 'Explicit graph', edges: [] }],
           },
         ],
       },
-      things: [
-        { id: THING_ID, document: { title: 'First', kind: 'markdown', body: 'One' } },
-        { id: SECOND_THING_ID, document: { title: 'Second', kind: 'markdown', body: 'Two' } },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'First', kind: 'markdown', body: 'One' } },
+        { id: SECOND_RESOURCE_ID, document: { title: 'Second', kind: 'markdown', body: 'Two' } },
         { document: { title: 'Minted', kind: 'markdown', body: 'Three' } },
       ],
     };
 
     const snapshot = identifySpace(input, countingIds());
 
-    const [diagram, second] = snapshot.document.diagrams ?? [];
-    if (diagram === undefined || second === undefined) throw new Error('Structure was not kept');
-    const minted = snapshot.things.find(({ id }) => id !== THING_ID && id !== SECOND_THING_ID)?.id;
-    const mintedGraph = diagram.graphs[0]?.id;
+    const [map, second] = snapshot.document.maps ?? [];
+    if (map === undefined || second === undefined) throw new Error('Structure was not kept');
+    const minted = snapshot.resources.find(
+      ({ id }) => id !== RESOURCE_ID && id !== SECOND_RESOURCE_ID,
+    )?.id;
+    const mintedGraph = map.graphs[0]?.id;
     if (minted === undefined || mintedGraph === undefined) throw new Error('Nothing was minted');
 
     // The explicit ids survive exactly; the minted ones are distinct UUIDs.
     expect(second.graphs[0]?.id).toBe(GRAPH_ID);
-    expect(diagram.graphs[0]?.edges).toEqual([{ from: THING_ID, to: SECOND_THING_ID }]);
-    const identities = [snapshot.id, minted, mintedGraph, diagram.id, second.id];
+    expect(map.graphs[0]?.edges).toEqual([{ from: RESOURCE_ID, to: SECOND_RESOURCE_ID }]);
+    const identities = [snapshot.id, minted, mintedGraph, map.id, second.id];
     for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
     expect(new Set(identities).size).toBe(identities.length);
   });
 
   it('takes the Space id it is given over the one the document declares nothing about', () => {
     const snapshot = identifySpace(
-      { document: { version: 1, title: 'Directory named' }, things: [] },
+      { document: { version: 1, title: 'Directory named' }, resources: [] },
       countingIds(),
       SPACE_ID,
     );
@@ -97,17 +101,17 @@ describe('identifySpace', () => {
   it('refuses a Space id that disagrees with the one the document declares', () => {
     const identify = (): SpaceSnapshot =>
       identifySpace(
-        { id: THING_ID, document: { version: 1, title: 'Disagreeing' }, things: [] },
+        { id: RESOURCE_ID, document: { version: 1, title: 'Disagreeing' }, resources: [] },
         countingIds(),
         SPACE_ID,
       );
 
-    expect(identify).toThrow(THING_ID);
+    expect(identify).toThrow(RESOURCE_ID);
     expect(identify).toThrow(SPACE_ID);
   });
 
   it('mints a fresh Space id per call for input that omits one', () => {
-    const input: ImportSpace = { document: { version: 1, title: 'Anonymous' }, things: [] };
+    const input: ImportSpace = { document: { version: 1, title: 'Anonymous' }, resources: [] };
     const newId = countingIds();
 
     expect(identifySpace(input, newId).id).not.toBe(identifySpace(input, newId).id);
@@ -126,14 +130,14 @@ describe('describeSchemaFailure', () => {
       [
         { path: ['id'], message: 'Invalid uuid' },
         { path: ['document', 'title'], message: 'Required' },
-        { path: ['things', 0, 'id'], message: 'Invalid uuid' },
-        { path: ['things', 1, 'id'], message: 'Invalid uuid' },
+        { path: ['resources', 0, 'id'], message: 'Invalid uuid' },
+        { path: ['resources', 1, 'id'], message: 'Invalid uuid' },
       ],
       'identified space',
     );
 
     expect(message).toBe(
-      'identified space is invalid: id invalid uuid; document.title required; things.0.id invalid uuid (and 1 more)',
+      'identified space is invalid: id invalid uuid; document.title required; resources.0.id invalid uuid (and 1 more)',
     );
   });
 

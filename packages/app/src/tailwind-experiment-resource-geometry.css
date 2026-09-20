@@ -1,0 +1,69 @@
+/*
+ * EXPERIMENT BLOCK — INERT. Nothing imports this file.
+ *
+ * Ticket 09 (`.scratch/structural-tokens/issues/09-prove-the-one-file-experiment.md`).
+ *
+ * This block gives the chrome the geometry the Resource already draws: no corner
+ * radius, and a hard unblurred offset shadow instead of the soft two-layer
+ * wash. The colours are not touched, so what you see is the geometry question
+ * on its own.
+ *
+ * To run the experiment, append the contents of this file to the end of
+ * `tailwind.css` and reload. Append it — do not import it at the top. A later
+ * declaration of the same token wins, and an `@import` must come first in a
+ * CSS file, which would put these values before the ones they replace.
+ *
+ * Two of these tokens reach the product by different routes, and the routes
+ * behave differently:
+ *
+ *  - `--radius-chrome-*` and `--text-chrome-*` live in `@theme inline`, so
+ *    Tailwind writes their values into the utility at build time. The compiled
+ *    rule is `.rounded-chrome-md{border-radius:6px}`, not a `var()`. These
+ *    need a rebuild; a runtime override of the custom property does nothing.
+ *  - `--shadow-chrome-elevated` and `--border-width-chrome-accent` live in
+ *    `:root`, and the hand-rolled stylesheets read them with `var()`. These do
+ *    respond at runtime.
+ */
+
+/*
+ * The chrome is drawn in TWO radius vocabularies, and a block that names only
+ * one moves only half the chrome. This was measured, not assumed:
+ *
+ *   surface      class            token             baseline
+ *   dock panel   (hand-rolled)    --radius-chrome-xl   10px
+ *   dock button  rounded-chrome-* --radius-chrome-md    6px
+ *   menu panel   rounded-lg       --radius-lg           8px
+ *   menu item    rounded-md       --radius-md           8px
+ *
+ * The components tickets 02 to 07 touched read `--radius-chrome-*`. The
+ * registry components they did not touch — `dropdown-menu`, `context-menu`,
+ * `combobox`, `card`, `alert`, `alert-dialog`, `kbd`, `textarea`,
+ * `input-group`, `field` — read Tailwind's own `--radius-*`. Both scales are
+ * named below.
+ *
+ * `--radius-md` needs two declarations, and the second is not a mistake.
+ * `tailwind.css` declares `--radius-md: 0.5rem` in an unlayered `:root`, and
+ * an unlayered declaration beats the `@layer theme` one that `@theme` emits.
+ * Ticket 01 recorded that rule; here it means a `@theme` entry alone does
+ * nothing for `rounded-md`.
+ */
+
+@theme {
+  --radius-chrome-2xs: 0;
+  --radius-chrome-xs: 0;
+  --radius-chrome-sm: 0;
+  --radius-chrome-md: 0;
+  --radius-chrome-lg: 0;
+  --radius-chrome-xl: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+}
+
+:root {
+  --radius-md: 0;
+  --shadow-chrome-elevated-offset: 6px;
+  --shadow-chrome-elevated: var(--shadow-chrome-elevated-offset)
+    var(--shadow-chrome-elevated-offset) 0 var(--foreground);
+}

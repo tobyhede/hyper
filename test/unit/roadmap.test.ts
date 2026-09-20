@@ -73,7 +73,7 @@ describe('status lines', () => {
 
   it('ignores a line that merely begins with the word status', () => {
     const root = scratch();
-    write(root, 'effort/issues/01-a.md', '# 01 — A\n\nStatusy prose about resolved things.\n');
+    write(root, 'effort/issues/01-a.md', '# 01 — A\n\nStatusy prose about resolved resources.\n');
 
     expect(featureNamed(buildRoadmap(root), 'effort').issues).toEqual([]);
   });
@@ -394,7 +394,7 @@ describe('release scope', () => {
     write(
       root,
       'parallel/issues/01-reference.md',
-      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      '# 01 — Reference Resource\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
     write(
       root,
@@ -483,7 +483,7 @@ describe('release scope', () => {
     write(
       root,
       'parallel/issues/01-reference.md',
-      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      '# 01 — Reference Resource\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
 
     const roadmap = buildRoadmap(root);
@@ -559,14 +559,14 @@ describe('release scope', () => {
     write(
       root,
       'parallel/issues/01-reference.md',
-      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      '# 01 — Reference Resource\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
 
     const release = readReleaseScope(root);
     if (release === null) throw new Error('Expected a release.');
     const destination = writeReleaseSpace(root, buildRoadmap(root), release);
     if (destination === null) throw new Error('Expected a generated Space.');
-    expect(readdirSync(join(destination, 'things'))).toHaveLength(1);
+    expect(readdirSync(join(destination, 'resources'))).toHaveLength(1);
 
     // And once the work that outlived the gate settles too, the release is over
     // and there is nothing left to draw. Generating a Space is still the normal
@@ -574,18 +574,18 @@ describe('release scope', () => {
     write(
       root,
       'parallel/issues/01-reference.md',
-      '# 01 — Reference Thing\n\nStatus: resolved\nTags: release/v1\n',
+      '# 01 — Reference Resource\n\nStatus: resolved\nTags: release/v1\n',
     );
     const emptied = writeReleaseSpace(root, buildRoadmap(root), release);
     if (emptied === null) throw new Error('Expected a generated Space.');
-    expect(readdirSync(join(emptied, 'things'))).toHaveLength(0);
+    expect(readdirSync(join(emptied, 'resources'))).toHaveLength(0);
 
     const imported = await readSingleSpace(emptied);
     const intake = loadSpaceSnapshot(
       spaceSnapshotSchema.parse({
         id: imported.id,
         document: imported.document,
-        things: imported.things,
+        resources: imported.resources,
       }),
     );
     expect(intake.ok ? [] : intake.errors).toEqual([]);
@@ -606,7 +606,7 @@ describe('release scope', () => {
     write(
       root,
       'parallel/issues/01-reference.md',
-      '# 01 — Reference Thing\n\nStatus: ready-for-agent\nTags: release/v1\n',
+      '# 01 — Reference Resource\n\nStatus: ready-for-agent\nTags: release/v1\n',
     );
     write(
       root,
@@ -620,13 +620,13 @@ describe('release scope', () => {
     const destination = writeReleaseSpace(root, roadmap, release);
     if (destination === null) throw new Error('Expected a generated Space.');
 
-    expect(readdirSync(join(destination, 'things'))).toHaveLength(3);
-    expect(readFileSync(join(destination, 'things/parallel-01.md'), 'utf8')).toContain(
+    expect(readdirSync(join(destination, 'resources'))).toHaveLength(3);
+    expect(readFileSync(join(destination, 'resources/parallel-01.md'), 'utf8')).toContain(
       '- **Tags:** `release/v1`',
     );
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
-    expect(file.diagrams?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
+    expect(file.maps?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
       [expect.any(Object), expect.any(Object)],
       [],
     ]);
@@ -636,7 +636,7 @@ describe('release scope', () => {
       spaceSnapshotSchema.parse({
         id: imported.id,
         document: imported.document,
-        things: imported.things,
+        resources: imported.resources,
       }),
     );
     // Named with its errors rather than asserted bare: a regression in a

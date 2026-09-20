@@ -3,7 +3,7 @@ import {
   asOrderable,
   buildRepositoryStateTable,
   buildSpaceTable,
-  buildThingTable,
+  buildResourceTable,
   defineSqlStore,
   type Orderable,
 } from '../persistence/sql-store';
@@ -56,7 +56,7 @@ const isUniqueViolation = (error: unknown, table: string): boolean => {
  * codec and answers an object — the whole row, `.select('id', 'document')`
  * and the root of an `.include()` read alike; only a field read as a
  * *nested relation inside `.include()`* answers the stored string, which is
- * how a loaded Space's `things` documents arrive. Both are valid driver
+ * how a loaded Space's `resources` documents arrive. Both are valid driver
  * output, so this parses a string here rather than asking the repository to
  * accept two shapes.
  */
@@ -67,28 +67,28 @@ const readDocument = (value: unknown): unknown => {
 };
 
 /**
- * `Space.where({ id }).include('things', …).first()`, composed once here
+ * `Space.where({ id }).include('resources', …).first()`, composed once here
  * rather than by the shared repository (`SqlTables`'s doc comment explains
  * why `.include(...)` cannot cross that boundary generically). The nested
- * `things` documents arrive as raw TEXT (this module's `readDocument`
+ * `resources` documents arrive as raw TEXT (this module's `readDocument`
  * decodes them); the shared repository's schema parses them next either way.
  */
-const loadWithThings = (orm: Orm, id: string) =>
+const loadWithResources = (orm: Orm, id: string) =>
   orm.Space.where({ id })
-    .include('things', (things) =>
-      things.select('id', 'document').orderBy((thing) => thing.id.asc()),
+    .include('resources', (resources) =>
+      resources.select('id', 'document').orderBy((resource) => resource.id.asc()),
     )
     .first();
 
 /**
- * Every stored Space with its Things, ascending by id — read through the
+ * Every stored Space with its Resources, ascending by id — read through the
  * lower-level `sql`/`execute` builder rather than the ORM, so that a
  * `document` that is not even JSON reaches the repository's own per-row
  * classification as raw text instead of throwing inside the driver's json
  * codec before any of this module's code runs (`SqlTables`'s doc comment).
  * Two raw-text statements rather than one `include` read, because the
  * lower-level builder used below has no relation support of its own to
- * express the nested `things` read in one statement; `document`'s codec is
+ * express the nested `resources` read in one statement; `document`'s codec is
  * overridden to `'sqlite/text@1'` on the way out so the raw stored text
  * reaches the repository unparsed.
  *
@@ -111,7 +111,7 @@ const loadEvery = async (database: SqliteDatabase, handle: Handle) => {
     .build();
   const spaceRows = await handle.execute(spacesPlan);
 
-  const thingsPlan = database.sql.things
+  const resourcesPlan = database.sql.resources
     .select((fields) => ({
       id: fields.id,
       spaceId: fields.space_id,
@@ -119,13 +119,13 @@ const loadEvery = async (database: SqliteDatabase, handle: Handle) => {
     }))
     .orderBy('id', { direction: 'asc' })
     .build();
-  const thingRows = await handle.execute(thingsPlan);
+  const resourceRows = await handle.execute(resourcesPlan);
 
-  const thingsBySpace = new Map<string, { readonly id: string; readonly document: unknown }[]>();
-  for (const thing of thingRows) {
-    const row = { id: thing.id, document: thing.document };
-    const existing = thingsBySpace.get(thing.spaceId);
-    if (existing === undefined) thingsBySpace.set(thing.spaceId, [row]);
+  const resourcesBySpace = new Map<string, { readonly id: string; readonly document: unknown }[]>();
+  for (const resource of resourceRows) {
+    const row = { id: resource.id, document: resource.document };
+    const existing = resourcesBySpace.get(resource.spaceId);
+    if (existing === undefined) resourcesBySpace.set(resource.spaceId, [row]);
     else existing.push(row);
   }
 
@@ -134,22 +134,22 @@ const loadEvery = async (database: SqliteDatabase, handle: Handle) => {
     document: space.document,
     revision: space.revision,
     exportedRevision: space.exportedRevision,
-    things: thingsBySpace.get(space.id) ?? [],
+    resources: resourcesBySpace.get(space.id) ?? [],
   }));
 };
 
-/** `SqlTables.Thing.deleteExcept`'s own doc comment explains why `keepIds` may be empty. */
-const deleteThingsExcept = async (
+/** `SqlTables.Resource.deleteExcept`'s own doc comment explains why `keepIds` may be empty. */
+const deleteResourcesExcept = async (
   orm: Orm,
   spaceId: string,
   keepIds: readonly string[],
 ): Promise<void> => {
-  const owned = orm.Thing.where({ spaceId });
+  const owned = orm.Resource.where({ spaceId });
   if (keepIds.length === 0) {
     await owned.deleteCount();
     return;
   }
-  await owned.where((thing) => thing.id.notIn(keepIds)).deleteCount();
+  await owned.where((resource) => resource.id.notIn(keepIds)).deleteCount();
 };
 
 /**
@@ -201,11 +201,13 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
       return {
         Space: buildSpaceTable(
           handle.orm.Space,
-          (id: string) => loadWithThings(handle.orm, id),
+          (id: string) => loadWithResources(handle.orm, id),
           () => loadEvery(database, handle),
         ),
-        Thing: buildThingTable(handle.orm.Thing, (spaceId: string, keepIds: readonly string[]) =>
-          deleteThingsExcept(handle.orm, spaceId, keepIds),
+        Resource: buildResourceTable(
+          handle.orm.Resource,
+          (spaceId: string, keepIds: readonly string[]) =>
+            deleteResourcesExcept(handle.orm, spaceId, keepIds),
         ),
         RepositoryState: buildRepositoryStateTable(handle.orm.RepositoryState),
       };

@@ -91,7 +91,7 @@ describe('the open-Spaces tree (ADR 0082)', () => {
   });
 
   /**
-   * **Meta tops the menu whoever opened it.** A Space Thing may target Meta, so
+   * **Meta tops the menu whoever opened it.** A Space Resource may target Meta, so
    * Meta can be Entered from Platform and record Platform as its Opener. Hung
    * by that Opener it drew under Platform, and a sort among the roots could not
    * reach it. It draws first at the root instead, with what was Entered from it

@@ -1,36 +1,36 @@
 import {
   decodeCompactUuid,
   encodeCompactUuid,
-  type ThingId,
+  type ResourceId,
   type GraphId,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import type { LoadedSpace, SpaceResourceRepository } from '@project/persistence';
+import type { LoadedSpace, StoredSpaceRepository } from '@project/persistence';
 
 export type ProductDestination =
   | { readonly kind: 'space'; readonly spaceId: UUID }
-  | { readonly kind: 'diagram'; readonly spaceId: UUID; readonly diagramId: UUID }
-  | { readonly kind: 'thing'; readonly spaceId: UUID; readonly thingId: ThingId }
+  | { readonly kind: 'map'; readonly spaceId: UUID; readonly mapId: UUID }
+  | { readonly kind: 'resource'; readonly spaceId: UUID; readonly resourceId: ResourceId }
   | { readonly kind: 'graph'; readonly spaceId: UUID; readonly graphId: GraphId }
   | {
-      readonly kind: 'diagram-thing';
+      readonly kind: 'map-resource';
       readonly spaceId: UUID;
-      readonly diagramId: UUID;
-      readonly thingId: ThingId;
+      readonly mapId: UUID;
+      readonly resourceId: ResourceId;
     }
   | {
-      readonly kind: 'diagram-graph';
+      readonly kind: 'map-graph';
       readonly spaceId: UUID;
-      readonly diagramId: UUID;
+      readonly mapId: UUID;
       readonly graphId: GraphId;
     }
   | {
       readonly kind: 'presentation';
       readonly spaceId: UUID;
-      readonly diagramId: UUID;
+      readonly mapId: UUID;
       readonly graphId: GraphId;
-      readonly thingId: ThingId;
+      readonly resourceId: ResourceId;
     };
 
 export type ProductDestinationResolution =
@@ -52,23 +52,23 @@ export type ProductDestinationSnapshotResolution =
 export const productDestinationPath = (destination: ProductDestination): string => {
   const space = `/spaces/${encodeCompactUuid(destination.spaceId)}`;
   if (destination.kind === 'space') return space;
-  if (destination.kind === 'thing')
-    return `${space}/things/${encodeCompactUuid(destination.thingId)}`;
+  if (destination.kind === 'resource')
+    return `${space}/resources/${encodeCompactUuid(destination.resourceId)}`;
   if (destination.kind === 'graph') {
     return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
   }
-  const diagram = `${space}/diagrams/${encodeCompactUuid(destination.diagramId)}`;
+  const map = `${space}/maps/${encodeCompactUuid(destination.mapId)}`;
   if (destination.kind === 'presentation') {
-    return `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.thingId)}`;
+    return `${map}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.resourceId)}`;
   }
-  return destination.kind === 'diagram'
-    ? diagram
-    : destination.kind === 'diagram-thing'
-      ? `${diagram}/things/${encodeCompactUuid(destination.thingId)}`
-      : `${diagram}/graphs/${encodeCompactUuid(destination.graphId)}`;
+  return destination.kind === 'map'
+    ? map
+    : destination.kind === 'map-resource'
+      ? `${map}/resources/${encodeCompactUuid(destination.resourceId)}`
+      : `${map}/graphs/${encodeCompactUuid(destination.graphId)}`;
 };
 
-type ProductDestinationLoader = Pick<SpaceResourceRepository, 'loadSpace'>;
+type ProductDestinationLoader = Pick<StoredSpaceRepository, 'loadSpace'>;
 
 const parseProductDestination = (pathname: string): ProductDestination | undefined => {
   const segments = pathname.split('/');
@@ -84,37 +84,35 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
   const spaceId = decodeCompactUuid(segments[2] ?? '');
   if (spaceId === undefined) return undefined;
   if (segments.length === 3) return { kind: 'space', spaceId };
-  if (segments[3] === 'things' && segments.length === 5) {
-    const thingId = decodeCompactUuid(segments[4] ?? '');
-    return thingId === undefined ? undefined : { kind: 'thing', spaceId, thingId };
+  if (segments[3] === 'resources' && segments.length === 5) {
+    const resourceId = decodeCompactUuid(segments[4] ?? '');
+    return resourceId === undefined ? undefined : { kind: 'resource', spaceId, resourceId };
   }
   if (segments[3] === 'graphs' && segments.length === 5) {
     const graphId = decodeCompactUuid(segments[4] ?? '');
     return graphId === undefined ? undefined : { kind: 'graph', spaceId, graphId };
   }
-  if (segments[3] !== 'diagrams') return undefined;
-  const diagramId = decodeCompactUuid(segments[4] ?? '');
-  if (diagramId === undefined) return undefined;
-  if (segments.length === 5) return { kind: 'diagram', spaceId, diagramId };
+  if (segments[3] !== 'maps') return undefined;
+  const mapId = decodeCompactUuid(segments[4] ?? '');
+  if (mapId === undefined) return undefined;
+  if (segments.length === 5) return { kind: 'map', spaceId, mapId };
   if (segments.length === 9) {
     if (segments[5] !== 'graphs' || segments[7] !== 'present') return undefined;
     const graphId = decodeCompactUuid(segments[6] ?? '');
-    const thingId = decodeCompactUuid(segments[8] ?? '');
-    return graphId === undefined || thingId === undefined
+    const resourceId = decodeCompactUuid(segments[8] ?? '');
+    return graphId === undefined || resourceId === undefined
       ? undefined
-      : { kind: 'presentation', spaceId, diagramId, graphId, thingId };
+      : { kind: 'presentation', spaceId, mapId, graphId, resourceId };
   }
-  if (segments[5] === 'things') {
-    const thingId = decodeCompactUuid(segments[6] ?? '');
-    return thingId === undefined
+  if (segments[5] === 'resources') {
+    const resourceId = decodeCompactUuid(segments[6] ?? '');
+    return resourceId === undefined
       ? undefined
-      : { kind: 'diagram-thing', spaceId, diagramId, thingId };
+      : { kind: 'map-resource', spaceId, mapId, resourceId };
   }
   if (segments[5] === 'graphs') {
     const graphId = decodeCompactUuid(segments[6] ?? '');
-    return graphId === undefined
-      ? undefined
-      : { kind: 'diagram-graph', spaceId, diagramId, graphId };
+    return graphId === undefined ? undefined : { kind: 'map-graph', spaceId, mapId, graphId };
   }
   return undefined;
 };
@@ -125,55 +123,55 @@ const destinationInSnapshot = (
 ): ProductDestinationSnapshotResolution => {
   if (destination.spaceId !== snapshot.id) return { kind: 'unresolved' };
   if (
-    destination.kind === 'thing' ||
-    destination.kind === 'diagram-thing' ||
+    destination.kind === 'resource' ||
+    destination.kind === 'map-resource' ||
     destination.kind === 'presentation'
   ) {
-    if (!snapshot.things.some(({ id }) => id === destination.thingId))
+    if (!snapshot.resources.some(({ id }) => id === destination.resourceId))
       return { kind: 'unresolved' };
   }
   const graphOwner =
     destination.kind === 'graph' ||
-    destination.kind === 'diagram-graph' ||
+    destination.kind === 'map-graph' ||
     destination.kind === 'presentation'
-      ? snapshot.document.diagrams?.find((diagram) =>
-          diagram.graphs.some(({ id }) => id === destination.graphId),
+      ? snapshot.document.maps?.find((map) =>
+          map.graphs.some(({ id }) => id === destination.graphId),
         )
       : undefined;
   if (
     (destination.kind === 'graph' ||
-      destination.kind === 'diagram-graph' ||
+      destination.kind === 'map-graph' ||
       destination.kind === 'presentation') &&
     graphOwner === undefined
   ) {
     return { kind: 'unresolved' };
   }
   if (
-    destination.kind === 'diagram' ||
-    destination.kind === 'diagram-thing' ||
-    destination.kind === 'diagram-graph' ||
+    destination.kind === 'map' ||
+    destination.kind === 'map-resource' ||
+    destination.kind === 'map-graph' ||
     destination.kind === 'presentation'
   ) {
-    const diagram = snapshot.document.diagrams?.find(({ id }) => id === destination.diagramId);
-    if (diagram === undefined) return { kind: 'unresolved' };
+    const map = snapshot.document.maps?.find(({ id }) => id === destination.mapId);
+    if (map === undefined) return { kind: 'unresolved' };
     if (
-      destination.kind === 'diagram-thing' &&
-      diagram.positions[destination.thingId] === undefined
+      destination.kind === 'map-resource' &&
+      map.positions[destination.resourceId] === undefined
     ) {
       return { kind: 'unresolved' };
     }
     if (
-      (destination.kind === 'diagram-graph' || destination.kind === 'presentation') &&
-      diagram.id !== graphOwner?.id
+      (destination.kind === 'map-graph' || destination.kind === 'presentation') &&
+      map.id !== graphOwner?.id
     ) {
       return { kind: 'unresolved' };
     }
     if (destination.kind === 'presentation') {
       const graph = graphOwner?.graphs.find(({ id }) => id === destination.graphId);
-      const graphContainsThing = graph?.edges.some(
-        ({ from, to }) => from === destination.thingId || to === destination.thingId,
+      const graphContainsResource = graph?.edges.some(
+        ({ from, to }) => from === destination.resourceId || to === destination.resourceId,
       );
-      if (graphContainsThing !== true) return { kind: 'unresolved' };
+      if (graphContainsResource !== true) return { kind: 'unresolved' };
     }
   }
   return { kind: 'resolved', destination };
@@ -239,7 +237,7 @@ export const resolveProductDestination = async (
  * not-found for one that reads and names nothing, a method rejection for a
  * request that is not a read, a service-unavailable for a repository that
  * cannot be read from yet, and an internal error for a stored document whose
- * Diagram identities collide.
+ * Map identities collide.
  *
  * Why a given host has nothing to serve yet, and what it does about it, is that
  * host's to say and not this module's: Node, Vite, PostgreSQL and process

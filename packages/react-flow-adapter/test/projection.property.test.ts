@@ -5,10 +5,10 @@ import {
   buildGraphRenderEdges,
   loadSpace,
   type LayoutStrategyGraph,
-  type ThingFile,
+  type ResourceFile,
 } from '@project/graph';
-import { projectThingNodes, projectGraphEdges } from '../src/index';
-import { thingFile } from './thing-files';
+import { projectResourceNodes, projectGraphEdges } from '../src/index';
+import { resourceFile } from './resource-files';
 
 /**
  * The projection's handle invariants, as properties rather than examples.
@@ -17,26 +17,26 @@ import { thingFile } from './thing-files';
  * fires when an Edge names a handle that does not resolve on the node it points
  * at, and warning or not, `getEdgePosition` then answers null and the Edge is
  * not drawn at all. That condition is fully determined by what
- * `projectThingNodes` and `projectGraphEdges` produce *together*. Each
+ * `projectResourceNodes` and `projectGraphEdges` produce *together*. Each
  * projection is well covered on its own in `projection.test.ts`; nothing there
  * asserts the relationship, so a change to one side only would pass every test
  * and render a Graph with no Edges.
  *
  * Since ADR 0087 an Edge names no handle and attaches to one of four anchors
- * chosen while it is drawn, so what has to hold is that **every** Thing an Edge
+ * chosen while it is drawn, so what has to hold is that **every** Resource an Edge
  * reaches carries those anchors — not that some named handle happens to exist.
  * React Flow resolves an unnamed handle to the first of the node's bounds of
- * that kind, so a Thing missing either kind is an Edge that silently vanishes.
+ * that kind, so a Resource missing either kind is an Edge that silently vanishes.
  *
  * Properties rather than examples because the failure mode is multi-graph: the
- * generated Spaces overlap on Things, which is the shape that once put several
+ * generated Spaces overlap on Resources, which is the shape that once put several
  * same-side handles on one node. See
  * `.scratch/react-flow-guidance/issues/02-projection-handle-invariants.md`.
  */
 
-/** Ids from a shared pool, so generated graphs overlap on things — the case that
+/** Ids from a shared pool, so generated graphs overlap on resources — the case that
  *  puts several same-side handles on one node. */
-const thingIdPool = fc
+const resourceIdPool = fc
   .uniqueArray(fc.integer({ min: 0, max: 25 }), { minLength: 2, maxLength: 8 })
   .map((ns) => ns.map(uuidFrom));
 
@@ -45,13 +45,13 @@ function uuidFrom(value: number): string {
 }
 
 /**
- * A space file whose graphs each run over distinct things in some order: a chain
+ * A space file whose graphs each run over distinct resources in some order: a chain
  * through all of them, plus up to three **shortcuts** skipping ahead. Every edge
  * points forward in that order and each exact Edge appears once, so `loadSpace`
- * always accepts what we generate; things are the union of what the graphs
+ * always accepts what we generate; resources are the union of what the graphs
  * touch, so there are no orphans either.
  *
- * The shortcuts are the point. They fork a thing and merge into a later one,
+ * The shortcuts are the point. They fork a resource and merge into a later one,
  * which is the shape a step list could not express and the one that puts several
  * edges on a single handle.
  */
@@ -61,37 +61,37 @@ const graphArb = (pool: string[]) =>
       fc.shuffledSubarray(pool, { minLength: 2 }),
       fc.array(fc.tuple(fc.nat(), fc.nat()), { maxLength: 3 }),
     )
-    .map(([things, shortcuts]) => {
-      const edges = things.slice(0, -1).map((from, i) => ({ from, to: things[i + 1]! }));
+    .map(([resources, shortcuts]) => {
+      const edges = resources.slice(0, -1).map((from, i) => ({ from, to: resources[i + 1]! }));
       for (const [rawFrom, rawSkip] of shortcuts) {
-        const from = rawFrom % things.length;
-        const to = from + 2 + (rawSkip % things.length);
-        const edge = { from: things[from]!, to: things[to]! };
+        const from = rawFrom % resources.length;
+        const to = from + 2 + (rawSkip % resources.length);
+        const edge = { from: resources[from]!, to: resources[to]! };
         if (
-          to < things.length &&
+          to < resources.length &&
           !edges.some((candidate) => candidate.from === edge.from && candidate.to === edge.to)
         ) {
           edges.push(edge);
         }
       }
-      return { things, edges };
+      return { resources, edges };
     });
 
-const spaceFileArb = thingIdPool.chain((pool) =>
+const spaceFileArb = resourceIdPool.chain((pool) =>
   fc.array(graphArb(pool), { minLength: 1, maxLength: 4 }).map((graphs) => {
-    const visited = [...new Set(graphs.flatMap((r) => r.things))];
+    const visited = [...new Set(graphs.flatMap((r) => r.resources))];
     return {
-      // One diagram owning every generated graph, taking membership of every thing
-      // they touch: a graph is an owned value of its diagram (ADR 0040) and its
-      // edges are closed over that diagram's members.
+      // One map owning every generated graph, taking membership of every resource
+      // they touch: a graph is an owned value of its map (ADR 0040) and its
+      // edges are closed over that map's members.
       file: {
         version: 1,
         id: '00000000-0000-4000-8000-000000000001',
         title: 'Generated',
-        diagrams: [
+        maps: [
           {
             id: '00000000-0000-4000-8000-000000000050',
-            title: 'Only diagram',
+            title: 'Only map',
             kind: 'positioned',
             positions: Object.fromEntries(
               visited.map((id, index) => [id, { x: index * 300, y: 0, open: false }]),
@@ -104,7 +104,7 @@ const spaceFileArb = thingIdPool.chain((pool) =>
           },
         ],
       },
-      thingFiles: visited.map((id) => thingFile(id)),
+      resourceFiles: visited.map((id) => resourceFile(id)),
     };
   }),
 );
@@ -113,17 +113,17 @@ const spaceFileArb = thingIdPool.chain((pool) =>
  * Project a generated Space to React Flow nodes and Edges. Colors are irrelevant
  * to these invariants, so the fallback is fine.
  *
- * A strategy graph is supplied because a Thing declares its anchors only once
+ * A strategy graph is supplied because a Resource declares its anchors only once
  * something has placed it — before that React Flow measures the DOM instead,
  * which is not what these properties are about.
  */
-function project(generated: { file: unknown; thingFiles: ThingFile[] }) {
-  const result = loadSpace(generated.file, generated.thingFiles);
+function project(generated: { file: unknown; resourceFiles: ResourceFile[] }) {
+  const result = loadSpace(generated.file, generated.resourceFiles);
   if (!result.ok) throw new Error(`generated space should load: ${JSON.stringify(result.errors)}`);
   const space = result.space;
   const strategyGraph: LayoutStrategyGraph = {
-    things: space.things.map((thing, index) => ({
-      id: thing.id,
+    resources: space.resources.map((resource, index) => ({
+      id: resource.id,
       width: 260,
       height: 146,
       x: index * 400,
@@ -133,7 +133,7 @@ function project(generated: { file: unknown; thingFiles: ThingFile[] }) {
   };
 
   return {
-    nodes: projectThingNodes(space, { strategyGraph }),
+    nodes: projectResourceNodes(space, { strategyGraph }),
     edges: projectGraphEdges(buildGraphRenderEdges(space), {}),
   };
 }
@@ -141,7 +141,7 @@ function project(generated: { file: unknown; thingFiles: ThingFile[] }) {
 describe('projection handle invariants', () => {
   const SIDES = new Set([Position.Top, Position.Right, Position.Bottom, Position.Left]);
 
-  it('declares the four anchors of each role on every Thing an Edge reaches', () => {
+  it('declares the four anchors of each role on every Resource an Edge reaches', () => {
     fc.assert(
       fc.property(spaceFileArb, (generated) => {
         const { nodes, edges } = project(generated);
@@ -152,11 +152,11 @@ describe('projection handle invariants', () => {
         const declared = new Map(nodes.map((node) => [node.id, node.handles ?? []]));
 
         for (const edge of edges) {
-          for (const [role, thingId] of [
+          for (const [role, resourceId] of [
             ['source', edge.source],
             ['target', edge.target],
           ] as const) {
-            const handles = declared.get(thingId);
+            const handles = declared.get(resourceId);
             expect(handles, `edge ${edge.id} has no ${role} node`).toBeDefined();
             const sides = (handles ?? [])
               .filter((handle) => handle.type === role)
@@ -185,7 +185,7 @@ describe('projection handle invariants', () => {
     );
   });
 
-  it('gives a Thing no two handles of one kind on one side', () => {
+  it('gives a Resource no two handles of one kind on one side', () => {
     fc.assert(
       fc.property(spaceFileArb, (generated) => {
         const { nodes } = project(generated);

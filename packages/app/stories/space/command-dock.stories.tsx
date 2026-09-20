@@ -14,15 +14,15 @@ export default { title: 'Space/Command Dock' };
 /**
  * The Dock over a Space three crossings in, with a branch open beside it.
  *
- * The whole command set at rest: which Space, which Diagram and which Graph, each
+ * The whole command set at rest: which Space, which Map and which Graph, each
  * naming the current one, disclosing the set and promoting at most one verb —
- * then the Things. The Opener control names the Space this one was entered from and the Open Spaces menu
+ * then the Resources. The Opener control names the Space this one was entered from and the Open Spaces menu
  * holds the rest, Meta first. The Spaces trigger and Meta's row draw the OPEN
  * mark; the Space you are in draws a cube.
  *
- * Drag a Thing out of the Things popover onto the canvas, or press the row where
- * it stands. Both are real and both are the same Edit: the Thing joins the
- * Diagram and the popover stays open, so the next one costs nothing either way.
+ * Drag a Resource out of the Resources popover onto the canvas, or press the row where
+ * it stands. Both are real and both are the same Edit: the Resource joins the
+ * Map and the popover stays open, so the next one costs nothing either way.
  * Drag the dock by its grip to any edge, or press the grip and pick a slot.
  */
 export const Default: Story = () => <CommandDockFixture />;
@@ -36,7 +36,7 @@ DockedLeft.meta = { iframed: true };
  * A Space opened directly, never crossed out of, and freshly minted.
  *
  * Two obligations in one situation. ADR 0079 and ADR 0080 make a new Space
- * complete — one Diagram, one empty Active Graph — and the Dock has to name both
+ * complete — one Map, one empty Active Graph — and the Dock has to name both
  * rather than leave a cluster blank; and a Space opened by its own address has
  * no Opener, so the Open Spaces menu is its one way to Meta. Meta is not
  * open here, and the menu still lists it first.
@@ -50,7 +50,7 @@ NewSpace.meta = { iframed: true };
  * Presenting, where the whole surface goes.
  *
  * The Sidebar withdrew authoring command by command — Rename and Delete left a
- * Diagram row's menu while its address stayed. The Dock does not have that
+ * Map row's menu while its address stayed. The Dock does not have that
  * problem to solve: it is furniture over the paper, so presenting removes the
  * furniture. What the audience is left with is the canvas and
  * `PresentingChrome`, which carries the way out.

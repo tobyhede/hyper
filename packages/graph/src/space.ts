@@ -2,13 +2,13 @@ import {
   SPACE_FILE_VERSION,
   spaceFileSchema,
   spaceSnapshotSchema,
-  type Thing,
-  type Diagram,
+  type Resource,
+  type Map,
   type Graph,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { parseThingFile, type ThingFile, type ThingFileError } from './thing-file';
+import { parseResourceFile, type ResourceFile, type ResourceFileError } from './resource-file';
 import { buildSpaceLookup, type SpaceLookup } from './lookup';
 import { validateReferences, type SpaceReferenceError } from './validate';
 
@@ -37,27 +37,27 @@ export interface Space {
   /** What names this space (ADR 0019). Not its title, and not its file path. */
   readonly id: UUID;
   readonly title: string;
-  readonly things: readonly Thing[];
+  readonly resources: readonly Resource[];
   /**
-   * Every graph in the space, **flattened** across the diagrams that own them —
-   * diagrams in declared order, each diagram's graphs in authored order (ADR
-   * 0045). Derived, never stored: a graph is an owned value of one diagram (ADR
-   * 0040), and this is the collection a view whose subject is the space's things
-   * draws. Closed for free, since every edge endpoint is a thing of some diagram
-   * and so a thing of the space.
+   * Every graph in the space, **flattened** across the maps that own them —
+   * maps in declared order, each map's graphs in authored order (ADR
+   * 0045). Derived, never stored: a graph is an owned value of one map (ADR
+   * 0040), and this is the collection a view whose subject is the space's resources
+   * draws. Closed for free, since every edge endpoint is a resource of some map
+   * and so a resource of the space.
    *
    * The exact nested values, never copies: a graph read off here and one read
    * through `lookup.graph` are the same object.
    */
   readonly graphs: readonly Graph[];
   /**
-   * The positioned diagrams the author wrote, if any. Empty is the normal state
+   * The positioned maps the author wrote, if any. Empty is the normal state
    * of a hand-authored space: automatic strategies carry no data, so they are
    * declared nowhere (ADR 0025).
    */
-  readonly diagrams: readonly Diagram[];
-  /** Which Diagram this Space opens in — one UUID namespace for both variants. */
-  readonly defaultDiagram: UUID | undefined;
+  readonly maps: readonly Map[];
+  /** Which Map this Space opens in — one UUID namespace for both variants. */
+  readonly defaultMap: UUID | undefined;
   /**
    * Contextual entity resolution — the only one. The Maps behind it are closed
    * over and appear nowhere on this value, so no caller can index the space a
@@ -71,14 +71,14 @@ export interface Space {
 type UnsupportedVersionError = { kind: 'unsupported-version'; message: string };
 
 /**
- * Why a load failed: a bad shape, a thing file that will not parse, or a
+ * Why a load failed: a bad shape, a resource file that will not parse, or a
  * reference that does not resolve.
  */
 export type SpaceError =
   | { kind: 'invalid-shape'; message: string }
   | UnsupportedVersionError
   | { kind: 'retired-space-graphs'; message: string }
-  | ThingFileError
+  | ResourceFileError
   | SpaceReferenceError;
 
 /**
@@ -86,7 +86,7 @@ export type SpaceError =
  * ordinary shape check speak.
  *
  * Read before parsing, because a version 2 document does not fail *once* under
- * version 1 — its diagrams each lack the graphs they now own, so the shape check
+ * version 1 — its maps each lack the graphs they now own, so the shape check
  * answers a cascade in which nothing says which version arrived. A version this
  * cannot read at all (absent, not a number) is left to the shape check, whose
  * message for it is already the right one.
@@ -137,7 +137,7 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
   return {
     kind: 'retired-space-graphs',
     message:
-      'This document carries a space-level `graphs` array, which is retired: a Diagram owns the Graphs it draws (ADR 0040)',
+      'This document carries a space-level `graphs` array, which is retired: a Map owns the Graphs it draws (ADR 0040)',
   };
 }
 
@@ -180,12 +180,12 @@ export type LoadSpaceSnapshotResult =
 /**
  * Parse, validate references, and index raw input into a {@link Space}.
  *
- * Takes the space file *and* the thing files, because a thing exists by virtue of
+ * Takes the space file *and* the resource files, because a resource exists by virtue of
  * its file existing (ADR 0020) — the space file holds structure and nothing
  * else. This is one more argument, not one more capability: it does no I/O and
  * stays synchronous. Reading the bytes belongs to the caller, as it always did.
  */
-export function loadSpace(input: unknown, thingFiles: readonly ThingFile[]): LoadSpaceResult {
+export function loadSpace(input: unknown, resourceFiles: readonly ResourceFile[]): LoadSpaceResult {
   const refusal = documentRefusal(input);
   if (refusal !== null) return { ok: false, errors: [refusal] };
 
@@ -199,38 +199,38 @@ export function loadSpace(input: unknown, thingFiles: readonly ThingFile[]): Loa
   }
   const file = parsed.data;
 
-  const things: Thing[] = [];
+  const resources: Resource[] = [];
   const pathById = new Map<string, string>();
-  const thingErrors: SpaceError[] = [];
-  for (const thingFile of thingFiles) {
-    const parsedThing = parseThingFile(thingFile);
-    if (!parsedThing.ok) {
-      thingErrors.push(...parsedThing.errors);
+  const resourceErrors: SpaceError[] = [];
+  for (const resourceFile of resourceFiles) {
+    const parsedResource = parseResourceFile(resourceFile);
+    if (!parsedResource.ok) {
+      resourceErrors.push(...parsedResource.errors);
       continue;
     }
     // Which file you are editing must not depend on scan order, so a repeated
     // id is an error and not a silent winner. The message names both files —
     // "which two" is the only useful part of it.
-    const seen = pathById.get(parsedThing.thing.id);
+    const seen = pathById.get(parsedResource.resource.id);
     if (seen !== undefined) {
-      thingErrors.push({
-        kind: 'duplicate-thing-id',
-        ref: parsedThing.thing.id,
-        message: `Duplicate thing id "${parsedThing.thing.id}" in ${seen} and ${thingFile.path}`,
+      resourceErrors.push({
+        kind: 'duplicate-resource-id',
+        ref: parsedResource.resource.id,
+        message: `Duplicate resource id "${parsedResource.resource.id}" in ${seen} and ${resourceFile.path}`,
       });
       continue;
     }
-    pathById.set(parsedThing.thing.id, thingFile.path);
-    things.push(parsedThing.thing);
+    pathById.set(parsedResource.resource.id, resourceFile.path);
+    resources.push(parsedResource.resource);
   }
-  if (thingErrors.length > 0) return { ok: false, errors: thingErrors };
+  if (resourceErrors.length > 0) return { ok: false, errors: resourceErrors };
 
   return buildSpace({
     id: file.id,
     title: file.title,
-    things,
-    diagrams: file.diagrams,
-    defaultDiagram: file.defaultDiagram,
+    resources,
+    maps: file.maps,
+    defaultMap: file.defaultMap,
   });
 }
 
@@ -257,22 +257,22 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
     };
   }
 
-  const { id, document, things: storedThings } = parsed.data;
-  // SAFETY: `thingDocument` is `thingDocumentSchema`'s output, which is exactly
-  // `thingSchema.omit({ id: true })` per thing kind — re-adding the `id` this
-  // schema stores alongside it reconstructs precisely a `Thing`. TypeScript
+  const { id, document, resources: storedResources } = parsed.data;
+  // SAFETY: `resourceDocument` is `resourceDocumentSchema`'s output, which is exactly
+  // `resourceSchema.omit({ id: true })` per resource kind — re-adding the `id` this
+  // schema stores alongside it reconstructs precisely a `Resource`. TypeScript
   // can't confirm that itself: spreading a discriminated union plus one field
   // doesn't re-infer back to the original union.
-  const things = storedThings.map(({ id: thingId, document: thingDocument }) => ({
-    id: thingId,
-    ...thingDocument,
-  })) as Thing[];
+  const resources = storedResources.map(({ id: resourceId, document: resourceDocument }) => ({
+    id: resourceId,
+    ...resourceDocument,
+  })) as Resource[];
   const loaded = buildSpace({
     id,
     title: document.title,
-    things,
-    diagrams: document.diagrams,
-    defaultDiagram: document.defaultDiagram,
+    resources,
+    maps: document.maps,
+    defaultMap: document.defaultMap,
   });
   return loaded.ok ? { ...loaded, snapshot: parsed.data } : loaded;
 }
@@ -280,35 +280,35 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
 function buildSpace(input: {
   id: UUID;
   title: string;
-  things: Thing[];
-  diagrams: Diagram[] | undefined;
-  defaultDiagram: UUID | undefined;
+  resources: Resource[];
+  maps: Map[] | undefined;
+  defaultMap: UUID | undefined;
 }): LoadSpaceResult {
   // Array order is read only by automatic strategies, so title order is the one
   // default stable across filesystem scans and unordered relational reads. Ties
   // break on id, making the order total rather than dependent on input order.
-  const things = [...input.things].sort(
+  const resources = [...input.resources].sort(
     (left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id),
   );
-  const diagrams = input.diagrams ?? [];
-  const referenceErrors = validateReferences({ ...input, things, diagrams });
+  const maps = input.maps ?? [];
+  const referenceErrors = validateReferences({ ...input, resources, maps });
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
 
-  // The flatten: diagrams in declared order, each diagram's owned graphs in
+  // The flatten: maps in declared order, each map's owned graphs in
   // authored order. Derived and never stored (ADR 0045) — it exists so the
   // readers that key colour, handles, render edge ids and activation on a graph
-  // id alone keep reading one collection while ownership sits on the diagram.
+  // id alone keep reading one collection while ownership sits on the map.
   // The reference check above has already refused a repeated id, so the lookup
   // built below can drop nothing.
-  const graphs = diagrams.flatMap((diagram) => diagram.graphs);
-  const built = buildSpaceLookup({ things, diagrams });
+  const graphs = maps.flatMap((map) => map.graphs);
+  const built = buildSpaceLookup({ resources, maps });
   if (!built.ok) {
     return {
       ok: false,
       errors: [
         {
           kind: 'invalid-shape',
-          message: `diagrams: diagram "${built.diagramWithoutGraph}" owns no graph`,
+          message: `maps: map "${built.mapWithoutGraph}" owns no graph`,
         },
       ],
     };
@@ -318,10 +318,10 @@ function buildSpace(input: {
     space: intake({
       id: input.id,
       title: input.title,
-      things,
+      resources,
       graphs,
-      diagrams,
-      defaultDiagram: input.defaultDiagram,
+      maps,
+      defaultMap: input.defaultMap,
       lookup: built.lookup,
     }),
   };

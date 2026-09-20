@@ -12,8 +12,8 @@
       "model": "Space",
       "namespace": "public"
     },
-    "things": {
-      "model": "Thing",
+    "resources": {
+      "model": "Resource",
       "namespace": "public"
     }
   },
@@ -129,7 +129,7 @@
                   "namespace": "public"
                 }
               },
-              "things": {
+              "resources": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
@@ -140,7 +140,7 @@
                   ]
                 },
                 "to": {
-                  "model": "Thing",
+                  "model": "Resource",
                   "namespace": "public"
                 }
               }
@@ -170,7 +170,7 @@
               "table": "spaces"
             }
           },
-          "Thing": {
+          "Resource": {
             "fields": {
               "createdAt": {
                 "nullable": false,
@@ -244,7 +244,7 @@
                 }
               },
               "namespaceId": "public",
-              "table": "things"
+              "table": "resources"
             }
           }
         }
@@ -363,7 +363,7 @@
               },
               "uniques": []
             },
-            "things": {
+            "resources": {
               "columns": {
                 "created_at": {
                   "codecId": "pg/timestamptz@1",
@@ -409,7 +409,7 @@
                       "space_id"
                     ],
                     "namespaceId": "public",
-                    "tableName": "things"
+                    "tableName": "resources"
                   },
                   "target": {
                     "columns": [
@@ -480,7 +480,7 @@
           "ref": {
             "column": "updated_at",
             "namespace": "public",
-            "table": "things"
+            "table": "resources"
           }
         }
       ]

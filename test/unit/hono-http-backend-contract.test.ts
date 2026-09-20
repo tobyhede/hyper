@@ -3,14 +3,14 @@ import { uuidSchema } from '@project/core';
 import {
   encodeCommitRequest,
   type LoadedSpace,
-  type SpaceResourceRepository,
+  type StoredSpaceRepository,
 } from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
-import { THING_ID, SPACE_ID, oneThingSnapshot as snapshot } from '../support/space-fixtures';
+import { RESOURCE_ID, SPACE_ID, oneResourceSnapshot as snapshot } from '../support/space-fixtures';
 
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 const loaded: LoadedSpace = {
@@ -18,13 +18,13 @@ const loaded: LoadedSpace = {
     ...snapshot,
     document: {
       ...snapshot.document,
-      defaultDiagram: DIAGRAM_ID,
-      diagrams: [
+      defaultMap: MAP_ID,
+      maps: [
         {
-          id: DIAGRAM_ID,
-          title: 'Diagram 1',
+          id: MAP_ID,
+          title: 'Map 1',
           kind: 'positioned',
-          positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+          positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
           graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: GRAPH_ID,
         },
@@ -35,7 +35,7 @@ const loaded: LoadedSpace = {
   exportedRevision: 3n,
 };
 
-const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
+const repository = (overrides: Partial<StoredSpaceRepository> = {}): StoredSpaceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(undefined),
   loadAggregate: () =>

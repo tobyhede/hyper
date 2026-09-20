@@ -14,10 +14,10 @@ export type CommandToolbarProps = ComponentProps<typeof Toolbar> & {
 /**
  * A set of commands drawn on the shared command surface, as one toolbar.
  *
- * This is what the Command Dock is and what a Thing's revealed strip is: one
+ * This is what the Command Dock is and what a Resource's revealed strip is: one
  * `Toolbar` root — so one tab stop, with the arrows moving between its controls
  * (ADR 0073) — wearing the neutral panel `command-surface.css` declares. Both
- * mount this rather than each naming the treatment, because "the Thing's
+ * mount this rather than each naming the treatment, because "the Resource's
  * commands look like the Dock's" is a fact about one surface drawn twice and
  * not a pair of stylesheets kept in step by hand.
  *
@@ -29,7 +29,7 @@ export type CommandToolbarProps = ComponentProps<typeof Toolbar> & {
  * It positions nothing and sizes nothing. Where the surface sits, how large it
  * may grow, whether it scrolls and when it is revealed belong to the surface
  * that mounts one — `command-dock.css` still owns the twelve slots, and
- * `canvas-thing.css` still owns the reveal.
+ * `canvas-resource.css` still owns the reveal.
  */
 export const CommandToolbar = forwardRef<HTMLDivElement, CommandToolbarProps>(
   function CommandToolbar({ className, orientation = 'horizontal', ...props }, ref) {
@@ -57,8 +57,8 @@ export type CommandSurfaceProps = ComponentProps<'div'> & {
 /**
  * The same surface, with no toolbar semantics on it.
  *
- * For non-toolbar chrome. Thing commands, including an Open Space Thing's
- * Diagram and Graph choices, belong in the rail's single `CommandToolbar`.
+ * For non-toolbar chrome. Resource commands, including an Open Space Resource's
+ * Map and Graph choices, belong in the rail's single `CommandToolbar`.
  */
 export const CommandSurface = forwardRef<HTMLDivElement, CommandSurfaceProps>(
   function CommandSurface({ className, orientation = 'horizontal', ...props }, ref) {
@@ -86,7 +86,7 @@ export interface CommandNameProps {
  *
  * A name takes the room it is given and ellipses rather than wrapping or
  * widening the strip it is on — which is the whole of what this is for, and why
- * the Dock's Diagram name and an Open Space Thing's Diagram name are the same
+ * the Dock's Map name and an Open Space Resource's Map name are the same
  * component rather than the same three declarations twice.
  */
 export function CommandName({ children, className }: CommandNameProps) {

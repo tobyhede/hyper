@@ -1,13 +1,13 @@
 import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphId } from '@project/core';
-import { graphThingIds } from '@project/graph';
+import { graphResourceIds } from '@project/graph';
 import { GraphHud } from '@project/react-flow-adapter';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { THING_SIZE } from '#src/thing';
-import { graphColorMap } from '#src/colors';
+import { RESOURCE_SIZE } from '#src/resource';
+import { graphColorsByGraphId } from '#src/colors';
 import { authoredSpace } from './spaces';
 import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
 
@@ -15,14 +15,14 @@ import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
  * The HUD's Graphs, colours and Active Graph, derived the way the canvas derives
  * them.
  *
- * `graphColorMap` is the application's own resolution and `GraphHud` reads it
+ * `graphColorsByGraphId` is the application's own resolution and `GraphHud` reads it
  * through the shared `graphColor` seam the Sidebar reads — so a colour on screen
  * here is one the Space app would agree with, rather than a hex literal a
  * fixture chose. The Graphs are the tracked story Space's, flattened across its
- * Diagrams in declared order exactly as `space.graphs` is.
+ * Maps in declared order exactly as `space.graphs` is.
  */
 const SPACE = authoredSpace;
-const COLORS = graphColorMap(SPACE);
+const COLORS = graphColorsByGraphId(SPACE);
 
 /**
  * The Graph the story opens on, read out at module scope.
@@ -38,28 +38,28 @@ const openingGraph = (): GraphId => {
 };
 
 /**
- * Real React Flow nodes, one per Thing of the story Space.
+ * Real React Flow nodes, one per Resource of the story Space.
  *
  * The MiniMap draws what the flow actually measured, so the geometry has to be
  * the framework's rather than a stand-in: these are ordinary nodes React Flow
  * lays out, measures and reports bounds for, at the size the application's own
- * `THING_SIZE` declares. **The positions are the fixture's**, which is the one
- * thing a story is allowed to supply here — a Space's placement is a Diagram
+ * `RESOURCE_SIZE` declares. **The positions are the fixture's**, which is the one
+ * fact a story is allowed to supply here — a Space's placement is a Map
  * strategy's answer, and running one to draw a HUD would put a placement
  * computation between this story and the surface it is about. They are staggered
  * so the minimap frame has two dimensions to show rather than a single line.
  */
-const NODES: readonly Node[] = SPACE.things.map((thing, index) => ({
-  id: thing.id,
+const NODES: readonly Node[] = SPACE.resources.map((resource, index) => ({
+  id: resource.id,
   position: { x: index * 320, y: (index % 2) * 180 },
-  data: { label: thing.title },
+  data: { label: resource.title },
   // Declared rather than left to be measured, as the production projection
   // declares its own: the MiniMap draws only nodes React Flow already has
   // dimensions for, so a node waiting on a ResizeObserver is one the minimap
   // silently omits.
-  width: THING_SIZE.width,
-  height: THING_SIZE.height,
-  style: { width: THING_SIZE.width, height: THING_SIZE.height },
+  width: RESOURCE_SIZE.width,
+  height: RESOURCE_SIZE.height,
+  style: { width: RESOURCE_SIZE.width, height: RESOURCE_SIZE.height },
 }));
 
 export interface GraphHudFixtureProps {
@@ -84,8 +84,8 @@ export interface GraphHudFixtureProps {
  * has no Space app around it to size one.
  */
 export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixtureProps) {
-  const activeGraphThingIds = new Set(
-    activeGraphId === null ? [] : graphThingIds(SPACE, activeGraphId),
+  const activeGraphResourceIds = new Set(
+    activeGraphId === null ? [] : graphResourceIds(SPACE, activeGraphId),
   );
 
   return (
@@ -95,7 +95,7 @@ export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixt
           graphs={SPACE.graphs}
           colorByGraphId={COLORS}
           activeGraphId={activeGraphId}
-          activeGraphThingIds={activeGraphThingIds}
+          activeGraphResourceIds={activeGraphResourceIds}
         />
       </StoryCanvas>
     </StoryCanvasFrame>

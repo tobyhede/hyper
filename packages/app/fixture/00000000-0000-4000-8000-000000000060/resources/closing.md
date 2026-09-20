@@ -1,0 +1,9 @@
+---
+id: 00000000-0000-4000-8000-000000000065
+title: Closing
+---
+
+# Closing
+
+Presenting ends here. From this Space you can still Enter the Deep dive or the
+Authoring notes — those Space Resources sit on this Map, off the Graph.

@@ -1,60 +1,60 @@
-import { uuidSchema, type Thing, type Diagram, type UUID } from '@project/core';
+import { uuidSchema, type Resource, type Map, type UUID } from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
- * The things and diagrams a reference check reads. Structural so it accepts both
+ * The resources and maps a reference check reads. Structural so it accepts both
  * a freshly parsed space file (inside `loadSpace`) and an already-built
- * `Space`. `diagrams` and `defaultDiagram` are optional: a space may declare
+ * `Space`. `maps` and `defaultMap` are optional: a space may declare
  * neither and open in an automatic view (ADR 0025).
  *
  * There is no `graphs` here, and that is the whole of ADR 0040 in one shape: a
- * graph is reached through the diagram that owns it, so a check written over a
+ * graph is reached through the map that owns it, so a check written over a
  * space-level collection could not ask the question that now matters — whether
- * an edge endpoint is a thing of *that* diagram.
+ * an edge endpoint is a resource of *that* map.
  */
 export interface Referenceable {
   readonly id: UUID;
-  readonly things: readonly Thing[];
-  readonly diagrams?: readonly Diagram[] | undefined;
-  readonly defaultDiagram?: UUID | undefined;
+  readonly resources: readonly Resource[];
+  readonly maps?: readonly Map[] | undefined;
+  readonly defaultMap?: UUID | undefined;
 }
 
 /**
  * Why a Space failed its reference check.
  *
  * The membership kinds name **ownership**, which is the era the aggregate is in
- * (ADR 0040): a Diagram's position keys are its Thing membership, and every Edge
+ * (ADR 0040): a Map's position keys are its Resource membership, and every Edge
  * of an owned Graph is closed over exactly that set. Where the superseded
- * vocabulary had one kind for "does not resolve", there are now two — the Thing
+ * vocabulary had one kind for "does not resolve", there are now two — the Resource
  * or Graph does not exist at all, or it exists and belongs somewhere else. They
  * are different mistakes and lead an author to different places, which is the
  * whole reason for the split.
  */
 export type SpaceReferenceErrorKind =
-  | 'duplicate-thing-id'
+  | 'duplicate-resource-id'
   | 'duplicate-graph-id'
-  | 'duplicate-diagram-id'
-  /** A Diagram's position names a Thing the Space does not hold. */
-  | 'diagram-member-missing-thing'
-  /** A Diagram opens active on a Graph no Diagram in the Space owns. */
-  | 'diagram-active-graph-missing'
-  /** A Diagram opens active on a Graph another Diagram owns. */
-  | 'diagram-active-graph-outside-diagram'
-  /** An Edge endpoint names a Thing the Space does not hold. */
-  | 'graph-edge-missing-thing'
-  /** An Edge endpoint names a Space Thing that is not a member of its own Diagram. */
-  | 'graph-edge-thing-outside-diagram'
-  | 'unresolved-default-diagram'
+  | 'duplicate-map-id'
+  /** A Map's position names a Resource the Space does not hold. */
+  | 'map-member-missing-resource'
+  /** A Map opens active on a Graph no Map in the Space owns. */
+  | 'map-active-graph-missing'
+  /** A Map opens active on a Graph another Map owns. */
+  | 'map-active-graph-outside-map'
+  /** An Edge endpoint names a Resource the Space does not hold. */
+  | 'graph-edge-missing-resource'
+  /** An Edge endpoint names a Space Resource that is not a member of its own Map. */
+  | 'graph-edge-resource-outside-map'
+  | 'unresolved-default-map'
   | 'duplicate-graph-edge'
   | 'unresolved-reference-target'
   | 'reference-targets-self'
   | 'reference-targets-reference'
   | 'reference-target-must-own-content'
-  | 'space-thing-reference-cycle';
+  | 'space-resource-reference-cycle';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
- * beside `ThingFileError` and inside `SpaceError` — and deliberately not
+ * beside `ResourceFileError` and inside `SpaceError` — and deliberately not
  * `ReferenceError`, which is a JavaScript global that any file importing the
  * bare name would lose.
  */
@@ -76,9 +76,9 @@ function duplicates(ids: readonly string[]): string[] {
   return [...dupes];
 }
 
-/** Where one occurrence of a graph id sits: the diagram owning it, and its index there. */
+/** Where one occurrence of a graph id sits: the map owning it, and its index there. */
 interface GraphOccurrence {
-  readonly diagram: Diagram;
+  readonly map: Map;
   readonly index: number;
 }
 
@@ -100,19 +100,23 @@ interface GraphOccurrence {
 export function validateReferences(space: Referenceable): SpaceReferenceError[] {
   const errors: SpaceReferenceError[] = [];
 
-  const thingById = new Map(space.things.map((t) => [t.id, t]));
-  const thingIds = new Set(space.things.map((t) => t.id));
+  const resourceById = new Map(space.resources.map((r) => [r.id, r]));
+  const resourceIds = new Set(space.resources.map((r) => r.id));
 
-  for (const id of duplicates(space.things.map((t) => t.id))) {
-    errors.push({ kind: 'duplicate-thing-id', ref: id, message: `Duplicate thing id "${id}"` });
+  for (const id of duplicates(space.resources.map((r) => r.id))) {
+    errors.push({
+      kind: 'duplicate-resource-id',
+      ref: id,
+      message: `Duplicate resource id "${id}"`,
+    });
   }
 
-  const diagrams = space.diagrams ?? [];
-  for (const id of duplicates(diagrams.map((d) => d.id))) {
-    errors.push({ kind: 'duplicate-diagram-id', ref: id, message: `Duplicate diagram id "${id}"` });
+  const maps = space.maps ?? [];
+  for (const id of duplicates(maps.map((m) => m.id))) {
+    errors.push({ kind: 'duplicate-map-id', ref: id, message: `Duplicate map id "${id}"` });
   }
 
-  // A graph id is unique across the **space**, although one diagram owns it
+  // A graph id is unique across the **space**, although one map owns it
   // (ADR 0045). The flatten a space-subject view draws keys colour and
   // activation on the id alone, and the lookup intake builds would drop one of a
   // pair in silence while both stayed in the collection. ADR 0045's third
@@ -120,23 +124,21 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   // names no handle now — and the two that remain carry the rule on their own.
   //
   // Every occurrence is collected before anything is reported, because the fault
-  // is the *id*, not its second appearance: an id used four times is one thing
+  // is the *id*, not its second appearance: an id used four times is one resource
   // wrong with the document, and the message that helps an author is the list of
-  // where to look. Same-diagram repeats and cross-diagram ones are the same kind
+  // where to look. Same-map repeats and cross-map ones are the same kind
   // for the same reason — they differ only in where the fix goes.
   const occurrencesByGraphId = new Map<string, GraphOccurrence[]>();
-  for (const diagram of diagrams) {
-    diagram.graphs.forEach((graph, index) => {
+  for (const map of maps) {
+    map.graphs.forEach((graph, index) => {
       const occurrences = occurrencesByGraphId.get(graph.id);
-      if (occurrences === undefined) occurrencesByGraphId.set(graph.id, [{ diagram, index }]);
-      else occurrences.push({ diagram, index });
+      if (occurrences === undefined) occurrencesByGraphId.set(graph.id, [{ map, index }]);
+      else occurrences.push({ map, index });
     });
   }
   for (const [graphId, occurrences] of occurrencesByGraphId) {
     if (occurrences.length < 2) continue;
-    const where = occurrences
-      .map(({ diagram, index }) => `diagram "${diagram.id}" graph ${index}`)
-      .join(', ');
+    const where = occurrences.map(({ map, index }) => `map "${map.id}" graph ${index}`).join(', ');
     errors.push({
       kind: 'duplicate-graph-id',
       ref: graphId,
@@ -144,35 +146,35 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     });
   }
 
-  for (const diagram of diagrams) {
-    // A diagram's position keys **are** its thing membership (ADR 0040). They may
-    // omit things — a thing the map leaves out is simply not in this diagram — but
-    // may not name a thing that does not exist, a position left behind by a
-    // deleted thing (ADR 0025).
+  for (const map of maps) {
+    // A map's position keys **are** its resource membership (ADR 0040). They may
+    // omit resources — a resource the map leaves out is simply not in this map — but
+    // may not name a resource that does not exist, a position left behind by a
+    // deleted resource (ADR 0025).
     //
-    // A key naming a missing thing still joins `members`, which is what keeps
-    // this the *only* fault reported for it: an edge into that thing is then a
+    // A key naming a missing resource still joins `members`, which is what keeps
+    // this the *only* fault reported for it: an edge into that resource is then a
     // consequence of this fault rather than a second one.
     const members = new Set<string>();
-    for (const key of Object.keys(diagram.positions)) {
-      const thingId = uuidSchema.parse(key);
-      members.add(thingId);
-      if (!thingIds.has(thingId)) {
+    for (const key of Object.keys(map.positions)) {
+      const resourceId = uuidSchema.parse(key);
+      members.add(resourceId);
+      if (!resourceIds.has(resourceId)) {
         errors.push({
-          kind: 'diagram-member-missing-thing',
-          ref: thingId,
-          message: `Diagram "${diagram.id}" holds a position for thing "${thingId}", which the space does not hold`,
+          kind: 'map-member-missing-resource',
+          ref: resourceId,
+          message: `Map "${map.id}" holds a position for resource "${resourceId}", which the space does not hold`,
         });
       }
     }
 
-    // Every edge endpoint of an owned graph names a thing **in that diagram** —
+    // Every edge endpoint of an owned graph names a resource **in that map** —
     // one rule, and the two kinds below are two readings of failing it rather
-    // than two rules. An endpoint naming no thing at all is a dangling reference;
-    // one naming a thing another diagram holds is a closure failure, and telling
+    // than two rules. An endpoint naming no resource at all is a dangling reference;
+    // one naming a resource another map holds is a closure failure, and telling
     // an author which they have is the difference between hunting for a deleted
-    // thing and adding a member.
-    for (const graph of diagram.graphs) {
+    // resource and adding a member.
+    for (const graph of map.graphs) {
       // Asked once, up front, and read inside the loop below so a graph's
       // diagnostics still arrive in edge order rather than in two passes.
       const repeats = repeatedGraphEdges(graph.edges);
@@ -180,14 +182,14 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         for (const end of ['from', 'to'] as const) {
           if (members.has(edge[end])) continue;
           errors.push(
-            thingIds.has(edge[end])
+            resourceIds.has(edge[end])
               ? {
-                  kind: 'graph-edge-thing-outside-diagram',
+                  kind: 'graph-edge-resource-outside-map',
                   ref: edge[end],
-                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a thing of the space but not a member of its diagram "${diagram.id}"`,
+                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a resource of the space but not a member of its map "${map.id}"`,
                 }
               : {
-                  kind: 'graph-edge-missing-thing',
+                  kind: 'graph-edge-missing-resource',
                   ref: edge[end],
                   message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which the space does not hold`,
                 },
@@ -206,75 +208,75 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       });
     }
 
-    // A diagram also points at one graph — the one that opens active (ADR 0026)
-    // — and it must be one the diagram **owns**. Split the same way the endpoints
+    // A map also points at one graph — the one that opens active (ADR 0026)
+    // — and it must be one the map **owns**. Split the same way the endpoints
     // above are: a graph nothing in the space owns is missing, while one a
-    // second diagram owns exists and is simply not this diagram's to open on.
-    const activeGraph = diagram.activeGraph;
-    if (activeGraph !== undefined && !diagram.graphs.some((g) => g.id === activeGraph)) {
+    // second map owns exists and is simply not this map's to open on.
+    const activeGraph = map.activeGraph;
+    if (activeGraph !== undefined && !map.graphs.some((g) => g.id === activeGraph)) {
       errors.push(
         occurrencesByGraphId.has(activeGraph)
           ? {
-              kind: 'diagram-active-graph-outside-diagram',
+              kind: 'map-active-graph-outside-map',
               ref: activeGraph,
-              message: `Diagram "${diagram.id}" opens active on graph "${activeGraph}", which another diagram owns`,
+              message: `Map "${map.id}" opens active on graph "${activeGraph}", which another map owns`,
             }
           : {
-              kind: 'diagram-active-graph-missing',
+              kind: 'map-active-graph-missing',
               ref: activeGraph,
-              message: `Diagram "${diagram.id}" opens active on graph "${activeGraph}", which no diagram in the space owns`,
+              message: `Map "${map.id}" opens active on graph "${activeGraph}", which no map in the space owns`,
             },
       );
     }
   }
 
-  // `defaultDiagram` names a declared Diagram and nothing else.
-  if (space.defaultDiagram !== undefined) {
-    const declared = new Set(diagrams.map((d) => d.id));
-    if (!declared.has(space.defaultDiagram)) {
+  // `defaultMap` names a declared Map and nothing else.
+  if (space.defaultMap !== undefined) {
+    const declared = new Set(maps.map((m) => m.id));
+    if (!declared.has(space.defaultMap)) {
       errors.push({
-        kind: 'unresolved-default-diagram',
-        ref: space.defaultDiagram,
-        message: `defaultDiagram "${space.defaultDiagram}" does not name a declared Diagram`,
+        kind: 'unresolved-default-map',
+        ref: space.defaultMap,
+        message: `defaultMap "${space.defaultMap}" does not name a declared Map`,
       });
     }
   }
 
-  for (const thing of space.things) {
-    if (thing.kind !== 'reference') continue;
-    if (thing.target === thing.id) {
+  for (const resource of space.resources) {
+    if (resource.kind !== 'reference') continue;
+    if (resource.target === resource.id) {
       errors.push({
         kind: 'reference-targets-self',
-        ref: thing.id,
-        message: `Reference Thing "${thing.id}" points at itself`,
+        ref: resource.id,
+        message: `Reference Resource "${resource.id}" points at itself`,
       });
       continue;
     }
-    const target = thingById.get(thing.target);
+    const target = resourceById.get(resource.target);
     if (!target) {
       errors.push({
         kind: 'unresolved-reference-target',
-        ref: thing.target,
-        message: `Reference Thing "${thing.id}" targets missing thing "${thing.target}"`,
+        ref: resource.target,
+        message: `Reference Resource "${resource.id}" targets missing resource "${resource.target}"`,
       });
       continue;
     }
     if (target.kind === 'reference') {
       errors.push({
         kind: 'reference-targets-reference',
-        ref: thing.target,
-        message: `Reference Thing "${thing.id}" targets reference "${thing.target}"; referencing is a single hop`,
+        ref: resource.target,
+        message: `Reference Resource "${resource.id}" targets reference "${resource.target}"; referencing is a single hop`,
       });
       continue;
     }
   }
 
-  for (const thing of space.things) {
-    if (thing.kind !== 'space' || thing.spaceId !== space.id) continue;
+  for (const resource of space.resources) {
+    if (resource.kind !== 'space' || resource.spaceId !== space.id) continue;
     errors.push({
-      kind: 'space-thing-reference-cycle',
-      ref: thing.spaceId,
-      message: `Space Thing "${thing.id}" targets its own Space "${thing.spaceId}"`,
+      kind: 'space-resource-reference-cycle',
+      ref: resource.spaceId,
+      message: `Space Resource "${resource.id}" targets its own Space "${resource.spaceId}"`,
     });
   }
 

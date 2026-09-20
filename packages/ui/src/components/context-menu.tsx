@@ -40,7 +40,7 @@ function ContextMenuContent({
         // canvas: `packages/app/src/components/command-dock.css` puts
         // `.command-dock` at `position: absolute; z-index: 20`, its drag snap
         // hint at `19` and the standing persistence notice it hangs off itself
-        // at `21`. So the number to beat is the *highest* thing the Dock puts
+        // at `21`. So the number to beat is the *highest* resource the Dock puts
         // on screen and not the Dock's own frame — a popup left at the auto
         // stacking level opens behind all of it, and one re-derived down to
         // `z-20` from the frame's number alone would open under the notice.

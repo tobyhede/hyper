@@ -19,32 +19,36 @@ const startupOver = (backend: SpaceBackend, newId: () => UUID = newUuid): SpaceS
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const OTHER_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 
-const snapshot = (id = SPACE_ID, thingId = THING_ID, title = 'Stored space'): SpaceSnapshot => ({
+const snapshot = (
+  id = SPACE_ID,
+  resourceId = RESOURCE_ID,
+  title = 'Stored space',
+): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  things: [
-    { id: thingId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } },
+  resources: [
+    { id: resourceId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } },
   ],
 });
 
 const metaReferencingOther = (): SpaceSnapshot => ({
   id: SPACE_ID,
   document: { version: 1, title: 'Stored space' },
-  things: [
+  resources: [
     {
-      id: THING_ID,
+      id: RESOURCE_ID,
       document: {
         title: 'Other space',
         kind: 'space',
         spaceId: OTHER_SPACE_ID,
-        diagram: OTHER_DIAGRAM_ID,
+        map: OTHER_MAP_ID,
         graph: OTHER_GRAPH_ID,
       },
     },
@@ -52,27 +56,27 @@ const metaReferencingOther = (): SpaceSnapshot => ({
 });
 
 /**
- * The Space the Meta Space above points at, carrying the Diagram and Graph that
- * Space Thing selects.
+ * The Space the Meta Space above points at, carrying the Map and Graph that
+ * Space Resource selects.
  *
- * A Space Thing names a Diagram of its target and a Graph that Diagram owns
- * (ADR 0079), so the target cannot be the structureless `snapshot` — a Diagram
+ * A Space Resource names a Map of its target and a Graph that Map owns
+ * (ADR 0079), so the target cannot be the structureless `snapshot` — a Map
  * the target minted for itself on first working load would carry an identity
  * this fixture could not have written down.
  */
 const otherSnapshot = (): SpaceSnapshot => {
-  const base = snapshot(OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
+  const base = snapshot(OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space');
   return {
     ...base,
     document: {
       ...base.document,
-      defaultDiagram: OTHER_DIAGRAM_ID,
-      diagrams: [
+      defaultMap: OTHER_MAP_ID,
+      maps: [
         {
-          id: OTHER_DIAGRAM_ID,
-          title: 'Diagram 1',
+          id: OTHER_MAP_ID,
+          title: 'Map 1',
           kind: 'positioned',
-          positions: { [OTHER_THING_ID]: { x: 0, y: 0, open: false } },
+          positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: OTHER_GRAPH_ID,
         },
@@ -95,13 +99,13 @@ const startupFor = (metaSpaceId: UUID, ...snapshots: SpaceSnapshot[]) => {
 };
 
 describe('HTTP space startup composition', () => {
-  it('initializes a diagramless Space through an injected memory backend before opening it', async () => {
+  it('initializes a mapless Space through an injected memory backend before opening it', async () => {
     const backend = MemorySpaceBackend.asMeta({
       snapshot: snapshot(),
       revision: 0n,
       exportedRevision: null,
     });
-    const ids = [DIAGRAM_ID, GRAPH_ID];
+    const ids = [MAP_ID, GRAPH_ID];
     const startup = startupOver(backend, () => {
       const id = ids.shift();
       if (id === undefined) throw new Error('initializer minted too many identities');
@@ -116,9 +120,7 @@ describe('HTTP space startup composition', () => {
     // `initialization` field and the header behind it went with the disclosure
     // they existed to trigger (`.scratch/command-dock/issues/13`).
     expect(result.opened.session.getState().acknowledgedRevision).toBe(1n);
-    expect(result.opened.app.currentSpace().lookup.diagram(DIAGRAM_ID)?.diagram.positions).toEqual(
-      {},
-    );
+    expect(result.opened.app.currentSpace().lookup.map(MAP_ID)?.map.positions).toEqual({});
   });
 
   it('opens the Space named by the compact product-route id through HTTP', async () => {
@@ -136,7 +138,7 @@ describe('HTTP space startup composition', () => {
   it('fails when the product-route id no longer resolves', async () => {
     const startup = startupFor(
       OTHER_SPACE_ID,
-      snapshot(OTHER_SPACE_ID, OTHER_THING_ID, 'Other space'),
+      snapshot(OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space'),
     );
 
     await expect(
@@ -200,20 +202,20 @@ describe('HTTP space startup composition', () => {
     );
   });
 
-  it('opens a resolved Diagram from one backend load', async () => {
+  it('opens a resolved Map from one backend load', async () => {
     const loaded = {
       snapshot: {
         ...snapshot(),
         document: {
           version: 1 as const,
           title: 'Stored space',
-          defaultDiagram: DIAGRAM_ID,
-          diagrams: [
+          defaultMap: MAP_ID,
+          maps: [
             {
-              id: DIAGRAM_ID,
-              title: 'Diagram 1',
+              id: MAP_ID,
+              title: 'Map 1',
               kind: 'positioned' as const,
-              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
             },
           ],
@@ -228,13 +230,13 @@ describe('HTTP space startup composition', () => {
 
     const result = await startup.resolve(
       productDestinationPath({
-        kind: 'diagram',
+        kind: 'map',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
       }),
     );
 
-    expect(result.opening?.selection).toBe(DIAGRAM_ID);
+    expect(result.opening?.selection).toBe(MAP_ID);
     expect(result.opened.app.currentSpace().id).toBe(SPACE_ID);
     expect(loadSpace).toHaveBeenCalledOnce();
     expect(loadSpace).toHaveBeenCalledWith(SPACE_ID);
@@ -256,19 +258,19 @@ describe('HTTP space startup composition', () => {
     expect(loadSpace).toHaveBeenNthCalledWith(2, SPACE_ID);
   });
 
-  it('opens a canonical Graph in its owning Diagram as navigation context', async () => {
+  it('opens a canonical Graph in its owning Map as navigation context', async () => {
     const loaded = {
       snapshot: {
         ...snapshot(),
         document: {
           version: 1 as const,
           title: 'Stored space',
-          diagrams: [
+          maps: [
             {
-              id: DIAGRAM_ID,
-              title: 'Diagram',
+              id: MAP_ID,
+              title: 'Map',
               kind: 'positioned' as const,
-              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
             },
           ],
@@ -283,35 +285,38 @@ describe('HTTP space startup composition', () => {
       productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID }),
     );
 
-    expect(result.opening?.selection).toBe(DIAGRAM_ID);
+    expect(result.opening?.selection).toBe(MAP_ID);
     expect(result.opening?.graphId).toBe(GRAPH_ID);
   });
 
-  it('opens an exact presentation point with its named View, Graph and Thing', async () => {
+  it('opens an exact presentation point with its named View, Graph and Resource', async () => {
     const loaded = {
       snapshot: {
         ...snapshot(),
-        things: [
-          ...snapshot().things,
-          { id: OTHER_THING_ID, document: { title: 'Next', kind: 'markdown' as const, body: '' } },
+        resources: [
+          ...snapshot().resources,
+          {
+            id: OTHER_RESOURCE_ID,
+            document: { title: 'Next', kind: 'markdown' as const, body: '' },
+          },
         ],
         document: {
           version: 1 as const,
           title: 'Stored space',
-          diagrams: [
+          maps: [
             {
-              id: DIAGRAM_ID,
-              title: 'Diagram',
+              id: MAP_ID,
+              title: 'Map',
               kind: 'positioned' as const,
               positions: {
-                [THING_ID]: { x: 0, y: 0, open: false as const },
-                [OTHER_THING_ID]: { x: 320, y: 0, open: false as const },
+                [RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                [OTHER_RESOURCE_ID]: { x: 320, y: 0, open: false as const },
               },
               graphs: [
                 {
                   id: GRAPH_ID,
                   title: 'Graph',
-                  edges: [{ from: THING_ID, to: OTHER_THING_ID }],
+                  edges: [{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }],
                 },
               ],
             },
@@ -327,31 +332,31 @@ describe('HTTP space startup composition', () => {
       productDestinationPath({
         kind: 'presentation',
         spaceId: SPACE_ID,
-        diagramId: DIAGRAM_ID,
+        mapId: MAP_ID,
         graphId: GRAPH_ID,
-        thingId: OTHER_THING_ID,
+        resourceId: OTHER_RESOURCE_ID,
       }),
     );
 
-    expect(result.opening?.selection).toBe(DIAGRAM_ID);
+    expect(result.opening?.selection).toBe(MAP_ID);
     expect(result.opening?.graphId).toBe(GRAPH_ID);
-    expect(result.opening?.presentationThingId).toBe(OTHER_THING_ID);
+    expect(result.opening?.presentationResourceId).toBe(OTHER_RESOURCE_ID);
   });
 
-  it('opens a contextual Thing in its named Diagram without authoring it open', async () => {
-    const diagramId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+  it('opens a contextual Resource in its named Map without authoring it open', async () => {
+    const mapId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const loaded = {
       snapshot: {
         ...snapshot(),
         document: {
           version: 1 as const,
           title: 'Stored space',
-          diagrams: [
+          maps: [
             {
-              id: diagramId,
-              title: 'Diagram',
+              id: mapId,
+              title: 'Map',
               kind: 'positioned' as const,
-              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -370,22 +375,22 @@ describe('HTTP space startup composition', () => {
 
     const result = await startup.resolve(
       productDestinationPath({
-        kind: 'diagram-thing',
+        kind: 'map-resource',
         spaceId: SPACE_ID,
-        diagramId: diagramId,
-        thingId: THING_ID,
+        mapId: mapId,
+        resourceId: RESOURCE_ID,
       }),
     );
 
-    expect(result.opening?.selection).toBe(diagramId);
-    expect(result.opening?.thingId).toBe(THING_ID);
+    expect(result.opening?.selection).toBe(mapId);
+    expect(result.opening?.resourceId).toBe(RESOURCE_ID);
     expect(
-      result.opened.app.currentSpace().lookup.diagram(diagramId)?.diagram.positions[THING_ID]?.open,
+      result.opened.app.currentSpace().lookup.map(mapId)?.map.positions[RESOURCE_ID]?.open,
     ).toBe(false);
   });
 
-  it('reveals a canonical Thing omitted by the default Diagram in the Things collection', async () => {
-    const diagramId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+  it('reveals a canonical Resource omitted by the default Map in the Resources collection', async () => {
+    const mapId = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
     const omittedId = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
     const loaded = {
       snapshot: {
@@ -393,13 +398,13 @@ describe('HTTP space startup composition', () => {
         document: {
           version: 1 as const,
           title: 'Stored space',
-          defaultDiagram: diagramId,
-          diagrams: [
+          defaultMap: mapId,
+          maps: [
             {
-              id: diagramId,
-              title: 'Diagram',
+              id: mapId,
+              title: 'Map',
               kind: 'positioned' as const,
-              positions: { [THING_ID]: { x: 0, y: 0, open: false as const } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -410,8 +415,8 @@ describe('HTTP space startup composition', () => {
             },
           ],
         },
-        things: [
-          ...snapshot().things,
+        resources: [
+          ...snapshot().resources,
           {
             id: omittedId,
             document: { title: 'Omitted', kind: 'markdown' as const, body: '' },
@@ -424,13 +429,13 @@ describe('HTTP space startup composition', () => {
     const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
-      productDestinationPath({ kind: 'thing', spaceId: SPACE_ID, thingId: omittedId }),
+      productDestinationPath({ kind: 'resource', spaceId: SPACE_ID, resourceId: omittedId }),
     );
 
-    expect(result.opening?.selection).toBe(diagramId);
-    expect(result.opening?.thingId).toBe(omittedId);
+    expect(result.opening?.selection).toBe(mapId);
+    expect(result.opening?.resourceId).toBe(omittedId);
     expect(
-      result.opened.app.currentSpace().lookup.diagram(diagramId)?.diagram.positions[omittedId],
+      result.opened.app.currentSpace().lookup.map(mapId)?.map.positions[omittedId],
     ).toBeUndefined();
   });
 });

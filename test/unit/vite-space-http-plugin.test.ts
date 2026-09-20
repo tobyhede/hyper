@@ -29,7 +29,7 @@ const install = <Loaded>(
   hook: 'configureServer' | 'configurePreviewServer',
   // Whatever the double exports, kept as the caller wrote it: this hands the
   // module straight to the plugin, whose own probe is what these tests are
-  // about, so a double exporting the wrong thing has to stay expressible.
+  // about, so a double exporting the wrong resource has to stay expressible.
   ssrLoadModule: () => Promise<Loaded> = () => Promise.reject(new Error('Unexpected load')),
 ): Middleware | undefined => {
   const configure = plugin[hook];

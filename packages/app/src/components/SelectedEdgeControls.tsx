@@ -1,8 +1,8 @@
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { ThingId } from '@project/core';
+import type { ResourceId } from '@project/core';
 import {
   Button,
-  ThingSearchCombobox,
+  ResourceSearchCombobox,
   Field,
   FieldError,
   Popover,
@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
   Separator,
   cn,
-  type ThingChoice,
+  type ResourceChoice,
 } from '@project/ui';
 import {
   presentEdgeDeletionRefusal,
@@ -26,14 +26,14 @@ import type { EdgeEndpoint } from '../space-authoring';
  * One Edge is selected at a time and one editor opens for it, so there is no
  * second instance for these to collide with — and a literal is what lets the
  * `aria-describedby` and the `FieldError` beneath it be read as the same fact in
- * one glance, as the Thing panes' own field ids already are. React's `useId`
+ * one glance, as the Resource panes' own field ids already are. React's `useId`
  * would also mint `:r3:`, which is a legal DOM id and not a parseable CSS
  * selector, so every test reaching the sentence would have to work around it.
  */
 const FROM_ERROR = 'edge-from-error';
 const TO_ERROR = 'edge-to-error';
 
-/** The raised thing these controls and their refusal are both drawn on. */
+/** The raised resource these controls and their refusal are both drawn on. */
 const RAISED_SURFACE =
   'rounded-chrome-md border border-border bg-card shadow-[0_6px_20px_rgb(0_0_0/45%)]';
 
@@ -44,13 +44,13 @@ const GROUPED_COMMAND = 'rounded-none border-0 text-chrome-xs text-foreground';
  * Escape closes the topmost layer: the open endpoint list first, this editor
  * after — and this handler is what makes the second half happen at all.
  *
- * **A `ThingSearchCombobox` carrying a selected value blocks Base UI's own
+ * **A `ResourceSearchCombobox` carrying a selected value blocks Base UI's own
  * Popover dismissal.** Measured against `@base-ui/react` 1.7.0 in Chromium: the
  * same Popover closes on Escape with a combobox whose `value` is `null`, and
  * stops closing the moment one is selected — `onOpenChange` is never called,
  * while an outside press still closes it, so the popup's dismissal is live and
  * only the Escape branch is suppressed. Both endpoint pickers always name the
- * Thing they currently point at, so this editor is never in the case that works.
+ * Resource they currently point at, so this editor is never in the case that works.
  * The reproduction is written up in
  * `.scratch/design-system-baseline/findings/base-ui-popover-escape-and-combobox-value.md`.
  *
@@ -74,7 +74,7 @@ const dismissOnEscape =
   (close: () => void) =>
   (event: ReactKeyboardEvent<HTMLElement>): void => {
     if (event.key !== 'Escape') return;
-    // Any expanded thing inside the popup is an endpoint list: the two
+    // Any expanded resource inside the popup is an endpoint list: the two
     // comboboxes are the only controls in here that carry `aria-expanded`, and
     // the Edit button that carries it too is outside the popup.
     if (event.currentTarget.querySelector('[aria-expanded="true"]') !== null) return;
@@ -82,9 +82,9 @@ const dismissOnEscape =
   };
 
 export interface SelectedEdgeControlsProps {
-  /** The Thing each endpoint currently names, so its picker opens on it. */
-  readonly from: ThingId;
-  readonly to: ThingId;
+  /** The Resource each endpoint currently names, so its picker opens on it. */
+  readonly from: ResourceId;
+  readonly to: ResourceId;
   /**
    * Whether the endpoint editor stands.
    *
@@ -95,18 +95,18 @@ export interface SelectedEdgeControlsProps {
    */
   readonly editorOpen: boolean;
   /**
-   * Which Things an endpoint may move to, and why each cannot.
+   * Which Resources an endpoint may move to, and why each cannot.
    *
    * A function rather than two arrays, because **the answer is snapshotted when
    * the editor opens**: recomputing under an open list would move the rows under
    * a pointer already on its way to one, and would not make the pick safe either
    * — only the completion's re-validation does that.
    */
-  readonly endpointChoices: (endpoint: EdgeEndpoint) => readonly ThingChoice[];
+  readonly endpointChoices: (endpoint: EdgeEndpoint) => readonly ResourceChoice[];
   readonly refusal: SelectedEdgeRefusal | null;
   readonly onOpenEditor: () => void;
   readonly onCloseEditor: () => void;
-  readonly onReconnect: (endpoint: EdgeEndpoint, thingId: ThingId) => void;
+  readonly onReconnect: (endpoint: EdgeEndpoint, resourceId: ResourceId) => void;
   readonly onDelete: () => void;
 }
 
@@ -213,7 +213,7 @@ export function SelectedEdgeControls({
 /**
  * The Edge's two endpoints as pickers — the keyboard path to a reconnection.
  *
- * Both fields show the Thing they currently name, so the existing endpoint is
+ * Both fields show the Resource they currently name, so the existing endpoint is
  * unchanged until the author picks another; a result that would duplicate a
  * different Edge in this Graph arrives from eligibility already disabled, with
  * its reason on the row rather than the row missing.
@@ -232,11 +232,11 @@ function EdgeEndpointFields({
   refusal,
   onReconnect,
 }: {
-  readonly from: ThingId;
-  readonly to: ThingId;
-  readonly endpointChoices: (endpoint: EdgeEndpoint) => readonly ThingChoice[];
+  readonly from: ResourceId;
+  readonly to: ResourceId;
+  readonly endpointChoices: (endpoint: EdgeEndpoint) => readonly ResourceChoice[];
   readonly refusal: Extract<SelectedEdgeRefusal, { readonly kind: 'reconnection' }> | null;
-  readonly onReconnect: (endpoint: EdgeEndpoint, thingId: ThingId) => void;
+  readonly onReconnect: (endpoint: EdgeEndpoint, resourceId: ResourceId) => void;
 }) {
   const errors: EdgeEndpointRefusalErrors =
     refusal === null
@@ -250,7 +250,7 @@ function EdgeEndpointFields({
   return (
     <div className="flex flex-col gap-[0.4rem]">
       <Field data-invalid={fromError !== null}>
-        <ThingSearchCombobox
+        <ResourceSearchCombobox
           label="From"
           testId="edge-from"
           choices={fromChoices}
@@ -259,14 +259,14 @@ function EdgeEndpointFields({
             'aria-invalid': fromError !== null,
             'aria-describedby': fromError === null ? undefined : FROM_ERROR,
           }}
-          onValueChange={(thingId) => onReconnect('from', thingId)}
+          onValueChange={(resourceId) => onReconnect('from', resourceId)}
         />
         <FieldError id={FROM_ERROR} data-testid="edge-from-refusal">
           {fromError}
         </FieldError>
       </Field>
       <Field data-invalid={toError !== null}>
-        <ThingSearchCombobox
+        <ResourceSearchCombobox
           label="To"
           testId="edge-to"
           choices={toChoices}
@@ -275,13 +275,13 @@ function EdgeEndpointFields({
             'aria-invalid': toError !== null,
             'aria-describedby': toError === null ? undefined : TO_ERROR,
           }}
-          onValueChange={(thingId) => onReconnect('to', thingId)}
+          onValueChange={(resourceId) => onReconnect('to', resourceId)}
         />
         <FieldError id={TO_ERROR} data-testid="edge-to-refusal">
           {toError}
         </FieldError>
       </Field>
-      {/* The form channel: a stale Diagram, Graph or Edge that no endpoint in
+      {/* The form channel: a stale Map, Graph or Edge that no endpoint in
           either list could correct, so neither Field is marked invalid. */}
       {errors.form !== undefined && (
         <FieldError data-testid="edge-endpoint-refusal">{errors.form}</FieldError>

@@ -18,33 +18,33 @@ import { openTestSpace } from './opened-space';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Target',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
@@ -55,7 +55,7 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
     id: SPACE_ID,
     session: opened.spaceSession,
     app: composeApp({ spaceSession: opened.spaceSession, reportObserverError }),
-    spaceThings: opened.spaceThings,
+    spaceResources: opened.spaceResources,
   };
 };
 
@@ -63,7 +63,7 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
  * The embedded composition, reporting where its target's composition does.
  *
  * The reporter is taken off the entry rather than handed in beside it, because
- * that is the one `EmbeddedDiagramAuthoring` spends (ADR 0016) — a recording one
+ * that is the one `EmbeddedMapAuthoring` spends (ADR 0016) — a recording one
  * supplied straight to the factory would prove the argument and not the wiring.
  */
 const embedded = () => {
@@ -71,34 +71,37 @@ const embedded = () => {
   const entry = openEntry((error) => {
     reported.push(error);
   });
-  const composition = createEmbeddedAuthoring(entry, DIAGRAM_ID, entry.app.reportObserverError);
+  const composition = createEmbeddedAuthoring(entry, MAP_ID, entry.app.reportObserverError);
   return { composition, reported };
 };
 
-describe('a completion an embedded Diagram does not support', () => {
-  it('is reported as an invariant rather than refused as an Edge that leaves the Diagram', () => {
+describe('a completion an embedded Map does not support', () => {
+  it('is reported as an invariant rather than refused as an Edge that leaves the Map', () => {
     const { composition, reported } = embedded();
 
     const result = composition.authoring.complete({
-      kind: 'created-thing',
+      kind: 'created-resource',
       anchor: { x: 0, y: 0 },
     });
 
-    expect(result).not.toMatchObject({ refusal: { code: 'edge-thing-outside-diagram' } });
+    expect(result).not.toMatchObject({ refusal: { code: 'edge-resource-outside-map' } });
     expect(result).toEqual({ kind: 'unchanged' });
     expect(reported).toHaveLength(1);
     expect(reported[0]).toBeInstanceOf(Error);
-    expect(String(reported[0])).toContain('created-thing');
+    expect(String(reported[0])).toContain('created-resource');
   });
 
   /** The same for a second kind, so the arm reads as a fallthrough and not a case. */
   it('reports every unsupported kind, naming the one that arrived', () => {
     const { composition, reported } = embedded();
 
-    const result = composition.authoring.complete({ kind: 'deleted-thing', thingId: THING_A });
+    const result = composition.authoring.complete({
+      kind: 'deleted-resource',
+      resourceId: RESOURCE_A,
+    });
 
     expect(result).toEqual({ kind: 'unchanged' });
-    expect(String(reported[0])).toContain('deleted-thing');
+    expect(String(reported[0])).toContain('deleted-resource');
   });
 
   /** Reporting is a diagnostic, never the gesture's failure path. */
@@ -106,9 +109,11 @@ describe('a completion an embedded Diagram does not support', () => {
     const entry = openEntry(() => {
       throw new Error('reporter failed');
     });
-    const composition = createEmbeddedAuthoring(entry, DIAGRAM_ID, entry.app.reportObserverError);
+    const composition = createEmbeddedAuthoring(entry, MAP_ID, entry.app.reportObserverError);
 
-    expect(composition.authoring.complete({ kind: 'deleted-thing', thingId: THING_A })).toEqual({
+    expect(
+      composition.authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A }),
+    ).toEqual({
       kind: 'unchanged',
     });
   });
@@ -138,24 +143,24 @@ describe('a completion an embedded Diagram does not support', () => {
 
     expect(
       composition.authoring.complete({
-        kind: 'connected-things',
-        from: THING_A,
-        to: THING_B,
+        kind: 'connected-resources',
+        from: RESOURCE_A,
+        to: RESOURCE_B,
         graphId: GRAPH_ID,
       }),
     ).toEqual({ kind: 'completed' });
     expect(reported).toEqual([]);
     expect(
-      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs[0]?.edges,
-    ).toEqual([{ from: THING_A, to: THING_B }]);
+      composition.authoring.getState().session.working.document.maps?.[0]?.graphs[0]?.edges,
+    ).toEqual([{ from: RESOURCE_A, to: RESOURCE_B }]);
   });
 
   /** Supported kinds still reach the target's own Space Authoring. */
-  it('still forwards a supported kind into the Diagram', () => {
+  it('still forwards a supported kind into the Map', () => {
     const { composition, reported } = embedded();
 
     expect(
-      composition.authoring.complete({ kind: 'opened-thing', thingId: THING_A }),
+      composition.authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A }),
     ).toMatchObject({
       kind: 'completed',
     });
@@ -170,24 +175,24 @@ describe('a completion an embedded Diagram does not support', () => {
     });
     expect(String(reported[0])).toContain('deleted-graph');
     expect(
-      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs,
+      composition.authoring.getState().session.working.document.maps?.[0]?.graphs,
     ).toHaveLength(1);
   });
 });
 
-describe('context commands on the Diagram an embedding is showing', () => {
-  it('forwards renaming the Diagram', () => {
+describe('context commands on the Map an embedding is showing', () => {
+  it('forwards renaming the Map', () => {
     const { composition, reported } = embedded();
 
     expect(
       composition.authoring.complete({
-        kind: 'renamed-diagram',
-        diagramId: DIAGRAM_ID,
+        kind: 'renamed-map',
+        mapId: MAP_ID,
         title: 'Renamed',
       }),
     ).toEqual({ kind: 'completed' });
     expect(reported).toEqual([]);
-    expect(composition.authoring.getState().session.working.document.diagrams?.[0]?.title).toBe(
+    expect(composition.authoring.getState().session.working.document.maps?.[0]?.title).toBe(
       'Renamed',
     );
   });
@@ -213,12 +218,11 @@ describe('context commands on the Diagram an embedding is showing', () => {
       kind: 'completed',
     });
     expect(reported).toEqual([]);
-    const graph =
-      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs[0];
+    const graph = composition.authoring.getState().session.working.document.maps?.[0]?.graphs[0];
     expect(graph?.title).toBe('Renamed Graph');
     expect(graph?.color).toBe('#aec7e8');
     expect(
-      composition.authoring.getState().session.working.document.diagrams?.[0]?.graphs,
+      composition.authoring.getState().session.working.document.maps?.[0]?.graphs,
     ).toHaveLength(2);
   });
 });

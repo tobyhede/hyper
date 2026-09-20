@@ -9,7 +9,7 @@ import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 
 // SAFETY: `kind` starts `undefined` but is reassigned to 'backup'/'staging'
 // later (per test) — the cast states the mutable field's real type up front
@@ -73,10 +73,10 @@ const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1, title: 'Stored talk' },
-    things: [
+    resources: [
       {
-        id: THING_ID,
-        document: { title: 'Stored thing', kind: 'markdown', body: 'Stored body.\n' },
+        id: RESOURCE_ID,
+        document: { title: 'Stored resource', kind: 'markdown', body: 'Stored body.\n' },
       },
     ],
   },
@@ -124,8 +124,8 @@ describe('canonical export recovery cleanup', () => {
     });
 
     await expect(
-      readFile(join(destination, SPACE_ID, 'things', `${THING_ID}.md`), 'utf8'),
-    ).resolves.toContain(`id: ${THING_ID}`);
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${RESOURCE_ID}`);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: 7n,
     });
@@ -141,8 +141,8 @@ describe('canonical export recovery cleanup', () => {
     });
 
     await expect(
-      readFile(join(destination, SPACE_ID, 'things', `${THING_ID}.md`), 'utf8'),
-    ).resolves.toContain(`id: ${THING_ID}`);
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
+    ).resolves.toContain(`id: ${RESOURCE_ID}`);
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: 7n,
     });

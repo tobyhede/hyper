@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { expectMenuGroups, thingActions } from '../e2e/graph';
+import { expectMenuGroups, resourceActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -36,7 +36,7 @@ const surface = (page: Page) => page.getByRole('toolbar', { name: 'Command Dock'
  */
 const disclose = async (page: Page, name: string) => {
   // `exact`, because an accessible name matches as a substring by default and
-  // a shorter `Diagram:` would also hit `Active Graph` is not the issue — a
+  // a shorter `Map:` would also hit `Active Graph` is not the issue — a
   // title that is a prefix of another identity's title would be.
   await surface(page).getByRole('button', { name, exact: true }).click({ delay: 120 });
   const menu = page.getByRole('menu').last();
@@ -46,17 +46,17 @@ const disclose = async (page: Page, name: string) => {
 
 /**
  * ADR 0053's one surviving clause, kept verbatim by ADR 0082: the canvas takes
- * one exclusive choice over authored Diagrams, with no second control and no
+ * one exclusive choice over authored Maps, with no second control and no
  * empty value.
  *
  * The list is a `DropdownMenuRadioGroup` rather than a column of pressed rows,
  * so what carries the choice is `aria-checked` on one item — and the cluster
- * outside the menu names the same Diagram, which is the "no second control" half
+ * outside the menu names the same Map, which is the "no second control" half
  * read from the other side.
  */
 test(
-  'the Diagram cluster is one exclusive list over the authored Diagrams',
-  { tag: '@parity:command-dock-marks-one-current-diagram' },
+  'the Map cluster is one exclusive list over the authored Maps',
+  { tag: '@parity:command-dock-marks-one-current-map' },
   async ({ page }) => {
     await page.goto(story('default'));
 
@@ -64,7 +64,7 @@ test(
       'Collection 1',
     );
 
-    const menu = await disclose(page, 'Diagram: Collection 1');
+    const menu = await disclose(page, 'Map: Collection 1');
     const chosen = menu.getByRole('menuitemradio', { name: 'Collection 1' });
     const other = menu.getByRole('menuitemradio', { name: 'Collection 2' });
     await expect(chosen).toHaveAttribute('aria-checked', 'true');
@@ -76,78 +76,76 @@ test(
     await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 2',
     );
-    // And the Graphs follow the Diagram that owns them (ADR 0040): `Echo` is
-    // `Collection 2`'s only Graph, and `Long` belongs to the Diagram just left.
+    // And the Graphs follow the Map that owns them (ADR 0040): `Echo` is
+    // `Collection 2`'s only Graph, and `Long` belongs to the Map just left.
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Echo');
     await expect(
-      surface(page).getByRole('button', { name: 'Diagram: Collection 2', exact: true }),
+      surface(page).getByRole('button', { name: 'Map: Collection 2', exact: true }),
     ).toBeVisible();
   },
 );
 
 /**
- * New Diagram is in the Diagram menu, beside the list it adds to, and it adds an
+ * New Map is in the Map menu, beside the list it adds to, and it adds an
  * *empty* one (ADR 0079, ADR 0080).
  *
- * The Sidebar had room for a permanent Add Diagram button; the Dock finds room by
+ * The Sidebar had room for a permanent Add Map button; the Dock finds room by
  * disclosure. What did not change is that the command creates and selects a
- * Diagram with no Things placed in it through production Space Authoring.
+ * Map with no Resources placed in it through production Space Authoring.
  */
 test(
-  'New Diagram creates and selects an empty Diagram from the Diagram menu',
-  { tag: '@parity:command-dock-adds-an-empty-diagram' },
+  'New Map creates and selects an empty Map from the Map menu',
+  { tag: '@parity:command-dock-adds-an-empty-map' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const nodes = page.locator('.react-flow__node:visible');
     await expect(nodes.first()).toBeVisible();
 
-    const menu = await disclose(page, 'Diagram: Collection 1');
-    await menu.getByRole('menuitem', { name: 'New Diagram' }).click();
+    const menu = await disclose(page, 'Map: Collection 1');
+    await menu.getByRole('menuitem', { name: 'New Map' }).click();
 
-    // The command opens nothing and continues in the new Diagram's name
+    // The command opens nothing and continues in the new Map's name
     // (`.scratch/command-dock/issues/13`), so the Dock is drawing that name's
     // editor rather than the name — and the caret is the outcome worth holding.
     // Escape cancels an untouched draft, which leaves the title the Edit stored.
     //
-    // `Diagram 1` is what `nextDiagramTitle` mints over `Collection 1` and
+    // `Map 1` is what `nextMapTitle` mints over `Collection 1` and
     // `Collection 2` — the application's own numbering, not a word this test
     // chose.
-    const name = page.getByRole('textbox', { name: 'Diagram name' });
+    const name = page.getByRole('textbox', { name: 'Map name' });
     await expect(name).toBeFocused();
-    await expect(name).toHaveValue('Diagram 1');
+    await expect(name).toHaveValue('Map 1');
     await page.keyboard.press('Escape');
     await expect(name).toHaveCount(0);
 
     await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
-      'Diagram 1',
+      'Map 1',
     );
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText(
       'Graph 1',
     );
     await expect(nodes).toHaveCount(0);
 
-    const reopened = await disclose(page, 'Diagram: Diagram 1');
+    const reopened = await disclose(page, 'Map: Map 1');
     await expect(reopened.getByRole('menuitemradio')).toHaveCount(3);
   },
 );
 
 /**
- * The Diagram menu's one grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/01`): the Diagram list, New
- * Diagram on its own, Rename beside Copy link to Diagram, then Delete — one
+ * The Map menu's one grouping grammar
+ * (`.scratch/dock-menu-reorganisation/issues/01`): the Map list, New
+ * Map on its own, Rename beside Copy link to Map, then Delete — one
  * separator between each group.
  */
-test('the Diagram menu groups New Diagram, Rename with Copy link, then Delete', async ({
-  page,
-}) => {
+test('the Map menu groups New Map, Rename with Copy link, then Delete', async ({ page }) => {
   await page.goto(story('default'));
 
-  const menu = await disclose(page, 'Diagram: Collection 1');
+  const menu = await disclose(page, 'Map: Collection 1');
   await expectMenuGroups(menu, [
     ['Collection 1', 'Collection 2'],
-    ['New Diagram'],
-    ['Rename', 'Copy link to Diagram'],
+    ['New Map'],
+    ['Rename', 'Copy link to Map'],
     ['Delete Collection 1'],
   ]);
 });
@@ -200,7 +198,7 @@ test(
 );
 
 /**
- * Delete Graph is present and unavailable on the last Graph a Diagram keeps,
+ * Delete Graph is present and unavailable on the last Graph a Map keeps,
  * and removes the active Graph when more than one survive (ADR 0040).
  */
 test(
@@ -209,8 +207,8 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
 
-    const diagrams = await disclose(page, 'Diagram: Collection 1');
-    await diagrams.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
+    const maps = await disclose(page, 'Map: Collection 1');
+    await maps.getByRole('menuitemradio', { name: 'Collection 2', exact: true }).click();
     const lone = await disclose(page, 'Active Graph: Echo');
     await expect(lone.getByRole('menuitem', { name: 'Delete Echo' })).toHaveAttribute(
       'aria-disabled',
@@ -231,18 +229,18 @@ test(
  * (`.scratch/dock-menu-reorganisation/issues/01`): the Graph list, Colour…
  * on its own immediately after it, New Graph, Rename beside Copy link to
  * Graph, then Delete — one separator between each group. The application
- * writes the real within-Diagram product URL to the clipboard, and offers no
+ * writes the real within-Map product URL to the clipboard, and offers no
  * permanent address of the Graph's own.
  */
 test(
-  'the Graph menu groups its commands and copies only its within-Diagram address',
+  'the Graph menu groups its commands and copies only its within-Map address',
   { tag: '@parity:command-dock-copies-graph-destinations' },
   async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(story('default'));
-    const diagram = commandDockSnapshot.document.diagrams?.[0];
-    const graph = diagram?.graphs[0];
-    if (diagram === undefined || graph === undefined) throw new Error('Missing fixture Graph');
+    const map = commandDockSnapshot.document.maps?.[0];
+    const graph = map?.graphs[0];
+    if (map === undefined || graph === undefined) throw new Error('Missing fixture Graph');
 
     const menu = await disclose(page, 'Active Graph: Long');
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
@@ -258,7 +256,7 @@ test(
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
-        `https://example.test${productDestinationPath({ kind: 'diagram-graph', spaceId: commandDockSnapshot.id, diagramId: diagram.id, graphId: graph.id })}`,
+        `https://example.test${productDestinationPath({ kind: 'map-graph', spaceId: commandDockSnapshot.id, mapId: map.id, graphId: graph.id })}`,
       );
   },
 );
@@ -269,7 +267,7 @@ test(
  * Space, then Exit Space — one separator between the two groups. Reorganisation
  * only: the Space's own address is unchanged, and Exit still stays trailing and
  * disabled on Meta (`command-dock-edits-identity-names`,
- * `space-thing.spec.ts`'s Exit coverage).
+ * `space-resource.spec.ts`'s Exit coverage).
  */
 test('the Space menu groups Rename with Copy link to Space, then Exit Space', async ({ page }) => {
   await page.goto(story('default'));
@@ -281,7 +279,7 @@ test('the Space menu groups Rename with Copy link to Space, then Exit Space', as
 /**
  * The Space's own copied destination, exercised the way the Graph's is above:
  * the application writes the real product URL to the clipboard, and it is the
- * Space's own address rather than the drawing Diagram's
+ * Space's own address rather than the drawing Map's
  * (`link-actions.spec.ts` holds the reason no second address is offered).
  */
 test('Copy link to Space copies the Space’s own durable address', async ({ page }) => {
@@ -298,67 +296,67 @@ test('Copy link to Space copies the Space’s own durable address', async ({ pag
 });
 
 /**
- * The Thing rail's own grouping grammar
+ * The Resource rail's own grouping grammar
  * (`.scratch/dock-menu-reorganisation/issues/03`), reached through the real
  * production host: Create Reference on its own, both copy links beside each
- * other, then Remove from Diagram and Delete from Space sharing the trailing
+ * other, then Remove from Map and Delete from Space sharing the trailing
  * destructive group — one separator between each. The Command Dock draws no
- * Thing commands of its own (ADR 0073); this is the rail's own menu.
+ * Resource commands of its own (ADR 0073); this is the rail's own menu.
  */
-test('a Markdown Thing’s actions menu groups Create Reference, both copy links, then Remove and Delete', async ({
+test('a Markdown Resource’s actions menu groups Create Reference, both copy links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto(story('default'));
 
-  const menu = await thingActions(page, 'Opening');
+  const menu = await resourceActions(page, 'Opening');
   await expectMenuGroups(menu, [
     ['Create Reference'],
-    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
-    ['Remove from Diagram', 'Delete from Space'],
+    ['Copy link to Resource in Map', 'Copy link to Resource'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
 });
 
 /**
- * Present and unavailable on a Reference Thing (ADR 0070): the same grouping, with
+ * Present and unavailable on a Reference Resource (ADR 0070): the same grouping, with
  * Create Reference leading the menu greyed rather than absent — the row is where
  * the product says that referencing terminates.
  */
-test('a Reference Thing’s actions menu keeps Create Reference leading, drawn unavailable', async ({
+test('a Reference Resource’s actions menu keeps Create Reference leading, drawn unavailable', async ({
   page,
 }) => {
   await page.goto(story('default'));
 
-  const menu = await thingActions(page, 'Strategy overview');
+  const menu = await resourceActions(page, 'Strategy overview');
   await expect(menu.getByRole('menuitem', { name: /^Create Reference/ })).toHaveAttribute(
     'aria-disabled',
     'true',
   );
   await expectMenuGroups(menu, [
     [/^Create Reference/],
-    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
-    ['Remove from Diagram', 'Delete from Space'],
+    ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
 });
 
 /**
- * A Space Thing's own grouping grammar
+ * A Space Resource's own grouping grammar
  * (`.scratch/dock-menu-reorganisation/issues/04`), reached through the real
  * production host: Create Reference; Enter and Open in New Tab; the three copy
- * links; then Remove from Diagram and Delete from Space sharing the trailing
+ * links; then Remove from Map and Delete from Space sharing the trailing
  * destructive group — one separator between each. Rename is absent — the
- * Title still edits on the Thing front, unchanged by this grouping.
+ * Title still edits on the Resource front, unchanged by this grouping.
  */
-test('a Space Thing’s actions menu groups Create Reference, Enter, links, then Remove and Delete', async ({
+test('a Space Resource’s actions menu groups Create Reference, Enter, links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto(story('default'));
 
-  const menu = await thingActions(page, 'Design system');
+  const menu = await resourceActions(page, 'Design system');
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Enter', 'Open in New Tab'],
-    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Space'],
-    ['Remove from Diagram', 'Delete from Space'],
+    ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
 });
 
@@ -372,7 +370,7 @@ test('a Space Thing’s actions menu groups Create Reference, Enter, links, then
  * focus back to itself.
  */
 test(
-  'the Space, Diagram and Graph names each edit in place and keep a refusal on the field',
+  'the Space, Map and Graph names each edit in place and keep a refusal on the field',
   { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto(story('default'));
@@ -380,7 +378,7 @@ test(
     // **The Space first, because it is the identity that was a label.** It is one
     // Edit on this Space's own session, writing `document.title` and nothing
     // else: the four other Spaces this story has open are untouched, and the
-    // Space Thing in the Opener that points here keeps its own Title (ADR 0083).
+    // Space Resource in the Opener that points here keeps its own Title (ADR 0083).
     // Visible-filtered for the reason every `getByTestId` here is — an inactive
     // open Space stays mounted and draws a Dock of its own.
     const spaceTitle = () => page.getByTestId('space-title').filter({ visible: true });
@@ -415,20 +413,20 @@ test(
 
     await page.getByTestId('selected-canvas').filter({ visible: true }).click({ delay: 120 });
     await page.getByRole('menuitem', { name: 'Rename' }).click();
-    const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
-    await expect(diagramName).toBeFocused();
-    await diagramName.fill('');
-    await diagramName.press('Enter');
-    await expect(page.getByText('A Diagram needs a name.')).toBeVisible();
+    const mapName = page.getByRole('textbox', { name: 'Map name' });
+    await expect(mapName).toBeFocused();
+    await mapName.fill('');
+    await mapName.press('Enter');
+    await expect(page.getByText('A Map needs a name.')).toBeVisible();
     // Refused and still open: the words the author typed are still theirs.
-    await expect(diagramName).toBeVisible();
-    await diagramName.fill('Workshop');
-    await diagramName.press('Enter');
+    await expect(mapName).toBeVisible();
+    await mapName.fill('Workshop');
+    await mapName.press('Enter');
     await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Workshop',
     );
     await expect(
-      surface(page).getByRole('button', { name: 'Diagram: Workshop', exact: true }),
+      surface(page).getByRole('button', { name: 'Map: Workshop', exact: true }),
     ).toBeVisible();
 
     await page.getByTestId('active-graph').filter({ visible: true }).click({ delay: 120 });
@@ -559,9 +557,9 @@ test(
       'Collection 1',
     );
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Long');
-    await expect(surface(page).getByRole('button', { name: 'Things' })).toBeVisible();
+    await expect(surface(page).getByRole('button', { name: 'Resources' })).toBeVisible();
 
-    const menu = await disclose(page, 'Diagram: Collection 1');
+    const menu = await disclose(page, 'Map: Collection 1');
     const frame = await dock(page).boundingBox();
     const popup = await menu.boundingBox();
     expect(frame).not.toBeNull();
@@ -585,10 +583,10 @@ test(
 );
 
 /**
- * A newly created Space opens complete: one authored Diagram, selected, owning
+ * A newly created Space opens complete: one authored Map, selected, owning
  * one empty Active Graph (ADR 0018, ADR 0079, ADR 0080).
  *
- * `Diagram 1`, `Graph 1` and `New space` are the titles `newSpace()` mints, read
+ * `Map 1`, `Graph 1` and `New space` are the titles `newSpace()` mints, read
  * rather than supplied — which is the evidence that this is really that Space
  * and not a stand-in wearing the catalogue's label. The Dock names both rather
  * than leaving a cluster blank, and Present is unavailable because an empty
@@ -622,8 +620,8 @@ test(
 );
 
 test(
-  'a new Space names its initial Diagram and empty Graph and cannot present',
-  { tag: '@parity:command-dock-names-a-new-spaces-initial-diagram-and-graph' },
+  'a new Space names its initial Map and empty Graph and cannot present',
+  { tag: '@parity:command-dock-names-a-new-spaces-initial-map-and-graph' },
   async ({ page }) => {
     await page.goto(story('new-space'));
 
@@ -631,7 +629,7 @@ test(
       'New space',
     );
     await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
-      'Diagram 1',
+      'Map 1',
     );
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText(
       'Graph 1',
@@ -689,7 +687,7 @@ test(
  * Presenting removes the furniture rather than emptying it.
  *
  * The Sidebar withdrew authoring command by command, and its claim described
- * which items left a Diagram row's menu. There is no menu left to withdraw
+ * which items left a Map row's menu. There is no menu left to withdraw
  * anything from: the audience is left with the canvas and `PresentingChrome`.
  */
 test(
@@ -734,15 +732,15 @@ test(
 
     // Nothing is withdrawn at a width: all four names are in the strip, and the
     // last of them is reached by scrolling it rather than by opening anything.
-    await strip.getByRole('button', { name: 'Things' }).scrollIntoViewIfNeeded();
+    await strip.getByRole('button', { name: 'Resources' }).scrollIntoViewIfNeeded();
     for (const testId of ['space-title', 'selected-canvas', 'active-graph'])
       await expect(strip.getByTestId(testId)).toBeAttached();
-    await expect(strip.getByRole('button', { name: 'Things' })).toBeVisible();
-    await expect(strip.getByRole('button', { name: 'Create Markdown Thing' })).toBeVisible();
+    await expect(strip.getByRole('button', { name: 'Resources' })).toBeVisible();
+    await expect(strip.getByRole('button', { name: 'Create Markdown Resource' })).toBeVisible();
 
     // And a command runs from the strip with nothing dismissed first: the menu
     // opens over the canvas, the choice lands, and the strip is still there.
-    const menu = await disclose(page, 'Diagram: Collection 1');
+    const menu = await disclose(page, 'Map: Collection 1');
     await menu.getByRole('menuitemradio', { name: 'Collection 2' }).click();
     await expect(page.getByTestId('selected-canvas').filter({ visible: true })).toContainText(
       'Collection 2',
@@ -752,7 +750,7 @@ test(
 );
 
 /**
- * Create Thing, as three peers rather than a disclosure.
+ * Create Resource, as three peers rather than a disclosure.
  *
  * **The obligation is the press count.** The kind is chosen at creation, so
  * none of the three is a default and none is disclosed behind another — which
@@ -762,7 +760,7 @@ test(
  * three and are.
  *
  * Each is named for the kind it makes rather than for the set. The glyphs are
- * the same silhouettes the Things list and the canvas use for *what a Thing
+ * the same silhouettes the Resources list and the canvas use for *what a Resource
  * is*, so the accessible name is what separates "make one of these" from "one
  * of these" — and it is asserted rather than assumed.
  *
@@ -777,7 +775,7 @@ test(
     await page.goto(story('default'));
 
     const strip = surface(page);
-    for (const kind of ['Markdown Thing', 'Space Thing']) {
+    for (const kind of ['Markdown Resource', 'Space Resource']) {
       const control = strip.getByRole('button', { name: `Create ${kind}` });
       await expect(control).toBeVisible();
       // Available, and reached without opening anything first — which is the
@@ -786,23 +784,23 @@ test(
     }
 
     // No disclosure stands in front of them: nothing in the cluster is a menu
-    // trigger but the Things list itself.
-    await expect(strip.getByRole('button', { name: 'Create Thing' })).toHaveCount(0);
+    // trigger but the Resources list itself.
+    await expect(strip.getByRole('button', { name: 'Create Resource' })).toHaveCount(0);
     await expect(page.getByRole('menu')).toHaveCount(0);
 
     // One group, so assistive technology announces the run once rather than two
-    // unrelated commands after the Things trigger.
-    await expect(strip.getByRole('group', { name: 'Create a Thing' })).toBeAttached();
-    const createSpace = strip.getByRole('button', { name: 'Create Space Thing', exact: true });
+    // unrelated commands after the Resources trigger.
+    await expect(strip.getByRole('group', { name: 'Create a Resource' })).toBeAttached();
+    const createSpace = strip.getByRole('button', { name: 'Create Space Resource', exact: true });
     await expect(createSpace.locator('[data-icon="space"]')).toBeVisible();
     await createSpace.click();
-    const title = page.getByRole('textbox', { name: 'Thing title' });
+    const title = page.getByRole('textbox', { name: 'Resource title' });
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(
       page
         .locator('.react-flow__node:visible')
-        .getByRole('img', { name: 'Space Thing', exact: true })
+        .getByRole('img', { name: 'Space Resource', exact: true })
         .locator('[data-icon="space"]')
         .last(),
     ).toBeVisible();
@@ -810,12 +808,12 @@ test(
 );
 
 /**
- * The side-edge dock packs the Things cluster onto one row.
+ * The side-edge dock packs the Resources cluster onto one row.
  *
- * **Things is the one cluster whose name is not a title**, so it is the one
- * that can give up the `1fr` track the others need: Space, Diagram and Graph
+ * **Resources is the one cluster whose name is not a title**, so it is the one
+ * that can give up the `1fr` track the others need: Space, Map and Graph
  * name entities the author renamed, and that track is what lets their names
- * take the slack and truncate instead of resizing the column. "Things" is a
+ * take the slack and truncate instead of resizing the column. "Resources" is a
  * fixed word, so the track held about 69px of nothing — and the three Create
  * commands are what it is spent on instead.
  *
@@ -826,39 +824,39 @@ test(
  * verb tracks — would have stood empty on the other three rows.
  */
 test(
-  'a side-edge dock packs Things onto one row at its neighbours’ height',
-  { tag: '@parity:command-dock-packs-things-onto-one-row' },
+  'a side-edge dock packs Resources onto one row at its neighbours’ height',
+  { tag: '@parity:command-dock-packs-resources-onto-one-row' },
   async ({ page }) => {
     await page.goto(story('docked-left'));
     await expect(surface(page)).toHaveAttribute('data-orientation', 'vertical');
 
     const strip = surface(page);
-    const things = strip.getByRole('group', { name: 'Things' });
+    const resources = strip.getByRole('group', { name: 'Resources' });
     const graph = strip.getByRole('group', { name: 'Graph' });
 
     // One row: the cluster carrying the disclosure and both Creates is no taller
     // than the one carrying a name, a disclosure and Present. Left as loose
     // siblings the vertical column auto-places them onto a row each and this is
     // what fails.
-    const thingsBox = await things.boundingBox();
+    const resourcesBox = await resources.boundingBox();
     const graphBox = await graph.boundingBox();
-    expect(thingsBox).not.toBeNull();
+    expect(resourcesBox).not.toBeNull();
     expect(graphBox).not.toBeNull();
-    if (thingsBox !== null && graphBox !== null)
-      expect(Math.abs(thingsBox.height - graphBox.height)).toBeLessThanOrEqual(1);
+    if (resourcesBox !== null && graphBox !== null)
+      expect(Math.abs(resourcesBox.height - graphBox.height)).toBeLessThanOrEqual(1);
 
     // One pitch: the chevron and both Creates are evenly spaced, so the
     // disclosure reads as the first of three glyphs. Centres rather than edges,
     // because the chevron is a 14px glyph inside a padded trigger and the
     // Creates are 14px glyphs inside 28px buttons.
     const centres = await strip.evaluate((root) => {
-      const cluster = root.querySelector('[aria-label="Things"]');
+      const cluster = root.querySelector('[aria-label="Resources"]');
       if (cluster === null) return [];
-      const trigger = cluster.querySelector('[aria-label="Things"][class*="things-trigger"]');
+      const trigger = cluster.querySelector('[aria-label="Resources"][class*="resources-trigger"]');
       const glyphs = trigger === null ? [] : [...trigger.querySelectorAll('svg')];
       const chevron = glyphs.at(-1);
       // `button`, because the group wrapping the pair is itself labelled
-      // "Create a Thing" and an attribute prefix match takes it as a third.
+      // "Create a Resource" and an attribute prefix match takes it as a third.
       const creates = [...cluster.querySelectorAll('button[aria-label^="Create "]')];
       return [chevron, ...creates]
         .filter((element): element is Element => element !== undefined)
@@ -980,7 +978,7 @@ test(
     const conflict = page.getByRole('alertdialog', { name: 'Changes conflict' });
     await expect(conflict).toBeVisible();
     await expect(conflict).toContainText(/unsaved text/i);
-    await expect(conflict).toContainText(/open Thing/);
+    await expect(conflict).toContainText(/open Resource/);
     await expect(conflict).toContainText(/Keep local and retry preserves/);
     await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
@@ -1083,9 +1081,9 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
     const space = page.getByTestId('space-title').filter({ visible: true });
-    const diagram = page.getByTestId('selected-canvas').filter({ visible: true });
+    const map = page.getByTestId('selected-canvas').filter({ visible: true });
     await expect(space).toBeVisible();
-    await expect(diagram).toBeVisible();
+    await expect(map).toBeVisible();
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toBeVisible();
     /**
      * **The three read in one frame, and that is the assertion rather than a
@@ -1131,14 +1129,14 @@ test(
     // and so out of the accessibility tree, while `getByTestId` above still
     // finds it and needs the visible filter.
     await expect(page.getByRole('button', { name: /^Space:/ })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /^Diagram:/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Map:/ })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Active Graph:/ })).toHaveCount(1);
-    await diagram.click({ delay: 120 });
+    await map.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
-    await expect(page.getByRole('textbox', { name: 'Diagram name', exact: true })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(diagram).toBeFocused();
+    await expect(map).toBeFocused();
     // And the Space's, because the caret coming back is the half of this claim
     // that the identity which used to be a label had no way to owe.
     await space.click({ delay: 120 });

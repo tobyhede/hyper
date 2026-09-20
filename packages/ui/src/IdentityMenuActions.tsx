@@ -14,7 +14,7 @@ import {
 } from './components/dropdown-menu';
 import { CopyIcon, DeleteIcon, GraphIcon, PlusIcon } from './icons';
 
-export interface DiagramMenuActionsProps {
+export interface MapMenuActionsProps {
   readonly title: string;
   readonly renameItem: ReactNode;
   readonly createDisabled: boolean;
@@ -25,14 +25,14 @@ export interface DiagramMenuActionsProps {
 }
 
 /**
- * The Diagram commands, shared by the Dock and a Space Thing's rail.
+ * The Map commands, shared by the Dock and a Space Resource's rail.
  *
  * One grouping grammar, below the selection list `ChoiceMenu` draws: New
- * Diagram on its own; Rename beside Copy link to Diagram, the two commands
+ * Map on its own; Rename beside Copy link to Map, the two commands
  * that act on the name already showing; then Delete — one separator between
  * each group (`.scratch/dock-menu-reorganisation/issues/01`).
  */
-export function DiagramMenuActions({
+export function MapMenuActions({
   title,
   renameItem,
   createDisabled,
@@ -40,13 +40,13 @@ export function DiagramMenuActions({
   onCreate,
   onCopyLink,
   onDelete,
-}: DiagramMenuActionsProps) {
+}: MapMenuActionsProps) {
   return (
     <>
       <DropdownMenuGroup>
         <DropdownMenuItem className="gap-2" disabled={createDisabled} onClick={onCreate}>
           <PlusIcon />
-          New Diagram
+          New Map
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
@@ -54,7 +54,7 @@ export function DiagramMenuActions({
         {renameItem}
         <DropdownMenuItem className="gap-2" onClick={onCopyLink}>
           <CopyIcon />
-          Copy link to Diagram
+          Copy link to Map
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
@@ -73,7 +73,7 @@ export function DiagramMenuActions({
   );
 }
 
-export interface GraphMenuActionsProps extends Omit<DiagramMenuActionsProps, 'createDisabled'> {
+export interface GraphMenuActionsProps extends Omit<MapMenuActionsProps, 'createDisabled'> {
   readonly editsDisabled: boolean;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
@@ -84,10 +84,10 @@ export interface GraphMenuActionsProps extends Omit<DiagramMenuActionsProps, 'cr
  * Graph commands use the same palette and menu order wherever a Graph is
  * named.
  *
- * The same grouping grammar as {@link DiagramMenuActions}, with one group
+ * The same grouping grammar as {@link MapMenuActions}, with one group
  * ahead of it: Colour… stands alone immediately after the selection list,
- * because it is the one command a Graph carries that a Diagram does not.
- * Copy link to Graph copies the within-Diagram address; this menu offers no
+ * because it is the one command a Graph carries that a Map does not.
+ * Copy link to Graph copies the within-Map address; this menu offers no
  * separate permanent address for the Graph itself
  * (`.scratch/dock-menu-reorganisation/issues/01`).
  */

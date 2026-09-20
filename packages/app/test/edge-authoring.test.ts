@@ -1,18 +1,18 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type DiagramId, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { composeApp } from '../src/compose-app';
 import {
   dropTarget,
-  newThingDrop,
+  newResourceDrop,
   type ConnectionGesture,
   type DropTarget,
   type ElementDropTarget,
 } from '../src/edge-authoring';
 
-import { THING_SIZE } from '../src/thing';
+import { RESOURCE_SIZE } from '../src/resource';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
 
@@ -27,51 +27,51 @@ import { node } from './render-adapter-fixtures';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 const THIRD_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
 const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 
-const EDGE = { from: THING_A, to: THING_B } as const;
+const EDGE = { from: RESOURCE_A, to: RESOURCE_B } as const;
 /** The Graph and Edge an Edge operation is named by, which travel together. */
 const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
 
-const PROJECTED: ThingFlowNode[] = [
-  node(THING_A, 10, 20),
-  node(THING_B, 300, 40),
-  node(THING_C, 600, 40),
+const PROJECTED: ResourceFlowNode[] = [
+  node(RESOURCE_A, 10, 20),
+  node(RESOURCE_B, 300, 40),
+  node(RESOURCE_C, 600, 40),
 ];
 
 const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
   ],
 };
 
-/** One Diagram holding all three Things, with two Graphs over them. */
+/** One Map holding all three Resources, with two Graphs over them. */
 const positionedSnapshot: SpaceSnapshot = {
   ...automaticSnapshot,
   document: {
     ...automaticSnapshot.document,
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 40, open: false },
-          [THING_C]: { x: 600, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_C]: { x: 600, y: 40, open: false },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -79,27 +79,27 @@ const positionedSnapshot: SpaceSnapshot = {
         ],
       },
       {
-        id: OTHER_DIAGRAM_ID,
-        title: 'Diagram 2',
+        id: OTHER_MAP_ID,
+        title: 'Map 2',
         kind: 'positioned',
-        positions: { [THING_C]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_C]: { x: 0, y: 0, open: false } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Third', edges: [] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
 };
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
-  diagramId: DiagramId = DIAGRAM_ID,
+  mapId: MapId = MAP_ID,
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring } = composeApp({
     spaceSession: session,
-    selection: diagramId,
+    selection: mapId,
     newId,
   });
   adapter.getState().syncProjection(PROJECTED, []);
@@ -107,14 +107,14 @@ function open(
 }
 
 const graphsOf = (snapshot: SpaceSnapshot) =>
-  (snapshot.document.diagrams ?? []).flatMap((diagram) => diagram.graphs);
+  (snapshot.document.maps ?? []).flatMap((map) => map.graphs);
 
 describe('the one Edge interaction draft', () => {
   it('holds at most one draft, whichever kind starts next', () => {
     const { edges } = open();
 
-    edges.beginPointerConnect(THING_A);
-    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: THING_A });
+    edges.beginPointerConnect(RESOURCE_A);
+    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: RESOURCE_A });
 
     edges.openEdgeEditor(SUBJECT);
     expect(edges.getState().draft).toEqual({
@@ -132,15 +132,15 @@ describe('the one Edge interaction draft', () => {
     });
   });
 
-  it('cancels the draft and asks for focus back at the Thing the author was on', () => {
+  it('cancels the draft and asks for focus back at the Resource the author was on', () => {
     const { edges, continuation } = open();
-    edges.beginPointerConnect(THING_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
     edges.cancelDraft();
 
     expect(edges.getState().draft).toBeNull();
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'thing', thingId: THING_A },
+      target: { kind: 'resource', resourceId: RESOURCE_A },
       select: false,
       then: 'focus',
     });
@@ -157,7 +157,7 @@ describe('the one Edge interaction draft', () => {
     edges.cancelDraft();
 
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'thing', thingId: THING_A },
+      target: { kind: 'resource', resourceId: RESOURCE_A },
       select: false,
       then: 'focus',
     });
@@ -174,7 +174,7 @@ describe('a refused proposal', () => {
     const { edges } = open();
     edges.openEdgeEditor(SUBJECT);
 
-    // A Thing outside this Diagram, so the rule is Authoring's rather than this
+    // A Resource outside this Map, so the rule is Authoring's rather than this
     // module's — which is the point: the identity comes from where the rule is,
     // and the endpoint beside it is the only context presentation needs to mark
     // one Field and not the other.
@@ -190,7 +190,7 @@ describe('a refused proposal', () => {
     expect(edges.getState().refusal).toEqual({
       kind: 'reconnection',
       endpoint: 'to',
-      refusal: { code: 'edge-thing-outside-diagram' },
+      refusal: { code: 'edge-resource-outside-map' },
     });
   });
 
@@ -199,7 +199,7 @@ describe('a refused proposal', () => {
     edges.openEdgeEditor(SUBJECT);
     edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
 
-    edges.beginPointerConnect(THING_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
     expect(edges.getState().refusal).toBeNull();
   });
@@ -208,11 +208,11 @@ describe('a refused proposal', () => {
     const { edges, session } = open();
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', THING_C)).toBe(true);
+    expect(edges.reconnect('to', RESOURCE_C)).toBe(true);
 
     expect(edges.getState().draft).toBeNull();
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
-      { from: THING_A, to: THING_C },
+      { from: RESOURCE_A, to: RESOURCE_C },
     ]);
   });
 
@@ -228,9 +228,9 @@ describe('a refused proposal', () => {
     adapter.getState().selectEdge(SUBJECT);
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', THING_C)).toBe(true);
+    expect(edges.reconnect('to', RESOURCE_C)).toBe(true);
 
-    const reconnected = { graphId: GRAPH_ID, edge: { from: THING_A, to: THING_C } };
+    const reconnected = { graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: RESOURCE_C } };
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...reconnected });
     expect(continuation.getState().pending).toEqual({
       target: { kind: 'edge', ...reconnected },
@@ -245,7 +245,7 @@ describe('a refused proposal', () => {
     adapter.getState().selectEdge(SUBJECT);
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', THING_B)).toBe(true);
+    expect(edges.reconnect('to', RESOURCE_B)).toBe(true);
 
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
   });
@@ -256,7 +256,7 @@ describe('a refused proposal', () => {
     const before = session.getState().working;
     edges.openEdgeEditor(SUBJECT);
 
-    expect(edges.reconnect('to', THING_B)).toBe(true);
+    expect(edges.reconnect('to', RESOURCE_B)).toBe(true);
 
     expect(edges.getState().draft).toBeNull();
     expect(session.getState().working).toBe(before);
@@ -264,14 +264,14 @@ describe('a refused proposal', () => {
 });
 
 describe('deleting an Edge', () => {
-  it('removes it from its Graph and asks for focus at the source Thing', () => {
+  it('removes it from its Graph and asks for focus at the source Resource', () => {
     const { edges, session, continuation } = open();
 
     expect(edges.deleteEdge(SUBJECT)).toBe(true);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'thing', thingId: THING_A },
+      target: { kind: 'resource', resourceId: RESOURCE_A },
       select: false,
       then: 'focus',
     });
@@ -301,7 +301,9 @@ describe('deleting an Edge', () => {
     edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE });
     expect(edges.getState().refusal).not.toBeNull();
 
-    adapter.getState().selectEdge({ graphId: GRAPH_ID, edge: { from: THING_B, to: THING_C } });
+    adapter
+      .getState()
+      .selectEdge({ graphId: GRAPH_ID, edge: { from: RESOURCE_B, to: RESOURCE_C } });
 
     expect(edges.getState().refusal).toBeNull();
   });
@@ -312,11 +314,11 @@ describe('deleting an Edge', () => {
  * it is *about*; an unrelated completed Edit leaves it standing.
  */
 describe('draft invalidation', () => {
-  it('cancels the draft when the selected Diagram changes', () => {
+  it('cancels the draft when the selected Map changes', () => {
     const { edges, navigation } = open();
-    edges.beginPointerConnect(THING_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
-    navigation.selectDiagram(OTHER_DIAGRAM_ID);
+    navigation.selectMap(OTHER_MAP_ID);
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -353,7 +355,7 @@ describe('draft invalidation', () => {
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
       spaceSession: session,
-      selection: DIAGRAM_ID,
+      selection: MAP_ID,
     });
     edges.openEdgeEditor(SUBJECT);
     // Force the conflict the accept resolves.
@@ -373,7 +375,7 @@ describe('draft invalidation', () => {
    */
   it('cancels the draft when presenting withdraws Edge authoring', () => {
     const { edges, navigation } = open();
-    edges.beginPointerConnect(THING_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
     navigation.present();
 
@@ -382,7 +384,7 @@ describe('draft invalidation', () => {
   });
 
   /**
-   * A refusal names Things and Graphs of the Space it was made against, so the
+   * A refusal names Resources and Graphs of the Space it was made against, so the
    * context that invalidates a draft invalidates the sentence too — and a
    * *pointer* refusal has no draft left to be cancelled with it. The handoff's
    * shared case 7 is the hard one: accepting the stored Space "cancels all
@@ -394,13 +396,13 @@ describe('draft invalidation', () => {
       ({ navigation }: ReturnType<typeof open>) => navigation.activateGraph(OTHER_GRAPH_ID),
     ],
     [
-      'the Diagram changes',
-      ({ navigation }: ReturnType<typeof open>) => navigation.selectDiagram(OTHER_DIAGRAM_ID),
+      'the Map changes',
+      ({ navigation }: ReturnType<typeof open>) => navigation.selectMap(OTHER_MAP_ID),
     ],
   ])('clears a refusal left by a finished gesture when %s', (_name, change) => {
     const opened = open();
-    opened.edges.beginPointerConnect(THING_A);
-    opened.edges.connect(THING_A, THING_B, null);
+    opened.edges.beginPointerConnect(RESOURCE_A);
+    opened.edges.connect(RESOURCE_A, RESOURCE_B, null);
     opened.edges.endPointerDrag();
     expect(opened.edges.getState().refusal).not.toBeNull();
 
@@ -460,49 +462,49 @@ describe('draft invalidation', () => {
     });
   });
 
-  it('cancels a pointer connection when the canvas selects another Thing', () => {
+  it('cancels a pointer connection when the canvas selects another Resource', () => {
     const { edges, adapter } = open();
-    edges.beginPointerConnect(THING_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
-    adapter.getState().selectThing(THING_B);
+    adapter.getState().selectResource(RESOURCE_B);
 
     expect(edges.getState().draft).toBeNull();
   });
 
   /**
-   * React Flow clears the Thing selection as a connection drag begins, so a
+   * React Flow clears the Resource selection as a connection drag begins, so a
    * pointer draft that treated `none` as "the author moved on" would end on its
    * own first frame.
    */
   it('survives the selection React Flow clears when a pointer drag begins', () => {
     const { edges, adapter } = open();
-    adapter.getState().selectThing(THING_A);
-    edges.beginPointerConnect(THING_A);
+    adapter.getState().selectResource(RESOURCE_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
     adapter.getState().clearSelection();
 
-    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: THING_A });
+    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: RESOURCE_A });
   });
 });
 
 describe('completing a pointer connection', () => {
-  it('authors the Edge and continues at the Thing it reached', () => {
+  it('authors the Edge and continues at the Resource it reached', () => {
     const { edges, session, continuation } = open();
-    edges.beginPointerConnect(THING_B);
+    edges.beginPointerConnect(RESOURCE_B);
 
-    edges.connect(THING_B, THING_C, PROJECTED);
+    edges.connect(RESOURCE_B, RESOURCE_C, PROJECTED);
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
       EDGE,
-      { from: THING_B, to: THING_C },
+      { from: RESOURCE_B, to: RESOURCE_C },
     ]);
     // Held until the drag ends, and published as one continuation then: the
-    // Thing is selected and there is nothing to do there, which is why `select`
+    // Resource is selected and there is nothing to do there, which is why `select`
     // and `then` are separate axes.
     expect(continuation.getState().pending).toBeNull();
     edges.endPointerDrag();
     expect(continuation.getState().pending).toEqual({
-      target: { kind: 'thing', thingId: THING_C },
+      target: { kind: 'resource', resourceId: RESOURCE_C },
       select: true,
       then: 'nothing',
     });
@@ -511,9 +513,9 @@ describe('completing a pointer connection', () => {
   it('reports the refusal and continues at nobody when Authoring declines', () => {
     const { edges, session, continuation } = open();
     const before = session.getState().working;
-    edges.beginPointerConnect(THING_A);
+    edges.beginPointerConnect(RESOURCE_A);
 
-    edges.connect(THING_A, THING_B, PROJECTED);
+    edges.connect(RESOURCE_A, RESOURCE_B, PROJECTED);
 
     expect(session.getState().working).toBe(before);
     // The canvas announcement channel: this gesture's drag is over by the time
@@ -533,18 +535,18 @@ describe('completing a pointer connection', () => {
    */
   it('clears a previous refusal when the next connection completes', () => {
     const { edges } = open();
-    edges.beginPointerConnect(THING_A);
-    edges.connect(THING_A, THING_B, null);
+    edges.beginPointerConnect(RESOURCE_A);
+    edges.connect(RESOURCE_A, RESOURCE_B, null);
     expect(edges.getState().refusal).not.toBeNull();
 
-    edges.connect(THING_A, THING_C, null);
+    edges.connect(RESOURCE_A, RESOURCE_C, null);
 
     expect(edges.getState().refusal).toBeNull();
   });
 
   it('ends the pointer draft with the drag, whatever it produced', () => {
     const { edges } = open();
-    edges.beginPointerConnect(THING_B);
+    edges.beginPointerConnect(RESOURCE_B);
 
     edges.endPointerDrag();
 
@@ -560,7 +562,7 @@ describe('completing a pointer connection', () => {
   it.each([
     [
       'a connection',
-      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerConnect(THING_A),
+      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerConnect(RESOURCE_A),
     ],
     [
       'a reconnection',
@@ -570,8 +572,9 @@ describe('completing a pointer connection', () => {
     const { edges } = open();
     begin(edges);
     // Both refuse for a reason Space Authoring owns: A→B already exists in this
-    // Graph, and this Thing is not in this Diagram.
-    if (edges.getState().draft?.kind === 'pointer-connect') edges.connect(THING_A, THING_B, null);
+    // Graph, and this Resource is not in this Map.
+    if (edges.getState().draft?.kind === 'pointer-connect')
+      edges.connect(RESOURCE_A, RESOURCE_B, null);
     else edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
     expect(edges.getState().refusal).not.toBeNull();
 
@@ -583,7 +586,7 @@ describe('completing a pointer connection', () => {
 });
 
 /**
- * The empty-drop rule: five facts in, one Thing or none out.
+ * The empty-drop rule: five facts in, one Resource or none out.
  *
  * A table rather than a browser test because nothing here touches the DOM — the
  * `over` classification is the DOM's answer *arriving*, and how each supplier
@@ -592,34 +595,34 @@ describe('completing a pointer connection', () => {
 describe('the Option/Alt empty drop', () => {
   const dragging = (over: DropTarget, modifierHeld: boolean): ConnectionGesture => ({
     kind: 'dragging',
-    sourceId: THING_A,
+    sourceId: RESOURCE_A,
     point: { x: 400, y: 300 },
     over,
     modifierHeld,
   });
 
-  it('authors a Thing centred on the drop point', () => {
-    expect(newThingDrop(dragging('empty-canvas', true), () => true)).toEqual({
-      sourceId: THING_A,
-      position: { x: 400 - THING_SIZE.width / 2, y: 300 - THING_SIZE.height / 2 },
+  it('authors a Resource centred on the drop point', () => {
+    expect(newResourceDrop(dragging('empty-canvas', true), () => true)).toEqual({
+      sourceId: RESOURCE_A,
+      position: { x: 400 - RESOURCE_SIZE.width / 2, y: 300 - RESOURCE_SIZE.height / 2 },
     });
   });
 
   it.each([
     ['an idle gesture', { kind: 'idle' } satisfies ConnectionGesture, true],
     ['a connection target in range', dragging('connection-target', true), true],
-    ['a release over a Thing', dragging('thing', true), true],
+    ['a release over a Resource', dragging('resource', true), true],
     ['a release off the canvas', dragging('off-canvas', true), true],
     ['the modifier not held', dragging('empty-canvas', false), true],
     ['a source Authoring refuses', dragging('empty-canvas', true), false],
   ])('authors nothing for %s', (_name, gesture, accepts) => {
-    expect(newThingDrop(gesture, () => accepts)).toBeNull();
+    expect(newResourceDrop(gesture, () => accepts)).toBeNull();
   });
 
-  it('never authors a Thing unless every fact agrees', () => {
+  it('never authors a Resource unless every fact agrees', () => {
     const anyTarget = fc.constantFrom<DropTarget>(
       'connection-target',
-      'thing',
+      'resource',
       'empty-canvas',
       'off-canvas',
     );
@@ -631,8 +634,8 @@ describe('the Option/Alt empty drop', () => {
         fc.integer({ min: -5000, max: 5000 }),
         fc.integer({ min: -5000, max: 5000 }),
         (over, modifierHeld, accepts, x, y) => {
-          const drop = newThingDrop(
-            { kind: 'dragging', sourceId: THING_A, point: { x, y }, over, modifierHeld },
+          const drop = newResourceDrop(
+            { kind: 'dragging', sourceId: RESOURCE_A, point: { x, y }, over, modifierHeld },
             () => accepts,
           );
           if (over !== 'empty-canvas' || !modifierHeld || !accepts) {
@@ -640,10 +643,10 @@ describe('the Option/Alt empty drop', () => {
             return;
           }
           // The preview draws from this same answer, so the ghost and the
-          // authored Thing cannot land in different places.
+          // authored Resource cannot land in different places.
           expect(drop).toEqual({
-            sourceId: THING_A,
-            position: { x: x - THING_SIZE.width / 2, y: y - THING_SIZE.height / 2 },
+            sourceId: RESOURCE_A,
+            position: { x: x - RESOURCE_SIZE.width / 2, y: y - RESOURCE_SIZE.height / 2 },
           });
         },
       ),
@@ -658,7 +661,7 @@ describe('the Option/Alt empty drop', () => {
  * Flow's `toNode` nor the DOM alone answers"*. `getClosestHandle` resolves
  * `toNode` by distance to a *handle* within `connectionRadius` — 20 at the
  * pinned 12.11.2 — so it is non-null over blank canvas near a handle and null
- * over the middle of a Thing, whose centre is some 73px from the nearest handle
+ * over the middle of a Resource, whose centre is some 73px from the nearest handle
  * at 260x146. Neither source answers alone, and a connection target in range
  * outranks the element underneath.
  *
@@ -674,11 +677,11 @@ describe('composing the two answers to a drop target', () => {
    * member added to the union cannot be answered with an existing one; and the
    * list both tables run over is derived from it, so the enumeration and the
    * union cannot fall out of step. A `Record<ElementDropTarget, …>` over a
-   * separate tuple checked only the keys — `toolbar: 'thing'` compiled, and the
+   * separate tuple checked only the keys — `toolbar: 'resource'` compiled, and the
    * new member went untested.
    */
   const EVERY_ELEMENT = Object.values({
-    thing: 'thing',
+    resource: 'resource',
     'empty-canvas': 'empty-canvas',
     'off-canvas': 'off-canvas',
   } satisfies { [K in ElementDropTarget]: K });

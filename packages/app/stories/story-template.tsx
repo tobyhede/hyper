@@ -14,7 +14,7 @@
  *
  * The top-level Ladle section is enforced by folder <-> title-prefix pairing
  * in `scripts/ui-catalog.ts`. It is not the domain hierarchy — a Space does
- * not "contain" a Thing here — and it is not how many parts something is built
+ * not "contain" a Resource here — and it is not how many parts something is built
  * from. It answers one question: **what real machinery does this story need
  * to mean anything?**
  *
@@ -69,7 +69,7 @@ function ComponentUnderTest() {
 
 /**
  * One sentence on what this story proves. If it lives in `Surfaces/…`, say
- * why a real canvas — rather than a fixture prop — is the thing that proves
+ * why a real canvas — rather than a fixture prop — is the evidence that proves
  * it, the way `Surfaces/Graph HUD`'s own story does.
  *
  * Keeping this form: delete `ComponentsExample` below; the title above is

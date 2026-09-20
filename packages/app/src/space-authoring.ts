@@ -1,16 +1,16 @@
 import {
-  type ThingDocument,
-  type ThingId,
-  type ThingPlacement,
-  COLLAPSED_THING_SIZE,
+  type ResourceDocument,
+  type ResourceId,
+  type ResourcePlacement,
+  COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
-  DEFAULT_SPACE_THING_OPEN_SIZE,
+  DEFAULT_SPACE_RESOURCE_OPEN_SIZE,
   type Graph,
   type GraphEdge,
   type GraphId,
-  type DiagramId,
-  type DiagramPosition,
-  THING_TITLE_REQUIRED,
+  type MapId,
+  type MapPosition,
+  RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
   titleName,
@@ -19,7 +19,7 @@ import {
 import {
   loadSpaceSnapshot,
   Placement,
-  type ResolvedDiagram,
+  type ResolvedMap,
   type Space,
   type SpaceError,
 } from '@project/graph';
@@ -31,15 +31,11 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import { nextGraphColor } from './colors';
-import { diagramShowsGraph } from './navigation';
+import { mapShowsGraph } from './navigation';
 import type { Navigation, NavigationState } from './navigation';
-import {
-  updatePositionedDiagram,
-  withThingRemovedFromDiagrams,
-  withoutIncidentEdges,
-} from './snapshot';
-import { nextThingTitle, nextGraphTitle, nextDiagramTitle } from './titles';
-import { requireDefaultDiagram, resolveDiagram } from './diagram-resolution';
+import { updatePositionedMap, withResourceRemovedFromMaps, withoutIncidentEdges } from './snapshot';
+import { nextResourceTitle, nextGraphTitle, nextMapTitle } from './titles';
+import { requireDefaultMap, resolveMap } from './map-resolution';
 
 /** Which end of an Edge a reconnection replaces. */
 export type EdgeEndpoint = 'from' | 'to';
@@ -52,30 +48,30 @@ export type EdgeEndpoint = 'from' | 'to';
  * over one value the surface built once. A gesture the canvas offers therefore
  * cannot be one the Edit silently drops — and, because a proposal carries
  * reconnect's *original* Edge and the endpoint being replaced, returning that
- * endpoint to the Thing it came from is eligible rather than looking like an
+ * endpoint to the Resource it came from is eligible rather than looking like an
  * Edge that already exists.
  *
  * `create-and-connect` names no target because the Option/Alt empty drop has
- * none yet (ADR 0033); the Thing it would author is minted by the Edit.
+ * none yet (ADR 0033); the Resource it would author is minted by the Edit.
  */
 export type EdgeProposal =
-  | { readonly kind: 'connect'; readonly from: ThingId; readonly to: ThingId }
-  | { readonly kind: 'create-and-connect'; readonly from: ThingId }
+  | { readonly kind: 'connect'; readonly from: ResourceId; readonly to: ResourceId }
+  | { readonly kind: 'create-and-connect'; readonly from: ResourceId }
   | {
       readonly kind: 'reconnect';
       readonly graphId: GraphId;
       readonly edge: GraphEdge;
       readonly endpoint: EdgeEndpoint;
-      readonly thingId: ThingId;
+      readonly resourceId: ResourceId;
     };
 
 /**
  * Whether a proposal may be offered, and why not.
  *
  * Two states rather than three: a reconnect returning an endpoint to its
- * original Thing is **eligible**, and settles as `unchanged` when it completes.
+ * original Resource is **eligible**, and settles as `unchanged` when it completes.
  * Eligibility answers what the author may still do, not what the Edit will
- * turn out to have changed — a picker that greyed out the Thing an endpoint
+ * turn out to have changed — a picker that greyed out the Resource an endpoint
  * already names would show the current value as the one forbidden choice.
  */
 export type EdgeEligibility =
@@ -100,95 +96,95 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
  * Identities and the settled value, never a plan: the interaction says what it
  * finished, and every read of current state, every eligibility question and the
  * whole derivation of the next Space happen on this side of the seam.
- * `settled-thing-movement` alone carries geometry — the moved Things' own drop
+ * `settled-resource-movement` alone carries geometry — the moved Resources' own drop
  * points — because a pointer gesture is the only input that knows where React
- * Flow drew them; every other kind is written against the Diagram the Edit
+ * Flow drew them; every other kind is written against the Map the Edit
  * derives against.
  */
 export type AuthoringCompletion =
-  | { readonly kind: 'created-diagram' }
+  | { readonly kind: 'created-map' }
   | {
-      readonly kind: 'settled-thing-movement';
+      readonly kind: 'settled-resource-movement';
       /**
-       * The moved Things' drop points, exactly. Applied over the Diagram's own
+       * The moved Resources' drop points, exactly. Applied over the Map's own
        * positions at derivation — drain time for a queued completion — rather
        * than merged here, so a drag that queues behind another Edit lands
-       * against the Diagram as it stands when it is finally derived, not the
+       * against the Map as it stands when it is finally derived, not the
        * one that was current when the gesture settled.
        */
-      readonly moved: ReadonlyMap<ThingId, DiagramPosition>;
+      readonly moved: ReadonlyMap<ResourceId, MapPosition>;
     }
-  | { readonly kind: 'opened-thing'; readonly thingId: ThingId }
-  | { readonly kind: 'closed-thing'; readonly thingId: ThingId }
+  | { readonly kind: 'opened-resource'; readonly resourceId: ResourceId }
+  | { readonly kind: 'closed-resource'; readonly resourceId: ResourceId }
   | {
-      readonly kind: 'resized-thing';
-      readonly thingId: ThingId;
+      readonly kind: 'resized-resource';
+      readonly resourceId: ResourceId;
       readonly size: { readonly width: number; readonly height: number };
     }
   | {
-      readonly kind: 'connected-things';
-      readonly from: ThingId;
-      readonly to: ThingId;
+      readonly kind: 'connected-resources';
+      readonly from: ResourceId;
+      readonly to: ResourceId;
       /**
        * The Graph this Edge joins. Host canvas omits it and writes the Active
-       * Graph. A Space Thing names the Graph it is showing.
+       * Graph. A Space Resource names the Graph it is showing.
        */
       readonly graphId?: GraphId;
     }
   | {
-      readonly kind: 'edited-thing';
-      readonly thingId: ThingId;
-      readonly document: ThingDocument;
+      readonly kind: 'edited-resource';
+      readonly resourceId: ResourceId;
+      readonly document: ResourceDocument;
     }
   | {
       readonly kind: 'create-and-connect';
-      readonly from: ThingId;
-      readonly position: DiagramPosition;
+      readonly from: ResourceId;
+      readonly position: MapPosition;
     }
-  /** Add Thing: a detached Markdown Thing at the visible centre, neutrally titled. */
-  | { readonly kind: 'created-thing'; readonly anchor: DiagramPosition }
+  /** Add Resource: a detached Markdown Resource at the visible centre, neutrally titled. */
+  | { readonly kind: 'created-resource'; readonly anchor: MapPosition }
   /**
-   * Add Reference Thing: created only once its Target is chosen, because a Reference Thing without
-   * one is not a valid Thing. An empty title mints `Thing N` like any other Thing
-   * rather than copying the Target's, which is what stopped two Things arriving
+   * Add Reference Resource: created only once its Target is chosen, because a Reference Resource without
+   * one is not a valid Resource. An empty title mints `Resource N` like any other Resource
+   * rather than copying the Target's, which is what stopped two Resources arriving
    * with one name (ADR 0083 refines ADR 0046).
    */
   | {
       readonly kind: 'created-reference';
-      readonly target: ThingId;
+      readonly target: ResourceId;
       readonly title?: string;
-      readonly anchor: DiagramPosition;
+      readonly anchor: MapPosition;
     }
-  /** Add to Diagram: membership and a first position for a Thing already in the Space. */
+  /** Add to Map: membership and a first position for a Resource already in the Space. */
   | {
-      readonly kind: 'added-thing-to-diagram';
-      readonly thingId: ThingId;
-      readonly anchor: DiagramPosition;
+      readonly kind: 'added-resource-to-map';
+      readonly resourceId: ResourceId;
+      readonly anchor: MapPosition;
     }
-  /** Remove from Diagram: membership, position and incident Edges, in this Diagram only. */
-  | { readonly kind: 'removed-thing-from-diagram'; readonly thingId: ThingId }
-  /** Delete Thing from Space: the same removal, cascaded through every Diagram. */
-  | { readonly kind: 'deleted-thing'; readonly thingId: ThingId }
-  | { readonly kind: 'renamed-diagram'; readonly diagramId: UUID; readonly title: string }
-  | { readonly kind: 'deleted-diagram'; readonly diagramId: UUID }
+  /** Remove from Map: membership, position and incident Edges, in this Map only. */
+  | { readonly kind: 'removed-resource-from-map'; readonly resourceId: ResourceId }
+  /** Delete Resource from Space: the same removal, cascaded through every Map. */
+  | { readonly kind: 'deleted-resource'; readonly resourceId: ResourceId }
+  | { readonly kind: 'renamed-map'; readonly mapId: UUID; readonly title: string }
+  | { readonly kind: 'deleted-map'; readonly mapId: UUID }
   /**
-   * Rename Space: the one Edit on the Space document *above* any Diagram.
+   * Rename Space: the one Edit on the Space document *above* any Map.
    *
-   * It writes `document.title` and nothing else. No Space Thing pointing at this
-   * Space changes with it — a Space's name and the Title of a Thing that
+   * It writes `document.title` and nothing else. No Space Resource pointing at this
+   * Space changes with it — a Space's name and the Title of a Resource that
    * references it are two stored values that agree only at creation, and ADR
-   * 0083 keeps the target's name off the Thing's front, so nothing in another
+   * 0083 keeps the target's name off the Resource's front, so nothing in another
    * Space draws what this writes.
    *
-   * Derived beside `created-diagram` and `deleted-diagram`, ahead of the general
-   * per-Diagram path below: all three write keys of `document` directly, read
+   * Derived beside `created-map` and `deleted-map`, ahead of the general
+   * per-Map path below: all three write keys of `document` directly, read
    * `session.getState().working` themselves, and still owe `CompletedEdit` a
-   * Diagram and Active Graph to continue in even though this one changes
-   * neither. It resolves the selected Diagram only for that pair.
+   * Map and Active Graph to continue in even though this one changes
+   * neither. It resolves the selected Map only for that pair.
    *
-   * The shape rejected for it was parallel to `renamed-diagram`, below the
-   * general path: a `DiagramRequiredOperation` answer and a Diagram lookup for
-   * an Edit that touches no Diagram, both wrong about what this Edit is.
+   * The shape rejected for it was parallel to `renamed-map`, below the
+   * general path: a `MapRequiredOperation` answer and a Map lookup for
+   * an Edit that touches no Map, both wrong about what this Edit is.
    */
   | { readonly kind: 'renamed-space'; readonly title: string }
   | { readonly kind: 'added-graph' }
@@ -200,7 +196,7 @@ export type AuthoringCompletion =
       readonly graphId: GraphId;
       readonly edge: GraphEdge;
       readonly endpoint: EdgeEndpoint;
-      readonly thingId: ThingId;
+      readonly resourceId: ResourceId;
     }
   | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge };
 
@@ -222,21 +218,21 @@ export type AuthoringCompletion =
 export type AuthoringResult =
   | {
       readonly kind: 'completed';
-      readonly createdThingId?: ThingId;
+      readonly createdResourceId?: ResourceId;
       readonly createdGraphId?: GraphId;
     }
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
   | { readonly kind: 'queued' };
 
-type DiagramRequiredOperation = Extract<
+type MapRequiredOperation = Extract<
   AuthoringCompletion,
-  | { readonly kind: 'added-thing-to-diagram' }
-  | { readonly kind: 'removed-thing-from-diagram' }
-  | { readonly kind: 'opened-thing' }
-  | { readonly kind: 'closed-thing' }
-  | { readonly kind: 'resized-thing' }
-  | { readonly kind: 'renamed-diagram' }
+  | { readonly kind: 'added-resource-to-map' }
+  | { readonly kind: 'removed-resource-from-map' }
+  | { readonly kind: 'opened-resource' }
+  | { readonly kind: 'closed-resource' }
+  | { readonly kind: 'resized-resource' }
+  | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
   | { readonly kind: 'deleted-graph' }
@@ -262,56 +258,56 @@ export type StoredSpaceRefusal =
 
 /** Stable identities for every expected refusal at the Authoring seam. */
 export type AuthoringRefusal =
-  | { readonly code: 'diagram-not-found' }
-  | { readonly code: 'diagram-required'; readonly operation: DiagramRequiredOperation }
-  | { readonly code: 'thing-not-found' }
-  | { readonly code: 'thing-kind-immutable' }
+  | { readonly code: 'map-not-found' }
+  | { readonly code: 'map-required'; readonly operation: MapRequiredOperation }
+  | { readonly code: 'resource-not-found' }
+  | { readonly code: 'resource-kind-immutable' }
   | { readonly code: 'reference-target-immutable' }
-  | { readonly code: 'space-thing-target-immutable' }
-  | { readonly code: 'space-thing-deletion-unsupported' }
+  | { readonly code: 'space-resource-target-immutable' }
+  | { readonly code: 'space-resource-deletion-unsupported' }
   // The one code here the domain owns rather than this module: `@project/core`
-  // raises it from the Thing schema, so both ends spell it from one constant.
-  | { readonly code: typeof THING_TITLE_REQUIRED }
-  | { readonly code: 'diagram-title-required' }
+  // raises it from the Resource schema, so both ends spell it from one constant.
+  | { readonly code: typeof RESOURCE_TITLE_REQUIRED }
+  | { readonly code: 'map-title-required' }
   /**
    * Rename Space with nothing left after the trim. `spaceFileSchema` declares
    * the title as `z.string().min(1)`, which counts characters, so blank is the
    * empty case wearing different bytes and only this Edit can refuse it.
    */
   | { readonly code: 'space-title-required' }
-  | { readonly code: 'space-must-keep-diagram' }
-  | { readonly code: 'reference-target-not-found'; readonly targetId: ThingId }
-  | { readonly code: 'reference-target-must-own-content'; readonly targetId: ThingId }
-  | { readonly code: 'thing-already-in-diagram' }
-  | { readonly code: 'thing-not-in-diagram' }
-  | { readonly code: 'thing-not-expanded' }
+  | { readonly code: 'space-must-keep-map' }
+  | { readonly code: 'reference-target-not-found'; readonly targetId: ResourceId }
+  | { readonly code: 'reference-target-must-own-content'; readonly targetId: ResourceId }
+  | { readonly code: 'resource-already-in-map' }
+  | { readonly code: 'resource-not-in-map' }
+  | { readonly code: 'resource-not-expanded' }
   | {
-      readonly code: 'thing-has-references';
-      /** The Reference Things by **name**, which is what a sentence listing Things says (ADR 0083). */
+      readonly code: 'resource-has-references';
+      /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
       readonly referenceTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
-  | { readonly code: 'diagram-must-keep-graph' }
+  | { readonly code: 'map-must-keep-graph' }
   | { readonly code: 'graph-not-owned' }
   | { readonly code: 'edge-not-found' }
-  | { readonly code: 'edge-thing-outside-diagram' }
+  | { readonly code: 'edge-resource-outside-map' }
   | { readonly code: 'edge-already-exists' }
-  | { readonly code: 'diagram-active-graph-required' };
+  | { readonly code: 'map-active-graph-required' };
 
 /**
  * The published state: what the collaborators say, plus the one fact only
  * Authoring knows — that a replacement Space has been opened over them.
  *
  * Placement is absent because Authoring holds none: every Edit derives it
- * fresh, from the Diagram it is writing, at the moment it derives. A caller
- * that wants the selected Diagram's current placement reads it the same way —
- * `Placement.fromDiagram` over the Diagram Navigation names.
+ * fresh, from the Map it is writing, at the moment it derives. A caller
+ * that wants the selected Map's current placement reads it the same way —
+ * `Placement.fromMap` over the Map Navigation names.
  */
 export interface SpaceAuthoringState {
   /**
    * ADR 0042's replacement signal: advances when a replacement Space is opened
    * over this Authoring without recreating it, and at no other time. Retry,
-   * Keep local, persistence status changes, Diagram selection and completed
+   * Keep local, persistence status changes, Map selection and completed
    * Edits all leave it where it is.
    *
    * It is invalidation rather than a registry — Authoring never learns which
@@ -327,32 +323,32 @@ export interface SpaceAuthoring {
   readonly getState: () => SpaceAuthoringState;
   readonly subscribe: (listener: () => void) => () => void;
   /**
-   * The selected Diagram's own placement, derived fresh from the working
+   * The selected Map's own placement, derived fresh from the working
    * snapshot.
    *
    * Not published state — every reader that wants it asks at the point of use,
    * the same way a completed Edit derives its own. The render adapter's resize
    * seed is the one caller outside this module.
    */
-  readonly diagramPlacement: () => Placement;
+  readonly mapPlacement: () => Placement;
   /**
-   * Whether an Edge gesture may be offered as things stand, and why not.
+   * Whether an Edge gesture may be offered as resources stand, and why not.
    *
    * The one eligibility query for every Edge path — connect, create-and-connect
    * and reconnect — asked by the live preview, by React Flow's
-   * `isValidConnection` during a drag, and by a picker deciding which Things to
+   * `isValidConnection` during a drag, and by a picker deciding which Resources to
    * disable. Completion validates the same proposal again, because the Space can
    * change while a preview or a picker is open.
    */
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   /**
-   * Author the explicitly addressed Diagram without switching this Space's canvas.
+   * Author the explicitly addressed Map without switching this Space's canvas.
    * Deleting its visible Active Graph advances that selection to a survivor.
    */
-  readonly completeInDiagram: (
-    diagramId: UUID,
-    completion: EmbeddedThingCompletion | EmbeddedContextCompletion,
+  readonly completeInMap: (
+    mapId: UUID,
+    completion: EmbeddedResourceCompletion | EmbeddedContextCompletion,
   ) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
@@ -392,16 +388,16 @@ export interface SpaceAuthoring {
  */
 interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
-  /** The Diagram this Edit wrote, which Navigation continues in. */
-  readonly nextDiagramId: DiagramId;
+  /** The Map this Edit wrote, which Navigation continues in. */
+  readonly nextMapId: MapId;
   /**
-   * The Active Graph of that Diagram, which Navigation adopts along with it.
+   * The Active Graph of that Map, which Navigation adopts along with it.
    *
-   * Under ADR 0040 a Diagram owns its Graphs, so which one is active is a fact
-   * about the Diagram this Edit wrote and not a separate consequence.
+   * Under ADR 0040 a Map owns its Graphs, so which one is active is a fact
+   * about the Map this Edit wrote and not a separate consequence.
    */
   readonly nextActiveGraphId: GraphId | null;
-  readonly createdThingId?: ThingId;
+  readonly createdResourceId?: ResourceId;
   readonly createdGraphId?: GraphId;
 }
 
@@ -431,28 +427,28 @@ const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refus
  */
 interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
-  readonly embeddedDiagramId?: UUID | undefined;
+  readonly embeddedMapId?: UUID | undefined;
 }
 
-export type EmbeddedThingCompletion = Extract<
+export type EmbeddedResourceCompletion = Extract<
   AuthoringCompletion,
   {
     kind:
-      | 'opened-thing'
-      | 'closed-thing'
-      | 'resized-thing'
-      | 'edited-thing'
-      | 'settled-thing-movement'
-      | 'removed-thing-from-diagram'
-      | 'connected-things';
+      | 'opened-resource'
+      | 'closed-resource'
+      | 'resized-resource'
+      | 'edited-resource'
+      | 'settled-resource-movement'
+      | 'removed-resource-from-map'
+      | 'connected-resources';
   }
 >;
 
-/** Commands addressed to the Diagram shown by a Space Thing. */
+/** Commands addressed to the Map shown by a Space Resource. */
 export type EmbeddedContextCompletion = Extract<
   AuthoringCompletion,
   {
-    kind: 'renamed-diagram' | 'added-graph' | 'renamed-graph' | 'recolored-graph' | 'deleted-graph';
+    kind: 'renamed-map' | 'added-graph' | 'renamed-graph' | 'recolored-graph' | 'deleted-graph';
   }
 >;
 
@@ -471,14 +467,14 @@ interface SpaceAuthoringDependencies {
   /**
    * The validated aggregate behind the session's working snapshot.
    *
-   * The same reader Navigation is given, so both resolve a Diagram against one
+   * The same reader Navigation is given, so both resolve a Map against one
    * `Space` identity and one parse — and both read entity context through that
    * Space's own `lookup`.
    */
   readonly currentSpace: () => Space;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
-   * Mints the identity of every Thing, Diagram and Graph a completed Edit creates.
+   * Mints the identity of every Resource, Map and Graph a completed Edit creates.
    *
    * Taken here, once, rather than at each `newUuid()` call inside the derivation,
    * so a test supplies the ids it is about to assert on instead of reaching past
@@ -504,25 +500,25 @@ interface SpaceAuthoringDependencies {
   readonly newId: () => UUID;
 }
 
-/** The Things a snapshot carries, in the shape a snapshot carries them. */
-type SnapshotThings = SpaceSnapshot['things'];
+/** The Resources a snapshot carries, in the shape a snapshot carries them. */
+type SnapshotResources = SpaceSnapshot['resources'];
 
 /**
- * How far a Thing creation steps when the anchor it was given is taken, and in
+ * How far a Resource creation steps when the anchor it was given is taken, and in
  * which direction.
  *
- * A visible stack rather than collision avoidance: existing Things never move,
+ * A visible stack rather than collision avoidance: existing Resources never move,
  * and partial overlap of the 260×146 Front is deliberate. Only an *exact*
  * anchor collision steps, which is what a repeated centre-add produces and a
  * pointer drop essentially never does.
  */
 const STACK_STEP = 24;
 
-const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosition => {
+const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
   const taken = new Set([...placement.values()].map(({ x, y }) => `${x},${y}`));
   let at = anchor;
   // Terminates: each step is a distinct point on one diagonal, and the taken
-  // set is finite, so at most one step per placed Thing can be occupied.
+  // set is finite, so at most one step per placed Resource can be occupied.
   for (let step = 1; taken.has(`${at.x},${at.y}`); step += 1) {
     at = { x: anchor.x + STACK_STEP * step, y: anchor.y + STACK_STEP * step };
   }
@@ -537,24 +533,24 @@ const freeAnchor = (placement: Placement, anchor: DiagramPosition): DiagramPosit
 type Extent = { readonly width: number; readonly height: number };
 
 /**
- * The room a Thing's neighbours gain when its rect goes from one Open Size to
+ * The room a Resource's neighbours gain when its rect goes from one Open Size to
  * another: the difference between the two growths, per axis (ADR 0084).
  *
  * Resize's alone. Close hands its whole growth back rather than a difference,
- * and says so in one place — `Placement.reclaim` — which is where a Thing that
- * leaves a Diagram and a Thing deleted from the Space say it too.
+ * and says so in one place — `Placement.reclaim` — which is where a Resource that
+ * leaves a Map and a Resource deleted from the Space say it too.
  *
- * Negative on an axis the Thing shrank on, which is legitimate and is the whole
+ * Negative on an axis the Resource shrank on, which is legitimate and is the whole
  * of a shrinking Resize. It is **not** the involution the Open/Close pair is,
  * and the bound `Placement.growth` documents does not extend to it: a negative
- * room reverses a growth only for the Things that growth was applied to, and a
- * Thing the author placed clear of the subject *after* the Open was never one of
- * them. Such a Thing can be carried back inside the subject — subject Open at
- * `x = 0`, a Thing dropped at `x = 260`, a shrink of 200 — and growing back skips
+ * room reverses a growth only for the Resources that growth was applied to, and a
+ * Resource the author placed clear of the subject *after* the Open was never one of
+ * them. Such a Resource can be carried back inside the subject — subject Open at
+ * `x = 0`, a Resource dropped at `x = 260`, a shrink of 200 — and growing back skips
  * it as no longer clear, so it keeps the 200. That is the same memorylessness
- * ADR 0084 chose for Close, which reclaims from every Thing currently clear of the
- * closing Thing including the ones the author moved there; remembering which
- * Things a growth actually pushed is the per-Thing history the ADR rejected.
+ * ADR 0084 chose for Close, which reclaims from every Resource currently clear of the
+ * closing Resource including the ones the author moved there; remembering which
+ * Resources a growth actually pushed is the per-Resource history the ADR rejected.
  */
 const roomBetween = (from: Extent, to: Extent): Extent => {
   const before = Placement.growth(from);
@@ -563,7 +559,7 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
 };
 
 /**
- * The placement after a Thing's own entry changes and the room it holds changes
+ * The placement after a Resource's own entry changes and the room it holds changes
  * with it: one Edit, and the whole of displacement at the Edit (ADR 0084).
  *
  * **Order.** The entry is written first and the displacement runs over the
@@ -578,65 +574,65 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
  */
 const withRoomFor = (
   placement: Placement,
-  thingId: ThingId,
-  at: ThingPlacement,
+  resourceId: ResourceId,
+  at: ResourcePlacement,
   room: Extent,
-): Placement => Placement.displace(Placement.place(placement, thingId, at), thingId, room);
+): Placement => Placement.displace(Placement.place(placement, resourceId, at), resourceId, room);
 
 /**
- * The placement after a Thing Closes: Closed on its own entry, and the room it
+ * The placement after a Resource Closes: Closed on its own entry, and the room it
  * held given back by `Placement.reclaim`.
  *
- * Both ways a Thing closes end here — the Close completion, and a resize
+ * Both ways a Resource closes end here — the Close completion, and a resize
  * proposal the magnet has taken to the collapsed size (ADR 0066) — so this
- * Diagram's two Close gestures reach the shared rule through one line rather
+ * Map's two Close gestures reach the shared rule through one line rather
  * than each restating it. That matters most for the magnetic one, which is
  * where a restatement would reclaim the collapsed proposal's zero growth
- * instead of the growth of the size the Thing was actually Open at.
+ * instead of the growth of the size the Resource was actually Open at.
  *
  * The reclaim runs first and the Closed entry is written over the result,
  * because `Placement.reclaim` reads the Open Size off the entry it is given and
  * a Closed entry no longer holds any room. The coordinates do not depend on the
- * order — `displace` moves every Thing against the subject's own `x`/`y`, and
+ * order — `displace` moves every Resource against the subject's own `x`/`y`, and
  * neither step moves the subject — so this is about what each step can still
  * see, not about where anything lands. The remembered Open Size rides through
  * untouched (ADR 0066), which is what makes the next Open apply exactly what
  * this gives back.
  */
-const closedThing = (
+const closedResource = (
   placement: Placement,
-  thingId: ThingId,
-  at: Extract<ThingPlacement, { readonly open: true }>,
+  resourceId: ResourceId,
+  at: Extract<ResourcePlacement, { readonly open: true }>,
 ): Placement =>
-  Placement.place(Placement.reclaim(placement, thingId), thingId, { ...at, open: false });
+  Placement.place(Placement.reclaim(placement, resourceId), resourceId, { ...at, open: false });
 
 /**
- * The placement after a Thing leaves this Diagram, with the room it held given
+ * The placement after a Resource leaves this Map, with the room it held given
  * back.
  *
- * Leaving is a Close the Thing does not come back from, so it reclaims exactly
- * as {@link closedThing} does — and it has to, because the room is no longer
- * derived from the Thing's own entry. Under the derivation ADR 0084 removed,
+ * Leaving is a Close the Resource does not come back from, so it reclaims exactly
+ * as {@link closedResource} does — and it has to, because the room is no longer
+ * derived from the Resource's own entry. Under the derivation ADR 0084 removed,
  * dropping the entry dropped the displacement with it; now the room is written
  * into the neighbours' own coordinates, and a removal that only drops the entry
  * leaves a hole with nothing on the canvas left to explain it and no Edit that
  * can give it back.
  *
  * The reclaim runs **before** the removal, because `Placement.reclaim` reads
- * the Thing's own entry — after `Placement.remove` there is neither an Open Size
+ * the Resource's own entry — after `Placement.remove` there is neither an Open Size
  * to read nor a subject to compare the neighbours against.
  *
- * Two of the three ways a Thing leaves end here — `removed-thing-from-diagram`,
+ * Two of the three ways a Resource leaves end here — `removed-resource-from-map`,
  * and the deletion applied with the other membership changes below — and both
- * of those write *this* Diagram. The third is the same deletion cascading into
- * every other Diagram, which no single-Diagram write can reach;
- * `withThingRemovedFromDiagrams` performs it, and reaches the same rule through
+ * of those write *this* Map. The third is the same deletion cascading into
+ * every other Map, which no single-Map write can reach;
+ * `withResourceRemovedFromMaps` performs it, and reaches the same rule through
  * `Placement.reclaim` rather than through this function.
  */
-const removedThing = (placement: Placement, thingId: ThingId): Placement =>
-  Placement.remove(Placement.reclaim(placement, thingId), thingId);
+const removedResource = (placement: Placement, resourceId: ResourceId): Placement =>
+  Placement.remove(Placement.reclaim(placement, resourceId), resourceId);
 
-/** Two Edges are the same Edge when they join the same Things the same way (ADR 0032). */
+/** Two Edges are the same Edge when they join the same Resources the same way (ADR 0032). */
 const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
   left.from === right.from && left.to === right.to;
 
@@ -656,9 +652,9 @@ type ReconnectOutcome =
  * Both callers need the same four answers and one of them needs the resulting
  * Edge, so this returns it rather than a boolean the completion would have to
  * recompute. The order is deliberate: **unchanged is decided before
- * membership**, because a Thing that is already this Edge's endpoint is by
- * definition in this Diagram, and asking the placement first would refuse a
- * dragged endpoint dropped back where it started on a Diagram still arranging.
+ * membership**, because a Resource that is already this Edge's endpoint is by
+ * definition in this Map, and asking the placement first would refuse a
+ * dragged endpoint dropped back where it started on a Map still arranging.
  */
 const reconnectOutcome = (
   graph: Graph | undefined,
@@ -666,21 +662,21 @@ const reconnectOutcome = (
     readonly graphId: GraphId;
     readonly edge: GraphEdge;
     readonly endpoint: EdgeEndpoint;
-    readonly thingId: ThingId;
+    readonly resourceId: ResourceId;
   },
   placement: Placement,
   /**
-   * Whether the Space still holds the Thing, which the placement does not answer.
+   * Whether the Space still holds the Resource, which the placement does not answer.
    *
    * The same second condition `connectable` applies to a connection, and the
-   * asymmetry was a latent trap rather than a nicety: an Edge naming a Thing the
+   * asymmetry was a latent trap rather than a nicety: an Edge naming a Resource the
    * Space has lost derives a snapshot intake rejects, and this derivation answers
    * an unloadable Space by *throwing* — putting a defect in front of the author
    * as their own mistake. A picker open across such a deletion is the way there.
    */
-  holdsThing: (thingId: ThingId) => boolean,
+  holdsResource: (resourceId: ResourceId) => boolean,
 ): ReconnectOutcome => {
-  // Ownership, not existence: a Graph a *second* Diagram owns exists and is
+  // Ownership, not existence: a Graph a *second* Map owns exists and is
   // still not one this Edit may write (ADR 0040).
   if (graph === undefined) {
     return { kind: 'refused', refusal: { code: 'graph-not-owned' } };
@@ -693,13 +689,13 @@ const reconnectOutcome = (
   }
   const reconnected: GraphEdge =
     proposal.endpoint === 'from'
-      ? { from: proposal.thingId, to: proposal.edge.to }
-      : { from: proposal.edge.from, to: proposal.thingId };
+      ? { from: proposal.resourceId, to: proposal.edge.to }
+      : { from: proposal.edge.from, to: proposal.resourceId };
   if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
   // Checked together and after `unchanged`, so an endpoint returned to its own
-  // Thing is still eligible on a Diagram that has not finished arranging.
-  if (!placement.has(proposal.thingId) || !holdsThing(proposal.thingId)) {
-    return { kind: 'refused', refusal: { code: 'edge-thing-outside-diagram' } };
+  // Resource is still eligible on a Map that has not finished arranging.
+  if (!placement.has(proposal.resourceId) || !holdsResource(proposal.resourceId)) {
+    return { kind: 'refused', refusal: { code: 'edge-resource-outside-map' } };
   }
   if (indexOfEdge(graph.edges, reconnected) !== -1) {
     return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
@@ -708,9 +704,9 @@ const reconnectOutcome = (
 };
 
 /**
- * Why a Thing document's Reference Thing Target may not be authored, or `null`.
+ * Why a Resource document's Reference Resource Target may not be authored, or `null`.
  *
- * This is the creation-time rule for choosing a Reference Thing Target. Existing Reference Thing
+ * This is the creation-time rule for choosing a Reference Resource Target. Existing Reference Resource
  * Targets are immutable and are refused before this validation is reached. It
  * duplicates what `validateReferences` already enforces, and deliberately:
  * intake reports by failing the whole snapshot, which this derivation answers
@@ -718,12 +714,15 @@ const reconnectOutcome = (
  * deserves a sentence rather than an exception. A markdown document has no
  * Target and nothing to refuse.
  */
-const referenceTargetRefusal = (space: Space, document: ThingDocument): AuthoringRefusal | null => {
+const referenceTargetRefusal = (
+  space: Space,
+  document: ResourceDocument,
+): AuthoringRefusal | null => {
   if (document.kind !== 'reference') return null;
-  const target = space.lookup.thing(document.target);
+  const target = space.lookup.resource(document.target);
   if (target === undefined)
     return { code: 'reference-target-not-found', targetId: document.target };
-  // Reference Thing resolution ends after one Thing reference, including a Space Thing.
+  // Reference Resource resolution ends after one Resource reference, including a Space Resource.
   if (target.kind === 'reference') {
     return { code: 'reference-target-must-own-content', targetId: document.target };
   }
@@ -731,33 +730,36 @@ const referenceTargetRefusal = (space: Space, document: ThingDocument): Authorin
 };
 
 /**
- * A Thing an Edit is creating, held rather than placed.
+ * A Resource an Edit is creating, held rather than placed.
  *
- * Its position waits here until the complete next Diagram is assembled.
+ * Its position waits here until the complete next Map is assembled.
  */
-interface CreatedThing {
-  readonly id: ThingId;
-  readonly position: DiagramPosition;
+interface CreatedResource {
+  readonly id: ResourceId;
+  readonly position: MapPosition;
   /**
-   * Step off a position another Thing already occupies exactly. A gesture that
-   * dropped on empty canvas aimed at its point and keeps it; a Thing created from
+   * Step off a position another Resource already occupies exactly. A gesture that
+   * dropped on empty canvas aimed at its point and keeps it; a Resource created from
    * a menu has no aimed-at point and would otherwise stack.
    */
   readonly avoidingOverlap: boolean;
 }
 
-/** The Reference Things pointing at a Thing, which are what block deleting it from the Space. */
-const incomingReferences = (things: SnapshotThings, thingId: ThingId): SnapshotThings =>
-  things.filter(
-    (thing) => thing.document.kind === 'reference' && thing.document.target === thingId,
+/** The Reference Resources pointing at a Resource, which are what block deleting it from the Space. */
+const incomingReferences = (
+  resources: SnapshotResources,
+  resourceId: ResourceId,
+): SnapshotResources =>
+  resources.filter(
+    (resource) => resource.document.kind === 'reference' && resource.document.target === resourceId,
   );
 
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
  *
- * Spaces, Diagrams and Graphs. Their titles are single-line by ADR 0083, so the
- * whole string is one line and trimming it is the whole rule. A Thing's Title is
- * Title Lines and normalizes by a rule of its own — {@link namedThingTitle}.
+ * Spaces, Maps and Graphs. Their titles are single-line by ADR 0083, so the
+ * whole string is one line and trimming it is the whole rule. A Resource's Title is
+ * Title Lines and normalizes by a rule of its own — {@link namedResourceTitle}.
  */
 const trimmedNonBlankTitle = (title: string): string | null => {
   const trimmed = title.trim();
@@ -765,18 +767,18 @@ const trimmedNonBlankTitle = (title: string): string | null => {
 };
 
 /**
- * A Thing Title normalized as the schema normalizes it, or `null` when it
+ * A Resource Title normalized as the schema normalizes it, or `null` when it
  * carries no name.
  *
  * `normalizeTitle` and not `trim()`, because on a Title of more than one line
  * the two give different answers: a whole-string trim cannot reach the trailing
  * whitespace on an interior line, and it strips a first line's leading
  * whitespace, which ADR 0083 says is that line's own. A write path that
- * disagreed with the parse boundary would store a Thing whose Title differs from
+ * disagreed with the parse boundary would store a Resource whose Title differs from
  * the one intake mints from the same bytes — derived state disagreeing with the
  * code that derives it, which this repo fixes at the source.
  */
-const namedThingTitle = (title: string): string | null => {
+const namedResourceTitle = (title: string): string | null => {
   const normalized = normalizeTitle(title);
   return normalized.length === 0 ? null : normalized;
 };
@@ -787,7 +789,7 @@ const namedThingTitle = (title: string): string | null => {
  * Serializing both sides and comparing the text was the same answer only when
  * the two agreed on key order, and nothing promises that: a snapshot loaded
  * from the database or an import carries whatever order it was written in,
- * while a completed Edit rebuilds each Diagram in the writer's order. A
+ * while a completed Edit rebuilds each Map in the writer's order. A
  * difference in order is not a difference an author made, and reading one as an
  * Edit submits a commit that changes nothing.
  */
@@ -826,11 +828,10 @@ export function createSpaceAuthoring({
   let replacementEpoch = 0;
   let installing = 0;
 
-  const selectedResolvedDiagram = (): ResolvedDiagram =>
-    resolveDiagram(currentSpace(), navigation.getState().selectedDiagramId);
+  const selectedResolvedMap = (): ResolvedMap =>
+    resolveMap(currentSpace(), navigation.getState().selectedMapId);
 
-  const diagramPlacement = (): Placement =>
-    Placement.fromDiagram(selectedResolvedDiagram().diagram);
+  const mapPlacement = (): Placement => Placement.fromMap(selectedResolvedMap().map);
 
   const snapshotState = (): SpaceAuthoringState => ({
     replacementEpoch,
@@ -885,14 +886,14 @@ export function createSpaceAuthoring({
    * Bring Navigation back in step with a working snapshot this module did not
    * write.
    *
-   * Placement needs no sibling repair: it is derived fresh from the Diagram at
+   * Placement needs no sibling repair: it is derived fresh from the Map at
    * every read, so a snapshot this module did not write already answers it.
    * Navigation's own selection, though, is state that has to be moved back in
    * step deliberately. Every other replacement of the working snapshot answers
    * the selection as it
-   * installs — a completed Edit resolves the Diagram and its Active Graph before
-   * `continueInDiagram`, and `acceptStoredSpace` re-opens Navigation on the
-   * Space it accepted. The coordinated Space Thing lifecycle is the exception:
+   * installs — a completed Edit resolves the Map and its Active Graph before
+   * `continueInMap`, and `acceptStoredSpace` re-opens Navigation on the
+   * Space it accepted. The coordinated Space Resource lifecycle is the exception:
    * its recovery restores *every participant's* snapshot
    * (`session-registry.ts`), and only the Space whose conflict the author
    * answered had a `SpaceAuthoring` to re-open. A second open Space rolled back
@@ -901,25 +902,25 @@ export function createSpaceAuthoring({
    *
    * **Both halves of the selection, because a recovery can take either.** A
    * restore past a locally added Graph leaves the Active Graph naming a Graph
-   * the Diagram no longer owns, which made the Dock command a Graph the canvas
-   * was not drawing as active. A restore past a locally *created* Diagram leaves
+   * the Map no longer owns, which made the Dock command a Graph the canvas
+   * was not drawing as active. A restore past a locally *created* Map leaves
    * the selection itself dangling, and that one is worse: the Space still loads,
-   * so `resolveDiagram` throws `DiagramNotFoundError` for a Space with nothing
+   * so `resolveMap` throws `MapNotFoundError` for a Space with nothing
    * wrong with it and `SpaceApp` draws the failure surface. One repair answers
-   * both, because `selectDiagram` resolves the pair.
+   * both, because `selectMap` resolves the pair.
    *
-   * **Re-resolving here is not the repair `continueInDiagram` refuses.** That
+   * **Re-resolving here is not the repair `continueInMap` refuses.** That
    * call declines to invent an Active Graph because its caller states one and is
    * held to it, and because inventing one would interrupt a traversal of the
    * Graph that was active. Neither holds here: no caller stated anything — the
    * Space was replaced out from under this one — and the structure the traversal
-   * belonged to is the structure that is gone. `selectDiagram` is what says so,
-   * the same operation an author spends to land on a Diagram's own Active Graph,
+   * belonged to is the structure that is gone. `selectMap` is what says so,
+   * the same operation an author spends to land on a Map's own Active Graph,
    * and it drops out of presentation because there is nothing left to present.
    * An absent Active Graph is exempt, as it is there: it names nothing, so there
    * is nothing about it to be stale.
    *
-   * Membership is asked of `diagramShowsGraph` and of the Space's own index
+   * Membership is asked of `mapShowsGraph` and of the Space's own index
    * rather than decided again, which is the rule that function's own comment
    * states. Nothing here resolves through a throw: a dangling selection is the
    * case being repaired, so raising and catching it to find that out would be
@@ -938,21 +939,21 @@ export function createSpaceAuthoring({
     } catch {
       return;
     }
-    const { selectedDiagramId, activeGraphId } = navigation.getState();
-    const selected = space.lookup.diagram(selectedDiagramId);
+    const { selectedMapId, activeGraphId } = navigation.getState();
+    const selected = space.lookup.map(selectedMapId);
     if (selected === undefined) {
-      // The Diagram is gone, so its Active Graph is not worth asking about. A
+      // The Map is gone, so its Active Graph is not worth asking about. A
       // Space whose own opening selection does not resolve either is the bug
-      // `requireDefaultDiagram` documents rather than a state to repair, so it
+      // `requireDefaultMap` documents rather than a state to repair, so it
       // is left for the surface to report.
-      const opening = space.defaultDiagram;
-      if (opening !== undefined && space.lookup.diagram(opening) !== undefined) {
-        navigation.selectDiagram(opening);
+      const opening = space.defaultMap;
+      if (opening !== undefined && space.lookup.map(opening) !== undefined) {
+        navigation.selectMap(opening);
       }
       return;
     }
-    if (activeGraphId === null || diagramShowsGraph(selected, activeGraphId)) return;
-    navigation.selectDiagram(selectedDiagramId);
+    if (activeGraphId === null || mapShowsGraph(selected, activeGraphId)) return;
+    navigation.selectMap(selectedMapId);
   };
 
   /**
@@ -976,27 +977,27 @@ export function createSpaceAuthoring({
   });
 
   /**
-   * The Graph a Diagram-owned Edge operation names, or `undefined` when the
-   * selected Diagram is not the one that owns it.
+   * The Graph a Map-owned Edge operation names, or `undefined` when the
+   * selected Map is not the one that owns it.
    *
    * Asked of `space.lookup.graph`, which answers a Graph *with its owner* — the
    * index built for exactly this question (ADR 0040), and O(1) rather than a
-   * walk over one Diagram's Graphs. Comparing the owner's id is what keeps this
-   * ownership rather than existence: a Graph a second Diagram owns resolves here
+   * walk over one Map's Graphs. Comparing the owner's id is what keeps this
+   * ownership rather than existence: a Graph a second Map owns resolves here
    * and is still not one this Edit may write. Graph ids are unique across the
    * Space (ADR 0045), so there is no second Graph the id could have meant.
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
-    const selectedDiagram = selectedResolvedDiagram();
+    const selectedMap = selectedResolvedMap();
     const owned = currentSpace().lookup.graph(graphId);
-    return owned?.owner.diagram.id === selectedDiagram.diagram.id ? owned.graph : undefined;
+    return owned?.owner.map.id === selectedMap.map.id ? owned.graph : undefined;
   };
 
   /**
    * The Graph a connection drawn right now would land in, or `null` when no
-   * selected Diagram owns one.
+   * selected Map owns one.
    *
-   * A Diagram the Space no longer holds answers `null` too: it names no Graph,
+   * A Map the Space no longer holds answers `null` too: it names no Graph,
    * and the completion that follows refuses for that reason rather than this one.
    */
   const targetGraph = (): Graph | null => {
@@ -1005,24 +1006,25 @@ export function createSpaceAuthoring({
   };
 
   /**
-   * Whether a Thing is one an Edge this gesture authors may name at all.
+   * Whether a Resource is one an Edge this gesture authors may name at all.
    *
-   * Two conditions, and the second is ADR 0040's closure read forwards. A Thing
-   * of the Space is not necessarily a Thing of the Diagram the Edit writes: a
-   * Diagram's members **are** its position keys, and the completed placement is
-   * what those keys are about to become. An Edge naming a Thing outside it
+   * Two conditions, and the second is ADR 0040's closure read forwards. A Resource
+   * of the Space is not necessarily a Resource of the Map the Edit writes: a
+   * Map's members **are** its position keys, and the completed placement is
+   * what those keys are about to become. An Edge naming a Resource outside it
    * derives a Space intake rejects, and `deriveCompletedEdit` answers an
    * unloadable Space by throwing — right for a bug, wrong for an eligibility
-   * query. Refusing here keeps the interaction boundary closed over the Diagram
-   * even if a stale caller names a Thing outside it.
+   * query. Refusing here keeps the interaction boundary closed over the Map
+   * even if a stale caller names a Resource outside it.
    *
-   * `members` is the Diagram's own placement, and every caller reads it fresh —
+   * `members` is the Map's own placement, and every caller reads it fresh —
    * so a preview and the completed Edit it previews can still disagree when the
    * Space changed between them, which is why completion asks this again rather
    * than trusting the preview's answer.
    */
-  const connectable = (thingId: ThingId, members: Placement): boolean =>
-    members.has(thingId) && session.getState().working.things.some((thing) => thing.id === thingId);
+  const connectable = (resourceId: ResourceId, members: Placement): boolean =>
+    members.has(resourceId) &&
+    session.getState().working.resources.some((resource) => resource.id === resourceId);
 
   /**
    * Why an Edge this gesture would author cannot be authored, or `null`.
@@ -1030,30 +1032,30 @@ export function createSpaceAuthoring({
    * One answer for the live preview, the release and the completed Edit, so a
    * gesture the canvas offers cannot be one the completion silently drops — and
    * the completion says *which* rule it hit, which a boolean could not.
-   * `to === null` is the Option/Alt empty drop, whose target Thing does not exist
+   * `to === null` is the Option/Alt empty drop, whose target Resource does not exist
    * yet (ADR 0033).
    *
    * An exact duplicate within one Graph is what intake rejects (ADR 0032), so it
    * can only be a duplicate of an Edge in the Graph the Edge is about to join.
-   * A created Thing cannot duplicate anything, which is why the callers differ.
+   * A created Resource cannot duplicate anything, which is why the callers differ.
    *
-   * `members` and `graph` are the Diagram and Graph this Edit writes, and every
-   * caller supplies `members` explicitly — the selected Diagram's own placement
+   * `members` and `graph` are the Map and Graph this Edit writes, and every
+   * caller supplies `members` explicitly — the selected Map's own placement
    * for a preview, the in-progress `completedPlacement` for an Edit already
    * assembling one. `graph` alone keeps a default, the Active Graph through
    * `targetGraph()`, because the host canvas is the one caller that never names
-   * a Graph of its own; a Space Thing names the Graph it is showing.
+   * a Graph of its own; a Space Resource names the Graph it is showing.
    */
   const connectRefusal = (
-    from: ThingId,
-    to: ThingId | null,
+    from: ResourceId,
+    to: ResourceId | null,
     members: Placement,
     graph: Graph | null = targetGraph(),
   ): AuthoringRefusal | null => {
     if (!connectable(from, members) || (to !== null && !connectable(to, members))) {
-      return { code: 'edge-thing-outside-diagram' };
+      return { code: 'edge-resource-outside-map' };
     }
-    if (graph === null) return { code: 'diagram-active-graph-required' };
+    if (graph === null) return { code: 'map-active-graph-required' };
     if (to !== null && indexOfEdge(graph.edges, { from, to }) !== -1) {
       return { code: 'edge-already-exists' };
     }
@@ -1070,10 +1072,10 @@ export function createSpaceAuthoring({
    * still change before the completion asks again.
    */
   const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
-    // The selected Diagram's own placement, read fresh — both branches ask
-    // about a Graph `ownedGraph`/`targetGraph` already scope to that Diagram,
-    // so this is the one Diagram either question could mean.
-    const members = diagramPlacement();
+    // The selected Map's own placement, read fresh — both branches ask
+    // about a Graph `ownedGraph`/`targetGraph` already scope to that Map,
+    // so this is the one Map either question could mean.
+    const members = mapPlacement();
     if (proposal.kind !== 'reconnect') {
       const refusal = connectRefusal(
         proposal.from,
@@ -1082,8 +1084,12 @@ export function createSpaceAuthoring({
       );
       return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
     }
-    const outcome = reconnectOutcome(ownedGraph(proposal.graphId), proposal, members, (thingId) =>
-      session.getState().working.things.some((thing) => thing.id === thingId),
+    const outcome = reconnectOutcome(
+      ownedGraph(proposal.graphId),
+      proposal,
+      members,
+      (resourceId) =>
+        session.getState().working.resources.some((resource) => resource.id === resourceId),
     );
     return outcome.kind === 'refused' ? outcome : ELIGIBLE;
   };
@@ -1098,24 +1104,24 @@ export function createSpaceAuthoring({
    * lets the shell below be a sequence of statements rather than a transaction.
    *
    * Neither `unchanged` nor `refused` is a failure: an Edit that changes
-   * nothing, names a Thing the Space no longer holds, or targets a Diagram that
+   * nothing, names a Resource the Space no longer holds, or targets a Map that
    * has gone is simply not an Edit, and the two say which of those it was.
    * Producing an unloadable Space *is* a failure, and it throws — here, where
    * the collaborators are all still level.
    */
   const deriveCompletedEdit = ({
     completion,
-    embeddedDiagramId,
+    embeddedMapId,
   }: ReportedCompletion): DerivedCompletion => {
-    const selection = embeddedDiagramId ?? navigation.getState().selectedDiagramId;
-    if (completion.kind === 'created-diagram') {
+    const selection = embeddedMapId ?? navigation.getState().selectedMapId;
+    if (completion.kind === 'created-map') {
       const snapshot = session.getState().working;
-      const diagramId = newId();
+      const mapId = newId();
       const graphId = newId();
       const emptyPlacement = Placement.fromEntries([]);
-      const next = updatePositionedDiagram(snapshot, {
-        diagramId,
-        title: nextDiagramTitle(snapshot),
+      const next = updatePositionedMap(snapshot, {
+        mapId,
+        title: nextMapTitle(snapshot),
         positions: emptyPlacement,
         graphs: [
           {
@@ -1133,33 +1139,33 @@ export function createSpaceAuthoring({
         edit: {
           snapshot: next,
           nextActiveGraphId: graphId,
-          nextDiagramId: diagramId,
+          nextMapId: mapId,
         },
       };
     }
-    if (completion.kind === 'deleted-diagram') {
+    if (completion.kind === 'deleted-map') {
       const snapshot = session.getState().working;
-      const diagrams = snapshot.document.diagrams ?? [];
-      const target = diagrams.find((diagram) => diagram.id === completion.diagramId);
-      if (target === undefined) return refuse({ code: 'diagram-not-found' });
-      if (diagrams.length === 1) return refuse({ code: 'space-must-keep-diagram' });
-      const survivors = diagrams.filter((diagram) => diagram.id !== completion.diagramId);
-      const selectedSurvives = survivors.some((diagram) => diagram.id === selection);
-      const nextDiagram = selectedSurvives
-        ? survivors.find((diagram) => diagram.id === selection)
+      const maps = snapshot.document.maps ?? [];
+      const target = maps.find((map) => map.id === completion.mapId);
+      if (target === undefined) return refuse({ code: 'map-not-found' });
+      if (maps.length === 1) return refuse({ code: 'space-must-keep-map' });
+      const survivors = maps.filter((map) => map.id !== completion.mapId);
+      const selectedSurvives = survivors.some((map) => map.id === selection);
+      const nextMap = selectedSurvives
+        ? survivors.find((map) => map.id === selection)
         : survivors[0];
-      if (nextDiagram === undefined) {
-        throw new Error('Deleting a Diagram left no survivor after the last Diagram was refused.');
+      if (nextMap === undefined) {
+        throw new Error('Deleting a Map left no survivor after the last Map was refused.');
       }
       const next = {
         ...snapshot,
         document: {
           ...snapshot.document,
-          diagrams: survivors,
-          defaultDiagram:
-            snapshot.document.defaultDiagram === completion.diagramId
-              ? nextDiagram.id
-              : snapshot.document.defaultDiagram,
+          maps: survivors,
+          defaultMap:
+            snapshot.document.defaultMap === completion.mapId
+              ? nextMap.id
+              : snapshot.document.defaultMap,
         },
       };
       assertValidAuthoredSnapshot(next);
@@ -1167,48 +1173,46 @@ export function createSpaceAuthoring({
         kind: 'completed',
         edit: {
           snapshot: next,
-          nextActiveGraphId: nextDiagram.activeGraph ?? nextDiagram.graphs[0]?.id ?? null,
-          nextDiagramId: nextDiagram.id,
+          nextActiveGraphId: nextMap.activeGraph ?? nextMap.graphs[0]?.id ?? null,
+          nextMapId: nextMap.id,
         },
       };
     }
     if (completion.kind === 'renamed-space') {
       const snapshot = session.getState().working;
-      // Trimmed for the reason a Diagram's and a Graph's titles are: the schema
+      // Trimmed for the reason a Map's and a Graph's titles are: the schema
       // counts characters, so a title of spaces satisfies it and would store a
       // Space with no readable name.
       const title = trimmedNonBlankTitle(completion.title);
       if (title === null) return refuse({ code: 'space-title-required' });
       if (title === snapshot.document.title) return UNCHANGED;
-      // The Diagram is resolved for the placement, not for permission: a Space
+      // The Map is resolved for the placement, not for permission: a Space
       // rename is legal whatever is drawing, and this Edit changes neither the
-      // selection nor the Diagram it names. So the resolution happens *after*
+      // selection nor the Map it names. So the resolution happens *after*
       // the title checks rather than as the universal gate the Edits below run
       // first — a blank name is a blank name whether or not the canvas has
-      // moved on, and answering with the Diagram instead would report the wrong
+      // moved on, and answering with the Map instead would report the wrong
       // fact about the author's own keystrokes.
       //
-      // `diagram-not-found` rather than a code of its own, and no
-      // `diagram-required` arm: the refusal is the one the chosen shape
+      // `map-not-found` rather than a code of its own, and no
+      // `map-required` arm: the refusal is the one the chosen shape
       // already raises, and inventing a second would make an Edit that holds
-      // no Diagram say it needed one.
-      const diagram = (snapshot.document.diagrams ?? []).find(
-        (candidate) => candidate.id === selection,
-      );
-      if (diagram === undefined) return refuse({ code: 'diagram-not-found' });
+      // no Map say it needed one.
+      const map = (snapshot.document.maps ?? []).find((candidate) => candidate.id === selection);
+      if (map === undefined) return refuse({ code: 'map-not-found' });
       const next = { ...snapshot, document: { ...snapshot.document, title } };
       assertValidAuthoredSnapshot(next);
       return {
         kind: 'completed',
         edit: {
           snapshot: next,
-          // **Navigation's Active Graph, not the Diagram's stored one.**
+          // **Navigation's Active Graph, not the Map's stored one.**
           //
           // Activating a Graph is not an Edit (ADR 0028), so the emphasised
-          // Graph routinely differs from the `activeGraph` the Diagram stores
-          // until some other Edit writes it. `created-diagram` and
-          // `deleted-diagram` re-resolve legitimately, each landing the reader
-          // in a *different* Diagram; this Edit changes no Diagram and no
+          // Graph routinely differs from the `activeGraph` the Map stores
+          // until some other Edit writes it. `created-map` and
+          // `deleted-map` re-resolve legitimately, each landing the reader
+          // in a *different* Map; this Edit changes no Map and no
           // selection, so re-resolving would answer a question nobody asked and
           // snap the emphasis, the Dock's Graph cluster and the product URL back
           // to the stored Graph — a rename of the Space silently activating a
@@ -1217,20 +1221,20 @@ export function createSpaceAuthoring({
           // writes out the harm at length).
           //
           // The embedded arm mirrors the one below, and it is written for that
-          // reason alone. `selection` is then the embedded Diagram rather than
-          // Navigation's, so Navigation's Graph may be one this Diagram does not
+          // reason alone. `selection` is then the embedded Map rather than
+          // Navigation's, so Navigation's Graph may be one this Map does not
           // show — but nothing here reads the answer: `performCompletion`'s
           // embedded path submits and installs and never calls
-          // `continueInDiagram`, so `nextActiveGraphId` is discarded whenever
-          // `embeddedDiagramId` is given. The arm is consistency with the
+          // `continueInMap`, so `nextActiveGraphId` is discarded whenever
+          // `embeddedMapId` is given. The arm is consistency with the
           // general path, not a guard against anything, and no gesture reaches a
-          // Space rename from an embedded Diagram in any case — the Dock's Space
+          // Space rename from an embedded Map in any case — the Dock's Space
           // name is not drawn inside one.
           nextActiveGraphId:
-            embeddedDiagramId === undefined
+            embeddedMapId === undefined
               ? navigation.getState().activeGraphId
-              : (diagram.activeGraph ?? diagram.graphs[0]?.id ?? null),
-          nextDiagramId: diagram.id,
+              : (map.activeGraph ?? map.graphs[0]?.id ?? null),
+          nextMapId: map.id,
         },
       };
     }
@@ -1238,74 +1242,76 @@ export function createSpaceAuthoring({
     const previousSnapshot = snapshot;
     const navigationState = navigation.getState();
     const space = currentSpace();
-    // A selected Diagram the Space no longer holds is not an Edit. Checked before
+    // A selected Map the Space no longer holds is not an Edit. Checked before
     // resolving, because the resolver answers that case by throwing.
     //
-    // Not the thing ADR 0045 forbids, which is turning a *thrown*
-    // `DiagramNotFoundError` into a refusal — there is no catch here and a
+    // Not the case ADR 0045 forbids, which is turning a *thrown*
+    // `MapNotFoundError` into a refusal — there is no catch here and a
     // resolver that refuses still takes the Edit down with it. This asks a
     // question of the Space instead, and the answer is an author's state rather
-    // than a defect: the Diagram this gesture was aimed at is gone, so there is
+    // than a defect: the Map this gesture was aimed at is gone, so there is
     // nothing to write it into.
-    if (space.lookup.diagram(selection) === undefined) {
-      return refuse({ code: 'diagram-not-found' });
+    if (space.lookup.map(selection) === undefined) {
+      return refuse({ code: 'map-not-found' });
     }
-    const resolved = resolveDiagram(space, selection);
+    const resolved = resolveMap(space, selection);
     /**
      * What this Edit does to the placement, held rather than applied.
      *
-     * Thing additions and removals wait here until the complete next Diagram is
+     * Resource additions and removals wait here until the complete next Map is
      * assembled.
      */
-    let createdThing: CreatedThing | null = null;
-    let unplacedThingId: ThingId | undefined;
-    let deletedThingId: ThingId | undefined;
+    let createdResource: CreatedResource | null = null;
+    let unplacedResourceId: ResourceId | undefined;
+    let deletedResourceId: ResourceId | undefined;
     let connection: GraphEdge | null = null;
-    // The Diagram's own placement, read fresh at derivation — the one source of
+    // The Map's own placement, read fresh at derivation — the one source of
     // geometry this Edit starts from. A queued completion derives against this
     // too, at drain time rather than at the moment it was requested, which is
-    // what keeps a settled drag from landing against a Diagram that has since
+    // what keeps a settled drag from landing against a Map that has since
     // moved on.
-    let completedPlacement = Placement.fromDiagram(resolved.diagram);
-    // The one way a Thing is added: mint it, place it at a free anchor, append it.
-    // Add Thing and Add Reference Thing differ in the document they carry and in nothing
-    // else — neither creates an Edge, and neither adds a Graph to a Diagram that
+    let completedPlacement = Placement.fromMap(resolved.map);
+    // The one way a Resource is added: mint it, place it at a free anchor, append it.
+    // Add Resource and Add Reference Resource differ in the document they carry and in nothing
+    // else — neither creates an Edge, and neither adds a Graph to a Map that
     // already has one.
-    // Returns rather than assigns: `createdThing` is read further down, and a
+    // Returns rather than assigns: `createdResource` is read further down, and a
     // `let` written only from inside a closure keeps its initial narrowing.
-    const createThing = (
-      document: ThingDocument,
-      at: DiagramPosition,
+    const createResource = (
+      document: ResourceDocument,
+      at: MapPosition,
       avoidingOverlap = true,
-    ): CreatedThing => {
+    ): CreatedResource => {
       const id = newId();
-      snapshot = { ...snapshot, things: [...snapshot.things, { id, document }] };
+      snapshot = { ...snapshot, resources: [...snapshot.resources, { id, document }] };
       return { id, position: at, avoidingOverlap };
     };
-    if (completion.kind === 'edited-thing') {
-      const thingIndex = snapshot.things.findIndex((thing) => thing.id === completion.thingId);
-      const thing = snapshot.things[thingIndex];
-      if (thing === undefined) return refuse({ code: 'thing-not-found' });
-      // Kind is fixed for a Thing's lifetime, and changing it is out of scope for
-      // version 1. Everything else the editor holds — a Markdown Thing's Title
-      // and body, or a Reference Thing's Title and Target — is one ordinary Edit of
-      // this Thing.
-      if (thing.document.kind !== completion.document.kind) {
-        return refuse({ code: 'thing-kind-immutable' });
+    if (completion.kind === 'edited-resource') {
+      const resourceIndex = snapshot.resources.findIndex(
+        (resource) => resource.id === completion.resourceId,
+      );
+      const resource = snapshot.resources[resourceIndex];
+      if (resource === undefined) return refuse({ code: 'resource-not-found' });
+      // Kind is fixed for a Resource's lifetime, and changing it is out of scope for
+      // version 1. Everything else the editor holds — a Markdown Resource's Title
+      // and body, or a Reference Resource's Title and Target — is one ordinary Edit of
+      // this Resource.
+      if (resource.document.kind !== completion.document.kind) {
+        return refuse({ code: 'resource-kind-immutable' });
       }
       if (
-        thing.document.kind === 'reference' &&
+        resource.document.kind === 'reference' &&
         completion.document.kind === 'reference' &&
-        thing.document.target !== completion.document.target
+        resource.document.target !== completion.document.target
       ) {
         return refuse({ code: 'reference-target-immutable' });
       }
       if (
-        thing.document.kind === 'space' &&
+        resource.document.kind === 'space' &&
         completion.document.kind === 'space' &&
-        thing.document.spaceId !== completion.document.spaceId
+        resource.document.spaceId !== completion.document.spaceId
       ) {
-        return refuse({ code: 'space-thing-target-immutable' });
+        return refuse({ code: 'space-resource-target-immutable' });
       }
       // Normalized and refused *here* rather than only at the surface that
       // typed it. A blank title is the empty case wearing different bytes, and
@@ -1313,53 +1319,53 @@ export function createSpaceAuthoring({
       // by throwing, and an author's mistake may not throw. Every caller of
       // this operation is covered by one rule instead of each remembering it,
       // and that one rule is the schema's own (ADR 0083).
-      const title = namedThingTitle(completion.document.title);
-      if (title === null) return refuse({ code: THING_TITLE_REQUIRED });
-      const document: ThingDocument = { ...completion.document, title };
-      if (sameValue(thing.document, document)) return UNCHANGED;
+      const title = namedResourceTitle(completion.document.title);
+      if (title === null) return refuse({ code: RESOURCE_TITLE_REQUIRED });
+      const document: ResourceDocument = { ...completion.document, title };
+      if (sameValue(resource.document, document)) return UNCHANGED;
       const refusal = referenceTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
-      const things = [...snapshot.things];
-      things[thingIndex] = { id: thing.id, document };
-      snapshot = { ...snapshot, things };
-    } else if (completion.kind === 'opened-thing') {
-      const at = completedPlacement.get(completion.thingId);
-      if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
+      const resources = [...snapshot.resources];
+      resources[resourceIndex] = { id: resource.id, document };
+      snapshot = { ...snapshot, resources };
+    } else if (completion.kind === 'opened-resource') {
+      const at = completedPlacement.get(completion.resourceId);
+      if (at === undefined) return refuse({ code: 'resource-not-in-map' });
       if (at.open) return UNCHANGED;
-      // The size the Thing is actually opening at: the one it remembers, or the
+      // The size the Resource is actually opening at: the one it remembers, or the
       // default for its kind. The room it takes is that size's growth, so the
       // Close that reverses this reads the same number back off the entry.
       const openSize =
         at.openSize ??
-        (space.lookup.thing(completion.thingId)?.kind === 'space'
-          ? DEFAULT_SPACE_THING_OPEN_SIZE
+        (space.lookup.resource(completion.resourceId)?.kind === 'space'
+          ? DEFAULT_SPACE_RESOURCE_OPEN_SIZE
           : DEFAULT_OPEN_SIZE);
       completedPlacement = withRoomFor(
         completedPlacement,
-        completion.thingId,
+        completion.resourceId,
         { ...at, open: true, openSize },
         Placement.growth(openSize),
       );
-    } else if (completion.kind === 'closed-thing') {
-      const at = completedPlacement.get(completion.thingId);
-      if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
+    } else if (completion.kind === 'closed-resource') {
+      const at = completedPlacement.get(completion.resourceId);
+      if (at === undefined) return refuse({ code: 'resource-not-in-map' });
       if (!at.open) return UNCHANGED;
-      // Read as the Diagram stands, with no record of who this Thing's Open
-      // pushed: everything currently clear of it moves back, the Things the author
+      // Read as the Map stands, with no record of who this Resource's Open
+      // pushed: everything currently clear of it moves back, the Resources the author
       // dragged there while it was open included (ADR 0084).
-      completedPlacement = closedThing(completedPlacement, completion.thingId, at);
-    } else if (completion.kind === 'resized-thing') {
-      const at = completedPlacement.get(completion.thingId);
-      if (at === undefined) return refuse({ code: 'thing-not-in-diagram' });
-      if (!at.open) return refuse({ code: 'thing-not-expanded' });
+      completedPlacement = closedResource(completedPlacement, completion.resourceId, at);
+    } else if (completion.kind === 'resized-resource') {
+      const at = completedPlacement.get(completion.resourceId);
+      if (at === undefined) return refuse({ code: 'resource-not-in-map' });
+      if (!at.open) return refuse({ code: 'resource-not-expanded' });
       if (
-        completion.size.width === COLLAPSED_THING_SIZE.width &&
-        completion.size.height === COLLAPSED_THING_SIZE.height
+        completion.size.width === COLLAPSED_RESOURCE_SIZE.width &&
+        completion.size.height === COLLAPSED_RESOURCE_SIZE.height
       ) {
         // The magnetic Close (ADR 0066). It is a Close, so it takes the Close
         // path rather than restating it — reclaiming the growth of the size the
-        // Thing was Open at, not the zero growth of the rect being proposed.
-        completedPlacement = closedThing(completedPlacement, completion.thingId, at);
+        // Resource was Open at, not the zero growth of the rect being proposed.
+        completedPlacement = closedResource(completedPlacement, completion.resourceId, at);
       } else if (
         at.openSize.width === completion.size.width &&
         at.openSize.height === completion.size.height
@@ -1368,207 +1374,207 @@ export function createSpaceAuthoring({
       } else {
         completedPlacement = withRoomFor(
           completedPlacement,
-          completion.thingId,
+          completion.resourceId,
           { ...at, openSize: completion.size },
           roomBetween(at.openSize, completion.size),
         );
       }
-    } else if (completion.kind === 'created-thing') {
-      createdThing = createThing(
-        { title: nextThingTitle(snapshot), kind: 'markdown', body: '' },
+    } else if (completion.kind === 'created-resource') {
+      createdResource = createResource(
+        { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
         completion.anchor,
       );
     } else if (completion.kind === 'created-reference') {
-      // An empty title mints the same neutral `Thing N` every other created Thing
+      // An empty title mints the same neutral `Resource N` every other created Resource
       // gets; text the author already entered is never overwritten. `??` cannot
       // express this — the empty string is a value a caller really sends, and
       // the whole point is that it does not count as one.
       //
       // **Copying the Target's Title is now what the one caller does** (ADR 0089).
       // This arm used to carry an argument against it, from when a pane asked for
-      // a name before the Edit ran: there is no pane, the Reference Thing is named after
-      // its Target and renamed in place afterwards, and two Things sharing a name
+      // a name before the Edit ran: there is no pane, the Reference Resource is named after
+      // its Target and renamed in place afterwards, and two Resources sharing a name
       // is not a collision because a title is not an identifier (ADR 0016). What
       // stays this module's is the default and the normalization, not the choice.
       // Normalized the way a rename is, and for the same reason: creation and
       // renaming write one field, so the same typed bytes have to reach the
       // same stored document whichever path wrote them (ADR 0083).
-      const entered = namedThingTitle(completion.title ?? '');
-      const document: ThingDocument = {
-        title: entered ?? nextThingTitle(snapshot),
+      const entered = namedResourceTitle(completion.title ?? '');
+      const document: ResourceDocument = {
+        title: entered ?? nextResourceTitle(snapshot),
         kind: 'reference',
         target: completion.target,
       };
       const refusal = referenceTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
-      createdThing = createThing(document, completion.anchor);
-    } else if (completion.kind === 'added-thing-to-diagram') {
-      if (space.lookup.thing(completion.thingId) === undefined) {
-        return refuse({ code: 'thing-not-found' });
+      createdResource = createResource(document, completion.anchor);
+    } else if (completion.kind === 'added-resource-to-map') {
+      if (space.lookup.resource(completion.resourceId) === undefined) {
+        return refuse({ code: 'resource-not-found' });
       }
-      if (completedPlacement.has(completion.thingId)) {
-        return refuse({ code: 'thing-already-in-diagram' });
+      if (completedPlacement.has(completion.resourceId)) {
+        return refuse({ code: 'resource-already-in-map' });
       }
-      // Membership and a position, and nothing else: a re-added Thing is detached,
+      // Membership and a position, and nothing else: a re-added Resource is detached,
       // and the Edges it once had are never inferred back.
       // The anchor is taken as given: a canvas coordinate is an authored one
       // (ADR 0084).
       completedPlacement = Placement.place(
         completedPlacement,
-        completion.thingId,
+        completion.resourceId,
         freeAnchor(completedPlacement, completion.anchor),
       );
-    } else if (completion.kind === 'removed-thing-from-diagram') {
-      if (!completedPlacement.has(completion.thingId)) {
-        return refuse({ code: 'thing-not-in-diagram' });
+    } else if (completion.kind === 'removed-resource-from-map') {
+      if (!completedPlacement.has(completion.resourceId)) {
+        return refuse({ code: 'resource-not-in-map' });
       }
-      unplacedThingId = completion.thingId;
-      completedPlacement = removedThing(completedPlacement, completion.thingId);
-    } else if (completion.kind === 'deleted-thing') {
-      const deleted = space.lookup.thing(completion.thingId);
+      unplacedResourceId = completion.resourceId;
+      completedPlacement = removedResource(completedPlacement, completion.resourceId);
+    } else if (completion.kind === 'deleted-resource') {
+      const deleted = space.lookup.resource(completion.resourceId);
       if (deleted === undefined) {
-        return refuse({ code: 'thing-not-found' });
+        return refuse({ code: 'resource-not-found' });
       }
-      // A Space Thing owns the Space it names (ADR 0058), so deleting it deletes
+      // A Space Resource owns the Space it names (ADR 0058), so deleting it deletes
       // that Space and everything below it — one coordinated multi-Space Edit,
-      // which is Space Thing lifecycle through the session registry and not
+      // which is Space Resource lifecycle through the session registry and not
       // a single-Space update this seam can make. Completing it here would store
       // a Space whose target is unreachable, and aggregate intake refuses that
-      // commit permanently with the Thing already gone from the working state.
+      // commit permanently with the Resource already gone from the working state.
       if (deleted.kind === 'space') {
-        return refuse({ code: 'space-thing-deletion-unsupported' });
+        return refuse({ code: 'space-resource-deletion-unsupported' });
       }
-      // A Reference Thing whose Target vanished is not a Thing intake accepts, so the Space
-      // cannot lose one out from under its Reference Things. Removing that Thing from a
-      // single Diagram is never blocked this way — only deleting it outright.
-      const incoming = incomingReferences(snapshot.things, completion.thingId);
+      // A Reference Resource whose Target vanished is not a Resource intake accepts, so the Space
+      // cannot lose one out from under its Reference Resources. Removing that Resource from a
+      // single Map is never blocked this way — only deleting it outright.
+      const incoming = incomingReferences(snapshot.resources, completion.resourceId);
       if (incoming.length > 0) {
         return refuse({
-          code: 'thing-has-references',
+          code: 'resource-has-references',
           // Named, not Titled: the wording joins these into one sentence, and
           // a Title's later lines would break the list across it (ADR 0083).
           referenceTitles: incoming.map((reference) => titleName(reference.document.title)),
         });
       }
-      // Deferred like a creation so the complete Diagram changes atomically.
-      unplacedThingId = completion.thingId;
-      deletedThingId = completion.thingId;
+      // Deferred like a creation so the complete Map changes atomically.
+      unplacedResourceId = completion.resourceId;
+      deletedResourceId = completion.resourceId;
       snapshot = {
         ...snapshot,
-        things: snapshot.things.filter((thing) => thing.id !== completion.thingId),
+        resources: snapshot.resources.filter((resource) => resource.id !== completion.resourceId),
       };
     } else if (completion.kind === 'create-and-connect') {
       const refusal = connectRefusal(completion.from, null, completedPlacement);
       if (refusal !== null) return refuse(refusal);
       // The drop point is aimed at, so it is kept exactly: the gesture only
-      // offers an empty-canvas release, and stepping off it would move the Thing
+      // offers an empty-canvas release, and stepping off it would move the Resource
       // away from where the author watched the preview sit.
-      createdThing = createThing(
-        { title: nextThingTitle(snapshot), kind: 'markdown', body: '' },
+      createdResource = createResource(
+        { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
         completion.position,
         false,
       );
-      connection = { from: completion.from, to: createdThing.id };
-    } else if (completion.kind === 'connected-things') {
+      connection = { from: completion.from, to: createdResource.id };
+    } else if (completion.kind === 'connected-resources') {
       const named =
         completion.graphId === undefined
           ? undefined
           : currentSpace().lookup.graph(completion.graphId);
-      if (completion.graphId !== undefined && named?.owner.diagram.id !== resolved.diagram.id) {
+      if (completion.graphId !== undefined && named?.owner.map.id !== resolved.map.id) {
         return refuse({ code: 'graph-not-owned' });
       }
-      const fallbackId = resolved.diagram.activeGraph ?? resolved.diagram.graphs[0]?.id;
+      const fallbackId = resolved.map.activeGraph ?? resolved.map.graphs[0]?.id;
       const graph =
         named?.graph ??
-        (embeddedDiagramId === undefined
+        (embeddedMapId === undefined
           ? targetGraph()
           : fallbackId === undefined
             ? null
-            : (resolved.diagram.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
+            : (resolved.map.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
       const refusal = connectRefusal(completion.from, completion.to, completedPlacement, graph);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
-    } else if (completion.kind === 'settled-thing-movement') {
-      // The moved Things' drop points, merged over the Diagram's own positions
+    } else if (completion.kind === 'settled-resource-movement') {
+      // The moved Resources' drop points, merged over the Map's own positions
       // this Edit already started from — `Placement.next` is what keeps each
-      // Thing's Open/Closed state and Open Size while overwriting `x`/`y`.
+      // Resource's Open/Closed state and Open Size while overwriting `x`/`y`.
       completedPlacement = Placement.next(
         completedPlacement,
         Placement.fromEntries(completion.moved),
         [...completion.moved.keys()],
       );
     }
-    // Which Diagram this Edit writes, and what it owns afterwards.
-    const diagramId: UUID = resolved.diagram.id;
-    let diagramTitle: string;
+    // Which Map this Edit writes, and what it owns afterwards.
+    const mapId: UUID = resolved.map.id;
+    let mapTitle: string;
     let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
-    const { diagram } = resolved;
-    diagramTitle = diagram.title;
-    ownedGraphs = diagram.graphs;
+    const { map } = resolved;
+    mapTitle = map.title;
+    ownedGraphs = map.graphs;
     activeGraphId =
-      embeddedDiagramId === undefined
+      embeddedMapId === undefined
         ? navigationState.activeGraphId
-        : (diagram.activeGraph ?? diagram.graphs[0]?.id ?? null);
-    if (completion.kind === 'renamed-diagram') {
+        : (map.activeGraph ?? map.graphs[0]?.id ?? null);
+    if (completion.kind === 'renamed-map') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040) — and the id is
-      // checked because this Edit resolves its Diagram from state read *later*
+      // checked because this Edit resolves its Map from state read *later*
       // than the gesture that named one. `deriveCompletedEdit` takes the
       // selection from `navigation.getState()` at derivation time, and three
-      // things put that ahead of the id the author submitted: a completion that
+      // resources put that ahead of the id the author submitted: a completion that
       // arrived while another was completing derives off the queue rather than
       // off the press; the Dock's `IdentityName` closes over the
       // `canvas.selected.id` of its last committed render, so a selection that
-      // moved this tick has not reached it yet; and an embedded Diagram Edit
-      // resolves `embeddedDiagramId` rather than the selection at all, so a
-      // rename aimed at the drawing Diagram names the wrong one by construction.
+      // moved this tick has not reached it yet; and an embedded Map Edit
+      // resolves `embeddedMapId` rather than the selection at all, so a
+      // rename aimed at the drawing Map names the wrong one by construction.
       // The surface guards are real and are not this one — `IdentityName` ends
       // a draft whose subject changed, `App` ends one the replacement epoch or
       // lost availability invalidated (ADR 0042) — but both end it on the
       // *next* render, and this answers the submit already in flight. So a
-      // rename naming a Diagram other than the one this Edit resolves is a
+      // rename naming a Map other than the one this Edit resolves is a
       // gesture aimed at something no longer drawing — an author's state, not a
       // defect.
-      if (completion.diagramId !== diagramId) return refuse({ code: 'diagram-not-found' });
+      if (completion.mapId !== mapId) return refuse({ code: 'map-not-found' });
       const title = trimmedNonBlankTitle(completion.title);
-      if (title === null) return refuse({ code: 'diagram-title-required' });
-      if (title === diagramTitle) return UNCHANGED;
-      diagramTitle = title;
+      if (title === null) return refuse({ code: 'map-title-required' });
+      if (title === mapTitle) return UNCHANGED;
+      mapTitle = title;
     }
-    // Apply membership changes together to the completed Diagram.
-    if (createdThing !== null) {
+    // Apply membership changes together to the completed Map.
+    if (createdResource !== null) {
       // As above: the drop point is authorship, not a coordinate to convert
       // (ADR 0084).
       completedPlacement = Placement.place(
         completedPlacement,
-        createdThing.id,
-        createdThing.avoidingOverlap
-          ? freeAnchor(completedPlacement, createdThing.position)
-          : createdThing.position,
+        createdResource.id,
+        createdResource.avoidingOverlap
+          ? freeAnchor(completedPlacement, createdResource.position)
+          : createdResource.position,
       );
     }
-    if (deletedThingId !== undefined) {
-      completedPlacement = removedThing(completedPlacement, deletedThingId);
+    if (deletedResourceId !== undefined) {
+      completedPlacement = removedResource(completedPlacement, deletedResourceId);
     }
     if (connection !== null) {
       const writeGraphId =
-        completion.kind === 'connected-things' && completion.graphId !== undefined
+        completion.kind === 'connected-resources' && completion.graphId !== undefined
           ? completion.graphId
           : activeGraphId;
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === writeGraphId);
       const graph = ownedGraphs[graphIndex];
       if (graph === undefined) {
-        return refuse({ code: 'diagram-active-graph-required' });
+        return refuse({ code: 'map-active-graph-required' });
       }
       const graphs = [...ownedGraphs];
       graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
       ownedGraphs = graphs;
-    } else if (unplacedThingId !== undefined) {
-      // A Thing that has left this Diagram cannot be an endpoint of a Graph this
-      // Diagram owns (ADR 0040), so its incident Edges leave with it. The Graphs
+    } else if (unplacedResourceId !== undefined) {
+      // A Resource that has left this Map cannot be an endpoint of a Graph this
+      // Map owns (ADR 0040), so its incident Edges leave with it. The Graphs
       // themselves stay, empty ones included: deletion is their own action.
-      ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedThingId);
+      ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedResourceId);
     } else if (completion.kind === 'added-graph') {
       const graph: Graph = {
         id: newId(),
@@ -1588,7 +1594,7 @@ export function createSpaceAuthoring({
     ) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === completion.graphId);
       const graph = ownedGraphs[graphIndex];
-      // Ownership, not existence: a Graph a *second* Diagram owns exists and is
+      // Ownership, not existence: a Graph a *second* Map owns exists and is
       // still not one this Edit may write (ADR 0040).
       if (graph === undefined) {
         return refuse({ code: 'graph-not-owned' });
@@ -1596,7 +1602,7 @@ export function createSpaceAuthoring({
       const replacing = (next: Graph): readonly Graph[] =>
         ownedGraphs.map((existing, index) => (index === graphIndex ? next : existing));
       if (completion.kind === 'renamed-graph') {
-        // Trimmed, for the reason a Thing title is: `z.string().min(1)` counts
+        // Trimmed, for the reason a Resource title is: `z.string().min(1)` counts
         // characters, so blank is the empty case wearing different bytes.
         const title = trimmedNonBlankTitle(completion.title);
         if (title === null) {
@@ -1608,10 +1614,10 @@ export function createSpaceAuthoring({
         if (completion.color === graph.color) return UNCHANGED;
         ownedGraphs = replacing({ ...graph, color: completion.color });
       } else if (completion.kind === 'deleted-graph') {
-        // Every Diagram resolves an Active Graph, so the last one cannot go
+        // Every Map resolves an Active Graph, so the last one cannot go
         // (ADR 0040). Removing its Edges is the author's way to empty it.
         if (ownedGraphs.length === 1) {
-          return refuse({ code: 'diagram-must-keep-graph' });
+          return refuse({ code: 'map-must-keep-graph' });
         }
         ownedGraphs = ownedGraphs.filter((_, index) => index !== graphIndex);
         // Order among the survivors is untouched, and the first of them becomes
@@ -1630,29 +1636,29 @@ export function createSpaceAuthoring({
         // The same rule `edgeEligibility` offered the gesture under, asked again
         // because the Space can have changed since — and answering with the
         // resulting Edge rather than a boolean, so there is nothing to rederive.
-        const outcome = reconnectOutcome(graph, completion, completedPlacement, (thingId) =>
-          snapshot.things.some((thing) => thing.id === thingId),
+        const outcome = reconnectOutcome(graph, completion, completedPlacement, (resourceId) =>
+          snapshot.resources.some((resource) => resource.id === resourceId),
         );
         if (outcome.kind !== 'edge') return outcome;
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
         // In place, so reconnecting does not reorder a Graph's Edges — that order
-        // is what a branching Thing's moves are offered in (ADR 0024).
+        // is what a branching Resource's moves are offered in (ADR 0024).
         ownedGraphs = replacing({
           ...graph,
           edges: graph.edges.map((edge, index) => (index === edgeIndex ? outcome.edge : edge)),
         });
       }
     }
-    const next = updatePositionedDiagram(
-      // The cascade first, then this Diagram written whole over the top of it.
-      // Delete Thing from Space is one Edit over every Diagram (ADR 0040), and the
-      // current one is simply the Diagram this Edit was also going to write.
-      deletedThingId === undefined
+    const next = updatePositionedMap(
+      // The cascade first, then this Map written whole over the top of it.
+      // Delete Resource from Space is one Edit over every Map (ADR 0040), and the
+      // current one is simply the Map this Edit was also going to write.
+      deletedResourceId === undefined
         ? snapshot
-        : withThingRemovedFromDiagrams(snapshot, deletedThingId),
+        : withResourceRemovedFromMaps(snapshot, deletedResourceId),
       {
-        diagramId,
-        title: diagramTitle,
+        mapId,
+        title: mapTitle,
         positions: completedPlacement,
         graphs: ownedGraphs,
         activeGraphId,
@@ -1660,15 +1666,15 @@ export function createSpaceAuthoring({
     );
     if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
     assertValidAuthoredSnapshot(next);
-    const created: { createdThingId?: ThingId; createdGraphId?: GraphId } = {};
-    if (createdThing !== null) created.createdThingId = createdThing.id;
+    const created: { createdResourceId?: ResourceId; createdGraphId?: GraphId } = {};
+    if (createdResource !== null) created.createdResourceId = createdResource.id;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
     return {
       kind: 'completed',
       edit: {
         snapshot: next,
         nextActiveGraphId: activeGraphId,
-        nextDiagramId: diagramId,
+        nextMapId: mapId,
         ...created,
       },
     };
@@ -1678,24 +1684,24 @@ export function createSpaceAuthoring({
    * Install a derived Edit: one fallible step, and then one that refuses
    * nothing this Edit produces.
    *
-   * `session.submit` has to come first. `continueInDiagram` resolves the Graph
-   * and the Diagram against `currentSpace()`, which reads the working snapshot
+   * `session.submit` has to come first. `continueInMap` resolves the Graph
+   * and the Map against `currentSpace()`, which reads the working snapshot
    * `submit` installs synchronously — before it, neither exists yet and it
    * would refuse. So the order is forced, and the useful consequence is that
    * the only statement here that can *fail* is also the first: a `submit` that
    * throws leaves Navigation untouched rather than half-applied.
    *
-   * **The Diagram is adopted with the Active Graph that belongs to it**, in one
-   * call. The Graph is resolved against the Diagram *this Edit produced* rather
-   * than the one it began in — a Diagram owns its Graphs (ADR 0040), so the
-   * pair is one answer, and an intermediate state where the Diagram has moved
-   * and the Graph has not would name a Diagram beside a Graph some other
-   * Diagram owns, which Navigation refuses.
+   * **The Map is adopted with the Active Graph that belongs to it**, in one
+   * call. The Graph is resolved against the Map *this Edit produced* rather
+   * than the one it began in — a Map owns its Graphs (ADR 0040), so the
+   * pair is one answer, and an intermediate state where the Map has moved
+   * and the Graph has not would name a Map beside a Graph some other
+   * Map owns, which Navigation refuses.
    *
-   * `continueInDiagram` refuses only a Diagram that does not draw the Active
-   * Graph handed with it — which is that Diagram's own `activeGraph`, in a
+   * `continueInMap` refuses only a Map that does not draw the Active
+   * Graph handed with it — which is that Map's own `activeGraph`, in a
    * snapshot `loadSpaceSnapshot` accepted a line earlier, and intake is
-   * precisely the check that a Diagram's `activeGraph` is one it owns. A null
+   * precisely the check that a Map's `activeGraph` is one it owns. A null
    * Active Graph names nothing and is exempt. Re-checking any of that *here*
    * would add a branch that cannot be taken, and this repo deletes those rather
    * than keeps them: the guard lives in Navigation because it is Navigation's
@@ -1705,7 +1711,7 @@ export function createSpaceAuthoring({
   const installCompletedEdit = (edit: CompletedEdit): void => {
     installTogether(() => {
       session.submit(edit.snapshot);
-      navigation.continueInDiagram(edit.nextDiagramId, edit.nextActiveGraphId);
+      navigation.continueInMap(edit.nextMapId, edit.nextActiveGraphId);
     });
   };
 
@@ -1714,8 +1720,8 @@ export function createSpaceAuthoring({
     // `unchanged` and `refused` are already the answer — the core and the
     // interface share one vocabulary rather than translating between two.
     if (derived.kind !== 'completed') return derived;
-    const { createdThingId, createdGraphId } = derived.edit;
-    if (reported.embeddedDiagramId === undefined) {
+    const { createdResourceId, createdGraphId } = derived.edit;
+    if (reported.embeddedMapId === undefined) {
       installCompletedEdit(derived.edit);
     } else {
       const previous = session.getState().working;
@@ -1723,42 +1729,36 @@ export function createSpaceAuthoring({
         ...derived.edit.snapshot,
         document: {
           ...derived.edit.snapshot.document,
-          defaultDiagram: previous.document.defaultDiagram,
+          defaultMap: previous.document.defaultMap,
         },
       };
       installTogether(() => {
         session.submit(snapshot);
-        if (navigation.getState().selectedDiagramId === reported.embeddedDiagramId) {
+        if (navigation.getState().selectedMapId === reported.embeddedMapId) {
           // A context menu may delete the Graph the target's own canvas shows.
-          // Keep its Diagram, but never leave Navigation naming a removed Graph.
+          // Keep its Map, but never leave Navigation naming a removed Graph.
           if (
             reported.completion.kind === 'deleted-graph' &&
             navigation.getState().activeGraphId === reported.completion.graphId
           ) {
-            navigation.continueInDiagram(
-              reported.embeddedDiagramId,
-              derived.edit.nextActiveGraphId,
-            );
+            navigation.continueInMap(reported.embeddedMapId, derived.edit.nextActiveGraphId);
           }
         }
       });
     }
-    const created: { createdThingId?: ThingId; createdGraphId?: GraphId } = {};
-    if (createdThingId !== undefined) created.createdThingId = createdThingId;
+    const created: { createdResourceId?: ResourceId; createdGraphId?: GraphId } = {};
+    if (createdResourceId !== undefined) created.createdResourceId = createdResourceId;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
     return { kind: 'completed', ...created };
   };
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (completion: AuthoringCompletion, embeddedDiagramId?: UUID): AuthoringResult => {
-    if (
-      embeddedDiagramId !== undefined &&
-      currentSpace().lookup.diagram(embeddedDiagramId) === undefined
-    ) {
-      return { kind: 'refused', refusal: { code: 'diagram-not-found' } };
+  const complete = (completion: AuthoringCompletion, embeddedMapId?: UUID): AuthoringResult => {
+    if (embeddedMapId !== undefined && currentSpace().lookup.map(embeddedMapId) === undefined) {
+      return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }
-    const reported: ReportedCompletion = { completion, embeddedDiagramId };
+    const reported: ReportedCompletion = { completion, embeddedMapId };
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
       return { kind: 'queued' };
@@ -1776,7 +1776,7 @@ export function createSpaceAuthoring({
       while (queued.length > 0) {
         const next = queued.shift();
         if (next === undefined) continue;
-        // ADR 0042: an entry was derived from identities, positions and Thing
+        // ADR 0042: an entry was derived from identities, positions and Resource
         // values read out of the Space that was current when it was queued, and
         // an observer may accept the stored Space from inside the very
         // publication this queue fills during. An entry the epoch has outlived
@@ -1855,7 +1855,7 @@ export function createSpaceAuthoring({
     if (!accepted.ok) {
       return { code: 'stored-space-invalid', errors: accepted.errors };
     }
-    const selection = requireDefaultDiagram(accepted.space);
+    const selection = requireDefaultMap(accepted.space);
     installTogether(() => {
       session.acceptRemote();
       navigation.openFresh(selection);
@@ -1867,10 +1867,10 @@ export function createSpaceAuthoring({
   return {
     getState: observable.getState,
     subscribe: observable.subscribe,
-    diagramPlacement,
+    mapPlacement,
     edgeEligibility,
     complete,
-    completeInDiagram: (diagramId, completion) => complete(completion, diagramId),
+    completeInMap: (mapId, completion) => complete(completion, mapId),
     retryPersistence: session.retry,
     // Read at the moment the author asks, never captured earlier. `session`
     // ignores the call outside a conflict, so there is nothing to check here.

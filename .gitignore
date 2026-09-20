@@ -36,7 +36,7 @@ test-results/
 .scratch/**
 !.scratch/**/
 !.scratch/**/*.md
-# Performance fixtures are generated aggregates; their Thing files happen to be
+# Performance fixtures are generated aggregates; their Resource files happen to be
 # Markdown, but are derived from the tracked benchmark scenario generator.
 .scratch/space-thing-drag-performance/generated/**
 # Generated dogfood Spaces are rebuilt from their release tag and issue blockers.

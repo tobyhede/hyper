@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraphRenderEdges, loadSpace, graphThingIds, type Space } from '../src/index';
+import { buildGraphRenderEdges, loadSpace, graphResourceIds, type Space } from '../src/index';
 // Internal to the package, so not reachable through what it offers.
-import { thingIdsForGraphs } from '../src/graph-rendering';
-import { thingFile, uuid } from './thing-files';
+import { resourceIdsForGraphs } from '../src/graph-rendering';
+import { resourceFile, uuid } from './resource-files';
 
 // a → b → c  (main),  a → c  (quick): c is shared, a fans out.
 function loadFixture(): Space {
@@ -11,7 +11,7 @@ function loadFixture(): Space {
       version: 1,
       id: uuid('00000000-0000-4000-8000-000000000001'),
       title: 'Test',
-      diagrams: [
+      maps: [
         {
           id: uuid('00000000-0000-4000-8000-000000000022'),
           title: 'Working',
@@ -50,9 +50,9 @@ function loadFixture(): Space {
       ],
     },
     [
-      thingFile(uuid('00000000-0000-4000-8000-000000000002')),
-      thingFile(uuid('00000000-0000-4000-8000-000000000003')),
-      thingFile(uuid('00000000-0000-4000-8000-000000000005')),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+      resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
     ],
   );
   if (!result.ok) throw new Error('fixture should load');
@@ -61,25 +61,25 @@ function loadFixture(): Space {
 
 const space = loadFixture();
 
-describe('graphThingIds', () => {
-  it('lists a graph’s distinct things', () => {
-    expect(graphThingIds(space, uuid('00000000-0000-4000-8000-000000000004'))).toEqual([
+describe('graphResourceIds', () => {
+  it('lists a graph’s distinct resources', () => {
+    expect(graphResourceIds(space, uuid('00000000-0000-4000-8000-000000000004'))).toEqual([
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000003'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ]);
-    expect(graphThingIds(space, uuid('00000000-0000-4000-8000-000000000031'))).toEqual([
+    expect(graphResourceIds(space, uuid('00000000-0000-4000-8000-000000000031'))).toEqual([
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000005'),
     ]);
-    expect(graphThingIds(space, uuid('00000000-0000-4000-8000-000000000099'))).toEqual([]);
+    expect(graphResourceIds(space, uuid('00000000-0000-4000-8000-000000000099'))).toEqual([]);
   });
 });
 
-describe('thingIdsForGraphs', () => {
-  it('unions several graphs, keeping each thing once', () => {
+describe('resourceIdsForGraphs', () => {
+  it('unions several graphs, keeping each resource once', () => {
     expect(
-      thingIdsForGraphs(space, [
+      resourceIdsForGraphs(space, [
         uuid('00000000-0000-4000-8000-000000000004'),
         uuid('00000000-0000-4000-8000-000000000031'),
       ]),
@@ -93,7 +93,7 @@ describe('thingIdsForGraphs', () => {
   it('orders by the graphs given, then by authored edge order within each', () => {
     // quick first, so c is listed before b.
     expect(
-      thingIdsForGraphs(space, [
+      resourceIdsForGraphs(space, [
         uuid('00000000-0000-4000-8000-000000000031'),
         uuid('00000000-0000-4000-8000-000000000004'),
       ]),
@@ -106,9 +106,9 @@ describe('thingIdsForGraphs', () => {
 
   it('ignores unknown graph ids', () => {
     const missing = uuid('00000000-0000-4000-8000-000000000099');
-    expect(thingIdsForGraphs(space, [missing])).toEqual([]);
+    expect(resourceIdsForGraphs(space, [missing])).toEqual([]);
     expect(
-      thingIdsForGraphs(space, [uuid('00000000-0000-4000-8000-000000000031'), missing]),
+      resourceIdsForGraphs(space, [uuid('00000000-0000-4000-8000-000000000031'), missing]),
     ).toEqual([
       uuid('00000000-0000-4000-8000-000000000002'),
       uuid('00000000-0000-4000-8000-000000000005'),
@@ -116,7 +116,7 @@ describe('thingIdsForGraphs', () => {
   });
 
   it('returns nothing for no graphs', () => {
-    expect(thingIdsForGraphs(space, [])).toEqual([]);
+    expect(resourceIdsForGraphs(space, [])).toEqual([]);
   });
 });
 
@@ -135,7 +135,7 @@ describe('buildGraphRenderEdges', () => {
    * resolving to the other in the render adapter's `changeEdges` fold.
    *
    * Two Graphs sharing a pair is the case worth pinning, because it is legal:
-   * `Main` and `Quick` both run between the same Things here, and only the Graph
+   * `Main` and `Quick` both run between the same Resources here, and only the Graph
    * prefix separates them.
    */
   it('mints one distinct id per authored edge across every graph', () => {
@@ -147,7 +147,7 @@ describe('buildGraphRenderEdges', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Test',
-        diagrams: [
+        maps: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -181,8 +181,8 @@ describe('buildGraphRenderEdges', () => {
         ],
       },
       [
-        thingFile(uuid('00000000-0000-4000-8000-000000000002')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000003')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
       ],
     );
     expect(shared.ok).toBe(true);
@@ -193,7 +193,7 @@ describe('buildGraphRenderEdges', () => {
     expect(new Set(sharedIds).size).toBe(2);
   });
 
-  it('produces one edge per authored edge, naming the two Things it joins', () => {
+  it('produces one edge per authored edge, naming the two Resources it joins', () => {
     expect(edges).toHaveLength(3);
     expect(edges).toContainEqual({
       id: '00000000-0000-4000-8000-000000000004::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000003',
@@ -227,7 +227,7 @@ describe('buildGraphRenderEdges', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Test',
-        diagrams: [
+        maps: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -253,9 +253,9 @@ describe('buildGraphRenderEdges', () => {
         ],
       },
       [
-        thingFile(uuid('00000000-0000-4000-8000-000000000002')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000003')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000005')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
       ],
     );
     if (!shortened.ok) throw new Error('fixture should load');
@@ -274,7 +274,7 @@ describe('buildGraphRenderEdges', () => {
         version: 1,
         id: uuid('00000000-0000-4000-8000-000000000001'),
         title: 'Fork',
-        diagrams: [
+        maps: [
           {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
@@ -303,9 +303,9 @@ describe('buildGraphRenderEdges', () => {
         ],
       },
       [
-        thingFile(uuid('00000000-0000-4000-8000-000000000002')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000003')),
-        thingFile(uuid('00000000-0000-4000-8000-000000000005')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+        resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
       ],
     );
     if (!forked.ok) throw new Error('fixture should load');

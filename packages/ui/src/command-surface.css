@@ -1,10 +1,10 @@
 /* The one command surface, beside the components that draw it.
 
-   **Chrome is about the thing it commands, so it reads as a layer over it.**
+   **Chrome is about the resource it commands, so it reads as a layer over it.**
    Translucent, blurred, hairline-bordered, softly shadowed — never the paper a
-   Thing is. That treatment was written for the Command Dock floating over the
-   canvas, and it is written here because it is not the Dock's: a Thing's own
-   commands are a strip of the same kind floating over the Thing
+   Resource is. That treatment was written for the Command Dock floating over the
+   canvas, and it is written here because it is not the Dock's: a Resource's own
+   commands are a strip of the same kind floating over the Resource
    (`.scratch/command-dock/issues/12`), and the two reading as one language is
    the point rather than a coincidence two stylesheets keep by hand.
 
@@ -14,7 +14,7 @@
 
    **Treatment only.** Where a surface sits, how big it may be, whether it
    scrolls and what it does when it is dragged are the mounting surface's — the
-   Dock's own sheet still owns its twelve slots and its cap, and the Thing's owns
+   Dock's own sheet still owns its twelve slots and its cap, and the Resource's owns
    when its strip is revealed. Nothing here positions anything. */
 .command-surface {
   /* Canvas nodes and application chrome inherit different line heights. */
@@ -42,7 +42,7 @@
 /* A name drawn on a command surface: as much of it as fits, ellipsed rather
    than wrapped, and never widening the surface it is on.
 
-   Shared because the Dock and an Open Space Thing both name a Diagram and a
+   Shared because the Dock and an Open Space Resource both name a Map and a
    Graph, and a name that ellipsed on one and wrapped on the other would be two
    answers to one question. The gap is the *name's* — between a glyph and the
    word beside it — and is not the surface's gap between controls. */
@@ -67,7 +67,7 @@
      it, here, once.
 
      Written on the surface rather than at each place one is mounted because the
-     two places disagreed: `canvas-thing.css` withdrew it for a Thing's rail
+     two places disagreed: `canvas-resource.css` withdrew it for a Resource's rail
      controls and `command-dock.css` never did, which is one control recipe with
      two answers to the same preference. The element selector is what outranks
      the utility class the recipe carries. */

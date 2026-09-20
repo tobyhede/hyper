@@ -183,7 +183,7 @@ export const decideCommit = (
     aggregate.ok
       ? []
       : aggregate.errors.flatMap((error) =>
-          error.kind === 'space-thing-target-missing' &&
+          error.kind === 'space-resource-target-missing' &&
           deletedIds.has(error.targetSpaceId) &&
           !changedIds.has(error.spaceId)
             ? [error.targetSpaceId]

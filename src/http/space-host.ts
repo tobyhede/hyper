@@ -93,7 +93,7 @@ const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoad
  *
  * `newId` is the composition-owned identity source (ADR 0016), and it is the
  * host's only one. One collaborator the host composes mints: the API tree's
- * working-space loader durably initializes a stored diagramless Space on first
+ * working-space loader durably initializes a stored mapless Space on first
  * load (ADR 0079). So it is forwarded to `createSpaceHttpApp` rather than left
  * to that function's own default, which would reinstate the ambient generator
  * behind this composition's back — a host handed a deterministic minter would
@@ -139,7 +139,7 @@ export const createSpaceHost = (
         // database being unreachable, which is temporary, and 503 says so.
         //
         // `GET /api/aggregate` (`packages/http/src/index.ts`) now does the same
-        // thing on the same rule, independently, because `@project/http` cannot
+        // resource on the same rule, independently, because `@project/http` cannot
         // import this module: it re-reads once on an invariant failure — the
         // package boundary means it re-implements `readAggregate` above rather
         // than sharing it — answers 200 if the retry succeeds, and otherwise

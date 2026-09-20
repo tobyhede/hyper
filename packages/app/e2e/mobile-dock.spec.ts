@@ -4,28 +4,28 @@ import {
   activateGraph,
   activeGraph,
   boxOf,
-  createThing,
-  createThingControl,
+  createResource,
+  createResourceControl,
   dock,
-  diagramMenu,
+  mapMenu,
   graphMenu,
-  newDiagram,
+  newMap,
   newGraph,
-  settleNewDiagramName,
+  settleNewMapName,
   nodeByTitle,
   presentControl,
   recolorActiveGraph,
   selectCanvas,
   selectedCanvas,
   settled,
-  thingActions,
+  resourceActions,
 } from './graph';
 
 /**
  * The app's chrome at phone width (ADR 0082).
  *
  * **This file replaced `mobile-sidebar.spec.ts`, and what it owes is a
- * different thing.** The Sidebar below its breakpoint was a modal Sheet drawn
+ * different resource.** The Sidebar below its breakpoint was a modal Sheet drawn
  * over the canvas: it trapped focus and marked everything behind it inert, so
  * every command whose result was on the canvas had to dismiss it first, and
  * that dismissal contract was most of what the old file proved. All of it came
@@ -70,9 +70,9 @@ test(
     await expect(page.getByTestId('space-title')).toBeVisible();
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(page.getByTestId('active-graph')).toBeVisible();
-    await expect(dock(page).getByRole('button', { name: 'Things' })).toBeVisible();
+    await expect(dock(page).getByRole('button', { name: 'Resources' })).toBeVisible();
 
-    // And every disclosure still discloses. The Diagram menu is opened, a choice
+    // And every disclosure still discloses. The Map menu is opened, a choice
     // is made, and the result is on the canvas with nothing dismissed in
     // between — which is the sentence the Sheet's contract used to be about.
     await selectCanvas(page, 'Collection 2');
@@ -89,32 +89,34 @@ test(
  * A command whose result opens an editor on the canvas.
  *
  * This is the case the Sheet could not serve at all: the editor took focus as it
- * mounted and the Sheet's trap took it straight back, so Add Thing had to dismiss
+ * mounted and the Sheet's trap took it straight back, so Add Resource had to dismiss
  * before it could run. Here the strip is beside the result rather than over it,
  * and the caret lands where the author is looking.
  */
-test('Create Thing from the strip names the new Thing on the canvas', async ({ page }) => {
+test('Create Resource from the strip names the new Resource on the canvas', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Markdown Thing');
+  await createResource(page, 'Markdown Resource');
 
-  const title = page.getByRole('textbox', { name: 'Thing title' });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toBeFocused();
-  await expect(title).toHaveValue('Thing 1');
+  await expect(title).toHaveValue('Resource 1');
   await expect(dock(page)).toBeVisible();
 });
 
 /** The other kind, which mints its own Space and names both from one `Space N`. */
-test('Create Space Thing from the strip names the new Thing on the canvas', async ({ page }) => {
+test('Create Space Resource from the strip names the new Resource on the canvas', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await createThing(page, 'Space Thing');
+  await createResource(page, 'Space Resource');
 
-  const title = page.getByRole('textbox', { name: 'Thing title' });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toBeFocused();
   await expect(title).toHaveValue(/^Space \d+$/);
   await expect(dock(page)).toBeVisible();
@@ -123,32 +125,32 @@ test('Create Space Thing from the strip names the new Thing on the canvas', asyn
 });
 
 /**
- * New Diagram at phone width, and the Delete that undoes it.
+ * New Map at phone width, and the Delete that undoes it.
  *
- * Both are rows in the Diagram menu rather than a permanent control and a row
+ * Both are rows in the Map menu rather than a permanent control and a row
  * menu, which is the one detail the narrower box changed about them.
  */
-test('New Diagram selects an empty authored Diagram, and Delete returns to the one before', async ({
+test('New Map selects an empty authored Map, and Delete returns to the one before', async ({
   page,
 }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await newDiagram(page);
+  await newMap(page);
 
-  // New Diagram continues in the new Diagram's name at this width exactly as it
+  // New Map continues in the new Map's name at this width exactly as it
   // does at any other — the caret, not a disclosure, is what the command leaves
-  // behind (`.scratch/command-dock/issues/13`). The Things list it used to
-  // reveal was the thing this test then had to dismiss to reach the next
+  // behind (`.scratch/command-dock/issues/13`). The Resources list it used to
+  // reveal was the control this test then had to dismiss to reach the next
   // command; there is nothing overlaying the strip now.
-  await settleNewDiagramName(page, 'Diagram 1');
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
+  await settleNewMapName(page, 'Map 1');
+  await expect(selectedCanvas(page)).toContainText('Map 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
 
-  const menu = await diagramMenu(page);
-  await menu.getByRole('menuitem', { name: 'Delete Diagram 1' }).click();
+  const menu = await mapMenu(page);
+  await menu.getByRole('menuitem', { name: 'Delete Map 1' }).click();
   await expect(selectedCanvas(page)).toContainText('Collection 1');
 });
 
@@ -198,29 +200,29 @@ test('recolouring the active Graph from the Graph menu persists at phone width',
 });
 
 /**
- * Delete reaching a Dock control leaves the selected Thing standing.
+ * Delete reaching a Dock control leaves the selected Resource standing.
  *
  * React Flow subscribes its delete key on `document`, so a control beside the
  * canvas is inside that subscription and outside the canvas's own guard. Every
  * Dock control carries `nokey` for exactly this, and at phone width the strip is
  * the *only* chrome there is — so if the marker were ever dropped, this is where
- * a reader would lose a Thing to a keystroke meant for a menu.
+ * a reader would lose a Resource to a keystroke meant for a menu.
  */
 
 /**
- * Delete Thing's confirmation at phone width (v1-release/03). Assertions
- * follow `editing.spec.ts` — `Delete Thing confirms before removing the Thing
- * from the whole Space` — so Confirm is `deleted-thing`, not canvas membership.
+ * Delete Resource's confirmation at phone width (v1-release/03). Assertions
+ * follow `editing.spec.ts` — `Delete Resource confirms before removing the Resource
+ * from the whole Space` — so Confirm is `deleted-resource`, not canvas membership.
  */
-test('Delete Thing confirms at phone width with the pointer', async ({ page }) => {
+test('Delete Resource confirms at phone width with the pointer', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const thing = nodeByTitle(page, 'B');
-  await thing.click();
+  const resource = nodeByTitle(page, 'B');
+  await resource.click();
   await (
-    await thingActions(page, 'B')
+    await resourceActions(page, 'B')
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
@@ -228,60 +230,60 @@ test('Delete Thing confirms at phone width with the pointer', async ({ page }) =
   const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
-  await expect(thing).toBeVisible();
+  await expect(resource).toBeVisible();
 
   await (
-    await thingActions(page, 'B')
+    await resourceActions(page, 'B')
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
   await confirmation.getByRole('button', { name: 'Delete from Space' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Things' }).click();
-  await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Resources' }).click();
+  await expect(page.getByRole('button', { name: 'Add B to Map' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(dock(page)).toBeVisible();
 });
 
-test('Delete Thing confirms at phone width from the keyboard', async ({ page }) => {
+test('Delete Resource confirms at phone width from the keyboard', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const thing = nodeByTitle(page, 'B').first();
-  await thing.click();
-  await thing.getByRole('button', { name: 'Actions for Thing B' }).press('Enter');
+  const resource = nodeByTitle(page, 'B').first();
+  await resource.click();
+  await resource.getByRole('button', { name: 'Actions for Resource B' }).press('Enter');
   await expect(page.getByRole('menu')).toBeVisible();
   await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
 
   const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).press('Enter');
-  await expect(thing).toBeVisible();
+  await expect(resource).toBeVisible();
 
-  await thing.getByRole('button', { name: 'Actions for Thing B' }).press('Enter');
+  await resource.getByRole('button', { name: 'Actions for Resource B' }).press('Enter');
   await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
   await confirmation.getByRole('button', { name: 'Delete from Space' }).press('Enter');
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Things' }).click();
-  await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Resources' }).click();
+  await expect(page.getByRole('button', { name: 'Add B to Map' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(dock(page)).toBeVisible();
 });
 
-test('Delete on a Dock control leaves the selected Thing on the canvas', async ({ page }) => {
+test('Delete on a Dock control leaves the selected Resource on the canvas', async ({ page }) => {
   await page.goto('/');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
-  await thing.click();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
+  await resource.click();
 
   await selectedCanvas(page).focus();
   await page.keyboard.press('Delete');
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-  await expect(thing).toBeVisible();
+  await expect(resource).toBeVisible();
 });
 
 /**
@@ -303,7 +305,7 @@ test('Present from the strip leaves the presentation reachable', async ({ page }
   await expect(dock(page)).toBeHidden();
 
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.react-flow__node.rf-thing-node--active')).toHaveCount(1);
+  await expect(page.locator('.react-flow__node.rf-resource-node--active')).toHaveCount(1);
 });
 
 /**
@@ -320,7 +322,7 @@ test('one disclosure is open at a time', async ({ page }) => {
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  await diagramMenu(page);
+  await mapMenu(page);
   await expect(page.getByRole('menu')).toHaveCount(1);
 
   // **The second trigger is pressed directly.** `disclose` dismisses whatever is
@@ -379,7 +381,7 @@ test('a persistence failure stays inside the viewport beside a side-edge Dock', 
   await page.route('**/api/spaces', failCommit);
 
   // Any Edit will do; this one is reachable from the strip itself at this width.
-  await createThing(page, 'Markdown Thing');
+  await createResource(page, 'Markdown Resource');
 
   const failure = page.getByTestId('persistence-failure');
   await expect(failure).toBeVisible();
@@ -460,17 +462,17 @@ test.describe('a short viewport', () => {
     // And the far cluster is reachable, which is what the scrolling is for.
     //
     // **Pressing it now completes an Edit rather than opening a menu.** Create
-    // Thing was one `+` disclosing three kinds, so the cheapest proof that the
+    // Resource was one `+` disclosing three kinds, so the cheapest proof that the
     // far cluster could be *pressed* was that its menu appeared. The kinds are
-    // peers now and Create Markdown Thing completes on activation, so the proof
-    // is the Thing it makes — and the assertion is the one
-    // `Create Thing from the strip names the new Thing on the canvas` already
-    // uses, rather than a second way of saying a Thing arrived.
-    const create = createThingControl(page);
+    // peers now and Create Markdown Resource completes on activation, so the proof
+    // is the Resource it makes — and the assertion is the one
+    // `Create Resource from the strip names the new Resource on the canvas` already
+    // uses, rather than a second way of saying a Resource arrived.
+    const create = createResourceControl(page);
     await create.scrollIntoViewIfNeeded();
     await expect(create).toBeInViewport({ ratio: 1 });
     await create.click();
-    await expect(page.getByRole('textbox', { name: 'Thing title' })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Resource title' })).toBeFocused();
   });
 });
 

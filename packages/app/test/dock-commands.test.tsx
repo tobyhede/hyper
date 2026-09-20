@@ -26,12 +26,12 @@ import { unavailable } from './command-dock';
  *
  * Three of ADR 0082's obligations and one of ADR 0073's are assertable without
  * a browser, and each of them is a claim the prototype failed before this file
- * existed: a Thing could only be placed by dragging it, the Open Spaces menu's
+ * existed: a Resource could only be placed by dragging it, the Open Spaces menu's
  * accessible name did not contain the word on its face, and the bar was four
  * toolbars where the ADR draws one.
  *
  * The story is mounted whole rather than through a harness of its own. It is
- * the thing under review — `Default` composes the real Space, the production
+ * the resource under review — `Default` composes the real Space, the production
  * canvas and the Dock over it — and a second assembly beside it would be a
  * surface this file could get right while the catalogue's stayed wrong.
  */
@@ -42,7 +42,7 @@ async function renderDock(view: ReactElement): Promise<void> {
     return Promise.resolve();
   });
   await waitFor(() =>
-    expect(within(dock()).getByRole('button', { name: /^Diagram:/ })).toBeInTheDocument(),
+    expect(within(dock()).getByRole('button', { name: /^Map:/ })).toBeInTheDocument(),
   );
 }
 
@@ -125,17 +125,17 @@ const visibleLabel = (control: HTMLElement): string => control.textContent.trim(
 const accessibleName = (control: HTMLElement): string =>
   control.getAttribute('aria-label') ?? visibleLabel(control);
 
-describe('placing a Thing into a Diagram without a pointer (ADR 0082)', () => {
+describe('placing a Resource into a Map without a pointer (ADR 0082)', () => {
   /**
    * The rows were `<div draggable>` — no role, no tab stop, no activation — so
-   * an HTML5 drag was the only way to add a Thing to the Diagram. ADR 0082 says a
+   * an HTML5 drag was the only way to add a Resource to the Map. ADR 0082 says a
    * drag may be *a* way and never the only one.
    */
-  it('offers each Thing in the list as a focusable button', async () => {
+  it('offers each Resource in the list as a focusable button', async () => {
     await renderDock(<Default />);
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Things' }));
+    fireEvent.click(within(dock()).getByRole('button', { name: 'Resources' }));
 
-    const row = screen.getByRole('button', { name: 'Add Constraints to Diagram' });
+    const row = screen.getByRole('button', { name: 'Add Constraints to Map' });
 
     // A native button rather than a `div` wearing a role: Enter and Space
     // activating one is the platform's, and jsdom does not synthesise that
@@ -148,15 +148,15 @@ describe('placing a Thing into a Diagram without a pointer (ADR 0082)', () => {
 
   /**
    * **The same completion, not a parallel one.** Activating a row spends the
-   * `onPlace` the canvas's own `onDrop` spends, so the Thing lands on the
-   * selected Diagram and the canvas draws it — which is the observable a drop
+   * `onPlace` the canvas's own `onDrop` spends, so the Resource lands on the
+   * selected Map and the canvas draws it — which is the observable a drop
    * would have produced.
    */
-  it('adds the Thing to the drawing Diagram, as the drop does', async () => {
+  it('adds the Resource to the drawing Map, as the drop does', async () => {
     await renderDock(<Default />);
-    fireEvent.click(within(dock()).getByRole('button', { name: 'Things' }));
+    fireEvent.click(within(dock()).getByRole('button', { name: 'Resources' }));
 
-    // `Collection 1` places five of the fixture's Things and `Constraints` is
+    // `Collection 1` places five of the fixture's Resources and `Constraints` is
     // not one of them. The canvas resolves its placement asynchronously, so the
     // count is waited for rather than read on the spot.
     const placed = (): number =>
@@ -165,12 +165,12 @@ describe('placing a Thing into a Diagram without a pointer (ADR 0082)', () => {
       ).length;
     await waitFor(() => expect(placed()).toBe(5));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Constraints to Diagram' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Constraints to Map' }));
 
     await waitFor(() => expect(placed()).toBe(6));
-    // The list is not dismissed by the placement: adding several Things costs
+    // The list is not dismissed by the placement: adding several Resources costs
     // one disclosure, exactly as the drag out of it does.
-    expect(screen.getByRole('button', { name: 'Add Prior art to Diagram' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Prior art to Map' })).toBeInTheDocument();
   });
 });
 
@@ -228,25 +228,25 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * arrows move between every command in it. The groups are what assistive
    * technology announces on the way past instead.
    *
-   * **The fifth group is nested inside Things, and is load-bearing rather than
+   * **The fifth group is nested inside Resources, and is load-bearing rather than
    * decorative.** The three Create commands are one `role="group"` so the
    * vertical column has a single element to place: left as three siblings the
-   * cluster's grid auto-places them onto three rows and Things stands at 102px
-   * beside a 44px Diagram. Base UI's group carries no positional logic and does
+   * cluster's grid auto-places them onto three rows and Resources stands at 102px
+   * beside a 44px Map. Base UI's group carries no positional logic and does
    * not divide the keyboard, so the roving tabindex stays on the one root —
    * which the arrow-order test below is what actually proves.
    */
-  it('draws one root and its named groups, with Create nested inside Things', async () => {
+  it('draws one root and its named groups, with Create nested inside Resources', async () => {
     await renderDock(<Default />);
 
     const groups = within(dock()).getAllByRole('group');
 
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
       'Space',
-      'Diagram',
+      'Map',
       'Graph',
-      'Things',
-      'Create a Thing',
+      'Resources',
+      'Create a Resource',
     ]);
     // No toolbar inside the toolbar: the clusters are groups now.
     expect(within(dock()).queryAllByRole('toolbar')).toHaveLength(0);
@@ -257,7 +257,7 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    *
    * The glyph fills the button, so it is what the pointer is over — a `title`
    * on the glyph is the tooltip the author actually sees, and the button's own
-   * never shows. `Markdown Thing` where the button says `Create Markdown Thing`
+   * never shows. `Markdown Resource` where the button says `Create Markdown Resource`
    * names the noun in a slot that performs a verb, which is the one reading the
    * issue's own cost list says a silent visual reading could already take for a
    * filter.
@@ -265,9 +265,9 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
   it('gives each Create control one tooltip, and it is the command', async () => {
     await renderDock(<Default />);
 
-    const create = within(dock()).getByRole('group', { name: 'Create a Thing' });
+    const create = within(dock()).getByRole('group', { name: 'Create a Resource' });
 
-    for (const name of ['Create Markdown Thing', 'Create Space Thing']) {
+    for (const name of ['Create Markdown Resource', 'Create Space Resource']) {
       const control = within(create).getByRole('button', { name });
       expect(control).toHaveAttribute('title', name);
       expect(control.querySelectorAll('[title]')).toHaveLength(0);
@@ -580,12 +580,12 @@ function TwoSpacesWithAnUnwellOpener() {
         );
         const openedOpener = await spaces.open(opener.id);
         control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Unavailable' });
-        const thing = opener.things[0];
-        if (thing === undefined) throw new Error('The Opener needs a Thing');
+        const resource = opener.resources[0];
+        if (resource === undefined) throw new Error('The Opener needs a Resource');
         const edit = openedOpener.app.authoring.complete({
-          kind: 'edited-thing',
-          thingId: thing.id,
-          document: { ...thing.document, title: 'An edited Thing' },
+          kind: 'edited-resource',
+          resourceId: resource.id,
+          document: { ...resource.document, title: 'An edited Resource' },
         });
         // A refused Edit commits nothing, so the wait below would spend its
         // whole timeout and then report the persistence state rather than the
@@ -600,7 +600,7 @@ function TwoSpacesWithAnUnwellOpener() {
 }
 
 /**
- * **The last Diagram and the last Graph cannot be deleted, and the rule is not this file's.**
+ * **The last Map and the last Graph cannot be deleted, and the rule is not this file's.**
  *
  * The prototype's version of this test had to argue that the fixture's
  * `deleteDisabled`/`editsDisabled` flags were not the floor — that each row read
@@ -612,9 +612,9 @@ function TwoSpacesWithAnUnwellOpener() {
  * Still written as a test rather than as a comment, because the next reader will
  * have the same doubt and a comment would only assert the answer.
  */
-describe('the last Diagram and Graph', () => {
+describe('the last Map and Graph', () => {
   /** Whichever the cluster is showing now, which each deletion changes. */
-  const showing = (kind: 'Diagram' | 'Active Graph'): string => {
+  const showing = (kind: 'Map' | 'Active Graph'): string => {
     const name = within(dock())
       .getByRole('button', { name: new RegExp(`^${kind}: `) })
       .getAttribute('aria-label');
@@ -622,7 +622,7 @@ describe('the last Diagram and Graph', () => {
     return name.slice(`${kind}: `.length);
   };
 
-  const deleteItem = (kind: 'Diagram' | 'Active Graph'): HTMLElement => {
+  const deleteItem = (kind: 'Map' | 'Active Graph'): HTMLElement => {
     if (screen.queryByRole('menu') !== null) fireEvent.keyDown(document.body, { key: 'Escape' });
     const title = showing(kind);
     fireEvent.click(within(dock()).getByRole('button', { name: `${kind}: ${title}` }));
@@ -632,7 +632,7 @@ describe('the last Diagram and Graph', () => {
   it('withhold Delete from a story, which cannot empty the Space', async () => {
     await renderDock(<Default />);
 
-    for (const kind of ['Diagram', 'Active Graph'] as const) {
+    for (const kind of ['Map', 'Active Graph'] as const) {
       // Down to one, however many the fixture starts with. The loop is bounded
       // by the collection rather than by a count this test would have to keep
       // in step with the fixture.
@@ -649,7 +649,7 @@ describe('the last Diagram and Graph', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' });
     // Still drawing: neither `loadSpaceSnapshot`'s refusal nor the fixture's own
     // guard was reached, which is what an emptied Space would have done.
-    expect(within(dock()).getByRole('button', { name: /^Diagram: / })).toBeInTheDocument();
+    expect(within(dock()).getByRole('button', { name: /^Map: / })).toBeInTheDocument();
     expect(within(dock()).getByRole('button', { name: /^Active Graph: / })).toBeInTheDocument();
   });
 });

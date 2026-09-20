@@ -20,12 +20,12 @@ import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-const THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const OTHER_THING_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const DIAGRAM_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+const OTHER_RESOURCE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+const MAP_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
-const LINK_THING_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
-const CHILD_DIAGRAM_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
+const LINK_RESOURCE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
+const CHILD_MAP_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CHILD_GRAPH_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 
 /**
@@ -45,16 +45,16 @@ const mintingIds = (...ids: readonly [UUID, ...UUID[]]): (() => UUID) => {
 const storedSpace = (
   revision: bigint,
   id = SPACE_ID,
-  thingId = THING_ID,
+  resourceId = RESOURCE_ID,
   title = 'Existing space',
 ): LoadedSpace => ({
   snapshot: {
     id,
     document: { version: 1, title },
-    things: [
+    resources: [
       {
-        id: thingId,
-        document: { title: 'Existing thing', kind: 'markdown', body: '' },
+        id: resourceId,
+        document: { title: 'Existing resource', kind: 'markdown', body: '' },
       },
     ],
   },
@@ -64,7 +64,7 @@ const storedSpace = (
 
 describe('defaultContentAggregate', () => {
   it('mints one complete Meta Space through the injected identity source', () => {
-    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID));
+    const aggregate = defaultContentAggregate(mintingIds(SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID));
 
     expect(aggregate).toEqual({
       metaSpaceId: SPACE_ID,
@@ -74,19 +74,21 @@ describe('defaultContentAggregate', () => {
           document: {
             version: 1,
             title: 'New space',
-            defaultDiagram: DIAGRAM_ID,
-            diagrams: [
+            defaultMap: MAP_ID,
+            maps: [
               {
-                id: DIAGRAM_ID,
-                title: 'Diagram 1',
+                id: MAP_ID,
+                title: 'Map 1',
                 kind: 'positioned',
-                positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
           },
-          things: [{ id: THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
+          resources: [
+            { id: RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+          ],
         },
       ],
     });
@@ -95,7 +97,7 @@ describe('defaultContentAggregate', () => {
 
 describe('openDatabaseSelection', () => {
   it('opens the space selected by its UUID', async () => {
-    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
+    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space');
     const repository = new MemorySpaceRepository([storedSpace(4n), selected], SPACE_ID);
 
     const result = await openDatabaseSelection(repository, OTHER_SPACE_ID);
@@ -105,7 +107,7 @@ describe('openDatabaseSelection', () => {
 
   it('rejects a selected UUID that disappeared without falling back to another space', async () => {
     const remaining = storedSpace(0n);
-    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_THING_ID, 'Other space');
+    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space');
     const repository = new MemorySpaceRepository([remaining, selected], SPACE_ID);
     // Not a lifecycle assertion — the Space is made to vanish after construction,
     // which since ADR 0078 is `replaceAggregate` and no longer a mode on one door.
@@ -129,7 +131,7 @@ describe('establishMetaSpace', () => {
 
     const metaSpaceId = await establishMetaSpace(
       repository,
-      mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID),
+      mintingIds(SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID),
     );
 
     expect(metaSpaceId).toBe(SPACE_ID);
@@ -166,7 +168,7 @@ describe('establishMetaSpace', () => {
     // The type rather than the message. Classification is what a reader acts on
     // — the root address picks a status from it and start-up decides whether to
     // keep trying — so pinning the prose here would leave the assertion and the
-    // behaviour it stands for testing different things.
+    // behaviour it stands for testing different resources.
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     await expect(establishMetaSpace(repository, mintingIds(OTHER_SPACE_ID))).rejects.toThrow(
       AggregateInvariantError,
@@ -218,7 +220,7 @@ const recordingWait = (waits: number[]) => (milliseconds: number) => {
 };
 
 /** The four ids one establishment mints, and no more. */
-const establishmentIds = () => mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID);
+const establishmentIds = () => mintingIds(SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID);
 
 describe('retryMetaSpaceEstablishment', () => {
   it('establishes the Meta Space once the database comes back', async () => {
@@ -391,7 +393,7 @@ describe('resolveDatabaseStartup', () => {
 
     const result = await resolveDatabaseStartup(
       repository,
-      mintingIds(SPACE_ID, THING_ID, DIAGRAM_ID, GRAPH_ID),
+      mintingIds(SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID),
     );
 
     expect(result).toEqual({
@@ -402,19 +404,21 @@ describe('resolveDatabaseStartup', () => {
           document: {
             version: 1,
             title: 'New space',
-            defaultDiagram: DIAGRAM_ID,
-            diagrams: [
+            defaultMap: MAP_ID,
+            maps: [
               {
-                id: DIAGRAM_ID,
-                title: 'Diagram 1',
+                id: MAP_ID,
+                title: 'Map 1',
                 kind: 'positioned',
-                positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
           },
-          things: [{ id: THING_ID, document: { title: 'Thing 1', kind: 'markdown', body: '' } }],
+          resources: [
+            { id: RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+          ],
         },
         revision: 0n,
         exportedRevision: null,
@@ -434,20 +438,23 @@ describe('resolveDatabaseStartup', () => {
 
   it('opens the Meta Space rather than the first of several stored Spaces', async () => {
     // Ordinary Spaces live inside the Meta reachability closure, so the second
-    // one is stored *because* a Space Thing in Meta names it.
+    // one is stored *because* a Space Resource in Meta names it.
     const meta: LoadedSpace = {
       snapshot: {
         id: OTHER_SPACE_ID,
         document: { version: 1, title: 'Meta space' },
-        things: [
-          { id: OTHER_THING_ID, document: { title: 'Meta thing', kind: 'markdown', body: '' } },
+        resources: [
           {
-            id: LINK_THING_ID,
+            id: OTHER_RESOURCE_ID,
+            document: { title: 'Meta resource', kind: 'markdown', body: '' },
+          },
+          {
+            id: LINK_RESOURCE_ID,
             document: {
               title: 'Open the child',
               kind: 'space',
               spaceId: SPACE_ID,
-              diagram: CHILD_DIAGRAM_ID,
+              map: CHILD_MAP_ID,
               graph: CHILD_GRAPH_ID,
             },
           },
@@ -456,8 +463,8 @@ describe('resolveDatabaseStartup', () => {
       revision: 7n,
       exportedRevision: null,
     };
-    // The child carries the Diagram that Space Thing selects. A Space Thing
-    // names a Diagram of its target and a Graph that Diagram owns from the
+    // The child carries the Map that Space Resource selects. A Space Resource
+    // names a Map of its target and a Graph that Map owns from the
     // moment it exists (ADR 0079), so the ordinary Space inside the closure
     // cannot be the structureless one `storedSpace` builds.
     const stored = storedSpace(4n);
@@ -467,13 +474,13 @@ describe('resolveDatabaseStartup', () => {
         ...stored.snapshot,
         document: {
           ...stored.snapshot.document,
-          defaultDiagram: CHILD_DIAGRAM_ID,
-          diagrams: [
+          defaultMap: CHILD_MAP_ID,
+          maps: [
             {
-              id: CHILD_DIAGRAM_ID,
-              title: 'Diagram 1',
+              id: CHILD_MAP_ID,
+              title: 'Map 1',
               kind: 'positioned',
-              positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
               activeGraph: CHILD_GRAPH_ID,
             },
@@ -483,7 +490,7 @@ describe('resolveDatabaseStartup', () => {
     };
     const repository = new MemorySpaceRepository([child, meta], OTHER_SPACE_ID);
 
-    const result = await resolveDatabaseStartup(repository, mintingIds(DIAGRAM_ID));
+    const result = await resolveDatabaseStartup(repository, mintingIds(MAP_ID));
 
     expect(result).toEqual({ kind: 'opened', space: meta });
   });

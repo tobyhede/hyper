@@ -13,7 +13,7 @@ export interface AppShellProps {
    * The shell positions its own chrome, so it is the shell that has to know
    * something covers that edge — the canvas is pinned to it, and so is the
    * notice above. Yielding the strip rather than layering over it is what keeps
-   * a Thing the reader is dragging, the Graph key and a standing notice all
+   * a Resource the reader is dragging, the Graph key and a standing notice all
    * visible beside the panel instead of behind it. Any CSS length; omitted
    * means nothing overlays and the main area is full-bleed.
    *
@@ -21,8 +21,8 @@ export interface AppShellProps {
    * Space's command surface takes no layout space from the canvas, and the
    * Command Dock takes none — it floats over `.shell__area`.
    *
-   * **Nothing sets it.** The strip was the Things drawer's, and that drawer is
-   * gone: the Things list is a Popover anchored to its trigger, which overlays
+   * **Nothing sets it.** The strip was the Resources drawer's, and that drawer is
+   * gone: the Resources list is a Popover anchored to its trigger, which overlays
    * the canvas rather than displacing it. Retiring this prop along with the
    * registry `Drawer` and its `DRAWER_WIDTH` is one undecided foundation
    * decision, owned by

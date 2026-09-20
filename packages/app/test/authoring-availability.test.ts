@@ -14,27 +14,27 @@ import {
 const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editable: true,
   presenting: false,
-  editingThingBody: false,
-  editingThingTitle: false,
-  thingIsOpen: false,
+  editingResourceBody: false,
+  editingResourceTitle: false,
+  resourceIsOpen: false,
   editingChromeTitle: false,
   spaceOnCanvas: true,
-  editingEmbeddedDiagram: false,
-  creatingSpaceThing: false,
+  editingEmbeddedMap: false,
+  creatingSpaceEndpoint: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
-  thingsView: true,
+  resourcesView: true,
   chromeTitleEdit: true,
   entityEdits: true,
-  deleteThing: true,
+  deleteResource: true,
   present: true,
-  addThing: true,
-  createSpaceThing: true,
-  createDiagram: true,
+  addResource: true,
+  createSpaceEndpoint: true,
+  createMap: true,
   authorOnCanvas: true,
-  authorInEmbeddedDiagram: true,
-  editThingBody: true,
+  authorInEmbeddedMap: true,
+  editResourceBody: true,
   connectOnCanvas: true,
   dragNodes: true,
   selectNodes: true,
@@ -52,12 +52,12 @@ describe('authoring availability', () => {
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
-        createDiagram: false,
+        createMap: false,
         entityEdits: false,
-        deleteThing: false,
+        deleteResource: false,
         authorOnCanvas: false,
-        authorInEmbeddedDiagram: false,
-        editThingBody: false,
+        authorInEmbeddedMap: false,
+        editResourceBody: false,
         connectOnCanvas: false,
         dragNodes: false,
       },
@@ -67,59 +67,59 @@ describe('authoring availability', () => {
       { presenting: true },
       {
         ...ALL_AVAILABLE,
-        thingsView: false,
+        resourcesView: false,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteThing: false,
-        addThing: false,
-        createSpaceThing: false,
-        createDiagram: false,
+        deleteResource: false,
+        addResource: false,
+        createSpaceEndpoint: false,
+        createMap: false,
         authorOnCanvas: false,
-        authorInEmbeddedDiagram: false,
-        editThingBody: false,
+        authorInEmbeddedMap: false,
+        editResourceBody: false,
         dragNodes: false,
         selectNodes: false,
       },
     ],
     [
-      'a live Thing content edit',
-      { editingThingBody: true },
+      'a live Resource content edit',
+      { editingResourceBody: true },
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteThing: false,
+        deleteResource: false,
         present: false,
-        addThing: false,
-        createSpaceThing: false,
-        createDiagram: false,
+        addResource: false,
+        createSpaceEndpoint: false,
+        createMap: false,
       },
     ],
     [
-      'a live Thing rename',
-      { editingThingTitle: true },
+      'a live Resource rename',
+      { editingResourceTitle: true },
       {
         ...ALL_AVAILABLE,
         chromeTitleEdit: false,
         entityEdits: false,
-        deleteThing: false,
-        createDiagram: false,
+        deleteResource: false,
+        createMap: false,
       },
     ],
-    ['an Open Thing', { thingIsOpen: true }, { ...ALL_AVAILABLE, deleteThing: false }],
+    ['an Open Resource', { resourceIsOpen: true }, { ...ALL_AVAILABLE, deleteResource: false }],
     [
       'a live chrome title edit',
       { editingChromeTitle: true },
       {
         ...ALL_AVAILABLE,
         entityEdits: false,
-        deleteThing: false,
+        deleteResource: false,
         present: false,
-        addThing: false,
-        createSpaceThing: false,
-        createDiagram: false,
+        addResource: false,
+        createSpaceEndpoint: false,
+        createMap: false,
         authorOnCanvas: false,
-        authorInEmbeddedDiagram: false,
+        authorInEmbeddedMap: false,
         connectOnCanvas: false,
       },
     ],
@@ -129,19 +129,19 @@ describe('authoring availability', () => {
       {
         ...ALL_AVAILABLE,
         authorOnCanvas: false,
-        authorInEmbeddedDiagram: false,
+        authorInEmbeddedMap: false,
         connectOnCanvas: false,
       },
     ],
     [
-      'a live Thing edit inside an embedded Diagram',
-      { editingEmbeddedDiagram: true },
+      'a live Resource edit inside an embedded Map',
+      { editingEmbeddedMap: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
     ],
     [
-      'a Space Thing creation in flight',
-      { creatingSpaceThing: true },
-      { ...ALL_AVAILABLE, createSpaceThing: false },
+      'a Space Resource creation in flight',
+      { creatingSpaceEndpoint: true },
+      { ...ALL_AVAILABLE, createSpaceEndpoint: false },
     ],
   ])('withdraws what %s takes away', (_what, inProgress, expected) => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress })).toStrictEqual(
@@ -150,35 +150,35 @@ describe('authoring availability', () => {
   });
 
   describe('the asymmetries', () => {
-    it('offers Add Thing during a live Thing rename and withholds Add Diagram', () => {
+    it('offers Add Resource during a live Resource rename and withholds Add Map', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
-        editingThingTitle: true,
+        editingResourceTitle: true,
       });
 
-      expect(availability.addThing).toBe(true);
-      expect(availability.createDiagram).toBe(false);
+      expect(availability.addResource).toBe(true);
+      expect(availability.createMap).toBe(false);
     });
 
-    it('withholds only Create Space Thing while its coordinated Edit is in flight', () => {
+    it('withholds only Create Space Resource while its coordinated Edit is in flight', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
-        creatingSpaceThing: true,
+        creatingSpaceEndpoint: true,
       });
 
-      expect(availability.createSpaceThing).toBe(false);
-      expect(availability.addThing).toBe(true);
+      expect(availability.createSpaceEndpoint).toBe(false);
+      expect(availability.addResource).toBe(true);
     });
 
-    it('withholds only Delete Thing while a Thing is open', () => {
-      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, thingIsOpen: true });
+    it('withholds only Delete Resource while a Resource is open', () => {
+      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, resourceIsOpen: true });
 
-      expect(availability.deleteThing).toBe(false);
+      expect(availability.deleteResource).toBe(false);
       expect(availability.entityEdits).toBe(true);
-      expect(availability.addThing).toBe(true);
+      expect(availability.addResource).toBe(true);
     });
 
-    it('keeps a connection reachable on the presented Thing that authoring is withdrawn from', () => {
+    it('keeps a connection reachable on the presented Resource that authoring is withdrawn from', () => {
       const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting: true });
 
       expect(availability.connectOnCanvas).toBe(true);
@@ -200,21 +200,21 @@ describe('authoring availability', () => {
         editingChromeTitle: true,
       });
 
-      expect(availability.editThingBody).toBe(true);
+      expect(availability.editResourceBody).toBe(true);
       expect(availability.authorOnCanvas).toBe(false);
     });
 
-    it('leaves an embedded Diagram authorable while withdrawing the canvas around it', () => {
+    it('leaves an embedded Map authorable while withdrawing the canvas around it', () => {
       const availability = authoringAvailability({
         ...NOTHING_IN_PROGRESS,
-        editingEmbeddedDiagram: true,
+        editingEmbeddedMap: true,
       });
 
       expect(availability.authorOnCanvas).toBe(false);
-      expect(availability.authorInEmbeddedDiagram).toBe(true);
+      expect(availability.authorInEmbeddedMap).toBe(true);
     });
 
-    it('withdraws an embedded Diagram for every reason that is not its own edit', () => {
+    it('withdraws an embedded Map for every reason that is not its own edit', () => {
       for (const inProgress of [
         { editable: false },
         { presenting: true },
@@ -222,7 +222,7 @@ describe('authoring availability', () => {
         { spaceOnCanvas: false },
       ]) {
         expect(
-          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress }).authorInEmbeddedDiagram,
+          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress }).authorInEmbeddedMap,
         ).toBe(false);
       }
     });

@@ -1,4 +1,4 @@
-import type { DiagramId } from '@project/core';
+import type { MapId } from '@project/core';
 import { Placement } from '@project/graph';
 import {
   createNonThrowingReporter,
@@ -14,43 +14,43 @@ const NOTHING_AUTHORED = { kind: 'unchanged' } as const;
 
 const completeEmbedded = (
   entry: OpenSpace,
-  diagramId: DiagramId,
+  mapId: MapId,
   completion: AuthoringCompletion,
   report: ObserverErrorReporter,
 ): AuthoringResult => {
   if (
-    completion.kind === 'opened-thing' ||
-    completion.kind === 'closed-thing' ||
-    completion.kind === 'resized-thing' ||
-    completion.kind === 'edited-thing' ||
-    completion.kind === 'settled-thing-movement' ||
-    completion.kind === 'removed-thing-from-diagram' ||
-    completion.kind === 'connected-things' ||
-    completion.kind === 'renamed-diagram' ||
+    completion.kind === 'opened-resource' ||
+    completion.kind === 'closed-resource' ||
+    completion.kind === 'resized-resource' ||
+    completion.kind === 'edited-resource' ||
+    completion.kind === 'settled-resource-movement' ||
+    completion.kind === 'removed-resource-from-map' ||
+    completion.kind === 'connected-resources' ||
+    completion.kind === 'renamed-map' ||
     completion.kind === 'added-graph' ||
     completion.kind === 'renamed-graph' ||
     completion.kind === 'recolored-graph'
   ) {
-    return entry.app.authoring.completeInDiagram(diagramId, completion);
+    return entry.app.authoring.completeInMap(mapId, completion);
   }
   /**
    * Anything else is a broken invariant, not a refusal.
    *
    * The kinds above are the whole of what the surfaces holding this
-   * `authoring` produce — `EmbeddedDiagramAuthoring`, the render adapter's
-   * resize and movement settlements, Canvas Thing Authoring, and the Space
-   * Thing rail's rename / recolor / add-Graph commands. Graph deletion is
+   * `authoring` produce — `EmbeddedMapAuthoring`, the render adapter's
+   * resize and movement settlements, Canvas Resource Authoring, and the Space
+   * Resource rail's rename / recolor / add-Graph commands. Graph deletion is
    * not forwarded (`embedded-authoring.test.ts` — "does not forward Graph
-   * deletion, which coordinated lifecycle owns"). Connecting two embedded Things is
-   * completed here as `connected-things`; the host Edge Authoring module is
+   * deletion, which coordinated lifecycle owns"). Connecting two embedded Resources is
+   * completed here as `connected-resources`; the host Edge Authoring module is
    * still not composed over this adapter. So any other kind arriving here is a
    * wiring defect, and `AuthoringResult`'s own rule (`space-authoring.ts`) says
    * a broken invariant "throws, or is reported through the non-throwing
    * reporter — dressing a programming defect as a refusal would put it in front
    * of the author as their own mistake". The refusal that used to stand here
    * did exactly that, and with an unrelated sentence:
-   * `edge-thing-outside-diagram` presents as "An Edge can only join Things in
-   * this Diagram."
+   * `edge-resource-outside-map` presents as "An Edge can only join Resources in
+   * this Map."
    *
    * Reported rather than thrown, under the canvas-wide rule recorded once in
    * `docs/agents/rendering.md` ("React Flow itself") and argued in
@@ -59,15 +59,15 @@ const completeEmbedded = (
    */
   report(
     new Error(
-      `A ${completion.kind} completion reached an embedded Diagram, which supports only Open, Close, Edit, Resize, movement, Remove from Diagram, connecting Things, renaming the Diagram, and renaming, recoloring or adding a Graph.`,
+      `A ${completion.kind} completion reached an embedded Map, which supports only Open, Close, Edit, Resize, movement, Remove from Map, connecting Resources, renaming the Map, and renaming, recoloring or adding a Graph.`,
     ),
   );
   return NOTHING_AUTHORED;
 };
 
 /**
- * The diagram-scoped authoring port: Thing gestures and context commands on
- * the Diagram a Space Thing shows, completed by the target's sole Space
+ * The map-scoped authoring port: Resource gestures and context commands on
+ * the Map a Space Resource shows, completed by the target's sole Space
  * Authoring. Graph deletion is not forwarded here
  * (`embedded-authoring.test.ts` — "does not forward Graph deletion, which
  * coordinated lifecycle owns").
@@ -78,16 +78,11 @@ const completeEmbedded = (
  */
 export function completeEmbeddedAuthoring(
   entry: OpenSpace,
-  diagramId: DiagramId,
+  mapId: MapId,
   completion: AuthoringCompletion,
   reportObserverError: ObserverErrorReporter,
 ): AuthoringResult {
-  return completeEmbedded(
-    entry,
-    diagramId,
-    completion,
-    createNonThrowingReporter(reportObserverError),
-  );
+  return completeEmbedded(entry, mapId, completion, createNonThrowingReporter(reportObserverError));
 }
 
 /**
@@ -96,12 +91,12 @@ export function completeEmbeddedAuthoring(
  * The reporter is required with no default (ADR 0016): the composition names
  * the ambient console once and answers it as `ComposedApp.reportObserverError`,
  * so this module — mounted from a canvas gesture, deep under it — never mints a
- * second, invisible one. One sink serves both of the things it hears about,
+ * second, invisible one. One sink serves both of the events it hears about,
  * each arriving as an `Error` that says which it was.
  */
 export function createEmbeddedAuthoring(
   entry: OpenSpace,
-  diagramId: DiagramId,
+  mapId: MapId,
   reportObserverError: ObserverErrorReporter,
 ) {
   const report = createNonThrowingReporter(reportObserverError);
@@ -109,16 +104,16 @@ export function createEmbeddedAuthoring(
     report(new Error('An embedded authoring observer failed.', { cause: error })),
   );
   const complete = (completion: AuthoringCompletion): AuthoringResult =>
-    completeEmbeddedAuthoring(entry, diagramId, completion, reportObserverError);
+    completeEmbeddedAuthoring(entry, mapId, completion, reportObserverError);
   const authoring: RenderAdapterAuthoring = {
     getState: entry.app.authoring.getState,
     complete,
-    // This Diagram's own placement, not the host canvas's selected one — a
-    // Space Thing embeds a Diagram of the target Space, which need not be the
+    // This Map's own placement, not the host canvas's selected one — a
+    // Space Resource embeds a Map of the target Space, which need not be the
     // one either canvas has selected.
-    diagramPlacement: () => {
-      const resolved = entry.app.currentSpace().lookup.diagram(diagramId);
-      return resolved === undefined ? Placement.empty() : Placement.fromDiagram(resolved.diagram);
+    mapPlacement: () => {
+      const resolved = entry.app.currentSpace().lookup.map(mapId);
+      return resolved === undefined ? Placement.empty() : Placement.fromMap(resolved.map);
     },
     subscribe: notifications.subscribe,
   };

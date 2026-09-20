@@ -1,49 +1,49 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type Thing, type Graph, type Diagram } from '@project/core';
+import { uuidSchema, type Resource, type Graph, type Map } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
-import {
-  DELETE_DIAGRAM_ACTION_ID,
-  spaceEntityActions,
-  type SpaceEntity,
-} from '../src/entity-actions';
+import { DELETE_MAP_ACTION_ID, spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const PLACED_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const OUTSIDE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const PLACED_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const OUTSIDE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const TARGET_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const REFERENCE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+const REFERENCE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const REFERENCE_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
 const GRAPH: Graph = { id: GRAPH_ID, title: 'Long', edges: [] };
-const DIAGRAM: Diagram = {
-  id: DIAGRAM_ID,
+const MAP: Map = {
+  id: MAP_ID,
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [PLACED_THING_ID]: { x: 0, y: 0, open: false } },
+  positions: { [PLACED_RESOURCE_ID]: { x: 0, y: 0, open: false } },
   graphs: [GRAPH],
 };
-const thing = (id: Thing['id'], title: string): Thing => ({
+const resource = (id: Resource['id'], title: string): Resource => ({
   id,
   title,
   kind: 'markdown',
   body: '',
 });
 
-const spaceThing = (id: typeof PLACED_THING_ID, title: string): Thing => ({
+const spaceResource = (id: typeof PLACED_RESOURCE_ID, title: string): Resource => ({
   id,
   title,
   kind: 'space',
   spaceId: TARGET_SPACE_ID,
-  diagram: TARGET_DIAGRAM_ID,
+  map: TARGET_MAP_ID,
   graph: TARGET_GRAPH_ID,
 });
 
-const referenceThing = (id: Thing['id'], title: string, target: Thing['id']): Thing => ({
+const referenceResource = (
+  id: Resource['id'],
+  title: string,
+  target: Resource['id'],
+): Resource => ({
   id,
   title,
   kind: 'reference',
@@ -59,7 +59,7 @@ const build = (
     onCopy: vi.fn(),
     onOpenIndependently: vi.fn(),
     onRename: vi.fn(),
-    onDeleteDiagram: vi.fn(),
+    onDeleteMap: vi.fn(),
     ...overrides,
   });
 
@@ -98,18 +98,18 @@ describe('spaceEntityActions', () => {
    */
   it.each([
     { name: 'a Space', entity: { kind: 'space' } as const },
-    { name: 'a Diagram', entity: { kind: 'diagram', diagram: DIAGRAM } as const },
-    { name: 'a Graph', entity: { kind: 'graph', graph: GRAPH, diagram: DIAGRAM } as const },
+    { name: 'a Map', entity: { kind: 'map', map: MAP } as const },
+    { name: 'a Graph', entity: { kind: 'graph', graph: GRAPH, map: MAP } as const },
     {
-      name: 'a Thing',
-      entity: { kind: 'thing', thing: thing(PLACED_THING_ID, 'A'), diagram: DIAGRAM } as const,
+      name: 'a Resource',
+      entity: { kind: 'resource', resource: resource(PLACED_RESOURCE_ID, 'A'), map: MAP } as const,
     },
     {
-      name: 'a Space Thing',
+      name: 'a Space Resource',
       entity: {
-        kind: 'thing',
-        thing: spaceThing(PLACED_THING_ID, 'Architecture'),
-        diagram: DIAGRAM,
+        kind: 'resource',
+        resource: spaceResource(PLACED_RESOURCE_ID, 'Architecture'),
+        map: MAP,
       } as const,
     },
   ])('never says canonical or contextual in $name’s menu', ({ entity }) => {
@@ -129,18 +129,18 @@ describe('spaceEntityActions', () => {
     expect(copied({ kind: 'space' }, 'Copy link')).toEqual({ kind: 'space', spaceId: SPACE_ID });
   });
 
-  it('offers a Diagram its rename, its address and a destructive delete', () => {
-    const entity: SpaceEntity = { kind: 'diagram', diagram: DIAGRAM };
+  it('offers a Map its rename, its address and a destructive delete', () => {
+    const entity: SpaceEntity = { kind: 'map', map: MAP };
     const groups = build()(entity);
 
-    expect(labels(groups)).toEqual(['Rename', 'Copy link', 'Delete Diagram']);
-    expect(commands(groups).find((action) => action.id === DELETE_DIAGRAM_ACTION_ID)?.variant).toBe(
+    expect(labels(groups)).toEqual(['Rename', 'Copy link', 'Delete Map']);
+    expect(commands(groups).find((action) => action.id === DELETE_MAP_ACTION_ID)?.variant).toBe(
       'destructive',
     );
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'diagram',
+      kind: 'map',
       spaceId: SPACE_ID,
-      diagramId: DIAGRAM_ID,
+      mapId: MAP_ID,
     });
   });
 
@@ -148,10 +148,10 @@ describe('spaceEntityActions', () => {
    * A withheld command is absent, never present and disabled — the rule the
    * Sidebar's link buttons already followed, applied to the Edits as well.
    */
-  it('withholds the Diagram Edits rather than offering them refused', () => {
-    const groups = build({ onRename: null, onDeleteDiagram: null })({
-      kind: 'diagram',
-      diagram: DIAGRAM,
+  it('withholds the Map Edits rather than offering them refused', () => {
+    const groups = build({ onRename: null, onDeleteMap: null })({
+      kind: 'map',
+      map: MAP,
     });
 
     expect(labels(groups)).toEqual(['Copy link']);
@@ -165,64 +165,64 @@ describe('spaceEntityActions', () => {
    * on away with it, and the reader was told nothing.
    */
   it.each([
-    { outcome: 'done', deleted: true, name: 'the Diagram was deleted' },
+    { outcome: 'done', deleted: true, name: 'the Map was deleted' },
     { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
   ])('answers $outcome when $name', async ({ outcome, deleted }) => {
-    const groups = build({ onDeleteDiagram: () => Promise.resolve(deleted) })({
-      kind: 'diagram',
-      diagram: DIAGRAM,
+    const groups = build({ onDeleteMap: () => Promise.resolve(deleted) })({
+      kind: 'map',
+      map: MAP,
     });
-    const action = commands(groups).find((candidate) => candidate.id === DELETE_DIAGRAM_ACTION_ID);
+    const action = commands(groups).find((candidate) => candidate.id === DELETE_MAP_ACTION_ID);
 
     expect(await action?.onSelect()).toBe(outcome);
   });
 
   /**
-   * A Diagram owns its Graphs (ADR 0040), so a Graph row always has the
-   * address within the Diagram drawing it. A Graph's own permanent address is
+   * A Map owns its Graphs (ADR 0040), so a Graph row always has the
+   * address within the Map drawing it. A Graph's own permanent address is
    * no longer offered from any menu (`.scratch/dock-menu-reorganisation/issues/01`).
    */
-  it('offers a Graph its within-Diagram address and no permanent one', () => {
-    const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, diagram: DIAGRAM };
+  it('offers a Graph its within-Map address and no permanent one', () => {
+    const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, map: MAP };
 
     expect(labels(build()(entity))).toEqual(['Rename', 'Copy link']);
     expect(copied(entity, 'Copy link')).toEqual({
-      kind: 'diagram-graph',
+      kind: 'map-graph',
       spaceId: SPACE_ID,
-      diagramId: DIAGRAM_ID,
+      mapId: MAP_ID,
       graphId: GRAPH_ID,
     });
   });
 
-  it('offers a placed Thing both link forms and no rename', () => {
+  it('offers a placed Resource both link forms and no rename', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: thing(PLACED_THING_ID, 'A'),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: resource(PLACED_RESOURCE_ID, 'A'),
+      map: MAP,
     };
 
     expect(labels(build()(entity))).toEqual([
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
+      'Copy link to Resource in Map',
+      'Copy link to Resource',
     ]);
-    expect(copied(entity, 'Copy link to Thing in Diagram')).toEqual({
-      kind: 'diagram-thing',
+    expect(copied(entity, 'Copy link to Resource in Map')).toEqual({
+      kind: 'map-resource',
       spaceId: SPACE_ID,
-      diagramId: DIAGRAM_ID,
-      thingId: PLACED_THING_ID,
+      mapId: MAP_ID,
+      resourceId: PLACED_RESOURCE_ID,
     });
   });
 
   /**
-   * A menu row refers to a Thing, so its sentence names the Thing's **name**
+   * A menu row refers to a Resource, so its sentence names the Resource's **name**
    * (ADR 0083). The description is one line of prose beneath a label, and a
    * Title's later lines reaching it would break the sentence in half.
    */
   it('uses concise copy labels without description text', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: thing(PLACED_THING_ID, 'Auth\nHow a session begins'),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: resource(PLACED_RESOURCE_ID, 'Auth\nHow a session begins'),
+      map: MAP,
     };
 
     const written = commands(build()(entity))
@@ -234,29 +234,29 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Thing the Things list reveals but this Diagram does not place has one
+   * A Resource the Resources list reveals but this Map does not place has one
    * address, so there is nothing for a second to differ from. Offering it
-   * anyway would copy a `diagram-thing` path the host answers 404 for.
+   * anyway would copy a `map-resource` path the host answers 404 for.
    */
-  it('withholds the permanent link from a Thing this Diagram does not place', () => {
+  it('withholds the permanent link from a Resource this Map does not place', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: thing(OUTSIDE_THING_ID, 'Outside'),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: resource(OUTSIDE_RESOURCE_ID, 'Outside'),
+      map: MAP,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy link to Thing']);
-    expect(copied(entity, 'Copy link to Thing')).toEqual({
-      kind: 'thing',
+    expect(labels(build()(entity))).toEqual(['Copy link to Resource']);
+    expect(copied(entity, 'Copy link to Resource')).toEqual({
+      kind: 'resource',
       spaceId: SPACE_ID,
-      thingId: OUTSIDE_THING_ID,
+      resourceId: OUTSIDE_RESOURCE_ID,
     });
   });
 
   /** Every address command confirms in place, which is what holds the menu open. */
   it('confirms every copy without a subtitle', () => {
     const copies = commands(
-      build()({ kind: 'thing', thing: thing(PLACED_THING_ID, 'A'), diagram: DIAGRAM }),
+      build()({ kind: 'resource', resource: resource(PLACED_RESOURCE_ID, 'A'), map: MAP }),
     ).filter((action) => action.label.startsWith('Copy'));
 
     expect(copies).toHaveLength(2);
@@ -268,28 +268,28 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Space Thing's own addresses still name the Thing. Independently opening
+   * A Space Resource's own addresses still name the Resource. Independently opening
    * the Space it shows is a third destination: the target's own address, with
-   * no containing Diagram or presentation (ADR 0068, ADR 0069).
+   * no containing Map or presentation (ADR 0068, ADR 0069).
    */
-  it('offers a Space Thing the target Space’s own address and an independent open', () => {
+  it('offers a Space Resource the target Space’s own address and an independent open', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: spaceThing(PLACED_THING_ID, 'Architecture'),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: spaceResource(PLACED_RESOURCE_ID, 'Architecture'),
+      map: MAP,
     };
 
     expect(labels(build()(entity))).toEqual([
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
+      'Copy link to Resource in Map',
+      'Copy link to Resource',
       'Copy link to Space',
       'Open in New Tab',
     ]);
-    expect(copied(entity, 'Copy link to Thing in Diagram')).toEqual({
-      kind: 'diagram-thing',
+    expect(copied(entity, 'Copy link to Resource in Map')).toEqual({
+      kind: 'map-resource',
       spaceId: SPACE_ID,
-      diagramId: DIAGRAM_ID,
-      thingId: PLACED_THING_ID,
+      mapId: MAP_ID,
+      resourceId: PLACED_RESOURCE_ID,
     });
     expect(copied(entity, 'Copy link to Space')).toEqual({
       kind: 'space',
@@ -297,12 +297,12 @@ describe('spaceEntityActions', () => {
     });
   });
 
-  it('opens the target Space independently from a Space Thing, not the Thing', async () => {
+  it('opens the target Space independently from a Space Resource, not the Resource', async () => {
     const opened: ProductDestination[] = [];
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: spaceThing(PLACED_THING_ID, 'Architecture'),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: spaceResource(PLACED_RESOURCE_ID, 'Architecture'),
+      map: MAP,
     };
     const actions = build({
       onOpenIndependently: (destination) => {
@@ -318,55 +318,55 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Reference Thing's own two addresses still name the Reference Thing itself.
-   * Copy link to Target is a third row naming the Target's own Thing address —
-   * never a within-Diagram one, because the Target is often not on this
-   * Diagram at all (`.scratch/reference-thing/issues/02`).
+   * A Reference Resource's own two addresses still name the Reference Resource itself.
+   * Copy link to Target is a third row naming the Target's own Resource address —
+   * never a within-Map one, because the Target is often not on this
+   * Map at all (`.scratch/reference-thing/issues/02`).
    */
-  it('offers a Reference Thing a Copy link to Target alongside its own addresses', () => {
+  it('offers a Reference Resource a Copy link to Target alongside its own addresses', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: referenceThing(REFERENCE_THING_ID, 'A reference', REFERENCE_TARGET_ID),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: referenceResource(REFERENCE_RESOURCE_ID, 'A reference', REFERENCE_TARGET_ID),
+      map: MAP,
     };
 
-    expect(labels(build()(entity))).toEqual(['Copy link to Thing', 'Copy link to Target']);
+    expect(labels(build()(entity))).toEqual(['Copy link to Resource', 'Copy link to Target']);
     expect(copied(entity, 'Copy link to Target')).toEqual({
-      kind: 'thing',
+      kind: 'resource',
       spaceId: SPACE_ID,
-      thingId: REFERENCE_TARGET_ID,
+      resourceId: REFERENCE_TARGET_ID,
     });
   });
 
-  /** No "in this Diagram" form for the Target: one row, the Target's own address. */
-  it('offers Copy link to Target only once, never a within-Diagram form', () => {
+  /** No "in this Map" form for the Target: one row, the Target's own address. */
+  it('offers Copy link to Target only once, never a within-Map form', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: referenceThing(REFERENCE_THING_ID, 'A reference', REFERENCE_TARGET_ID),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: referenceResource(REFERENCE_RESOURCE_ID, 'A reference', REFERENCE_TARGET_ID),
+      map: MAP,
     };
 
     const written = labels(build()(entity));
     expect(written.filter((label) => label.includes('Target'))).toEqual(['Copy link to Target']);
   });
 
-  it('withholds the independent Space address from a Markdown Thing', () => {
+  it('withholds the independent Space address from a Markdown Resource', () => {
     const entity: SpaceEntity = {
-      kind: 'thing',
-      thing: thing(PLACED_THING_ID, 'A'),
-      diagram: DIAGRAM,
+      kind: 'resource',
+      resource: resource(PLACED_RESOURCE_ID, 'A'),
+      map: MAP,
     };
 
     expect(labels(build()(entity))).toEqual([
-      'Copy link to Thing in Diagram',
-      'Copy link to Thing',
+      'Copy link to Resource in Map',
+      'Copy link to Resource',
     ]);
   });
 
   it('begins a rename against the entity the row is about', () => {
     const onRename = vi.fn();
 
-    commands(build({ onRename })({ kind: 'graph', graph: GRAPH, diagram: DIAGRAM }))
+    commands(build({ onRename })({ kind: 'graph', graph: GRAPH, map: MAP }))
       .filter((action) => action.id === 'rename')
       .forEach((action) => {
         void action.onSelect();

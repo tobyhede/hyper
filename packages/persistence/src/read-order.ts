@@ -19,9 +19,9 @@ export const ascendingById = (
 };
 
 /**
- * A stored Space as every in-memory double answers it: cloned, and its Things
+ * A stored Space as every in-memory double answers it: cloned, and its Resources
  * ascending by id regardless of seed or write order. PostgreSQL orders the
- * aggregate's Things on read — `loadSpaceAggregate` sorts `thing.id.asc()`,
+ * aggregate's Resources on read — `loadSpaceAggregate` sorts `resource.id.asc()`,
  * inside an import transaction and outside it alike — and SQLite matches, so a
  * double that answered insertion order would be a divergence the shared
  * contract asserts, `toEqual` being order-sensitive on arrays.
@@ -29,5 +29,5 @@ export const ascendingById = (
 export const readInIdOrder = (loaded: LoadedSpace): LoadedSpace =>
   clone({
     ...loaded,
-    snapshot: { ...loaded.snapshot, things: [...loaded.snapshot.things].sort(ascendingById) },
+    snapshot: { ...loaded.snapshot, resources: [...loaded.snapshot.resources].sort(ascendingById) },
   });

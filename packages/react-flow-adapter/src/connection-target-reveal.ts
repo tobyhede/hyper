@@ -1,9 +1,9 @@
 /**
- * When a connection drag may *show* seeking-end handles on a Thing.
+ * When a connection drag may *show* seeking-end handles on a Resource.
  *
  * React Flow's own snap radius (`connectionRadius`, 20 at the pinned release) is
  * how a release lands on a handle. Reveal is a wider, product-owned magnet around
- * the Thing's axis-aligned bounds so the author sees the drop before they are
+ * the Resource's axis-aligned bounds so the author sees the drop before they are
  * already on it. Bounds are in **flow** coordinates (`positionAbsolute`);
  * `connection.pointer` is in **container** coordinates and must be converted
  * with {@link connectionPointerInFlow} before measuring.
@@ -62,11 +62,11 @@ export function isNearConnectionTarget(
 }
 
 /**
- * Whether this Thing offers the seeking-end affordance for the live drag.
+ * Whether this Resource offers the seeking-end affordance for the live drag.
  *
  * Seeking is the role React Flow is looking for; near is proximity; eligible is
  * Space Authoring's answer for releasing here. All three are required — a far or
- * refused Thing stays visually and (for eligibility) interactively quiet.
+ * refused Resource stays visually and (for eligibility) interactively quiet.
  */
 export function offersConnectionEnd(input: {
   readonly seeking: 'source' | 'target' | null;

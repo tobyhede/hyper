@@ -10,7 +10,7 @@ import type { RoutedFlowEdge } from '../src/RoutedEdge';
 /**
  * React Flow is the system boundary, so the store is stood in for and the
  * assertions read what the Edge asked it. What matters is that the side is
- * chosen from where the two Things are *now*: the projection does not run again
+ * chosen from where the two Resources are *now*: the projection does not run again
  * during a drag, so the handles named on the Edge below are the ones a previous
  * settle left behind (ADR 0087).
  */
@@ -53,7 +53,7 @@ const edgeProps = (source: string, target: string): EdgeProps<RoutedFlowEdge> =>
 });
 
 describe('useEdgeAttachment', () => {
-  it('attaches on the facing sides of where the two Things are now', () => {
+  it('attaches on the facing sides of where the two Resources are now', () => {
     nodes.set('above', rect(0, 0));
     nodes.set('below', rect(0, 500));
 
@@ -75,7 +75,7 @@ describe('useEdgeAttachment', () => {
    * when the store cannot answer keeps this a total function without an
    * assertion standing in for a node that is not there.
    */
-  it("keeps React Flow's own answer when the store holds neither Thing", () => {
+  it("keeps React Flow's own answer when the store holds neither Resource", () => {
     nodes.clear();
 
     const props = edgeProps('gone', 'also-gone');
@@ -91,7 +91,7 @@ describe('useEdgeAttachment', () => {
     });
   });
 
-  it('loops a self-Edge rather than dividing by the vector from a Thing to itself', () => {
+  it('loops a self-Edge rather than dividing by the vector from a Resource to itself', () => {
     nodes.clear();
     nodes.set('alone', rect(100, 200));
 

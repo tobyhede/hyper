@@ -11,13 +11,13 @@ import { expectTypeOf, it } from 'vitest';
 
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 type SpaceCollection = SpaceHttpClient['api']['spaces'];
-type SpaceResource = SpaceCollection[':id'];
-type AggregateResource = SpaceHttpClient['api']['aggregate'];
+type SpaceEndpoint = SpaceCollection[':id'];
+type AggregateEndpoint = SpaceHttpClient['api']['aggregate'];
 
 it('exposes lazy Space and complete aggregate reads through the inferred contract', () => {
-  expectTypeOf<InferResponseType<SpaceResource['$get'], 200>>().toEqualTypeOf<LoadedSpaceJson>();
+  expectTypeOf<InferResponseType<SpaceEndpoint['$get'], 200>>().toEqualTypeOf<LoadedSpaceJson>();
   expectTypeOf<
-    InferResponseType<AggregateResource['$get'], 200>
+    InferResponseType<AggregateEndpoint['$get'], 200>
   >().toEqualTypeOf<LoadedAggregateJson>();
 });
 
@@ -44,11 +44,11 @@ it('keeps aggregate refusal identities and locations in the inferred 422 body', 
   >;
   type MissingTarget = Extract<
     AggregateRefusal['errors'][number],
-    { kind: 'space-thing-target-missing' }
+    { kind: 'space-resource-target-missing' }
   >;
 
-  expectTypeOf<MissingTarget['kind']>().toEqualTypeOf<'space-thing-target-missing'>();
+  expectTypeOf<MissingTarget['kind']>().toEqualTypeOf<'space-resource-target-missing'>();
   expectTypeOf<MissingTarget['spaceId']>().toEqualTypeOf<string>();
-  expectTypeOf<MissingTarget['thingId']>().toEqualTypeOf<string>();
+  expectTypeOf<MissingTarget['resourceId']>().toEqualTypeOf<string>();
   expectTypeOf<MissingTarget['targetSpaceId']>().toEqualTypeOf<string>();
 });

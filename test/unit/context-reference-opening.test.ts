@@ -3,19 +3,19 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * CONTEXT.md defines the vocabulary twice over for a Reference Thing — once under
- * **Reference Thing**, which says what authoring one changes, and once under **Opening**,
+ * CONTEXT.md defines the vocabulary twice over for a Reference Resource — once under
+ * **Reference Resource**, which says what authoring one changes, and once under **Opening**,
  * which says what bringing one up puts on screen — and the two drifted apart.
- * The Reference Thing definition was moved to ADR 0049's model (a Reference Thing authors its own
+ * The Reference Resource definition was moved to ADR 0049's model (a Reference Resource authors its own
  * Title and Target; the Target is opened explicitly to author its content)
  * while the Opening definition kept ADR 0039/0046's withdrawn one, in which a
- * Reference Thing opened "the same content surface through its target". Both ADRs are
+ * Reference Resource opened "the same content surface through its target". Both ADRs are
  * still `accepted` and carry `Refined by: 0049`, so an ADR status scan cannot
  * see the drift, and neither can `tsc`: a definition is prose, and prose that
  * describes a surface nobody built compiles perfectly.
  *
  * The code is unambiguous about which one is live — `ReferenceEditorForm` renders a
- * Title input and a Target picker and the props of the Reference Thing branch make a
+ * Title input and a Target picker and the props of the Reference Resource branch make a
  * content field unrepresentable — so this reads the document against the
  * decision rather than against the other document, in the idiom
  * `current-domain-vocabulary.test.ts` and `conflict-markers.test.ts` already
@@ -42,16 +42,17 @@ const definitionOf = (term: string): string => {
 };
 
 /**
- * The Opening definition names each Thing kind in its own semicolon-separated
- * clause. Reading the Reference Thing one alone is what keeps the assertions honest: the
+ * The Opening definition names each Resource kind in its own semicolon-separated
+ * clause. Reading the Reference Resource one alone is what keeps the assertions honest: the
  * Markdown clause beside it legitimately says *title*, so a whole-paragraph
- * match for that word would pass while saying nothing about a Reference Thing at all.
+ * match for that word would pass while saying nothing about a Reference Resource at all.
  */
 const referenceClause = (definition: string): string => {
   const clauses = definition.split(';').filter((clause) => /reference/i.test(clause));
-  expect(clauses, 'the Opening definition says nothing about a reference thing').not.toHaveLength(
-    0,
-  );
+  expect(
+    clauses,
+    'the Opening definition says nothing about a reference resource',
+  ).not.toHaveLength(0);
   return clauses.join(' ');
 };
 
@@ -62,27 +63,27 @@ const referenceClause = (definition: string): string => {
  * semantic weight instead.
  *
  * A wider one is worse than useless here. "The same content" reads as the
- * withdrawn model in a sentence about opening, but it is also how the **Reference Thing**
- * definition states the domain fact that a Reference Thing *shows* its Target's content
+ * withdrawn model in a sentence about opening, but it is also how the **Reference Resource**
+ * definition states the domain fact that a Reference Resource *shows* its Target's content
  * — one source of truth, appearing again elsewhere — which is true, live, and
  * the whole point of the kind. A marker that cannot tell showing from
  * authoring fails the correct document.
  *
  * A third pattern closes a real gap the first two leave open: neither
  * "content surface" nor "delegat" appears if the withdrawn model resurfaces
- * paraphrased, as "opening a Reference Thing opens its Target's content for
+ * paraphrased, as "opening a Reference Resource opens its Target's content for
  * authoring". That phrase cannot be banned by "opens … Target's content"
  * alone, because that is also exactly how the live text describes the correct
- * model — "A Reference Thing opens on its own Title and its immutable
+ * model — "A Reference Resource opens on its own Title and its immutable
  * Target's content read-only" is `opens … Target's content` in one breath
  * too. What tells them apart is whether an authoring purpose sits in the same
  * clause as "Target's content": the live text never puts one there — its
  * "read-only" ends the clause at a comma, and its "opened explicitly to
- * author" is a separate clause about the Target, not the Reference Thing's
+ * author" is a separate clause about the Target, not the Reference Resource's
  * own opening. So the third pattern matches "Target's content" only when
  * followed, before the next comma, period or semicolon, by "to author" or
  * "for authoring". Checked against the live document (both the Opening
- * definition's reference clause and the Reference Thing definition) so this
+ * definition's reference clause and the Reference Resource definition) so this
  * note asserts an absence actually confirmed, not assumed.
  */
 const DELEGATED_CONTENT = [
@@ -94,31 +95,31 @@ const DELEGATED_CONTENT = [
 /**
  * ADR 0049's model, read as the shape both clauses actually share rather than
  * as the one adverb, "explicitly", that only the Opening definition still
- * carries. CONTEXT.md's ADR 0092 rewrite reworded the Reference Thing
+ * carries. CONTEXT.md's ADR 0092 rewrite reworded the Reference Resource
  * definition to "the Target is opened to author that content" — the same
  * fact, that the Target takes a distinct step to author, stated without that
  * word. What this guards is the fact, not the adverb: `target` has to be the
- * subject of `opened`, so a sentence that opens the Reference Thing and only
+ * subject of `opened`, so a sentence that opens the Reference Resource and only
  * mentions its Target later does not count. `must` is left off for the same
- * reason as `explicitly` — the Reference Thing definition does not use it.
+ * reason as `explicitly` — the Reference Resource definition does not use it.
  */
 const SEPARATELY_OPENED = /target[^.;]*opened[^.;]*to author/i;
 
-describe('CONTEXT.md on opening a Reference Thing', () => {
-  it('limits a Reference Thing to its own title and target', () => {
+describe('CONTEXT.md on opening a Reference Resource', () => {
+  it('limits a Reference Resource to its own title and target', () => {
     const clause = referenceClause(definitionOf('Opening'));
 
     expect(clause).toMatch(/title/i);
     expect(clause).toMatch(/target/i);
   });
 
-  it('sends an author to the Target Thing itself to author its content', () => {
+  it('sends an author to the Target Resource itself to author its content', () => {
     expect(referenceClause(definitionOf('Opening'))).toMatch(SEPARATELY_OPENED);
-    expect('A Reference Thing is opened to author its Title').not.toMatch(SEPARATELY_OPENED);
+    expect('A Reference Resource is opened to author its Title').not.toMatch(SEPARATELY_OPENED);
     expect('the Target is opened to author that content').toMatch(SEPARATELY_OPENED);
   });
 
-  it('does not describe a Reference Thing as opening its Target’s content', () => {
+  it('does not describe a Reference Resource as opening its Target’s content', () => {
     const clause = referenceClause(definitionOf('Opening'));
 
     for (const withdrawn of DELEGATED_CONTENT) {
@@ -129,13 +130,13 @@ describe('CONTEXT.md on opening a Reference Thing', () => {
   });
 
   /**
-   * The drift this file exists for was between two definitions, so the Reference Thing
+   * The drift this file exists for was between two definitions, so the Reference Resource
    * one is held to the same rule rather than trusted for having been fixed
    * first. It is the definition that states the rule outright, and it is where
    * a future edit would most plausibly reintroduce delegation.
    */
-  it('agrees with the Reference Thing definition', () => {
-    const reference = definitionOf('Reference Thing');
+  it('agrees with the Reference Resource definition', () => {
+    const reference = definitionOf('Reference Resource');
 
     expect(reference).toMatch(/title/i);
     expect(reference).toMatch(/target/i);
