@@ -163,10 +163,10 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
 });
 
 /**
- * The one member `withRawRevisionHarness` needs from vitest's own per-test
- * context (`it`'s callback parameter, `ExtendedContext<Test>` in
- * `@vitest/runner`), named locally rather than importing that generic type
- * for one method.
+ * The one member the helpers below that skip an inapplicable harness need
+ * from vitest's own per-test context (`it`'s callback parameter,
+ * `ExtendedContext<Test>` in `@vitest/runner`), named locally rather than
+ * importing that generic type for one method.
  */
 type SkippableTestContext = { skip: () => void };
 

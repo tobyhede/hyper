@@ -178,9 +178,10 @@ const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undef
  * way -- a revision conflict, or a write that moves no snapshot boundary --
  * and hands everything else to that decision. `#commitTopologyPreservingUpdate`
  * runs this before `#lockMetaIdentity` is ever called, deliberately: the fast
- * path holds no singleton lock. It does make one unlocked existence read of
- * the Meta identity first, because without that identity `decideCommit` would
- * refuse every otherwise-writable update (ticket 29).
+ * path holds no singleton lock. A `write` it answers is then gated on one
+ * unlocked existence read of the Meta identity, because without that identity
+ * `decideCommit` would refuse every otherwise-writable update (ticket 29); an
+ * `answer` or `aggregate-path` never reaches that read.
  */
 const decideTopologyPreservingUpdate = (
   change: UpdateChange,
@@ -443,6 +444,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * decision, while presence grants no new write authority. It uses the same
    * transaction handle as the candidate read, which matters on SQLite: opening
    * a separate runtime here can contend with the transaction it is deciding.
+   *
+   * It is read last, gating only the `write` branch, because that is the only
+   * branch the identity bears on: a conflict and a boundary-moving snapshot
+   * are both answered without it, `#lockMetaIdentity`'s own doc comment saying
+   * revision conflicts are answerable with no Meta Space at all. So a stale
+   * revision -- the case the fast path exists to make cheap -- costs the same
+   * statements it did before ticket 29.
    */
   async #commitTopologyPreservingUpdate(
     tables: SqlTables<Order>,
@@ -450,13 +458,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   ): Promise<RepositoryCommitResult | undefined> {
     const change = topologyPreservingCandidate(request);
     if (change === undefined) return undefined;
-    if ((await tables.RepositoryState.read()) === null) return undefined;
     const decision = decideTopologyPreservingUpdate(
       change,
       await this.#loadStoredSpaceRowForCommit(tables, change.spaceId),
     );
     if (decision.kind === 'aggregate-path') return undefined;
     if (decision.kind === 'answer') return decision.result;
+    if ((await tables.RepositoryState.read()) === null) return undefined;
 
     // Past this point the snapshot boundary is settled and this path commits,
     // so the write below is the first one and every earlier return has
@@ -693,12 +701,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   async #loadMetaSpaceIdUnserialised(): Promise<UUID | undefined> {
-    const state = await this.#readMetaIdentityState();
+    const tables = this.#store.tables(this.#store.orm);
+    const state = await tables.RepositoryState.read();
     return state === null ? undefined : uuidSchema.parse(state.metaSpaceId);
-  }
-
-  #readMetaIdentityState(): Promise<{ readonly metaSpaceId: string } | null> {
-    return this.#store.tables(this.#store.orm).RepositoryState.read();
   }
 
   async #initializeUnserialised(input: AggregateInput): Promise<InitializeAggregateResult> {
