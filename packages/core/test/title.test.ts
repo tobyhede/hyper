@@ -1,109 +1,113 @@
 import { describe, expect, it } from 'vitest';
 import type { ZodIssue, ZodType, ZodTypeDef } from 'zod';
 import {
-  THING_TITLE_REQUIRED,
-  referenceThingFrontmatterSchema,
-  thingDocumentSchema,
-  thingFrontmatterSchema,
-  thingSchema,
+  RESOURCE_TITLE_REQUIRED,
+  referenceResourceFrontmatterSchema,
+  resourceDocumentSchema,
+  resourceFrontmatterSchema,
+  resourceSchema,
   graphSchema,
-  importReferenceThingFrontmatterSchema,
-  importThingFrontmatterSchema,
-  importMarkdownThingFrontmatterSchema,
-  importSpaceThingFrontmatterSchema,
-  markdownThingFrontmatterSchema,
+  importReferenceResourceFrontmatterSchema,
+  importResourceFrontmatterSchema,
+  importMarkdownResourceFrontmatterSchema,
+  importSpaceEndpointFrontmatterSchema,
+  markdownResourceFrontmatterSchema,
   normalizeTitle,
-  positionedDiagramSchema,
-  spaceThingFrontmatterSchema,
+  positionedMapSchema,
+  spaceResourceFrontmatterSchema,
   spaceFileSchema,
   titleLines,
   titleName,
 } from '../src/index';
 
-const THING_ID = '00000000-0000-4000-8000-000000000001';
+const RESOURCE_ID = '00000000-0000-4000-8000-000000000001';
 const TARGET_ID = '00000000-0000-4000-8000-000000000002';
 const SPACE_ID = '00000000-0000-4000-8000-000000000003';
-const DIAGRAM_ID = '00000000-0000-4000-8000-000000000004';
+const MAP_ID = '00000000-0000-4000-8000-000000000004';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000005';
 
 /**
- * Any schema that reads a Thing's Title, written so the three kinds and the
+ * Any schema that reads a Resource's Title, written so the three kinds and the
  * three unions can sit in one list. Only the Title is under test here, so what
  * each one answers with is `unknown` and the assertions read the Title off it.
  */
-type ThingTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
+type ResourceTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
 
 /**
- * A Thing frontmatter as it arrives at a schema, before one has read it: every
- * field a Thing of any kind declares is written down, and all of them are text.
+ * A Resource frontmatter as it arrives at a schema, before one has read it: every
+ * field a Resource of any kind declares is written down, and all of them are text.
  */
-type ThingFrontmatterDraft = Readonly<Record<string, string>>;
+type ResourceFrontmatterDraft = Readonly<Record<string, string>>;
 
 const markdownFrontmatter = (title: string) => ({
-  id: THING_ID,
+  id: RESOURCE_ID,
   title,
   kind: 'markdown',
   body: '',
 });
 const referenceFrontmatter = (title: string) => ({
-  id: THING_ID,
+  id: RESOURCE_ID,
   title,
   kind: 'reference',
   target: TARGET_ID,
 });
 const spaceFrontmatter = (title: string) => ({
-  id: THING_ID,
+  id: RESOURCE_ID,
   title,
   kind: 'space',
   spaceId: SPACE_ID,
-  diagram: DIAGRAM_ID,
+  map: MAP_ID,
   graph: GRAPH_ID,
 });
 
-/** The schemas that read one Thing kind, each beside the frontmatter it reads. */
+/** The schemas that read one Resource kind, each beside the frontmatter it reads. */
 const kindSchemas: readonly {
   readonly label: string;
-  readonly schema: ThingTitleSchema;
-  readonly frontmatter: (title: string) => ThingFrontmatterDraft;
+  readonly schema: ResourceTitleSchema;
+  readonly frontmatter: (title: string) => ResourceFrontmatterDraft;
 }[] = [
   {
-    label: 'markdown thing',
-    schema: markdownThingFrontmatterSchema,
+    label: 'markdown resource',
+    schema: markdownResourceFrontmatterSchema,
     frontmatter: markdownFrontmatter,
   },
   {
-    label: 'reference thing',
-    schema: referenceThingFrontmatterSchema,
+    label: 'reference resource',
+    schema: referenceResourceFrontmatterSchema,
     frontmatter: referenceFrontmatter,
   },
-  { label: 'space thing', schema: spaceThingFrontmatterSchema, frontmatter: spaceFrontmatter },
   {
-    label: 'imported markdown thing',
-    schema: importMarkdownThingFrontmatterSchema,
+    label: 'space resource',
+    schema: spaceResourceFrontmatterSchema,
+    frontmatter: spaceFrontmatter,
+  },
+  {
+    label: 'imported markdown resource',
+    schema: importMarkdownResourceFrontmatterSchema,
     frontmatter: markdownFrontmatter,
   },
   {
-    label: 'imported reference thing',
-    schema: importReferenceThingFrontmatterSchema,
+    label: 'imported reference resource',
+    schema: importReferenceResourceFrontmatterSchema,
     frontmatter: referenceFrontmatter,
   },
   {
-    label: 'imported space thing',
-    schema: importSpaceThingFrontmatterSchema,
+    label: 'imported space resource',
+    schema: importSpaceEndpointFrontmatterSchema,
     frontmatter: spaceFrontmatter,
   },
 ];
 
 /** The unions and the stored document, each of which reads every kind. */
-const unionSchemas: readonly { readonly label: string; readonly schema: ThingTitleSchema }[] = [
-  { label: 'thing frontmatter', schema: thingFrontmatterSchema },
-  { label: 'thing', schema: thingSchema },
-  { label: 'thing document', schema: thingDocumentSchema },
-  { label: 'imported thing frontmatter', schema: importThingFrontmatterSchema },
+const unionSchemas: readonly { readonly label: string; readonly schema: ResourceTitleSchema }[] = [
+  { label: 'resource frontmatter', schema: resourceFrontmatterSchema },
+  { label: 'resource', schema: resourceSchema },
+  { label: 'resource document', schema: resourceDocumentSchema },
+  { label: 'imported resource frontmatter', schema: importResourceFrontmatterSchema },
 ];
 
 /**
- * Every door a Thing's Title arrives through, carrying one Title.
+ * Every door a Resource's Title arrives through, carrying one Title.
  *
  * A rule that reaches only the three declared shapes is visibly not the rule at
  * every door: the union, the stored document and the import variants have to
@@ -114,8 +118,8 @@ const titleCases = (
   title: string,
 ): readonly {
   readonly label: string;
-  readonly schema: ThingTitleSchema;
-  readonly value: ThingFrontmatterDraft;
+  readonly schema: ResourceTitleSchema;
+  readonly value: ResourceFrontmatterDraft;
 }[] => [
   ...kindSchemas.map(({ label, schema, frontmatter }) => ({
     label,
@@ -141,7 +145,7 @@ const titleCases = (
  */
 const refusesNamelessTitle = (issues: readonly ZodIssue[]): boolean =>
   issues.some(
-    (issue) => issue.code === 'custom' && issue.params?.['code'] === THING_TITLE_REQUIRED,
+    (issue) => issue.code === 'custom' && issue.params?.['code'] === RESOURCE_TITLE_REQUIRED,
   );
 
 describe('a Title is one or more Title Lines', () => {
@@ -219,8 +223,8 @@ describe('normalizing a Title', () => {
   });
 });
 
-describe('a Thing Title carries at least one non-empty line', () => {
-  it('normalizes the Title at every door a Thing arrives through', () => {
+describe('a Resource Title carries at least one non-empty line', () => {
+  it('normalizes the Title at every door a Resource arrives through', () => {
     for (const { label, schema, value } of titleCases('Auth  \r\n\n  session \n\n')) {
       const parsed = schema.safeParse(value);
 
@@ -246,7 +250,7 @@ describe('a Thing Title carries at least one non-empty line', () => {
   });
 });
 
-describe('Space, Diagram and Graph titles are untouched', () => {
+describe('Space, Map and Graph titles are untouched', () => {
   it('keeps a Space title exactly as written', () => {
     const parsed = spaceFileSchema.parse({ version: 1, id: SPACE_ID, title: 'Deck  ' });
 
@@ -259,9 +263,9 @@ describe('Space, Diagram and Graph titles are untouched', () => {
     );
   });
 
-  it('keeps a Diagram title exactly as written', () => {
-    const parsed = positionedDiagramSchema.parse({
-      id: DIAGRAM_ID,
+  it('keeps a Map title exactly as written', () => {
+    const parsed = positionedMapSchema.parse({
+      id: MAP_ID,
       title: 'Working ',
       kind: 'positioned',
       positions: {},
@@ -271,7 +275,7 @@ describe('Space, Diagram and Graph titles are untouched', () => {
     expect(parsed.title).toBe('Working ');
   });
 
-  it('still accepts the whitespace-only title a Thing no longer may have', () => {
+  it('still accepts the whitespace-only title a Resource no longer may have', () => {
     expect(graphSchema.safeParse({ id: GRAPH_ID, title: '  ', edges: [] }).success).toBe(true);
   });
 });

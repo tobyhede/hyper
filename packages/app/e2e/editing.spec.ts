@@ -1,9 +1,9 @@
 import {
-  COLLAPSED_THING_SIZE,
+  COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
   encodeCompactUuid,
   uuidSchema,
-  type ThingPlacement,
+  type ResourcePlacement,
 } from '@project/core';
 import { productDestinationPath } from '@project/http';
 import type { Locator, Page } from '@playwright/test';
@@ -12,7 +12,7 @@ import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
   AUTHORING_HANDLE_SIDES,
   activateGraph,
-  activeThing,
+  activeResource,
   activeGraph,
   beginRename,
   allPositions,
@@ -20,22 +20,22 @@ import {
   boxOf,
   connectHandles,
   connectToEmptyWithAlt,
-  createThing,
-  createThingControl,
+  createResource,
+  createResourceControl,
   dock,
   dragBy,
   expectMenuGroups,
-  expectThingFillsNode,
-  diagramChoices,
-  diagramMenu,
+  expectResourceFillsNode,
+  mapChoices,
+  mapMenu,
   deleteActiveGraph,
   graphMenu,
-  newDiagram,
+  newMap,
   newGraph,
   openGraphColourPicker,
-  settleNewDiagramName,
+  settleNewMapName,
   nodeByTitle,
-  openThing,
+  openResource,
   positionOf,
   presentControl,
   recolorActiveGraph,
@@ -43,10 +43,10 @@ import {
   selectedCanvas,
   settled,
   spaceName,
-  thingActions,
+  resourceActions,
   viewportTransform,
 } from './graph';
-import { seedPositionedDiagram } from './seed';
+import { seedPositionedMap } from './seed';
 
 /**
  * The barrier a *negative* assertion needs.
@@ -65,11 +65,11 @@ async function quiescent(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
-async function addExistingThing(page: Page, title: string): Promise<void> {
-  await page.getByRole('button', { name: 'Things', exact: true }).click();
-  await page.getByRole('button', { name: `Add ${title} to Diagram` }).click();
+async function addExistingResource(page: Page, title: string): Promise<void> {
+  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  await page.getByRole('button', { name: `Add ${title} to Map` }).click();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
 }
 
 function sameEdgeGeometry(left: string | null, right: string | null): boolean {
@@ -98,7 +98,7 @@ async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
     const hit = document.elementFromPoint(at.x, at.y);
     return hit !== null && hit.closest('.react-flow__node') === null;
   }, point);
-  expect(clear, 'the chosen point is over a Thing rather than empty canvas').toBe(true);
+  expect(clear, 'the chosen point is over a Resource rather than empty canvas').toBe(true);
   return point;
 }
 
@@ -106,7 +106,7 @@ async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
  * Drag one endpoint of a selected Edge to a screen point.
  *
  * The anchors are transparent circles React Flow draws only on a reconnectable
- * Edge, so the press is asserted to land on one — a Thing handle drawn over it
+ * Edge, so the press is asserted to land on one — a Resource handle drawn over it
  * would otherwise read as a reconnection that silently never began. React Flow
  * starts the connection on the first move after mousedown and can swallow a
  * single jump, which is why the move is stepped, as in `connectHandles`.
@@ -135,7 +135,7 @@ async function dragEndpointTo(
   }
 }
 
-/** Drag one endpoint onto a Thing's seeking-end authoring handle. */
+/** Drag one endpoint onto a Resource's seeking-end authoring handle. */
 async function reconnectOnto(
   page: Page,
   edge: Locator,
@@ -150,7 +150,7 @@ async function reconnectOnto(
     await page.mouse.move(from.x + 12, from.y, { steps: 3 });
     // Eligibility arms `connectableend` once the reconnect drag has begun;
     // seeking-end *visibility* waits until the pointer is within product
-    // proximity of the Thing (connection-handle-proximity/01). Hidden handles
+    // proximity of the Resource (connection-handle-proximity/01). Hidden handles
     // keep `pointer-events: none`, so Playwright `hover` cannot arm them —
     // move by coordinates onto the drop handle first (same as `connectHandles`).
     await expect(targetHandle).toHaveClass(/connectableend/);
@@ -209,45 +209,48 @@ async function selectAnEdge(page: Page): Promise<string> {
 }
 
 test(
-  'inline title editing persists without moving or opening the Thing',
-  { tag: '@parity:canvas-thing-owns-title-editing-and-refusal' },
+  'inline title editing persists without moving or opening the Resource',
+  { tag: '@parity:canvas-resource-owns-title-editing-and-refusal' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
     await settled(page);
     const before = await allPositions(page);
 
-    const actions = thing.getByTestId('canvas-thing-actions');
+    const actions = resource.getByTestId('canvas-resource-actions');
     // Asserted on the container, not on the button: the reveal is
-    // `opacity`/`pointer-events` on `.canvas-thing__actions`, and `opacity` does
+    // `opacity`/`pointer-events` on `.canvas-resource__actions`, and `opacity` does
     // not inherit — a computed `opacity` read off the button is `1` whether the
-    // Thing is hovered or not, so the same assertion there cannot fail.
+    // Resource is hovered or not, so the same assertion there cannot fail.
     await expect(actions).toHaveCSS('opacity', '0');
-    await thing.hover();
+    await resource.hover();
     await expect(actions).toHaveCSS('opacity', '1');
-    const edit = thing.getByRole('button', { name: 'Open Thing A' });
+    const edit = resource.getByRole('button', { name: 'Open Resource A' });
     // The affordance draws a glyph, so nothing about its own content keeps it in
     // shape or in place. Sized square in CSS and parked in the corner, clear of
     // the title — a name is what a screen reader gets, and the box is all a
     // pointer gets.
-    const editBox = await boxOf(edit, 'the Thing affordance');
-    const thingBox = await boxOf(thing, 'Thing A');
-    const titleBox = await boxOf(thing.getByRole('heading', { name: 'A' }), "Thing A's title");
+    const editBox = await boxOf(edit, 'the Resource affordance');
+    const resourceBox = await boxOf(resource, 'Resource A');
+    const titleBox = await boxOf(
+      resource.getByRole('heading', { name: 'A' }),
+      "Resource A's title",
+    );
     expect(Math.abs(editBox.width - editBox.height)).toBeLessThanOrEqual(1);
-    expect(editBox.x).toBeGreaterThanOrEqual(thingBox.x);
-    expect(editBox.x + editBox.width).toBeLessThanOrEqual(thingBox.x + thingBox.width);
-    expect(editBox.y).toBeGreaterThanOrEqual(thingBox.y);
+    expect(editBox.x).toBeGreaterThanOrEqual(resourceBox.x);
+    expect(editBox.x + editBox.width).toBeLessThanOrEqual(resourceBox.x + resourceBox.width);
+    expect(editBox.y).toBeGreaterThanOrEqual(resourceBox.y);
     expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
 
     // The displayed Title is its own control (ADR 0065): activating it neither
-    // selects nor opens the Thing around it.
+    // selects nor opens the Resource around it.
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await thing.getByRole('button', { name: 'Edit Title A' }).click();
+    await resource.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
-    const title = page.getByRole('textbox', { name: 'Thing title' });
+    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+    const title = page.getByRole('textbox', { name: 'Resource title' });
     await title.fill('Renamed A');
     await title.press('Enter');
 
@@ -257,16 +260,16 @@ test(
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
     expect(await allPositions(page)).toEqual(before);
 
-    await openThing(renamed, 'Renamed A');
-    await renamed.getByRole('button', { name: 'Close Thing Renamed A' }).click();
+    await openResource(renamed, 'Renamed A');
+    await renamed.getByRole('button', { name: 'Close Resource Renamed A' }).click();
     await renamed.click();
     await page.keyboard.press('F2');
-    const keyboardTitle = page.getByRole('textbox', { name: 'Thing title' });
+    const keyboardTitle = page.getByRole('textbox', { name: 'Resource title' });
     await expect(keyboardTitle).toBeVisible();
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -277,70 +280,72 @@ test(
   },
 );
 
-test("a short Title control's hit-area hugs its text, not the whole Thing body", async ({
+test("a short Title control's hit-area hugs its text, not the whole Resource body", async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
 
-  const thingBox = await boxOf(thing, 'Thing A');
+  const resourceBox = await boxOf(resource, 'Resource A');
   const titleBox = await boxOf(
-    thing.getByRole('button', { name: 'Edit Title A' }),
-    "Thing A's Title",
+    resource.getByRole('button', { name: 'Edit Title A' }),
+    "Resource A's Title",
   );
 
   // Editing is the Title's own activation (ADR 0065), so its target
   // must claim only the pixels it draws — a one-letter title next to a much
-  // wider thing is the case that tells a shrunk-to-fit title apart from one
-  // stretched to the thing's full width.
-  expect(titleBox.width).toBeLessThan(thingBox.width - 40);
+  // wider resource is the case that tells a shrunk-to-fit title apart from one
+  // stretched to the resource's full width.
+  expect(titleBox.width).toBeLessThan(resourceBox.width - 40);
 
-  // A point in the blank band to the title's right, still inside the thing body
-  // and at the title's own height — over the thing, but off its text.
+  // A point in the blank band to the title's right, still inside the resource body
+  // and at the title's own height — over the resource, but off its text.
   const blankSpace = {
-    x: (titleBox.x + titleBox.width + thingBox.x + thingBox.width) / 2,
+    x: (titleBox.x + titleBox.width + resourceBox.x + resourceBox.width) / 2,
     y: titleBox.y + titleBox.height / 2,
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
-  await expect(page.getByRole('textbox', { name: 'Thing title' })).toHaveCount(0);
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
 });
 
-test('a click selects a Thing, and no pointer gesture on its body opens it', async ({ page }) => {
+test('a click selects a Resource, and no pointer gesture on its body opens it', async ({
+  page,
+}) => {
   await page.goto('/');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
   const transform = await viewportTransform(page);
 
-  await thing.click();
-  await expect(thing).toHaveClass(/selected/);
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  await resource.click();
+  await expect(resource).toHaveClass(/selected/);
+  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
-  // by default and its filter exempts only `.nopan`, which a Thing is not.
-  await thing.dblclick({ position: { x: 24, y: 12 } });
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  // by default and its filter exempts only `.nopan`, which a Resource is not.
+  await resource.dblclick({ position: { x: 24, y: 12 } });
+  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
-test('the Thing affordance opens rendered Markdown and edits it in place', async ({ page }) => {
+test('the Resource affordance opens rendered Markdown and edits it in place', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
 
-  await openThing(thing, 'A');
+  await openResource(resource, 'A');
 
-  await expect(thing).toContainText('entry point');
-  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
+  await expect(resource).toContainText('entry point');
+  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await source.fill('Authored from the graph');
-  await thing.getByRole('button', { name: 'Save Thing A' }).click();
+  await resource.getByRole('button', { name: 'Save Resource A' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
@@ -349,29 +354,29 @@ test('the Thing affordance opens rendered Markdown and edits it in place', async
 });
 
 test(
-  'the open Markdown Thing owns exact source, cancellation and commit',
-  { tag: '@parity:open-markdown-thing-owns-its-editing-lifecycle' },
+  'the open Markdown Resource owns exact source, cancellation and commit',
+  { tag: '@parity:open-markdown-resource-owns-its-editing-lifecycle' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thingA = nodeByTitle(page, 'A').first();
+    const resourceA = nodeByTitle(page, 'A').first();
     await settled(page);
-    await openThing(thingA, 'A');
-    await thingA.hover();
-    const bodyTarget = thingA.getByTestId('markdown-thing-body-edit-target');
+    await openResource(resourceA, 'A');
+    await resourceA.hover();
+    const bodyTarget = resourceA.getByTestId('markdown-resource-body-edit-target');
     await expect(bodyTarget).toHaveCSS('opacity', '0');
     await expect(bodyTarget.locator('svg')).toHaveCount(0);
     expect(
-      await thingA
-        .getByTestId('canvas-thing-actions')
+      await resourceA
+        .getByTestId('canvas-resource-actions')
         .getByRole('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
-      // The rail carries the Thing's own actions menu ahead of Edit and Close:
-      // a Thing's addresses and its deletion belong to the Thing (ADR 0073), and
+      // The rail carries the Resource's own actions menu ahead of Edit and Close:
+      // a Resource's addresses and its deletion belong to the Resource (ADR 0073), and
       // the Space's command surface does not draw them at all (ADR 0082). The
       // list is asserted whole rather than by presence, so a control appearing
       // here is a decision rather than a drift.
-    ).toEqual(['Actions for Thing A', 'Edit Thing A', 'Close Thing A']);
+    ).toEqual(['Actions for Resource A', 'Edit Resource A', 'Close Resource A']);
     await bodyTarget.click();
     const source = page.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
@@ -380,8 +385,8 @@ test(
     const originalLineNumbers = await lineNumbers.elementHandle();
     expect(originalLineNumbers).not.toBeNull();
 
-    // A quarter of `--canvas-thing-muted-color`, as Chrome serialises the
-    // `color-mix` in `markdown-thing-body.css` — the Thing's own muted ink,
+    // A quarter of `--canvas-resource-muted-color`, as Chrome serialises the
+    // `color-mix` in `markdown-resource-body.css` — the Resource's own muted ink,
     // washed. It was `--accent`, the chrome's highlighted-row fill, which on the
     // light theme is a near-white and would leave a selection nobody could see
     // on cream.
@@ -407,13 +412,13 @@ test(
     await expect(source).toBeVisible();
     await source.press('Escape');
     await expect(source).toHaveCount(0);
-    await expect(thingA).toContainText('entry point');
+    await expect(resourceA).toContainText('entry point');
 
-    // Hovered first: the click on the pane above took the pointer off the Thing,
+    // Hovered first: the click on the pane above took the pointer off the Resource,
     // and a rail nobody is pointing at takes no pointer events — which is what
     // the reload branch below already spells out.
-    await thingA.hover();
-    await thingA.getByRole('button', { name: 'Edit Thing A' }).click();
+    await resourceA.hover();
+    await resourceA.getByRole('button', { name: 'Edit Resource A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
@@ -422,7 +427,7 @@ test(
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
     await persisted.hover();
-    await persisted.getByRole('button', { name: 'Edit Thing A' }).click();
+    await persisted.getByRole('button', { name: 'Edit Resource A' }).click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
       'two spaces and `code`',
     );
@@ -441,24 +446,24 @@ test(
 test('the rail Cancel discards edited source', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thingA = nodeByTitle(page, 'A').first();
+  const resourceA = nodeByTitle(page, 'A').first();
   await settled(page);
 
-  await openThing(thingA, 'A');
-  await thingA.getByRole('button', { name: 'Edit Thing A' }).click();
+  await openResource(resourceA, 'A');
+  await resourceA.getByRole('button', { name: 'Edit Resource A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(source).toContainText('entry point');
   await source.fill('Discarded rewrite');
   expect(await markdownSource(source)).toBe('Discarded rewrite');
-  await thingA.getByRole('button', { name: 'Cancel editing Thing A' }).click();
-  await expect(thingA).toContainText('entry point');
-  await thingA.getByRole('button', { name: 'Edit Thing A' }).click();
+  await resourceA.getByRole('button', { name: 'Cancel editing Resource A' }).click();
+  await expect(resourceA).toContainText('entry point');
+  await resourceA.getByRole('button', { name: 'Edit Resource A' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
     'entry point',
   );
 });
 
-test('the Markdown editor code loads only when a Markdown Thing opens', async ({ page }) => {
+test('the Markdown editor code loads only when a Markdown Resource opens', async ({ page }) => {
   const editorRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('MarkdownSourceEditor')) editorRequests.push(request.url());
@@ -466,21 +471,21 @@ test('the Markdown editor code loads only when a Markdown Thing opens', async ({
 
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
   expect(editorRequests).toEqual([]);
 
   const reference = nodeByTitle(page, 'A′').first();
-  await openThing(reference, 'A′');
+  await openResource(reference, 'A′');
   await expect(reference).toContainText('entry point');
   await expect(reference.getByRole('textbox')).toHaveCount(0);
   expect(editorRequests).toEqual([]);
-  await reference.getByRole('button', { name: 'Close Thing A′' }).click();
+  await reference.getByRole('button', { name: 'Close Resource A′' }).click();
 
-  await openThing(thing, 'A');
+  await openResource(resource, 'A');
   expect(editorRequests).toEqual([]);
-  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
+  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
   expect(editorRequests).toHaveLength(1);
 });
@@ -490,26 +495,29 @@ test('the Markdown editor code loads only when a Markdown Thing opens', async ({
  * mono body that is the writing surface rather than a form control.
  *
  * Pinned because nothing else asserts it. The treatment's rules and the general
- * `.thing--full` rules they override have equal specificity, so only source
+ * `.resource--full` rules they override have equal specificity, so only source
  * order separates them — the same cascade trap `presenting.spec.ts` pins for
- * `.thing--full`. With the treatment colocated in its own stylesheet, that order
+ * `.resource--full`. With the treatment colocated in its own stylesheet, that order
  * is now a fact about the module graph rather than about one file's line
  * numbers, and a reordered import would silently return the editor to the
  * generic dark pane with every other assertion still green.
  */
-test('the opened Thing draws Markdown and its editor on the same paper surface', async ({
+test('the opened Resource draws Markdown and its editor on the same paper surface', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
 
-  await openThing(thing, 'A');
+  await openResource(resource, 'A');
 
-  await expect(thing.getByTestId('thing')).toHaveCSS('background-color', 'rgb(255, 250, 240)');
-  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
+  await expect(resource.getByTestId('resource')).toHaveCSS(
+    'background-color',
+    'rgb(255, 250, 240)',
+  );
+  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
 
   const source = page.locator('[data-slot="markdown-source-editor"]');
   await expect(source).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -517,8 +525,8 @@ test('the opened Thing draws Markdown and its editor on the same paper surface',
 
   // The gutter remains legible through the Markdown body component's own theme;
   // application CSS does not reach through to CodeMirror classes (ADR 0063).
-  // `#4a505c` is `--canvas-thing-muted-color`, the Thing's own muted ink: this is
-  // drawn on cream, so it takes the role held to AA against both Thing faces
+  // `#4a505c` is `--canvas-resource-muted-color`, the Resource's own muted ink: this is
+  // drawn on cream, so it takes the role held to AA against both Resource faces
   // rather than the chrome's `--muted-foreground`, which is measured on paper.
   await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
     'color',
@@ -526,18 +534,18 @@ test('the opened Thing draws Markdown and its editor on the same paper surface',
   );
 });
 
-test('opened Markdown editing persists source while expansion displaces and restores Things', async ({
+test('opened Markdown editing persists source while expansion displaces and restores Resources', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
-  const openedId = await thing.getAttribute('data-id');
+  const openedId = await resource.getAttribute('data-id');
 
-  await openThing(thing, 'A');
+  await openResource(resource, 'A');
   const expanded = await allPositions(page);
   expect(expanded[openedId ?? '']).toEqual(before[openedId ?? '']);
   expect(
@@ -546,41 +554,41 @@ test('opened Markdown editing persists source while expansion displaces and rest
         id !== openedId && JSON.stringify(expanded[id]) !== JSON.stringify(position),
     ),
   ).toBe(true);
-  await thing.getByRole('button', { name: 'Edit Thing A' }).click();
+  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
-  await thing.getByRole('button', { name: 'Save Thing A' }).click();
+  await resource.getByRole('button', { name: 'Save Resource A' }).click();
 
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(expanded);
 
-  await thing.getByRole('button', { name: 'Close Thing A' }).click();
+  await resource.getByRole('button', { name: 'Close Resource A' }).click();
   expect(await allPositions(page)).toEqual(before);
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
   await persisted.hover();
-  await persisted.getByRole('button', { name: 'Edit Thing A' }).click();
+  await persisted.getByRole('button', { name: 'Edit Resource A' }).click();
   const persistedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(persistedSource).toContainText('# Edited');
   await expect(persistedSource).toContainText('New source');
 });
 
 /**
- * Dragging a thing writes its placement into the Diagram.
+ * Dragging a resource writes its placement into the Map.
  *
- * The fixture opens in its declared default Diagram. A Thing goes where the
+ * The fixture opens in its declared default Map. A Resource goes where the
  * author puts it and nothing else moves.
  */
 
-test('a dragged thing stays where it is dropped, and nothing else moves', async ({ page }) => {
+test('a dragged resource stays where it is dropped, and nothing else moves', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
   // Wait for the placement to resolve — before it does, the space is not yet
-  // draggable and every thing sits at the origin.
+  // draggable and every resource sits at the origin.
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
 
   await settled(page);
@@ -598,63 +606,63 @@ test('a dragged thing stays where it is dropped, and nothing else moves', async 
   const to = await positionOf(a);
   expect(to.y).toBeGreaterThan(from.y + 100);
 
-  // Every other thing is exactly where it was. Not "roughly" — a global
-  // optimiser is what this rules out, and it moves things by pixels as readily
+  // Every other resource is exactly where it was. Not "roughly" — a global
+  // optimiser is what this rules out, and it moves resources by pixels as readily
   // as by hundreds.
   const after = await allPositions(page);
   const draggedId = await a.getAttribute('data-id');
   for (const [id, position] of Object.entries(before)) {
     if (id === draggedId) continue;
-    expect(after[id], `thing ${id} moved`).toEqual(position);
+    expect(after[id], `resource ${id} moved`).toEqual(position);
   }
 });
 
 /**
- * Moving a Thing is one gesture, and the affordances that begin the other two
+ * Moving a Resource is one gesture, and the affordances that begin the other two
  * are no part of it.
  *
- * The Thing is Opened first so both are on it at once — the four Edge anchors
+ * The Resource is Opened first so both are on it at once — the four Edge anchors
  * and the one resize control — and the reveal is observed at rest before the
  * drag, so the withdrawal below is evidence of the gesture rather than of a
- * Thing that was never offering anything. Mid-drag the pointer is on the Thing
+ * Resource that was never offering anything. Mid-drag the pointer is on the Resource
  * and React Flow has Selected it, which is every condition either reveal reads.
  */
 test(
-  'a Thing being moved reveals neither its Edge handles nor its resize control, and offers both again on release',
-  { tag: '@parity:dragged-thing-returns-its-chrome-to-rest' },
+  'a Resource being moved reveals neither its Edge handles nor its resize control, and offers both again on release',
+  { tag: '@parity:dragged-resource-returns-its-chrome-to-rest' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-    // Opening grows the Thing through a transition, so its rect is still moving
+    // Opening grows the Resource through a transition, so its rect is still moving
     // for a moment: a drag started inside it would be measuring the animation.
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
 
-    const inner = thing.locator('.rf-thing-node__inner');
-    const handle = authoringHandle(thing, 'source', 'right');
-    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    const inner = resource.locator('.rf-resource-node__inner');
+    const handle = authoringHandle(resource, 'source', 'right');
+    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
 
-    await thing.hover();
+    await resource.hover();
     await expect(handle).toHaveCSS('opacity', '1');
     await expect(control).toHaveCSS('opacity', '1');
 
-    await dragBy(page, thing, 160, 120, async () => {
+    await dragBy(page, resource, 160, 120, async () => {
       await expect(inner).toHaveAttribute('data-dragging', 'true');
       await expect(handle).toHaveCSS('opacity', '0');
       await expect(control).toHaveCSS('opacity', '0');
-      // The rail is `CanvasThing`'s own withdrawal, and it predates this: a
-      // dragging Thing renders no actions rather than hiding them.
-      await expect(thing.getByTestId('canvas-thing-actions')).toHaveCount(0);
+      // The rail is `CanvasResource`'s own withdrawal, and it predates this: a
+      // dragging Resource renders no actions rather than hiding them.
+      await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
       // The anchors are not the rail's case — they stay mounted and measurable,
       // because React Flow measures a handle to place an Edge on it and a
       // `display: none` one reports 0x0 (ADR 0087).
-      await expect(thing.locator('.rf-thing-node__authoring-handle')).toHaveCount(8);
-      const anchor = await boxOf(handle, "the dragged Thing's right source anchor");
+      await expect(resource.locator('.rf-resource-node__authoring-handle')).toHaveCount(8);
+      const anchor = await boxOf(handle, "the dragged Resource's right source anchor");
       expect(anchor.width).toBeGreaterThan(0);
       expect(anchor.height).toBeGreaterThan(0);
     });
@@ -672,75 +680,75 @@ test(
 /* -------------------------------------------------------------------------- */
 
 /**
- * The room an Open Thing makes for itself: its Open rect less the Closed one.
+ * The room an Open Resource makes for itself: its Open rect less the Closed one.
  *
  * Arithmetic over the domain's own two constants rather than the numbers they
  * currently are, so a change to either size moves these tests with it instead of
  * leaving them asserting a stale offset.
  */
 const OPEN_GROWTH = {
-  width: DEFAULT_OPEN_SIZE.width - COLLAPSED_THING_SIZE.width,
-  height: DEFAULT_OPEN_SIZE.height - COLLAPSED_THING_SIZE.height,
+  width: DEFAULT_OPEN_SIZE.width - COLLAPSED_RESOURCE_SIZE.width,
+  height: DEFAULT_OPEN_SIZE.height - COLLAPSED_RESOURCE_SIZE.height,
 } as const;
 
 /**
- * The fixture Things the three geometries below place, by id and by title.
+ * The fixture Resources the three geometries below place, by id and by title.
  *
  * Placed by id and read back by id, so none of this depends on the order
- * `snapshot.things` happens to arrive in; the titles are the fixture's own, and
- * are what a Thing's own controls are named for.
+ * `snapshot.resources` happens to arrive in; the titles are the fixture's own, and
+ * are what a Resource's own controls are named for.
  */
 const SUBJECT = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000002'), title: 'A' };
 const NEIGHBOUR = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'), title: 'B' };
 const BEHIND = { id: uuidSchema.parse('00000000-0000-4000-8000-000000000005'), title: 'C' };
 
 /**
- * Open the Space in a Diagram whose geometry the test states.
+ * Open the Space in a Map whose geometry the test states.
  *
- * The tracked fixture's Diagram is a hand-set grid in the space file, so a test written against it would
+ * The tracked fixture's Map is a hand-set grid in the space file, so a test written against it would
  * be reverse-engineering coordinates it never chose — and every claim below is
- * about a distance between two Things. Seeding goes through the same HTTP
- * boundary the browser uses, so the Diagram the app opens is the one written
+ * about a distance between two Resources. Seeding goes through the same HTTP
+ * boundary the browser uses, so the Map the app opens is the one written
  * here.
  */
 async function seedGeometry(
   page: Page,
   title: string,
-  positions: Record<string, ThingPlacement>,
+  positions: Record<string, ResourcePlacement>,
 ): Promise<void> {
-  const seeded = await seedPositionedDiagram(page, title, () => positions);
+  const seeded = await seedPositionedMap(page, title, () => positions);
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText(title);
   await settled(page);
 }
 
-/** The node React Flow drew for one seeded Thing. */
-const seededNode = (page: Page, thing: { readonly id: string }): Locator =>
-  page.locator(`.react-flow__node[data-id="${thing.id}"]`);
+/** The node React Flow drew for one seeded Resource. */
+const seededNode = (page: Page, resource: { readonly id: string }): Locator =>
+  page.locator(`.react-flow__node[data-id="${resource.id}"]`);
 
 /**
- * One seeded Thing's position out of a frame `allPositions` read.
+ * One seeded Resource's position out of a frame `allPositions` read.
  *
- * Required rather than optional: a Thing that is not on the canvas is a broken
+ * Required rather than optional: a Resource that is not on the canvas is a broken
  * seed, and saying so here beats an assertion against `undefined` several lines
  * later.
  */
 function at(
   positions: Record<string, { x: number; y: number }>,
-  thing: { readonly id: string; readonly title: string },
+  resource: { readonly id: string; readonly title: string },
 ): { x: number; y: number } {
-  const position = positions[thing.id];
-  if (position === undefined) throw new Error(`Thing ${thing.title} is not on the canvas.`);
+  const position = positions[resource.id];
+  if (position === undefined) throw new Error(`Resource ${resource.title} is not on the canvas.`);
   return position;
 }
 
 /**
- * The first of ADR 0084's two reported defects: an Open Thing's size deciding
+ * The first of ADR 0084's two reported defects: an Open Resource's size deciding
  * where its neighbours are drawn.
  *
  * The neighbour is before the subject on both axes, so opening the subject
  * displaces nothing and what follows is about the drag alone. The rule is
- * per-axis, so the geometry only has to cross one: the Things are a hundred and
+ * per-axis, so the geometry only has to cross one: the Resources are a hundred and
  * twenty apart on `x` and far enough apart on `y` never to overlap, and a short
  * drag leftwards carries the subject across the neighbour's `x` and nothing
  * else. That is the discontinuity ADR 0084 measured — the derived rule answered
@@ -748,10 +756,10 @@ function at(
  * it back on the return. `whileDragging` is what makes the mid-gesture frame visible at
  * all, and the delta is chosen so the halfway move is already past the crossing.
  */
-test('dragging an Open Thing across a neighbour moves nothing but the dragged Thing', async ({
+test('dragging an Open Resource across a neighbour moves nothing but the dragged Resource', async ({
   page,
 }) => {
-  // Apart on `y` by more than a Thing's height, so the two never overlap and
+  // Apart on `y` by more than a Resource's height, so the two never overlap and
   // the drag below crosses `x` alone.
   await seedGeometry(page, 'Drag Geometry', {
     [SUBJECT.id]: { x: 120, y: 400, open: false },
@@ -759,8 +767,10 @@ test('dragging an Open Thing across a neighbour moves nothing but the dragged Th
   });
   const subject = seededNode(page, SUBJECT);
 
-  await openThing(subject, SUBJECT.title);
-  await expect(subject.getByRole('button', { name: `Close Thing ${SUBJECT.title}` })).toBeVisible();
+  await openResource(subject, SUBJECT.title);
+  await expect(
+    subject.getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
+  ).toBeVisible();
   await settled(page);
 
   // The resting frame, read before any pointer goes down. Everything below is
@@ -804,12 +814,14 @@ test('dragging an Open Thing across a neighbour moves nothing but the dragged Th
  * The second reported defect: a drop the old inverse could not answer for.
  *
  * `Placement.authoredPoint` inverted a derivation that is not onto — no authored
- * coordinate drew inside an Open Thing's growth — so a drop that landed in that
- * band was answered with the near side, and the Thing settled on the Open Thing's
+ * coordinate drew inside an Open Resource's growth — so a drop that landed in that
+ * band was answered with the near side, and the Resource settled on the Open Resource's
  * origin instead of where the author released it. The band was one growth-step
  * wide beginning at that origin, so this drops half a step into it on both axes.
  */
-test('a closed Thing released inside an Open Thing lands at the drop point', async ({ page }) => {
+test('a closed Resource released inside an Open Resource lands at the drop point', async ({
+  page,
+}) => {
   await seedGeometry(page, 'Drop Geometry', {
     [SUBJECT.id]: { x: 150, y: 150, open: false },
     [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
@@ -817,8 +829,10 @@ test('a closed Thing released inside an Open Thing lands at the drop point', asy
   const subject = seededNode(page, SUBJECT);
   const mover = seededNode(page, NEIGHBOUR);
 
-  await openThing(subject, SUBJECT.title);
-  await expect(subject.getByRole('button', { name: `Close Thing ${SUBJECT.title}` })).toBeVisible();
+  await openResource(subject, SUBJECT.title);
+  await expect(
+    subject.getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
+  ).toBeVisible();
   await settled(page);
 
   // The resting frame, before the pointer goes down.
@@ -828,17 +842,17 @@ test('a closed Thing released inside an Open Thing lands at the drop point', asy
   expect(open).toEqual({ x: 150, y: 150 });
   expect(from).toEqual({ x: 0, y: 0 });
 
-  // Inside the Open Thing's drawn box, and inside the band: half a growth-step
+  // Inside the Open Resource's drawn box, and inside the band: half a growth-step
   // beyond its origin on each axis.
   const dropAt = { x: open.x + OPEN_GROWTH.width / 2, y: open.y + OPEN_GROWTH.height / 2 };
-  const openBox = await boxOf(subject, 'the Open Thing');
+  const openBox = await boxOf(subject, 'the Open Resource');
   await dragBy(page, mover, dropAt.x - from.x, dropAt.y - from.y);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  // Drawn inside the Open Thing, which is the premise the flow-space assertions
-  // below rest on — and the thing the clamp made unreachable, since a Thing it
-  // answered for came to rest on the Open Thing's own top-left corner.
-  const moverBox = await boxOf(mover, 'the dropped Thing');
+  // Drawn inside the Open Resource, which is the premise the flow-space assertions
+  // below rest on — and the resource the clamp made unreachable, since a Resource it
+  // answered for came to rest on the Open Resource's own top-left corner.
+  const moverBox = await boxOf(mover, 'the dropped Resource');
   expect(moverBox.x).toBeGreaterThan(openBox.x);
   expect(moverBox.y).toBeGreaterThan(openBox.y);
   expect(moverBox.x).toBeLessThan(openBox.x + openBox.width);
@@ -848,23 +862,23 @@ test('a closed Thing released inside an Open Thing lands at the drop point', asy
   expect(at(landed, NEIGHBOUR).x - from.x, 'the drag never started').toBeGreaterThan(
     OPEN_GROWTH.width / 4,
   );
-  // Where it was released, not the Open Thing's origin.
+  // Where it was released, not the Open Resource's origin.
   expect(at(landed, NEIGHBOUR).x).toBeCloseTo(dropAt.x, -1);
   expect(at(landed, NEIGHBOUR).y).toBeCloseTo(dropAt.y, -1);
-  expect(at(landed, SUBJECT), 'the Open Thing moved').toEqual(open);
+  expect(at(landed, SUBJECT), 'the Open Resource moved').toEqual(open);
 });
 
 /**
  * Once, and then not again (ADR 0084).
  *
- * Opening writes the room it takes into the Diagram, so the neighbour clear of the
+ * Opening writes the room it takes into the Map, so the neighbour clear of the
  * subject on both axes moves by the width growth alone — its one room axis is
- * `x` (ADR 0093) — and the Thing behind it on both axes does not move at all. From then on those are authored positions like any
- * other: dragging the Open Thing past the neighbour is not a second Open, and the
+ * `x` (ADR 0093) — and the Resource behind it on both axes does not move at all. From then on those are authored positions like any
+ * other: dragging the Open Resource past the neighbour is not a second Open, and the
  * room stays where the Open Edit put it. Under the derived rule the neighbour
  * came back to its authored point the moment the subject was dragged beyond it.
  */
-test('opening a Thing displaces its neighbours once, and dragging it never displaces them again', async ({
+test('opening a Resource displaces its neighbours once, and dragging it never displaces them again', async ({
   page,
 }) => {
   await seedGeometry(page, 'Open Geometry', {
@@ -875,12 +889,14 @@ test('opening a Thing displaces its neighbours once, and dragging it never displ
   const subject = seededNode(page, SUBJECT);
   const closed = await allPositions(page);
 
-  await openThing(subject, SUBJECT.title);
-  await expect(subject.getByRole('button', { name: `Close Thing ${SUBJECT.title}` })).toBeVisible();
+  await openResource(subject, SUBJECT.title);
+  await expect(
+    subject.getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
+  ).toBeVisible();
   await settled(page);
 
   const opened = await allPositions(page);
-  expect(at(opened, SUBJECT), 'the opening Thing moved').toEqual(at(closed, SUBJECT));
+  expect(at(opened, SUBJECT), 'the opening Resource moved').toEqual(at(closed, SUBJECT));
   expect(at(opened, NEIGHBOUR)).toEqual({
     x: at(closed, NEIGHBOUR).x + OPEN_GROWTH.width,
     y: at(closed, NEIGHBOUR).y,
@@ -893,7 +909,9 @@ test('opening a Thing displaces its neighbours once, and dragging it never displ
     expect(at(midGesture, NEIGHBOUR), 'the neighbour moved mid-drag').toEqual(
       at(opened, NEIGHBOUR),
     );
-    expect(at(midGesture, BEHIND), 'the Thing behind moved mid-drag').toEqual(at(opened, BEHIND));
+    expect(at(midGesture, BEHIND), 'the Resource behind moved mid-drag').toEqual(
+      at(opened, BEHIND),
+    );
   };
 
   // Past the neighbour's *authored* origin on both axes, which is the crossing
@@ -910,7 +928,7 @@ test('opening a Thing displaces its neighbours once, and dragging it never displ
     -1,
   );
   expect(at(dragged, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(opened, NEIGHBOUR));
-  expect(at(dragged, BEHIND), 'the Thing behind moved at release').toEqual(at(opened, BEHIND));
+  expect(at(dragged, BEHIND), 'the Resource behind moved at release').toEqual(at(opened, BEHIND));
 
   await dragBy(page, subject, -340, -280, roomKept);
 
@@ -921,8 +939,8 @@ test('opening a Thing displaces its neighbours once, and dragging it never displ
 });
 
 test(
-  'selecting Diagrams is navigation and does not persist',
-  { tag: '@parity:command-dock-marks-one-current-diagram' },
+  'selecting Maps is navigation and does not persist',
+  { tag: '@parity:command-dock-marks-one-current-map' },
   async ({ page }) => {
     await page.goto('/');
     const a = nodeByTitle(page, 'A').first();
@@ -931,10 +949,10 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // One list over the authored Diagrams with exactly one checked item, and the
+    // One list over the authored Maps with exactly one checked item, and the
     // cluster outside it naming the same one (ADR 0053's surviving clause, kept
     // verbatim by ADR 0082; ADR 0079).
-    const choices = await diagramChoices(page);
+    const choices = await mapChoices(page);
     await expect(choices).toHaveCount(3);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
@@ -943,13 +961,13 @@ test(
     await expect(activeGraph(page)).toContainText('Long');
 
     await selectCanvas(page, 'Collection 2');
-    const afterSwitch = await diagramChoices(page);
+    const afterSwitch = await mapChoices(page);
     await expect(afterSwitch.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 2');
     await page.keyboard.press('Escape');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
     await selectCanvas(page, 'Collection 1');
-    const afterReturn = await diagramChoices(page);
+    const afterReturn = await mapChoices(page);
     await expect(afterReturn.and(page.locator('[aria-checked="true"]'))).toHaveText('Collection 1');
     await page.keyboard.press('Escape');
     await expect(persistence).toHaveAttribute('data-revision', '0');
@@ -957,8 +975,8 @@ test(
 );
 
 test(
-  'New Diagram creates an empty selected Diagram and persists it through reload',
-  { tag: '@parity:command-dock-adds-an-empty-diagram' },
+  'New Map creates an empty selected Map and persists it through reload',
+  { tag: '@parity:command-dock-adds-an-empty-map' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -966,28 +984,28 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // In the Diagram menu, beside the list it adds to — the Sidebar had room for
+    // In the Map menu, beside the list it adds to — the Sidebar had room for
     // a permanent control and the Dock finds room by disclosure (ADR 0082).
-    // What the command does is unchanged: an *empty* Diagram, created and
+    // What the command does is unchanged: an *empty* Map, created and
     // selected in one Edit (ADR 0079, ADR 0080).
-    await newDiagram(page);
+    await newMap(page);
 
-    // The command opens nothing and continues in the new Diagram's name
-    // (`.scratch/command-dock/issues/13`). It used to reveal the Things list
+    // The command opens nothing and continues in the new Map's name
+    // (`.scratch/command-dock/issues/13`). It used to reveal the Resources list
     // instead, which is why there is no dialog to dismiss here any more.
-    await settleNewDiagramName(page, 'Diagram 1');
-    await expect(selectedCanvas(page)).toContainText('Diagram 1');
+    await settleNewMapName(page, 'Map 1');
+    await expect(selectedCanvas(page)).toContainText('Map 1');
     await expect(persistence).toHaveAttribute('data-revision', '1');
     expect(await allPositions(page)).toEqual({});
 
     await page.reload();
-    await expect(selectedCanvas(page)).toContainText('Diagram 1');
+    await expect(selectedCanvas(page)).toContainText('Map 1');
     expect(await allPositions(page)).toEqual({});
 
-    // Rename is a command in the Diagram list: the name discloses, and the
+    // Rename is a command in the Map list: the name discloses, and the
     // editor is the same in-place draft it was.
     await beginRename(page, selectedCanvas(page));
-    const title = page.getByRole('textbox', { name: 'Diagram name' });
+    const title = page.getByRole('textbox', { name: 'Map name' });
     await title.fill('Workshop');
     await title.press('Enter');
     await expect(selectedCanvas(page)).toContainText('Workshop');
@@ -995,7 +1013,7 @@ test(
 
     await page.reload();
     await expect(selectedCanvas(page)).toContainText('Workshop');
-    const menu = await diagramMenu(page);
+    const menu = await mapMenu(page);
     await menu.getByRole('menuitem', { name: 'Delete Workshop' }).click();
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -1008,91 +1026,91 @@ test(
 );
 
 test(
-  'resizing an open Thing persists its authored rect through reload',
+  'resizing an open Resource persists its authored rect through reload',
   {
-    tag: '@parity:canvas-thing-fills-authored-node-rect',
+    tag: '@parity:canvas-resource-fills-authored-node-rect',
   },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
-    await expectThingFillsNode(thing);
-    await thing.click({ position: { x: 8, y: 8 } });
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
+    await expectResourceFillsNode(resource);
+    await resource.click({ position: { x: 8, y: 8 } });
 
     const size = async () =>
-      thing.evaluate((element) => ({
+      resource.evaluate((element) => ({
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
     const beforeSize = await size();
-    const beforePosition = await positionOf(thing);
-    const handle = thing.locator('.react-flow__resize-control.handle.bottom.right');
+    const beforePosition = await positionOf(resource);
+    const handle = resource.locator('.react-flow__resize-control.handle.bottom.right');
     await expect(handle).toBeVisible();
-    const box = await boxOf(handle, 'the bottom-right Thing resize handle');
+    const box = await boxOf(handle, 'the bottom-right Resource resize handle');
 
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
-    await expectThingFillsNode(thing);
+    await expectResourceFillsNode(resource);
     await page.mouse.up();
 
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    await expectThingFillsNode(thing);
+    await expectResourceFillsNode(resource);
     const resized = await size();
     expect(resized.width).toBeGreaterThan(beforeSize.width);
     expect(resized.height).toBeGreaterThan(beforeSize.height);
-    expect(await positionOf(thing)).toEqual(beforePosition);
+    expect(await positionOf(resource)).toEqual(beforePosition);
 
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Close Thing A' })).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Resource A' })).toBeVisible();
     const persistedSize = await persisted.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
-    await expectThingFillsNode(persisted);
+    await expectResourceFillsNode(persisted);
     expect(persistedSize).toEqual(resized);
     await persisted.hover();
-    await persisted.getByRole('button', { name: 'Close Thing A', exact: true }).click();
+    await persisted.getByRole('button', { name: 'Close Resource A', exact: true }).click();
     await expect(persisted).toHaveCSS('width', '260px');
-    await expectThingFillsNode(persisted);
+    await expectResourceFillsNode(persisted);
     await persisted.hover();
-    await persisted.getByRole('button', { name: 'Edit Thing A', exact: true }).click();
+    await persisted.getByRole('button', { name: 'Edit Resource A', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
-    await expectThingFillsNode(persisted);
+    await expectResourceFillsNode(persisted);
     expect(await size()).toEqual(resized);
     expect(await positionOf(persisted)).toEqual(beforePosition);
   },
 );
 
 test(
-  'an Open Thing offers one resize control, revealed on hover, that selects the Thing and clears a Selected Edge without a second Edit',
-  { tag: '@parity:open-thing-offers-one-resize-control' },
+  'an Open Resource offers one resize control, revealed on hover, that selects the Resource and clears a Selected Edge without a second Edit',
+  { tag: '@parity:open-resource-offers-one-resize-control' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
+    const resource = nodeByTitle(page, 'A').first();
     const closed = nodeByTitle(page, 'B').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
     const openedRevision = await persistence.getAttribute('data-revision');
-    const beforePosition = await positionOf(thing);
-    // Opening grows the Thing through a CSS transition, so its rect is still
+    const beforePosition = await positionOf(resource);
+    // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists. Settling it first is what
     // makes the mid-gesture growth below evidence of the drag rather than of
     // an animation that had not finished.
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const beforeSize = await thing.evaluate((element) => ({
+    const beforeSize = await resource.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
@@ -1101,32 +1119,32 @@ test(
     const edgePath = page.locator('.react-flow__edge-path').first();
     const beforeEdgePath = await edgePath.getAttribute('d');
 
-    // A Closed Thing offers no control at all.
+    // A Closed Resource offers no control at all.
     await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
 
-    // The Open Thing offers exactly one, at its bottom-right corner, and it is
-    // not visible until hovered — the actual reveal mechanism. `openThing` left
+    // The Open Resource offers exactly one, at its bottom-right corner, and it is
+    // not visible until hovered — the actual reveal mechanism. `openResource` left
     // keyboard focus on its own control, which is *also* a reveal condition
-    // (Thing focus), so that focus is moved off the Thing first to observe rest.
-    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
-    await expect(thing.locator('.react-flow__resize-control')).toHaveCount(1);
+    // (Resource focus), so that focus is moved off the Resource first to observe rest.
+    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+    await expect(resource.locator('.react-flow__resize-control')).toHaveCount(1);
     await page.evaluate(() => {
       const focused = document.activeElement;
       if (focused instanceof HTMLElement) focused.blur();
     });
     await page.mouse.move(0, 0);
     await expect(control).toHaveCSS('opacity', '0');
-    await thing.hover();
+    await resource.hover();
     await expect(control).toHaveCSS('opacity', '1');
 
-    // Select an Edge first, and leave the Thing unselected, so the gesture below
-    // is proven to move both — not merely to arrive with the Thing already
+    // Select an Edge first, and leave the Resource unselected, so the gesture below
+    // is proven to move both — not merely to arrive with the Resource already
     // Selected from an earlier click.
     await selectAnEdge(page);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
 
-    const box = await boxOf(control, "Thing A's resize control");
+    const box = await boxOf(control, "Resource A's resize control");
     // A hit target a hand can find. React Flow's own two-class `.handle` rule
     // declares a 5px box and outranks a rule naming one class, so this is
     // asserted as a size rather than inferred from the drag below succeeding:
@@ -1136,12 +1154,15 @@ test(
     const hitTargetTolerance = 0.01;
     expect(Math.abs(box.width - 48)).toBeLessThanOrEqual(hitTargetTolerance);
     expect(Math.abs(box.height - 48)).toBeLessThanOrEqual(hitTargetTolerance);
-    const markLocator = thing.locator('.rf-thing-node__resize-mark');
+    const markLocator = resource.locator('.rf-resource-node__resize-mark');
     await expect.poll(async () => (await markLocator.boundingBox())?.width).toBeCloseTo(20, 1);
     const mark = await markLocator.boundingBox();
-    if (mark === null) throw new Error("Thing A's resize control draws no mark");
+    if (mark === null) throw new Error("Resource A's resize control draws no mark");
     expect(mark.height).toBeCloseTo(20, 1);
-    const innerBox = await boxOf(thing.locator('.rf-thing-node__inner'), "Thing A's inner box");
+    const innerBox = await boxOf(
+      resource.locator('.rf-resource-node__inner'),
+      "Resource A's inner box",
+    );
     expect(mark.x + mark.width).toBeGreaterThan(innerBox.x + innerBox.width);
     expect(mark.y + mark.height).toBeGreaterThan(innerBox.y + innerBox.height);
     await expect(markLocator).toHaveCSS('translate', '1px 1px');
@@ -1150,32 +1171,32 @@ test(
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 80, { steps: 6 });
-    // Mid-gesture, before release: the Thing is already following the pointer.
-    // Beginning a resize Selects the Thing, and the selected Thing is an input to
+    // Mid-gesture, before release: the Resource is already following the pointer.
+    // Beginning a resize Selects the Resource, and the selected Resource is an input to
     // the projection, so a reprojection lands mid-drag — the render adapter has
-    // to hold the live rect through it or every frame redraws the Thing at the
+    // to hold the live rect through it or every frame redraws the Resource at the
     // size it had before the gesture and nothing moves until release. Polled
     // rather than sampled once: the last pointer move and the frame that paints
     // it are not the same tick, and a single read races that.
     await expect
       .poll(async () =>
-        thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+        resource.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBeGreaterThan(beforeSize.width);
     // The neighbour does **not** move while the pointer is down (ADR 0084).
-    // The draft previews the resizing Thing's own rect and nothing else, so
-    // every other Thing is drawn from the authored placement until the Edit
-    // lands. This read alone would also pass if the Thing were simply at rest,
+    // The draft previews the resizing Resource's own rect and nothing else, so
+    // every other Resource is drawn from the authored placement until the Edit
+    // lands. This read alone would also pass if the Resource were simply at rest,
     // so it is the pair with the assertion after release — where the neighbour
     // is required to have moved — that says the room is taken at the Edit and
     // not at the frame.
     await expect.poll(async () => positionOf(neighbour)).toEqual(beforeNeighbourPosition);
-    // The Edge does move, and it is the resizing Thing's own growth that moves
+    // The Edge does move, and it is the resizing Resource's own growth that moves
     // it: A's handles travel with its rect, so the curve is redrawn from the
     // live draft while B stays exactly where it was authored.
     await expect.poll(async () => edgePath.getAttribute('d')).not.toBe(beforeEdgePath);
-    await expect(thing.locator('.canvas-thing__rail')).toHaveCSS('opacity', '0');
-    await expect(thing.locator('.rf-thing-node__authoring-handle--source').first()).toHaveCSS(
+    await expect(resource.locator('.canvas-resource__rail')).toHaveCSS('opacity', '0');
+    await expect(resource.locator('.rf-resource-node__authoring-handle--source').first()).toHaveCSS(
       'opacity',
       '0',
     );
@@ -1185,35 +1206,35 @@ test(
 
     await page.mouse.up();
 
-    // One drag both Selected the Thing and cleared the Selected Edge — no
+    // One drag both Selected the Resource and cleared the Selected Edge — no
     // separate click, and Selection was never a second Edit.
-    await expect(thing).toHaveClass(/selected/);
+    await expect(resource).toHaveClass(/selected/);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');
     await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
 
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const afterSize = await thing.evaluate((element) => ({
+    const afterSize = await resource.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
     expect(afterSize.width).toBeGreaterThan(beforeSize.width);
     expect(afterSize.height).toBeGreaterThan(beforeSize.height);
     // The authored top-left origin is unchanged: only the box grew.
-    expect(await positionOf(thing)).toEqual(beforePosition);
+    expect(await positionOf(resource)).toEqual(beforePosition);
 
     // Released, and only now does the neighbour take the room: the completed
     // Resize applied the difference between the old growth and the new one and
-    // wrote B's position into the Diagram (ADR 0084). This is the other half of
+    // wrote B's position into the Map (ADR 0084). This is the other half of
     // the mid-gesture assertion above — together they place the movement at the
     // Edit rather than at the frame.
     const afterNeighbourPosition = await positionOf(neighbour);
     expect(afterNeighbourPosition).not.toEqual(beforeNeighbourPosition);
     const afterEdgePath = await edgePath.getAttribute('d');
     const completedRevision = await persistence.getAttribute('data-revision');
-    const secondBox = await boxOf(control, "Thing A's resize control after completion");
+    const secondBox = await boxOf(control, "Resource A's resize control after completion");
     await page.mouse.move(secondBox.x + secondBox.width / 2, secondBox.y + secondBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
@@ -1223,7 +1244,7 @@ test(
     );
     await expect
       .poll(async () =>
-        thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+        resource.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBeGreaterThan(afterSize.width);
     await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel')));
@@ -1231,7 +1252,7 @@ test(
 
     await expect
       .poll(async () =>
-        thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
+        resource.evaluate((element) => Number.parseFloat(getComputedStyle(element).width)),
       )
       .toBe(afterSize.width);
     await expect.poll(async () => positionOf(neighbour)).toEqual(afterNeighbourPosition);
@@ -1278,7 +1299,7 @@ test.describe('resizing by touch', () => {
    *
    * `page.touchscreen` offers `tap()` and nothing else, and a `TouchEvent`
    * constructed inside `page.evaluate` arrives untrusted: Chromium derives no
-   * `pointerdown`/`pointerup` from it, so the release — the thing `ThingNode`'s
+   * `pointerdown`/`pointerup` from it, so the release — the resource `ResourceNode`'s
    * window listener answers with `finishResize` — would never happen. CDP's
    * `Input.dispatchTouchEvent` is what `touchscreen.tap()` uses underneath and
    * produces actual browser behaviour, compatibility pointer events included.
@@ -1313,40 +1334,40 @@ test.describe('resizing by touch', () => {
   }
 
   // No `@parity` tag: the reporter wants exactly one test per claim, and the
-  // mouse tests above already carry the two this Thing's resize control owns.
-  test('a touch drag resizes an Open Thing to the rect it dragged and commits one Edit on release', async ({
+  // mouse tests above already carry the two this Resource's resize control owns.
+  test('a touch drag resizes an Open Resource to the rect it dragged and commits one Edit on release', async ({
     page,
   }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
     const openedRevision = await persistence.getAttribute('data-revision');
-    const beforePosition = await positionOf(thing);
-    // Opening grows the Thing through a CSS transition, so its rect is still
+    const beforePosition = await positionOf(resource);
+    // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
     // makes the growth below evidence of the drag.
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     const width = async () =>
-      thing.evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
+      resource.evaluate((element) => Number.parseFloat(getComputedStyle(element).width));
     const size = async () =>
-      thing.evaluate((element) => ({
+      resource.evaluate((element) => ({
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
     const beforeSize = await size();
 
-    await thing.hover();
-    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
-    const box = await boxOf(control, "Thing A's resize control");
+    await resource.hover();
+    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+    const box = await boxOf(control, "Resource A's resize control");
     const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
-    // The drag is expressed in screen pixels and the Thing's rect is in flow
+    // The drag is expressed in screen pixels and the Resource's rect is in flow
     // units, so the expected rect is the one the pointer described, divided
     // through the camera. Asserting the whole delta — not merely "bigger" —
     // is what makes every frame after the first load-bearing.
@@ -1360,7 +1381,7 @@ test.describe('resizing by touch', () => {
 
     const gesture = await beginTouchGesture(page, from.x, from.y);
     // The first frame is already the regression: against inline callbacks this
-    // poll never moves off the Thing's opened width, because the re-render the
+    // poll never moves off the Resource's opened width, because the re-render the
     // gesture's own start schedules — `setResizeActive(true)`, before any
     // preview — lands before the browser delivers the next touch. The later
     // frames are not redundant, though: the rect asserted after release is
@@ -1377,18 +1398,18 @@ test.describe('resizing by touch', () => {
     await gesture.release();
 
     // Chromium raises `pointerup` from the touch release, which is the signal
-    // `ThingNode` turns into the one completing Edit.
+    // `ResourceNode` turns into the one completing Edit.
     await expect(persistence).toHaveText('Persisted');
     await expect(persistence).toHaveAttribute('data-revision', String(Number(openedRevision) + 1));
 
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     const resized = await size();
     expect(resized.width).toBeCloseTo(expected.width, 0);
     expect(resized.height).toBeCloseTo(expected.height, 0);
     // The authored top-left origin is unchanged: only the box grew.
-    expect(await positionOf(thing)).toEqual(beforePosition);
+    expect(await positionOf(resource)).toEqual(beforePosition);
     // Exactly one Edit, not one-so-far: the revision assertion above succeeds on
     // its first poll, so only elapsed time can rule out a second arriving behind
     // it — and touch is the path where a stray `pointerup`/`touchend` pair could
@@ -1399,7 +1420,7 @@ test.describe('resizing by touch', () => {
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Close Thing A' })).toBeVisible();
+    await expect(persisted.getByRole('button', { name: 'Close Resource A' })).toBeVisible();
     await persisted.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
@@ -1429,7 +1450,7 @@ test.describe('resizing by touch', () => {
    * Nothing underneath answers that signal either. `shouldResize` always
    * returns false, so `XYResizer` never sets `resizeDetected` and its `end`
    * handler returns early every time — React Flow never calls `onResizeEnd`,
-   * and d3-drag contributes nothing to ending or cancelling. `ThingNode`'s three
+   * and d3-drag contributes nothing to ending or cancelling. `ResourceNode`'s three
    * `window` listeners are the entire lifecycle. Miss the cancellation and
    * `resizing.current` stays true with the draft still live, so the *next*
    * `pointerup` anywhere on the page finishes a gesture the author abandoned
@@ -1441,46 +1462,46 @@ test.describe('resizing by touch', () => {
   }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
     const openedRevision = await persistence.getAttribute('data-revision');
-    const beforePosition = await positionOf(thing);
-    // Opening grows the Thing through a CSS transition, so its rect is still
+    const beforePosition = await positionOf(resource);
+    // Opening grows the Resource through a CSS transition, so its rect is still
     // moving for a moment after the Edit persists — settling it first is what
     // makes this the authored rect the cancellation has to restore.
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
     const size = async () =>
-      thing.evaluate((element) => ({
+      resource.evaluate((element) => ({
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
     const authored = await size();
 
-    await thing.hover();
-    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
-    const box = await boxOf(control, "Thing A's resize control");
+    await resource.hover();
+    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+    const box = await boxOf(control, "Resource A's resize control");
     const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 
     const gesture = await beginTouchGesture(page, from.x, from.y);
     await gesture.moveTo(from.x + 70, from.y + 45);
     await gesture.moveTo(from.x + 140, from.y + 90);
     // The draft has to be live before it can be discarded: a cancellation of a
-    // gesture that never grew the Thing would restore the authored rect by
+    // gesture that never grew the Resource would restore the authored rect by
     // having never left it, and prove nothing.
     await expect.poll(async () => (await size()).width).toBeGreaterThan(authored.width);
     await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
 
     await gesture.cancel();
 
-    // The draft is discarded: the Thing is the rect it was authored at, not the
+    // The draft is discarded: the Resource is the rect it was authored at, not the
     // rect the finger dragged to, and its origin never moved either.
     await expect.poll(size).toEqual(authored);
-    expect(await positionOf(thing)).toEqual(beforePosition);
+    expect(await positionOf(resource)).toEqual(beforePosition);
     await quiescent(page);
     await expect(persistence).toHaveAttribute('data-revision', openedRevision ?? '');
 
@@ -1503,12 +1524,12 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveText('Persisted');
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
 
@@ -1517,10 +1538,10 @@ test(
         width: Number.parseFloat(getComputedStyle(element).width),
         height: Number.parseFloat(getComputedStyle(element).height),
       }));
-    const initialSize = await size(thing);
-    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
-    await thing.hover();
-    const growBox = await boxOf(control, "Thing A's resize control before growing");
+    const initialSize = await size(resource);
+    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+    await resource.hover();
+    const growBox = await boxOf(control, "Resource A's resize control before growing");
     await page.mouse.move(growBox.x + growBox.width / 2, growBox.y + growBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
@@ -1530,16 +1551,16 @@ test(
     );
     await page.mouse.up();
     await expect(persistence).toHaveText('Persisted');
-    await thing.evaluate(async (element) => {
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const rememberedSize = await size(thing);
+    const rememberedSize = await size(resource);
     expect(rememberedSize.width).toBeGreaterThan(initialSize.width);
     expect(rememberedSize.height).toBeGreaterThan(initialSize.height);
 
     const beforeCloseRevision = await persistence.getAttribute('data-revision');
     const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
-    const closeBox = await boxOf(control, "Thing A's resize control before Closing");
+    const closeBox = await boxOf(control, "Resource A's resize control before Closing");
     await page.mouse.move(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(
@@ -1548,14 +1569,20 @@ test(
       { steps: 8 },
     );
 
-    await expect.poll(async () => size(thing)).toEqual({ width: 260, height: 146 });
-    await expect(thing.locator('.rf-thing-node__inner')).toHaveAttribute('data-expanded', 'true');
+    await expect.poll(async () => size(resource)).toEqual({ width: 260, height: 146 });
+    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute(
+      'data-expanded',
+      'true',
+    );
     await expect(persistence).toHaveAttribute('data-revision', beforeCloseRevision ?? '');
 
     await page.mouse.up();
 
-    await expect(thing.locator('.rf-thing-node__inner')).toHaveAttribute('data-expanded', 'false');
-    await expect(thing.locator('.react-flow__resize-control')).toHaveCount(0);
+    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute(
+      'data-expanded',
+      'false',
+    );
+    await expect(resource.locator('.react-flow__resize-control')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');
     await expect(persistence).toHaveAttribute(
       'data-revision',
@@ -1565,8 +1592,8 @@ test(
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Open Thing A' })).toBeVisible();
-    await openThing(persisted, 'A');
+    await expect(persisted.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+    await openResource(persisted, 'A');
     await persisted.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
@@ -1575,29 +1602,32 @@ test(
 );
 
 test(
-  'an active Thing resize does not animate its dimensions behind the pointer',
-  { tag: '@parity:active-thing-resize-tracks-pointer-without-dimension-animation' },
+  'an active Resource resize does not animate its dimensions behind the pointer',
+  { tag: '@parity:active-resource-resize-tracks-pointer-without-dimension-animation' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
-    await openThing(thing, 'A');
-    await thing.evaluate(async (element) => {
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await openResource(resource, 'A');
+    await resource.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
 
-    const control = thing.locator('.react-flow__resize-control.handle.bottom.right');
-    await thing.hover();
-    const box = await boxOf(control, "Thing A's resize control");
+    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+    await resource.hover();
+    const box = await boxOf(control, "Resource A's resize control");
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2 + 45, box.y + box.height / 2 + 35, {
       steps: 2,
     });
-    await expect(thing.locator('.rf-thing-node__inner')).toHaveAttribute('data-resizing', 'true');
+    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute(
+      'data-resizing',
+      'true',
+    );
 
-    const dimensionAnimationRunning = await thing.evaluate((element) =>
+    const dimensionAnimationRunning = await resource.evaluate((element) =>
       element.getAnimations().some((animation) => {
         if (!(animation instanceof CSSTransition) || animation.playState !== 'running') {
           return false;
@@ -1612,16 +1642,16 @@ test(
   },
 );
 
-test('opening animates the Thing wrapper and displaced neighbours from one duration token', async ({
+test('opening animates the Resource wrapper and displaced neighbours from one duration token', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await page.addStyleTag({
-    content: '.graph-area { --thing-placement-duration: 10s !important; }',
+    content: '.graph-area { --resource-placement-duration: 10s !important; }',
   });
-  const thing = nodeByTitle(page, 'A').first();
-  await openThing(thing, 'A');
+  const resource = nodeByTitle(page, 'A').first();
+  await openResource(resource, 'A');
 
   const animatedProperties = async () =>
     page.locator('.react-flow__node').evaluateAll((nodes) =>
@@ -1635,7 +1665,7 @@ test('opening animates the Thing wrapper and displaced neighbours from one durat
         }),
       })),
     );
-  const openedId = await thing.getAttribute('data-id');
+  const openedId = await resource.getAttribute('data-id');
   await expect
     .poll(async () => (await animatedProperties()).some(({ properties }) => properties.length > 0))
     .toBe(true);
@@ -1651,40 +1681,38 @@ test('opening animates the Thing wrapper and displaced neighbours from one durat
 /**
  * **It opens nothing, and the author continues in the name.**
  *
- * This test used to be named for the Things View it revealed. New Diagram no
- * longer discloses anything — the Edit creates and selects an empty Diagram and
+ * This test used to be named for the Resources View it revealed. New Map no
+ * longer discloses anything — the Edit creates and selects an empty Map and
  * the caret lands in its name (`.scratch/command-dock/issues/13`) — so what is
  * left to hold is that the canvas really is empty, that the Space's existing
- * Things are still there to be placed on it, and that the empty Diagram is
- * durable. The Things are read from the list the author opens themselves, which
+ * Resources are still there to be placed on it, and that the empty Map is
+ * durable. The Resources are read from the list the author opens themselves, which
  * is the half the old disclosure was standing in for.
  */
-test('New Diagram creates an empty Diagram, continues in its name, and persists', async ({
-  page,
-}) => {
+test('New Map creates an empty Map, continues in its name, and persists', async ({ page }) => {
   await page.goto('/');
-  await newDiagram(page);
+  await newMap(page);
 
-  await settleNewDiagramName(page, 'Diagram 1');
+  await settleNewMapName(page, 'Map 1');
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
-  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
+  await expect(selectedCanvas(page)).toContainText('Map 1');
 
-  // The Space kept its Things; only this Diagram is empty. Opened by hand,
+  // The Space kept its Resources; only this Map is empty. Opened by hand,
   // because that is now the only way the list opens.
-  await page.getByRole('button', { name: 'Things' }).click();
-  await expect(page.getByRole('button', { name: 'Add A to Diagram' })).toBeVisible();
+  await page.getByRole('button', { name: 'Resources' }).click();
+  await expect(page.getByRole('button', { name: 'Add A to Map' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
-  // `Persisted` says the commit was acknowledged, not that this Diagram reopens.
-  // Reload against the same repository to prove the empty Diagram is durable.
+  // `Persisted` says the commit was acknowledged, not that this Map reopens.
+  // Reload against the same repository to prove the empty Map is durable.
   await page.reload();
   await expect(page.locator('.react-flow__node')).toHaveCount(0);
-  await expect(selectedCanvas(page)).toContainText('Diagram 1');
+  await expect(selectedCanvas(page)).toContainText('Map 1');
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
@@ -1766,15 +1794,15 @@ test(
 );
 
 test(
-  'adding an existing Thing from the Things list authors Diagram membership',
-  { tag: '@parity:things-popover-adds-existing-diagram-members' },
+  'adding an existing Resource from the Resources list authors Map membership',
+  { tag: '@parity:resources-popover-adds-existing-map-members' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await page.getByRole('button', { name: 'Things' }).click();
-    const source = page.getByRole('button', { name: 'Add E to Diagram' });
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const source = page.getByRole('button', { name: 'Add E to Map' });
     await expect(source).toBeVisible();
     await source.click();
 
@@ -1785,100 +1813,100 @@ test(
 );
 
 test(
-  'the Things list names an empty Diagram after every absent Thing is added',
-  { tag: '@parity:things-popover-distinguishes-an-empty-diagram' },
+  'the Resources list names an empty Map after every absent Resource is added',
+  { tag: '@parity:resources-popover-distinguishes-an-empty-map' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await page.getByRole('button', { name: 'Things' }).click();
+    await page.getByRole('button', { name: 'Resources' }).click();
     // Spaces stay offered after a press — placing one authors another Space
-    // Thing, it does not take the Space away — so the loop that empties the
+    // Resource, it does not take the Space away — so the loop that empties the
     // list has to stop looking at that source first. The fixture already
     // holds ordinary Spaces; leaving them on would never reach the empty
     // sentence this claim is about.
     await page.getByRole('button', { name: /^Spaces in this Meta Space, \d+$/ }).click();
-    const choices = page.getByRole('button', { name: /^Add .* to Diagram$/ });
+    const choices = page.getByRole('button', { name: /^Add .* to Map$/ });
     while ((await choices.count()) > 0) {
       const before = await choices.count();
       await choices.first().click();
       await expect(choices).toHaveCount(before - 1);
     }
 
-    await expect(page.getByText('All Things are in this Diagram.')).toBeVisible();
+    await expect(page.getByText('All Resources are in this Map.')).toBeVisible();
   },
 );
 
 test(
-  'the Things filter counts what each switch contributes under the current search',
-  { tag: '@parity:things-popover-counts-what-each-filter-contributes' },
+  'the Resources filter counts what each switch contributes under the current search',
+  { tag: '@parity:resources-popover-counts-what-each-filter-contributes' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await page.getByRole('button', { name: 'Things' }).click();
-    const markdown = page.getByRole('button', { name: /^Markdown Things, \d+$/ });
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const markdown = page.getByRole('button', { name: /^Markdown Resources, \d+$/ });
     await expect(markdown).toBeVisible();
 
     // Narrowed to the one kind the count is read against, because the claim is
     // that the number agrees with the rows *under it* — and the rows are four
-    // sources interleaved, this Space leaving a Reference Thing unplaced beside its
-    // Markdown Things. Turning the other three off is also the gesture that
+    // sources interleaved, this Space leaving a Reference Resource unplaced beside its
+    // Markdown Resources. Turning the other three off is also the gesture that
     // proves a switch narrows the list at all.
     for (const other of [
-      'Reference Things',
-      'Space Things in this Space',
+      'Reference Resources',
+      'Space Resources in this Space',
       'Spaces in this Meta Space',
     ]) {
       await page.getByRole('button', { name: new RegExp(`^${other}, \\d+$`) }).click();
     }
 
-    const rows = page.getByRole('button', { name: /^Add .* to Diagram$/ });
+    const rows = page.getByRole('button', { name: /^Add .* to Map$/ });
     const before = await rows.count();
-    expect(before, 'this Diagram leaves Markdown Things unplaced').toBeGreaterThan(0);
-    await expect(markdown).toHaveAccessibleName(`Markdown Things, ${String(before)}`);
+    expect(before, 'this Map leaves Markdown Resources unplaced').toBeGreaterThan(0);
+    await expect(markdown).toHaveAccessibleName(`Markdown Resources, ${String(before)}`);
 
     // The count answers the search rather than the Space, which is the whole of
     // why it is worth drawing — a number that disagreed with the rows under it
     // would be a second claim about the same set
     // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
-    await page.getByRole('textbox', { name: 'Search things' }).fill('zzzz');
+    await page.getByRole('textbox', { name: 'Search resources' }).fill('zzzz');
     await expect(rows).toHaveCount(0);
-    await expect(markdown).toHaveAccessibleName('Markdown Things, 0');
+    await expect(markdown).toHaveAccessibleName('Markdown Resources, 0');
 
     // And a switch the reader turns off goes on counting, because the number is
     // what says whether turning it back on is worth the press.
-    await page.getByRole('textbox', { name: 'Search things' }).fill('');
+    await page.getByRole('textbox', { name: 'Search resources' }).fill('');
     await markdown.click();
     await expect(markdown).toHaveAttribute('aria-pressed', 'false');
-    await expect(markdown).toHaveAccessibleName(`Markdown Things, ${String(before)}`);
+    await expect(markdown).toHaveAccessibleName(`Markdown Resources, ${String(before)}`);
   },
 );
 
 test(
-  'a long Things list scrolls independently on a narrow screen',
-  { tag: '@parity:things-popover-scrolls-a-long-list-on-a-narrow-screen' },
+  'a long Resources list scrolls independently on a narrow screen',
+  { tag: '@parity:resources-popover-scrolls-a-long-list-on-a-narrow-screen' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
     await page.setViewportSize({ width: 480, height: 360 });
 
-    await page.getByRole('button', { name: 'Things' }).click();
-    await expect(page.getByRole('textbox', { name: 'Search things' })).toBeVisible();
+    await page.getByRole('button', { name: 'Resources' }).click();
+    await expect(page.getByRole('textbox', { name: 'Search resources' })).toBeVisible();
     // **The application half proves containment; the Ladle half proves the
-    // scrolling.** This Space's selected Diagram leaves five Things unplaced, and
+    // scrolling.** This Space's selected Map leaves five Resources unplaced, and
     // five rows do not overflow any sane bound — the drawer this replaced
-    // scrolled here only because its rows were whole 146px Thing fronts. What is
+    // scrolled here only because its rows were whole 146px Resource fronts. What is
     // provable against the real Space is the invariant that actually bites on a
     // short screen: an anchored popover is bounded by the room it has and stays
     // inside the viewport, where a fixed height would put the last rows under
-    // the edge with no way to reach them. `things-popover.spec.ts` mounts
+    // the edge with no way to reach them. `resources-popover.spec.ts` mounts
     // eighteen rows against the same bound and asserts it scrolls.
-    const list = page.locator('.things-popover__list');
-    const box = await boxOf(list, 'the Things list');
+    const list = page.locator('.resources-popover__list');
+    const box = await boxOf(list, 'the Resources list');
     const viewport = page.viewportSize();
     expect(viewport, 'the viewport was sized above').not.toBeNull();
     expect(box.y + box.height, 'the list ends inside the viewport').toBeLessThanOrEqual(
@@ -1892,23 +1920,23 @@ test(
 );
 
 test(
-  'the Things list dismisses on Escape and survives working on the canvas behind it',
-  { tag: '@parity:things-popover-opens-and-dismisses-without-locking-the-canvas' },
+  'the Resources list dismisses on Escape and survives working on the canvas behind it',
+  { tag: '@parity:resources-popover-opens-and-dismisses-without-locking-the-canvas' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    const trigger = page.getByRole('button', { name: 'Things' });
-    const list = page.getByRole('dialog', { name: 'Things' });
+    const trigger = page.getByRole('button', { name: 'Resources' });
+    const list = page.getByRole('dialog', { name: 'Resources' });
 
     await expect(list).toHaveCount(0);
     await trigger.click();
     await expect(list).toBeVisible();
 
-    // Selecting a Thing on the canvas is the ordinary press this list has to
-    // live through: it is how a Thing is dropped, and a surface that closed on
-    // it could only ever add one Thing per opening. That is the comparison's own
+    // Selecting a Resource on the canvas is the ordinary press this list has to
+    // live through: it is how a Resource is dropped, and a surface that closed on
+    // it could only ever add one Resource per opening. That is the comparison's own
     // reason for anchoring the list rather than drawing it from the screen edge
     // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
     await nodeByTitle(page, 'A').click();
@@ -1921,7 +1949,7 @@ test(
   },
 );
 
-test('the open Things list takes no width from the canvas it feeds', async ({ page }) => {
+test('the open Resources list takes no width from the canvas it feeds', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
@@ -1932,8 +1960,8 @@ test('the open Things list takes no width from the canvas it feeds', async ({ pa
   await expect(legend).toBeVisible();
   const before = await boxOf(canvas, 'the canvas');
 
-  await page.getByRole('button', { name: 'Things' }).click();
-  const list = page.getByRole('dialog', { name: 'Things' });
+  await page.getByRole('button', { name: 'Resources' }).click();
+  const list = page.getByRole('dialog', { name: 'Resources' });
   await expect(list).toBeVisible();
 
   // **The obligation ADR 0082 binds, and the one the drawer this replaced could
@@ -1952,15 +1980,15 @@ test('the open Things list takes no width from the canvas it feeds', async ({ pa
   await expect(list).toBeVisible();
 });
 
-test('leaving a presentation closes the Things list rather than reopening it over the canvas', async ({
+test('leaving a presentation closes the Resources list rather than reopening it over the canvas', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const list = page.getByRole('dialog', { name: 'Things' });
-  await page.getByRole('button', { name: 'Things' }).click();
+  const list = page.getByRole('dialog', { name: 'Resources' });
+  await page.getByRole('button', { name: 'Resources' }).click();
   await expect(list).toBeVisible();
 
   await presentControl(page).click();
@@ -1969,7 +1997,7 @@ test('leaving a presentation closes the Things list rather than reopening it ove
 
   // A list that sprang back would also take focus with it — a popover moves
   // focus in on every open, however that open was caused — landing the reader
-  // in the Things instead of on the canvas they returned to. What the Dock drops
+  // in the Resources instead of on the canvas they returned to. What the Dock drops
   // on the way into presenting is the *request* that opened it, so there is
   // nothing left to reopen from.
   await page.getByTestId('exit-presenting').click();
@@ -1978,58 +2006,60 @@ test('leaving a presentation closes the Things list rather than reopening it ove
 });
 
 test(
-  'a keyboard Add keeps the reader in the Things list, on the filter',
-  { tag: '@parity:things-popover-keeps-the-reader-in-the-list-after-a-keyboard-add' },
+  'a keyboard Add keeps the reader in the Resources list, on the filter',
+  { tag: '@parity:resources-popover-keeps-the-reader-in-the-list-after-a-keyboard-add' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    await page.getByRole('button', { name: 'Things' }).click();
-    const source = page.getByRole('button', { name: 'Add E to Diagram' });
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const source = page.getByRole('button', { name: 'Add E to Map' });
     await source.focus();
     await source.press('Enter');
 
-    // The Thing is placed, and the reader has not been taken anywhere: an anchored
+    // The Resource is placed, and the reader has not been taken anywhere: an anchored
     // list is a surface you spend repeatedly, which is what the surface
-    // comparison bought and what a screen-edge drawer, taken away by the Thing it
+    // comparison bought and what a screen-edge drawer, taken away by the Resource it
     // placed, could not offer
     // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
     await expect(nodeByTitle(page, 'E')).toBeVisible();
-    await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add E to Diagram' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add E to Map' })).toHaveCount(0);
 
     // On the filter rather than on the popup Base UI would otherwise park it on:
-    // the reader's next move is to name the next Thing.
-    await expect(page.getByRole('textbox', { name: 'Search things' })).toBeFocused();
+    // the reader's next move is to name the next Resource.
+    await expect(page.getByRole('textbox', { name: 'Search resources' })).toBeFocused();
 
     // And Escape is the way out to the canvas, returning focus to the control the
     // list hangs off rather than dropping it on the document.
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Things' })).toBeFocused();
+    await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Resources' })).toBeFocused();
   },
 );
 
 /**
- * Deleting a Thing is the Thing rail's now (ADR 0073), so its withdrawal is read
+ * Deleting a Resource is the Resource rail's now (ADR 0073), so its withdrawal is read
  * there.
  *
- * The Sidebar drew a standing `Delete Thing <title>` button for the selected
- * Thing, and these tests read its presence. The Command Dock has no Thing
+ * The Sidebar drew a standing `Delete Resource <title>` button for the selected
+ * Resource, and these tests read its presence. The Command Dock has no Resource
  * commands at all — that is its organising rule — so the command lives in the
- * Thing's own actions menu, and "withdrawn" means the row is absent from that
+ * Resource's own actions menu, and "withdrawn" means the row is absent from that
  * menu rather than a button absent from the chrome.
  */
-test('Delete Thing confirms before removing the Thing from the whole Space', async ({ page }) => {
+test('Delete Resource confirms before removing the Resource from the whole Space', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
-  const thing = nodeByTitle(page, 'B');
-  await thing.click();
+  const resource = nodeByTitle(page, 'B');
+  await resource.click();
   await (
-    await thingActions(page, 'B')
+    await resourceActions(page, 'B')
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
@@ -2039,28 +2069,28 @@ test('Delete Thing confirms before removing the Thing from the whole Space', asy
   const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
-  await expect(thing).toBeVisible();
+  await expect(resource).toBeVisible();
 
   await (
-    await thingActions(page, 'B')
+    await resourceActions(page, 'B')
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
   await confirmation.getByRole('button', { name: 'Delete from Space' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Things' }).click();
-  await expect(page.getByRole('button', { name: 'Add B to Diagram' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Resources' }).click();
+  await expect(page.getByRole('button', { name: 'Add B to Map' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-test('Delete Thing is withdrawn while presenting', async ({ page }) => {
+test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   await expect(
-    (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
+    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
@@ -2069,32 +2099,34 @@ test('Delete Thing is withdrawn while presenting', async ({ page }) => {
 
   // The rail itself is withdrawn while presenting, so there is no menu to open:
   // the audience is looking at the Space, not at the tools. Asserted without
-  // hovering the Thing, because the camera has closed in on the presented one and
+  // hovering the Resource, because the camera has closed in on the presented one and
   // `B` is off frame — which is the same reason the rail would be unreachable
   // even if it were drawn.
-  await expect(page.getByRole('button', { name: 'Actions for Thing B' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Actions for Resource B' })).toHaveCount(0);
 });
 
-test('Delete Thing is withdrawn while the selected Thing is Open', async ({ page }) => {
+test('Delete Resource is withdrawn while the selected Resource is Open', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
 
   await expect(
-    (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
+    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
   await nodeByTitle(page, 'B').first().click();
-  await page.getByRole('button', { name: 'Open Thing B' }).click();
-  await expect(nodeByTitle(page, 'B').getByRole('button', { name: 'Close Thing B' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open Resource B' }).click();
+  await expect(
+    nodeByTitle(page, 'B').getByRole('button', { name: 'Close Resource B' }),
+  ).toBeVisible();
 
   await expect(
-    (await thingActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
+    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
   ).toHaveCount(0);
 });
 
-test('dragging from the Things list uses transformed canvas coordinates then ordinary Thing dragging', async ({
+test('dragging from the Resources list uses transformed canvas coordinates then ordinary Resource dragging', async ({
   page,
 }) => {
   await page.goto('/');
@@ -2103,8 +2135,8 @@ test('dragging from the Things list uses transformed canvas coordinates then ord
   await page.getByRole('button', { name: 'Zoom in' }).click();
   await settled(page);
 
-  await page.getByRole('button', { name: 'Things' }).click();
-  const source = page.getByRole('button', { name: 'Add E to Diagram' });
+  await page.getByRole('button', { name: 'Resources' }).click();
+  const source = page.getByRole('button', { name: 'Add E to Map' });
   const pane = page.locator('.react-flow__pane');
   const paneBox = await boxOf(pane, 'the React Flow pane');
   const targetPosition = { x: paneBox.width * 0.5, y: paneBox.height * 0.8 };
@@ -2115,7 +2147,7 @@ test('dragging from the Things list uses transformed canvas coordinates then ord
   await expect(added).toBeVisible();
   // Zoomed in, so a screen pixel is a fraction of a flow unit — sub-pixel
   // rounding through that scale is expected, not evidence of a wrong drop.
-  const addedBox = await boxOf(added, 'the added Thing');
+  const addedBox = await boxOf(added, 'the added Resource');
   expect(addedBox.x + addedBox.width / 2).toBeCloseTo(dropPoint.x, -1);
   expect(addedBox.y + addedBox.height / 2).toBeCloseTo(dropPoint.y, -1);
 
@@ -2130,16 +2162,16 @@ test('dragging from the Things list uses transformed canvas coordinates then ord
 });
 
 test(
-  'the Things toggle is withdrawn while presenting, matching the list it controls',
+  'the Resources toggle is withdrawn while presenting, matching the list it controls',
   {
-    tag: '@parity:things-popover-withdraws-while-authoring-is-unavailable',
+    tag: '@parity:resources-popover-withdraws-while-authoring-is-unavailable',
   },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
 
-    const toggle = dock(page).getByRole('button', { name: 'Things' });
+    const toggle = dock(page).getByRole('button', { name: 'Resources' });
     await expect(toggle).not.toHaveAttribute('aria-disabled', 'true');
 
     await presentControl(page).click();
@@ -2159,14 +2191,14 @@ test(
     await expect(surface).toBeAttached();
     await expect(surface).toBeHidden();
     await expect(
-      page.getByTestId('command-dock').locator('.command-dock__things-trigger'),
+      page.getByTestId('command-dock').locator('.command-dock__resources-trigger'),
     ).toHaveCount(1);
     await expect(toggle).toHaveCount(0);
-    await expect(page.getByRole('dialog', { name: 'Things' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Resources' })).toHaveCount(0);
   },
 );
 
-test('editing an existing Diagram updates it instead of creating another one', async ({ page }) => {
+test('editing an existing Map updates it instead of creating another one', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
@@ -2189,7 +2221,7 @@ test('editing an existing Diagram updates it instead of creating another one', a
 });
 
 test(
-  'Space, Diagram and Graph names edit from the Dock and survive reload',
+  'Space, Map and Graph names edit from the Dock and survive reload',
   { tag: '@parity:command-dock-edits-identity-names' },
   async ({ page }) => {
     await page.goto('/');
@@ -2200,22 +2232,22 @@ test(
     // in that list continues in the editor the Dock already used. Escape,
     // Enter and a refused draft stay as they were.
     await beginRename(page, selectedCanvas(page));
-    const diagramName = page.getByRole('textbox', { name: 'Diagram name' });
-    await expect(diagramName).toBeFocused();
-    await diagramName.fill('');
-    await diagramName.press('Enter');
+    const mapName = page.getByRole('textbox', { name: 'Map name' });
+    await expect(mapName).toBeFocused();
+    await mapName.fill('');
+    await mapName.press('Enter');
     // Refused and still open, with the author's words still theirs.
-    await expect(page.getByText('A Diagram needs a name.')).toBeVisible();
+    await expect(page.getByText('A Map needs a name.')).toBeVisible();
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-    await diagramName.fill('Workshop');
-    await diagramName.press('Enter');
+    await mapName.fill('Workshop');
+    await mapName.press('Enter');
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     await expect(selectedCanvas(page)).toContainText('Workshop');
 
     // Begun again from the same list, and cancelled: Escape drops the draft
     // rather than committing it.
     await beginRename(page, selectedCanvas(page));
-    const cancelled = page.getByRole('textbox', { name: 'Diagram name' });
+    const cancelled = page.getByRole('textbox', { name: 'Map name' });
     await cancelled.fill('Studio');
     await cancelled.press('Escape');
     await expect(selectedCanvas(page)).toContainText('Workshop');
@@ -2229,16 +2261,16 @@ test(
     await expect(activeGraph(page)).toContainText('Journey');
 
     // **The Space's own name, from inside the Space, as one Edit on its session.**
-    // It writes `document.title` and nothing else: no Space Thing pointing here
-    // moves with it, and ADR 0083 keeps this name off any Thing's front, so the
-    // reload below is reading the stored document rather than a Thing that
+    // It writes `document.title` and nothing else: no Space Resource pointing here
+    // moves with it, and ADR 0083 keeps this name off any Resource's front, so the
+    // reload below is reading the stored document rather than a Resource that
     // happened to agree with it.
     await beginRename(page, spaceName(page));
     const spaceTitle = page.getByRole('textbox', { name: 'Space name' });
     await expect(spaceTitle).toBeFocused();
     // Whitespace rather than nothing, because that is the case the schema cannot
     // refuse — `z.string().min(1)` counts characters — and the surface refuses it
-    // on the trim before the Edit is asked, exactly as it does for a Diagram.
+    // on the trim before the Edit is asked, exactly as it does for a Map.
     await spaceTitle.fill('   ');
     await spaceTitle.press('Enter');
     await expect(page.getByText('A Space needs a name.')).toBeVisible();
@@ -2269,15 +2301,15 @@ test(
 );
 
 /**
- * Dragged in an authored Diagram, because that is where a Thing and the Edges
+ * Dragged in an authored Map, because that is where a Resource and the Edges
  * around it stay together.
  *
  * The fixture's own `Collection 1` owns Long,
  * Mid and Short over
- * the spine, so dragging A there updates that Diagram in place and its Edges are
- * still drawn around the Thing that moved.
+ * the spine, so dragging A there updates that Map in place and its Edges are
+ * still drawn around the Resource that moved.
  */
-test('edges follow a thing that has been dragged', async ({ page }) => {
+test('edges follow a resource that has been dragged', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
   await selectCanvas(page, 'Collection 1');
@@ -2298,9 +2330,9 @@ test('edges follow a thing that has been dragged', async ({ page }) => {
   // masquerading as an edge that did not redraw.
   expect((await positionOf(a)).y).toBeGreaterThan(from.y + 100);
 
-  // Whatever geometry the placement computed described where the things were,
+  // Whatever geometry the placement computed described where the resources were,
   // so it is stale the moment one leaves it. The edge is redrawn between where
-  // the things now are.
+  // the resources now are.
   await expect.poll(edgePath).not.toBe(before);
 });
 
@@ -2324,7 +2356,7 @@ test('a completed drag persists automatically', async ({ page }) => {
   await expect(page.getByRole('button', { name: /save/i })).toHaveCount(0);
 });
 
-test('a selected Thing exposes four circular handles coloured as the active Graph', async ({
+test('a selected Resource exposes four circular handles coloured as the active Graph', async ({
   page,
 }) => {
   await page.goto('/');
@@ -2339,7 +2371,7 @@ test('a selected Thing exposes four circular handles coloured as the active Grap
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
-  const handles = a.locator('.rf-thing-node__authoring-handle--source');
+  const handles = a.locator('.rf-resource-node__authoring-handle--source');
   await expect(handles).toHaveCount(4);
   await expect(handles.first()).toHaveCSS('width', '24px');
   await expect(handles.first()).toHaveCSS('height', '24px');
@@ -2358,27 +2390,27 @@ test('a selected Thing exposes four circular handles coloured as the active Grap
       elements.every((element) => getComputedStyle(element).borderRadius === '50%'),
     ),
   ).toBe(true);
-  // The target anchors on the same Thing stay hidden: no drag is in flight, so
-  // the Thing is offering where an Edge may start and nothing else.
-  await expect(a.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+  // The target anchors on the same Resource stay hidden: no drag is in flight, so
+  // the Resource is offering where an Edge may start and nothing else.
+  await expect(a.locator('.rf-resource-node__authoring-handle--target').first()).toHaveCSS(
     'opacity',
     '0',
   );
 });
 
-test('drawing between existing Things persists one active-Graph Edge and selects the target', async ({
+test('drawing between existing Resources persists one active-Graph Edge and selects the target', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingThing(page, 'E');
+  await addExistingResource(page, 'E');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'E').first();
   const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await expect(source).toBeVisible();
   await expect(target).toBeVisible();
 
-  // Explicit creation captures the computed placement into the authored Diagram.
+  // Explicit creation captures the computed placement into the authored Map.
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await settled(page);
   await source.hover();
@@ -2396,30 +2428,30 @@ test('drawing between existing Things persists one active-Graph Edge and selects
   );
 
   await connectHandles(page, sourceHandle, targetHandle, async () => {
-    // Seeking handles show only on near, eligible Things — here the drop target
-    // under the pointer — not on every Thing in the Diagram (ADR 0090). A neighbour inside the
-    // proximity magnet may also seek; lighting *every* Thing is the regression.
-    await expect(target.locator('.rf-thing-node__inner')).toHaveAttribute(
+    // Seeking handles show only on near, eligible Resources — here the drop target
+    // under the pointer — not on every Resource in the Map (ADR 0090). A neighbour inside the
+    // proximity magnet may also seek; lighting *every* Resource is the regression.
+    await expect(target.locator('.rf-resource-node__inner')).toHaveAttribute(
       'data-connection-seeking',
       'target',
     );
-    await expect(target.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+    await expect(target.locator('.rf-resource-node__authoring-handle--target').first()).toHaveCSS(
       'opacity',
       '1',
     );
-    await expect(target.locator('.rf-thing-node__authoring-handle--target')).toHaveCount(
+    await expect(target.locator('.rf-resource-node__authoring-handle--target')).toHaveCount(
       AUTHORING_HANDLE_SIDES,
     );
-    await expect(source.locator('.rf-thing-node__authoring-handle--target').first()).toHaveCSS(
+    await expect(source.locator('.rf-resource-node__authoring-handle--target').first()).toHaveCSS(
       'opacity',
       '0',
     );
-    const thingCount = await page.locator('.rf-thing-node__inner').count();
+    const resourceCount = await page.locator('.rf-resource-node__inner').count();
     expect(
-      await page.locator('.rf-thing-node__inner[data-connection-seeking="target"]').count(),
-    ).toBeLessThan(thingCount);
+      await page.locator('.rf-resource-node__inner[data-connection-seeking="target"]').count(),
+    ).toBeLessThan(resourceCount);
     const preview = page.locator('.react-flow__connection-path');
-    // `toBeAttached`, not `toBeVisible`: a connection drawn between two Things
+    // `toBeAttached`, not `toBeVisible`: a connection drawn between two Resources
     // whose centres share a row is a horizontal `path`, and a zero-height
     // bounding box is what Playwright calls hidden. What the assertion is about
     // is the line's colour and its arrow, both read below.
@@ -2429,28 +2461,28 @@ test('drawing between existing Things persists one active-Graph Edge and selects
   });
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
-  // An Edge names its Things and its Graph for a screen reader. Matched loosely
+  // An Edge names its Resources and its Graph for a screen reader. Matched loosely
   // on the Graph, whose neutral title depends on how many the Space already had.
   await expect(page.getByLabel(/^Edge from A to E in /)).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  await expect(target.locator('.rf-thing-node__authoring-handle--source').first()).toHaveCSS(
+  await expect(target.locator('.rf-resource-node__authoring-handle--source').first()).toHaveCSS(
     'opacity',
     '1',
   );
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingThing(page, 'E');
+  await addExistingResource(page, 'E');
   const source = nodeByTitle(page, 'E').first();
   const target = nodeByTitle(page, 'A').first();
   await expect(source).toBeVisible();
   await expect(target).toBeVisible();
 
-  // Create a Diagram explicitly, then author E → A into its empty Graph. It is that
+  // Create a Map explicitly, then author E → A into its empty Graph. It is that
   // Graph's only Edge, so E is where presenting it begins.
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '1');
@@ -2468,31 +2500,31 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000008',
   );
   await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText('A');
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000002',
   );
   await page.keyboard.press('ArrowLeft');
-  await expect(activeThing(page)).toHaveAttribute(
+  await expect(activeResource(page)).toHaveAttribute(
     'data-id',
     '00000000-0000-4000-8000-000000000008',
   );
 });
 
-test('an Edge drawn from the presented Thing is a move the presenter can take now', async ({
+test('an Edge drawn from the presented Resource is a move the presenter can take now', async ({
   page,
 }) => {
   const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingThing(page, 'E');
+  await addExistingResource(page, 'E');
   const a = nodeByTitle(page, 'A').first();
   await expect(a).toBeVisible();
 
@@ -2501,14 +2533,14 @@ test('an Edge drawn from the presented Thing is a move the presenter can take no
   const persistence = page.getByTestId('persistence-status');
   await expect(persistence).toHaveAttribute('data-revision', '1');
   await settled(page);
-  // The gesture below is made from the presented Thing, so A has to be selected
+  // The gesture below is made from the presented Resource, so A has to be selected
   // going in.
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeThing(page)).toHaveAttribute('data-id', A);
+  await expect(activeResource(page)).toHaveAttribute('data-id', A);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveText(['B']);
   // The presenting camera closes in over two animated moves; a handle box read
@@ -2516,16 +2548,16 @@ test('an Edge drawn from the presented Thing is a move the presenter can take no
   await settled(page);
 
   // A self-Edge is valid authored structure (ADR 0032), and it is the Edge this
-  // gesture can reach: at a zoom where the active Thing is legible every other
-  // Thing is provably off frame (ADR 0027), so the presented Thing's own handles
+  // gesture can reach: at a zoom where the active Resource is legible every other
+  // Resource is provably off frame (ADR 0027), so the presented Resource's own handles
   // are the only ones on screen.
   await connectHandles(
     page,
-    authoringHandle(activeThing(page), 'source', 'right'),
-    authoringHandle(activeThing(page), 'target', 'left'),
+    authoringHandle(activeResource(page), 'source', 'right'),
+    authoringHandle(activeResource(page), 'target', 'left'),
   );
 
-  // Attached rather than visible: with one Graph on the Thing its inbound and
+  // Attached rather than visible: with one Graph on the Resource its inbound and
   // outbound handles sit at the same height, so a self-Edge is a flat line whose
   // box has no height — which Playwright reads as hidden. The moves below are
   // what prove it was authored.
@@ -2533,7 +2565,7 @@ test('an Edge drawn from the presented Thing is a move the presenter can take no
   await expect(persistence).toHaveAttribute('data-revision', '2');
   await expect(persistence).toHaveText('Persisted');
 
-  // The chrome enumerates the active Thing's outgoing Edges, so the Edge just
+  // The chrome enumerates the active Resource's outgoing Edges, so the Edge just
   // drawn is available without leaving and re-entering presentation.
   await expect(moves).toHaveText(['B', 'A']);
 });
@@ -2542,13 +2574,13 @@ test('an Edge drawn from the presented Thing is a move the presenter can take no
  * Explicit creation preserves the active Graph. A → E is absent from it, so the
  * first is accepted and repeating it is the duplicate refusal asserted below.
  */
-test('drawing an Edge into an explicitly created Diagram then refuses its duplicate', async ({
+test('drawing an Edge into an explicitly created Map then refuses its duplicate', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingThing(page, 'E');
-  await addExistingThing(page, 'F');
+  await addExistingResource(page, 'E');
+  await addExistingResource(page, 'F');
   const source = nodeByTitle(page, 'A').first();
   const target = nodeByTitle(page, 'E').first();
   const initialEdgeCount = await page.locator('.react-flow__edge').count();
@@ -2575,7 +2607,7 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
   // Adding an Edge moves nothing.
   expect(await allPositions(page)).toEqual(before);
 
-  // Drawn a second time, in the Diagram that now owns the Graph holding it, it is
+  // Drawn a second time, in the Map that now owns the Graph holding it, it is
   // the duplicate the rule is about — refused, with nothing persisted. Asserted
   // live mid-drag: eligibility withholds seeking handles on a refused target
   // (`edge-already-exists`), so `connectHandles` cannot gate on them here.
@@ -2583,14 +2615,14 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
   await source.hover();
   const duplicateFrom = authoringHandle(source, 'source', 'right');
   const refused = authoringHandle(target, 'target', 'left');
-  const from = await boxOf(duplicateFrom, "Thing A's source handle");
-  const drop = await boxOf(refused, "Thing E's refused target handle");
+  const from = await boxOf(duplicateFrom, "Resource A's source handle");
+  const drop = await boxOf(refused, "Resource E's refused target handle");
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   try {
     await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
     await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 8 });
-    await expect(target.locator('.rf-thing-node__inner')).toHaveAttribute(
+    await expect(target.locator('.rf-resource-node__inner')).toHaveAttribute(
       'data-connection-seeking',
       'none',
     );
@@ -2605,10 +2637,10 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
 });
 
 /**
- * Two connections in one session, chained so the second starts from the Thing the
+ * Two connections in one session, chained so the second starts from the Resource the
  * first selected.
  *
- * The second one is the whole point. A Thing's declared handles (`projection.ts`)
+ * The second one is the whole point. A Resource's declared handles (`projection.ts`)
  * include every Graph id, not only the ones incident to it, so a completed
  * connection resolves in the same render that first makes its target incident.
  * Forcing React Flow to re-measure from the DOM replaces those declarations with
@@ -2616,15 +2648,15 @@ test('drawing an Edge into an explicitly created Diagram then refuses its duplic
  * the *next* connection then fails to resolve its source handle. One connection
  * cannot see it; the damage is done to the gesture after.
  *
- * Verified both ways against the fixture: with a forced remeasure in `ThingNode`
+ * Verified both ways against the fixture: with a forced remeasure in `ResourceNode`
  * this fails with six React Flow #008 warnings on the second connection, and
  * without one it passes.
  */
 test('a second connection drawn in the same session resolves its handles', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingThing(page, 'E');
-  await addExistingThing(page, 'F');
+  await addExistingResource(page, 'E');
+  await addExistingResource(page, 'F');
   const a = nodeByTitle(page, 'A').first();
   const e = nodeByTitle(page, 'E').first();
   const f = nodeByTitle(page, 'F').first();
@@ -2632,13 +2664,13 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(a).toBeVisible();
 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  // Newly added Things use the same initial placement. Separate F so its target
+  // Newly added Resources use the same initial placement. Separate F so its target
   // handle is not covered by E during the chained gesture.
   await dragBy(page, f, 260, 0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
   await settled(page);
 
-  // The drag above left the pointer on `F`, and a handle reveals with the Thing
+  // The drag above left the pointer on `F`, and a handle reveals with the Resource
   // it belongs to — an unrevealed handle takes no pointer events, so the press
   // that starts the connection would land on the pane instead.
   await a.hover();
@@ -2650,7 +2682,7 @@ test('a second connection drawn in the same session resolves its handles', async
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '4');
   await settled(page);
-  // The Thing the connection reached is the selected one, which is what the
+  // The Resource the connection reached is the selected one, which is what the
   // chain above is named for and what the continuation `endPointerDrag`
   // requests is owed. Asserted rather than assumed, and *after* the barrier:
   // the deferral that used to hold this selection past React Flow's own
@@ -2683,7 +2715,7 @@ test('changing the active Graph recolours authoring handles without persisting o
   // Collection 1 owns several Graphs, so changing the active one recolours the
   // authored handles without changing which overview Edges are drawn.
   await source.hover();
-  const handle = source.locator('.rf-thing-node__authoring-handle--source').first();
+  const handle = source.locator('.rf-resource-node__authoring-handle--source').first();
   const longColour = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
   const drawn = await page.locator('.react-flow__edge').count();
 
@@ -2700,25 +2732,25 @@ test('changing the active Graph recolours authoring handles without persisting o
  * The authoring handle is a drag affordance, and a click is not a drag.
  *
  * A press and release inside React Flow's drag threshold never starts a
- * connection, so the click reached the Thing underneath and opened it to read —
+ * connection, so the click reached the Resource underneath and opened it to read —
  * from a control whose whole purpose is to begin an Edge.
  */
-test('clicking a Thing authoring handle neither opens the Thing nor draws an Edge', async ({
+test('clicking a Resource authoring handle neither opens the Resource nor draws an Edge', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
   await settled(page);
-  await thing.hover();
+  await resource.hover();
   const drawn = await page.locator('.react-flow__edge').count();
 
-  const handleBox = (await authoringHandle(thing, 'source', 'right').boundingBox())!;
+  const handleBox = (await authoringHandle(resource, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
@@ -2732,10 +2764,10 @@ for (const key of ['Backspace', 'Delete'] as const) {
   test(`${key} removes the selected Edge from its Graph and nothing else`, async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    // An Edge belongs to a Diagram's Graph, so an Edge Edit needs one selected.
+    // An Edge belongs to a Map's Graph, so an Edge Edit needs one selected.
     await selectCanvas(page, 'Collection 1');
     await settled(page);
-    const drawnThings = await page.locator('.react-flow__node').count();
+    const drawnResources = await page.locator('.react-flow__node').count();
     const drawn = await page.locator('.react-flow__edge').count();
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
@@ -2744,51 +2776,54 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await page.keyboard.press(key);
 
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
-    await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnResources);
     await expect(persistence).toHaveAttribute('data-revision', '1');
     await expect(persistence).toHaveText('Persisted');
   });
 }
 
 /**
- * The app-owned canvas key removes a selected Thing from this Diagram through the
- * completed Space Edit lifecycle. The Thing still belongs to the Space; the
- * projection loses it and the Diagram-owned Edges incident to it together.
+ * The app-owned canvas key removes a selected Resource from this Map through the
+ * completed Space Edit lifecycle. The Resource still belongs to the Space; the
+ * projection loses it and the Map-owned Edges incident to it together.
  */
 for (const key of ['Backspace', 'Delete'] as const) {
-  test(`${key} with a Thing selected removes it and its Edges from this Diagram`, async ({
+  test(`${key} with a Resource selected removes it and its Edges from this Map`, async ({
     page,
   }) => {
     await page.goto('/');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
     await selectCanvas(page, 'Collection 1');
     await settled(page);
-    const drawnThings = await page.locator('.react-flow__node').count();
+    const drawnResources = await page.locator('.react-flow__node').count();
     const drawn = await page.locator('.react-flow__edge').count();
-    // Every Edge this Thing is an endpoint of, counted before the Edit, so the
+    // Every Edge this Resource is an endpoint of, counted before the Edit, so the
     // assertion below is an exact remainder rather than "fewer than before" —
     // which passed while a single incident Edge went and the rest stayed.
     const incident = await page.getByLabel(/^Edge (from A to|from .* to A) /).count();
     expect(incident).toBeGreaterThan(0);
 
-    const thingBox = (await thing.boundingBox())!;
-    await page.mouse.click(thingBox.x + thingBox.width / 2, thingBox.y + thingBox.height / 2);
-    await expect(thing).toHaveClass(/selected/);
+    const resourceBox = (await resource.boundingBox())!;
+    await page.mouse.click(
+      resourceBox.x + resourceBox.width / 2,
+      resourceBox.y + resourceBox.height / 2,
+    );
+    await expect(resource).toHaveClass(/selected/);
 
     await page.keyboard.press(key);
     await quiescent(page);
 
-    await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings - 1);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnResources - 1);
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
-    await page.getByRole('button', { name: 'Things' }).click();
-    const restoreMembership = page.getByRole('button', { name: 'Add A to Diagram' });
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const restoreMembership = page.getByRole('button', { name: 'Add A to Map' });
     await expect(restoreMembership).toBeVisible();
     await restoreMembership.click();
 
-    await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings);
+    await expect(page.locator('.react-flow__node')).toHaveCount(drawnResources);
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - incident);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   });
@@ -2800,20 +2835,20 @@ for (const key of ['Backspace', 'Delete'] as const) {
  * Both descriptions name the application-owned operations rather than React
  * Flow's disabled local deletion.
  */
-test('the graph advertises its Thing and Edge delete commands', async ({ page }) => {
+test('the graph advertises its Resource and Edge delete commands', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
 
-  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Thing/i);
-  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Diagram/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/open a Resource/i);
+  await expect(page.locator('[id^="react-flow__node-desc"]')).toContainText(/remove.*Map/i);
   await expect(page.locator('[id^="react-flow__edge-desc"]')).toContainText(/delete/i);
 });
 
 /**
  * Only the Active Graph's Edges are tab stops, and each is named for a reader.
  *
- * An Edge belonging to another Graph the Diagram draws is there to be seen —
+ * An Edge belonging to another Graph the Map draws is there to be seen —
  * putting every Edge in the graph into the tab order would place inert stops
  * between a keyboard author and the ones they can act on.
  */
@@ -2836,7 +2871,7 @@ test('only Active Graph Edges are focusable, and focus selects the one reached',
     expect(name).toMatch(/^Edge from .+ to .+ in .+$/);
     expect(name.endsWith(` in ${activeTitle}`), `${name} is not in ${activeTitle}`).toBe(true);
   }
-  // Every other Edge the Diagram draws is out of the tab order entirely.
+  // Every other Edge the Map draws is out of the tab order entirely.
   expect(await page.locator('.react-flow__edge:not([tabindex])').count()).toBeGreaterThan(0);
 
   // React Flow does not select an Edge that receives focus; Hyper bridges that,
@@ -2894,8 +2929,8 @@ test(
     await selectAnEdge(page);
     await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
 
-    // The endpoints, as the keyboard reaches them: two pickers over this Diagram's
-    // Things, each showing the Thing the Edge currently names.
+    // The endpoints, as the keyboard reaches them: two pickers over this Map's
+    // Resources, each showing the Resource the Edge currently names.
     await page.getByRole('button', { name: 'Edit this Edge' }).click();
     await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
@@ -3000,7 +3035,7 @@ test(
     // the endpoint picker below, where B is disabled as a duplicate.
     const option = page.locator('[role="option"]:not([data-disabled])');
     // Read before the click, because the list goes with the completion: this is
-    // the only moment the chosen Thing's title is on screen to be observed rather
+    // the only moment the chosen Resource's title is on screen to be observed rather
     // than derived from the code under test.
     const chosen = (await option.last().innerText()).trim();
     await option.last().click();
@@ -3025,11 +3060,11 @@ test(
           : null;
       });
     // **The reconnected Edge by name, not merely "some other Edge".** A
-    // Diagram overview draws every Graph at once, so "focus moved" is satisfied
+    // Map overview draws every Graph at once, so "focus moved" is satisfied
     // by any of a dozen Edges — including one with these very endpoints in
     // another Graph. The decorated label carries all three facts the request is
     // made of (`edge-authoring-react.tsx`: `Edge from X to Y in G`), so naming
-    // the expected one pins the unmoved endpoint, the chosen Thing and the Graph
+    // the expected one pins the unmoved endpoint, the chosen Resource and the Graph
     // together. `selected` and `chosen` are both read off the page, so this
     // asserts against observed values rather than recomputed ones.
     const reconnected = selected.replace(/ to .* in /, ` to ${chosen} in `);
@@ -3039,12 +3074,12 @@ test(
 );
 
 /**
- * A selected Edge's reconnect anchors sit over the Thing's four authoring handles
+ * A selected Edge's reconnect anchors sit over the Resource's four authoring handles
  * where they overlap, and the anchors have to win.
  *
  * Reconnection is per-Edge and narrowed to the *selected* one for exactly this
  * reason: `edgesReconnectable` left globally true would put two transparent
- * anchors permanently live on every Edge, over every Thing's handles.
+ * anchors permanently live on every Edge, over every Resource's handles.
  */
 test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
   await page.goto('/');
@@ -3072,7 +3107,7 @@ test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
  * `Long` is A→B→C→D→A′, so moving A→B's target onto D makes A→D, which is no
  * duplicate.
  */
-test('dragging an endpoint onto another Thing moves it and keeps the Edge in its Graph', async ({
+test('dragging an endpoint onto another Resource moves it and keeps the Edge in its Graph', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3136,12 +3171,12 @@ test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
 
   // `connectToEmptyWithAlt` gates on the preview appearing, which is exactly the
   // state a raised flag starves — so a leak fails inside the helper rather than
-  // as a Thing that mysteriously never arrived.
+  // as a Resource that mysteriously never arrived.
   const source = nodeByTitle(page, 'B').first();
   await source.hover();
   await connectToEmptyWithAlt(page, authoringHandle(source, 'source', 'right'));
 
-  await expect(nodeByTitle(page, 'Thing 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 });
@@ -3165,7 +3200,7 @@ test('dragging the source endpoint moves the end the author took hold of', async
   await expect(edge).toHaveClass(/selected/);
 
   // A source-endpoint drag anchors at the Edge's target and looks for a new
-  // *source*, so the Thing offers its source handles for this gesture alone.
+  // *source*, so the Resource offers its source handles for this gesture alone.
   await reconnectOnto(
     page,
     edge,
@@ -3276,11 +3311,11 @@ test('dragging an endpoint off the canvas restores the Edge', async ({ page }) =
 
 /**
  * The third `DropTarget` classification, and the reason the DOM half of the
- * empty-drop rule exists: a release over a Thing's *body* is far enough from any
+ * empty-drop rule exists: a release over a Resource's *body* is far enough from any
  * handle that React Flow resolves no target, so without the hit-test an Alt-drop
- * there would author a Thing on top of the one underneath.
+ * there would author a Resource on top of the one underneath.
  */
-test('an Alt-drop released over a Thing body creates no Thing', async ({ page }) => {
+test('an Alt-drop released over a Resource body creates no Resource', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const source = nodeByTitle(page, 'A').first();
@@ -3288,27 +3323,27 @@ test('an Alt-drop released over a Thing body creates no Thing', async ({ page })
   await expect(page.locator('.react-flow__edge-path').first()).toHaveAttribute('d', /./);
   await settled(page);
   await source.hover();
-  const drawnThings = await page.locator('.react-flow__node').count();
+  const drawnResources = await page.locator('.react-flow__node').count();
 
   const from = await boxOf(authoringHandle(source, 'source', 'right'), 'the source handle');
-  const over = await boxOf(nodeByTitle(page, 'C').first(), 'Thing C');
+  const over = await boxOf(nodeByTitle(page, 'C').first(), 'Resource C');
   try {
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();
     await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
     await page.keyboard.down('Alt');
-    // The centre of a 260x146 Thing is some 73px from its nearest handle, well
+    // The centre of a 260x146 Resource is some 73px from its nearest handle, well
     // outside React Flow's connection radius of 20 — so `toNode` is null here
-    // and only the DOM says this is a Thing.
+    // and only the DOM says this is a Resource.
     await page.mouse.move(over.x + over.width / 2, over.y + over.height / 2, { steps: 4 });
-    await expect(page.getByTestId('new-thing-preview')).toHaveCount(0);
+    await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   } finally {
     await page.mouse.up();
     await page.keyboard.up('Alt');
   }
 
   await quiescent(page);
-  await expect(page.locator('.react-flow__node')).toHaveCount(drawnThings);
+  await expect(page.locator('.react-flow__node')).toHaveCount(drawnResources);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
@@ -3321,13 +3356,13 @@ test('an Alt-drop released over a Thing body creates no Thing', async ({ page })
  * the gesture for exactly this, and drives the handle's own `valid` state from
  * the answer.
  *
- * It is a rule about the Active Graph of a selected Diagram. Explicit creation
+ * It is a rule about the Active Graph of a selected Map. Explicit creation
  * preserves its Graphs; the first A → E connection below establishes the duplicate.
  */
 test('a duplicate Edge is marked invalid while the drag is still live', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  await addExistingThing(page, 'E');
+  await addExistingResource(page, 'E');
   const source = nodeByTitle(page, 'A').first();
   const initialEdgeCount = await page.locator('.react-flow__edge').count();
   await expect(source).toBeVisible();
@@ -3349,7 +3384,7 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
     return handle;
   };
 
-  // Author A→E into the Diagram's own Graph, so the Active Graph now holds it.
+  // Author A→E into the Map's own Graph, so the Active Graph now holds it.
   await startDrag();
   await expect(await dragOnto('E')).toHaveClass(/valid/);
   await page.mouse.up();
@@ -3377,23 +3412,23 @@ test('a duplicate Edge is marked invalid while the drag is still live', async ({
 });
 
 /**
- * Add Thing after explicit Diagram creation, and the naming that follows it.
+ * Add Resource after explicit Map creation, and the naming that follows it.
  *
- * Explicit creation happens exactly once and the created Thing really is under
+ * Explicit creation happens exactly once and the created Resource really is under
  * the caret, in a browser where focus is the browser's to give.
  */
-test('Add Thing names the new Thing in place in the selected Diagram', async ({ page }) => {
+test('Add Resource names the new Resource in place in the selected Map', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
   const before = await allPositions(page);
-  await expect(createThingControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(createResourceControl(page)).not.toHaveAttribute('aria-disabled', 'true');
 
-  await createThing(page, 'Markdown Thing');
+  await createResource(page, 'Markdown Resource');
 
-  const title = page.getByRole('textbox', { name: 'Thing title' });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toBeFocused();
-  await expect(title).toHaveValue('Thing 1');
+  await expect(title).toHaveValue('Resource 1');
   await expect(selectedCanvas(page)).toContainText('Collection 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   const after = await allPositions(page);
@@ -3404,19 +3439,19 @@ test('Add Thing names the new Thing in place in the selected Diagram', async ({ 
 
   await expect(nodeByTitle(page, 'Consequences')).toBeVisible();
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(await diagramChoices(page)).toHaveCount(3);
+  await expect(await mapChoices(page)).toHaveCount(3);
 });
 
 /**
- * Create Reference is a command on the Thing it points at (ADR 0089).
+ * Create Reference is a command on the Resource it points at (ADR 0089).
  *
  * The gesture supplies the Target, so there is no picker, no pane and nothing to
- * cancel: one row, one press, and the Reference Thing exists. The Title is the Target's,
- * copied once, with the caret in it — which is the only thing on the canvas that
- * says what the Reference Thing points at, ADR 0083 keeping the Target's name off the
- * Thing front.
+ * cancel: one row, one press, and the Reference Resource exists. The Title is the Target's,
+ * copied once, with the caret in it — which is the only resource on the canvas that
+ * says what the Reference Resource points at, ADR 0083 keeping the Target's name off the
+ * Resource front.
  */
-test('Create Reference on a Thing makes a Reference Thing of it and names it after its Target', async ({
+test('Create Reference on a Resource makes a Reference Resource of it and names it after its Target', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3425,15 +3460,15 @@ test('Create Reference on a Thing makes a Reference Thing of it and names it aft
   await settled(page);
   const nodes = await page.locator('.react-flow__node').count();
 
-  const menu = await thingActions(page, 'B');
+  const menu = await resourceActions(page, 'B');
   await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
 
-  const title = page.getByRole('textbox', { name: 'Thing title' });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toBeFocused();
   await expect(title).toHaveValue('B');
   await title.press('Escape');
 
-  // Two Things called B now, and the second is the Reference Thing: the Title is copied
+  // Two Resources called B now, and the second is the Reference Resource: the Title is copied
   // once and the two are independent afterwards, so nothing here is a link.
   await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
   await expect(nodeByTitle(page, 'B')).toHaveCount(2);
@@ -3442,13 +3477,13 @@ test('Create Reference on a Thing makes a Reference Thing of it and names it aft
 });
 
 /**
- * The whole gesture: the Reference Thing is renamed by the editor its creation opens, and
+ * The whole gesture: the Reference Resource is renamed by the editor its creation opens, and
  * the Target keeps its own name.
  *
  * The Titles agree at creation and diverge freely afterwards, which is the same
- * rule the Space and Space Thing pair follows.
+ * rule the Space and Space Resource pair follows.
  */
-test('a Reference Thing is renamed by the shared Title editor creation begins', async ({
+test('a Reference Resource is renamed by the shared Title editor creation begins', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3456,17 +3491,17 @@ test('a Reference Thing is renamed by the shared Title editor creation begins', 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  const menu = await thingActions(page, 'B');
+  const menu = await resourceActions(page, 'B');
   await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
 
-  const title = page.getByRole('textbox', { name: 'Thing title' });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toHaveValue('B');
   await expect(title).toBeFocused();
   await title.fill('Recap');
   await title.press('Enter');
 
   await expect(nodeByTitle(page, 'Recap')).toHaveCount(1);
-  // The Target keeps its own: one Thing called B, the one that was always there.
+  // The Target keeps its own: one Resource called B, the one that was always there.
   await expect(nodeByTitle(page, 'B')).toHaveCount(1);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -3481,12 +3516,12 @@ test('a Reference Thing is renamed by the shared Title editor creation begins', 
  * The rename is a pending field, so Escape discards it — one press, no field
  * intercepting it (ADR 0048).
  *
- * The Reference Thing itself is *not* a pending field and does not go with it: it was
+ * The Reference Resource itself is *not* a pending field and does not go with it: it was
  * created on the press, one revision earlier, and Escape here discards a draft
  * rather than undoing an Edit. That is the whole point of the test — the two are
  * told apart, and only one of them is a draft.
  */
-test('Escape discards a Reference Thing rename without undoing the Reference Thing', async ({
+test('Escape discards a Reference Resource rename without undoing the Reference Resource', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3494,9 +3529,9 @@ test('Escape discards a Reference Thing rename without undoing the Reference Thi
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  const menu = await thingActions(page, 'B');
+  const menu = await resourceActions(page, 'B');
   await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
-  const title = page.getByRole('textbox', { name: 'Thing title' });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
   await title.fill('Recap');
 
   await title.press('Escape');
@@ -3508,12 +3543,12 @@ test('Escape discards a Reference Thing rename without undoing the Reference Thi
 });
 
 /**
- * The Thing menu's one grouping grammar
+ * The Resource menu's one grouping grammar
  * (`.scratch/dock-menu-reorganisation/issues/03`): Create Reference on its own,
- * both copy links beside each other, then Remove from Diagram and Delete from
+ * both copy links beside each other, then Remove from Map and Delete from
  * Space sharing the trailing destructive group — one separator between each.
  */
-test('the Thing menu groups Create Reference, both copy links, then Remove and Delete', async ({
+test('the Resource menu groups Create Reference, both copy links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3521,20 +3556,20 @@ test('the Thing menu groups Create Reference, both copy links, then Remove and D
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  const menu = await thingActions(page, 'B');
+  const menu = await resourceActions(page, 'B');
   await expectMenuGroups(menu, [
     ['Create Reference'],
-    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
-    ['Remove from Diagram', 'Delete from Space'],
+    ['Copy link to Resource in Map', 'Copy link to Resource'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
 });
 
 /**
  * The dropdown and the context menu draw the identical list
- * (`EntityActionItems`), so a right click on the Thing itself offers the same
+ * (`EntityActionItems`), so a right click on the Resource itself offers the same
  * ordered menu the actions control does.
  */
-test('a right click on a Thing opens the same ordered menu as its actions control', async ({
+test('a right click on a Resource opens the same ordered menu as its actions control', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3546,20 +3581,20 @@ test('a right click on a Thing opens the same ordered menu as its actions contro
   const menu = page.getByRole('menu');
   await expectMenuGroups(menu, [
     ['Create Reference'],
-    ['Copy link to Thing in Diagram', 'Copy link to Thing'],
-    ['Remove from Diagram', 'Delete from Space'],
+    ['Copy link to Resource in Map', 'Copy link to Resource'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
 });
 
 /**
- * **Present and unavailable on a Reference Thing, not absent.**
+ * **Present and unavailable on a Reference Resource, not absent.**
  *
- * ADR 0070 forbids a Reference Thing of a Reference Thing, and a Reference Thing is otherwise a regular
- * Thing — so the menu stays consistent with every other Thing's, and the greyed
+ * ADR 0070 forbids a Reference Resource of a Reference Resource, and a Reference Resource is otherwise a regular
+ * Resource — so the menu stays consistent with every other Resource's, and the greyed
  * row is where the product says that referencing terminates. Create Reference
  * still leads the group it always does.
  */
-test('Create Reference is drawn unavailable on a Reference Thing, still leading its menu', async ({
+test('Create Reference is drawn unavailable on a Reference Resource, still leading its menu', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3567,33 +3602,33 @@ test('Create Reference is drawn unavailable on a Reference Thing, still leading 
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
   await settled(page);
 
-  const first = await thingActions(page, 'B');
+  const first = await resourceActions(page, 'B');
   await first.getByRole('menuitem', { name: 'Create Reference' }).click();
-  const title = page.getByRole('textbox', { name: 'Thing title' });
-  await title.fill('Reference Thing of B');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await title.fill('Reference Resource of B');
   await title.press('Enter');
   await settled(page);
 
-  const menu = await thingActions(page, 'Reference Thing of B');
+  const menu = await resourceActions(page, 'Reference Resource of B');
   const row = menu.getByRole('menuitem', { name: /^Create Reference/ });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-disabled', 'true');
   await expectMenuGroups(menu, [
     [/^Create Reference/],
-    ['Copy link to Thing in Diagram', 'Copy link to Thing', 'Copy link to Target'],
-    ['Remove from Diagram', 'Delete from Space'],
+    ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
 });
 
 /**
- * Copy link to Target copies the Target's own canonical Thing address, not a
- * within-Diagram one — the Target is frequently absent from the Diagram the
- * Reference Thing itself lives on (`.scratch/reference-thing/issues/02`).
+ * Copy link to Target copies the Target's own canonical Resource address, not a
+ * within-Map one — the Target is frequently absent from the Map the
+ * Reference Resource itself lives on (`.scratch/reference-thing/issues/02`).
  */
 const FIXTURE_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
-const THING_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
-test('Copy link to Target on a Reference Thing copies its Target’s own address', async ({
+test('Copy link to Target on a Reference Resource copies its Target’s own address', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -3612,23 +3647,23 @@ test('Copy link to Target on a Reference Thing copies its Target’s own address
   await expect(nodeByTitle(page, 'B').first()).toBeVisible();
   await settled(page);
 
-  const first = await thingActions(page, 'B');
+  const first = await resourceActions(page, 'B');
   await first.getByRole('menuitem', { name: 'Create Reference' }).click();
-  const title = page.getByRole('textbox', { name: 'Thing title' });
-  await title.fill('Reference Thing of B');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await title.fill('Reference Resource of B');
   await title.press('Enter');
   await settled(page);
 
-  const menu = await thingActions(page, 'Reference Thing of B');
+  const menu = await resourceActions(page, 'Reference Resource of B');
   await menu.getByRole('menuitem', { name: /^Copy link to Target/ }).click();
 
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe(
       `${new URL(page.url()).origin}${productDestinationPath({
-        kind: 'thing',
+        kind: 'resource',
         spaceId: FIXTURE_SPACE_ID,
-        thingId: THING_B_ID,
+        resourceId: RESOURCE_B_ID,
       })}`,
     );
 });

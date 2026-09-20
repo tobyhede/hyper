@@ -11,10 +11,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
-import { THINGS_TRIGGER } from '../src/components/command-dock-triggers';
+import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -22,7 +22,7 @@ import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
-import { THING_SIZE } from '../src/thing';
+import { RESOURCE_SIZE } from '../src/resource';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -34,33 +34,33 @@ import { THING_SIZE } from '../src/thing';
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const THING_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const RESOURCE_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
-const EDGE = { from: THING_A, to: THING_B } as const;
+const EDGE = { from: RESOURCE_A, to: RESOURCE_B } as const;
 /** The Graph and Edge an Edge operation is named by, which travel together. */
 const SUBJECT = { graphId: GRAPH_ID, edge: EDGE } as const;
-const ASIDE_EDGE = { from: THING_B, to: THING_C } as const;
+const ASIDE_EDGE = { from: RESOURCE_B, to: RESOURCE_C } as const;
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 0, y: 0, open: false },
-          [THING_B]: { x: 400, y: 0, open: false },
-          [THING_C]: { x: 800, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0, open: false },
+          [RESOURCE_B]: { x: 400, y: 0, open: false },
+          [RESOURCE_C]: { x: 800, y: 0, open: false },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [EDGE] },
@@ -68,12 +68,12 @@ const snapshot: SpaceSnapshot = {
         ],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: THING_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
   ],
 };
 
@@ -89,13 +89,21 @@ const snapshot: SpaceSnapshot = {
  * that both roles are declared on every side, which is what lets an Edge naming
  * no handle resolve at either end.
  */
-function thingNode(id: string, x: number, title: string): ThingFlowNode {
+function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
   const radius = 12;
   const sides = [
-    { position: Position.Top, x: THING_SIZE.width / 2 - radius, y: -radius },
-    { position: Position.Right, x: THING_SIZE.width - radius, y: THING_SIZE.height / 2 - radius },
-    { position: Position.Bottom, x: THING_SIZE.width / 2 - radius, y: THING_SIZE.height - radius },
-    { position: Position.Left, x: -radius, y: THING_SIZE.height / 2 - radius },
+    { position: Position.Top, x: RESOURCE_SIZE.width / 2 - radius, y: -radius },
+    {
+      position: Position.Right,
+      x: RESOURCE_SIZE.width - radius,
+      y: RESOURCE_SIZE.height / 2 - radius,
+    },
+    {
+      position: Position.Bottom,
+      x: RESOURCE_SIZE.width / 2 - radius,
+      y: RESOURCE_SIZE.height - radius,
+    },
+    { position: Position.Left, x: -radius, y: RESOURCE_SIZE.height / 2 - radius },
   ];
   const anchors = (['source', 'target'] as const).flatMap((type) =>
     sides.map((side) => ({
@@ -110,13 +118,13 @@ function thingNode(id: string, x: number, title: string): ThingFlowNode {
   );
   return {
     id,
-    type: 'thing',
+    type: 'resource',
     position: { x, y: 0 },
-    width: THING_SIZE.width,
-    height: THING_SIZE.height,
+    width: RESOURCE_SIZE.width,
+    height: RESOURCE_SIZE.height,
     handles: anchors,
     data: {
-      thingId: uuidSchema.parse(id),
+      resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,
       kind: 'markdown',
@@ -130,13 +138,13 @@ function thingNode(id: string, x: number, title: string): ThingFlowNode {
 }
 
 const NODES = [
-  thingNode(THING_A, 0, 'A'),
-  thingNode(THING_B, 400, 'B'),
-  thingNode(THING_C, 800, 'C'),
+  resourceNode(RESOURCE_A, 0, 'A'),
+  resourceNode(RESOURCE_B, 400, 'B'),
+  resourceNode(RESOURCE_C, 800, 'C'),
 ];
 
 /**
- * One projected Edge, with the id minted by the thing that mints it in
+ * One projected Edge, with the id minted by the function that mints it in
  * production: from the Graph and the two endpoints, so a replaced Edge is a new
  * element rather than the previous one under a reused id. Spelling the format
  * out here instead would leave this fixture green against a shape
@@ -154,24 +162,27 @@ const flowEdge = (graphId: string, from: string, to: string): Edge => ({
   data: { graphId },
 });
 
-const EDGES = [flowEdge(GRAPH_ID, THING_A, THING_B), flowEdge(OTHER_GRAPH_ID, THING_B, THING_C)];
+const EDGES = [
+  flowEdge(GRAPH_ID, RESOURCE_A, RESOURCE_B),
+  flowEdge(OTHER_GRAPH_ID, RESOURCE_B, RESOURCE_C),
+];
 
 /**
  * The composition every canvas test runs on.
  *
  * `connections` is overridable because `ConnectionCompletion` is a declared
  * dependency of `createEdgeAuthoring`, and one refusal channel is reachable
- * only through it. `diagram-active-graph-required` is the sole refusal that can
+ * only through it. `map-active-graph-required` is the sole refusal that can
  * reach `connect-form-refusal` on a connect gesture — the others are
- * `correctableByThingChoice` and mark the Target field instead (ADR 0057,
- * `authoring-refusal.ts`) — and it needs a selected Diagram whose Active Graph
- * the Diagram does not own. **No legal Space can be in that state**, not merely
- * no gesture over this fixture: `spaceFileSchema` gives a Diagram
+ * `correctableByResourceChoice` and mark the Target field instead (ADR 0057,
+ * `authoring-refusal.ts`) — and it needs a selected Map whose Active Graph
+ * the Map does not own. **No legal Space can be in that state**, not merely
+ * no gesture over this fixture: `spaceFileSchema` gives a Map
  * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
- * `core/test/persistence-schema.test.ts`), `ResolvedDiagram.activeGraph`
+ * `core/test/persistence-schema.test.ts`), `ResolvedMap.activeGraph`
  * resolves named-or-first and is never null, Navigation writes only an Active
- * Graph the selected Diagram owns, and Graph deletion refuses the
- * last one (`diagram-must-keep-graph`).
+ * Graph the selected Map owns, and Graph deletion refuses the
+ * last one (`map-must-keep-graph`).
  *
  * So the stand-in is what exercises the channel at all, and the alternative —
  * arranging the fixture so the real completion refuses this way — is not
@@ -180,11 +191,11 @@ const EDGES = [flowEdge(GRAPH_ID, THING_A, THING_B), flowEdge(OTHER_GRAPH_ID, TH
  */
 function compose({
   connections,
-  selection = DIAGRAM_ID,
+  selection = MAP_ID,
 }: {
   connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
-  /** Which Diagram opens. */
-  selection?: typeof DIAGRAM_ID | undefined;
+  /** Which Map opens. */
+  selection?: typeof MAP_ID | undefined;
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
@@ -194,7 +205,7 @@ function compose({
 }
 
 const graphsOf = (working: SpaceSnapshot) =>
-  (working.document.diagrams ?? []).flatMap((diagram) => diagram.graphs);
+  (working.document.maps ?? []).flatMap((map) => map.graphs);
 
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
@@ -257,7 +268,7 @@ function mountCanvas(
     presenting?: boolean;
     deleteWhenCoveredCommits?: boolean;
     connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
-    selection?: typeof DIAGRAM_ID | undefined;
+    selection?: typeof MAP_ID | undefined;
   } = {},
 ) {
   const composed = compose({ connections, selection });
@@ -321,7 +332,7 @@ function CanvasHarness({
           projection React Flow has drawn. */}
       <CanvasContinuation
         continuation={continuation}
-        onSelectThing={adapter.getState().selectThing}
+        onSelectResource={adapter.getState().selectResource}
         onSelectEdge={adapter.getState().selectEdge}
       />
       <SpaceCanvas
@@ -329,42 +340,42 @@ function CanvasHarness({
         nodes={projection?.nodes ?? []}
         edges={projection?.edges ?? []}
         projectedNodes={null}
-        activeThingId={null}
+        activeResourceId={null}
         presenting={presenting}
         placementReady={true}
         availability={authoringAvailability({
           editable: true,
           presenting,
-          editingThingBody: false,
-          editingThingTitle: false,
-          thingIsOpen: false,
+          editingResourceBody: false,
+          editingResourceTitle: false,
+          resourceIsOpen: false,
           editingChromeTitle: covered,
           spaceOnCanvas: true,
-          editingEmbeddedDiagram: false,
-          creatingSpaceThing: false,
+          editingEmbeddedMap: false,
+          creatingSpaceEndpoint: false,
         })}
         onNodesChange={adapter.getState().changeNodes}
         onEdgesChange={adapter.getState().changeEdges}
         edgeAuthoring={edgeAuthoring}
         selection={selection}
-        onSelectThing={adapter.getState().selectThing}
+        onSelectResource={adapter.getState().selectResource}
         onSelectEdge={adapter.getState().selectEdge}
-        placedThings={currentSpace().things}
-        newThingTitle="Thing 4"
-        onAddThing={() => undefined}
-        onAddExistingThing={() => undefined}
+        placedResources={currentSpace().resources}
+        newResourceTitle="Resource 4"
+        onAddResource={() => undefined}
+        onAddExistingResource={() => undefined}
         nameOnCreation={null}
         authoring={authoring}
         spaceSession={session}
-        thingResize={{
+        resourceResize={{
           beginResize: () => undefined,
           previewResize: () => undefined,
           finishResize: () => undefined,
           cancelResize: () => undefined,
         }}
-        reportEmbeddedDiagramEditing={() => undefined}
+        reportEmbeddedMapEditing={() => undefined}
         spaceTitle="Test Space"
-        diagramTitle="Test Diagram"
+        mapTitle="Test Map"
         graphs={currentSpace().graphs}
         colorByGraphId={{}}
         activeGraphId={GRAPH_ID}
@@ -387,7 +398,7 @@ const canvasElement = (): HTMLElement => {
 
 /**
  * Only the Active Graph's Edges are tab stops. An Edge belonging to another
- * Graph the Diagram draws is there to be seen; putting it in the tab order would
+ * Graph the Map draws is there to be seen; putting it in the tab order would
  * place inert stops between a keyboard author and the Edges they can act on.
  */
 describe('decorated Edges', () => {
@@ -469,7 +480,7 @@ describe('the Edge toolbar', () => {
    * The picker's disabled rows are eligibility's answer, so they say whether the
    * right *question* was asked.
    *
-   * `Main` holds A→B, so every Thing of this Diagram is a legal `to` for it: B is
+   * `Main` holds A→B, so every Resource of this Map is a legal `to` for it: B is
    * unchanged, C is a new Edge, and A is a self-Edge, which is valid authored
    * structure (ADR 0032). The subject handed in is an `EdgeSelection`, which is
    * what the callbacks really hold and which carries a `kind` of its own —
@@ -488,8 +499,8 @@ describe('the Edge toolbar', () => {
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        placedThings: composed.currentSpace().things,
-        newThingTitle: 'Thing 4',
+        placedResources: composed.currentSpace().resources,
+        newResourceTitle: 'Resource 4',
         enabled: true,
         onSelectEdge: NO_OP,
       });
@@ -533,65 +544,66 @@ describe("the app's canvas delete key", () => {
   });
 
   it.each(DELETE_KEYS)(
-    'removes the selected Thing from its Diagram when %s is aimed at the canvas',
+    'removes the selected Resource from its Map when %s is aimed at the canvas',
     (key) => {
       const { adapter, session } = mountCanvas();
-      act(() => adapter.getState().selectThing(THING_A));
+      act(() => adapter.getState().selectResource(RESOURCE_A));
 
       fireEvent.keyDown(canvasElement(), { key });
 
       const current = session.getState().working;
-      expect(current.things.map(({ id }) => id)).toContain(THING_A);
-      expect(current.document.diagrams?.[0]?.positions[THING_A]).toBeUndefined();
+      expect(current.resources.map(({ id }) => id)).toContain(RESOURCE_A);
+      expect(current.document.maps?.[0]?.positions[RESOURCE_A]).toBeUndefined();
     },
   );
 
   it.each(DELETE_KEYS)(
-    'leaves the selected Thing standing when %s is aimed outside the canvas',
+    'leaves the selected Resource standing when %s is aimed outside the canvas',
     (key) => {
       const { adapter, session } = mountCanvas(<main tabIndex={-1}>Outside the canvas</main>);
-      act(() => adapter.getState().selectThing(THING_A));
+      act(() => adapter.getState().selectResource(RESOURCE_A));
 
       fireEvent.keyDown(screen.getByText('Outside the canvas'), { key });
 
-      expect(session.getState().working.document.diagrams?.[0]?.positions[THING_A]).toBeDefined();
+      expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_A]).toBeDefined();
     },
   );
 
   /**
-   * The key acts on the Thing it was aimed at, not the one selected before.
+   * The key acts on the Resource it was aimed at, not the one selected before.
    *
    * React Flow never selects a node on focus — its `onFocus` only auto-pans —
    * and only the Edge half of this canvas has a focus-to-selection bridge. So a
-   * Tab to another Thing leaves the selection where it was, while the node's own
+   * Tab to another Resource leaves the selection where it was, while the node's own
    * assistive description promises Delete removes *it*. The open command one
-   * branch above already resolves its Thing from the event target; this one now
+   * branch above already resolves its Resource from the event target; this one now
    * agrees, and falls back to the selection when the key came from the pane.
    */
-  it.each(DELETE_KEYS)('removes the focused Thing rather than the selected one on %s', (key) => {
+  it.each(DELETE_KEYS)('removes the focused Resource rather than the selected one on %s', (key) => {
     const { adapter, session } = mountCanvas();
-    act(() => adapter.getState().selectThing(THING_A));
-    const focused = document.querySelector(`.react-flow__node[data-id="${THING_B}"]`);
-    if (focused === null) throw new Error('The Thing the key is aimed at must be on the canvas.');
+    act(() => adapter.getState().selectResource(RESOURCE_A));
+    const focused = document.querySelector(`.react-flow__node[data-id="${RESOURCE_B}"]`);
+    if (focused === null)
+      throw new Error('The Resource the key is aimed at must be on the canvas.');
 
     fireEvent.keyDown(focused, { key, bubbles: true });
 
-    const diagram = session.getState().working.document.diagrams?.[0];
-    expect(diagram?.positions[THING_B]).toBeUndefined();
-    expect(diagram?.positions[THING_A]).toBeDefined();
+    const map = session.getState().working.document.maps?.[0];
+    expect(map?.positions[RESOURCE_B]).toBeUndefined();
+    expect(map?.positions[RESOURCE_A]).toBeDefined();
   });
 
   /**
    * The same two exclusions the `C` binding spells out, for the same reasons: a
    * command runs once per press, and a modifier makes the key somebody else's.
    */
-  it('ignores an auto-repeated Backspace so one press removes one Thing', () => {
+  it('ignores an auto-repeated Backspace so one press removes one Resource', () => {
     const { adapter, session } = mountCanvas();
-    act(() => adapter.getState().selectThing(THING_A));
+    act(() => adapter.getState().selectResource(RESOURCE_A));
 
     fireEvent.keyDown(document.body, { key: 'Backspace', repeat: true });
 
-    expect(session.getState().working.document.diagrams?.[0]?.positions[THING_A]).toBeDefined();
+    expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_A]).toBeDefined();
   });
 
   /**
@@ -610,11 +622,11 @@ describe("the app's canvas delete key", () => {
     'leaves a %s-modified Backspace to whatever else would have had it',
     (modifier) => {
       const { adapter, session } = mountCanvas();
-      act(() => adapter.getState().selectThing(THING_A));
+      act(() => adapter.getState().selectResource(RESOURCE_A));
 
       fireEvent.keyDown(document.body, { key: 'Backspace', [modifier]: true });
 
-      expect(session.getState().working.document.diagrams?.[0]?.positions[THING_A]).toBeDefined();
+      expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_A]).toBeDefined();
     },
   );
 
@@ -644,29 +656,32 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches a Create Thing control', (key) => {
-    // The real treatment, mounted where the real control is: outside the flow
-    // entirely, in chrome that marks itself `.nokey` — which is the marker
-    // the canvas guard reads rather than a list of its own. `THINGS_TRIGGER` is
-    // the Command Dock's own Things trigger, exported for whoever supplies that
-    // surface, so the class under test here is the class the Dock ships.
-    //
-    // It carried two cases beside it once, over `AddThingControl` and a
-    // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
-    // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
-    // replaced both marks itself the same way — so one production trigger
-    // proves one guard.
-    const { adapter, session } = mountCanvas(
-      <Toolbar>
-        <ToolbarButton {...THINGS_TRIGGER}>Things</ToolbarButton>
-      </Toolbar>,
-    );
-    act(() => adapter.getState().selectEdge(SUBJECT));
+  it.each(DELETE_KEYS)(
+    'leaves the Edge standing when %s reaches a Create Resource control',
+    (key) => {
+      // The real treatment, mounted where the real control is: outside the flow
+      // entirely, in chrome that marks itself `.nokey` — which is the marker
+      // the canvas guard reads rather than a list of its own. `RESOURCES_TRIGGER` is
+      // the Command Dock's own Resources trigger, exported for whoever supplies that
+      // surface, so the class under test here is the class the Dock ships.
+      //
+      // It carried two cases beside it once, over `AddResourceControl` and a
+      // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
+      // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
+      // replaced both marks itself the same way — so one production trigger
+      // proves one guard.
+      const { adapter, session } = mountCanvas(
+        <Toolbar>
+          <ToolbarButton {...RESOURCES_TRIGGER}>Resources</ToolbarButton>
+        </Toolbar>,
+      );
+      act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Things' }), { key });
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Resources' }), { key });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
-  });
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    },
+  );
 
   it.each([
     ['menu', 'menu'],
@@ -742,7 +757,7 @@ describe("the app's canvas delete key", () => {
  * A creation pane is a `Dialog` — a backdrop at `inset: 0` over the whole graph
  * area, and a focus trap — and `authorOnCanvas` carries it, alongside the live
  * chrome rename, which withdraws canvas authoring without covering anything.
- * The canvas once fed that condition to every Thing control and *not* to Edge
+ * The canvas once fed that condition to every Resource control and *not* to Edge
  * authoring, so the two disagreed about when the graph is authorable.
  *
  * The `covered` prop below is the pane, which is the case this file exercises.
@@ -770,7 +785,7 @@ describe('a pane covering the graph', () => {
   /**
    * The handles themselves, not just the control that opens the picker.
    *
-   * A Thing's four authoring handles are rendered unconditionally and withdrawn
+   * A Resource's four authoring handles are rendered unconditionally and withdrawn
    * only by CSS and by the pane's own backdrop — so before `nodesConnectable`
    * reached them, a pane hid the affordance while leaving a live drag target
    * underneath it. React Flow marks a handle it will accept a drag at with
@@ -781,7 +796,7 @@ describe('a pane covering the graph', () => {
   it('leaves no handle a drag could start from', () => {
     mountCanvas(null, { covered: true });
 
-    const handles = document.querySelectorAll('.rf-thing-node__authoring-handle');
+    const handles = document.querySelectorAll('.rf-resource-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
     expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(
       false,
@@ -792,18 +807,18 @@ describe('a pane covering the graph', () => {
    * Presenting is the exception, and it is the reason `nodesConnectable` reads
    * `connectOnCanvas` rather than `authorOnCanvas`.
    *
-   * The presenting chrome enumerates the active Thing's outgoing Edges at render
-   * time so an Edge drawn from the presented Thing is a move available without
+   * The presenting chrome enumerates the active Resource's outgoing Edges at render
+   * time so an Edge drawn from the presented Resource is a move available without
    * leaving the presentation (ADR 0027). `editing.spec.ts` authors a self-Edge
    * mid-presentation and asserts exactly that. Withdrawing the handles here
    * would take the feature with them — which is what happened the first time
-   * `ThingNode` was made to honour the flag, because the flag had been carrying
+   * `ResourceNode` was made to honour the flag, because the flag had been carrying
    * `!presenting` unread for as long as nothing forwarded it.
    */
   it('keeps the handles connectable while presenting, where the Edge is a move', () => {
     mountCanvas(null, { presenting: true });
 
-    const handles = document.querySelectorAll('.rf-thing-node__authoring-handle');
+    const handles = document.querySelectorAll('.rf-resource-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
     expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(true);
   });
@@ -846,8 +861,8 @@ const surface = (composed: ReturnType<typeof compose>) =>
         selection: { kind: 'edge', ...SUBJECT },
         activeGraphId: GRAPH_ID,
         graphs: composed.currentSpace().graphs,
-        placedThings: composed.currentSpace().things,
-        newThingTitle: 'Thing 4',
+        placedResources: composed.currentSpace().resources,
+        newResourceTitle: 'Resource 4',
         enabled: true,
         onSelectEdge: NO_OP,
       }),
@@ -859,7 +874,7 @@ describe("React Flow's reconnect callback order", () => {
     // The order React Flow uses, verbatim.
     props.reactFlowProps.onReconnectStart(null, edge, 'target');
     props.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-      nodeId: THING_B,
+      nodeId: RESOURCE_B,
       handleId: null,
       handleType: 'target',
     });
@@ -883,7 +898,7 @@ describe("React Flow's reconnect callback order", () => {
    * it has to be asked the reconnect question or the anchor reads invalid for
    * the whole drag.
    *
-   * Dropping either end of A→B back on its own Thing is the case that exposes
+   * Dropping either end of A→B back on its own Resource is the case that exposes
    * it: as a *connect* proposal that is the duplicate rule, and as a *reconnect*
    * proposal it is the endpoint returning to where it came from, which
    * `reconnectOutcome` answers `unchanged` before it ever reaches the duplicate
@@ -906,15 +921,15 @@ describe("React Flow's reconnect callback order", () => {
     act(() => {
       result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, handleType);
       result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-        nodeId: THING_B,
+        nodeId: RESOURCE_B,
         handleId: null,
         handleType: 'target',
       });
     });
 
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_B))).toBe(
-      true,
-    );
+    expect(
+      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_B)),
+    ).toBe(true);
   });
 
   /**
@@ -929,26 +944,26 @@ describe("React Flow's reconnect callback order", () => {
   it('refuses a reconnection that would duplicate another Edge in the Graph', () => {
     const composed = compose();
     act(() => {
-      composed.edgeAuthoring.beginPointerConnect(THING_A);
-      composed.edgeAuthoring.connect(THING_A, THING_C, null);
+      composed.edgeAuthoring.beginPointerConnect(RESOURCE_A);
+      composed.edgeAuthoring.connect(RESOURCE_A, RESOURCE_C, null);
       composed.edgeAuthoring.endPointerDrag();
     });
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
       EDGE,
-      { from: THING_A, to: THING_C },
+      { from: RESOURCE_A, to: RESOURCE_C },
     ]);
 
     const { result } = surface(composed);
     act(() => result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, 'target'));
 
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_C))).toBe(
-      false,
-    );
-    // And the endpoint's own Thing is still offered, so the refusal is the
+    expect(
+      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_C)),
+    ).toBe(false);
+    // And the endpoint's own Resource is still offered, so the refusal is the
     // duplicate rule rather than the reconnect branch refusing everything.
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_B))).toBe(
-      true,
-    );
+    expect(
+      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_B)),
+    ).toBe(true);
   });
 
   /** With no reconnect draft open, the ordinary connect rule still answers. */
@@ -957,12 +972,12 @@ describe("React Flow's reconnect callback order", () => {
     const { result } = surface(composed);
 
     // A→B already exists in Main, so as a plain connection it is a duplicate.
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_A, THING_B))).toBe(
-      false,
-    );
-    expect(result.current.reactFlowProps.isValidConnection(connectionTo(THING_B, THING_C))).toBe(
-      true,
-    );
+    expect(
+      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_B)),
+    ).toBe(false);
+    expect(
+      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_B, RESOURCE_C)),
+    ).toBe(true);
   });
 
   it('completes the reconnection rather than silently authoring nothing', () => {
@@ -972,15 +987,15 @@ describe("React Flow's reconnect callback order", () => {
 
     act(() => {
       result.current.reactFlowProps.onReconnect(EDGES[0]!, {
-        source: THING_A,
-        target: THING_C,
+        source: RESOURCE_A,
+        target: RESOURCE_C,
         sourceHandle: null,
         targetHandle: null,
       });
     });
 
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
-      { from: THING_A, to: THING_C },
+      { from: RESOURCE_A, to: RESOURCE_C },
     ]);
   });
 
@@ -1011,7 +1026,7 @@ describe("React Flow's reconnect callback order", () => {
    * session.** They are the same handlers an ordinary connection uses, so a flag
    * left raised silently disables every later pointer connection and the Alt
    * empty-drop for the life of the canvas — and `onConnect` is unguarded, so a
-   * plain Thing-to-Thing drag still authors and hides it.
+   * plain Resource-to-Resource drag still authors and hides it.
    */
   it('takes its connection handlers back once the reconnect drag ends', () => {
     const composed = compose();
@@ -1026,7 +1041,7 @@ describe("React Flow's reconnect callback order", () => {
         FINISHED_CONNECTION,
       );
       result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-        nodeId: THING_C,
+        nodeId: RESOURCE_C,
         handleId: null,
         handleType: 'source',
       });
@@ -1034,16 +1049,16 @@ describe("React Flow's reconnect callback order", () => {
 
     expect(composed.edgeAuthoring.getState().draft).toEqual({
       kind: 'pointer-connect',
-      from: THING_C,
+      from: RESOURCE_C,
     });
   });
 
   /**
    * The connection release arrives first and must author nothing: with Alt held
-   * it would otherwise create a Thing and an Edge from the anchored end, and then
+   * it would otherwise create a Resource and an Edge from the anchored end, and then
    * `onReconnectEnd` would delete the Edge — one gesture, two Edits.
    */
-  it('authors no Thing when an Alt-held reconnect release reaches the connection callback', () => {
+  it('authors no Resource when an Alt-held reconnect release reaches the connection callback', () => {
     const composed = compose();
     const { result } = surface(composed);
     const before = composed.session.getState().working;
@@ -1067,7 +1082,7 @@ describe("React Flow's reconnect callback order", () => {
  * *"Neither React Flow's `toNode` nor the DOM alone answers"* bullet, and
  * the one that is easiest to miss: it composes React Flow's answer with the
  * DOM's exactly as the connect path does, and then asks a different question of
- * the result — delete this Edge, rather than author a Thing. Nothing but
+ * the result — delete this Edge, rather than author a Resource. Nothing but
  * `editing.spec.ts` used to cover it.
  *
  * jsdom performs no hit-testing, so `elementFromPoint` is answered with a
@@ -1079,12 +1094,12 @@ describe('what a reconnect release decides', () => {
   const mountFlowDom = () => {
     const renderer = document.createElement('div');
     renderer.className = 'react-flow__renderer';
-    const thing = document.createElement('div');
-    thing.className = 'react-flow__node';
-    renderer.append(thing);
+    const resource = document.createElement('div');
+    resource.className = 'react-flow__node';
+    renderer.append(resource);
     document.body.append(renderer);
     mounted = renderer;
-    return { renderer, thing };
+    return { renderer, resource };
   };
 
   /** The node `mountFlowDom` put in the document, so cleanup removes that one. */
@@ -1094,7 +1109,7 @@ describe('what a reconnect release decides', () => {
     const userNode = { id, position: { x: 0, y: 0 }, data: {} };
     return {
       ...userNode,
-      measured: { width: THING_SIZE.width, height: THING_SIZE.height },
+      measured: { width: RESOURCE_SIZE.width, height: RESOURCE_SIZE.height },
       internals: { positionAbsolute: { x: 0, y: 0 }, z: 0, userNode },
     };
   };
@@ -1117,7 +1132,7 @@ describe('what a reconnect release decides', () => {
     from: { x: 0, y: 0 },
     fromHandle: {
       id: null,
-      nodeId: THING_A,
+      nodeId: RESOURCE_A,
       type: 'source',
       position: Position.Right,
       x: 0,
@@ -1126,11 +1141,11 @@ describe('what a reconnect release decides', () => {
       height: 6,
     },
     fromPosition: Position.Right,
-    fromNode: internalNode(THING_A),
+    fromNode: internalNode(RESOURCE_A),
     to: { x: 400, y: 0 },
     toHandle: null,
     toPosition: Position.Left,
-    toNode: internalNode(THING_B),
+    toNode: internalNode(RESOURCE_B),
     pointer: { x: 400, y: 0 },
   } satisfies FinalConnectionState;
 
@@ -1166,9 +1181,9 @@ describe('what a reconnect release decides', () => {
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([]);
   });
 
-  it('keeps the Edge when the release lands on a Thing body', () => {
+  it('keeps the Edge when the release lands on a Resource body', () => {
     const composed = compose();
-    release(composed, mountFlowDom().thing, FINISHED_CONNECTION);
+    release(composed, mountFlowDom().resource, FINISHED_CONNECTION);
 
     expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
@@ -1200,8 +1215,8 @@ describe('what a reconnect release decides', () => {
  * anywhere but the "Edited Edge" the matrix names.
  */
 describe('spending a continuation on the canvas', () => {
-  const RECONNECTED = { graphId: GRAPH_ID, edge: { from: THING_A, to: THING_C } } as const;
-  const reconnectedFlowEdge = flowEdge(GRAPH_ID, THING_A, THING_C);
+  const RECONNECTED = { graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: RESOURCE_C } } as const;
+  const reconnectedFlowEdge = flowEdge(GRAPH_ID, RESOURCE_A, RESOURCE_C);
 
   it('focuses the Edge on the projection that draws it, not the one before', () => {
     // The real canvas, because resolving the continuation is a DOM lookup: the
@@ -1211,7 +1226,7 @@ describe('spending a continuation on the canvas', () => {
 
     act(() => {
       edgeAuthoring.openEdgeEditor(SUBJECT);
-      edgeAuthoring.reconnect('to', THING_C);
+      edgeAuthoring.reconnect('to', RESOURCE_C);
     });
 
     // The Edit has completed, but the projection still holds the Edge as it
@@ -1256,7 +1271,7 @@ describe('spending a continuation on the canvas', () => {
 
     act(() => {
       edgeAuthoring.openEdgeEditor(SUBJECT);
-      edgeAuthoring.reconnect('to', THING_C);
+      edgeAuthoring.reconnect('to', RESOURCE_C);
     });
     act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
 
@@ -1276,7 +1291,7 @@ describe('spending a continuation on the canvas', () => {
   /**
    * **The other kind `staysOwed` waits for, on the same schedule.**
    *
-   * A thing target is resolved by `data-id` against the DOM, so it needs the
+   * A resource target is resolved by `data-id` against the DOM, so it needs the
    * commit that draws just as much as an Edge does — React Flow syncs the
    * `nodes` prop into its own store from an effect and draws from that.
    *
@@ -1285,7 +1300,7 @@ describe('spending a continuation on the canvas', () => {
    * (`edges: [...edges]`), so every publication through it moves the Edge
    * subscription whether or not an Edge changed. `mergeProjected` spreads the
    * projection and replaces only `nodes` — it is the path a create-and-connect
-   * takes, where Authoring has just minted a Thing and the projection carrying
+   * takes, where Authoring has just minted a Resource and the projection carrying
    * it arrives with the Edges untouched. `decorated` memoises on that same
    * reference, so React Flow's store keeps the edges it has and the drawn nodes
    * are the only state that moves. Without the node subscription the spend
@@ -1293,31 +1308,31 @@ describe('spending a continuation on the canvas', () => {
    * none does, which is a caret left on `document.body` and, for `reveal`, a
    * camera that never arrives.
    */
-  it('focuses a Thing on the projection that draws it, not the one before', () => {
+  it('focuses a Resource on the projection that draws it, not the one before', () => {
     const { adapter, continuation } = mountCanvas();
     document.body.focus();
 
     act(() =>
       continuation.request({
-        target: { kind: 'thing', thingId: THING_D },
+        target: { kind: 'resource', resourceId: RESOURCE_D },
         select: false,
         then: 'focus',
       }),
     );
 
-    // Owed rather than spent: the canvas is not drawing this Thing yet.
+    // Owed rather than spent: the canvas is not drawing this Resource yet.
     expect(continuation.getState().pending).not.toBeNull();
 
-    act(() => adapter.getState().mergeProjected([...NODES, thingNode(THING_D, 1200, 'D')]));
+    act(() => adapter.getState().mergeProjected([...NODES, resourceNode(RESOURCE_D, 1200, 'D')]));
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__node[data-id="${THING_D}"]`),
+      document.querySelector(`.react-flow__node[data-id="${RESOURCE_D}"]`),
     );
   });
 
-  /** A Thing already on the canvas resolves on the render that receives it. */
-  it('focuses a Thing that is already drawn without waiting', () => {
+  /** A Resource already on the canvas resolves on the render that receives it. */
+  it('focuses a Resource that is already drawn without waiting', () => {
     const { edgeAuthoring, continuation } = mountCanvas();
     document.body.focus();
 
@@ -1327,7 +1342,7 @@ describe('spending a continuation on the canvas', () => {
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__node[data-id="${THING_A}"]`),
+      document.querySelector(`.react-flow__node[data-id="${RESOURCE_A}"]`),
     );
   });
 });
@@ -1345,13 +1360,13 @@ describe('announcing a refusal', () => {
     // A→B already exists in Main, so this is the duplicate rule — reached
     // directly, as a completion whose drag has already ended.
     act(() => {
-      edgeAuthoring.beginPointerConnect(THING_A);
-      edgeAuthoring.connect(THING_A, THING_B, null);
+      edgeAuthoring.beginPointerConnect(RESOURCE_A);
+      edgeAuthoring.connect(RESOURCE_A, RESOURCE_B, null);
       edgeAuthoring.endPointerDrag();
     });
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'These Things are already connected in this Graph.',
+      'These Resources are already connected in this Graph.',
     );
   });
 });
@@ -1372,8 +1387,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedThings: composed.currentSpace().things,
-          newThingTitle: 'Thing 4',
+          placedResources: composed.currentSpace().resources,
+          newResourceTitle: 'Resource 4',
           enabled: true,
           onSelectEdge: NO_OP,
         }),
@@ -1400,8 +1415,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedThings: composed.currentSpace().things,
-          newThingTitle: 'Thing 4',
+          placedResources: composed.currentSpace().resources,
+          newResourceTitle: 'Resource 4',
           enabled: true,
           onSelectEdge: NO_OP,
         }),
@@ -1434,8 +1449,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'edge', graphId: GRAPH_ID, edge: EDGE },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedThings: composed.currentSpace().things,
-          newThingTitle: 'Thing 4',
+          placedResources: composed.currentSpace().resources,
+          newResourceTitle: 'Resource 4',
           enabled: true,
           onSelectEdge: NO_OP,
         }),
@@ -1466,8 +1481,8 @@ describe('the React Flow properties', () => {
           selection: { kind: 'none' },
           activeGraphId: GRAPH_ID,
           graphs: composed.currentSpace().graphs,
-          placedThings: composed.currentSpace().things,
-          newThingTitle: 'Thing 4',
+          placedResources: composed.currentSpace().resources,
+          newResourceTitle: 'Resource 4',
           enabled: false,
           onSelectEdge: NO_OP,
         }),

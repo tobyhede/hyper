@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The Command Dock and a Thing's own commands are **one surface drawn twice**.
+ * The Command Dock and a Resource's own commands are **one surface drawn twice**.
  *
- * `.scratch/command-dock/issues/12` asks for a Thing's hover toolbar to read as
+ * `.scratch/command-dock/issues/12` asks for a Resource's hover toolbar to read as
  * the Dock does, and says in as many words that copying the Dock's stylesheet
- * into the Thing's does not answer it. That is not a claim a rendering test can
+ * into the Resource's does not answer it. That is not a claim a rendering test can
  * make: two stylesheets that happen to declare the same nine properties draw
  * exactly the same picture as one stylesheet mounted twice, and only the second
  * stays true after the next change to either surface.
@@ -21,13 +21,13 @@ const read = (path: string): string =>
 
 const sharedSheet = read('packages/ui/src/command-surface.css');
 const dockSheet = read('packages/app/src/components/command-dock.css');
-const thingSheet = read('packages/ui/src/canvas-thing.css');
-const railSheet = read('packages/ui/src/thing-rail.css');
+const resourceSheet = read('packages/ui/src/canvas-resource.css');
+const railSheet = read('packages/ui/src/resource-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
-const thingRailActions = read('packages/ui/src/ThingRailActions.tsx');
-const spaceThingSelectors = read('packages/ui/src/SpaceThingSelectors.tsx');
-const spaceThingRail = read('packages/app/src/build-space-thing-rail.tsx');
-const canvasThing = read('packages/ui/src/CanvasThing.tsx');
+const resourceRailActions = read('packages/ui/src/ResourceRailActions.tsx');
+const spaceResourceSelectors = read('packages/ui/src/SpaceEndpointSelectors.tsx');
+const spaceResourceRail = read('packages/app/src/build-space-resource-rail.tsx');
+const canvasResource = read('packages/ui/src/CanvasResource.tsx');
 
 /** The declaration block of the rule whose selector is exactly `selector`. */
 const block = (stylesheet: string, selector: string): string => {
@@ -67,22 +67,22 @@ describe('the shared command surface', () => {
    *
    * A `className` would not do: the point of the component is that the axis
    * reaches Base UI and the stylesheet from one value, and that a surface added
-   * later gets the treatment by mounting the thing rather than by remembering a
+   * later gets the treatment by mounting the resource rather than by remembering a
    * string.
    */
-  it('is mounted by both the Command Dock and a Thing rail', () => {
+  it('is mounted by both the Command Dock and a Resource rail', () => {
     expect(dock).toContain('<CommandToolbar');
-    expect(thingRailActions).toContain('<CommandToolbar');
+    expect(resourceRailActions).toContain('<CommandToolbar');
   });
 
   /**
    * And neither has taken a copy back. The Dock's own sheet still owns its
-   * twelve slots, its cap and what a drag does to it; the Thing's still owns
+   * twelve slots, its cap and what a drag does to it; the Resource's still owns
    * when its commands are revealed. Neither may own the panel.
    */
   it.each([
     { name: 'the Command Dock', stylesheet: dockSheet, selector: '.command-dock__surface' },
-    { name: 'a Thing rail', stylesheet: thingSheet, selector: '.canvas-thing__actions' },
+    { name: 'a Resource rail', stylesheet: resourceSheet, selector: '.canvas-resource__actions' },
   ])('leaves $name declaring none of the treatment itself', ({ stylesheet, selector }) => {
     const declarations = block(stylesheet, selector);
 
@@ -94,23 +94,23 @@ describe('the shared command surface', () => {
   });
 });
 
-describe('the Thing rail', () => {
+describe('the Resource rail', () => {
   /**
    * **The band is neutral, and that is the requested change** (issue 12). It
-   * carried the Active Graph's colour; what a Thing reveals is a command strip,
+   * carried the Active Graph's colour; what a Resource reveals is a command strip,
    * and a strip of commands is chrome, so it is drawn as chrome is everywhere
    * else. The colour has not left the canvas — the authoring handles are
-   * painted `activeGraphColor` by `ThingNode` and each Graph's Edges are drawn in
+   * painted `activeGraphColor` by `ResourceNode` and each Graph's Edges are drawn in
    * its own — which is where a colour that says *which Graph* belongs.
    */
   it('paints no background of its own', () => {
     expect(railSheet).not.toMatch(/(?<![\w-])background(-color)?:/u);
-    expect(railSheet).not.toContain('--thing-rail-graph');
+    expect(railSheet).not.toContain('--resource-rail-graph');
   });
 
-  /** And no Thing puts one back behind the strip. */
-  it('is not banded by the Thing that mounts it either', () => {
-    const railRules = [...thingSheet.matchAll(/\.thing-rail[^{]*\{([^}]*)\}/gu)].map(
+  /** And no Resource puts one back behind the strip. */
+  it('is not banded by the Resource that mounts it either', () => {
+    const railRules = [...resourceSheet.matchAll(/\.resource-rail[^{]*\{([^}]*)\}/gu)].map(
       (found) => found[1] ?? '',
     );
 
@@ -121,38 +121,38 @@ describe('the Thing rail', () => {
   });
 });
 
-describe('choosing a Diagram or a Graph', () => {
+describe('choosing a Map or a Graph', () => {
   /**
    * One composition for the two surfaces that ask the same question.
    *
-   * The Dock's Diagram and Graph clusters and an Open Space Thing's two choices
+   * The Dock's Map and Graph clusters and an Open Space Resource's two choices
    * are the same control over the same kind of set — and deliberately not the
    * same *operation*: one moves the canvas the author is standing on, the other
-   * writes which Diagram a Thing shows into that Thing. `ChoiceMenu` is the half
+   * writes which Map a Resource shows into that Resource. `ChoiceMenu` is the half
    * that is shared, and it takes the set, the selection and the operation from
    * whoever draws it.
    */
-  it('is the same shared menu on the Dock and on a Space Thing', () => {
-    expect(dock).toContain('<ChoiceMenu<DiagramId>');
+  it('is the same shared menu on the Dock and on a Space Resource', () => {
+    expect(dock).toContain('<ChoiceMenu<MapId>');
     expect(dock).toContain('<ChoiceMenu<GraphId>');
-    expect(spaceThingSelectors).toContain('<ChoiceMenu<string>');
+    expect(spaceResourceSelectors).toContain('<ChoiceMenu<string>');
   });
 
   /**
-   * And an Open Space Thing's two choices are themselves **one** control,
+   * And an Open Space Resource's two choices are themselves **one** control,
    * mounted by both surfaces that draw them, rather than a control copied
-   * twice: `@project/ui`'s `SpaceThingSelectors` is the sole place a Diagram or
-   * Graph choice is turned into a `ChoiceMenu`, an embedded canvas Thing's own
-   * rail (`CanvasThing`) and the application's Space Thing rail
-   * (`buildSpaceThingRail`) each mount it rather than restating it.
+   * twice: `@project/ui`'s `SpaceEndpointSelectors` is the sole place a Map or
+   * Graph choice is turned into a `ChoiceMenu`, an embedded canvas Resource's own
+   * rail (`CanvasResource`) and the application's Space Resource rail
+   * (`buildSpaceEndpointRail`) each mount it rather than restating it.
    */
-  it('is owned once by @project/ui, not copied onto the canvas Thing or the app rail', () => {
-    expect(spaceThingRail).toContain("from '@project/ui'");
-    expect(spaceThingRail).not.toContain('<ChoiceMenu');
-    expect(spaceThingRail).not.toMatch(/function SpaceThingSelector/u);
+  it('is owned once by @project/ui, not copied onto the canvas Resource or the app rail', () => {
+    expect(spaceResourceRail).toContain("from '@project/ui'");
+    expect(spaceResourceRail).not.toContain('<ChoiceMenu');
+    expect(spaceResourceRail).not.toMatch(/function SpaceEndpointSelector/u);
 
-    expect(canvasThing).toContain("from './SpaceThingSelectors'");
-    expect(canvasThing).not.toContain('<ChoiceMenu');
-    expect(canvasThing).not.toMatch(/function SpaceThingSelector/u);
+    expect(canvasResource).toContain("from './SpaceEndpointSelectors'");
+    expect(canvasResource).not.toContain('<ChoiceMenu');
+    expect(canvasResource).not.toMatch(/function SpaceEndpointSelector/u);
   });
 });

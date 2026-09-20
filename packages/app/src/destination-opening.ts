@@ -1,14 +1,14 @@
-import type { ThingId, GraphId } from '@project/core';
+import type { ResourceId, GraphId } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { Space } from '@project/graph';
-import type { DiagramId } from '@project/core';
-import { requireDefaultDiagram } from './diagram-resolution';
+import type { MapId } from '@project/core';
+import { requireDefaultMap } from './map-resolution';
 
 export interface DestinationOpening {
-  readonly selection: DiagramId;
-  readonly thingId: ThingId | null;
+  readonly selection: MapId;
+  readonly resourceId: ResourceId | null;
   readonly graphId: GraphId | null;
-  readonly presentationThingId: ThingId | null;
+  readonly presentationResourceId: ResourceId | null;
 }
 
 /** Translate a resolved product destination into the application state it opens. */
@@ -18,42 +18,42 @@ export function destinationOpening(
 ): DestinationOpening {
   if (destination.kind === 'space') {
     return {
-      selection: requireDefaultDiagram(space),
-      thingId: null,
+      selection: requireDefaultMap(space),
+      resourceId: null,
       graphId: null,
-      presentationThingId: null,
+      presentationResourceId: null,
     };
   }
-  if (destination.kind === 'diagram') {
+  if (destination.kind === 'map') {
     return {
-      selection: destination.diagramId,
-      thingId: null,
+      selection: destination.mapId,
+      resourceId: null,
       graphId: null,
-      presentationThingId: null,
+      presentationResourceId: null,
     };
   }
-  if (destination.kind === 'diagram-thing') {
+  if (destination.kind === 'map-resource') {
     return {
-      selection: destination.diagramId,
-      thingId: destination.thingId,
+      selection: destination.mapId,
+      resourceId: destination.resourceId,
       graphId: null,
-      presentationThingId: null,
+      presentationResourceId: null,
     };
   }
-  if (destination.kind === 'diagram-graph') {
+  if (destination.kind === 'map-graph') {
     return {
-      selection: destination.diagramId,
-      thingId: null,
+      selection: destination.mapId,
+      resourceId: null,
       graphId: destination.graphId,
-      presentationThingId: null,
+      presentationResourceId: null,
     };
   }
   if (destination.kind === 'presentation') {
     return {
-      selection: destination.diagramId,
-      thingId: null,
+      selection: destination.mapId,
+      resourceId: null,
       graphId: destination.graphId,
-      presentationThingId: destination.thingId,
+      presentationResourceId: destination.resourceId,
     };
   }
   if (destination.kind === 'graph') {
@@ -62,16 +62,16 @@ export function destinationOpening(
       throw new Error(`The resolved Graph ${destination.graphId} does not exist.`);
     }
     return {
-      selection: owned.owner.diagram.id,
-      thingId: null,
+      selection: owned.owner.map.id,
+      resourceId: null,
       graphId: destination.graphId,
-      presentationThingId: null,
+      presentationResourceId: null,
     };
   }
   return {
-    selection: requireDefaultDiagram(space),
-    thingId: destination.thingId,
+    selection: requireDefaultMap(space),
+    resourceId: destination.resourceId,
     graphId: null,
-    presentationThingId: null,
+    presentationResourceId: null,
   };
 }

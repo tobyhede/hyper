@@ -11,7 +11,7 @@ export default defineConfig({
   forbidOnly: !!process.env['CI'],
   // Deliberately not the `retries: 2` of the default suite, for the same
   // reason `playwright.postgres.config.ts` sets `retries: 0`: each attempt
-  // mints its own Space and Thing ids and cleans them up in `finally`, so a
+  // mints its own Space and Resource ids and cleans them up in `finally`, so a
   // retry is safe — but this test exists to answer whether an edit is
   // durable, and a pass on the second attempt does not answer that question
   // the way a pass on a flaky interaction test does.

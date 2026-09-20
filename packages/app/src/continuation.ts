@@ -1,4 +1,4 @@
-import type { ThingId } from '@project/core';
+import type { ResourceId } from '@project/core';
 import {
   createObservableState,
   type ObservableState,
@@ -27,13 +27,13 @@ import type { SpaceAuthoring } from './space-authoring';
  * author should be *now*, so an unspent one is stale the moment a second
  * gesture finishes: {@link Continuation.request} replaces it silently. Firing
  * *twice* is the bug class this exists to close, and {@link Continuation.take}
- * is what closes it — `createdThingId` was set from two places and cleared from
+ * is what closes it — `createdResourceId` was set from two places and cleared from
  * none.
  */
 
 /** What a continuation names. */
 export type ContinuationTarget =
-  | { readonly kind: 'thing'; readonly thingId: ThingId }
+  | { readonly kind: 'resource'; readonly resourceId: ResourceId }
   | ({ readonly kind: 'edge' } & EdgeSubject)
   | { readonly kind: 'canvas' }
   | {
@@ -53,25 +53,25 @@ export type ContinuationTarget =
  *
  * **One address, and it is a destination rather than a return.** This was the
  * two creation panes' return addresses, `'create-reference'` and
- * `'create-space-thing'` — where the caret went when a pane was cancelled. ADR
+ * `'create-space-resource'` — where the caret went when a pane was cancelled. ADR
  * 0089 retired both panes, so there is nothing left to come back *from*: every
- * Thing creation completes its Edit on activation and continues at the Thing it
+ * Resource creation completes its Edit on activation and continues at the Resource it
  * made, which is a canvas target. What replaced them is the one chrome
- * continuation the Dock still owes: Add Diagram creates an empty Diagram and
- * selects it, and what an author does with a brand-new Diagram is say what it
+ * continuation the Dock still owes: Add Map creates an empty Map and
+ * selects it, and what an author does with a brand-new Map is say what it
  * is for, so the caret lands in its name (`.scratch/command-dock/issues/13`).
  *
  * **There was a third kind here, `sidebar-row`, and it is gone with the surface
- * it named.** It existed because a Diagram or Graph rename was one draft shared
+ * it named.** It existed because a Map or Graph rename was one draft shared
  * between a Sidebar row and the canvas header, begun from either and returning
  * the caret to whichever began it — so the return address had to survive the
  * row swapping its own branch mid-rename, and could only be an attribute query.
  * The Command Dock draws each name once and its editor replaces that one
  * control, so the editor returns focus to itself and there is no second surface
  * to address (`components/CommandDock.tsx`). Renaming it would have been a name
- * for a thing that no longer exists.
+ * for a resource that no longer exists.
  */
-export type ContinuationControl = 'diagram-name';
+export type ContinuationControl = 'map-name';
 
 export interface PendingContinuation {
   readonly target: ContinuationTarget;
@@ -128,23 +128,23 @@ const NONE: ContinuationState = { pending: null };
  *
  * A canvas subject stays owed. A continuation is published synchronously with
  * the Edit that produced it, and the projection carrying that Edit's result
- * arrives a strategy later — so a Thing just created, just added to the Diagram
+ * arrives a strategy later — so a Resource just created, just added to the Map
  * or an Edge just reconnected resolves to nothing *yet*, and spending it on
- * the canvas fallback lands focus anywhere but the thing the author made.
+ * the canvas fallback lands focus anywhere but the resource the author made.
  * A chrome control and the canvas itself fall through: both are drawn already,
  * so unresolvable means gone, and a wait with no end is worse than a fallback.
  *
- * **Every thing target waits**, not only `reveal` and `rename`. Add to Diagram
+ * **Every resource target waits**, not only `reveal` and `rename`. Add to Map
  * is a `focus` whose target arrives a projection later exactly as a creation
  * does — it is why the mechanism this replaces polled the live projection —
- * and keying the wait on `then` would drop it. The two thing targets that name
+ * and keying the wait on `then` would drop it. The two resource targets that name
  * something already drawn (a cancelled Edge draft's anchor, a deleted Edge's
  * source) resolve on the first render either way, so waiting costs them
- * nothing; a thing that never arrives stays owed until the next request
+ * nothing; a resource that never arrives stays owed until the next request
  * replaces it or an invalidation discards it.
  */
 export const staysOwed = ({ target }: PendingContinuation): boolean =>
-  target.kind === 'thing' || target.kind === 'edge';
+  target.kind === 'resource' || target.kind === 'edge';
 
 /**
  * Whether a chrome control continuation waits for activatability.
@@ -173,10 +173,10 @@ export function createContinuation({
   // Invalidated on two facts and deliberately not on four. A replacement
   // discards every open Interaction draft (ADR 0042), and presenting draws over
   // the surfaces a continuation would land on — spending onto a chrome control
-  // underneath a live presentation is wrong. **Not** the selected Diagram and
+  // underneath a live presentation is wrong. **Not** the selected Map and
   // **not** the Active Graph, which the chrome title draft invalidates on:
   // over-invalidating silently loses a legitimate continuation, and a target in
-  // a Diagram no longer drawn simply fails to resolve, which the wait policy
+  // a Map no longer drawn simply fails to resolve, which the wait policy
   // above already answers.
   let replacementEpoch = authoring.getState().replacementEpoch;
   let presenting = authoring.getState().navigation.mode === 'presenting';

@@ -59,7 +59,7 @@ describe('the global Presenting keys', () => {
     expect(traversal.exitPresenting).toHaveBeenCalledTimes(1);
   });
 
-  it('binds nothing while a traversal is not the thing on screen', () => {
+  it('binds nothing while a traversal is not the resource on screen', () => {
     const traversal = commands();
     render(<Presenting active={false} traversal={traversal} />);
 

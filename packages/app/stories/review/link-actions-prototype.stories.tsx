@@ -1,5 +1,5 @@
 /**
- * The entity-actions menu on a **Thing rail** — the one surface the application
+ * The entity-actions menu on a **Resource rail** — the one surface the application
  * still cannot reach. See `.scratch/link-ux/issues/01-choose-the-link-action-pattern.md`.
  *
  * **Review, not stable**, and only this half of it is. The Sidebar half moved
@@ -8,8 +8,8 @@
  * 0052 parity claims a production-reachable surface owes. A second Sidebar
  * story here would have been a copy of that one, free to disagree with it.
  *
- * The rail stays a review surface because `ThingNode` still does not pass
- * `entityActions` through, so no Thing on a canvas opens this menu. What the
+ * The rail stays a review surface because `ResourceNode` still does not pass
+ * `entityActions` through, so no Resource on a canvas opens this menu. What the
  * commands *are*, however, is no longer invented here: they come from
  * production's own `spaceEntityActions`, so the rail cannot advertise a command
  * the application does not have. Copying is replaced by a line in the
@@ -18,8 +18,8 @@
 import type { Story } from '@ladle/react';
 import { useRef, useState } from 'react';
 import { productDestinationPath } from '@project/http';
-import { CanvasThing, cn, type CanvasThingState } from '@project/ui';
-import { thingSizeVars } from '#src/thing';
+import { CanvasResource, cn, type CanvasResourceState } from '@project/ui';
+import { resourceSizeVars } from '#src/resource';
 import { spaceEntityActions } from '#src/entity-actions';
 import { authoredSpace } from '../support/spaces';
 
@@ -61,7 +61,7 @@ function ActivityLog({ log, className }: { readonly log: readonly Logged[]; clas
     >
       <p className="mb-1 font-sans text-xs font-semibold text-muted-foreground">Last actions</p>
       {log.length === 0 ? (
-        <p className="text-muted-foreground">Nothing yet — try a Thing's actions.</p>
+        <p className="text-muted-foreground">Nothing yet — try a Resource's actions.</p>
       ) : (
         <ul className="grid gap-1">
           {log.map((entry) => (
@@ -82,29 +82,29 @@ function PrototypeBanner({ children }: { readonly children: string }) {
 }
 
 /**
- * The Thing's own rail carrying the menu, at four of the states a Thing is drawn
+ * The Resource's own rail carrying the menu, at four of the states a Resource is drawn
  * in.
  *
- * The rail is `CanvasThing`'s, not a replica: the icon sits in the shared
+ * The rail is `CanvasResource`'s, not a replica: the icon sits in the shared
  * command group ahead of Open/Close, so what a reviewer is looking at is the
  * order `[link][open-or-close]` on the real control cluster, with the real
- * roving-tabindex keyboard contract (ADR 0073) over it. Hover a Thing, or Tab to
+ * roving-tabindex keyboard contract (ADR 0073) over it. Hover a Resource, or Tab to
  * it and press ArrowRight, to reach the icon.
  *
  * The rail keeps the **link** glyph while a Sidebar row now draws the general
  * one: every other control here names its own command, so a generic glyph would
  * be the one saying nothing. Whether that survives is a rail decision, taken
- * when `ThingNode` first supplies the actions.
+ * when `ResourceNode` first supplies the actions.
  *
- * There is no Rename in this menu, because production has none to offer: a Thing
- * title is renamed in place on its Front. "Open in new tab" is a Space Thing
+ * There is no Rename in this menu, because production has none to offer: a Resource
+ * title is renamed in place on its Front. "Open in new tab" is a Space Resource
  * command in production (`spaceEntityActions`); this review story still
  * records copies only.
  */
-export const ThingRail: Story = () => {
+export const ResourceRail: Story = () => {
   const { log, record } = useActivityLog();
-  const diagram = authoredSpace.diagrams[0];
-  if (diagram === undefined) throw new Error('ThingRail fixture requires an authored Diagram');
+  const map = authoredSpace.maps[0];
+  if (map === undefined) throw new Error('ResourceRail fixture requires an authored Map');
   const actions = spaceEntityActions({
     spaceId: authoredSpace.id,
     spaceTitle: authoredSpace.title,
@@ -116,31 +116,31 @@ export const ThingRail: Story = () => {
     },
     onOpenIndependently: null,
     onRename: null,
-    onDeleteDiagram: null,
+    onDeleteMap: null,
   });
-  const things = authoredSpace.things.slice(0, 4);
+  const resources = authoredSpace.resources.slice(0, 4);
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PrototypeBanner>
-        The actions menu is one more control on the real Thing rail, ahead of Open/Close.
+        The actions menu is one more control on the real Resource rail, ahead of Open/Close.
       </PrototypeBanner>
-      <div className="flex flex-1 flex-wrap items-start gap-6 p-6" style={thingSizeVars}>
-        {things.map((thing, index) => {
-          const state: CanvasThingState = index === 1 ? 'selected' : 'rest';
+      <div className="flex flex-1 flex-wrap items-start gap-6 p-6" style={resourceSizeVars}>
+        {resources.map((resource, index) => {
+          const state: CanvasResourceState = index === 1 ? 'selected' : 'rest';
           return (
-            <div key={thing.id} className="grid gap-2">
-              <p className="text-xs text-muted-foreground">thing · {state}</p>
-              <CanvasThing
+            <div key={resource.id} className="grid gap-2">
+              <p className="text-xs text-muted-foreground">resource · {state}</p>
+              <CanvasResource
                 front={{
                   kind: 'markdown',
                   source: '',
                   open: false,
                   onOpenChange: () => 'retained',
                 }}
-                title={thing.title}
+                title={resource.title}
                 state={state}
                 graphColor="#ffc53d"
-                entityActions={actions({ kind: 'thing', thing, diagram })}
+                entityActions={actions({ kind: 'resource', resource, map })}
               />
             </div>
           );
@@ -150,4 +150,4 @@ export const ThingRail: Story = () => {
     </div>
   );
 };
-ThingRail.meta = { iframed: true };
+ResourceRail.meta = { iframed: true };

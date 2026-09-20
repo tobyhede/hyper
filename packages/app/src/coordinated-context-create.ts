@@ -1,19 +1,19 @@
-import type { Diagram, GraphId, UUID } from '@project/core';
+import type { Map, GraphId, UUID } from '@project/core';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import type { AuthoringResult } from './space-authoring';
 
-/** The identities a completed New Diagram leaves for the call site. */
+/** The identities a completed New Map leaves for the call site. */
 export interface CreatedContext {
   readonly created: { readonly id: UUID };
   readonly active: GraphId;
 }
 
-export const createdDiagramContext = (
-  diagrams: readonly Diagram[],
-  selectedDiagramId: UUID | null,
+export const createdMapContext = (
+  maps: readonly Map[],
+  selectedMapId: UUID | null,
 ): CreatedContext | undefined => {
-  const created = diagrams.find((each) => each.id === selectedDiagramId);
+  const created = maps.find((each) => each.id === selectedMapId);
   const active = created?.activeGraph ?? created?.graphs[0]?.id;
   return created !== undefined && active !== undefined ? { created, active } : undefined;
 };

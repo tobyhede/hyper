@@ -19,16 +19,16 @@ const UNRELATED_SPACE_ID = uuidSchema.parse('d3333333-3333-4333-8333-33333333333
 const REFUSED_IMPORT_SPACE_ID = uuidSchema.parse('d4444444-4444-4444-8444-444444444444');
 const TARGET_SPACE_ID = uuidSchema.parse('d5555555-5555-4555-8555-555555555555');
 const META_SPACE_ID = uuidSchema.parse('d6666666-6666-4666-8666-666666666666');
-const EXPORTED_THING_ID = uuidSchema.parse('d7777777-7777-4777-8777-777777777777');
-const TARGET_DIAGRAM_ID = uuidSchema.parse('d8888888-8888-4888-8888-888888888888');
+const EXPORTED_RESOURCE_ID = uuidSchema.parse('d7777777-7777-4777-8777-777777777777');
+const TARGET_MAP_ID = uuidSchema.parse('d8888888-8888-4888-8888-888888888888');
 const TARGET_GRAPH_ID = uuidSchema.parse('d9999999-9999-4999-8999-999999999999');
-const LINK_THING_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab');
+const LINK_RESOURCE_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab');
 
 const runHyperCommand = (args: readonly string[]) => runHyperScript('hyper', args);
 
 /**
- * The Space the Meta below points at, carrying the Diagram and Graph that Space
- * Thing selects.
+ * The Space the Meta below points at, carrying the Map and Graph that Space
+ * Resource selects.
  *
  * An ordinary Space nothing references is `ordinary-space-unreferenced`, so an
  * aggregate is not a bag of Spaces that happen to be in one directory — Meta has
@@ -41,19 +41,19 @@ const targetSpaceSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Target space',
-    diagrams: [
+    maps: [
       {
-        id: TARGET_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: TARGET_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: TARGET_GRAPH_ID,
       },
     ],
-    defaultDiagram: TARGET_DIAGRAM_ID,
+    defaultMap: TARGET_MAP_ID,
   },
-  things: [],
+  resources: [],
 };
 
 /**
@@ -67,14 +67,14 @@ const targetSpaceSnapshot: SpaceSnapshot = {
 const metaSpaceSnapshot: SpaceSnapshot = {
   id: META_SPACE_ID,
   document: { version: 1, title: 'Meta space' },
-  things: [
+  resources: [
     {
-      id: LINK_THING_ID,
+      id: LINK_RESOURCE_ID,
       document: {
         title: 'To the target',
         kind: 'space',
         spaceId: TARGET_SPACE_ID,
-        diagram: TARGET_DIAGRAM_ID,
+        map: TARGET_MAP_ID,
         graph: TARGET_GRAPH_ID,
       },
     },
@@ -138,7 +138,7 @@ describe('hyper CLI', () => {
    * Every Hyper row, before each case rather than a list of the ids one created.
    *
    * The two lifecycle doors are whole-aggregate doors: `--dangerous-truncate`
-   * deletes rows this file never named, and an id-less Thing in a fixture is
+   * deletes rows this file never named, and an id-less Resource in a fixture is
    * minted during import, so a per-id cleanup list cannot be written from what
    * the test knows. Clearing up front also gives the `hyper` startup cases the
    * empty repository they assert against, rather than inheriting whatever the
@@ -161,13 +161,17 @@ describe('hyper CLI', () => {
 
   it('imports through the real command and durably reports the stored space', async () => {
     const directory = await makeAggregateDirectory(IMPORTED_SPACE_ID, [
-      { id: IMPORTED_SPACE_ID, document: { version: 1, title: 'CLI imported talk' }, things: [] },
+      {
+        id: IMPORTED_SPACE_ID,
+        document: { version: 1, title: 'CLI imported talk' },
+        resources: [],
+      },
     ]);
-    // Written by hand rather than through `serializeThingFile`, because the id
+    // Written by hand rather than through `serializeResourceFile`, because the id
     // is the point: a hand-authored aggregate may leave out a nested id nothing
     // can reference, and import mints it. Every *Space* Id stays explicit.
     await writeFile(
-      join(directory, IMPORTED_SPACE_ID, 'things', 'opening.md'),
+      join(directory, IMPORTED_SPACE_ID, 'resources', 'opening.md'),
       '---\ntitle: Opening\n---\nDurable CLI body.\n',
     );
 
@@ -184,9 +188,9 @@ describe('hyper CLI', () => {
       version: 1,
       title: 'CLI imported talk',
     });
-    expect(stored?.snapshot.things).toHaveLength(1);
-    expect(uuidSchema.safeParse(stored?.snapshot.things[0]?.id).success).toBe(true);
-    expect(stored?.snapshot.things[0]?.document).toEqual({
+    expect(stored?.snapshot.resources).toHaveLength(1);
+    expect(uuidSchema.safeParse(stored?.snapshot.resources[0]?.id).success).toBe(true);
+    expect(stored?.snapshot.resources[0]?.document).toEqual({
       title: 'Opening',
       kind: 'markdown',
       body: 'Durable CLI body.\n',
@@ -236,14 +240,18 @@ describe('hyper CLI', () => {
     await seedAggregate({
       metaSpaceId: UNRELATED_SPACE_ID,
       spaces: [
-        { id: UNRELATED_SPACE_ID, document: { version: 1, title: 'Unrelated talk' }, things: [] },
+        {
+          id: UNRELATED_SPACE_ID,
+          document: { version: 1, title: 'Unrelated talk' },
+          resources: [],
+        },
       ],
     });
     const directory = await makeAggregateDirectory(REFUSED_IMPORT_SPACE_ID, [
       {
         id: REFUSED_IMPORT_SPACE_ID,
         document: { version: 1, title: 'Fresh imported talk' },
-        things: [],
+        resources: [],
       },
     ]);
 
@@ -272,11 +280,11 @@ describe('hyper CLI', () => {
     const snapshot: SpaceSnapshot = {
       id: IMPORTED_SPACE_ID,
       document: { version: 1, title: 'CLI exported talk' },
-      things: [
+      resources: [
         {
-          id: EXPORTED_THING_ID,
+          id: EXPORTED_RESOURCE_ID,
           document: {
-            title: 'Exported thing',
+            title: 'Exported resource',
             kind: 'markdown',
             body: 'Canonical export.\n',
           },
@@ -288,7 +296,7 @@ describe('hyper CLI', () => {
 
     // One argument, because export takes the whole aggregate. The Space-scoped
     // `hyper export <space-uuid> <destination>` is retired: a Space on its own
-    // is not something the format can round-trip, since a Space Thing pointing
+    // is not something the format can round-trip, since a Space Resource pointing
     // out of it would name a target the directory does not hold.
     const result = await runHyperCommand(['export', destination]);
 
@@ -312,11 +320,14 @@ describe('hyper CLI', () => {
     await expect(readSingleSpace(join(destination, IMPORTED_SPACE_ID))).resolves.toEqual({
       id: snapshot.id,
       document: snapshot.document,
-      things: snapshot.things,
+      resources: snapshot.resources,
     });
     await expect(
-      readFile(join(destination, IMPORTED_SPACE_ID, 'things', `${EXPORTED_THING_ID}.md`), 'utf8'),
-    ).resolves.toContain(`id: ${EXPORTED_THING_ID}`);
+      readFile(
+        join(destination, IMPORTED_SPACE_ID, 'resources', `${EXPORTED_RESOURCE_ID}.md`),
+        'utf8',
+      ),
+    ).resolves.toContain(`id: ${EXPORTED_RESOURCE_ID}`);
     await expect(repository.loadSpace(IMPORTED_SPACE_ID)).resolves.toEqual({
       snapshot,
       revision: 0n,
@@ -351,8 +362,8 @@ describe('hyper CLI', () => {
       stderr: '',
     });
 
-    // The same aggregate, including the Space Thing's own Diagram and Graph
-    // selection: a round trip that dropped either would leave a Space Thing
+    // The same aggregate, including the Space Resource's own Map and Graph
+    // selection: a round trip that dropped either would leave a Space Resource
     // pointing at a Space and at nothing inside it (ADR 0079).
     //
     // `exportedRevision` is back to `null` because replacement rewrote the rows
@@ -382,44 +393,45 @@ describe('hyper CLI', () => {
     expect(result.stdout).toBe(`Opened space ${created.id} at revision 0\n`);
     expect(created.title).toBe('New space');
     const stored = await repository.loadSpace(created.id);
-    // A new Space begins complete: its Thing is already placed in an authored
-    // default Diagram with one empty Active Graph (ADR 0079, ADR 0080). Every id
+    // A new Space begins complete: its Resource is already placed in an authored
+    // default Map with one empty Active Graph (ADR 0079, ADR 0080). Every id
     // in it is minted, so the shape is asserted against the ones that arrived.
-    const diagram = stored?.snapshot.document.diagrams?.[0];
-    if (diagram === undefined) throw new Error('Expected the new space to arrive with its Diagram');
-    const graph = diagram.graphs[0];
-    if (graph === undefined) throw new Error('Expected the new Diagram to arrive with its Graph');
-    const thingId = stored?.snapshot.things[0]?.id;
-    if (thingId === undefined) throw new Error('Expected the new space to arrive with its Thing');
+    const map = stored?.snapshot.document.maps?.[0];
+    if (map === undefined) throw new Error('Expected the new space to arrive with its Map');
+    const graph = map.graphs[0];
+    if (graph === undefined) throw new Error('Expected the new Map to arrive with its Graph');
+    const resourceId = stored?.snapshot.resources[0]?.id;
+    if (resourceId === undefined)
+      throw new Error('Expected the new space to arrive with its Resource');
     expect(stored).toEqual({
       snapshot: {
         id: created.id,
         document: {
           version: 1,
           title: 'New space',
-          diagrams: [
+          maps: [
             {
-              id: diagram.id,
-              title: 'Diagram 1',
+              id: map.id,
+              title: 'Map 1',
               kind: 'positioned',
-              positions: { [thingId]: { x: 0, y: 0, open: false } },
+              positions: { [resourceId]: { x: 0, y: 0, open: false } },
               graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
               activeGraph: graph.id,
             },
           ],
-          defaultDiagram: diagram.id,
+          defaultMap: map.id,
         },
-        things: [
+        resources: [
           {
-            id: thingId,
-            document: { title: 'Thing 1', kind: 'markdown', body: '' },
+            id: resourceId,
+            document: { title: 'Resource 1', kind: 'markdown', body: '' },
           },
         ],
       },
       revision: 0n,
       exportedRevision: null,
     });
-    for (const id of [thingId, diagram.id, graph.id]) {
+    for (const id of [resourceId, map.id, graph.id]) {
       expect(uuidSchema.safeParse(id).success).toBe(true);
     }
   });
@@ -449,18 +461,22 @@ describe('hyper CLI', () => {
     await expect(repository.loadSpace(created.id)).resolves.toEqual(firstStored);
   });
 
-  it('reports a malformed thing path and stores no partial space', async () => {
+  it('reports a malformed resource path and stores no partial space', async () => {
     const directory = await makeAggregateDirectory(MALFORMED_SPACE_ID, [
-      { id: MALFORMED_SPACE_ID, document: { version: 1, title: 'CLI imported talk' }, things: [] },
+      {
+        id: MALFORMED_SPACE_ID,
+        document: { version: 1, title: 'CLI imported talk' },
+        resources: [],
+      },
     ]);
-    const thingPath = join(directory, MALFORMED_SPACE_ID, 'things', 'broken.md');
-    await writeFile(thingPath, 'Missing frontmatter.\n');
+    const resourcePath = join(directory, MALFORMED_SPACE_ID, 'resources', 'broken.md');
+    await writeFile(resourcePath, 'Missing frontmatter.\n');
 
     const result = await runHyperCommand([directory]);
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toContain(thingPath);
+    expect(result.stderr).toContain(resourcePath);
     await expect(repository.loadSpace(MALFORMED_SPACE_ID)).resolves.toBeUndefined();
   });
 });

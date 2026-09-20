@@ -10,7 +10,7 @@ export default { title: 'Components/Selected Edge Controls' };
  * Four of them are refusals, and every one is handed in **structured**: the
  * sentence, the channel and the Field are derived by the same adapters the
  * canvas uses (ADR 0057). Three of the four are unreachable through any browser
- * gesture — the pickers only ever offer eligible Things, so a refused completion
+ * gesture — the pickers only ever offer eligible Resources, so a refused completion
  * needs the Space to have moved under an open editor — which is exactly why the
  * catalogue is where they are exercised.
  */
@@ -21,11 +21,11 @@ export const Closed: Story = () => <SelectedEdgeFixture />;
 /** Edit pressed: both endpoints, and the trigger itself reading as open. */
 export const EndpointEditor: Story = () => <SelectedEdgeFixture editorOpen />;
 
-/** A Thing the Graph already reaches: still listed, disabled, with its reason. */
+/** A Resource the Graph already reaches: still listed, disabled, with its reason. */
 export const DisabledChoice: Story = () => (
   <SelectedEdgeFixture
     editorOpen
-    ineligible={{ thingId: DUPLICATE_TARGET, refusal: 'edge-already-exists' }}
+    ineligible={{ resourceId: DUPLICATE_TARGET, refusal: 'edge-already-exists' }}
   />
 );
 
@@ -64,7 +64,7 @@ export const DeletionRefusal: Story = () => (
   <SelectedEdgeFixture
     refusal={{
       kind: 'deletion',
-      refusal: { code: 'diagram-required', operation: 'deleted-edge' },
+      refusal: { code: 'map-required', operation: 'deleted-edge' },
     }}
   />
 );

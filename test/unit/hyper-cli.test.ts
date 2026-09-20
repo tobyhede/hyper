@@ -11,7 +11,7 @@ import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-di
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
@@ -23,10 +23,10 @@ const storedSpace: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1, title: 'Stored talk' },
-    things: [
+    resources: [
       {
-        id: THING_ID,
-        document: { title: 'Stored thing', kind: 'markdown', body: 'Stored body.\n' },
+        id: RESOURCE_ID,
+        document: { title: 'Stored resource', kind: 'markdown', body: 'Stored body.\n' },
       },
     ],
   },
@@ -59,7 +59,7 @@ const writeSingleSpaceAggregate = (id: UUID = SPACE_ID, title = 'Imported talk')
     {
       name: id,
       spaceFile: JSON.stringify({ version: 1, id, title }),
-      things: { 'opening.md': '---\ntitle: Opening\n---\nHello.\n' },
+      resources: { 'opening.md': '---\ntitle: Opening\n---\nHello.\n' },
     },
   ]);
 
@@ -112,9 +112,9 @@ describe('runHyper', () => {
       `${JSON.stringify({ version: 1, id: SPACE_ID, title: 'Stored talk' }, null, 2)}\n`,
     );
     await expect(
-      readFile(join(destination, SPACE_ID, 'things', `${THING_ID}.md`), 'utf8'),
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
     ).resolves.toBe(
-      `---\nid: ${THING_ID}\ntitle: Stored thing\nkind: markdown\n---\n\nStored body.\n`,
+      `---\nid: ${RESOURCE_ID}\ntitle: Stored resource\nkind: markdown\n---\n\nStored body.\n`,
     );
   });
 
@@ -145,12 +145,12 @@ describe('runHyper', () => {
   it('replaces discovered files while preserving files outside space discovery', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const spaceDirectory = join(destination, SPACE_ID);
-    await mkdir(join(spaceDirectory, 'things', 'nested'), { recursive: true });
+    await mkdir(join(spaceDirectory, 'resources', 'nested'), { recursive: true });
     await writeFile(join(spaceDirectory, 'space.json'), '{}\n');
     await writeFile(join(spaceDirectory, 'stale-root.md'), 'stale\n');
-    await writeFile(join(spaceDirectory, 'things', 'stale.md'), 'stale\n');
+    await writeFile(join(spaceDirectory, 'resources', 'stale.md'), 'stale\n');
     await writeFile(join(spaceDirectory, 'notes.txt'), 'keep space\n');
-    await writeFile(join(spaceDirectory, 'things', 'nested', 'keep.md'), 'keep nested\n');
+    await writeFile(join(spaceDirectory, 'resources', 'nested', 'keep.md'), 'keep nested\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
 
     const exitCode = await runHyper(['export', destination], {
@@ -163,13 +163,13 @@ describe('runHyper', () => {
     await expect(access(join(spaceDirectory, 'stale-root.md'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
-    await expect(access(join(spaceDirectory, 'things', 'stale.md'))).rejects.toMatchObject({
+    await expect(access(join(spaceDirectory, 'resources', 'stale.md'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
     await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
     await expect(readFile(join(spaceDirectory, 'notes.txt'), 'utf8')).resolves.toBe('keep space\n');
     await expect(
-      readFile(join(spaceDirectory, 'things', 'nested', 'keep.md'), 'utf8'),
+      readFile(join(spaceDirectory, 'resources', 'nested', 'keep.md'), 'utf8'),
     ).resolves.toBe('keep nested\n');
   });
 
@@ -197,7 +197,7 @@ describe('runHyper', () => {
     const spaceDirectory = join(destination, SPACE_ID);
     await mkdir(spaceDirectory, { recursive: true });
     await writeFile(join(spaceDirectory, 'space.json'), 'previous space\n');
-    await writeFile(join(spaceDirectory, 'things'), 'not a directory\n');
+    await writeFile(join(spaceDirectory, 'resources'), 'not a directory\n');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -209,7 +209,7 @@ describe('runHyper', () => {
     await expect(readFile(join(spaceDirectory, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
-    await expect(readFile(join(spaceDirectory, 'things'), 'utf8')).resolves.toBe(
+    await expect(readFile(join(spaceDirectory, 'resources'), 'utf8')).resolves.toBe(
       'not a directory\n',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
@@ -229,7 +229,7 @@ describe('runHyper', () => {
           spaces: [
             storedSpace,
             {
-              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, things: [] },
+              snapshot: { id: orphan, document: { version: 1, title: 'Orphan' }, resources: [] },
               revision: 0n,
               exportedRevision: null,
             },
@@ -244,7 +244,7 @@ describe('runHyper', () => {
 
     expect(output.stdout).toEqual([]);
     expect(output.stderr).toEqual([
-      `Exported aggregate does not read back as a valid aggregate:\nSpace ${orphan} is not the Meta Space and no Space Thing points at it\n`,
+      `Exported aggregate does not read back as a valid aggregate:\nSpace ${orphan} is not the Meta Space and no Space Resource points at it\n`,
     ]);
   });
 
@@ -252,9 +252,9 @@ describe('runHyper', () => {
     const parent = await makeTemporaryDirectory();
     const external = await makeTemporaryDirectory();
     const destination = join(parent, 'exported');
-    await mkdir(join(external, SPACE_ID, 'things'), { recursive: true });
+    await mkdir(join(external, SPACE_ID, 'resources'), { recursive: true });
     await writeFile(join(external, SPACE_ID, 'space.json'), 'external space\n');
-    await writeFile(join(external, SPACE_ID, 'things', 'external.md'), 'external thing\n');
+    await writeFile(join(external, SPACE_ID, 'resources', 'external.md'), 'external resource\n');
     await symlink(external, destination);
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
@@ -270,23 +270,23 @@ describe('runHyper', () => {
     await expect(readFile(join(external, SPACE_ID, 'space.json'), 'utf8')).resolves.toBe(
       'external space\n',
     );
-    await expect(readFile(join(external, SPACE_ID, 'things', 'external.md'), 'utf8')).resolves.toBe(
-      'external thing\n',
-    );
+    await expect(
+      readFile(join(external, SPACE_ID, 'resources', 'external.md'), 'utf8'),
+    ).resolves.toBe('external resource\n');
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
   });
 
-  it('rejects a symlinked things directory without changing the destination or external things', async () => {
+  it('rejects a symlinked resources directory without changing the destination or external resources', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const spaceDirectory = join(destination, SPACE_ID);
-    const externalThings = await makeTemporaryDirectory();
+    const externalResources = await makeTemporaryDirectory();
     await mkdir(spaceDirectory, { recursive: true });
     await writeFile(join(spaceDirectory, 'space.json'), 'previous space\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
-    await writeFile(join(externalThings, 'external.md'), 'external thing\n');
-    await symlink(externalThings, join(spaceDirectory, 'things'));
+    await writeFile(join(externalResources, 'external.md'), 'external resource\n');
+    await symlink(externalResources, join(spaceDirectory, 'resources'));
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -295,29 +295,29 @@ describe('runHyper', () => {
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
-      `Export failed: Export destination contains a symbolic link: ${join(spaceDirectory, 'things')}\n`,
+      `Export failed: Export destination contains a symbolic link: ${join(spaceDirectory, 'resources')}\n`,
     ]);
-    expect((await lstat(join(spaceDirectory, 'things'))).isSymbolicLink()).toBe(true);
+    expect((await lstat(join(spaceDirectory, 'resources'))).isSymbolicLink()).toBe(true);
     await expect(readFile(join(spaceDirectory, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
     await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
-    await expect(readFile(join(externalThings, 'external.md'), 'utf8')).resolves.toBe(
-      'external thing\n',
+    await expect(readFile(join(externalResources, 'external.md'), 'utf8')).resolves.toBe(
+      'external resource\n',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
   });
 
-  it('rejects a symlinked canonical thing file without changing its external target', async () => {
+  it('rejects a symlinked canonical resource file without changing its external target', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const spaceDirectory = join(destination, SPACE_ID);
     const external = join(await makeTemporaryDirectory(), 'external.md');
-    await mkdir(join(spaceDirectory, 'things'), { recursive: true });
+    await mkdir(join(spaceDirectory, 'resources'), { recursive: true });
     await writeFile(join(spaceDirectory, 'space.json'), 'previous space\n');
-    await writeFile(external, 'external thing\n');
-    await symlink(external, join(spaceDirectory, 'things', `${THING_ID}.md`));
+    await writeFile(external, 'external resource\n');
+    await symlink(external, join(spaceDirectory, 'resources', `${RESOURCE_ID}.md`));
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -326,15 +326,15 @@ describe('runHyper', () => {
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
-      `Export failed: Export destination contains a symbolic link: ${join(spaceDirectory, 'things', `${THING_ID}.md`)}\n`,
+      `Export failed: Export destination contains a symbolic link: ${join(spaceDirectory, 'resources', `${RESOURCE_ID}.md`)}\n`,
     ]);
-    expect((await lstat(join(spaceDirectory, 'things', `${THING_ID}.md`))).isSymbolicLink()).toBe(
-      true,
-    );
+    expect(
+      (await lstat(join(spaceDirectory, 'resources', `${RESOURCE_ID}.md`))).isSymbolicLink(),
+    ).toBe(true);
     await expect(readFile(join(spaceDirectory, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
     );
-    await expect(readFile(external, 'utf8')).resolves.toBe('external thing\n');
+    await expect(readFile(external, 'utf8')).resolves.toBe('external resource\n');
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,
     });
@@ -435,35 +435,39 @@ describe('runHyper', () => {
       document: {
         version: 1,
         title: 'Canonical: talk',
-        diagrams: [
+        maps: [
           {
             id: OTHER_SPACE_ID,
-            title: 'Authored diagram',
+            title: 'Authored map',
             kind: 'positioned',
             positions: {
               [THIRD_SPACE_ID]: { x: 30, y: 40, open: false },
-              [THING_ID]: { x: 10, y: 20, open: false },
+              [RESOURCE_ID]: { x: 10, y: 20, open: false },
             },
             graphs: [
               {
                 id: GRAPH_ID,
                 title: 'Main graph',
                 color: '#123456',
-                edges: [{ from: THING_ID, to: THIRD_SPACE_ID }],
+                edges: [{ from: RESOURCE_ID, to: THIRD_SPACE_ID }],
               },
             ],
             activeGraph: GRAPH_ID,
           },
         ],
-        defaultDiagram: OTHER_SPACE_ID,
+        defaultMap: OTHER_SPACE_ID,
       },
-      things: [
+      resources: [
         {
           id: THIRD_SPACE_ID,
-          document: { title: 'Reference Thing: opening', kind: 'reference', target: THING_ID },
+          document: {
+            title: 'Reference Resource: opening',
+            kind: 'reference',
+            target: RESOURCE_ID,
+          },
         },
         {
-          id: THING_ID,
+          id: RESOURCE_ID,
           document: {
             title: 'Opening: why',
             kind: 'markdown',
@@ -486,29 +490,29 @@ describe('runHyper', () => {
 
     const exportedJson = await readFile(join(destination, SPACE_ID, 'space.json'), 'utf8');
     const positionsJson = exportedJson.slice(exportedJson.indexOf('"positions"'));
-    expect(positionsJson.indexOf(`"${THING_ID}"`)).toBeLessThan(
+    expect(positionsJson.indexOf(`"${RESOURCE_ID}"`)).toBeLessThan(
       positionsJson.indexOf(`"${THIRD_SPACE_ID}"`),
     );
     await expect(readSingleSpace(join(destination, SPACE_ID))).resolves.toEqual({
       id: snapshot.id,
       document: snapshot.document,
-      things: [...snapshot.things].reverse(),
+      resources: [...snapshot.resources].reverse(),
     });
   });
 
-  it('canonicalizes thing frontmatter independently of document key insertion order', async () => {
+  it('canonicalizes resource frontmatter independently of document key insertion order', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const reordered: LoadedSpace = {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,
-        things: [
+        resources: [
           {
-            id: THING_ID,
+            id: RESOURCE_ID,
             document: {
               kind: 'markdown',
               body: 'Stored body.\n',
-              title: 'Stored thing',
+              title: 'Stored resource',
             },
           },
         ],
@@ -524,9 +528,9 @@ describe('runHyper', () => {
     ).resolves.toBe(0);
 
     await expect(
-      readFile(join(destination, SPACE_ID, 'things', `${THING_ID}.md`), 'utf8'),
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
     ).resolves.toBe(
-      `---\nid: ${THING_ID}\ntitle: Stored thing\nkind: markdown\n---\n\nStored body.\n`,
+      `---\nid: ${RESOURCE_ID}\ntitle: Stored resource\nkind: markdown\n---\n\nStored body.\n`,
     );
   });
 
@@ -536,11 +540,11 @@ describe('runHyper', () => {
       ...storedSpace,
       snapshot: {
         ...storedSpace.snapshot,
-        things: [
+        resources: [
           {
-            id: THING_ID,
+            id: RESOURCE_ID,
             document: {
-              title: 'Stored thing',
+              title: 'Stored resource',
               kind: 'markdown',
               body: 'First\r\nSecond\rThird\n',
             },
@@ -557,12 +561,12 @@ describe('runHyper', () => {
       }),
     ).resolves.toBe(0);
 
-    const thingFile = await readFile(
-      join(destination, SPACE_ID, 'things', `${THING_ID}.md`),
+    const resourceFile = await readFile(
+      join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`),
       'utf8',
     );
-    expect(thingFile).not.toContain('\r');
-    expect(thingFile).toContain('\nFirst\nSecond\nThird\n');
+    expect(resourceFile).not.toContain('\r');
+    expect(resourceFile).toContain('\nFirst\nSecond\nThird\n');
   });
 
   it('opens the stored Meta Space without filesystem import and preserves its revision', async () => {
@@ -662,14 +666,14 @@ describe('runHyper', () => {
    */
   it('reports a re-import of the same aggregate without claiming to have written', async () => {
     // Every id is written down, because `existing` is decided by deep equality
-    // against what is stored — a Thing id minted afresh on the second run would
+    // against what is stored — a Resource id minted afresh on the second run would
     // make the two aggregates differ and take the `already-initialized` door.
     const directory = await writeAggregate(SPACE_ID, [
       {
         name: SPACE_ID,
         spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported talk' }),
-        things: {
-          [`${THING_ID}.md`]: `---\nid: ${THING_ID}\ntitle: Opening\nkind: markdown\n---\n\nHello.\n`,
+        resources: {
+          [`${RESOURCE_ID}.md`]: `---\nid: ${RESOURCE_ID}\ntitle: Opening\nkind: markdown\n---\n\nHello.\n`,
         },
       },
     ]);
@@ -768,11 +772,11 @@ describe('runHyper', () => {
       join(root, AGGREGATE_FILE_NAME),
       JSON.stringify({ version: 1, metaSpaceId: SPACE_ID }),
     );
-    const firstThingPath = join(spaceDirectory, 'first.md');
-    const secondThingPath = join(spaceDirectory, 'second.md');
+    const firstResourcePath = join(spaceDirectory, 'first.md');
+    const secondResourcePath = join(spaceDirectory, 'second.md');
     await writeFile(join(spaceDirectory, 'space.json'), '{ invalid JSON');
-    await writeFile(firstThingPath, 'Missing frontmatter.\n');
-    await writeFile(secondThingPath, 'Also missing frontmatter.\n');
+    await writeFile(firstResourcePath, 'Missing frontmatter.\n');
+    await writeFile(secondResourcePath, 'Also missing frontmatter.\n');
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 
@@ -781,25 +785,25 @@ describe('runHyper', () => {
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
     expect(output.stderr.join('')).toContain(join(spaceDirectory, 'space.json'));
-    expect(output.stderr.join('')).toContain(firstThingPath);
-    expect(output.stderr.join('')).toContain(secondThingPath);
+    expect(output.stderr.join('')).toContain(firstResourcePath);
+    expect(output.stderr.join('')).toContain(secondResourcePath);
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
   /*
-   * The fault is produced for real: a directory whose two diagrams own one graph
+   * The fault is produced for real: a directory whose two maps own one graph
    * id, read off disk, identified, and put through domain intake by a real
    * repository. That error is new to version 1 — a graph id is unique across the
-   * space although one diagram owns it (ADR 0045).
+   * space although one map owns it (ADR 0045).
    *
    * This test is where the CLI's refusal reporting was found to be throwing
    * identities away: a duplicate graph id is a whole-Space fault, so it arrives
    * as one `invalid-space-snapshot`, and printing the kind alone left an author
    * holding a directory and the word "invalid" — when the only part they can act
    * on is *which two* collided. `describeAggregateRefusal` renders the structured
-   * error instead, which is why both colliding Diagram ids are nameable below.
+   * error instead, which is why both colliding Map ids are nameable below.
    */
-  it('refuses a graph id two diagrams own, naming both of them', async () => {
+  it('refuses a graph id two maps own, naming both of them', async () => {
     const root = await writeAggregate(SPACE_ID, [
       {
         name: SPACE_ID,
@@ -807,28 +811,28 @@ describe('runHyper', () => {
           version: 1,
           id: SPACE_ID,
           title: 'Two owners',
-          diagrams: [
+          maps: [
             {
               id: OTHER_SPACE_ID,
               title: 'First owner',
               kind: 'positioned',
-              positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [
-                { id: GRAPH_ID, title: 'Shared', edges: [{ from: THING_ID, to: THING_ID }] },
+                { id: GRAPH_ID, title: 'Shared', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
               ],
             },
             {
               id: THIRD_SPACE_ID,
               title: 'Second owner',
               kind: 'positioned',
-              positions: { [THING_ID]: { x: 10, y: 10, open: false } },
+              positions: { [RESOURCE_ID]: { x: 10, y: 10, open: false } },
               graphs: [
-                { id: GRAPH_ID, title: 'Shared', edges: [{ from: THING_ID, to: THING_ID }] },
+                { id: GRAPH_ID, title: 'Shared', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
               ],
             },
           ],
         }),
-        things: { 'opening.md': `---\nid: ${THING_ID}\ntitle: Opening\n---\nHello.\n` },
+        resources: { 'opening.md': `---\nid: ${RESOURCE_ID}\ntitle: Opening\n---\nHello.\n` },
       },
     ]);
     const output = captureIo();
@@ -898,7 +902,7 @@ describe('runHyper', () => {
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
     expect(output.stderr).toEqual([
-      `Aggregate validation failed:\nSpace ${OTHER_SPACE_ID} is not the Meta Space and no Space Thing points at it\n`,
+      `Aggregate validation failed:\nSpace ${OTHER_SPACE_ID} is not the Meta Space and no Space Resource points at it\n`,
     ]);
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });

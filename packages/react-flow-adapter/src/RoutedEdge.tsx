@@ -22,20 +22,20 @@ import { laneBezier } from './edge-lanes';
  *
  * It kept a second branch until ADR 0086: a polyline along the waypoints a
  * routing strategy had placed, for a back-edge (target left of source, e.g. two
- * graphs disagreeing on the order of things they share) whose bezier leaves
+ * graphs disagreeing on the order of resources they share) whose bezier leaves
  * rightward and hooks back on itself. That branch never executed in the
  * application — no strategy in the tree ever emitted a routed section, and a
- * Diagram has nowhere to store one — so the bezier is, and always was, the only
+ * Map has nowhere to store one — so the bezier is, and always was, the only
  * edge geometry the product draws. The name stays because the edge is still the
  * one drawn along a Graph; where it attaches is settled by ADR 0087 and answered
- * below by `useEdgeAttachment`, from where the two Things are at that moment.
+ * below by `useEdgeAttachment`, from where the two Resources are at that moment.
  */
 export type RoutedEdgeData = {
   graphId: GraphId;
   /**
    * How far below (or right of) where its two anchors put it this Edge is
    * drawn, whole — above (or left) when negative — so the Edges of several
-   * Graphs joining the same two Things run as parallel lines rather than over
+   * Graphs joining the same two Resources run as parallel lines rather than over
    * each other. Zero for a lone Edge.
    */
   laneOffset: number;
@@ -65,7 +65,7 @@ export interface RoutedEdgeGeometry {
  *
  * Takes the attachment rather than the Edge's props: what the props answer is
  * where the *projected* handles were, and the side is chosen from where the two
- * Things are now (ADR 0087). The lane is the projection's, because only the
+ * Resources are now (ADR 0087). The lane is the projection's, because only the
  * projection sees every Edge that shares this one's pair.
  */
 function routedEdgeGeometry(
@@ -134,12 +134,12 @@ export function RoutedEdge(props: EdgeProps<RoutedFlowEdge>) {
 }
 
 /**
- * The rect React Flow currently holds for a Thing: where it is now, which is
+ * The rect React Flow currently holds for a Resource: where it is now, which is
  * what a drag moves and the projection does not.
  *
  * The size is read the way React Flow's own `getNodeDimensions` reads it —
- * measured first, then what the projection declared — so a Thing whose rect the
- * Diagram placed attaches correctly before anything has been measured.
+ * measured first, then what the projection declared — so a Resource whose rect the
+ * Map placed attaches correctly before anything has been measured.
  */
 const rectOf = (node: InternalNode<Node>): AnchorRect => ({
   x: node.internals.positionAbsolute.x,
@@ -149,7 +149,7 @@ const rectOf = (node: InternalNode<Node>): AnchorRect => ({
 });
 
 /**
- * Where this Edge attaches, decided from where its two Things are at this
+ * Where this Edge attaches, decided from where its two Resources are at this
  * moment (ADR 0087).
  *
  * The six coordinates React Flow hands down as props answer the same question
@@ -157,7 +157,7 @@ const rectOf = (node: InternalNode<Node>): AnchorRect => ({
  * during a drag — the render adapter splices live positions into the published
  * projection and leaves the Edges as they were. So an Edge that read its props
  * would stay attached to the side that faced its neighbour when the gesture
- * began, and cross its own Thing until the author let go.
+ * began, and cross its own Resource until the author let go.
  */
 export function useEdgeAttachment(props: EdgeProps<RoutedFlowEdge>): EdgeAttachment {
   const source = useInternalNode(props.source);
@@ -172,7 +172,7 @@ export function useEdgeAttachment(props: EdgeProps<RoutedFlowEdge>): EdgeAttachm
       targetPosition: props.targetPosition,
     };
   }
-  // A Graph may hold an Edge from a Thing to itself (ADR 0032), and the facing
+  // A Graph may hold an Edge from a Resource to itself (ADR 0032), and the facing
   // rule has nothing to say about one rect. Taken first, before the geometry.
   if (props.source === props.target) return selfEdgeAttachment(rectOf(source));
   return edgeAttachment(rectOf(source), rectOf(target));

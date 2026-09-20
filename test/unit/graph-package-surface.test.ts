@@ -10,16 +10,16 @@ import * as graphPackage from '@project/graph';
  * The rule behind the list: the unit of curation is the module, not the name. A
  * module reaches the index when something outside the package calls into it, and
  * every type that module exports is offered with it — which is why
- * `GridStrategyOptions` and `ThingFileErrorKind` are listed below
+ * `GridStrategyOptions` and `ResourceFileErrorKind` are listed below
  * with nothing importing them. Functions are named one at a time: a helper whose
  * only callers are inside the package stays in its module, behind the form
  * consumers do call.
  *
- * Two whole modules are absent by that rule. `frontmatter` is how `thing-file`
- * reads a fence, and `parseThingFile` is the intake it exists to serve.
+ * Two whole modules are absent by that rule. `frontmatter` is how `resource-file`
+ * reads a fence, and `parseResourceFile` is the intake it exists to serve.
  * `validate` runs inside `loadSpace`, which ADR 0010 makes the one intake — a
  * caller never checks references itself, so it never names the check, its input
- * or its errors. `SpaceReferenceError` is the edge: `ThingFileError` sits beside
+ * or its errors. `SpaceReferenceError` is the edge: `ResourceFileError` sits beside
  * it in the same `SpaceError` union and is offered, so what separates them is
  * the module each belongs to and not how a consumer reaches it.
  *
@@ -27,7 +27,7 @@ import * as graphPackage from '@project/graph';
  * `space.lookup`, which the Space carries, so the shallow `get*` pairs that used
  * to be listed here have no callers left to name — and `buildSpaceLookup` is
  * intake's, called by `space` and by nothing outside the package. Its
- * contextual types come with the module, which is why `ResolvedDiagram`,
+ * contextual types come with the module, which is why `ResolvedMap`,
  * `OwnedGraph` and `SpaceLookup` are listed below.
  *
  * Adding a name here is the deliberate act this guard exists to require. It is
@@ -47,25 +47,25 @@ const OFFERED_VALUES = [
   'loadSpaceSnapshot',
   'newSpace',
   'outgoingEdges',
-  'parseThingFile',
-  'parseImportThingFile',
+  'parseResourceFile',
+  'parseImportResourceFile',
   'positionedStrategy',
   'repeatedGraphEdges',
-  'resolveContentThing',
-  'graphThingIds',
-  'graphStartThing',
-  'serializeThingFile',
+  'resolveContentResource',
+  'graphResourceIds',
+  'graphStartResource',
+  'serializeResourceFile',
   'SnapshotEdit',
 ] as const;
 
 const OFFERED_TYPES = [
-  'ThingFile',
-  'ThingFileError',
-  'ThingFileErrorKind',
+  'ResourceFile',
+  'ResourceFileError',
+  'ResourceFileErrorKind',
   'GraphRenderEdge',
   'GridStrategyOptions',
   'InitializeSpaceOptions',
-  'LayoutStrategyThing',
+  'LayoutStrategyResource',
   'LayoutStrategyEdge',
   'LayoutStrategyGraph',
   'LayoutStrategy',
@@ -74,11 +74,11 @@ const OFFERED_TYPES = [
   'LoadSpaceAggregateResult',
   'LoadSpaceSnapshotResult',
   'NewSpace',
-  'ParseThingFileResult',
-  'ParseImportThingFileResult',
+  'ParseResourceFileResult',
+  'ParseImportResourceFileResult',
   'OwnedGraph',
-  'ResolvedContentThing',
-  'ResolvedDiagram',
+  'ResolvedContentResource',
+  'ResolvedMap',
   'Space',
   'SpaceAggregate',
   'SpaceAggregateError',

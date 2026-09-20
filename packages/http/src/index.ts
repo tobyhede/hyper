@@ -14,7 +14,7 @@ import {
   type HyperProblemCode,
   type ProblemError,
   type CommitRequestJson,
-  type SpaceResourceRepository,
+  type StoredSpaceRepository,
 } from '@project/persistence';
 import { parse as parseContentType } from 'content-type';
 import { Hono, type Context, type Env } from 'hono';
@@ -343,7 +343,7 @@ const applyTransportPolicy = createMiddleware(async (context, next) => {
 });
 
 export const createSpaceHttpApp = (
-  repository: SpaceResourceRepository,
+  repository: StoredSpaceRepository,
   options: SpaceHttpAppOptions = {},
 ) => {
   const logError = options.logError ?? defaultLogError;
@@ -379,7 +379,7 @@ export const createSpaceHttpApp = (
           // impossible `kind` at runtime, and there cannot be: the repo errors
           // on a `default` under an exhaustive switch, and on the equivalent
           // final `if` as an always-true comparison. Both rules say the same
-          // thing — a discriminated union is trusted at runtime here.
+          // resource — a discriminated union is trusted at runtime here.
           switch (result.kind) {
             case 'committed':
               return context.json(

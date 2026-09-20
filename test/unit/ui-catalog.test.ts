@@ -708,30 +708,30 @@ describe('hand-rolled application styles', () => {
   });
 
   /**
-   * A colocated component stylesheet is not inventory debt — `canvas-thing.css` beside
-   * `CanvasThing` is the pattern, not the exception — so the *recorded block* half does
+   * A colocated component stylesheet is not inventory debt — `canvas-resource.css` beside
+   * `CanvasResource` is the pattern, not the exception — so the *recorded block* half does
    * not apply to it. The dead-rule half does: moving a block out of `styles.css` and
    * beside its component must not be a way to stop the ratchet reading it.
    */
   it('reports a dead rule in a stylesheet colocated with its component', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/canvas-thing.css', '.canvas-thing__ghost { color: red; }');
+    write(root, 'packages/ui/src/canvas-resource.css', '.canvas-resource__ghost { color: red; }');
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/ui\/src\/canvas-thing\.css declares \.canvas-thing__ghost, which no production module names/,
+      /packages\/ui\/src\/canvas-resource\.css declares \.canvas-resource__ghost, which no production module names/,
     );
   });
 
   it('asks a colocated stylesheet for no inventory entry', () => {
     const root = fixture();
-    write(root, 'packages/ui/src/canvas-thing.css', '.canvas-thing__rail { color: red; }');
+    write(root, 'packages/ui/src/canvas-resource.css', '.canvas-resource__rail { color: red; }');
     write(
       root,
-      'packages/ui/src/CanvasThing.tsx',
-      'export const CanvasThing = () => <div className="canvas-thing__rail" />;',
+      'packages/ui/src/CanvasResource.tsx',
+      'export const CanvasResource = () => <div className="canvas-resource__rail" />;',
     );
 
-    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-thing__rail.*is not recorded/);
+    expect(() => buildUiCatalog(root)).not.toThrowError(/canvas-resource__rail.*is not recorded/);
   });
 
   it('reports a rule no production module names', () => {
@@ -855,7 +855,7 @@ describe('hand-rolled application styles', () => {
   });
 
   it.each([
-    ['[data-thing-search-combobox]', 'data-thing-search-combobox'],
+    ['[data-resource-search-combobox]', 'data-resource-search-combobox'],
     ['#root', 'root'],
     ['html,\nbody,\n#root', 'root'],
     ['*', '*'],
@@ -872,25 +872,25 @@ describe('hand-rolled application styles', () => {
 
   it('does not count a domain string that merely spells a class name', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '.thing { color: red; }');
+    write(root, 'packages/app/src/styles.css', '.resource { color: red; }');
     // React Flow's node type, an Edge drop target, a refusal code — none of these
     // is a class name, and reading every string literal made them look like one.
     write(
       root,
       'packages/app/src/App.tsx',
-      "export const App = () => ({ kind: 'thing', type: 'thing' });",
+      "export const App = () => ({ kind: 'resource', type: 'resource' });",
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }],
-        [{ block: 'thing', reason: 'React Flow thing geometry.' }],
+        [{ block: 'resource', reason: 'React Flow resource geometry.' }],
       ),
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /styles\.css declares \.thing, which no production module names/,
+      /styles\.css declares \.resource, which no production module names/,
     );
   });
 
@@ -924,7 +924,7 @@ describe('hand-rolled application styles', () => {
 
   it('does not read a class name out of a comment', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '/* .btn is gone; see .thing-pane */\n');
+    write(root, 'packages/app/src/styles.css', '/* .btn is gone; see .resource-pane */\n');
 
     expect(buildUiCatalog(root).handRolledStyles).toEqual([]);
   });
@@ -936,11 +936,11 @@ describe('story support harnesses', () => {
     write(
       root,
       'packages/app/stories/support/inventory.css',
-      '.thing-pane__panel { width: 10px; }',
+      '.resource-pane__panel { width: 10px; }',
     );
 
     expect(() => buildUiCatalog(root)).toThrowError(
-      /packages\/app\/stories\/support\/inventory\.css declares \.thing-pane__panel, which is not catalogue furniture/,
+      /packages\/app\/stories\/support\/inventory\.css declares \.resource-pane__panel, which is not catalogue furniture/,
     );
   });
 
@@ -953,30 +953,30 @@ describe('story support harnesses', () => {
 
   it('rejects a support harness that names a production class instead of rendering its owner', () => {
     const root = fixture();
-    write(root, 'packages/app/src/styles.css', '.thing-pane { inset: 0; }');
+    write(root, 'packages/app/src/styles.css', '.resource-pane { inset: 0; }');
     write(
       root,
       'packages/app/src/App.tsx',
-      'export const App = () => <div className="thing-pane" />;',
+      'export const App = () => <div className="resource-pane" />;',
     );
     write(
       root,
       'packages/app/stories/design-system-inventory.ts',
       inventory(
         [{ module: 'packages/app/src/App.tsx', reason: 'Composition root.' }],
-        [{ block: 'thing-pane', reason: 'The pane React Flow is covered by.' }],
+        [{ block: 'resource-pane', reason: 'The pane React Flow is covered by.' }],
       ),
     );
     write(
       root,
       'packages/app/stories/support/Facsimile.tsx',
-      'export const Facsimile = () => <div className="thing-pane" />;',
+      'export const Facsimile = () => <div className="resource-pane" />;',
     );
 
     // The reproduction is the whole complaint: production really does name the
     // class, so the rule is live and the harness is copying a real surface.
     expect(problemsOf(root)).toEqual([
-      'packages/app/stories/support/Facsimile.tsx names the production class thing-pane — render the production component instead of reproducing it (ADR 0052)',
+      'packages/app/stories/support/Facsimile.tsx names the production class resource-pane — render the production component instead of reproducing it (ADR 0052)',
     ]);
   });
 });

@@ -9,7 +9,7 @@ export interface SpaceDirectory {
   readonly name: string;
   /** Raw text, so a test can write a space file that does not parse. */
   readonly spaceFile: string;
-  readonly things?: Readonly<Record<string, string>>;
+  readonly resources?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -36,10 +36,10 @@ export const writeAggregateInto = async (
   );
   for (const space of spaces) {
     const directory = join(root, space.name);
-    await mkdir(join(directory, 'things'), { recursive: true });
+    await mkdir(join(directory, 'resources'), { recursive: true });
     await writeFile(join(directory, 'space.json'), space.spaceFile);
-    for (const [name, text] of Object.entries(space.things ?? {})) {
-      await writeFile(join(directory, 'things', name), text);
+    for (const [name, text] of Object.entries(space.resources ?? {})) {
+      await writeFile(join(directory, 'resources', name), text);
     }
   }
   return root;

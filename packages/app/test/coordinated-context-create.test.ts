@@ -1,16 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { coordinatedContextCreate, createdDiagramContext } from '../src/coordinated-context-create';
+import { coordinatedContextCreate, createdMapContext } from '../src/coordinated-context-create';
 import type { AuthoringResult } from '../src/space-authoring';
 
-const DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 const PERSISTENCE_UNSETTLED = 'The change could not be saved. Check the Space persistence status.';
 
 const completed: AuthoringResult = { kind: 'completed' };
-const created = { id: DIAGRAM };
+const created = { id: MAP };
 
 describe('coordinated context create', () => {
   it('answers the persistence error and does not create when waitBefore returns false', async () => {
@@ -31,7 +31,7 @@ describe('coordinated context create', () => {
   it('maps an authoring refusal into the author-facing sentence', async () => {
     let hooked = false;
     const result = await coordinatedContextCreate({
-      create: () => ({ kind: 'refused', refusal: { code: 'diagram-not-found' } }),
+      create: () => ({ kind: 'refused', refusal: { code: 'map-not-found' } }),
       createdOf: () => ({ created, active: GRAPH }),
       afterCreated: () => {
         hooked = true;
@@ -39,10 +39,10 @@ describe('coordinated context create', () => {
       },
     });
     expect(hooked).toBe(false);
-    expect(result).toBe('This Diagram is no longer part of the Space.');
+    expect(result).toBe('This Map is no longer part of the Space.');
   });
 
-  it('answers the persistence error and does not hook when the created Diagram has not persisted', async () => {
+  it('answers the persistence error and does not hook when the created Map has not persisted', async () => {
     let hooked = false;
     const result = await coordinatedContextCreate({
       create: () => completed,
@@ -92,34 +92,34 @@ describe('coordinated context create', () => {
         return 'stored selection refused';
       },
     });
-    expect(received).toEqual([{ id: DIAGRAM, active: GRAPH }]);
+    expect(received).toEqual([{ id: MAP, active: GRAPH }]);
     expect(result).toBe('stored selection refused');
   });
 });
 
-describe('created Diagram context', () => {
-  const diagram = {
-    id: DIAGRAM,
-    title: 'Diagram 1',
+describe('created Map context', () => {
+  const map = {
+    id: MAP,
+    title: 'Map 1',
     kind: 'positioned' as const,
     positions: {},
     graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
   };
 
-  it('reads the selected Diagram and its Active Graph', () => {
-    const selected = { ...diagram, activeGraph: GRAPH };
-    expect(createdDiagramContext([selected], DIAGRAM)).toEqual({
+  it('reads the selected Map and its Active Graph', () => {
+    const selected = { ...map, activeGraph: GRAPH };
+    expect(createdMapContext([selected], MAP)).toEqual({
       created: selected,
       active: GRAPH,
     });
   });
 
-  it("falls back to the Diagram's first Graph when none is Active", () => {
-    expect(createdDiagramContext([diagram], DIAGRAM)?.active).toBe(GRAPH);
+  it("falls back to the Map's first Graph when none is Active", () => {
+    expect(createdMapContext([map], MAP)?.active).toBe(GRAPH);
   });
 
-  it('answers undefined when the selected Diagram is missing', () => {
-    expect(createdDiagramContext([diagram], null)).toBeUndefined();
+  it('answers undefined when the selected Map is missing', () => {
+    expect(createdMapContext([map], null)).toBeUndefined();
   });
 });
 

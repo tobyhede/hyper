@@ -63,9 +63,9 @@ export type EntityActionOutcome = 'done' | 'failed';
  * surface was a Sheet over the shell, so a report pinned in the corner was
  * behind it and a reader on a phone never saw it. ADR 0082 retired that Sheet
  * and the Command Dock covers nothing, so the Dock's own menus pass no words
- * and report through the standing notice instead. What keeps this is the Thing
- * rail: it is a menu on the canvas, over the Things, and a reader whose eyes are
- * on the Thing they pressed is not looking at the shell's corner.
+ * and report through the standing notice instead. What keeps this is the Resource
+ * rail: it is a menu on the canvas, over the Resources, and a reader whose eyes are
+ * on the Resource they pressed is not looking at the shell's corner.
  */
 export type EntityActionReport = Readonly<Record<EntityActionOutcome, string>>;
 
@@ -119,8 +119,8 @@ export interface EntityAction {
    *
    * The rule above this interface is that an address which does not exist is
    * not offered at all — so this is deliberately narrow. Create Reference is the
-   * case it was added for: ADR 0070 forbids a Reference Thing of a Reference Thing, and a Reference Thing
-   * is otherwise a regular Thing, so withholding the row would make one Thing's
+   * case it was added for: ADR 0070 forbids a Reference Resource of a Reference Resource, and a Reference Resource
+   * is otherwise a regular Resource, so withholding the row would make one Resource's
    * menu shorter than every other's for a reason the reader cannot see. The
    * greyed row is where the product says that referencing terminates.
    *
@@ -147,7 +147,7 @@ export type EntityActionGroup = readonly EntityAction[];
  *
  * `w-80` rather than the `w-72` this started at: the leading icon column and
  * its gap take a little over 20px off the text, and at `w-72` the longest
- * destination sentence a Thing or Graph produces — "Always opens <title> on its
+ * destination sentence a Resource or Graph produces — "Always opens <title> on its
  * own, wherever it is placed" — went from two lines to three. The extra 32px
  * buys that line back and still leaves the popup inside the canvas it opens
  * over, which is the width that mattered when the menu opened against a
@@ -240,7 +240,7 @@ function useConfirmation() {
      * is called on this click exactly as before — but a command that throws
      * before it ever returns a promise now rejects instead of throwing out of a
      * React event handler, which no error boundary catches. The Sidebar's
-     * Delete Diagram is that command: it runs an Edit, and `complete` throws
+     * Delete Map is that command: it runs an Edit, and `complete` throws
      * outright for a Space that has stopped loading.
      */
     void (async () => {
@@ -253,7 +253,7 @@ function useConfirmation() {
          * outcome, and an item naming no words has nothing to show for it
          * either way. So it is recorded here as well, because the alternative
          * is what this replaced: the promise was never consumed on the
-         * wordless path, so a refused Delete Diagram became an unhandled
+         * wordless path, so a refused Delete Map became an unhandled
          * rejection and the author pressed it to no effect and no message
          * anywhere.
          */
@@ -369,7 +369,7 @@ export interface EntityActionsTriggerProps {
   /** Names the control for assistive technology — "Golden path actions". */
   readonly label: string;
   /**
-   * The control the menu hangs off. A Thing rail passes its `ThingRailAction` —
+   * The control the menu hangs off. A Resource rail passes its `ResourceRailAction` —
    * the Space Sidebar's rows passed their `SidebarMenuAction` before ADR 0082 —
    * so the trigger takes the treatment of the cluster it sits in rather than
    * importing a second one.

@@ -16,7 +16,7 @@
  * reason nor an owner is the one to be suspicious of.
  *
  * **A reason must be a property of its subject, never of this check.** One entry
- * currently breaks that rule and says so — `ThingNode.tsx` is rendered by a stable
+ * currently breaks that rule and says so — `ResourceNode.tsx` is rendered by a stable
  * story the walk cannot follow — and it is a defect with a ticket rather than an
  * entry to keep.
  *
@@ -45,29 +45,29 @@ export const uncataloguedComponents = [
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
   },
   {
-    module: 'packages/react-flow-adapter/src/ThingNode.tsx',
+    module: 'packages/react-flow-adapter/src/ResourceNode.tsx',
     reason:
-      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-thing-hover-reveals-actions-and-handles-together` mounts the real `ThingNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
+      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-resource-hover-reveals-actions-and-handles-together` mounts the real `ResourceNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
   },
   {
     module: 'packages/ui/src/Command.tsx',
     reason:
-      'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `ThingSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
+      'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `ResourceSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
     module: 'packages/ui/src/components/drawer.tsx',
     reason:
-      'Without a consumer since `.scratch/command-dock/issues/10-decide-the-cards-surface.md` restored the Things surface decision: `ThingsDrawer` was its only one, and the Things list is a `Popover` anchored to the Dock’s own trigger — which is what the prototype’s three-surface comparison chose, on the ground that a screen-edge drawer occludes the canvas edge you are dropping onto. The registry `Drawer` and `DRAWER_WIDTH` are what is left, and `AppShell`’s `insetEnd` is left standing with them. `08-retire-the-sidebar-era-primitives.md` took the Sidebar-era primitives while this one still had a consumer, so it did not take this; retiring a registry primitive is a foundation decision rather than a surface one, and `22-retire-the-registry-drawer-and-the-yielded-strip.md` is the decision of its own that owns taking the three.',
+      'Without a consumer since `.scratch/command-dock/issues/10-decide-the-cards-surface.md` restored the Resources surface decision: `ResourcesDrawer` was its only one, and the Resources list is a `Popover` anchored to the Dock’s own trigger — which is what the prototype’s three-surface comparison chose, on the ground that a screen-edge drawer occludes the canvas edge you are dropping onto. The registry `Drawer` and `DRAWER_WIDTH` are what is left, and `AppShell`’s `insetEnd` is left standing with them. `08-retire-the-sidebar-era-primitives.md` took the Sidebar-era primitives while this one still had a consumer, so it did not take this; retiring a registry primitive is a foundation decision rather than a surface one, and `22-retire-the-registry-drawer-and-the-yielded-strip.md` is the decision of its own that owns taking the three.',
   },
   {
     module: 'packages/ui/src/Dialog.tsx',
     reason:
-      'Without a consumer since ADR 0089 retired the two Thing creation panes: `ThingPane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Thing deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
+      'Without a consumer since ADR 0089 retired the two Resource creation panes: `ResourcePane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Resource deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
   },
   {
     module: 'packages/ui/src/Select.tsx',
     reason:
-      'Without a consumer since ADR 0089 retired the Space Thing creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Thing or a Space is `ThingSearchCombobox`\'s and `ChoiceMenu`\'s everywhere that remains.',
+      'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Resource or a Space is `ResourceSearchCombobox`\'s and `ChoiceMenu`\'s everywhere that remains.',
   },
   {
     module: 'packages/ui/src/components/empty.tsx',
@@ -84,14 +84,14 @@ export const uncataloguedComponents = [
  * A block earns its place by being React Flow's geometry, React Flow's
  * integration, or a placement the framework forces into the application layer.
  * Product appearance does not: it belongs beside the component that draws it,
- * hand-rolled the way `canvas-thing.css` sits beside `CanvasThing`.
+ * hand-rolled the way `canvas-resource.css` sits beside `CanvasResource`.
  *
  * A rule naming no class at all — `#root`, the `*` and `body` resets — is keyed by
  * its leading attribute or id, or failing both by its leading element name, so those
  * cannot slip past by having no class to record.
  *
- * The Thing-choice popup's theme lives in
- * `packages/ui/src/thing-search-combobox.css` beside `ThingSearchCombobox`, the
+ * The Resource-choice popup's theme lives in
+ * `packages/ui/src/resource-search-combobox.css` beside `ResourceSearchCombobox`, the
  * component it actually styles.
  */
 export const handRolledStyles = [
@@ -101,24 +101,24 @@ export const handRolledStyles = [
       "React Flow's own classes, restyled where the library's defaults do not suit the canvas. Integration styling by definition — no module here emits these names.",
   },
   {
-    block: 'thing-rail-layer',
+    block: 'resource-rail-layer',
     reason:
-      'React Flow viewport placement and pointer routing for the shared Thing rail above embedded nodes.',
+      'React Flow viewport placement and pointer routing for the shared Resource rail above embedded nodes.',
   },
   {
-    block: 'rf-thing-node',
+    block: 'rf-resource-node',
     reason:
-      "The adapter's node wrapper: thing sizing from `--thing-width`/`--thing-height` and the Expanded Thing's fill of the box the Diagram authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Thing's palette, and the one rule naming the actively presented Thing. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: resource sizing from `--resource-width`/`--resource-height` and the Expanded Resource's fill of the box the Map authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Resource's palette, and the one rule naming the actively presented Resource. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
-    block: 'thing',
+    block: 'resource',
     reason:
-      "`ThingContent`'s base appearance plus the container-query typography that scales a presented Thing with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
+      "`ResourceContent`'s base appearance plus the container-query typography that scales a presented Resource with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
   },
   {
-    block: 'canvas-thing',
+    block: 'canvas-resource',
     reason:
-      "Two rules, both adapter and application state rather than appearance: React Flow's \"this is the actively presented Thing\" fact, and the lean an embedded Thing is given while the Thing framing it is dragged — which is the application's, because only it knows which Thing frames which. `CanvasThing`'s own appearance is in `packages/ui/src/canvas-thing.css`, beside the component.",
+      "Two rules, both adapter and application state rather than appearance: React Flow's \"this is the actively presented Resource\" fact, and the lean an embedded Resource is given while the Resource framing it is dragged — which is the application's, because only it knows which Resource frames which. `CanvasResource`'s own appearance is in `packages/ui/src/canvas-resource.css`, beside the component.",
   },
   {
     block: 'graph-area',
@@ -141,9 +141,9 @@ export const handRolledStyles = [
       'The base font stack and the page background and foreground colours, set once on the document. Not a component and not stylable from one — the `html, body, #root` sizing that gives the app its one viewport is recorded as `root` above.',
   },
   {
-    block: 'new-thing-preview',
+    block: 'new-resource-preview',
     reason:
-      'Placement and opacity for the ghost Thing drawn over the canvas mid-drag. What it draws is a real `CanvasThing`; this is only where it sits.',
+      'Placement and opacity for the ghost Resource drawn over the canvas mid-drag. What it draws is a real `CanvasResource`; this is only where it sits.',
   },
   {
     block: 'edge-control-layer',

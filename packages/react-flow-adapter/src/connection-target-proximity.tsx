@@ -23,7 +23,7 @@ export function connectionTargetProximity(
 
 /**
  * Node ids whose seeking-end handles may be revealed for the live connection
- * pointer — computed once per store update rather than once per Thing.
+ * pointer — computed once per store update rather than once per Resource.
  *
  * Absent (null) means no provider: seeking reveal stays off. Production always
  * provides through Edge Authoring's `provide`; unit tests mock
@@ -43,8 +43,8 @@ function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean
 }
 
 /**
- * One React Flow store subscription that answers which Things are within the
- * product proximity magnet. `ThingNode` reads membership; it does not subscribe.
+ * One React Flow store subscription that answers which Resources are within the
+ * product proximity magnet. `ResourceNode` reads membership; it does not subscribe.
  */
 export function ConnectionTargetProximityProvider({ children }: { readonly children: ReactNode }) {
   const retained = useRef(EMPTY_NEAR);
@@ -56,7 +56,7 @@ export function ConnectionTargetProximityProvider({ children }: { readonly child
       }
       // `connection.pointer` is container coordinates (see XYHandle's
       // `getEventPosition`); node `positionAbsolute` is flow coordinates. Convert
-      // before measuring AABB distance or every Thing looks far away.
+      // before measuring AABB distance or every Resource looks far away.
       const pointer = connectionPointerInFlow(connection.pointer, state.transform);
       const next = new Set<string>();
       for (const [id, node] of state.nodeLookup) {
@@ -86,7 +86,7 @@ export function ConnectionTargetProximityProvider({ children }: { readonly child
   );
 }
 
-/** Whether the live connection pointer is within the product proximity of this Thing. */
+/** Whether the live connection pointer is within the product proximity of this Resource. */
 export function useConnectionTargetProximity(nodeId: string): boolean {
   const nearIds = useContext(ConnectionTargetNearIdsContext);
   return nearIds?.has(nodeId) ?? false;

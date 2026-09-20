@@ -18,9 +18,9 @@ import { migrateSqliteFile } from '../support/sqlite-harness';
 const META_SPACE_ID = uuidSchema.parse('e1111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('e2222222-2222-4222-8222-222222222222');
 const OTHER_META_SPACE_ID = uuidSchema.parse('e3333333-3333-4333-8333-333333333333');
-const THING_ID = uuidSchema.parse('e4444444-4444-4444-8444-444444444444');
-const LINK_THING_ID = uuidSchema.parse('e5555555-5555-4555-8555-555555555555');
-const DIAGRAM_ID = uuidSchema.parse('e6666666-6666-4666-8666-666666666666');
+const RESOURCE_ID = uuidSchema.parse('e4444444-4444-4444-8444-444444444444');
+const LINK_RESOURCE_ID = uuidSchema.parse('e5555555-5555-4555-8555-555555555555');
+const MAP_ID = uuidSchema.parse('e6666666-6666-4666-8666-666666666666');
 const GRAPH_ID = uuidSchema.parse('e7777777-7777-4777-8777-777777777777');
 
 const targetSpace: SpaceSnapshot = {
@@ -28,36 +28,36 @@ const targetSpace: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Target',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: GRAPH_ID,
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [],
+  resources: [],
 };
 
 const metaSpace: SpaceSnapshot = {
   id: META_SPACE_ID,
   document: { version: 1, title: 'Meta' },
-  things: [
+  resources: [
     {
-      id: THING_ID,
+      id: RESOURCE_ID,
       document: { title: 'Opening', kind: 'markdown', body: 'Durable SQLite body.\n' },
     },
     {
-      id: LINK_THING_ID,
+      id: LINK_RESOURCE_ID,
       document: {
         title: 'To the target',
         kind: 'space',
         spaceId: TARGET_SPACE_ID,
-        diagram: DIAGRAM_ID,
+        map: MAP_ID,
         graph: GRAPH_ID,
       },
     },
@@ -67,7 +67,7 @@ const metaSpace: SpaceSnapshot = {
 const otherMeta: SpaceSnapshot = {
   id: OTHER_META_SPACE_ID,
   document: { version: 1, title: 'Other Meta' },
-  things: [],
+  resources: [],
 };
 
 describe('hyper:sqlite CLI', () => {

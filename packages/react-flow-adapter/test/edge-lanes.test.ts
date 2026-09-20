@@ -21,7 +21,8 @@ describe('graphLanes', () => {
     source,
     target,
   });
-  const offsets = (lanes: Map<string, GraphLane>) => [...lanes.values()].map((l) => l.offset);
+  const offsets = (lanes: ReadonlyMap<string, GraphLane>) =>
+    [...lanes.values()].map((l) => l.offset);
 
   it('leaves a lone Edge on the centre line', () => {
     expect(graphLanes([edge(RED!, 'a', 'b')], null)).toEqual(
@@ -207,7 +208,7 @@ describe('laneBezier', () => {
     expect([x2, y2]).toEqual([self.targetX - GRAPH_LANE_SPACING, self.targetY]);
   });
 
-  it('draws a short Edge forwards between Things close together', () => {
+  it('draws a short Edge forwards between Resources close together', () => {
     const close: EdgeAttachment = { ...level, sourceX: 100, targetX: 112 };
     const [x1, , , , , , x2] = numbers(
       laneBezier(close, GRAPH_LANE_SPACING, DETACHED_END_TRIM).path,

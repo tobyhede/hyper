@@ -1,96 +1,99 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
-import type { SpaceThingRefusal, SpaceThingTargetUnavailableReason } from './space-thing-lifecycle';
+import type {
+  SpaceEndpointRefusal,
+  SpaceEndpointTargetUnavailableReason,
+} from './space-resource-lifecycle';
 import { failureMessage } from './failure-message';
 
 /**
- * Why a coordinated Space Thing lifecycle operation refused (ADR 0076).
+ * Why a coordinated Space Resource lifecycle operation refused (ADR 0076).
  *
  * Named by the lifecycle now rather than extracted from one of its results: the
  * three operations no longer share a result type, and a union reachable through
  * `create` alone would be a second reading of a refusal `delete` can also make.
  */
-export type { SpaceThingRefusal };
+export type { SpaceEndpointRefusal };
 
 type PresentedAuthoringRefusal =
   AuthoringRefusal | { readonly code: 'placement-failed'; readonly error: Error };
 
 /**
- * The one sentence for a Diagram the Space no longer holds.
+ * The one sentence for a Map the Space no longer holds.
  *
  * Both switches in this module answer that fact — an ordinary Authoring
- * refusal and a coordinated Space Thing one — and a Diagram that has gone means
+ * refusal and a coordinated Space Resource one — and a Map that has gone means
  * the same message either way. It is written here rather than in each arm for
- * the reason the Space Thing translation below states for aggregate refusals:
+ * the reason the Space Resource translation below states for aggregate refusals:
  * the two can reach the author on the same screen, so one of them reading
  * differently would be a difference nothing could explain.
  */
-const DIAGRAM_NO_LONGER_IN_SPACE = 'This Diagram is no longer part of the Space.';
+const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
   switch (refusal.code) {
     case 'placement-failed':
-      return `This view could not place its Things: ${refusal.error.message}`;
-    case 'diagram-not-found':
-      return DIAGRAM_NO_LONGER_IN_SPACE;
-    case 'diagram-required':
-      if (refusal.operation === 'added-thing-to-diagram')
-        return 'Select a Diagram to add an existing Thing to it.';
-      if (refusal.operation === 'removed-thing-from-diagram')
-        return 'Select a Diagram to remove a Thing from it.';
+      return `This view could not place its Resources: ${refusal.error.message}`;
+    case 'map-not-found':
+      return MAP_NO_LONGER_IN_SPACE;
+    case 'map-required':
+      if (refusal.operation === 'added-resource-to-map')
+        return 'Select a Map to add an existing Resource to it.';
+      if (refusal.operation === 'removed-resource-from-map')
+        return 'Select a Map to remove a Resource from it.';
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
         refusal.operation === 'deleted-graph'
       )
-        return 'Select a Diagram to manage its Graphs.';
-      return 'Select a Diagram to edit its Edges.';
-    case 'thing-not-found':
-      return 'This Thing is no longer part of the Space.';
-    case 'thing-kind-immutable':
-      return 'A Thing keeps the kind it was created with.';
+        return 'Select a Map to manage its Graphs.';
+      return 'Select a Map to edit its Edges.';
+    case 'resource-not-found':
+      return 'This Resource is no longer part of the Space.';
+    case 'resource-kind-immutable':
+      return 'A Resource keeps the kind it was created with.';
     case 'reference-target-immutable':
-      return 'A Reference Thing keeps the Target it was created with.';
-    case 'space-thing-target-immutable':
-      return 'A Space Thing keeps the target Space it was created with.';
-    case 'space-thing-deletion-unsupported':
-      return 'Deleting this Space Thing requires a coordinated multi-Space Edit, which this control cannot perform.';
-    case 'thing-title-required':
-      return 'A Thing title is required.';
-    case 'diagram-title-required':
-      return 'A Diagram title is required.';
+      return 'A Reference Resource keeps the Target it was created with.';
+    case 'space-resource-target-immutable':
+      return 'A Space Resource keeps the target Space it was created with.';
+    case 'space-resource-deletion-unsupported':
+      return 'Deleting this Space Resource requires a coordinated multi-Space Edit, which this control cannot perform.';
+    case 'resource-title-required':
+      return 'A Resource title is required.';
+    case 'map-title-required':
+      return 'A Map title is required.';
     case 'space-title-required':
       return 'A Space title is required.';
-    case 'space-must-keep-diagram':
-      return 'A Space keeps at least one Diagram.';
+    case 'space-must-keep-map':
+      return 'A Space keeps at least one Map.';
     case 'reference-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'reference-target-must-own-content':
-      return 'A Reference Thing cannot target another Reference Thing.';
-    case 'thing-already-in-diagram':
-      return 'This Thing is already in this Diagram.';
-    case 'thing-not-in-diagram':
-      return 'This Thing is not in this Diagram.';
-    case 'thing-not-expanded':
-      return 'Open this Thing before resizing it.';
-    case 'thing-has-references':
-      return `Delete the Reference Things of this Thing first: ${refusal.referenceTitles.join(', ')}.`;
+      return 'A Reference Resource cannot target another Reference Resource.';
+    case 'resource-already-in-map':
+      return 'This Resource is already in this Map.';
+    case 'resource-not-in-map':
+      return 'This Resource is not in this Map.';
+    case 'resource-not-expanded':
+      return 'Open this Resource before resizing it.';
+    case 'resource-has-references':
+      return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
-    case 'diagram-must-keep-graph':
-      return 'A Diagram keeps at least one Graph.';
+    case 'map-must-keep-graph':
+      return 'A Map keeps at least one Graph.';
     case 'graph-not-owned':
-      return 'That Graph is not one this Diagram owns.';
+      return 'That Graph is not one this Map owns.';
     case 'edge-not-found':
       return 'That Edge is no longer in this Graph.';
-    case 'edge-thing-outside-diagram':
-      return 'An Edge can only join Things in this Diagram.';
+    case 'edge-resource-outside-map':
+      return 'An Edge can only join Resources in this Map.';
     case 'edge-already-exists':
-      return 'These Things are already connected in this Graph.';
-    case 'diagram-active-graph-required':
-      return 'This Diagram has no active Graph for the connection to join.';
+      return 'These Resources are already connected in this Graph.';
+    case 'map-active-graph-required':
+      return 'This Map has no active Graph for the connection to join.';
   }
 };
 
@@ -102,43 +105,43 @@ type AuthoringRefusalErrors<Field extends string> = {
 };
 
 /**
- * Whether choosing another Thing would answer this refusal.
+ * Whether choosing another Resource would answer this refusal.
  *
  * A picker refusal is *correctable* exactly when it is about the choice: the
- * Thing lies outside this Diagram, or the Edge it would produce is one the Graph
- * already holds. Everything else — a placement still resolving, a Diagram or
+ * Resource lies outside this Map, or the Edge it would produce is one the Graph
+ * already holds. Everything else — a placement still resolving, a Map or
  * Graph the Space no longer holds, an Edge that has gone — describes the
  * subject rather than the choice, and no row in either list would fix it.
  *
- * Endpoint editing names two Things and cannot correct a stale subject. The
+ * Endpoint editing names two Resources and cannot correct a stale subject. The
  * record is exhaustive over the codes rather than a list of the two that are
  * true, so a new refusal has to be decided here before it will compile.
  */
-const correctableByThingChoice = {
-  'diagram-not-found': false,
-  'diagram-required': false,
-  'thing-not-found': false,
-  'thing-kind-immutable': false,
+const correctableByResourceChoice = {
+  'map-not-found': false,
+  'map-required': false,
+  'resource-not-found': false,
+  'resource-kind-immutable': false,
   'reference-target-immutable': false,
-  'space-thing-target-immutable': false,
-  'space-thing-deletion-unsupported': false,
-  'thing-title-required': false,
-  'diagram-title-required': false,
+  'space-resource-target-immutable': false,
+  'space-resource-deletion-unsupported': false,
+  'resource-title-required': false,
+  'map-title-required': false,
   'space-title-required': false,
-  'space-must-keep-diagram': false,
+  'space-must-keep-map': false,
   'reference-target-not-found': false,
   'reference-target-must-own-content': false,
-  'thing-already-in-diagram': false,
-  'thing-not-in-diagram': false,
-  'thing-not-expanded': false,
-  'thing-has-references': false,
+  'resource-already-in-map': false,
+  'resource-not-in-map': false,
+  'resource-not-expanded': false,
+  'resource-has-references': false,
   'graph-title-required': false,
-  'diagram-must-keep-graph': false,
+  'map-must-keep-graph': false,
   'graph-not-owned': false,
   'edge-not-found': false,
-  'edge-thing-outside-diagram': true,
+  'edge-resource-outside-map': true,
   'edge-already-exists': true,
-  'diagram-active-graph-required': false,
+  'map-active-graph-required': false,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
 
 export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
@@ -164,14 +167,14 @@ const formChannel = <Field extends string>(
  * Error placement for endpoint editing, which owns From and To.
  *
  * **Only the endpoint the author attempted is marked invalid.** The other one
- * names a Thing the Edit never questioned, and marking it would ask for a
+ * names a Resource the Edit never questioned, and marking it would ask for a
  * correction to a value nothing refused.
  */
 export const presentEdgeEndpointRefusal = (
   refusal: AuthoringRefusal,
   endpoint: EdgeEndpoint,
 ): EdgeEndpointRefusalErrors =>
-  correctableByThingChoice[refusal.code]
+  correctableByResourceChoice[refusal.code]
     ? { fields: { [endpoint]: describeAuthoringRefusal(refusal) } }
     : formChannel(refusal);
 
@@ -181,7 +184,7 @@ export const presentEdgeEndpointRefusal = (
  * Total by construction rather than by an exhaustive record: a surface with no
  * field has nowhere else for a code to go, so a second twenty-two-line table
  * saying `form` twenty-two times would be a burden to keep in step and never a
- * thing to decide.
+ * resource to decide.
  */
 export const presentEdgeDeletionRefusal = (
   refusal: AuthoringRefusal,
@@ -195,7 +198,7 @@ export const presentEdgeDeletionRefusal = (
  * repository's.
  *
  * A refusal kind is a stable domain identity (ADR 0057), which is exactly why
- * it is the wrong thing to show: `space-thing-target-missing` names the fact for
+ * it is the wrong resource to show: `space-resource-target-missing` names the fact for
  * a caller matching on it, and says nothing to the person who has just been
  * told their work would not save. The identity stays on the wire; only this
  * translation is user-facing.
@@ -206,21 +209,21 @@ export const presentEdgeDeletionRefusal = (
  *
  * It lives here rather than beside the persistence dialog that first needed it
  * because a coordinated Edit is refused in two places now — as a rejected
- * commit, and as a Space Thing lifecycle operation that never got to commit at
+ * commit, and as a Space Resource lifecycle operation that never got to commit at
  * all — and one refusal reading differently in the two would be a difference
  * the author could see and nothing could explain.
  */
 const AGGREGATE_REFUSAL_REASONS = {
   'invalid-space-snapshot': 'A space in this edit is not valid.',
   'duplicate-space-id': 'Two spaces in this edit share one identity.',
-  'duplicate-thing-id': 'Two spaces in this edit claim the same thing.',
+  'duplicate-resource-id': 'Two spaces in this edit claim the same resource.',
   'meta-space-missing': 'The repository’s Meta Space is missing.',
-  'space-thing-target-missing': 'A space thing points at a space that no longer exists.',
-  'space-thing-reference-cycle': 'A space thing would make a space contain itself.',
+  'space-resource-target-missing': 'A space resource points at a space that no longer exists.',
+  'space-resource-reference-cycle': 'A space resource would make a space contain itself.',
   'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
-  'space-thing-diagram-missing': 'A space thing points at a Diagram that no longer exists.',
-  'space-thing-graph-missing': 'A space thing points at a Graph that no longer exists.',
-  'space-thing-graph-outside-diagram': 'A space thing names a Graph that its Diagram does not own.',
+  'space-resource-map-missing': 'A space resource points at a Map that no longer exists.',
+  'space-resource-graph-missing': 'A space resource points at a Graph that no longer exists.',
+  'space-resource-graph-outside-map': 'A space resource names a Graph that its Map does not own.',
   // `satisfies` rather than an annotation: it still fails the moment a refusal
   // kind is added without a sentence, and it keeps each value's literal type
   // instead of widening the map to an open dictionary.
@@ -252,11 +255,11 @@ const STORED_SPACE_REFS_RECITED = 3;
 
 /**
  * What the application can name about one intake error: the id that failed to
- * resolve, the thing file that would not parse, or nothing.
+ * resolve, the resource file that would not parse, or nothing.
  *
  * Never `error.message`. Intake writes those for a CLI and a log, in
  * `@project/graph`'s vocabulary, and a sentence the application did not write
- * is the thing ADR 0057 exists to keep off the screen. A shape or version
+ * is the outcome ADR 0057 exists to keep off the screen. A shape or version
  * error names nothing here because there is nothing in it to name — the
  * document as a whole is what failed.
  *
@@ -297,7 +300,7 @@ export const describeStoredSpaceRefusal = (refusal: StoredSpaceRefusal): string 
 
 /**
  * What accepting the stored side of a conflict would do, which is not one
- * thing.
+ * resource.
  *
  * `reload` is the ordinary case: the repository answered with a newer Space.
  * `revert` is a participant the conflict never named — the coordinated edit did
@@ -315,9 +318,9 @@ export type ConflictRecovery = 'reload' | 'revert' | 'none';
 
 const CONFLICT_DESCRIPTIONS = {
   reload:
-    'A newer version of this space is available. Reload discards your local changes, including unsaved text you have typed into an open Thing. Keep local and retry preserves that editing and tries to save it again.',
+    'A newer version of this space is available. Reload discards your local changes, including unsaved text you have typed into an open Resource. Keep local and retry preserves that editing and tries to save it again.',
   revert:
-    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit and discards unsaved text typed into an open Thing. Keep local and retry preserves that editing and tries to save it again.',
+    'A related space changed while this coordinated edit was saving. Reload returns this space to how it was before the edit and discards unsaved text typed into an open Resource. Keep local and retry preserves that editing and tries to save it again.',
   none: 'There is no stored version of this space. Keep your local version to restore it.',
 } satisfies Record<ConflictRecovery, string>;
 
@@ -364,11 +367,11 @@ const PERSISTENCE_FAILURE_REASONS = {
     'Changes were sent faster than the server accepts. Wait a moment before retrying.',
   'invalid-commit': 'These changes are not in a form the server can store.',
   forbidden: 'You do not have permission to save this space.',
-  // The limit is on the whole change, not one Thing: a Space can exceed it on
-  // Thing count with nothing long in it. And the rejection dialog offers only
+  // The limit is on the whole change, not one Resource: a Space can exceed it on
+  // Resource count with nothing long in it. And the rejection dialog offers only
   // Continue editing, so this names no retry.
   'payload-too-large':
-    'This space is larger than the server accepts in one save. Shortening its longest things is what brings it under the limit.',
+    'This space is larger than the server accepts in one save. Shortening its longest resources is what brings it under the limit.',
   protocol: 'The application and the server disagree about how changes are saved.',
   // `satisfies` for the reason the aggregate table above gives: it still fails
   // the moment a code is added without a sentence, without widening the map.
@@ -379,11 +382,11 @@ export const describePersistenceFailure = (failure: PersistenceFailure): string 
   PERSISTENCE_FAILURE_REASONS[failure.code];
 
 /**
- * Why the Space a new Space Thing was pointed at could not supply a selection.
+ * Why the Space a new Space Resource was pointed at could not supply a selection.
  *
  * `not-initialized` is the one that ends in advice, because it is the one a
  * second attempt can answer: the Space is there and readable and the commit
- * that would have given it a Diagram simply did not land. The other two are
+ * that would have given it a Map simply did not land. The other two are
  * permanent for that target, so their sentences stop at what happened and leave
  * the Target field beside them to say what to do instead.
  *
@@ -395,15 +398,15 @@ const TARGET_UNAVAILABLE_REASONS = {
   unreadable: 'That Space could not be read, so nothing was created.',
   'not-initialized':
     'That Space could not be prepared to be shown here, so nothing was created. Try again.',
-} satisfies Record<SpaceThingTargetUnavailableReason, string>;
+} satisfies Record<SpaceEndpointTargetUnavailableReason, string>;
 
-/** Why a coordinated Space Thing operation refused, in the author's terms. */
-export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string => {
+/** Why a coordinated Space Resource operation refused, in the author's terms. */
+export const describeSpaceEndpointRefusal = (refusal: SpaceEndpointRefusal): string => {
   switch (refusal.code) {
-    case 'diagram-not-found':
-      return DIAGRAM_NO_LONGER_IN_SPACE;
-    case 'space-thing-not-found':
-      return 'This Space Thing is no longer part of the Space.';
+    case 'map-not-found':
+      return MAP_NO_LONGER_IN_SPACE;
+    case 'space-resource-not-found':
+      return 'This Space Resource is no longer part of the Space.';
     case 'persistence-recovery-required':
       return refusal.recovery === 'retry'
         ? 'A Space in this edit has not saved. Retry that save first.'
@@ -412,48 +415,48 @@ export const describeSpaceThingRefusal = (refusal: SpaceThingRefusal): string =>
       return describeAggregateRefusal(refusal.errors);
     case 'persistence-read-failed':
       return 'The stored Spaces could not be read, so this edit was not attempted.';
-    case 'space-thing-target-unavailable':
+    case 'space-resource-target-unavailable':
       return TARGET_UNAVAILABLE_REASONS[refusal.reason];
-    // Same wording Authoring's own `deleted-thing` refuses a Markdown or
-    // Reference Thing's Reference Things with (ADR 0070) — one sentence for
+    // Same wording Authoring's own `deleted-resource` refuses a Markdown or
+    // Reference Resource's Reference Resources with (ADR 0070) — one sentence for
     // one meaning, whichever seam the deletion reached it through.
-    case 'thing-has-references':
-      return `Delete the Reference Things of this Thing first: ${refusal.referenceTitles.join(', ')}.`;
+    case 'resource-has-references':
+      return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
   }
 };
 
 /**
- * What a rejected Space Thing placement says, where a refusal would have been.
+ * What a rejected Space Resource placement says, where a refusal would have been.
  *
- * The Things list places a Space by spending a coordinated Edit across Spaces,
- * and neither the Diagram it resolves first nor the transport under it is a
+ * The Resources list places a Space by spending a coordinated Edit across Spaces,
+ * and neither the Map it resolves first nor the transport under it is a
  * refusal channel: both *reject*. A rejection is not a refusal: the lifecycle
  * refuses for everything it can name, so reaching here means an invariant broke
  * and there is no field to correct. The reader pressed a row and is owed a
  * sentence either way, and every surface that can show one now draws a single
  * string — the panes that placed fielded errors are gone (ADR 0089).
  *
- * Here rather than on the surface, because a Space Thing's prose is written in
+ * Here rather than on the surface, because a Space Resource's prose is written in
  * this module or nowhere. The rejection is `unknown` because a `throw` can carry
  * anything, and that is the caught-error boundary the parsing rules exempt —
  * named at the type rather than at a parameter, which is what lets a rejection
  * arm take it without writing the annotation those rules reserve for an I/O
  * boundary.
  */
-export type SpaceThingBreak = (failure: unknown) => string;
+export type SpaceEndpointBreak = (failure: unknown) => string;
 
-/** @see SpaceThingBreak */
-export const describeSpaceThingBreak: SpaceThingBreak = (failure) =>
-  `This Space Thing was not added: ${failureMessage(failure)}`;
+/** @see SpaceEndpointBreak */
+export const describeSpaceEndpointBreak: SpaceEndpointBreak = (failure) =>
+  `This Space Resource was not added: ${failureMessage(failure)}`;
 
 /**
  * The same rejection, said by the command that *makes* a Space.
  *
  * Two sentences rather than one generic, because the two gestures are not the
- * same act (ADR 0089): the Things list points a Thing at a Space that already
- * exists, and Create Space Thing mints one. A reader who pressed the Dock's
- * glyph and is told a Thing "was not added" has to work out what was supposed
+ * same act (ADR 0089): the Resources list points a Resource at a Space that already
+ * exists, and Create Space Resource mints one. A reader who pressed the Dock's
+ * glyph and is told a Resource "was not added" has to work out what was supposed
  * to have been added to what.
  */
-export const describeSpaceThingCreationBreak: SpaceThingBreak = (failure) =>
-  `This Thing was not created: ${failureMessage(failure)}`;
+export const describeSpaceEndpointCreationBreak: SpaceEndpointBreak = (failure) =>
+  `This Resource was not created: ${failureMessage(failure)}`;

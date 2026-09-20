@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  *
  * React Flow is mocked rather than mounted. What is under test is which commands
  * the effects issue; mounting a real flow would supply a real d3 transition, and
- * a real d3 transition is the thing whose settlement cannot be relied on.
+ * a real d3 transition is the resource whose settlement cannot be relied on.
  */
 
 const flow = vi.hoisted(() => ({
@@ -42,8 +42,8 @@ vi.mock('@xyflow/react', () => ({
 const { OverviewCamera, PresentingCamera, OpeningFramingCamera } =
   await import('../src/components/cameras');
 
-const THING = { id: 'a', position: { x: 0, y: 0 }, width: 200, height: 100 };
-const OTHER_THING = { id: 'b', position: { x: 600, y: 0 }, width: 200, height: 100 };
+const RESOURCE = { id: 'a', position: { x: 0, y: 0 }, width: 200, height: 100 };
+const OTHER_RESOURCE = { id: 'b', position: { x: 600, y: 0 }, width: 200, height: 100 };
 
 const fits = () => flow.fitView.mock.calls;
 
@@ -52,16 +52,16 @@ beforeEach(() => {
   flow.setViewport.mockClear();
   flow.viewport = { width: 1000, height: 800 };
   flow.getNode.mockImplementation((id: string) =>
-    id === THING.id ? THING : id === OTHER_THING.id ? OTHER_THING : undefined,
+    id === RESOURCE.id ? RESOURCE : id === OTHER_RESOURCE.id ? OTHER_RESOURCE : undefined,
   );
 });
 
 describe('the presenting camera', () => {
-  it('frames the active Thing in one move', () => {
-    render(<PresentingCamera activeThingId={THING.id} />);
+  it('frames the active Resource in one move', () => {
+    render(<PresentingCamera activeResourceId={RESOURCE.id} />);
 
     expect(fits()).toHaveLength(1);
-    expect(fits()[0]?.[0].nodes).toEqual([{ id: THING.id }]);
+    expect(fits()[0]?.[0].nodes).toEqual([{ id: RESOURCE.id }]);
     expect(fits()[0]?.[0].duration).toBeGreaterThan(0);
   });
 
@@ -73,19 +73,19 @@ describe('the presenting camera', () => {
    * proves.
    */
   it('issues the next arrival without waiting for the last to settle', () => {
-    const view = render(<PresentingCamera activeThingId={THING.id} />);
+    const view = render(<PresentingCamera activeResourceId={RESOURCE.id} />);
 
-    view.rerender(<PresentingCamera activeThingId={OTHER_THING.id} />);
+    view.rerender(<PresentingCamera activeResourceId={OTHER_RESOURCE.id} />);
 
     expect(fits()).toHaveLength(2);
-    expect(fits()[1]?.[0].nodes).toEqual([{ id: OTHER_THING.id }]);
+    expect(fits()[1]?.[0].nodes).toEqual([{ id: OTHER_RESOURCE.id }]);
   });
 
-  it('re-frames the same Thing when the viewport is resized', () => {
-    const view = render(<PresentingCamera activeThingId={THING.id} />);
+  it('re-frames the same Resource when the viewport is resized', () => {
+    const view = render(<PresentingCamera activeResourceId={RESOURCE.id} />);
 
     flow.viewport = { width: 500, height: 400 };
-    view.rerender(<PresentingCamera activeThingId={THING.id} />);
+    view.rerender(<PresentingCamera activeResourceId={RESOURCE.id} />);
 
     expect(fits()).toHaveLength(2);
   });
@@ -96,8 +96,8 @@ describe('the presenting camera', () => {
    * guards exist to keep the camera away from that.
    */
   it.each([
-    ['no Thing is active', { activeThingId: null }],
-    ['the active Thing is not on the canvas yet', { activeThingId: 'missing' }],
+    ['no Resource is active', { activeResourceId: null }],
+    ['the active Resource is not on the canvas yet', { activeResourceId: 'missing' }],
   ])('does not move the camera when %s', (_name, props) => {
     render(<PresentingCamera {...props} />);
 
@@ -107,7 +107,7 @@ describe('the presenting camera', () => {
   it('does not move the camera before the container has been measured', () => {
     flow.viewport = { width: 0, height: 0 };
 
-    render(<PresentingCamera activeThingId={THING.id} />);
+    render(<PresentingCamera activeResourceId={RESOURCE.id} />);
 
     expect(fits()).toHaveLength(0);
   });

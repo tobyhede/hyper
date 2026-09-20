@@ -138,10 +138,10 @@ const rejectSymbolicLinks = async (
     aggregate.spaces.map(async ({ snapshot }) => {
       const spaceDirectory = join(destination, snapshot.id);
       await rejectSymbolicLink(spaceDirectory);
-      await rejectSymbolicLink(join(spaceDirectory, 'things'));
+      await rejectSymbolicLink(join(spaceDirectory, 'resources'));
       await Promise.all(
-        snapshot.things.map(({ id }) =>
-          rejectSymbolicLink(join(spaceDirectory, 'things', `${id}.md`)),
+        snapshot.resources.map(({ id }) =>
+          rejectSymbolicLink(join(spaceDirectory, 'resources', `${id}.md`)),
         ),
       );
     }),

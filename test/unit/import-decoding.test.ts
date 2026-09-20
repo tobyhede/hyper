@@ -1,7 +1,7 @@
 import {
-  referenceThingFrontmatterSchema,
+  referenceResourceFrontmatterSchema,
   importSpaceSchema,
-  markdownThingFrontmatterSchema,
+  markdownResourceFrontmatterSchema,
   spaceSnapshotSchema,
   uuidSchema,
   type ImportSpace,
@@ -46,9 +46,9 @@ import {
  */
 describe('import decoding', () => {
   const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
-  const THING_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
-  const SECOND_THING_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-  const DIAGRAM_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+  const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+  const SECOND_RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
+  const MAP_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
   const GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
   /**
@@ -95,9 +95,9 @@ describe('import decoding', () => {
    * counts.
    *
    * **Every fault is a title the schema refuses**, because `identifySpace` takes
-   * an `ImportSpace` rather than unproven input: it walks the diagrams and the
-   * things to mint what they left out *before* it parses, so a wrong-typed
-   * `diagrams` never reaches the summariser at all — it throws a `TypeError` on
+   * an `ImportSpace` rather than unproven input: it walks the maps and the
+   * resources to mint what they left out *before* it parses, so a wrong-typed
+   * `maps` never reaches the summariser at all — it throws a `TypeError` on
    * the way. A blank title is a fault the type permits and the schema names, at
    * five nested paths, which is what lets the counts be built without handing
    * the door something its contract says it cannot be handed. Variety in the
@@ -110,20 +110,23 @@ describe('import decoding', () => {
       document: {
         version: 1,
         title: title(1, 'Space'),
-        diagrams: [
+        maps: [
           {
-            id: DIAGRAM_ID,
-            title: title(2, 'Diagram 1'),
+            id: MAP_ID,
+            title: title(2, 'Map 1'),
             kind: 'positioned',
-            positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: GRAPH_ID, title: title(3, 'Graph 1'), edges: [] }],
             activeGraph: GRAPH_ID,
           },
         ],
       },
-      things: [
-        { id: THING_ID, document: { title: title(4, 'One'), kind: 'markdown', body: '' } },
-        { id: SECOND_THING_ID, document: { title: title(5, 'Two'), kind: 'markdown', body: '' } },
+      resources: [
+        { id: RESOURCE_ID, document: { title: title(4, 'One'), kind: 'markdown', body: '' } },
+        {
+          id: SECOND_RESOURCE_ID,
+          document: { title: title(5, 'Two'), kind: 'markdown', body: '' },
+        },
       ],
     };
   };
@@ -201,8 +204,8 @@ describe('import decoding', () => {
 
   /**
    * The one message a well-typed document can reach that Zod writes as a
-   * standing sentence: a Thing Title of nothing but whitespace normalizes to
-   * empty and `thingTitleSchema` answers with prose of its own (ADR 0083). Both
+   * standing sentence: a Resource Title of nothing but whitespace normalizes to
+   * empty and `resourceTitleSchema` answers with prose of its own (ADR 0083). Both
    * doors fold it to a clause after the path, and they have to fold it the same
    * way — which is the general precondition the scan below checks, met here by
    * the one message that exercises it end to end.
@@ -211,11 +214,11 @@ describe('import decoding', () => {
     const blankLine: ImportSpace = {
       id: SPACE_ID,
       document: { version: 1, title: 'Space' },
-      things: [{ id: THING_ID, document: { title: '   ', kind: 'markdown', body: '' } }],
+      resources: [{ id: RESOURCE_ID, document: { title: '   ', kind: 'markdown', body: '' } }],
     };
 
     expect(cliMessage(blankLine)).toBe(
-      'identified space is invalid: things.0.document.title a title must have at least one line with something in it',
+      'identified space is invalid: resources.0.document.title a title must have at least one line with something in it',
     );
     expect(summaryOf(cliMessage(blankLine))).toBe(summaryOf(wireMessage(blankLine)));
   });
@@ -241,18 +244,18 @@ describe('import decoding', () => {
   it('folds no acronym and no capitalised identifier out of a Zod message', () => {
     const malformed: readonly unknown[] = [
       // A bad UUID, in each position one can occupy.
-      { id: 'not-a-uuid', document: { version: 1, title: 'T' }, things: [] },
+      { id: 'not-a-uuid', document: { version: 1, title: 'T' }, resources: [] },
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
-        things: [{ id: 'nope', document: { title: 'C', kind: 'markdown', body: '' } }],
+        resources: [{ id: 'nope', document: { title: 'C', kind: 'markdown', body: '' } }],
       },
       {
         id: SPACE_ID,
         document: {
           version: 1,
           title: 'T',
-          diagrams: [
+          maps: [
             {
               id: SPACE_ID,
               title: 'L',
@@ -262,39 +265,39 @@ describe('import decoding', () => {
             },
           ],
         },
-        things: [],
+        resources: [],
       },
       // A bad literal version, and wrong-typed fields.
-      { id: SPACE_ID, document: { version: 9, title: 'T' }, things: [] },
+      { id: SPACE_ID, document: { version: 9, title: 'T' }, resources: [] },
       {
         id: SPACE_ID,
-        document: { version: 1, title: 7, diagrams: 4, defaultDiagram: 7 },
-        things: [],
+        document: { version: 1, title: 7, maps: 4, defaultMap: 7 },
+        resources: [],
       },
-      // Discriminated-union failures, on a thing's kind and on a diagram's.
+      // Discriminated-union failures, on a resource's kind and on a map's.
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
-        things: [{ id: THING_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
+        resources: [{ id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
       },
       {
         id: SPACE_ID,
         document: {
           version: 1,
           title: 'T',
-          diagrams: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {}, graphs: [] }],
+          maps: [{ id: SPACE_ID, title: 'L', kind: 'Weird', positions: {}, graphs: [] }],
         },
-        things: [],
+        resources: [],
       },
       // A bounded string and the one union that is not discriminated — each
       // writes a different sentence.
-      { id: SPACE_ID, document: { version: 1, title: '' }, things: [] },
+      { id: SPACE_ID, document: { version: 1, title: '' }, resources: [] },
       {
         id: SPACE_ID,
-        document: { version: 1, title: 'T', defaultDiagram: 'SpaceCanvas' },
-        things: [],
+        document: { version: 1, title: 'T', defaultMap: 'SpaceCanvas' },
+        resources: [],
       },
-      { id: SPACE_ID, document: { version: 1, title: 'T', defaultDiagram: 7 }, things: [] },
+      { id: SPACE_ID, document: { version: 1, title: 'T', defaultMap: 7 }, resources: [] },
       // And the root-path renders, where neither schema sees an object at all.
       'nope',
       42,
@@ -320,7 +323,7 @@ describe('import decoding', () => {
   });
 
   /**
-   * The same conclusion at the level a reader meets it: the kinds a thing may
+   * The same conclusion at the level a reader meets it: the kinds a resource may
    * declare survive the fold verbatim. Read off the schemas rather than written
    * out, so changing a literal to `'Markdown'` fails here instead of quietly
    * shipping a summary that names a kind nothing accepts.
@@ -330,16 +333,16 @@ describe('import decoding', () => {
    * because a `kind` outside the union is not a value an `ImportSpace` can
    * carry, and the tests above are what tie that pair to the door.
    */
-  it('leaves a thing kind legible in the summary it prints', () => {
+  it('leaves a resource kind legible in the summary it prints', () => {
     const parsed = spaceSnapshotSchema.safeParse({
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
-      things: [{ id: THING_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
+      resources: [{ id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
     });
-    if (parsed.success) throw new Error('Expected an unknown thing kind to be refused');
+    if (parsed.success) throw new Error('Expected an unknown resource kind to be refused');
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
-    expect(summary).toContain(`'${markdownThingFrontmatterSchema.shape.kind.value}'`);
-    expect(summary).toContain(`'${referenceThingFrontmatterSchema.shape.kind.value}'`);
+    expect(summary).toContain(`'${markdownResourceFrontmatterSchema.shape.kind.value}'`);
+    expect(summary).toContain(`'${referenceResourceFrontmatterSchema.shape.kind.value}'`);
   });
 });

@@ -15,35 +15,35 @@ import { chromeControlStaysOwed, staysOwed, type PendingContinuation } from '../
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
-const EDGE = { from: THING_A, to: THING_B } as const;
+const EDGE = { from: RESOURCE_A, to: RESOURCE_B } as const;
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [EDGE] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
   ],
 };
 
@@ -53,18 +53,18 @@ function open(stored: SpaceSnapshot = snapshot, revision = 0n) {
   const session = openSpaceSession(backend, loaded);
   const { authoring, navigation, continuation } = composeApp({
     spaceSession: session,
-    selection: DIAGRAM_ID,
+    selection: MAP_ID,
   });
   return { session, authoring, navigation, continuation };
 }
 
 const NAME_A: PendingContinuation = {
-  target: { kind: 'thing', thingId: THING_A },
+  target: { kind: 'resource', resourceId: RESOURCE_A },
   select: true,
   then: 'rename',
 };
-const RENAME_DIAGRAM: PendingContinuation = {
-  target: { kind: 'control', name: 'diagram-name' },
+const RENAME_MAP: PendingContinuation = {
+  target: { kind: 'control', name: 'map-name' },
   select: false,
   then: 'rename',
 };
@@ -90,9 +90,9 @@ describe('the one pending continuation', () => {
     const { continuation } = open();
     continuation.request(NAME_A);
 
-    continuation.request(RENAME_DIAGRAM);
+    continuation.request(RENAME_MAP);
 
-    expect(continuation.getState().pending).toEqual(RENAME_DIAGRAM);
+    expect(continuation.getState().pending).toEqual(RENAME_MAP);
   });
 
   it('yields a continuation once and leaves none behind', () => {
@@ -122,7 +122,7 @@ describe('the one pending continuation', () => {
 
 /**
  * Two facts discard a continuation, and only two. Over-invalidating is how a
- * legitimate continuation is silently lost — a target in a Diagram no longer
+ * legitimate continuation is silently lost — a target in a Map no longer
  * drawn simply fails to resolve, which the wait policy answers on its own.
  */
 describe('invalidation', () => {
@@ -144,19 +144,19 @@ describe('invalidation', () => {
 
   it('discards a pending continuation when presenting begins', () => {
     const { navigation, continuation } = open();
-    continuation.request(RENAME_DIAGRAM);
+    continuation.request(RENAME_MAP);
 
     navigation.present();
 
     expect(continuation.getState().pending).toBeNull();
   });
 
-  it('keeps one across an ordinary Edit, a Diagram choice and an activated Graph', () => {
+  it('keeps one across an ordinary Edit, a Map choice and an activated Graph', () => {
     const { authoring, navigation, continuation } = open();
     continuation.request(NAME_A);
 
-    authoring.complete({ kind: 'renamed-diagram', diagramId: DIAGRAM_ID, title: 'Renamed' });
-    navigation.selectDiagram(DIAGRAM_ID);
+    authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: 'Renamed' });
+    navigation.selectMap(MAP_ID);
     navigation.activateGraph(GRAPH_ID);
 
     expect(continuation.getState().pending).toEqual(NAME_A);
@@ -164,12 +164,12 @@ describe('invalidation', () => {
 
   it('stops answering its collaborator once disposed', () => {
     const { navigation, continuation } = open();
-    continuation.request(RENAME_DIAGRAM);
+    continuation.request(RENAME_MAP);
 
     continuation.dispose();
     navigation.present();
 
-    expect(continuation.getState().pending).toEqual(RENAME_DIAGRAM);
+    expect(continuation.getState().pending).toEqual(RENAME_MAP);
   });
 });
 
@@ -182,7 +182,7 @@ describe('invalidation', () => {
  */
 describe('the wait policy', () => {
   it.each([
-    ['a created or added Thing', { kind: 'thing', thingId: THING_A } as const],
+    ['a created or added Resource', { kind: 'resource', resourceId: RESOURCE_A } as const],
     ['a reconnected Edge', { kind: 'edge', graphId: GRAPH_ID, edge: EDGE } as const],
   ])('keeps %s owed until it is drawn', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(true);
@@ -198,7 +198,7 @@ describe('the wait policy', () => {
   ])('keeps a chrome control owed while %s is waiting to land', (_name, then) => {
     expect(
       chromeControlStaysOwed({
-        target: { kind: 'control', name: 'diagram-name' },
+        target: { kind: 'control', name: 'map-name' },
         select: false,
         then,
       }),
@@ -208,20 +208,20 @@ describe('the wait policy', () => {
   it('falls through on a chrome control whose action needs no press', () => {
     expect(
       chromeControlStaysOwed({
-        target: { kind: 'control', name: 'diagram-name' },
+        target: { kind: 'control', name: 'map-name' },
         select: false,
         then: 'nothing',
       }),
     ).toBe(false);
   });
 
-  /** A Thing waits whatever it was going to do there — Add to Diagram is a `focus`. */
+  /** A Resource waits whatever it was going to do there — Add to Map is a `focus`. */
   it.each(['nothing', 'focus', 'reveal', 'rename'] as const)(
-    'keeps a Thing owed whose continuation is %s',
+    'keeps a Resource owed whose continuation is %s',
     (then) => {
-      expect(staysOwed({ target: { kind: 'thing', thingId: THING_A }, select: false, then })).toBe(
-        true,
-      );
+      expect(
+        staysOwed({ target: { kind: 'resource', resourceId: RESOURCE_A }, select: false, then }),
+      ).toBe(true);
     },
   );
 });

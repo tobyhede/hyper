@@ -25,7 +25,7 @@ Only when the decision is all three:
 
 Record the rejected alternative and the cost accepted, not just the decision.
 
-The most valuable ADRs capture a **negative** — the thing a future review will otherwise re-suggest. ADR 0005 exists mainly to say *don't introduce an Arrangement type*; ADR 0004 to say *don't reintroduce a placement layer*. Both are things that look like improvements until you know why they were rejected.
+The most valuable ADRs capture a **negative** — the proposal a future review will otherwise re-suggest. ADR 0005 exists mainly to say *don't introduce an Arrangement type*; ADR 0004 to say *don't reintroduce a placement layer*. Both are proposals that look like improvements until you know why they were rejected.
 
 Skip ADRs for ephemeral reasons ("not worth it right now"), self-evident choices, and anything the glossary already implies.
 
@@ -83,9 +83,9 @@ A repo-wide rename conflicts with everything, so it should run alone, and early.
 
 **Check the replay rather than trusting it.** Diff the result against the merge and expect a handful of comment-only differences: that is how change one's review found six sites where a masked spelling had frozen a verb sense or an unmasked one had swept it, and how the second replay found two `.scratch/` efforts cited without their directory prefix, which no citation mask could see. A `--dry` that reports no change says the mask table and the tree agree — not that a replay needs no reading.
 
-**Merge with `-M20%`.** A rename that rewrites most of a file's lines falls under git's default 50% similarity and git stops reporting it as a rename at all: `layout-resolution.ts` → `diagram-resolution.ts` did, and a reviewer then reads a deletion and an unrelated addition instead of a move.
+**Merge with `-M20%`.** A rename that rewrites most of a file's lines falls under git's default 50% similarity and git stops reporting it as a rename at all: `layout-resolution.ts` → `map-resolution.ts` did, and a reviewer then reads a deletion and an unrelated addition instead of a move.
 
-**And the rename is not finished until `test/unit/current-domain-vocabulary.test.ts` can prove it.** Every completed rename here has a block there reporting the retired word in the identifier shapes it was written in, because a manual sweep misses sites and the scan is what found them. Write the **kebab-case** arms: a hyphen is not a word character, so `\b` lands either side of the retired word and every PascalCase and camelCase arm reads straight past `thing-not-found`, `space-must-keep-diagram` and `.canvas-thing` — which is the shape a rename mostly carries. That instrument also decides whether a candidate name is affordable at all: ADR 0085 rejected *Object* because the same scan would need 287 exceptions, which is no guard.
+**And the rename is not finished until `test/unit/current-domain-vocabulary.test.ts` can prove it.** Every completed rename here has a block there reporting the retired word in the identifier shapes it was written in, because a manual sweep misses sites and the scan is what found them. Write the **kebab-case** arms: a hyphen is not a word character, so `\b` lands either side of the retired word and every PascalCase and camelCase arm reads straight past `resource-not-found`, `space-must-keep-map` and `.canvas-resource` — which is the shape a rename mostly carries. That instrument also decides whether a candidate name is affordable at all: ADR 0085 rejected *Object* because the same scan would need 287 exceptions, which is no guard.
 
 ## Verification bar
 
@@ -101,11 +101,11 @@ Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
 
 A comment may only assert what its writer has checked. Ticket 14 shipped three that had not been, and every one was verifiable in the minute it would have taken to open the file named in it.
 
-**A negative result belongs in a ticket, never in source.** "X was tried and reverted because it broke Y" forecloses the work, reads as settled because it is in the source, and is never re-run. `App.tsx`'s `entityActions` carried one — six embedded-Diagram tests said to fail under `useMemo` — copied from a handoff bullet into a ticket into the source, and it did not reproduce. Put the finding in `.scratch/<feature>/`, dated and attributed, where a reader can see it is a report.
+**A negative result belongs in a ticket, never in source.** "X was tried and reverted because it broke Y" forecloses the work, reads as settled because it is in the source, and is never re-run. `App.tsx`'s `entityActions` carried one — six embedded-Map tests said to fail under `useMemo` — copied from a handoff bullet into a ticket into the source, and it did not reproduce. Put the finding in `.scratch/<feature>/`, dated and attributed, where a reader can see it is a report.
 
 **No measurement in source.** Commit the instrumentation or put the number in the ticket with the method that produced it. A count whose bench is gone cannot be refreshed or falsified.
 
-**A claim about another module names the test that holds it.** That family of test already exists for exactly this: `test/unit/command-surface-sharing.test.ts`, `codemirror-encapsulation.test.ts`, `graph-package-surface.test.ts`, `current-domain-vocabulary.test.ts`. "`EmbeddedDiagramAuthoring` calls `useCanvasThingAuthoring` without `thingEntityActions`" is one line of test; written as prose instead, its second clause was false. A subagent's summary is a report, not a fact — read the file before it becomes a sentence in the source.
+**A claim about another module names the test that holds it.** That family of test already exists for exactly this: `test/unit/command-surface-sharing.test.ts`, `codemirror-encapsulation.test.ts`, `graph-package-surface.test.ts`, `current-domain-vocabulary.test.ts`. "`EmbeddedMapAuthoring` calls `useCanvasResourceAuthoring` without `resourceEntityActions`" is one line of test; written as prose instead, its second clause was false. A subagent's summary is a report, not a fact — read the file before it becomes a sentence in the source.
 
 **A decision called load-bearing needs something that fails when it is reversed.** This ticket documented its reconciliation order that way; swapping the two calls broke none of the five cases, because they all read Navigation, which the repair fixes either way.
 

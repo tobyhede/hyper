@@ -1,13 +1,13 @@
-import type { Thing, ThingId, Graph, GraphId, Diagram, UUID } from '@project/core';
+import type { Resource, ResourceId, Graph, GraphId, Map, UUID } from '@project/core';
 import type { Space } from './space';
 
 /**
  * Contextual entity resolution over a validated Space.
  *
- * A Diagram owns its Graphs (ADR 0040) and `space.graphs` is a flatten across
- * every Diagram (ADR 0045), so an id taken off that collection has lost the one
- * thing ownership adds — which Diagram's Things its Edges are closed over, and
- * which Diagram an Edit to it belongs in. Every answer here therefore arrives
+ * A Map owns its Graphs (ADR 0040) and `space.graphs` is a flatten across
+ * every Map (ADR 0045), so an id taken off that collection has lost the one
+ * resource ownership adds — which Map's Resources its Edges are closed over, and
+ * which Map an Edit to it belongs in. Every answer here therefore arrives
  * with its context already resolved, rather than as a bare value a caller has to
  * go looking for the rest of.
  *
@@ -19,113 +19,114 @@ import type { Space } from './space';
  */
 
 /**
- * A Diagram, and the Graph it opens active on.
+ * A Map, and the Graph it opens active on.
  *
  * The Active Graph is resolved once, here, rather than at each reader: it is the
- * Graph the Diagram names, or its first (ADR 0026). Resolving it does **not**
- * fill the authored optional — `diagram` is the exact authored value, so a
+ * Graph the Map names, or its first (ADR 0026). Resolving it does **not**
+ * fill the authored optional — `map` is the exact authored value, so a
  * snapshot or an export written from it preserves the absence.
  */
-export interface ResolvedDiagram {
-  /** The exact authored value in `space.diagrams`. */
-  readonly diagram: Diagram;
+export interface ResolvedMap {
+  /** The exact authored value in `space.maps`. */
+  readonly map: Map;
   /** The exact owned Graph: the authored choice, or the first-Graph fallback. */
   readonly activeGraph: Graph;
 }
 
-/** A Graph, and the Diagram that owns it. */
+/** A Graph, and the Map that owns it. */
 export interface OwnedGraph {
   /** The exact nested value, also present in `space.graphs`. */
   readonly graph: Graph;
-  /** The canonical contextual value `lookup.diagram` answers for its owner. */
-  readonly owner: ResolvedDiagram;
+  /** The canonical contextual value `lookup.map` answers for its owner. */
+  readonly owner: ResolvedMap;
 }
 
 /**
  * The one interface for identity lookup over a Space. O(1), total over the
  * Space's own entities, and canonical: two calls with one id answer the same
- * value, and a Graph's `owner` is the very value its owning Diagram's id resolves
+ * value, and a Graph's `owner` is the very value its owning Map's id resolves
  * to.
  */
 export interface SpaceLookup {
-  thing(id: ThingId): Thing | undefined;
-  diagram(id: UUID): ResolvedDiagram | undefined;
+  resource(id: ResourceId): Resource | undefined;
+  map(id: UUID): ResolvedMap | undefined;
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/** A Thing that supplies Markdown or a Space view, after resolving a Reference Thing. */
-export type ResolvedContentThing = Extract<Thing, { kind: 'markdown' | 'space' }>;
+/** A Resource that supplies Markdown or a Space view, after resolving a Reference Resource. */
+export type ResolvedContentResource = Extract<Resource, { kind: 'markdown' | 'space' }>;
 
 /**
- * The Thing whose content `thingId` shows. Markdown and Space Things resolve
- * to themselves; a reference thing resolves to its target (ADR 0009). Referencing is a single hop —
- * validation guarantees a target is never itself a reference thing — so this follows at
- * most one link. Returns `undefined` if the thing or its target does not resolve.
+ * The Resource whose content `resourceId` shows. Markdown and Space Resources resolve
+ * to themselves; a reference resource resolves to its target (ADR 0009). Referencing is a single hop —
+ * validation guarantees a target is never itself a reference resource — so this follows at
+ * most one link. Returns `undefined` if the resource or its target does not resolve.
  *
  * A domain operation rather than an identity lookup, which is why it stays a
  * function beside `SpaceLookup` rather than becoming a fourth method on it: what
- * it answers is *content*, and the hop it follows is Reference Thing semantics.
+ * it answers is *content*, and the hop it follows is Reference Resource semantics.
  */
-export function resolveContentThing(
+export function resolveContentResource(
   space: Space,
-  thingId: ThingId,
-): ResolvedContentThing | undefined {
-  const thing = space.lookup.thing(thingId);
-  if (thing?.kind === 'markdown' || thing?.kind === 'space') return thing;
-  if (thing?.kind !== 'reference') return undefined;
+  resourceId: ResourceId,
+): ResolvedContentResource | undefined {
+  const resource = space.lookup.resource(resourceId);
+  if (resource?.kind === 'markdown' || resource?.kind === 'space') return resource;
+  if (resource?.kind !== 'reference') return undefined;
 
-  const target = space.lookup.thing(thing.target);
+  const target = space.lookup.resource(resource.target);
   return target?.kind === 'markdown' || target?.kind === 'space' ? target : undefined;
 }
 
 /**
  * The one failure building the lookup can meet, and it is not one a document can
- * reach: `positionedDiagramSchema` requires at least one Graph, and every Space
+ * reach: `positionedMapSchema` requires at least one Graph, and every Space
  * arrives through that parse.
  *
  * It survives because `min(1)` does not reach the type — `noUncheckedIndexedAccess`
  * widens the first read to `| undefined` — so a total function needs an answer
  * for a state no document is in. Reporting it as a shape failure naming the
- * Diagram says exactly what the schema would have, in the one place still able to
+ * Map says exactly what the schema would have, in the one place still able to
  * observe it, rather than inventing a Graph or asserting the read away.
  */
 type SpaceLookupResult =
   | { readonly ok: true; readonly lookup: SpaceLookup }
-  | { readonly ok: false; readonly diagramWithoutGraph: UUID };
+  | { readonly ok: false; readonly mapWithoutGraph: UUID };
 
 /**
  * Build the lookup over an already reference-checked Space.
  *
- * Order matters: every `ResolvedDiagram` is built first, so the `OwnedGraph`
+ * Order matters: every `ResolvedMap` is built first, so the `OwnedGraph`
  * values below can close over the *same* value the owner's id answers with. Two
  * passes rather than one is what makes `lookup.graph(id)?.owner ===
- * lookup.diagram(ownerId)` hold as identity rather than as equality.
+ * lookup.map(ownerId)` hold as identity rather than as equality.
  */
 export function buildSpaceLookup(input: {
-  readonly things: readonly Thing[];
-  readonly diagrams: readonly Diagram[];
+  readonly resources: readonly Resource[];
+  readonly maps: readonly Map[];
 }): SpaceLookupResult {
-  const resolvedDiagrams = new Map<UUID, ResolvedDiagram>();
-  for (const diagram of input.diagrams) {
-    const activeGraph =
-      diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
-    if (activeGraph === undefined) return { ok: false, diagramWithoutGraph: diagram.id };
-    resolvedDiagrams.set(diagram.id, { diagram, activeGraph });
+  const resolvedMaps = new Map<UUID, ResolvedMap>();
+  for (const map of input.maps) {
+    const activeGraph = map.graphs.find((graph) => graph.id === map.activeGraph) ?? map.graphs[0];
+    if (activeGraph === undefined) return { ok: false, mapWithoutGraph: map.id };
+    resolvedMaps.set(map.id, { map, activeGraph });
   }
 
   const ownedGraphs = new Map<GraphId, OwnedGraph>();
-  for (const owner of resolvedDiagrams.values()) {
-    for (const graph of owner.diagram.graphs) {
+  for (const owner of resolvedMaps.values()) {
+    for (const graph of owner.map.graphs) {
       ownedGraphs.set(graph.id, { graph, owner });
     }
   }
 
-  const things = new Map<ThingId, Thing>(input.things.map((thing) => [thing.id, thing]));
+  const resources = new Map<ResourceId, Resource>(
+    input.resources.map((resource) => [resource.id, resource]),
+  );
   return {
     ok: true,
     lookup: {
-      thing: (id) => things.get(id),
-      diagram: (id) => resolvedDiagrams.get(id),
+      resource: (id) => resources.get(id),
+      map: (id) => resolvedMaps.get(id),
       graph: (id) => ownedGraphs.get(id),
     },
   };

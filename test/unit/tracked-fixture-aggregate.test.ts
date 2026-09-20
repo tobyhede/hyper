@@ -1,4 +1,4 @@
-import { titleName, uuidSchema, type Thing, type UUID } from '@project/core';
+import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import { describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
@@ -6,14 +6,14 @@ import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
-const spaceThingTargets = (things: readonly Thing[]): readonly UUID[] =>
-  things.flatMap((thing) => (thing.kind === 'space' ? [thing.spaceId] : []));
+const spaceResourceTargets = (resources: readonly Resource[]): readonly UUID[] =>
+  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.spaceId] : []));
 
 /**
- * Longest Space-Thing path from Meta, and every ordinary Space that path reaches.
+ * Longest Space-Resource path from Meta, and every ordinary Space that path reaches.
  *
  * Depth is the number of Spaces on the longest chain, Meta included — Meta → A → B
- * is depth three. A Space is reachable when some chain of Space Things starting
+ * is depth three. A Space is reachable when some chain of Space Resources starting
  * at Meta names it.
  */
 const traverseFromMeta = (metaId: UUID, targetsBySpace: ReadonlyMap<UUID, readonly UUID[]>) => {
@@ -37,7 +37,7 @@ describe('tracked fixture aggregate', () => {
     const meta = await importFixture(repository);
 
     expect(meta.snapshot.id).toBe(META_ID);
-    expect(meta.snapshot.document.title).toBe('Diagram fixture');
+    expect(meta.snapshot.document.title).toBe('Map fixture');
 
     const listed = await repository.listSpaces();
     expect(listed.length).toBeGreaterThan(1);
@@ -64,7 +64,7 @@ describe('tracked fixture aggregate', () => {
 
     const byId = new Map(intake.aggregate.spaces.map((space) => [space.id, space]));
     const targetsBySpace = new Map(
-      intake.aggregate.spaces.map((space) => [space.id, spaceThingTargets(space.things)]),
+      intake.aggregate.spaces.map((space) => [space.id, spaceResourceTargets(space.resources)]),
     );
     const inbound = new Map<UUID, number>();
     for (const targets of targetsBySpace.values()) {
@@ -91,10 +91,10 @@ describe('tracked fixture aggregate', () => {
     expect(inbound.get(deepDive.id)).toBeGreaterThanOrEqual(2);
 
     for (const space of ordinary) {
-      for (const thing of space.things) {
-        if (thing.kind !== 'markdown') continue;
-        expect(titleName(thing.title).length).toBeGreaterThan(1);
-        expect(thing.body.trim().length).toBeGreaterThan(0);
+      for (const resource of space.resources) {
+        if (resource.kind !== 'markdown') continue;
+        expect(titleName(resource.title).length).toBeGreaterThan(1);
+        expect(resource.body.trim().length).toBeGreaterThan(0);
       }
     }
   });

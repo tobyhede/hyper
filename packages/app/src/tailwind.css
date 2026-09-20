@@ -35,12 +35,12 @@
   --color-sidebar-ring: var(--sidebar-ring);
   /* The chrome's structural scale (radius and type size): every command
      surface, menu, popover and control states a step from this list by name
-     rather than restating its own arbitrary value. The Thing's own geometry is
-     a second, deliberately separate scale — declared below, beside the Thing's
+     rather than restating its own arbitrary value. The Resource's own geometry is
+     a second, deliberately separate scale — declared below, beside the Resource's
      colour tokens, rather than here (ticket 06).
 
      **Every radius step is zero, and the six names are kept.** The chrome now
-     draws the Thing's corner, so the steps collapse to one value; the names
+     draws the Resource's corner, so the steps collapse to one value; the names
      stay because they are what makes the corner one edit rather than a hundred
      (`.scratch/structural-tokens/issues/09-...`). Give them distinct values
      again and every surface follows, which is the property the effort bought.
@@ -77,10 +77,10 @@
 }
 
 /*
- * **Sand is the canvas and nothing else.** The beige is the paper the Things are
+ * **Sand is the canvas and nothing else.** The beige is the paper the Resources are
  * laid on; it is not a tint the chrome inherits. The chrome is a neutral grey
  * scale over sand, so the only two surfaces on screen carrying warmth are the
- * canvas and a Thing's own face, and the only element carrying colour is a Graph.
+ * canvas and a Resource's own face, and the only element carrying colour is a Graph.
  *
  * These values were settled in the Command Dock prototype, which drew a light
  * canvas while this block was still dark and so had to fork every token it
@@ -95,7 +95,7 @@
   --background: #e5dbc7;
   --foreground: #1f2933;
   /* Chrome paper: the shell, its popovers, its menus and its dialogs. Neutral
-     and a shade off white, so it never reads as the Thing's cream. */
+     and a shade off white, so it never reads as the Resource's cream. */
   --card: #fbfbfa;
   --card-foreground: var(--foreground);
   --popover: var(--card);
@@ -133,32 +133,32 @@
      sand. The dot is the sand a step down rather than a neutral. */
   --xy-background-color: var(--background);
   --xy-background-pattern-color: #cdbfa4;
-  --canvas-thing-ink-color: #0b0d11;
-  --canvas-thing-face-rest: #f4efe4;
-  --canvas-thing-face-active: #fffaf0;
-  --canvas-thing-title-color: #12161c;
-  --thing-hover-duration: 120ms;
-  --thing-hover-easing: ease;
-  /* Text roles the Thing draws on its own cream faces. The Thing's paper is
+  --canvas-resource-ink-color: #0b0d11;
+  --canvas-resource-face-rest: #f4efe4;
+  --canvas-resource-face-active: #fffaf0;
+  --canvas-resource-title-color: #12161c;
+  --resource-hover-duration: 120ms;
+  --resource-hover-easing: ease;
+  /* Text roles the Resource draws on its own cream faces. The Resource's paper is
      warmer and lighter than the chrome's, so these stay separate from
      `--foreground` and `--muted-foreground` rather than inheriting them;
-     `test/unit/canvas-thing-contrast.test.ts` holds them to AA on both faces. */
-  --canvas-thing-muted-color: #4a505c;
-  --canvas-thing-error-color: #b3261e;
-  /* The Thing's own structural scale: border weight, corner and shadow
+     `test/unit/canvas-resource-contrast.test.ts` holds them to AA on both faces. */
+  --canvas-resource-muted-color: #4a505c;
+  --canvas-resource-error-color: #b3261e;
+  /* The Resource's own structural scale: border weight, corner and shadow
      character, kept apart from the chrome's for the same reason the two text
-     roles above are — the Thing is paper lying on the canvas and the chrome
+     roles above are — the Resource is paper lying on the canvas and the chrome
      floats above it, so each states its own geometry even where the two agree
      (`.scratch/structural-tokens/issues/06-...`). They agree on the corner and
      on the shadow's character and part on weight: the chrome draws a 1px border
-     and the Thing a 4px one, and the Thing states a shadow only while it is
+     and the Resource a 4px one, and the Resource states a shadow only while it is
      being handled. Both shadows below are stated as one composite value each,
      the same way `--shadow-chrome-elevated` further down is, rather than
      decomposed into separate offset/blur primitives. */
-  --canvas-thing-border-width: 4px;
-  --canvas-thing-radius: 0;
-  --canvas-thing-shadow-dragging: 7px 7px 0 var(--canvas-thing-ink-color);
-  --canvas-thing-shadow-selected: 0 0 0 3px var(--canvas-thing-ink-color);
+  --canvas-resource-border-width: 4px;
+  --canvas-resource-radius: 0;
+  --canvas-resource-shadow-dragging: 7px 7px 0 var(--canvas-resource-ink-color);
+  --canvas-resource-shadow-selected: 0 0 0 3px var(--canvas-resource-ink-color);
   /* Declared unlayered as well as in `@theme` above, and both are needed: an
      unlayered declaration beats the `@layer theme` one `@theme` emits, so a
      theme entry alone would leave `rounded-md` at the old value. */
@@ -166,8 +166,8 @@
   --border-width-chrome-accent: 3px;
   /* The chrome's one elevation: an unblurred offset cast in the chrome's own
      ink rather than black, lifting a command surface off whatever it sits
-     over. It is the Thing's shadow in the chrome's ink — the Thing draws
-     `7px 7px 0` while it is handled — because the chrome and the Thing are one
+     over. It is the Resource's shadow in the chrome's ink — the Resource draws
+     `7px 7px 0` while it is handled — because the chrome and the Resource are one
      material.
 
      Not wired into `@theme` alongside the radius and type steps above:

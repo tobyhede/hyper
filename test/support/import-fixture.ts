@@ -61,7 +61,7 @@ export const importSpaceDirectory = async (
  * same `readAggregate` + `initializeAggregate` path public import uses.
  *
  * Returns the Meta Space so callers that open the fixture still receive the
- * Diagram fixture they address.
+ * Map fixture they address.
  */
 export const importFixture = async (repository: SpaceRepository): Promise<LoadedSpace> => {
   const source = await readAggregate(fixtureDirectory, newUuid);

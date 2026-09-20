@@ -4,42 +4,42 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
 import { OpenSpacesContext } from '../src/open-spaces-context';
 import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces';
-import type { SpaceThingFraming } from '../src/space-thing-framing';
-import { THING_SIZE } from '../src/thing';
+import type { SpaceEndpointFraming } from '../src/space-resource-framing';
+import { RESOURCE_SIZE } from '../src/resource';
 
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const HOST_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 
-const HOST_FRAMING: SpaceThingFraming = { centreX: 1, centreY: 1, zoom: 9 };
-const TARGET_FRAMING: SpaceThingFraming = { centreX: 100, centreY: 50, zoom: 2 };
+const HOST_FRAMING: SpaceEndpointFraming = { centreX: 1, centreY: 1, zoom: 9 };
+const TARGET_FRAMING: SpaceEndpointFraming = { centreX: 100, centreY: 50, zoom: 2 };
 
 const snapshot = spaceSnapshotSchema.parse({
   id: TARGET_ID,
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram',
+        id: MAP_ID,
+        title: 'Map',
         kind: 'positioned',
-        positions: { [THING_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 });
 
 const IDLE_EDGE_STATE = { draft: null, refusal: null } as const;
@@ -50,12 +50,12 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     subscribe: () => () => undefined,
     eligibility: () => ({
       kind: 'refused',
-      refusal: { code: 'diagram-required', operation: 'reconnected-edge' },
+      refusal: { code: 'map-required', operation: 'reconnected-edge' },
     }),
     accepts: () => false,
     beginPointerConnect: () => undefined,
     connect: () => undefined,
-    createConnectedThing: () => undefined,
+    createConnectedResource: () => undefined,
     endPointerDrag: () => undefined,
     beginPointerReconnect: () => undefined,
     openEdgeEditor: () => undefined,
@@ -70,16 +70,16 @@ function unused(): never {
   throw new Error('OpenSpaces method unused by this canvas mount');
 }
 
-function thingNode(): ThingFlowNode {
+function resourceNode(): ResourceFlowNode {
   return {
-    id: THING_ID,
-    type: 'thing',
+    id: RESOURCE_ID,
+    type: 'resource',
     position: { x: 0, y: 0 },
-    width: THING_SIZE.width,
-    height: THING_SIZE.height,
+    width: RESOURCE_SIZE.width,
+    height: RESOURCE_SIZE.height,
     selected: false,
     data: {
-      thingId: THING_ID,
+      resourceId: RESOURCE_ID,
       title: 'A',
       readOnly: false,
       kind: 'markdown',
@@ -101,9 +101,9 @@ function stubEntry(
   id: UUID,
   spaceSession: OpenSpace['session'],
   app: OpenSpace['app'],
-  spaceThings: OpenSpace['spaceThings'],
+  spaceResources: OpenSpace['spaceResources'],
 ): OpenSpace {
-  return { id, session: spaceSession, app, spaceThings };
+  return { id, session: spaceSession, app, spaceResources };
 }
 
 beforeAll(() => {
@@ -130,21 +130,21 @@ describe('opening framing on a mounted canvas', () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
     const app = composeApp({ spaceSession });
-    const spaceThings: OpenSpace['spaceThings'] = {
+    const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
       delete: unused,
-      deleteDiagram: unused,
+      deleteMap: unused,
       deleteGraph: unused,
       referenceableSpaces: unused,
       target: unused,
       spaceSet: { getState: () => 0, subscribe: () => () => undefined },
     };
-    const hostEntry = stubEntry(HOST_ID, spaceSession, app, spaceThings);
-    const targetEntry = stubEntry(TARGET_ID, spaceSession, app, spaceThings);
+    const hostEntry = stubEntry(HOST_ID, spaceSession, app, spaceResources);
+    const targetEntry = stubEntry(TARGET_ID, spaceSession, app, spaceResources);
     const asked: UUID[] = [];
-    const seeds: (SpaceThingFraming | undefined)[] = [];
-    const framingByEntry = new Map<OpenSpace, SpaceThingFraming>([[hostEntry, HOST_FRAMING]]);
+    const seeds: (SpaceEndpointFraming | undefined)[] = [];
+    const framingByEntry = new Map<OpenSpace, SpaceEndpointFraming>([[hostEntry, HOST_FRAMING]]);
     const listeners = new Set<() => void>();
     const entries: readonly OpenSpace[] = [];
     let state: OpenSpacesState = {
@@ -180,13 +180,13 @@ describe('opening framing on a mounted canvas', () => {
       enter: unused,
       switchTo: unused,
       exit: unused,
-      spaceThings,
+      spaceResources,
       browserLocation: {
-        getState: () => ({ addressedThingId: null, destinationNotFound: false }),
+        getState: () => ({ addressedResourceId: null, destinationNotFound: false }),
         subscribe: () => () => undefined,
         follow: unused,
         activate: unused,
-        chooseDiagram: unused,
+        chooseMap: unused,
         activateGraph: unused,
         href: unused,
         dispose: unused,
@@ -199,47 +199,47 @@ describe('opening framing on a mounted canvas', () => {
           <ReactFlowProvider>
             <SpaceCanvas
               continuation={app.continuation}
-              nodes={[thingNode()]}
+              nodes={[resourceNode()]}
               edges={[]}
               projectedNodes={null}
-              activeThingId={null}
+              activeResourceId={null}
               presenting={false}
               placementReady={true}
               availability={authoringAvailability({
                 editable: true,
                 presenting: false,
-                editingThingBody: false,
-                editingThingTitle: false,
-                thingIsOpen: false,
+                editingResourceBody: false,
+                editingResourceTitle: false,
+                resourceIsOpen: false,
                 editingChromeTitle: false,
                 spaceOnCanvas: true,
-                editingEmbeddedDiagram: false,
-                creatingSpaceThing: false,
+                editingEmbeddedMap: false,
+                creatingSpaceEndpoint: false,
               })}
               onNodesChange={() => undefined}
               onEdgesChange={() => undefined}
               edgeAuthoring={inertEdgeAuthoring()}
               selection={{ kind: 'none' }}
-              onSelectThing={() => undefined}
+              onSelectResource={() => undefined}
               onSelectEdge={() => undefined}
-              placedThings={[]}
-              newThingTitle="Thing 2"
-              onAddThing={() => undefined}
-              onAddExistingThing={() => undefined}
+              placedResources={[]}
+              newResourceTitle="Resource 2"
+              onAddResource={() => undefined}
+              onAddExistingResource={() => undefined}
               nameOnCreation={null}
               authoring={app.authoring}
               spaceSession={spaceSession}
               onBodyEditingChange={() => undefined}
               onTitleEditingChange={() => undefined}
-              thingResize={{
+              resourceResize={{
                 beginResize: () => undefined,
                 previewResize: () => undefined,
                 finishResize: () => undefined,
                 cancelResize: () => undefined,
               }}
-              reportEmbeddedDiagramEditing={() => undefined}
+              reportEmbeddedMapEditing={() => undefined}
               spaceTitle="Test Space"
-              diagramTitle="Test Diagram"
+              mapTitle="Test Map"
               graphs={[]}
               colorByGraphId={{}}
               activeGraphId={null}
@@ -278,17 +278,17 @@ describe('opening framing on a mounted canvas', () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
     const app = composeApp({ spaceSession });
-    const spaceThings: OpenSpace['spaceThings'] = {
+    const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
       delete: unused,
-      deleteDiagram: unused,
+      deleteMap: unused,
       deleteGraph: unused,
       referenceableSpaces: unused,
       target: unused,
       spaceSet: { getState: () => 0, subscribe: () => () => undefined },
     };
-    const targetEntry = stubEntry(TARGET_ID, spaceSession, app, spaceThings);
+    const targetEntry = stubEntry(TARGET_ID, spaceSession, app, spaceResources);
     const asked: UUID[] = [];
     const state: OpenSpacesState = {
       activeSpaceId: TARGET_ID,
@@ -312,13 +312,13 @@ describe('opening framing on a mounted canvas', () => {
       enter: unused,
       switchTo: unused,
       exit: unused,
-      spaceThings,
+      spaceResources,
       browserLocation: {
-        getState: () => ({ addressedThingId: null, destinationNotFound: false }),
+        getState: () => ({ addressedResourceId: null, destinationNotFound: false }),
         subscribe: () => () => undefined,
         follow: unused,
         activate: unused,
-        chooseDiagram: unused,
+        chooseMap: unused,
         activateGraph: unused,
         href: unused,
         dispose: unused,
@@ -330,47 +330,47 @@ describe('opening framing on a mounted canvas', () => {
         <ReactFlowProvider>
           <SpaceCanvas
             continuation={app.continuation}
-            nodes={[thingNode()]}
+            nodes={[resourceNode()]}
             edges={[]}
             projectedNodes={null}
-            activeThingId={null}
+            activeResourceId={null}
             presenting={false}
             placementReady={true}
             availability={authoringAvailability({
               editable: true,
               presenting: false,
-              editingThingBody: false,
-              editingThingTitle: false,
-              thingIsOpen: false,
+              editingResourceBody: false,
+              editingResourceTitle: false,
+              resourceIsOpen: false,
               editingChromeTitle: false,
               spaceOnCanvas: true,
-              editingEmbeddedDiagram: false,
-              creatingSpaceThing: false,
+              editingEmbeddedMap: false,
+              creatingSpaceEndpoint: false,
             })}
             onNodesChange={() => undefined}
             onEdgesChange={() => undefined}
             edgeAuthoring={inertEdgeAuthoring()}
             selection={{ kind: 'none' }}
-            onSelectThing={() => undefined}
+            onSelectResource={() => undefined}
             onSelectEdge={() => undefined}
-            placedThings={[]}
-            newThingTitle="Thing 2"
-            onAddThing={() => undefined}
-            onAddExistingThing={() => undefined}
+            placedResources={[]}
+            newResourceTitle="Resource 2"
+            onAddResource={() => undefined}
+            onAddExistingResource={() => undefined}
             nameOnCreation={null}
             authoring={app.authoring}
             spaceSession={spaceSession}
             onBodyEditingChange={() => undefined}
             onTitleEditingChange={() => undefined}
-            thingResize={{
+            resourceResize={{
               beginResize: () => undefined,
               previewResize: () => undefined,
               finishResize: () => undefined,
               cancelResize: () => undefined,
             }}
-            reportEmbeddedDiagramEditing={() => undefined}
+            reportEmbeddedMapEditing={() => undefined}
             spaceTitle="Test Space"
-            diagramTitle="Test Diagram"
+            mapTitle="Test Map"
             graphs={[]}
             colorByGraphId={{}}
             activeGraphId={null}

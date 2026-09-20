@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
-import type { ThingChoice } from '@project/ui';
+import type { ResourceChoice } from '@project/ui';
 import {
   SelectedEdgeControls,
   type SelectedEdgeControlsProps,
@@ -17,14 +17,19 @@ import {
  * pinned by `edge-authoring-react.test.tsx` and by the Playwright suite.
  */
 
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 
-const CHOICES: readonly ThingChoice[] = [
-  { id: THING_A, title: 'A', kind: 'markdown' },
-  { id: THING_B, title: 'B', kind: 'markdown' },
-  { id: THING_C, title: 'C', kind: 'markdown', refusal: 'These Things are already connected.' },
+const CHOICES: readonly ResourceChoice[] = [
+  { id: RESOURCE_A, title: 'A', kind: 'markdown' },
+  { id: RESOURCE_B, title: 'B', kind: 'markdown' },
+  {
+    id: RESOURCE_C,
+    title: 'C',
+    kind: 'markdown',
+    refusal: 'These Resources are already connected.',
+  },
 ];
 
 beforeAll(() => {
@@ -53,8 +58,8 @@ const mount = (props: Partial<SelectedEdgeControlsProps> = {}) => {
   };
   const view = render(
     <SelectedEdgeControls
-      from={THING_A}
-      to={THING_B}
+      from={RESOURCE_A}
+      to={RESOURCE_B}
       editorOpen={false}
       endpointChoices={() => CHOICES}
       refusal={null}
@@ -87,7 +92,7 @@ describe('the controls a selected Edge offers', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
-  it('shows both endpoints on the Things they name when the editor stands', () => {
+  it('shows both endpoints on the Resources they name when the editor stands', () => {
     mount({ editorOpen: true });
 
     expect(screen.getByRole('combobox', { name: 'From' })).toHaveValue('A');
@@ -109,8 +114,8 @@ describe('the controls a selected Edge offers', () => {
     const endpointChoices = vi.fn(() => CHOICES);
     const { rerender } = render(
       <SelectedEdgeControls
-        from={THING_A}
-        to={THING_B}
+        from={RESOURCE_A}
+        to={RESOURCE_B}
         editorOpen
         endpointChoices={endpointChoices}
         refusal={null}
@@ -124,8 +129,8 @@ describe('the controls a selected Edge offers', () => {
 
     rerender(
       <SelectedEdgeControls
-        from={THING_A}
-        to={THING_C}
+        from={RESOURCE_A}
+        to={RESOURCE_C}
         editorOpen
         endpointChoices={endpointChoices}
         refusal={null}
@@ -139,13 +144,13 @@ describe('the controls a selected Edge offers', () => {
     expect(endpointChoices).toHaveBeenCalledTimes(2);
   });
 
-  /** A refused Thing stays visible with its reason rather than dropping out of the list. */
-  it('keeps an ineligible Thing in the list, disabled, with the reason it cannot be chosen', () => {
+  /** A refused Resource stays visible with its reason rather than dropping out of the list. */
+  it('keeps an ineligible Resource in the list, disabled, with the reason it cannot be chosen', () => {
     mount({ editorOpen: true });
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'To' }), { key: 'ArrowDown' });
 
-    const refused = screen.getByRole('option', { name: /These Things are already connected/ });
+    const refused = screen.getByRole('option', { name: /These Resources are already connected/ });
     expect(refused).toHaveAttribute('aria-disabled', 'true');
     expect(refused).toHaveTextContent('C');
   });
@@ -185,13 +190,13 @@ describe('where a refused Edge Edit is said', () => {
       const describedBy = attempted.getAttribute('aria-describedby');
       expect(describedBy).not.toBeNull();
       expect(document.getElementById(describedBy ?? '')).toHaveTextContent(
-        'These Things are already connected in this Graph.',
+        'These Resources are already connected in this Graph.',
       );
       expect(screen.queryByTestId('edge-endpoint-refusal')).not.toBeInTheDocument();
     },
   );
 
-  /** A Diagram, Graph or Edge that has gone: no row in either list would answer it. */
+  /** A Map, Graph or Edge that has gone: no row in either list would answer it. */
   it('uses the form channel for a refusal no endpoint could correct', () => {
     mount({
       editorOpen: true,
@@ -216,7 +221,7 @@ describe('where a refused Edge Edit is said', () => {
     mount({ refusal: { kind: 'deletion', refusal: { code: 'graph-not-owned' } } });
 
     expect(screen.getByTestId('edge-delete-refusal')).toHaveTextContent(
-      'That Graph is not one this Diagram owns.',
+      'That Graph is not one this Map owns.',
     );
     expect(screen.getByRole('alert')).toBeVisible();
     expect(screen.queryByTestId('edge-editor')).not.toBeInTheDocument();

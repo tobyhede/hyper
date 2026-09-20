@@ -1,27 +1,27 @@
 import { expect, test } from './fixtures';
 import { nodeByTitle, selectCanvas, settled } from './graph';
 
-test('a focused Thing opens with Enter and Space', async ({ page }) => {
+test('a focused Resource opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
 
-  // The guard that opening did not follow the pointer off the Thing when it
+  // The guard that opening did not follow the pointer off the Resource when it
   // stopped being a gesture (ADR 0036, 0037).
-  await thing.focus();
-  await expect(thing).toBeFocused();
+  await resource.focus();
+  await expect(resource).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(thing).toContainText('entry point');
+  await expect(resource).toContainText('entry point');
 
-  await thing.hover();
-  await thing.getByRole('button', { name: 'Close Thing A' }).click();
-  await thing.focus();
-  await expect(thing).toBeFocused();
+  await resource.hover();
+  await resource.getByRole('button', { name: 'Close Resource A' }).click();
+  await resource.focus();
+  await expect(resource).toBeFocused();
   const scrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press('Space');
-  await expect(thing).toContainText('entry point');
+  await expect(resource).toContainText('entry point');
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
 });
 

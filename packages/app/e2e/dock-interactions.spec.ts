@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   boxOf,
-  createThing,
+  createResource,
   dock,
   nodeByTitle,
   settled,
@@ -18,17 +18,17 @@ for (const delay of [0, 120]) {
     await expect(nodeByTitle(page, 'A')).toBeVisible();
     await settled(page);
     const surface = dock(page);
-    await surface.getByRole('button', { name: /^Diagram: / }).click({ delay });
-    await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
+    await surface.getByRole('button', { name: /^Map: / }).click({ delay });
+    await expect(page.getByRole('menuitem', { name: 'New Map', exact: true })).toBeVisible();
     await surface.getByRole('button', { name: /^Active Graph: / }).click({ delay });
     await expect(page.getByRole('menuitem', { name: 'New Graph', exact: true })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'New Map', exact: true })).toHaveCount(0);
     await surface.getByRole('button', { name: /^Space: / }).click({ delay });
     await expect(page.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'New Graph', exact: true })).toHaveCount(0);
   });
 
-  for (const kind of ['Diagram', 'Graph']) {
+  for (const kind of ['Map', 'Graph']) {
     test(`${kind} rename is isolated from the canvas with a menu open (${delay}ms)`, async ({
       page,
     }) => {
@@ -37,13 +37,13 @@ for (const delay of [0, 120]) {
       await settled(page);
       const persistence = page.getByTestId('persistence-status');
       const revision = await persistence.getAttribute('data-revision');
-      const closed = await page.locator('.canvas-thing[data-expanded="false"]').count();
+      const closed = await page.locator('.canvas-resource[data-expanded="false"]').count();
       await dock(page)
         .getByRole('button', { name: /^Space: / })
         .click({ delay });
       await expect(page.getByRole('menuitem', { name: /^Copy link/ })).toBeVisible();
       await dock(page)
-        .getByRole('button', { name: kind === 'Diagram' ? /^Diagram: / : /^Active Graph: / })
+        .getByRole('button', { name: kind === 'Map' ? /^Map: / : /^Active Graph: / })
         .click({ delay });
       await page.getByRole('menuitem', { name: 'Rename' }).click();
       const editor = page.getByRole('textbox', { name: `${kind} name`, exact: true });
@@ -55,8 +55,8 @@ for (const delay of [0, 120]) {
       // Give an unintended asynchronous Edit time to publish before checking
       // the unchanged revision, as the editing suite does for negative gestures.
       await page.waitForTimeout(250);
-      await expect(page.locator('.canvas-thing[data-expanded="false"]')).toHaveCount(closed);
-      await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+      await expect(page.locator('.canvas-resource[data-expanded="false"]')).toHaveCount(closed);
+      await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
       await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
     });
   }
@@ -64,47 +64,47 @@ for (const delay of [0, 120]) {
 
 /**
  * Ticket `18` could not obtain a reproduction. The Open command is not on the
- * Dock name: a pointer Open is the Thing's own control (ADR 0036), and a
+ * Dock name: a pointer Open is the Resource's own control (ADR 0036), and a
  * keyboard Open sits on React Flow's wrapper and declines a `button` or
  * textbox (`SpaceCanvas` `NOT_A_CANVAS_COMMAND`). These are the gestures `11`
- * never tried — no menu, a Thing already selected, Enter completing the
+ * never tried — no menu, a Resource already selected, Enter completing the
  * rename, and activating the name from the keyboard.
  */
-test('renaming a Space, Diagram or Graph from the Dock does not Open a selected Thing', async ({
+test('renaming a Space, Map or Graph from the Dock does not Open a selected Resource', async ({
   page,
 }) => {
   await page.goto('/');
-  const thing = nodeByTitle(page, 'A');
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A');
+  await expect(resource).toBeVisible();
   await settled(page);
-  await thing.click();
+  await resource.click();
 
   const identities = {
     Space: spaceName(page),
-    Diagram: selectedCanvas(page),
+    Map: selectedCanvas(page),
     Graph: activeGraph(page),
   } as const;
 
-  for (const kind of ['Space', 'Diagram', 'Graph'] as const) {
+  for (const kind of ['Space', 'Map', 'Graph'] as const) {
     await beginRename(page, identities[kind]);
     const editor = page.getByRole('textbox', { name: `${kind} name`, exact: true });
     await expect(editor).toBeFocused();
     await editor.press('Enter');
     await expect(editor).toHaveCount(0);
-    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
   }
 
   for (const key of ['Enter', ' '] as const) {
-    const diagram = selectedCanvas(page);
-    await diagram.focus();
+    const map = selectedCanvas(page);
+    await map.focus();
     await page.keyboard.press(key);
     await expect(page.getByRole('menu')).toBeVisible();
-    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
     await page.getByRole('menuitem', { name: 'Rename' }).click();
-    const editor = page.getByRole('textbox', { name: 'Diagram name', exact: true });
+    const editor = page.getByRole('textbox', { name: 'Map name', exact: true });
     await expect(editor).toBeFocused();
     await editor.press('Escape');
-    await expect(page.locator('.canvas-thing[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
   }
 });
 
@@ -137,11 +137,11 @@ test(
     // is exactly the problem: this failed on CI's first attempt and passed on
     // retry #1, which `failOnFlakyTests` correctly refuses to call a pass.
     await expect(page.getByRole('menu')).toHaveCount(0);
-    await expect(page.getByTestId('space-title')).toHaveText('Diagram fixture');
+    await expect(page.getByTestId('space-title')).toHaveText('Map fixture');
     await expect(page.getByTestId('selected-canvas')).toHaveText('Collection 1');
     await expect(page.getByTestId('active-graph')).toHaveText('Long');
     await dock(page)
-      .getByRole('button', { name: /^Diagram: / })
+      .getByRole('button', { name: /^Map: / })
       .click();
     const menu = page.getByRole('menu');
     await expect(menu).toBeVisible();
@@ -194,31 +194,31 @@ test('a secondary-button drag on the grip leaves the Dock in its slot', async ({
 });
 
 /**
- * The handles sit half outside the Thing's own box, so a pointer moving from the
- * Thing onto one leaves `.canvas-thing` without leaving the Thing — and the rail
- * must not drop away under a pointer that is still on the Thing's furniture.
+ * The handles sit half outside the Resource's own box, so a pointer moving from the
+ * Resource onto one leaves `.canvas-resource` without leaving the Resource — and the rail
+ * must not drop away under a pointer that is still on the Resource's furniture.
  *
  * Read off the commands and the kind glyph rather than a coloured band: the band
  * is gone and the rail is neutral (`.scratch/command-dock/issues/12`). The
  * handle's own colour is asserted here too, because it is the half of the
  * treatment change that says where the Graph's colour went.
  */
-test('hovering a Thing handle keeps its rail revealed with entity actions', async ({ page }) => {
+test('hovering a Resource handle keeps its rail revealed with entity actions', async ({ page }) => {
   await page.goto('/');
-  const thing = nodeByTitle(page, 'A');
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A');
+  await expect(resource).toBeVisible();
   await settled(page);
-  await thing.hover();
-  const handle = thing.locator('[data-handleid="authoring-source-right"]');
+  await resource.hover();
+  const handle = resource.locator('[data-handleid="authoring-source-right"]');
   const color = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(color).not.toBe('rgba(0, 0, 0, 0)');
   const box = await handle.boundingBox();
-  if (box === null) throw new Error('Thing handle has no box');
-  // The outside half is beyond the Thing face but inside the handle hit target.
+  if (box === null) throw new Error('Resource handle has no box');
+  // The outside half is beyond the Resource face but inside the handle hit target.
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
   await expect(handle).toBeVisible();
-  await expect(thing.locator('.thing-rail__kind')).toHaveCSS('opacity', '1');
-  await expect(thing.getByTestId('canvas-thing-actions')).toHaveCSS('opacity', '1');
+  await expect(resource.locator('.resource-rail__kind')).toHaveCSS('opacity', '1');
+  await expect(resource.getByTestId('canvas-resource-actions')).toHaveCSS('opacity', '1');
 });
 
 /**
@@ -242,7 +242,7 @@ async function reportOverAnOverlappingDock(page: Page): Promise<Locator> {
     .click();
   await page.getByRole('menuitemradio', { name: 'Right', exact: true }).first().click();
   await dock(page)
-    .getByRole('button', { name: /^Diagram: / })
+    .getByRole('button', { name: /^Map: / })
     .click({ delay: 120 });
   await page.getByRole('menuitem', { name: /^Copy link/ }).click();
   const notice = page.getByRole('alert').filter({ hasText: 'Link not copied' });
@@ -303,13 +303,13 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
   expect(covered).toBe(false);
   // And the bar takes the next press where the report was standing.
   await dock(page)
-    .getByRole('button', { name: /^Diagram: / })
+    .getByRole('button', { name: /^Map: / })
     .click({ delay: 120 });
-  await expect(page.getByRole('menuitem', { name: 'New Diagram', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'New Map', exact: true })).toBeVisible();
 });
 
 /**
- * Create Thing, as two peers, through the running application.
+ * Create Resource, as two peers, through the running application.
  *
  * The Ladle half of this claim asserts the controls are present, named and
  * ungated; this half asserts what a press of one actually *does*, which the
@@ -318,13 +318,13 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
  *
  * **The press count is the obligation, and it is now the same count for both.**
  * ADR 0089 retired the panes that stood between a press and a creation: each
- * kind completes its Edit on activation and continues in the Thing's own Title
+ * kind completes its Edit on activation and continues in the Resource's own Title
  * editor, so neither owes a second decision. The asymmetry that killed the
  * disclosure — one kind completing on the press while two collected a value
  * first — is gone rather than merely unmeasured.
  */
 test(
-  'each Thing kind is created in one press from the Dock',
+  'each Resource kind is created in one press from the Dock',
   { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
   async ({ page }) => {
     await page.goto('/');
@@ -335,21 +335,21 @@ test(
     // opened by either press.
     await expect(page.getByRole('menu')).toHaveCount(0);
 
-    await createThing(page, 'Markdown Thing');
-    const title = page.getByRole('textbox', { name: 'Thing title' });
+    await createResource(page, 'Markdown Resource');
+    const title = page.getByRole('textbox', { name: 'Resource title' });
     await expect(title).toBeFocused();
     await title.press('Escape');
 
-    // The same one press, and the same arrival: a Space Thing mints its own
-    // Space and continues in the Thing's Title editor, seeded with the `Space N`
+    // The same one press, and the same arrival: a Space Resource mints its own
+    // Space and continues in the Resource's Title editor, seeded with the `Space N`
     // both were named from.
     await expect(
       page
-        .getByRole('button', { name: 'Create Space Thing', exact: true })
+        .getByRole('button', { name: 'Create Space Resource', exact: true })
         .locator('[data-icon="space"]'),
     ).toBeVisible();
-    await createThing(page, 'Space Thing');
-    const spaceTitle = page.getByRole('textbox', { name: 'Thing title' });
+    await createResource(page, 'Space Resource');
+    const spaceTitle = page.getByRole('textbox', { name: 'Resource title' });
     await expect(spaceTitle).toBeFocused();
     await expect(spaceTitle).toHaveValue(/^Space \d+$/);
     await expect(page.getByRole('menu')).toHaveCount(0);
@@ -359,7 +359,7 @@ test(
 );
 
 /**
- * The Things cluster packs onto one row on a side edge, in the application.
+ * The Resources cluster packs onto one row on a side edge, in the application.
  *
  * The Ladle half measures the arrangement against a story's dock. This half
  * measures it on the real Dock, moved to a real slot through the position menu
@@ -367,8 +367,8 @@ test(
  * draws, not one a story arranged.
  */
 test(
-  'a side-edge Dock packs Things onto one row at its neighbours’ height',
-  { tag: '@parity:command-dock-packs-things-onto-one-row' },
+  'a side-edge Dock packs Resources onto one row at its neighbours’ height',
+  { tag: '@parity:command-dock-packs-resources-onto-one-row' },
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
@@ -383,18 +383,18 @@ test(
     // The slot transition is 160ms of `top`; measure where the column rests.
     await page.waitForTimeout(400);
 
-    const things = await boxOf(
-      surface.getByRole('group', { name: 'Things' }),
-      'the Things cluster',
+    const resources = await boxOf(
+      surface.getByRole('group', { name: 'Resources' }),
+      'the Resources cluster',
     );
     const graph = await boxOf(surface.getByRole('group', { name: 'Graph' }), 'the Graph cluster');
 
     // One row, so the cluster carrying four controls stands at the height of
     // the one carrying three. Three siblings would auto-place onto three rows.
-    expect(Math.abs(things.height - graph.height)).toBeLessThanOrEqual(1);
+    expect(Math.abs(resources.height - graph.height)).toBeLessThanOrEqual(1);
 
     // And its trailing edge is still the surface's, so packing bought the room
     // without pushing a command out of the column.
-    expect(things.x + things.width).toBeLessThanOrEqual(graph.x + graph.width + 1);
+    expect(resources.x + resources.width).toBeLessThanOrEqual(graph.x + graph.width + 1);
   },
 );

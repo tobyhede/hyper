@@ -11,8 +11,8 @@ import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import {
-  dragThingAndCapturePosition,
-  expectThingRestoredAt,
+  dragResourceAndCapturePosition,
+  expectResourceRestoredAt,
   openStoredSpace,
 } from '../support/restart-proof';
 import { POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
@@ -28,7 +28,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
     // Below the default suite's `E2E_PORT_BASE + workerIndex` range, which no
     // worker index can reach downward: this project is opt-in and may be running
     // beside a normal `pnpm e2e`, and `strictPort` turns any overlap into a
-    // failure that blames the wrong thing.
+    // failure that blames the wrong resource.
     server: { host: '127.0.0.1', port: POSTGRES_E2E_PORT, strictPort: true },
   });
   try {
@@ -48,8 +48,8 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
   const repository = new SqlSpaceRepository(postgresSqlStore);
   const spaceId = newUuid();
-  const thingId = newUuid();
-  const diagramId = newUuid();
+  const resourceId = newUuid();
+  const mapId = newUuid();
   const graphId = newUuid();
   const title = `HTTP restart ${spaceId}`;
   let firstHost: ViteDevServer | undefined;
@@ -64,21 +64,21 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // first state and leaves an initialized repository exactly as it is (ADR
     // 0078), so on a developer's database that already holds a Meta Space it
     // would answer `already-initialized` and write nothing — and the drag below
-    // would then be looking for a Thing that was never stored. The old
+    // would then be looking for a Resource that was never stored. The old
     // `importSpaces` hid that by falling through to an insert; there is no such
     // door now, so the empty repository this test needs has to be arranged
     // rather than assumed. Safe for the same reason the cleanup below is:
     // `workers: 1` and one test, so nothing else holds this `DATABASE_URL`.
     await clearHyperContent();
 
-    // The Diagram is part of the fixture, and has to be. A diagramless Space is
+    // The Map is part of the fixture, and has to be. A mapless Space is
     // initialized on its first working load (ADR 0079), and that initialization
-    // mints an *empty* Diagram — `positions: {}` in `working-space.ts`. The
-    // fixture's Thing would then belong to the Space and to no Diagram, so the
+    // mints an *empty* Map — `positions: {}` in `working-space.ts`. The
+    // fixture's Resource would then belong to the Space and to no Map, so the
     // canvas would draw nothing and `nodeByTitle` below would wait out the
-    // timeout with the Thing sitting in the Things list. Placing the Thing here
+    // timeout with the Resource sitting in the Resources list. Placing the Resource here
     // also keeps this test about durability alone: initialization is a write,
-    // and an unasked-for write is one more thing between the drag and the
+    // and an unasked-for write is one more resource between the drag and the
     // revision this asserts.
     //
     // This Space is Meta, and says so rather than being inferred to be. A
@@ -92,22 +92,22 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
           document: {
             version: 1,
             title,
-            diagrams: [
+            maps: [
               {
-                id: diagramId,
-                title: 'Diagram 1',
+                id: mapId,
+                title: 'Map 1',
                 kind: 'positioned',
-                positions: { [thingId]: { x: 0, y: 0, open: false } },
+                positions: { [resourceId]: { x: 0, y: 0, open: false } },
                 graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
                 activeGraph: graphId,
               },
             ],
-            defaultDiagram: diagramId,
+            defaultMap: mapId,
           },
-          things: [
+          resources: [
             {
-              id: thingId,
-              document: { title: 'Restart thing', kind: 'markdown', body: 'Durable.' },
+              id: resourceId,
+              document: { title: 'Restart resource', kind: 'markdown', body: 'Durable.' },
             },
           ],
         },
@@ -121,9 +121,9 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     firstHost = first.server;
     const openedFirst = await openStoredSpace(browser, first.baseURL, spaceId, title);
     firstContext = openedFirst.context;
-    const durablePosition = await dragThingAndCapturePosition(
+    const durablePosition = await dragResourceAndCapturePosition(
       openedFirst.page,
-      'Restart thing',
+      'Restart resource',
       0,
       220,
       '1',
@@ -141,7 +141,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     secondHost = second.server;
     const openedSecond = await openStoredSpace(browser, second.baseURL, spaceId, title);
     secondContext = openedSecond.context;
-    await expectThingRestoredAt(openedSecond.page, 'Restart thing', durablePosition, '1');
+    await expectResourceRestoredAt(openedSecond.page, 'Restart resource', durablePosition, '1');
 
     // Durability is only half of what the aggregate owes; the other half is
     // that it can leave again, at the revision the drag actually reached. An

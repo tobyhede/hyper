@@ -15,7 +15,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'Escape',
     surface: 'Markdown source editor',
-    behaviour: 'withhold the Thing surface cancel key from CodeMirror',
+    behaviour: 'withhold the Resource surface cancel key from CodeMirror',
   },
   {
     module: 'packages/ui/src/MarkdownSourceEditor.tsx',
@@ -23,22 +23,22 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'Mod-Enter',
     surface: 'Markdown source editor',
-    behaviour: 'withhold the Thing surface commit chord from CodeMirror',
+    behaviour: 'withhold the Resource surface commit chord from CodeMirror',
   },
   {
-    module: 'packages/ui/src/MarkdownThingBody.tsx',
+    module: 'packages/ui/src/MarkdownResourceBody.tsx',
     sourceKey: 'Escape',
     occurrence: 1,
     key: 'Escape',
-    surface: 'Markdown Thing body',
+    surface: 'Markdown Resource body',
     behaviour: 'cancel Markdown editing',
   },
   {
-    module: 'packages/ui/src/MarkdownThingBody.tsx',
+    module: 'packages/ui/src/MarkdownResourceBody.tsx',
     sourceKey: 'Enter',
     occurrence: 1,
     key: 'Mod-Enter',
-    surface: 'Markdown Thing body',
+    surface: 'Markdown Resource body',
     behaviour: 'commit Markdown editing',
   },
   {
@@ -62,16 +62,16 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     sourceKey: 'Enter',
     occurrence: 1,
     key: 'Enter',
-    surface: 'Canvas Thing',
-    behaviour: 'open the focused Thing',
+    surface: 'Canvas Resource',
+    behaviour: 'open the focused Resource',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
     sourceKey: ' ',
     occurrence: 1,
     key: 'Space',
-    surface: 'Canvas Thing',
-    behaviour: 'open the focused Thing',
+    surface: 'Canvas Resource',
+    behaviour: 'open the focused Resource',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
@@ -79,7 +79,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'C',
     surface: 'Canvas',
-    behaviour: 'add a Thing on an unmodified, non-repeating press',
+    behaviour: 'add a Resource on an unmodified, non-repeating press',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
@@ -87,7 +87,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'F2',
     surface: 'Canvas',
-    behaviour: 'begin renaming the selected Thing',
+    behaviour: 'begin renaming the selected Resource',
   },
   {
     module: 'packages/app/src/presenting-keys.ts',
@@ -160,7 +160,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     key: 'Backspace',
     surface: 'Canvas',
     behaviour:
-      'remove the focused Thing, else the selected Thing or Edge, through Space Authoring, on an unmodified, non-repeating press',
+      'remove the focused Resource, else the selected Resource or Edge, through Space Authoring, on an unmodified, non-repeating press',
   },
   {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
@@ -169,7 +169,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     key: 'Delete',
     surface: 'Canvas',
     behaviour:
-      'remove the focused Thing, else the selected Thing or Edge, through Space Authoring, on an unmodified, non-repeating press',
+      'remove the focused Resource, else the selected Resource or Edge, through Space Authoring, on an unmodified, non-repeating press',
   },
   {
     module: 'packages/app/src/edge-authoring-react.tsx',
@@ -177,7 +177,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     occurrence: 1,
     key: 'Alt',
     surface: 'Edge authoring',
-    behaviour: 'modify an empty drop into a new Thing connection',
+    behaviour: 'modify an empty drop into a new Resource connection',
   },
   {
     module: 'packages/app/src/components/SelectedEdgeControls.tsx',

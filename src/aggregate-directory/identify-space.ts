@@ -85,10 +85,10 @@ export const describeSchemaFailure = (issues: readonly SchemaIssue[], label: str
  * left to dangle and refused by aggregate intake, which is where a dangling
  * reference is reported anyway.
  *
- * A diagram's own id and the ids of the graphs it owns are minted in the
+ * A map's own id and the ids of the graphs it owns are minted in the
  * **same pass**, because under version 1 a graph is reached only through its
  * owner (ADR 0040): there is no space-level collection to walk beside the
- * diagrams.
+ * maps.
  *
  * `spaceId` **supplies** the identity the document omits; it never overrides one
  * the document declares. A caller has it because the identity was written
@@ -110,22 +110,22 @@ export const identifySpace = (
     );
   }
 
-  const diagrams = input.document.diagrams?.map((diagram) => ({
-    ...diagram,
-    id: diagram.id ?? newId(),
-    graphs: diagram.graphs.map((graph) => ({ ...graph, id: graph.id ?? newId() })),
+  const maps = input.document.maps?.map((map) => ({
+    ...map,
+    id: map.id ?? newId(),
+    graphs: map.graphs.map((graph) => ({ ...graph, id: graph.id ?? newId() })),
   }));
 
   // The document is carried through rather than rebuilt field by field, so a
   // version this build does not read reaches domain intake and is rejected
   // there. Rebuilding it stamped `version` with a constant, which quietly
   // rewrote an unsupported document into a supported one.
-  const document = diagrams === undefined ? { ...input.document } : { ...input.document, diagrams };
+  const document = maps === undefined ? { ...input.document } : { ...input.document, maps };
 
   const parsed = spaceSnapshotSchema.safeParse({
     id: spaceId,
     document,
-    things: input.things.map((thing) => ({ ...thing, id: thing.id ?? newId() })),
+    resources: input.resources.map((resource) => ({ ...resource, id: resource.id ?? newId() })),
   });
   if (!parsed.success) {
     throw new SpaceIdentityError(describeSchemaFailure(parsed.error.issues, 'identified space'));

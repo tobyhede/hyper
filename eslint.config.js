@@ -241,7 +241,7 @@ export default tseslint.config(
       // ADR 0062. The assertions already in the tree were examined in a reviewed
       // pass and stand on their `SAFETY:` comments; what has no gate is the next
       // one, because a comment requirement is satisfied by prose and prose is the
-      // cheapest thing an agent produces. The committed suppressions baseline
+      // cheapest resource an agent produces. The committed suppressions baseline
       // records the existing sites and `--prune-suppressions` keeps the ceiling
       // falling, so this caps the count while the anti-slop comment rule — which
       // is unchanged and still applies to every surviving assertion — demands the

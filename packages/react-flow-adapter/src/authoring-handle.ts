@@ -1,5 +1,5 @@
 /**
- * Diameter of a Thing's four Edge anchors, in canvas pixels.
+ * Diameter of a Resource's four Edge anchors, in canvas pixels.
  *
  * Declared once and consumed by the handle declaration, the rendered element and
  * the attachment geometry, because all three must agree: React Flow builds

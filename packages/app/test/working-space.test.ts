@@ -8,10 +8,10 @@ const snapshot = (title: string): SpaceSnapshot =>
     document: {
       version: 1,
       title,
-      // The Graph is a nested owned value of the Diagram that positions both the
-      // Things its Edge names (ADR 0040) — a Space holds Graphs by holding a
-      // Diagram, and nowhere else.
-      diagrams: [
+      // The Graph is a nested owned value of the Map that positions both the
+      // Resources its Edge names (ADR 0040) — a Space holds Graphs by holding a
+      // Map, and nowhere else.
+      maps: [
         {
           id: '00000000-0000-4000-8000-000000000005',
           title: 'Working',
@@ -35,10 +35,10 @@ const snapshot = (title: string): SpaceSnapshot =>
         },
       ],
     },
-    things: [
+    resources: [
       {
         id: '00000000-0000-4000-8000-000000000002',
-        document: { title: 'Thing', kind: 'markdown', body: 'Body' },
+        document: { title: 'Resource', kind: 'markdown', body: 'Body' },
       },
       {
         id: '00000000-0000-4000-8000-000000000003',
@@ -75,11 +75,11 @@ it('revalidates when the session installs a different working snapshot', () => {
 });
 
 it('throws the validation failure every time an invalid snapshot is read', () => {
-  // A Diagram positioning — and a Graph naming — Things the snapshot does not
+  // A Map positioning — and a Graph naming — Resources the snapshot does not
   // carry: valid wire shape, invalid aggregate, so this fails domain intake
   // rather than the schema.
   const base = snapshot('Space');
-  const dangling: SpaceSnapshot = { ...base, things: [] };
+  const dangling: SpaceSnapshot = { ...base, resources: [] };
   const readWorkingSpace = createWorkingSpaceReader();
   const valid = readWorkingSpace(base);
 

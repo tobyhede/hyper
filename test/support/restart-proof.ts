@@ -20,13 +20,13 @@ export interface OpenedStoredSpace {
  *
  * **The Space's name is a label, not a heading** (ADR 0082). The Space
  * Sidebar drew it as an `h1`; the Command Dock draws it through the same
- * `IdentityName` the Diagram and Graph use, and a name with no rename Edit
+ * `IdentityName` the Map and Graph use, and a name with no rename Edit
  * behind it renders as a `span` rather than as a button or a heading —
  * renaming a Space is not built (`.scratch/command-dock/issues/09`). So the
  * slot is addressed the way every other spec addresses it, and the visible
  * filter is the open-Spaces rule: every open Space stays mounted, and only
  * the one on the canvas is showing.
- * `toContainText`, which is the matcher `space-thing.spec.ts` spends on this
+ * `toContainText`, which is the matcher `space-resource.spec.ts` spends on this
  * same locator and the one actually proven green against the Dock. The title
  * carries the Space's own UUID, so containment is unambiguous here.
  */
@@ -44,28 +44,28 @@ export async function openStoredSpace(
 }
 
 /**
- * Drag the named Thing by a flow-space delta, wait for the commit to reach
+ * Drag the named Resource by a flow-space delta, wait for the commit to reach
  * `revision`, and answer where React Flow actually put it.
  */
-export async function dragThingAndCapturePosition(
+export async function dragResourceAndCapturePosition(
   page: Page,
   title: string,
   dx: number,
   dy: number,
   revision: string,
 ): Promise<{ x: number; y: number }> {
-  const thing = nodeByTitle(page, title);
+  const resource = nodeByTitle(page, title);
   await settled(page);
-  await dragBy(page, thing, dx, dy);
+  await dragBy(page, resource, dx, dy);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', revision);
-  return positionOf(thing);
+  return positionOf(resource);
 }
 
 /**
- * Assert the named Thing reappears at `position` on a freshly opened host,
+ * Assert the named Resource reappears at `position` on a freshly opened host,
  * once it reports `revision`.
  */
-export async function expectThingRestoredAt(
+export async function expectResourceRestoredAt(
   page: Page,
   title: string,
   position: { x: number; y: number },

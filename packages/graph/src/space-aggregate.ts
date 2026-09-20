@@ -17,9 +17,9 @@ export interface SpaceAggregate {
   readonly [SPACE_AGGREGATE_INTAKE]: true;
 }
 
-interface SpaceThingLocation {
+interface SpaceEndpointLocation {
   readonly spaceId: UUID;
-  readonly thingId: UUID;
+  readonly resourceId: UUID;
   readonly targetSpaceId: UUID;
 }
 
@@ -35,24 +35,27 @@ export type SpaceAggregateError =
       readonly snapshotIndexes: readonly number[];
     }
   | {
-      readonly kind: 'duplicate-thing-id';
-      readonly thingId: UUID;
+      readonly kind: 'duplicate-resource-id';
+      readonly resourceId: UUID;
       readonly spaceIds: readonly UUID[];
     }
   | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: UUID }
-  | ({ readonly kind: 'space-thing-target-missing' } & SpaceThingLocation)
-  | ({ readonly kind: 'space-thing-reference-cycle' } & SpaceThingLocation)
+  | ({ readonly kind: 'space-resource-target-missing' } & SpaceEndpointLocation)
+  | ({ readonly kind: 'space-resource-reference-cycle' } & SpaceEndpointLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | ({
-      readonly kind: 'space-thing-diagram-missing';
-      readonly diagramId: UUID;
-    } & SpaceThingLocation)
-  | ({ readonly kind: 'space-thing-graph-missing'; readonly graphId: UUID } & SpaceThingLocation)
+      readonly kind: 'space-resource-map-missing';
+      readonly mapId: UUID;
+    } & SpaceEndpointLocation)
   | ({
-      readonly kind: 'space-thing-graph-outside-diagram';
-      readonly diagramId: UUID;
+      readonly kind: 'space-resource-graph-missing';
       readonly graphId: UUID;
-    } & SpaceThingLocation);
+    } & SpaceEndpointLocation)
+  | ({
+      readonly kind: 'space-resource-graph-outside-map';
+      readonly mapId: UUID;
+      readonly graphId: UUID;
+    } & SpaceEndpointLocation);
 
 export type LoadSpaceAggregateResult =
   | { readonly ok: true; readonly aggregate: SpaceAggregate }
@@ -103,16 +106,16 @@ export function loadSpaceAggregate({
   }
   if (errors.length > 0) return { ok: false, errors };
 
-  const spaceIdsByThingId = new Map<UUID, UUID[]>();
+  const spaceIdsByResourceId = new Map<UUID, UUID[]>();
   for (const space of spaces) {
-    for (const thing of space.things) {
-      const spaceIds = spaceIdsByThingId.get(thing.id);
-      if (spaceIds === undefined) spaceIdsByThingId.set(thing.id, [space.id]);
+    for (const resource of space.resources) {
+      const spaceIds = spaceIdsByResourceId.get(resource.id);
+      if (spaceIds === undefined) spaceIdsByResourceId.set(resource.id, [space.id]);
       else spaceIds.push(space.id);
     }
   }
-  for (const [thingId, spaceIds] of spaceIdsByThingId) {
-    if (spaceIds.length > 1) errors.push({ kind: 'duplicate-thing-id', thingId, spaceIds });
+  for (const [resourceId, spaceIds] of spaceIdsByResourceId) {
+    if (spaceIds.length > 1) errors.push({ kind: 'duplicate-resource-id', resourceId, spaceIds });
   }
   if (errors.length > 0) return { ok: false, errors };
 
@@ -121,60 +124,60 @@ export function loadSpaceAggregate({
     return { ok: false, errors: [{ kind: 'meta-space-missing', metaSpaceId }] };
   }
   for (const space of spaces) {
-    for (const thing of space.things) {
-      if (thing.kind !== 'space' || byId.has(thing.spaceId)) continue;
+    for (const resource of space.resources) {
+      if (resource.kind !== 'space' || byId.has(resource.spaceId)) continue;
       errors.push({
-        kind: 'space-thing-target-missing',
+        kind: 'space-resource-target-missing',
         spaceId: space.id,
-        thingId: thing.id,
-        targetSpaceId: thing.spaceId,
+        resourceId: resource.id,
+        targetSpaceId: resource.spaceId,
       });
     }
   }
   if (errors.length > 0) return { ok: false, errors };
 
   for (const space of spaces) {
-    for (const thing of space.things) {
-      if (thing.kind !== 'space') continue;
-      const target = byId.get(thing.spaceId);
+    for (const resource of space.resources) {
+      if (resource.kind !== 'space') continue;
+      const target = byId.get(resource.spaceId);
       if (target === undefined) continue;
-      // The Thing's own stored id, with no fallback to the target's
-      // `defaultDiagram` (ADR 0079). A Space Thing selects a Diagram from the
-      // moment it exists, so a `diagram` that resolves to nothing is a dangling
-      // reference to a deleted Diagram rather than an unmade choice — which is
+      // The Resource's own stored id, with no fallback to the target's
+      // `defaultMap` (ADR 0079). A Space Resource selects a Map from the
+      // moment it exists, so a `map` that resolves to nothing is a dangling
+      // reference to a deleted Map rather than an unmade choice — which is
       // what makes reporting it right where reading through the target's own
       // opening selection used to be.
-      const diagramId = thing.diagram;
-      const resolvedDiagram = target.lookup.diagram(diagramId);
-      if (resolvedDiagram === undefined) {
+      const mapId = resource.map;
+      const resolvedMap = target.lookup.map(mapId);
+      if (resolvedMap === undefined) {
         errors.push({
-          kind: 'space-thing-diagram-missing',
+          kind: 'space-resource-map-missing',
           spaceId: space.id,
-          thingId: thing.id,
+          resourceId: resource.id,
           targetSpaceId: target.id,
-          diagramId,
+          mapId,
         });
         continue;
       }
-      if (target.lookup.graph(thing.graph) === undefined) {
+      if (target.lookup.graph(resource.graph) === undefined) {
         errors.push({
-          kind: 'space-thing-graph-missing',
+          kind: 'space-resource-graph-missing',
           spaceId: space.id,
-          thingId: thing.id,
+          resourceId: resource.id,
           targetSpaceId: target.id,
-          graphId: thing.graph,
+          graphId: resource.graph,
         });
         continue;
       }
-      const subjectGraphs = resolvedDiagram.diagram.graphs;
-      if (!subjectGraphs.some((graph) => graph.id === thing.graph)) {
+      const subjectGraphs = resolvedMap.map.graphs;
+      if (!subjectGraphs.some((graph) => graph.id === resource.graph)) {
         errors.push({
-          kind: 'space-thing-graph-outside-diagram',
+          kind: 'space-resource-graph-outside-map',
           spaceId: space.id,
-          thingId: thing.id,
+          resourceId: resource.id,
           targetSpaceId: target.id,
-          diagramId,
-          graphId: thing.graph,
+          mapId,
+          graphId: resource.graph,
         });
       }
     }
@@ -184,18 +187,18 @@ export function loadSpaceAggregate({
   const visitState = new Map<UUID, 'visiting' | 'visited'>();
   const visit = (space: Space): void => {
     visitState.set(space.id, 'visiting');
-    for (const thing of space.things) {
-      if (thing.kind !== 'space') continue;
-      const target = byId.get(thing.spaceId);
+    for (const resource of space.resources) {
+      if (resource.kind !== 'space') continue;
+      const target = byId.get(resource.spaceId);
       // Missing targets were returned above, so this branch only preserves the
       // type-level boundary between Map lookup and the validated topology.
       if (target === undefined) continue;
       const state = visitState.get(target.id);
       if (state === 'visiting') {
         errors.push({
-          kind: 'space-thing-reference-cycle',
+          kind: 'space-resource-reference-cycle',
           spaceId: space.id,
-          thingId: thing.id,
+          resourceId: resource.id,
           targetSpaceId: target.id,
         });
       } else if (state === undefined) {
@@ -212,8 +215,8 @@ export function loadSpaceAggregate({
 
   const referencedSpaceIds = new Set<UUID>();
   for (const space of spaces) {
-    for (const thing of space.things) {
-      if (thing.kind === 'space') referencedSpaceIds.add(thing.spaceId);
+    for (const resource of space.resources) {
+      if (resource.kind === 'space') referencedSpaceIds.add(resource.spaceId);
     }
   }
   for (const space of spaces) {

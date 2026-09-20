@@ -3,19 +3,19 @@ import { buildGraphRenderEdges, loadSpace, type Space } from '@project/graph';
 import type { SpaceFile } from '@project/core';
 import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
-import { projectThingNodes, projectGraphEdges, OTHER_GRAPH_OPACITY } from '../src/index';
-import { referenceFile, thingFile } from './thing-files';
+import { projectResourceNodes, projectGraphEdges, OTHER_GRAPH_OPACITY } from '../src/index';
+import { referenceFile, resourceFile } from './resource-files';
 import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
 function load(
   input: unknown,
-  thingFiles = [
-    thingFile('00000000-0000-4000-8000-000000000002', 'Thing A'),
-    thingFile('00000000-0000-4000-8000-000000000003', 'Thing B'),
+  resourceFiles = [
+    resourceFile('00000000-0000-4000-8000-000000000002', 'Resource A'),
+    resourceFile('00000000-0000-4000-8000-000000000003', 'Resource B'),
   ],
 ): Space {
-  const result = loadSpace(input, thingFiles);
+  const result = loadSpace(input, resourceFiles);
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
 }
@@ -23,11 +23,11 @@ function load(
 /**
  * A version 1 space document over the given graphs.
  *
- * A graph is an owned value of the diagram that holds it now (ADR 0040), and
- * every edge endpoint must be a thing of *that* diagram, so the one diagram below
- * takes membership of every thing the graphs touch. The positions are arbitrary
+ * A graph is an owned value of the map that holds it now (ADR 0040), and
+ * every edge endpoint must be a resource of *that* map, so the one map below
+ * takes membership of every resource the graphs touch. The positions are arbitrary
  * — nothing in this file reads them — and what they express here is membership,
- * which is what a diagram's position keys are.
+ * which is what a map's position keys are.
  *
  * Returned as `SpaceFile` rather than as `unknown`, although `loadSpace` takes
  * `unknown` and would accept either. The literal is the whole point: typed, the
@@ -43,10 +43,10 @@ function spaceFile(
     version: 1,
     id: uuid('00000000-0000-4000-8000-000000000001'),
     title: 'Test',
-    diagrams: [
+    maps: [
       {
         id: uuid('00000000-0000-4000-8000-000000000050'),
-        title: 'Only diagram',
+        title: 'Only map',
         kind: 'positioned',
         positions: Object.fromEntries(
           members.map((id, index) => [uuid(id), { x: index * 300, y: 0, open: false }]),
@@ -90,21 +90,21 @@ const colors = {
   '00000000-0000-4000-8000-000000000004': '#111111',
   '00000000-0000-4000-8000-000000000030': '#222222',
 };
-describe('projectThingNodes', () => {
-  it('maps things to thing nodes carrying the title, not the content', () => {
-    const nodes = projectThingNodes(space);
+describe('projectResourceNodes', () => {
+  it('maps resources to resource nodes carrying the title, not the content', () => {
+    const nodes = projectResourceNodes(space);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
-    expect(a.type).toBe('thing');
-    expect(a.data.title).toBe('Thing A');
+    expect(a.type).toBe('resource');
+    expect(a.data.title).toBe('Resource A');
     expect(a.data.active).toBe(false);
-    // ADR 0006: content is loaded when a thing is opened, not embedded per node.
+    // ADR 0006: content is loaded when a resource is opened, not embedded per node.
     expect('markdown' in a.data).toBe(false);
   });
 
-  it('uses the positions a diagram put on the things', () => {
-    const nodes = projectThingNodes(space, {
+  it('uses the positions a map put on the resources', () => {
+    const nodes = projectResourceNodes(space, {
       strategyGraph: {
-        things: [
+        resources: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 500,
@@ -123,21 +123,21 @@ describe('projectThingNodes', () => {
     // React Flow re-measures a node that carries no measured size.
     expect(a.width).toBe(260);
     expect(a.height).toBe(300);
-    // thing b is absent from the diagram → falls back to the origin (no authored position).
+    // resource b is absent from the map → falls back to the origin (no authored position).
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.position).toEqual({
       x: 0,
       y: 0,
     });
   });
 
-  it("declares four anchors of each role on the rim of the Thing's own box", () => {
-    // A Thing's anchors follow the rect it occupies rather than a constant: the
-    // strategies arrange every collapsed Thing at `THING_SIZE`, so this differs
+  it("declares four anchors of each role on the rim of the Resource's own box", () => {
+    // A Resource's anchors follow the rect it occupies rather than a constant: the
+    // strategies arrange every collapsed Resource at `RESOURCE_SIZE`, so this differs
     // only for an Open one (ADR 0064) — and it has to, or an Edge attaches
-    // partway down a box the Thing no longer fills.
-    const nodes = projectThingNodes(space, {
+    // partway down a box the Resource no longer fills.
+    const nodes = projectResourceNodes(space, {
       strategyGraph: {
-        things: [
+        resources: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 0,
@@ -194,10 +194,10 @@ describe('projectThingNodes', () => {
     }
   });
 
-  it('declares no geometry for a thing the strategy has not placed, leaving React Flow to measure it', () => {
-    const nodes = projectThingNodes(space, {
+  it('declares no geometry for a resource the strategy has not placed, leaving React Flow to measure it', () => {
+    const nodes = projectResourceNodes(space, {
       strategyGraph: {
-        things: [
+        resources: [
           {
             id: uuid('00000000-0000-4000-8000-000000000002'),
             x: 500,
@@ -213,25 +213,25 @@ describe('projectThingNodes', () => {
 
     // Both keys are absent together, and that pairing is load-bearing: React Flow
     // reads declared handles only when they are there, and re-measures a node that
-    // carries no measured size. Declaring one without the other strands a thing on
+    // carries no measured size. Declaring one without the other strands a resource on
     // whichever half it kept.
     expect('handles' in b).toBe(false);
     expect('measured' in b).toBe(false);
   });
 
-  it('flags the active thing', () => {
-    const nodes = projectThingNodes(space, {
-      activeThingId: uuid('00000000-0000-4000-8000-000000000003'),
+  it('flags the active resource', () => {
+    const nodes = projectResourceNodes(space, {
+      activeResourceId: uuid('00000000-0000-4000-8000-000000000003'),
     });
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data.active).toBe(
       true,
     );
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.className).toContain(
-      'rf-thing-node--active',
+      'rf-resource-node--active',
     );
   });
 
-  it("resolves an Open Reference Thing's Target Markdown under the Reference Thing identity", () => {
+  it("resolves an Open Reference Resource's Target Markdown under the Reference Resource identity", () => {
     const referenceId = uuid('00000000-0000-4000-8000-000000000007');
     const withReference = load(
       spaceFile([
@@ -247,13 +247,13 @@ describe('projectThingNodes', () => {
         },
       ]),
       [
-        thingFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
+        resourceFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
         referenceFile(referenceId, 'Return', '00000000-0000-4000-8000-000000000002'),
       ],
     );
 
-    const nodes = projectThingNodes(withReference, {
-      openThingIds: new Set([referenceId]),
+    const nodes = projectResourceNodes(withReference, {
+      openResourceIds: new Set([referenceId]),
     });
     expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
       title: 'Return',
@@ -285,7 +285,7 @@ describe('projectGraphEdges', () => {
       source: '00000000-0000-4000-8000-000000000002',
       target: '00000000-0000-4000-8000-000000000003',
     });
-    // The side is chosen while the Edge is drawn, from where its two Things are
+    // The side is chosen while the Edge is drawn, from where its two Resources are
     // at that moment (ADR 0087), so there is nothing for the projection to name.
     expect(mainEdge.sourceHandle).toBeUndefined();
     expect(mainEdge.targetHandle).toBeUndefined();
@@ -296,11 +296,11 @@ describe('projectGraphEdges', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
 
     // The Edge data is the Graph id, its lane and its end trim, and no geometry
-    // (ADR 0086). Both fixture Graphs join the same two Things, Alt in the other
+    // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
     // direction: with nothing active the first keeps the centre and Alt takes
     // the lane below it. Nothing is active, so both connect. It carried an
     // optional routed polyline until then, for waypoints a routing strategy
-    // might have placed; nothing ever placed one, and a Diagram has nowhere to
+    // might have placed; nothing ever placed one, and a Map has nowhere to
     // store one, so the bezier the Edge draws between the two anchors it
     // attaches to is the only Edge geometry there has ever been.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
@@ -339,7 +339,7 @@ describe('projectGraphEdges', () => {
     expect(edges).toHaveLength(graphRenderEdges.length);
   });
 
-  describe('Graphs joining the same two Things', () => {
+  describe('Graphs joining the same two Resources', () => {
     const [A, B, C] = ['a', 'b', 'c'].map((id) => uuid(`00000000-0000-4000-8000-00000000010${id}`));
     const [RED, BLUE, GREEN] = ['1', '2', '3'].map((id) =>
       uuid(`00000000-0000-4000-8000-00000000020${id}`),

@@ -4,10 +4,10 @@ import { expect, it } from 'vitest';
 import {
   normalizeTitle,
   uuidSchema,
-  type Thing,
+  type Resource,
   type Graph,
-  type Diagram,
-  type DiagramId,
+  type Map,
+  type MapId,
   type SpaceSnapshot,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -25,7 +25,7 @@ import type { AuthoringCompletion, AuthoringResult } from '../src/space-authorin
  *
  * 1. The working Space always passes normal domain intake. A completed Edit
  *    derives and validates the whole next Space before a collaborator moves, so
- *    an Edit that would break Diagram membership, Edge closure, Reference Thing resolution
+ *    an Edit that would break Map membership, Edge closure, Reference Resource resolution
  *    or Graph ownership is refused rather than stored — and the sequence keeps
  *    going afterwards.
  * 2. An operation that is not an Edit changes nothing. `unchanged` and `refused`
@@ -43,16 +43,16 @@ import type { AuthoringCompletion, AuthoringResult } from '../src/space-authorin
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
-const OTHER_DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
 
 /**
- * Two Diagrams, a Reference Thing, a Thing one Diagram omits and a Graph in each — the
+ * Two Maps, a Reference Resource, a Resource one Map omits and a Graph in each — the
  * smallest Space in which every rule under test has something to bite on.
  */
 const start: SpaceSnapshot = {
@@ -60,43 +60,43 @@ const start: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    diagrams: [
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 10, y: 20, open: false },
-          [THING_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
         graphs: [
-          { id: GRAPH_ID, title: 'Main', edges: [{ from: THING_A, to: THING_B }] },
-          { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: THING_B, to: THING_B }] },
+          { id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
+          { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: RESOURCE_B, to: RESOURCE_B }] },
         ],
       },
       {
-        id: OTHER_DIAGRAM_ID,
-        title: 'Diagram 2',
+        id: OTHER_MAP_ID,
+        title: 'Map 2',
         kind: 'positioned',
         positions: {
-          [THING_A]: { x: 0, y: 400, open: false },
-          [THING_C]: { x: 0, y: 600, open: false },
+          [RESOURCE_A]: { x: 0, y: 400, open: false },
+          [RESOURCE_C]: { x: 0, y: 600, open: false },
         },
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
             title: 'Elsewhere',
-            edges: [{ from: THING_A, to: THING_C }],
+            edges: [{ from: RESOURCE_A, to: RESOURCE_C }],
           },
         ],
       },
     ],
-    defaultDiagram: DIAGRAM_ID,
+    defaultMap: MAP_ID,
   },
-  things: [
-    { id: THING_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: THING_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: THING_C, document: { title: 'A again', kind: 'reference', target: THING_A } },
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_C, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
   ],
 };
 
@@ -110,7 +110,7 @@ const anchor = fc.record({
 /**
  * A generated operation, still holding indices rather than identities.
  *
- * `settled-thing-movement` is absent because it carries the moved Things' own
+ * `settled-resource-movement` is absent because it carries the moved Resources' own
  * drop points, which only a real pointer gesture produces; its eligibility and
  * derivation are pinned in `space-authoring-operations.test.ts` and
  * `displacement.property.test.ts` against real geometry. The two connect
@@ -118,22 +118,22 @@ const anchor = fc.record({
  * eligibility rules need.
  */
 const operation = fc.oneof(
-  fc.record({ op: fc.constant('created-thing' as const), anchor }),
-  fc.record({ op: fc.constant('created-reference' as const), thing: index, anchor }),
+  fc.record({ op: fc.constant('created-resource' as const), anchor }),
+  fc.record({ op: fc.constant('created-reference' as const), resource: index, anchor }),
   /**
-   * Thing editing includes attempts to change a Reference Thing's immutable Target. The
+   * Resource editing includes attempts to change a Reference Resource's immutable Target. The
    * title is generated blank sometimes on purpose: an empty one must refuse
    * rather than reach intake.
    */
   fc.record({
-    op: fc.constant('edited-thing' as const),
-    thing: index,
+    op: fc.constant('edited-resource' as const),
+    resource: index,
     title: fc.oneof(fc.constant(''), fc.constant('  '), fc.string({ maxLength: 8 })),
     proposedTarget: fc.option(index, { nil: undefined }),
   }),
-  fc.record({ op: fc.constant('added-thing-to-diagram' as const), thing: index, anchor }),
-  fc.record({ op: fc.constant('removed-thing-from-diagram' as const), thing: index }),
-  fc.record({ op: fc.constant('deleted-thing' as const), thing: index }),
+  fc.record({ op: fc.constant('added-resource-to-map' as const), resource: index, anchor }),
+  fc.record({ op: fc.constant('removed-resource-from-map' as const), resource: index }),
+  fc.record({ op: fc.constant('deleted-resource' as const), resource: index }),
   fc.record({ op: fc.constant('added-graph' as const) }),
   fc.record({
     op: fc.constant('renamed-graph' as const),
@@ -152,7 +152,7 @@ const operation = fc.oneof(
     graph: index,
     edge: index,
     endpoint: fc.constantFrom('from' as const, 'to' as const),
-    thing: index,
+    resource: index,
   }),
 );
 
@@ -163,12 +163,12 @@ const NOTHING = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 
 const pick = <T>(items: readonly T[], at: number): T | undefined => items[at];
 
-it('keeps an existing Reference Thing Target immutable while accepting Title edits', () => {
+it('keeps an existing Reference Resource Target immutable while accepting Title edits', () => {
   fc.assert(
     fc.property(
-      fc.constantFrom(THING_A, THING_B),
+      fc.constantFrom(RESOURCE_A, RESOURCE_B),
       fc.oneof(
-        fc.constant('Reference Thing'),
+        fc.constant('Reference Resource'),
         // Normalized, not trimmed: the write path stores what the schema would
         // mint, and the two disagree about a line's leading whitespace and
         // about trailing whitespace on any line but the last (ADR 0083).
@@ -176,44 +176,47 @@ it('keeps an existing Reference Thing Target immutable while accepting Title edi
           .string({ minLength: 1, maxLength: 8 })
           .filter(
             (title) =>
-              normalizeTitle(title).length > 0 && normalizeTitle(title) !== 'Reference Thing',
+              normalizeTitle(title).length > 0 && normalizeTitle(title) !== 'Reference Resource',
           ),
       ),
       (target, proposedTitle) => {
-        const alternativeTarget = target === THING_A ? THING_B : THING_A;
+        const alternativeTarget = target === RESOURCE_A ? RESOURCE_B : RESOURCE_A;
         const snapshot: SpaceSnapshot = {
           ...start,
-          things: start.things.map((thing) =>
-            thing.id === THING_C
-              ? { id: THING_C, document: { title: 'Reference Thing', kind: 'reference', target } }
-              : thing,
+          resources: start.resources.map((resource) =>
+            resource.id === RESOURCE_C
+              ? {
+                  id: RESOURCE_C,
+                  document: { title: 'Reference Resource', kind: 'reference', target },
+                }
+              : resource,
           ),
         };
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-        const { authoring } = composeApp({ spaceSession: session, selection: OTHER_DIAGRAM_ID });
+        const { authoring } = composeApp({ spaceSession: session, selection: OTHER_MAP_ID });
 
         expect(
           authoring.complete({
-            kind: 'edited-thing',
-            thingId: THING_C,
+            kind: 'edited-resource',
+            resourceId: RESOURCE_C,
             document: { title: proposedTitle, kind: 'reference', target },
           }),
         ).toEqual(
-          normalizeTitle(proposedTitle) === 'Reference Thing'
+          normalizeTitle(proposedTitle) === 'Reference Resource'
             ? { kind: 'unchanged' }
             : { kind: 'completed' },
         );
-        expect(session.getState().working.things).toContainEqual({
-          id: THING_C,
+        expect(session.getState().working.resources).toContainEqual({
+          id: RESOURCE_C,
           document: { title: normalizeTitle(proposedTitle), kind: 'reference', target },
         });
 
         const beforeRetarget = session.getState().working;
         expect(
           authoring.complete({
-            kind: 'edited-thing',
-            thingId: THING_C,
+            kind: 'edited-resource',
+            resourceId: RESOURCE_C,
             document: { title: proposedTitle, kind: 'reference', target: alternativeTarget },
           }),
         ).toEqual({ kind: 'refused', refusal: { code: 'reference-target-immutable' } });
@@ -228,24 +231,24 @@ it('keeps the working Space loadable through any sequence of semantic operations
   fc.assert(
     fc.property(
       fc.array(operation, { minLength: 1, maxLength: 12 }),
-      fc.constantFrom<DiagramId>(DIAGRAM_ID, OTHER_DIAGRAM_ID, DIAGRAM_ID),
-      (operations, diagramId) => {
+      fc.constantFrom<MapId>(MAP_ID, OTHER_MAP_ID, MAP_ID),
+      (operations, mapId) => {
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
           spaceSession: session,
-          selection: diagramId,
+          selection: mapId,
         });
         // The authored geometry available when an author reaches these controls.
-        const selectedDiagram = (): Diagram | undefined => {
-          const selected = navigation.getState().selectedDiagramId;
-          return currentSpace().lookup.diagram(selected)?.diagram;
+        const selectedMap = (): Map | undefined => {
+          const selected = navigation.getState().selectedMapId;
+          return currentSpace().lookup.map(selected)?.map;
         };
 
         for (const generated of operations) {
           const space = currentSpace();
-          const graphs: readonly Graph[] = selectedDiagram()?.graphs ?? space.graphs;
-          const completion = resolve(generated, space.things, graphs);
+          const graphs: readonly Graph[] = selectedMap()?.graphs ?? space.graphs;
+          const completion = resolve(generated, space.resources, graphs);
 
           const before = session.getState().working;
           const result: AuthoringResult = authoring.complete(completion);
@@ -272,30 +275,32 @@ it('keeps the working Space loadable through any sequence of semantic operations
 /** Turn generated indices into the identities the live Space actually holds. */
 function resolve(
   generated: GeneratedOperation,
-  things: readonly Thing[],
+  resources: readonly Resource[],
   graphs: readonly Graph[],
 ): AuthoringCompletion {
-  const thingId = uuidSchema.parse(
-    'thing' in generated ? (pick(things, generated.thing)?.id ?? NOTHING) : NOTHING,
+  const resourceId = uuidSchema.parse(
+    'resource' in generated ? (pick(resources, generated.resource)?.id ?? NOTHING) : NOTHING,
   );
   const graph = 'graph' in generated ? pick(graphs, generated.graph) : undefined;
   const graphId = uuidSchema.parse(graph?.id ?? NOTHING);
   switch (generated.op) {
-    case 'edited-thing': {
-      const thing = pick(things, generated.thing);
-      if (thing === undefined) {
+    case 'edited-resource': {
+      const resource = pick(resources, generated.resource);
+      if (resource === undefined) {
         return {
-          kind: 'edited-thing',
-          thingId,
+          kind: 'edited-resource',
+          resourceId,
           document: { title: generated.title, kind: 'markdown', body: '' },
         };
       }
-      const { id: _id, ...document } = thing;
+      const { id: _id, ...document } = resource;
       const proposedTarget =
-        generated.proposedTarget === undefined ? undefined : pick(things, generated.proposedTarget);
+        generated.proposedTarget === undefined
+          ? undefined
+          : pick(resources, generated.proposedTarget);
       return {
-        kind: 'edited-thing',
-        thingId: thing.id,
+        kind: 'edited-resource',
+        resourceId: resource.id,
         document:
           document.kind === 'reference'
             ? {
@@ -306,16 +311,16 @@ function resolve(
             : { ...document, title: generated.title },
       };
     }
-    case 'created-thing':
-      return { kind: 'created-thing', anchor: generated.anchor };
+    case 'created-resource':
+      return { kind: 'created-resource', anchor: generated.anchor };
     case 'created-reference':
-      return { kind: 'created-reference', target: thingId, anchor: generated.anchor };
-    case 'added-thing-to-diagram':
-      return { kind: 'added-thing-to-diagram', thingId, anchor: generated.anchor };
-    case 'removed-thing-from-diagram':
-      return { kind: 'removed-thing-from-diagram', thingId };
-    case 'deleted-thing':
-      return { kind: 'deleted-thing', thingId };
+      return { kind: 'created-reference', target: resourceId, anchor: generated.anchor };
+    case 'added-resource-to-map':
+      return { kind: 'added-resource-to-map', resourceId, anchor: generated.anchor };
+    case 'removed-resource-from-map':
+      return { kind: 'removed-resource-from-map', resourceId };
+    case 'deleted-resource':
+      return { kind: 'deleted-resource', resourceId };
     case 'added-graph':
       return { kind: 'added-graph' };
     case 'renamed-graph':
@@ -336,7 +341,7 @@ function resolve(
         graphId,
         edge: pick(graph?.edges ?? [], generated.edge) ?? { from: NOTHING, to: NOTHING },
         endpoint: generated.endpoint,
-        thingId,
+        resourceId,
       };
   }
 }

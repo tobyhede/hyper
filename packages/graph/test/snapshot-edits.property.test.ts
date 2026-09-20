@@ -1,8 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { GraphEdge, SpaceSnapshot, ThingDocument, ThingPlacement, UUID } from '@project/core';
+import type {
+  GraphEdge,
+  SpaceSnapshot,
+  ResourceDocument,
+  ResourcePlacement,
+  UUID,
+} from '@project/core';
 import { loadSpaceSnapshot, Placement, SnapshotEdit } from '../src/index';
-import { uuid } from './thing-files';
+import { uuid } from './resource-files';
 
 /**
  * The membership rules `SnapshotEdit` owns, held once as properties over
@@ -12,7 +18,7 @@ import { uuid } from './thing-files';
  */
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');
-const DIAGRAM_ID = uuid('00000000-0000-4000-8000-000000000002');
+const MAP_ID = uuid('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000003');
 
 const idsArb = fc
@@ -28,9 +34,13 @@ const titleArb = fc
   .string({ minLength: 1, maxLength: 12 })
   .filter((s) => s.trim().length > 0 && !s.includes('\n'));
 
-const markdownDocument = (title: string): ThingDocument => ({ title, kind: 'markdown', body: '' });
+const markdownDocument = (title: string): ResourceDocument => ({
+  title,
+  kind: 'markdown',
+  body: '',
+});
 
-/** A chain Edge through every consecutive pair, so an interior Thing carries incident Edges on both sides. */
+/** A chain Edge through every consecutive pair, so an interior Resource carries incident Edges on both sides. */
 const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
   const edges: GraphEdge[] = [];
   for (let i = 0; i + 1 < ids.length; i += 1) {
@@ -41,28 +51,28 @@ const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
   return edges;
 };
 
-/** One Diagram owning one Graph over every generated Thing, at the given positions. */
+/** One Map owning one Graph over every generated Resource, at the given positions. */
 const baseSnapshot = (
   ids: readonly UUID[],
-  positions: Record<UUID, ThingPlacement>,
+  positions: Record<UUID, ResourcePlacement>,
   edges: readonly GraphEdge[] = [],
 ): SpaceSnapshot => ({
   id: SPACE_ID,
   document: {
     version: 1,
     title: 'Generated',
-    defaultDiagram: DIAGRAM_ID,
-    diagrams: [
+    defaultMap: MAP_ID,
+    maps: [
       {
-        id: DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions,
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [...edges] }],
       },
     ],
   },
-  things: ids.map((id, index) => ({ id, document: markdownDocument(`Thing ${index}`) })),
+  resources: ids.map((id, index) => ({ id, document: markdownDocument(`Resource ${index}`) })),
 });
 
 const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Placement =>
@@ -74,7 +84,7 @@ const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Place
   );
 
 describe('SnapshotEdit.deleteFromSpace properties', () => {
-  it('leaves a snapshot intake accepts after deleting any un-referenced Thing', () => {
+  it('leaves a snapshot intake accepts after deleting any un-referenced Resource', () => {
     fc.assert(
       fc.property(idsArb, coordsArb, fc.nat({ max: 8 }), (ids, coords, subjectSeed) => {
         const subject = ids[subjectSeed % ids.length];
@@ -91,12 +101,12 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     );
   });
 
-  it('leaves every other Thing where a delete before Open would have', () => {
+  it('leaves every other Resource where a delete before Open would have', () => {
     // The property Open and Delete rest on (ADR 0084): Delete reclaims exactly
-    // the room an Open Thing holds, so the Things that were never opened land
-    // in the same place whether or not the deleted Thing was ever Open —
+    // the room an Open Resource holds, so the Resources that were never opened land
+    // in the same place whether or not the deleted Resource was ever Open —
     // `deleteFromSpace`'s own use of `Placement.reclaim` is what makes this
-    // hold, and it is exactly the call the registry's old `removeSpaceThing`
+    // hold, and it is exactly the call the registry's old `removeSpaceEndpoint`
     // skipped.
     fc.assert(
       fc.property(
@@ -129,8 +139,8 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 
           const others = ids.filter((id) => id !== subject);
           const positionsOf = (snapshot: SpaceSnapshot) => {
-            const diagram = snapshot.document.diagrams?.[0];
-            return others.map((id) => diagram?.positions[id]);
+            const map = snapshot.document.maps?.[0];
+            return others.map((id) => map?.positions[id]);
           };
           expect(positionsOf(deletedAfter.snapshot)).toEqual(positionsOf(deletedBefore.snapshot));
         },
@@ -138,7 +148,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     );
   });
 
-  it('always refuses to delete a Thing a Reference Thing in the Space still targets', () => {
+  it('always refuses to delete a Resource a Reference Resource in the Space still targets', () => {
     fc.assert(
       fc.property(
         idsArb,
@@ -154,8 +164,8 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
           const base = baseSnapshot(ids, positions);
           const snapshot: SpaceSnapshot = {
             ...base,
-            things: [
-              ...base.things,
+            resources: [
+              ...base.resources,
               {
                 id: referenceId,
                 document: { title: referenceTitle, kind: 'reference', target: subject },
@@ -167,7 +177,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 
           expect(outcome).toEqual({
             kind: 'refused',
-            refusal: { code: 'thing-has-references', referenceTitles: [referenceTitle] },
+            refusal: { code: 'resource-has-references', referenceTitles: [referenceTitle] },
           });
         },
       ),
@@ -175,41 +185,41 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
   });
 });
 
-describe('SnapshotEdit.createInDiagram properties', () => {
-  it('refuses creation into a Diagram the snapshot does not name, and changes nothing', () => {
+describe('SnapshotEdit.createInMap properties', () => {
+  it('refuses creation into a Map the snapshot does not name, and changes nothing', () => {
     // A coordinated create or link must not silently add an unpositioned
-    // Thing when its containing Diagram is gone by the time the Edit lands.
+    // Resource when its containing Map is gone by the time the Edit lands.
     fc.assert(
       fc.property(
         idsArb,
         coordsArb,
         fc.uuid().map(uuid),
         fc.uuid().map(uuid),
-        (ids, coords, newThingId, missingDiagramId) => {
-          fc.pre(!ids.includes(newThingId));
-          fc.pre(missingDiagramId !== DIAGRAM_ID);
+        (ids, coords, newResourceId, missingMapId) => {
+          fc.pre(!ids.includes(newResourceId));
+          fc.pre(missingMapId !== MAP_ID);
           const positions = Placement.toPositions(closedPlacement(ids, coords));
           const snapshot = baseSnapshot(ids, positions);
 
-          const outcome = SnapshotEdit.createInDiagram(
+          const outcome = SnapshotEdit.createInMap(
             snapshot,
-            missingDiagramId,
-            newThingId,
+            missingMapId,
+            newResourceId,
             markdownDocument('New'),
             { x: 0, y: 0 },
             'avoidingOverlap',
           );
 
-          expect(outcome).toEqual({ kind: 'refused', refusal: { code: 'diagram-not-found' } });
+          expect(outcome).toEqual({ kind: 'refused', refusal: { code: 'map-not-found' } });
         },
       ),
     );
   });
 
-  it('never lands avoidingOverlap on a point another Thing already occupies', () => {
+  it('never lands avoidingOverlap on a point another Resource already occupies', () => {
     fc.assert(
-      fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newThingId) => {
-        fc.pre(!ids.includes(newThingId));
+      fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newResourceId) => {
+        fc.pre(!ids.includes(newResourceId));
         const positions = Placement.toPositions(closedPlacement(ids, coords));
         const snapshot = baseSnapshot(ids, positions);
         const first = ids[0];
@@ -217,10 +227,10 @@ describe('SnapshotEdit.createInDiagram properties', () => {
         const anchor = positions[first];
         if (anchor === undefined) return;
 
-        const outcome = SnapshotEdit.createInDiagram(
+        const outcome = SnapshotEdit.createInMap(
           snapshot,
-          DIAGRAM_ID,
-          newThingId,
+          MAP_ID,
+          newResourceId,
           markdownDocument('New'),
           anchor,
           'avoidingOverlap',
@@ -228,7 +238,7 @@ describe('SnapshotEdit.createInDiagram properties', () => {
 
         expect(outcome.kind).toBe('completed');
         if (outcome.kind !== 'completed') return;
-        const newAt = outcome.snapshot.document.diagrams?.[0]?.positions[newThingId];
+        const newAt = outcome.snapshot.document.maps?.[0]?.positions[newResourceId];
         expect(newAt).toBeDefined();
         if (newAt === undefined) return;
         const collides = ids.some((id) => {

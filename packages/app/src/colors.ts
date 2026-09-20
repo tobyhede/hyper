@@ -79,22 +79,22 @@ export function activeGraphColor(
 
 /**
  * The color authoring stores on a graph it creates, rotating through the
- * palette by the Graph's appended position in its owning Diagram.
+ * palette by the Graph's appended position in its owning Map.
  *
  * Stored rather than resolved. Every creation gesture rotates by this same
- * Diagram-local rule, so a Graph does not get different properties according to
+ * Map-local rule, so a Graph does not get different properties according to
  * whether it was added through Graph management or minted by the first
- * connection drawn in a Diagram.
+ * connection drawn in a Map.
  *
  * The palette is an authoring constant, not a domain constraint:
- * {@link graphColorMap} still resolves a fallback for an imported graph that
+ * {@link graphColorsByGraphId} still resolves a fallback for an imported graph that
  * carries no color of its own.
  */
-export const nextGraphColor = (owningDiagramGraphCount: number): string =>
-  GRAPH_PALETTE[owningDiagramGraphCount % GRAPH_PALETTE.length] ?? GRAPH_PALETTE[0];
+export const nextGraphColor = (owningMapGraphCount: number): string =>
+  GRAPH_PALETTE[owningMapGraphCount % GRAPH_PALETTE.length] ?? GRAPH_PALETTE[0];
 
 /** Resolve each graph's color: its space `color`, else a palette slot by order. */
-export function graphColorMap(space: Space): Record<string, string> {
+export function graphColorsByGraphId(space: Space): Record<string, string> {
   const map: Record<string, string> = {};
   space.graphs.forEach((graph, index) => {
     map[graph.id] = graph.color ?? GRAPH_PALETTE[index % GRAPH_PALETTE.length] ?? '#8a94a6';

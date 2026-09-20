@@ -1,4 +1,4 @@
-import type { ThingId, GraphId, DiagramId } from '@project/core';
+import type { ResourceId, GraphId, MapId } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import type { ComposedApp } from './compose-app';
@@ -9,7 +9,7 @@ import {
   type AddressedPosition,
 } from './destination-coordination';
 import type { DestinationOpening } from './destination-opening';
-import { resolveDiagram } from './diagram-resolution';
+import { resolveMap } from './map-resolution';
 import { navigationAddress } from './navigation';
 
 /**
@@ -40,8 +40,8 @@ export interface HistoryApi {
  * what the private bookkeeping exists to prevent.
  */
 export interface BrowserLocationState {
-  /** The Thing the location names, or `null` once a deliberate move leaves it. */
-  readonly addressedThingId: ThingId | null;
+  /** The Resource the location names, or `null` once a deliberate move leaves it. */
+  readonly addressedResourceId: ResourceId | null;
   /** Whether the location the reader arrived at failed to resolve. */
   readonly destinationNotFound: boolean;
 }
@@ -60,7 +60,7 @@ export interface BrowserLocation {
   readonly follow: (app: ComposedApp) => void;
   /** A deliberate switch between already composed Spaces updates the address. */
   readonly activate: (app: ComposedApp) => void;
-  readonly chooseDiagram: (diagramId: DiagramId) => void;
+  readonly chooseMap: (mapId: MapId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   /** The absolute URL of a destination, for the clipboard to carry. */
   readonly href: (destination: ProductDestination) => string;
@@ -84,7 +84,7 @@ export function createBrowserLocation(
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;
-  let addressedThingId: ThingId | null = null;
+  let addressedResourceId: ResourceId | null = null;
   let destinationNotFound = false;
   /**
    * The position the browser was last told about.
@@ -107,24 +107,24 @@ export function createBrowserLocation(
   let syncedUnresolved = false;
 
   const observable = createObservableState<BrowserLocationState>(
-    { addressedThingId, destinationNotFound },
+    { addressedResourceId, destinationNotFound },
     reportObserverError,
   );
 
   const publish = (): void => {
     const published = observable.getState();
     if (
-      published.addressedThingId === addressedThingId &&
+      published.addressedResourceId === addressedResourceId &&
       published.destinationNotFound === destinationNotFound
     ) {
       return;
     }
-    observable.publish({ addressedThingId, destinationNotFound });
+    observable.publish({ addressedResourceId, destinationNotFound });
   };
 
   const positionOf = (app: ComposedApp): AddressedPosition => ({
     ...navigationAddress(app.navigation.getState()),
-    addressedThingId,
+    addressedResourceId,
   });
 
   /**
@@ -161,7 +161,7 @@ export function createBrowserLocation(
     });
     if (decision.kind === 'none') return;
     // Writing the location is what clears the report, rather than a second
-    // thing every caller has to remember.
+    // resource every caller has to remember.
     destinationNotFound = false;
     syncedUnresolved = false;
     const path = productDestinationPath(decision.destination);
@@ -195,7 +195,7 @@ export function createBrowserLocation(
    * its own to disagree with either.
    *
    * Private, because arriving is not a capability a surface spends: both the
-   * reader's Back and their Diagram choice are arrivals, and a third caller
+   * reader's Back and their Map choice are arrivals, and a third caller
    * would be a third answer to "what does this destination open".
    */
   const arriveAt = (opening: DestinationOpening): void => {
@@ -206,68 +206,68 @@ export function createBrowserLocation(
     // belongs to the choice rather than to the history entry it may not earn.
     destinationNotFound = false;
     // Resolved for the throw alone: a selection that does not resolve must
-    // leave Navigation untouched rather than moving it to a Diagram this
+    // leave Navigation untouched rather than moving it to a Map this
     // function is about to fail on.
-    resolveDiagram(app.currentSpace(), opening.selection);
-    const changesDiagram = app.navigation.getState().selectedDiagramId !== opening.selection;
-    if (opening.graphId === null) app.navigation.selectDiagram(opening.selection);
-    else if (opening.presentationThingId === null) {
+    resolveMap(app.currentSpace(), opening.selection);
+    const changesMap = app.navigation.getState().selectedMapId !== opening.selection;
+    if (opening.graphId === null) app.navigation.selectMap(opening.selection);
+    else if (opening.presentationResourceId === null) {
       app.navigation.openGraph(opening.selection, opening.graphId);
     } else {
       app.navigation.openPresentation(
         opening.selection,
         opening.graphId,
-        opening.presentationThingId,
+        opening.presentationResourceId,
       );
     }
     // A current row can be chosen again. Its UUID is already the Navigation
-    // value, so no Diagram dependency will change and no placement effect will
+    // value, so no Map dependency will change and no placement effect will
     // rerun; clearing the published projection here would strand the canvas in
     // its pending state. Navigation still receives the choice so it can apply
-    // its own same-Diagram semantics.
-    if (!changesDiagram) return;
-    app.adapter.getState().selectDiagram();
+    // its own same-Map semantics.
+    if (!changesMap) return;
+    app.adapter.getState().selectMap();
   };
 
   /**
-   * A move the reader made: it clears the addressed Thing and answers the report.
+   * A move the reader made: it clears the addressed Resource and answers the report.
    *
    * Shared rather than written out per operation, because the two that make one
-   * — choosing a Diagram row and activating a Graph — differed only in that one
+   * — choosing a Map row and activating a Graph — differed only in that one
    * of them got the report clear transitively and the other hand-rolled it.
    * What they still differ in is the render adapter, and that difference is the
-   * point: activating a Graph does not change the Diagram, so it must not clear
+   * point: activating a Graph does not change the Map, so it must not clear
    * the published projection.
    */
   const deliberateMove = (move: () => void): void => {
-    addressedThingId = null;
+    addressedResourceId = null;
     destinationNotFound = false;
     move();
     settle();
   };
 
   /**
-   * Choosing a Diagram row, including the row already current.
+   * Choosing a Map row, including the row already current.
    *
    * The repeated choice is not a no-op and must not be skipped:
-   * `navigation.selectDiagram` publishes `mode: 'overview'`, so choosing the
+   * `navigation.selectMap` publishes `mode: 'overview'`, so choosing the
    * current row is how an author leaves a presentation. Whether that earns a
    * history entry is not asked here at all — the position it produces is what
    * the sync decides from (ADR 0081).
    */
-  const chooseDiagram = (diagramId: DiagramId): void => {
+  const chooseMap = (mapId: MapId): void => {
     deliberateMove(() => {
       arriveAt({
-        selection: diagramId,
+        selection: mapId,
         graphId: null,
-        presentationThingId: null,
-        thingId: null,
+        presentationResourceId: null,
+        resourceId: null,
       });
     });
   };
 
   /**
-   * Same rule as {@link chooseDiagram}, for the same reason: activating the
+   * Same rule as {@link chooseMap}, for the same reason: activating the
    * Graph that is already active publishes `mode: 'overview'`, which is how the
    * Graph row leaves a presentation, so the call may not be skipped.
    */
@@ -290,10 +290,10 @@ export function createBrowserLocation(
       settle();
       return;
     }
-    // Before `arriveAt`, not after: the Thing is known the moment the
+    // Before `arriveAt`, not after: the Resource is known the moment the
     // restoration resolves, and moving Navigation first would notify against a
-    // position carrying the Thing the reader is leaving.
-    addressedThingId = restoration.opening.thingId;
+    // position carrying the Resource the reader is leaving.
+    addressedResourceId = restoration.opening.resourceId;
     destinationNotFound = false;
     arriveAt(restoration.opening);
     settle();
@@ -313,7 +313,7 @@ export function createBrowserLocation(
       },
       () => {
         if (request !== restorationRequest || history.pathname() !== pathname) return;
-        // One rejection refuses two different things, and only one of them is a
+        // One rejection refuses two different resources, and only one of them is a
         // destination that failed to resolve. A location outside product
         // addressing refuses to open because it is not an address of ours: the
         // application did not write it and it names no position to be wrong
@@ -343,7 +343,7 @@ export function createBrowserLocation(
    * The position recorded here is the one the application is already at, which
    * is what makes following decide nothing at all: startup read the location
    * once and composed from it, so correcting the location here could only undo
-   * a Back the reader took before this listener existed. The addressed Thing is
+   * a Back the reader took before this listener existed. The addressed Resource is
    * read off that same location rather than carried in — it is a fact about the
    * location and the Space now shown, not about a mounted component's lifetime.
    */
@@ -356,7 +356,7 @@ export function createBrowserLocation(
       app.authoring.getState().session.working,
       history.pathname(),
     );
-    addressedThingId = restoration.kind === 'opening' ? restoration.opening.thingId : null;
+    addressedResourceId = restoration.kind === 'opening' ? restoration.opening.resourceId : null;
     destinationNotFound = false;
     syncedUnresolved = false;
     syncedPosition = positionOf(app);
@@ -373,7 +373,7 @@ export function createBrowserLocation(
       follow(app);
       // Back and Forward have already moved the browser. Restore that complete
       // destination before deriving a write from the arriving Space's retained
-      // Navigation, which may still name a different Diagram or Graph.
+      // Navigation, which may still name a different Map or Graph.
       const restoration = destinationRestoration(
         app.currentSpace(),
         app.authoring.getState().session.working,
@@ -388,7 +388,7 @@ export function createBrowserLocation(
         settle();
       }
     },
-    chooseDiagram,
+    chooseMap,
     activateGraph,
     href: (destination) => new URL(productDestinationPath(destination), history.href()).href,
     dispose: () => {

@@ -6,21 +6,21 @@ import {
   problemCatalogue,
   type HyperProblemCode,
   type SpaceCommit,
-  type SpaceResourceRepository,
+  type StoredSpaceRepository,
 } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import { HTTPException } from 'hono/http-exception';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
-const THING_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
+const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  things: [{ id: THING_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
 };
 const loaded = { snapshot, revision: 0n, exportedRevision: null };
 
@@ -28,7 +28,7 @@ const updateCommit = (next = snapshot): SpaceCommit => ({
   changes: [{ kind: 'update', spaceId: SPACE_ID, snapshot: next, expectedRevision: 0n }],
 });
 
-const repository = (overrides: Partial<SpaceResourceRepository> = {}): SpaceResourceRepository => ({
+const repository = (overrides: Partial<StoredSpaceRepository> = {}): StoredSpaceRepository => ({
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(loaded),
   loadAggregate: () =>
@@ -70,8 +70,8 @@ const OVERSIZED_DETAIL = `Send a request body no larger than ${MAX_COMMIT_BODY_B
 
 const oversizedSnapshot: SpaceSnapshot = {
   ...snapshot,
-  things: [
-    { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } },
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } },
   ],
 };
 
@@ -311,8 +311,8 @@ describe('commit wire policy', () => {
   it('accepts a body of exactly the 1 MiB limit through both framings', async () => {
     const padded = (length: number): SpaceSnapshot => ({
       ...snapshot,
-      things: [
-        { id: THING_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
       ],
     });
     const overhead = commitBody(padded(0)).length;
@@ -372,7 +372,7 @@ describe('commit wire policy', () => {
 
 describe('Space HTTP reads', () => {
   it('retains collection listing and lazy resource loading', async () => {
-    const ids = [DIAGRAM_ID, GRAPH_ID];
+    const ids = [MAP_ID, GRAPH_ID];
     const base = repository();
     const commit = vi.fn((request: Parameters<typeof base.commit>[0]) => base.commit(request));
     const app = createSpaceHttpApp(repository({ commit }), {
@@ -392,17 +392,17 @@ describe('Space HTTP reads', () => {
         ...snapshot,
         document: {
           ...snapshot.document,
-          diagrams: [
+          maps: [
             {
-              id: DIAGRAM_ID,
-              title: 'Diagram 1',
+              id: MAP_ID,
+              title: 'Map 1',
               kind: 'positioned',
               positions: {},
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
               activeGraph: GRAPH_ID,
             },
           ],
-          defaultDiagram: DIAGRAM_ID,
+          defaultMap: MAP_ID,
         },
       },
       revision: '1',
@@ -650,9 +650,9 @@ describe('Space HTTP aggregate commit', () => {
 
   it('preserves stable aggregate-refusal identity and location fields', async () => {
     const error = {
-      kind: 'space-thing-target-missing' as const,
+      kind: 'space-resource-target-missing' as const,
       spaceId: SPACE_ID,
-      thingId: THING_ID,
+      resourceId: RESOURCE_ID,
       targetSpaceId: TARGET_ID,
     };
     const response = await postCommit(
@@ -1079,9 +1079,9 @@ describe('Space HTTP response media', () => {
                   kind: 'aggregate-refused' as const,
                   errors: [
                     {
-                      kind: 'space-thing-target-missing' as const,
+                      kind: 'space-resource-target-missing' as const,
                       spaceId: SPACE_ID,
-                      thingId: THING_ID,
+                      resourceId: RESOURCE_ID,
                       targetSpaceId: TARGET_ID,
                     },
                   ],

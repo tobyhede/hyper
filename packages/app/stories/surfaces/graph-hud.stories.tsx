@@ -21,14 +21,14 @@ export const Retained: Story = () => <GraphHudFixture />;
 Retained.meta = { iframed: true };
 
 /**
- * The same tracked Space, opened on its other Diagram.
+ * The same tracked Space, opened on its other Map.
  *
- * `authoredSpace` owns two Diagrams — `Collection 1`, above, owning three
+ * `authoredSpace` owns two Maps — `Collection 1`, above, owning three
  * Graphs, and `Collection 2`, owning one. `sparseAuthoredSpace` is the same
- * Space declaring `Collection 2` as its `defaultDiagram`, so this story's key
- * holds exactly the one Graph that Diagram owns and none of `Collection 1`'s.
- * That is the evidence a single Diagram's story cannot give: a key which
- * changes with the Diagram it opens on, shown rather than merely asserted.
+ * Space declaring `Collection 2` as its `defaultMap`, so this story's key
+ * holds exactly the one Graph that Map owns and none of `Collection 1`'s.
+ * That is the evidence a single Map's story cannot give: a key which
+ * changes with the Map it opens on, shown rather than merely asserted.
  */
-export const SparseDiagram: Story = () => <GraphHudFixture space={sparseAuthoredSpace} />;
-SparseDiagram.meta = { iframed: true };
+export const SparseMap: Story = () => <GraphHudFixture space={sparseAuthoredSpace} />;
+SparseMap.meta = { iframed: true };

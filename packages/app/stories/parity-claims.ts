@@ -16,8 +16,8 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
-    id: 'thing-rail-reveal-distinguishes-pointer-and-keyboard',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'resource-rail-reveal-distinguishes-pointer-and-keyboard',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenAndClose',
     claim:
       'Pointer Open and Close allow the rail to hide on departure; keyboard activation keeps the focused command visible across both transitions.',
@@ -27,260 +27,260 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Create offers both Thing kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind available in the Dock — and every kind available in the Dock now completes its Edit on that one activation (ADR 0089). Reference Thing is not a Dock Create peer.',
+      'Create offers both Resource kinds as peer controls rather than behind a disclosure, each named for the kind it makes and both withdrawn together, so one activation reaches either kind available in the Dock — and every kind available in the Dock now completes its Edit on that one activation (ADR 0089). Reference Resource is not a Dock Create peer.',
   },
   {
-    id: 'command-dock-packs-things-onto-one-row',
+    id: 'command-dock-packs-resources-onto-one-row',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'DockedLeft',
     claim:
-      'On a side edge the Things cluster packs onto one row at its neighbours’ height, its trigger giving up the slack track the three authored names need, with the disclosure and both Create controls on one glyph pitch.',
+      'On a side edge the Resources cluster packs onto one row at its neighbours’ height, its trigger giving up the slack track the three authored names need, with the disclosure and both Create controls on one glyph pitch.',
   },
   {
     id: 'command-dock-identity-presentation',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Space, Diagram and Graph names share typography and each disclose that identity’s list; Rename in the list continues in the existing editor, and Escape hands the caret back to the name.',
+      'Space, Map and Graph names share typography and each disclose that identity’s list; Rename in the list continues in the existing editor, and Escape hands the caret back to the name.',
   },
   {
-    id: 'things-popover-adds-existing-diagram-members',
-    storyFile: 'surfaces/things-popover.stories.tsx',
-    storyExport: 'AvailableThings',
+    id: 'resources-popover-adds-existing-map-members',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'AvailableResources',
     claim:
-      'The Things list, anchored to its own trigger, draws each Thing absent from the Diagram as a titled row carrying its kind glyph and a drag grip, and activates an existing Thing through the application Add to Diagram path.',
+      'The Resources list, anchored to its own trigger, draws each Resource absent from the Map as a titled row carrying its kind glyph and a drag grip, and activates an existing Resource through the application Add to Map path.',
   },
   {
-    id: 'things-popover-opens-and-dismisses-without-locking-the-canvas',
-    storyFile: 'surfaces/things-popover.stories.tsx',
-    storyExport: 'AvailableThings',
+    id: 'resources-popover-opens-and-dismisses-without-locking-the-canvas',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'AvailableResources',
     claim:
-      'The Things list opens anchored to its own trigger, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Thing onto the canvas is.',
+      'The Resources list opens anchored to its own trigger, dismisses on Escape with focus returning to that trigger, and leaves the surface behind it both live and undismissing — which is what dropping a Resource onto the canvas is.',
   },
   {
-    id: 'things-popover-keeps-the-reader-in-the-list-after-a-keyboard-add',
-    storyFile: 'surfaces/things-popover.stories.tsx',
-    storyExport: 'AvailableThings',
+    id: 'resources-popover-keeps-the-reader-in-the-list-after-a-keyboard-add',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'AvailableResources',
     claim:
-      'A keyboard Add leaves the Things list open and puts the caret back in its filter, rather than following the placed Thing onto the canvas — so adding several Things costs one disclosure.',
+      'A keyboard Add leaves the Resources list open and puts the caret back in its filter, rather than following the placed Resource onto the canvas — so adding several Resources costs one disclosure.',
   },
   {
-    id: 'things-popover-offers-the-meta-spaces-beside-the-things',
-    storyFile: 'surfaces/things-popover.stories.tsx',
+    id: 'resources-popover-offers-the-meta-spaces-beside-the-resources',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'MetaSpaces',
     claim:
-      'The Things list offers the Meta Space’s Spaces interleaved with this Space’s Things, each row carrying the glyph that says which it is, and the Spaces toggle takes them away without touching the Things.',
+      'The Resources list offers the Meta Space’s Spaces interleaved with this Space’s Resources, each row carrying the glyph that says which it is, and the Spaces toggle takes them away without touching the Resources.',
   },
   {
-    id: 'things-popover-counts-what-each-filter-contributes',
-    storyFile: 'surfaces/things-popover.stories.tsx',
-    storyExport: 'AvailableThings',
+    id: 'resources-popover-counts-what-each-filter-contributes',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'AvailableResources',
     claim:
       'Each filter switch draws its glyph beside the number of rows it is contributing under the current search — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
   },
   {
-    id: 'things-popover-distinguishes-an-empty-diagram',
-    storyFile: 'surfaces/things-popover.stories.tsx',
+    id: 'resources-popover-distinguishes-an-empty-map',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'Empty',
-    claim: 'A Diagram containing every Space Thing names that empty Things View explicitly.',
+    claim: 'A Map containing every Space Resource names that empty Resources View explicitly.',
   },
   {
-    id: 'things-popover-scrolls-a-long-list-on-a-narrow-screen',
-    storyFile: 'surfaces/things-popover.stories.tsx',
+    id: 'resources-popover-scrolls-a-long-list-on-a-narrow-screen',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'LongList',
     claim:
-      'A long Things list remains searchable and independently scrollable inside the viewport on a narrow screen.',
+      'A long Resources list remains searchable and independently scrollable inside the viewport on a narrow screen.',
   },
   {
-    id: 'things-popover-withdraws-while-authoring-is-unavailable',
-    storyFile: 'surfaces/things-popover.stories.tsx',
+    id: 'resources-popover-withdraws-while-authoring-is-unavailable',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'Disabled',
     claim:
-      'The Things trigger is disabled while the Diagram cannot accept membership edits — presenting, an open Thing, or Reference Thing creation.',
+      'The Resources trigger is disabled while the Map cannot accept membership edits — presenting, an open Resource, or Reference Resource creation.',
   },
   {
-    id: 'things-popover-keeps-an-add-refusal-on-its-surface',
-    storyFile: 'surfaces/things-popover.stories.tsx',
+    id: 'resources-popover-keeps-an-add-refusal-on-its-surface',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'Refused',
-    claim: 'A refused Add remains visible in the open Things list that asked for it.',
+    claim: 'A refused Add remains visible in the open Resources list that asked for it.',
     applicationEvidence:
-      'No browser gesture reaches a repeated Add. Completing the first one removes the Thing from `thingsOutsideSelectedDiagram`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
+      'No browser gesture reaches a repeated Add. Completing the first one removes the Resource from `resourcesOutsideSelectedMap`, so the row unmounts before a second click can land on it, and only two events dispatched inside one task reach the refusal at all. The story is driven to the state instead, through the production Authoring composition, so the sentence it draws is the one `describeAuthoringRefusal` gives the application.',
   },
   {
-    id: 'things-popover-coexists-with-persistence-failure',
-    storyFile: 'surfaces/things-popover.stories.tsx',
+    id: 'resources-popover-coexists-with-persistence-failure',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'PersistenceFailure',
     claim:
-      'A failed membership save leaves the Things list available beside the standing retryable persistence notice.',
+      'A failed membership save leaves the Resources list available beside the standing retryable persistence notice.',
   },
   {
-    id: 'canvas-thing-fills-authored-node-rect',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-fills-authored-node-rect',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'The production CanvasThing fills a React Flow node whose authored rect differs from the collapsed default.',
+      'The production CanvasResource fills a React Flow node whose authored rect differs from the collapsed default.',
   },
   {
-    id: 'open-thing-offers-one-resize-control',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'open-resource-offers-one-resize-control',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'Every Open Thing exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Thing exposes none.',
+      'Every Open Resource exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Resource exposes none.',
   },
   {
     id: 'resize-preview-snaps-to-closed-rect',
-    storyFile: 'components/thing.stories.tsx',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'A resize proposal entering the complete Close range previews the exact Closed rect while the active gesture still owns an Open Thing.',
+      'A resize proposal entering the complete Close range previews the exact Closed rect while the active gesture still owns an Open Resource.',
   },
   {
-    id: 'active-thing-resize-tracks-pointer-without-dimension-animation',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'active-resource-resize-tracks-pointer-without-dimension-animation',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'An active Thing resize applies each proposed width and height directly, without animating either dimension behind the pointer.',
+      'An active Resource resize applies each proposed width and height directly, without animating either dimension behind the pointer.',
   },
   {
-    id: 'markdown-thing-opens-and-closes-in-place',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'markdown-resource-opens-and-closes-in-place',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenAndClose',
     claim:
-      'A Markdown Thing opens and closes inside its production React Flow node with authoring handles present, retaining one Thing and Title treatment; its content fades out inertly before unmounting while its Title stays bottom-anchored for the whole closing motion.',
+      'A Markdown Resource opens and closes inside its production React Flow node with authoring handles present, retaining one Resource and Title treatment; its content fades out inertly before unmounting while its Title stays bottom-anchored for the whole closing motion.',
   },
   {
-    id: 'open-markdown-thing-owns-its-editing-lifecycle',
-    storyFile: 'components/thing-editing.stories.tsx',
+    id: 'open-markdown-resource-owns-its-editing-lifecycle',
+    storyFile: 'components/resource-editing.stories.tsx',
     storyExport: 'Markdown',
     claim:
-      'An open Markdown Thing begins editing from its rendered body or rail without a second visible affordance, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
+      'An open Markdown Resource begins editing from its rendered body or rail without a second visible affordance, keeps blur inert, and ends through Save, Cancel, Escape or Mod-Enter while Close remains disabled.',
   },
   {
-    id: 'canvas-thing-exposes-kind-and-keyboard-actions',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-exposes-kind-and-keyboard-actions',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'Actions',
     claim:
-      'The production canvas Thing exposes Reference Thing identity and keyboard-focusable actions.',
+      'The production canvas Resource exposes Reference Resource identity and keyboard-focusable actions.',
   },
   {
-    id: 'canvas-thing-shows-rest-selected-and-dragging-states',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-shows-rest-selected-and-dragging-states',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'States',
     claim:
-      'Rest, selected and dragging are visually distinct states for both the Markdown and Reference Thing front.',
-    // React Flow's own selection/dragging booleans, and ThingNode's translation
-    // of them into CanvasThing's four-value `state`, are unit-tested directly
-    // (`ThingNode.test.tsx`, "translates React Flow selection and dragging into
-    // shared visual states"). Dragging a real Thing is exercised throughout
+      'Rest, selected and dragging are visually distinct states for both the Markdown and Reference Resource front.',
+    // React Flow's own selection/dragging booleans, and ResourceNode's translation
+    // of them into CanvasResource's four-value `state`, are unit-tested directly
+    // (`ResourceNode.test.tsx`, "translates React Flow selection and dragging into
+    // shared visual states"). Dragging a real Resource is exercised throughout
     // `editing.spec.ts`'s drag-and-drop coverage, and selection through
-    // `canvas-thing-exposes-kind-and-keyboard-actions`'s own application
+    // `canvas-resource-exposes-kind-and-keyboard-actions`'s own application
     // evidence above. What this story adds beyond those is the *visual*
     // pairing of state with treatment (box-shadow ring, rotated drop shadow)
-    // side by side for review — and it renders through `CanvasThingSpecimen`,
-    // a thin pass-through to the shipped `CanvasThing`, so there is no
+    // side by side for review — and it renders through `CanvasResourceSpecimen`,
+    // a thin pass-through to the shipped `CanvasResource`, so there is no
     // facsimile that could drift from what the translated state actually
     // draws.
     applicationEvidence:
-      'React Flow selection/dragging and their translation into state are covered by ThingNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-thing-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasThing through CanvasThingSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
+      'React Flow selection/dragging and their translation into state are covered by ResourceNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-resource-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasResource through CanvasResourceSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
   },
   {
-    id: 'canvas-thing-front-draws-only-its-title-lines',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-front-draws-only-its-title-lines',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'Front',
     claim:
-      'Every Thing front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
+      'Every Resource front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
   {
-    id: 'canvas-thing-shows-kind-treatment',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-shows-kind-treatment',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'Kinds',
     claim:
-      "A Reference Thing front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
+      "A Reference Resource front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
     // **The former coloured-rail claim, changed rather than dropped.**
-    // It read "a selected Thing's rail carries the Active Graph's own colour",
+    // It read "a selected Resource's rail carries the Active Graph's own colour",
     // which was true and is now deliberately false: the rail is neutral and the
     // commands on it are the Command Dock's own surface
     // (`.scratch/command-dock/issues/12`). The claim keeps the palette sweep,
     // because what has to hold at every colour is the *opposite* of what it used
     // to be — and adds the half that says where the colour went.
-    id: 'canvas-thing-toolbar-is-neutral-and-graph-colour-stays-on-connections',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-toolbar-is-neutral-and-graph-colour-stays-on-connections',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'Colours',
     claim:
-      "A Thing's revealed commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Thing's authoring handles and its Edges keep that colour.",
+      "A Resource's revealed commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Resource's authoring handles and its Edges keep that colour.",
   },
   {
-    id: 'dragged-thing-returns-its-chrome-to-rest',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'dragged-resource-returns-its-chrome-to-rest',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'Drag',
     claim:
-      'A Thing being moved draws as dragging and reveals none of its hover chrome — no rail actions and no Edge handles — though the pointer is still on it and the drag has Selected it; hovering it after release reveals them again.',
+      'A Resource being moved draws as dragging and reveals none of its hover chrome — no rail actions and no Edge handles — though the pointer is still on it and the drag has Selected it; hovering it after release reveals them again.',
   },
   {
-    id: 'canvas-thing-hover-reveals-actions-and-handles-together',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'canvas-resource-hover-reveals-actions-and-handles-together',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'Hover',
     claim:
-      "Hovering the real React Flow node reveals CanvasThing's own rail actions and the adapter's Edge handles together.",
+      "Hovering the real React Flow node reveals CanvasResource's own rail actions and the adapter's Edge handles together.",
     // The two halves of this claim already have real application evidence
-    // separately: hover revealing CanvasThing's rail actions is asserted in
+    // separately: hover revealing CanvasResource's rail actions is asserted in
     // `editing.spec.ts` ("inline title editing persists without moving or
-    // opening the Thing", `await thing.hover(); ... toHaveCSS('opacity', '1')`
+    // opening the Resource", `await resource.hover(); ... toHaveCSS('opacity', '1')`
     // on the Edit control), and hover/selection revealing the adapter's
     // authoring handles is asserted in `overview.spec.ts` ("handles stay
-    // measurable...") and unit-tested in ThingNode.test.tsx. What this story
-    // adds is mounting both through the same real `ThingNode` in a real
+    // measurable...") and unit-tested in ResourceNode.test.tsx. What this story
+    // adds is mounting both through the same real `ResourceNode` in a real
     // `ReactFlow` instance side by side, which is exactly what
-    // `CanvasThingNodeSpecimen` does — not a facsimile of
+    // `CanvasResourceNodeSpecimen` does — not a facsimile of
     // either half.
     applicationEvidence:
-      "Hover revealing CanvasThing's rail actions is covered by editing.spec.ts (asserted on the `canvas-thing-actions` container, which is where the reveal's opacity lives — `opacity` does not inherit, so the same assertion on a button could not fail); hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and ThingNode.test.tsx. This story mounts the real ThingNode in a real ReactFlow instance (CanvasThingNodeSpecimen, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
+      "Hover revealing CanvasResource's rail actions is covered by editing.spec.ts (asserted on the `canvas-resource-actions` container, which is where the reveal's opacity lives — `opacity` does not inherit, so the same assertion on a button could not fail); hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and ResourceNode.test.tsx. This story mounts the real ResourceNode in a real ReactFlow instance (CanvasResourceNodeSpecimen, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
   },
   {
-    id: 'canvas-thing-owns-title-editing-and-refusal',
-    storyFile: 'components/thing-editing.stories.tsx',
+    id: 'canvas-resource-owns-title-editing-and-refusal',
+    storyFile: 'components/resource-editing.stories.tsx',
     storyExport: 'Title',
     claim:
-      "The canvas Thing's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
+      "The canvas Resource's displayed Title is a named pointer and keyboard control that opens its field with the value selected, keeps a refused draft field-local, completes on Enter and cancels on Escape.",
   },
   {
-    id: 'two-space-things-draw-one-target-at-their-own-selections',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    id: 'two-space-resources-draw-one-target-at-their-own-selections',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'TwoSelectionsOfOneTarget',
     claim:
-      'Two Space Things referencing one Space each draw the Diagram they store rather than the target\u2019s own opening Diagram, so their embeddings differ in membership while converging on one Space.',
-    // Both Space Things can be authored in a browser, but only against a target
-    // that owns two Diagrams \u2014 and a second Diagram is Add Diagram, which acts
+      'Two Space Resources referencing one Space each draw the Map they store rather than the target\u2019s own opening Map, so their embeddings differ in membership while converging on one Space.',
+    // Both Space Resources can be authored in a browser, but only against a target
+    // that owns two Maps \u2014 and a second Map is Add Map, which acts
     // on the Space the author is *in*. Entering that Space is the rail command
     // `space-cards/11` owns. The remaining gap is a target that already owns
-    // two Diagrams, not the absence of Enter \u2014 the e2e fixture does not author
-    // that second Diagram through the browser \u2014 so the claim takes the
+    // two Maps, not the absence of Enter \u2014 the e2e fixture does not author
+    // that second Map through the browser \u2014 so the claim takes the
     // documented exemption meanwhile.
     applicationEvidence:
-      'A second Diagram in the target is Add Diagram from inside that Space. Entering a Space Thing is now the rail command `space-cards/11` owns, but this claim still needs a target that already owns two Diagrams — the e2e fixture does not author that second Diagram through the browser. `packages/app/test/space-thing-authoring.test.tsx` proves two Space Things keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',
+      'A second Map in the target is Add Map from inside that Space. Entering a Space Resource is now the rail command `space-cards/11` owns, but this claim still needs a target that already owns two Maps — the e2e fixture does not author that second Map through the browser. `packages/app/test/space-resource-authoring.test.tsx` proves two Space Resources keeping their own selections through the application path meanwhile, and `test/support/repository-contract.ts` proves the pair survives the aggregate round trip.',
   },
   {
-    id: 'space-thing-offers-enter',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'space-resource-offers-enter',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'EnterSpace',
     claim:
-      'A Space Thing offers Enter in its entity menu; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
+      'A Space Resource offers Enter in its entity menu; activating it is the crossing that adds the target to Open Spaces and shows that Space.',
   },
   {
-    id: 'space-thing-opens-independently',
-    storyFile: 'components/thing.stories.tsx',
+    id: 'space-resource-opens-independently',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenIndependently',
     claim:
-      'A Space Thing offers Copy Space link and Open in new tab for the Space it shows, at that Space’s own address and with no containing Diagram or presentation.',
+      'A Space Resource offers Copy Space link and Open in new tab for the Space it shows, at that Space’s own address and with no containing Map or presentation.',
   },
   {
     id: 'open-reference-shows-target-markdown-read-only',
-    storyFile: 'components/thing.stories.tsx',
+    storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenReference',
     claim:
-      'An Open Reference Thing keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
+      'An Open Reference Resource keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
   },
   /*
    * **`persistence-indicator-shows-save-lifecycle` is retired with its story,
@@ -312,11 +312,11 @@ export const parityClaims: readonly ParityClaim[] = [
    * claim below states one obligation in the Dock's own words, so a reader
    * comparing them to the old set reads two surfaces rather than one renamed.
    *
-   * **Two obligations left rather than moved.** A Thing's Copy link to Thing
-   * in Diagram, Copy link to Thing and Delete from Space belong to the Thing
+   * **Two obligations left rather than moved.** A Resource's Copy link to Resource
+   * in Map, Copy link to Resource and Delete from Space belong to the Resource
    * rail (ADR 0073) and not to this surface — the Dock's organising rule is
-   * that a Thing's own commands are absent — so
-   * `space-sidebar-copies-thing-destinations` and
+   * that a Resource's own commands are absent — so
+   * `space-sidebar-copies-resource-destinations` and
    * `space-sidebar-entity-actions-menu` have no successor here. They keep their
    * browser evidence in `space-routing.spec.ts` and `link-actions.spec.ts`
    * untagged, and they gain a claim of their own when the rail's story sheet
@@ -329,18 +329,18 @@ export const parityClaims: readonly ParityClaim[] = [
    * from here and there is nothing left to claim.
    */
   {
-    id: 'command-dock-marks-one-current-diagram',
+    id: 'command-dock-marks-one-current-map',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      "Exactly one authored Diagram is the one drawing the canvas, chosen from the Diagram cluster's single exclusive list, which names the chosen one on the cluster itself.",
+      "Exactly one authored Map is the one drawing the canvas, chosen from the Map cluster's single exclusive list, which names the chosen one on the cluster itself.",
   },
   {
-    id: 'command-dock-adds-an-empty-diagram',
+    id: 'command-dock-adds-an-empty-map',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'New Diagram sits in the Diagram menu beside the list it adds to, and creates and selects an empty Diagram without implicitly placing Things.',
+      'New Map sits in the Map menu beside the list it adds to, and creates and selects an empty Map without implicitly placing Resources.',
   },
   {
     id: 'command-dock-adds-graph',
@@ -361,14 +361,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Delete Graph removes the active Graph when the Diagram owns more than one, and is present but unavailable on the last Graph the Diagram keeps.',
+      'Delete Graph removes the active Graph when the Map owns more than one, and is present but unavailable on the last Graph the Map keeps.',
   },
   {
     id: 'command-dock-copies-graph-destinations',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'The Graph menu offers Copy link to Graph, building the current-Diagram address, and offers no permanent address of its own.',
+      'The Graph menu offers Copy link to Graph, building the current-Map address, and offers no permanent address of its own.',
   },
   {
     id: 'command-dock-recolors-graph-through-swatch-picker',
@@ -391,7 +391,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'The Space, Diagram and Graph names each disclose that identity’s list; Rename in the list continues in the existing in-place editor as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
+      'The Space, Map and Graph names each disclose that identity’s list; Rename in the list continues in the existing in-place editor as one refusable draft that keeps a refusal on the field, completes on Enter and cancels on Escape.',
   },
   {
     id: 'command-dock-marks-the-space-one-crossing-up',
@@ -415,11 +415,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'The Open Spaces menu is drawn in every Space and lists the Meta Space first by its own title, marked with OPEN, with a cube on every other open Space, and choosing it opens Meta even when Meta is not open.',
   },
   {
-    id: 'command-dock-names-a-new-spaces-initial-diagram-and-graph',
+    id: 'command-dock-names-a-new-spaces-initial-map-and-graph',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'NewSpace',
     claim:
-      'A new Space names its initial Diagram and its empty Active Graph rather than leaving either cluster blank, and cannot present.',
+      'A new Space names its initial Map and its empty Active Graph rather than leaving either cluster blank, and cannot present.',
   },
   {
     id: 'command-dock-withdraws-entirely-while-presenting',
@@ -491,7 +491,7 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'presenting-sink-ends-the-graph-and-can-retreat',
     storyFile: 'components/presenting-chrome.stories.tsx',
     storyExport: 'Sink',
-    claim: 'A sink announces the end of the Graph and Back recovers the Thing before it.',
+    claim: 'A sink announces the end of the Graph and Back recovers the Resource before it.',
   },
   {
     id: 'presenting-narrow-keeps-choices-and-controls',
@@ -531,13 +531,13 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Placement',
     claim: 'A strategy that cannot produce positions fails placement with its own diagnostic.',
     applicationEvidence:
-      'Selectable V1 Diagrams use the in-process positioned strategy, which cannot reject, so no application flow reaches a failed placement. The failed state becomes the failure diagnostic in packages/app/test/canvas-content.test.ts.',
+      'Selectable V1 Maps use the in-process positioned strategy, which cannot reject, so no application flow reaches a failed placement. The failed state becomes the failure diagnostic in packages/app/test/canvas-content.test.ts.',
   },
   {
     id: 'operational-feedback-placement-pending',
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Arranging',
-    claim: 'The canvas shows a busy state while a strategy is still arranging Things.',
+    claim: 'The canvas shows a busy state while a strategy is still arranging Resources.',
     applicationEvidence:
       'The positioned strategy settles before Playwright can deterministically observe the pending frame. Covered by packages/app/test/placement-rendering.test.tsx.',
   },
@@ -559,7 +559,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'EndpointEditor',
     claim:
-      'The endpoint editor names both endpoints, completes on the Thing chosen, and dismisses its list then itself on Escape.',
+      'The endpoint editor names both endpoints, completes on the Resource chosen, and dismisses its list then itself on Escape.',
   },
   {
     id: 'selected-edge-endpoint-refusal-disables-its-choice',
@@ -599,7 +599,7 @@ export const parityClaims: readonly ParityClaim[] = [
     id: 'selected-edge-stale-reconnection-uses-the-form-channel',
     storyFile: 'components/selected-edge-controls.stories.tsx',
     storyExport: 'ReconnectionRefusal',
-    claim: 'A stale Diagram, Graph or Edge reports on the form channel and marks neither Field.',
+    claim: 'A stale Map, Graph or Edge reports on the form channel and marks neither Field.',
     applicationEvidence:
       'The remaining stale conditions need the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
   },
@@ -619,115 +619,116 @@ export const parityClaims: readonly ParityClaim[] = [
       'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
   },
   {
-    id: 'open-space-thing-draws-its-selected-diagram',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'open-space-resource-draws-its-selected-map',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      "An Open Space Thing draws the Diagram it selects — the target Space's own Things and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Thing's own rect.",
+      "An Open Space Resource draws the Map it selects — the target Space's own Resources and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Resource's own rect.",
   },
   {
-    id: 'thing-dock-floats',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'resource-dock-floats',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'The Thing dock floats eight pixels inside the border, measured past its cast shadow on the right, remains operable above embedded content, and replaces the open kind glyph.',
+      'The Resource dock floats eight pixels inside the border, measured past its cast shadow on the right, remains operable above embedded content, and replaces the open kind glyph.',
   },
   {
-    id: 'space-thing-content-sized-footer',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'space-resource-content-sized-footer',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'The Space Thing title footer grows with title content and the embedded Diagram clips at its measured edge.',
+      'The Space Resource title footer grows with title content and the embedded Map clips at its measured edge.',
   },
   {
-    id: 'space-thing-canvas-padding',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
-    claim: 'Embedded Things drag against equal top, left and right canvas padding.',
+    id: 'space-resource-canvas-padding',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
+    claim: 'Embedded Resources drag against equal top, left and right canvas padding.',
   },
   {
-    id: 'space-thing-entity-menu',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'space-resource-entity-menu',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'Space Thing entity menus group Create Reference, Enter and independent opening, three concise copy links, and removal — Rename is absent, the Title editing on the Thing front instead; creating a Reference Thing shows the selected target Diagram read-only.',
+      'Space Resource entity menus group Create Reference, Enter and independent opening, three concise copy links, and removal — Rename is absent, the Title editing on the Resource front instead; creating a Reference Resource shows the selected target Map read-only.',
   },
   {
-    id: 'space-thing-context-menus-share-dock-actions',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'space-resource-context-menus-share-dock-actions',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      "Space Thing Diagram and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link to Diagram or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
+      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
   },
   {
-    id: 'open-space-thing-chooses-its-context-on-the-shared-controls',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'open-space-resource-chooses-its-context-on-the-shared-controls',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      "An Open Space Thing's Diagram and Graph choices extend its one rail toolbar with the Command Dock's shared clusters, controls and lists; arrows traverse them alongside entity actions and Close, and choosing one writes the Thing's stored context without moving the containing Space.",
+      "An Open Space Resource's Map and Graph choices extend its one rail toolbar with the Command Dock's shared clusters, controls and lists; arrows traverse them alongside entity actions and Close, and choosing one writes the Resource's stored context without moving the containing Space.",
   },
   {
-    id: 'open-space-thing-drag-keeps-embedded-diagram-aligned',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'open-space-resource-drag-keeps-embedded-map-aligned',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'Dragging an Open Space Thing translates its embedded Things and Graph connectors as one aligned drawing throughout the gesture, without delayed catch-up after release.',
+      'Dragging an Open Space Resource translates its embedded Resources and Graph connectors as one aligned drawing throughout the gesture, without delayed catch-up after release.',
   },
   {
-    id: 'embedded-diagram-things-author-target',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'embedded-map-resources-author-target',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'Editing a Thing inside an Open Space Thing authors its target Space and updates both canvases; Edit offers the same connection handles as the host canvas, and those handles author the Graph the Space Thing is showing rather than a cross-Space Edge.',
+      'Editing a Resource inside an Open Space Resource authors its target Space and updates both canvases; Edit offers the same connection handles as the host canvas, and those handles author the Graph the Space Resource is showing rather than a cross-Space Edge.',
   },
   {
-    id: 'space-thing-portal-read-edit',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'space-resource-portal-read-edit',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'An Open Space Thing offers Edit and Done on its floating dock; Read keeps the embedding inert so dragging moves the containing Thing, and Edit makes the embedded canvas interactive without a second command surface.',
+      'An Open Space Resource offers Edit and Done on its floating dock; Read keeps the embedding inert so dragging moves the containing Resource, and Edit makes the embedded canvas interactive without a second command surface.',
   },
   {
-    id: 'space-thing-portal-framing',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'EnteredFromSpaceThing',
+    id: 'space-resource-portal-framing',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'EnteredFromSpaceEndpoint',
     claim:
-      'A Space Thing stores camera framing independently of other Things on the same target; Done, Close, reopen and Return restore it, Enter uses the browser-sized canvas rather than the source Thing rectangle, Diagram fallback clears framing and Graph fallback keeps it.',
+      'A Space Resource stores camera framing independently of other Resources on the same target; Done, Close, reopen and Return restore it, Enter uses the browser-sized canvas rather than the source Resource rectangle, Map fallback clears framing and Graph fallback keeps it.',
   },
   {
-    id: 'space-thing-portal-edit-is-the-host-canvas',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
-    storyExport: 'SelectedDiagram',
+    id: 'space-resource-portal-edit-is-the-host-canvas',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
+    storyExport: 'SelectedMap',
     claim:
-      'Portal Edit frames authored coordinates without stretching a Thing flow-pixel size; a Thing that leaves the window is clipped to it and never paints on the containing canvas after zoom-out.',
+      'Portal Edit frames authored coordinates without stretching a Resource flow-pixel size; a Resource that leaves the window is clipped to it and never paints on the containing canvas after zoom-out.',
   },
   {
-    id: 'space-thing-portal-independent-framing',
-    storyFile: 'surfaces/space-thing-embedded-diagram.stories.tsx',
+    id: 'space-resource-portal-independent-framing',
+    storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'TwoSelectionsOfOneTarget',
-    claim: 'Two Space Things selecting the same target author framing independently of each other.',
+    claim:
+      'Two Space Resources selecting the same target author framing independently of each other.',
     applicationEvidence:
-      'Two Space Things on one two-Diagram target is the Ladle fixture; the e2e fixture does not author that pair through the browser. packages/app/ladle-e2e/space-thing-embedded-diagram.spec.ts holds the independent-framing proof, and packages/app/e2e/space-thing.spec.ts covers persistence, reload, Enter/Return and Diagram/Graph fallback on one Space Thing.',
+      'Two Space Resources on one two-Map target is the Ladle fixture; the e2e fixture does not author that pair through the browser. packages/app/ladle-e2e/space-resource-embedded-map.spec.ts holds the independent-framing proof, and packages/app/e2e/space-resource.spec.ts covers persistence, reload, Enter/Return and Map/Graph fallback on one Space Resource.',
   },
   {
     id: 'graph-hud-and-dock-agree-on-the-active-graph',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD names the current Space and open Diagram read-only, keys every Graph that Diagram owns and emphasises the active one, attached above a real MiniMap.',
+      'The canvas HUD names the current Space and open Map read-only, keys every Graph that Map owns and emphasises the active one, attached above a real MiniMap.',
   },
   {
     id: 'graph-hud-key-hands-back-the-pointers-it-does-not-need',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Thing’s resize control lives in — while the two clipped identity names keep the pointer, because their title is the only place a truncated name can be read.',
+      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while the two clipped identity names keep the pointer, because their title is the only place a truncated name can be read.',
   },
   {
-    id: 'graph-hud-key-follows-the-open-diagram',
+    id: 'graph-hud-key-follows-the-open-map',
     storyFile: 'surfaces/graph-hud.stories.tsx',
-    storyExport: 'SparseDiagram',
+    storyExport: 'SparseMap',
     claim:
-      'The canvas HUD keys the Graphs of the Diagram it opens on, not the Graphs of the Space: a Diagram that owns one Graph draws a key of one, and the Graphs another Diagram owns are absent from it rather than dimmed.',
+      'The canvas HUD keys the Graphs of the Map it opens on, not the Graphs of the Space: a Map that owns one Graph draws a key of one, and the Graphs another Map owns are absent from it rather than dimmed.',
   },
 ] as const;

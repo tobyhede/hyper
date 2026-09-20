@@ -1,10 +1,10 @@
 import type { EdgeTypes, NodeTypes } from '@xyflow/react';
-import { ThingNode } from './ThingNode';
+import { ResourceNode } from './ResourceNode';
 import { RoutedEdge } from './RoutedEdge';
 
 export * from './projection';
 export { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
-export { ThingNode } from './ThingNode';
+export { ResourceNode } from './ResourceNode';
 export {
   CONNECTION_TARGET_PROXIMITY,
   connectionPointerInFlow,
@@ -42,7 +42,7 @@ export type { GraphHudProps } from './GraphHud';
 
 /** Register the custom node type(s) with React Flow. */
 export const nodeTypes: NodeTypes = {
-  thing: ThingNode,
+  resource: ResourceNode,
 };
 
 /** Register the custom edge type(s) with React Flow. */

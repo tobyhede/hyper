@@ -1,6 +1,6 @@
-import type { ThingId, DiagramPosition } from '@project/core';
+import type { ResourceId, MapPosition } from '@project/core';
 import { createNonThrowingReporter, type ObserverErrorReporter } from '@project/persistence';
-import type { ThingFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from './render-adapter';
 import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
 
@@ -20,7 +20,7 @@ import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
 /**
  * What a connection attempt came to.
  *
- * Three outcomes rather than `ThingId | null`, because the caller has to tell a
+ * Three outcomes rather than `ResourceId | null`, because the caller has to tell a
  * **refusal** — which owes the author the identity carried here — from a gesture
  * that simply had nowhere to land, which owes them nothing and must not wipe a
  * message already on screen. Answering the refusal here is also what keeps
@@ -33,32 +33,32 @@ import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
  * `reason` string here would have decided both before the surface was reached.
  */
 export type ConnectionResult =
-  | { readonly kind: 'completed'; readonly thingId: ThingId }
+  | { readonly kind: 'completed'; readonly resourceId: ResourceId }
   | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal }
-  /** No Things on the canvas to write into, or an invariant already reported. */
+  /** No Resources on the canvas to write into, or an invariant already reported. */
   | { readonly kind: 'unavailable' };
 
 export interface ConnectionCompletion {
   /**
-   * Author one Edge between two Things already on screen.
+   * Author one Edge between two Resources already on screen.
    *
    * `projected` is the render path's next projection, merged onto the live
    * nodes so the Edge draws without waiting for a strategy. It is `null` while
    * a replacement placement is still resolving — the canvas keeps drawing the
-   * Things already on screen, so a connection stays reachable through that window
+   * Resources already on screen, so a connection stays reachable through that window
    * — and then there is nothing to merge and the live nodes stand until the
    * next `syncProjection`.
    */
   readonly connect: (
-    from: ThingId,
-    to: ThingId,
-    projected: readonly ThingFlowNode[] | null,
+    from: ResourceId,
+    to: ResourceId,
+    projected: readonly ResourceFlowNode[] | null,
   ) => ConnectionResult;
-  /** Author a Thing at an Option/Alt empty drop and the Edge that reaches it. */
+  /** Author a Resource at an Option/Alt empty drop and the Edge that reaches it. */
   readonly createAndConnect: (
-    from: ThingId,
-    position: DiagramPosition,
-    projected: readonly ThingFlowNode[] | null,
+    from: ResourceId,
+    position: MapPosition,
+    projected: readonly ResourceFlowNode[] | null,
   ) => ConnectionResult;
 }
 
@@ -83,10 +83,10 @@ export function createConnectionCompletion({
    *
    * `renderedPlacement` is asked first, purely as "has anything rendered yet":
    * `null` means the canvas has drawn nothing to connect. The Edit itself is
-   * derived against the Diagram, not against what is on screen — Authoring
+   * derived against the Map, not against what is on screen — Authoring
    * takes no placement from this module at all. Only the merge-back is the
    * render path's: `mergeProjected` takes the freshly **projected** list, so
-   * the new Edge and the Thing it may have created draw immediately rather
+   * the new Edge and the Resource it may have created draw immediately rather
    * than waiting for the next full strategy resolution.
    *
    * A completion that has not happened — refused, or thrown on an invalid Space
@@ -104,8 +104,8 @@ export function createConnectionCompletion({
    */
   const complete = (
     completion: Parameters<SpaceAuthoring['complete']>[0],
-    projected: readonly ThingFlowNode[] | null,
-    continueAt: (result: { readonly createdThingId?: ThingId }) => ThingId | undefined,
+    projected: readonly ResourceFlowNode[] | null,
+    continueAt: (result: { readonly createdResourceId?: ResourceId }) => ResourceId | undefined,
   ): ConnectionResult => {
     const result = authoring.complete(completion);
     if (result.kind === 'refused') return { kind: 'refused', refusal: result.refusal };
@@ -122,8 +122,8 @@ export function createConnectionCompletion({
     // and a listener may have replaced the projection — accepting a stored
     // Space drops it outright.
     if (projected !== null) adapter.getState().mergeProjected(projected);
-    const thingId = continueAt(result);
-    return thingId === undefined ? UNAVAILABLE : { kind: 'completed', thingId };
+    const resourceId = continueAt(result);
+    return resourceId === undefined ? UNAVAILABLE : { kind: 'completed', resourceId };
   };
 
   /**
@@ -145,18 +145,18 @@ export function createConnectionCompletion({
       if (adapter.getState().renderedPlacement() === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'connect', from, to });
       if (refusal !== null) return { kind: 'refused', refusal };
-      return complete({ kind: 'connected-things', from, to }, projected, () => to);
+      return complete({ kind: 'connected-resources', from, to }, projected, () => to);
     },
 
     createAndConnect: (from, position, projected) => {
       if (adapter.getState().renderedPlacement() === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'create-and-connect', from });
       if (refusal !== null) return { kind: 'refused', refusal };
-      // The dropped Thing is placed by `position` inside the completion itself.
+      // The dropped Resource is placed by `position` inside the completion itself.
       return complete(
         { kind: 'create-and-connect', from, position },
         projected,
-        (result) => result.createdThingId,
+        (result) => result.createdResourceId,
       );
     },
   };

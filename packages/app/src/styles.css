@@ -38,8 +38,8 @@ body {
 }
 
 /* `padding-inline-end` is the strip yielded to a surface overlaying the end
-   edge. Nothing asks for one now — the Things drawer it was written for is gone
-   and the Things list is an anchored Popover — so this is dead with
+   edge. Nothing asks for one now — the Resources drawer it was written for is gone
+   and the Resources list is an anchored Popover — so this is dead with
    `AppShell.insetEnd`. Issue 08 retired the Sidebar-era primitives while
    this one still had a consumer, so it did not take the pair; taking them is a
    decision of its own, and `.scratch/command-dock/issues/16-retire-the-registry-drawer-and-the-yielded-strip.md`
@@ -47,8 +47,8 @@ body {
 
    Deliberately not animated, although the panel beside it slides. React Flow
    re-measures this container continuously, so an animated width moves the
-   canvas under a pointer that is already dragging a Thing out of the drawer, and
-   the Thing lands somewhere other than where it was dropped. The strip is taken
+   canvas under a pointer that is already dragging a Resource out of the drawer, and
+   the Resource lands somewhere other than where it was dropped. The strip is taken
    in one step, which is also what the flex layout this replaced did. */
 .shell__main {
   flex: 1;
@@ -106,78 +106,78 @@ body {
 
 /* ---- Graph area ---- */
 .graph-area {
-  --thing-placement-duration: 200ms;
-  --thing-placement-easing: ease;
+  --resource-placement-duration: 200ms;
+  --resource-placement-easing: ease;
   position: relative;
 }
 
-/* ---- Thing node ---- */
-.rf-thing-node {
-  border-radius: var(--canvas-thing-radius);
+/* ---- Resource node ---- */
+.rf-resource-node {
+  border-radius: var(--canvas-resource-radius);
   transition:
-    width var(--thing-placement-duration) var(--thing-placement-easing),
-    height var(--thing-placement-duration) var(--thing-placement-easing),
-    transform var(--thing-placement-duration) var(--thing-placement-easing);
+    width var(--resource-placement-duration) var(--resource-placement-easing),
+    height var(--resource-placement-duration) var(--resource-placement-easing),
+    transform var(--resource-placement-duration) var(--resource-placement-easing);
 }
 
-.rf-thing-node:has(> .rf-thing-node__inner[data-resizing='true']) {
+.rf-resource-node:has(> .rf-resource-node__inner[data-resizing='true']) {
   transition-property: transform;
 }
 
-.rf-thing-node__inner {
+.rf-resource-node__inner {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-/* An Expanded Thing is whatever rect the Diagram authored, so the node's own
+/* An Expanded Resource is whatever rect the Map authored, so the node's own
    subtree stops declaring the collapsed constant and fills the box React Flow
    sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
-   default because a Thing is drawn before any layout resolves, and 100% of an
+   default because a Resource is drawn before any layout resolves, and 100% of an
    unsized wrapper is nothing. */
-.rf-thing-node__inner > .canvas-thing {
+.rf-resource-node__inner > .canvas-resource {
   width: 100%;
   height: 100%;
 }
 
 /* React Flow sub-flow children move with their parent but are DOM siblings of
-   it, so only disabling the directly dragged wrapper leaves embedded Things
+   it, so only disabling the directly dragged wrapper leaves embedded Resources
    interpolating toward the parent's current position. Treat the whole canvas
    as directly manipulated while any node carries React Flow's dragging state.
    The rule stops applying on release, restoring authored placement motion. */
-.graph-area:has(.react-flow__node[class~='dragging']) .rf-thing-node {
+.graph-area:has(.react-flow__node[class~='dragging']) .rf-resource-node {
   transition: none;
 }
 
-/* The other half of that same sibling fact. A Thing leans as it is dragged
-   (`canvas-thing.css`), and a transform reaches only its own descendants —
-   which its embedded canvas is not, those Things being React Flow sub-flow
+/* The other half of that same sibling fact. A Resource leans as it is dragged
+   (`canvas-resource.css`), and a transform reaches only its own descendants —
+   which its embedded canvas is not, those Resources being React Flow sub-flow
    children drawn as siblings of this wrapper.
 
-   The lean is given to them as a rigid motion in two halves: `embedded-diagram.ts`
-   has already rotated each one's *position* about the dragged Thing's centre,
+   The lean is given to them as a rigid motion in two halves: `embedded-map.ts`
+   has already rotated each one's *position* about the dragged Resource's centre,
    and this turns it in place by the same angle. Together those are the one
    motion, and splitting it that way is what lets an Edge follow a moved
    position (`leaves the Edges to React Flow, which draws them from the
-   positions that moved` in `embedded-diagram.test.ts`). It leans the Thing,
-   not `.rf-thing-node__inner`. */
-.rf-thing-node__inner[data-drag-tilted='true'] > .canvas-thing {
-  transform: rotate(var(--canvas-thing-drag-tilt));
+   positions that moved` in `embedded-map.test.ts`). It leans the Resource,
+   not `.rf-resource-node__inner`. */
+.rf-resource-node__inner[data-drag-tilted='true'] > .canvas-resource {
+  transform: rotate(var(--canvas-resource-drag-tilt));
 }
 
 @media (prefers-reduced-motion: reduce) {
   .graph-area {
-    --thing-placement-duration: 1ms;
+    --resource-placement-duration: 1ms;
   }
 
-  .rf-thing-node__inner .react-flow__resize-control.rf-thing-node__resize-control {
+  .rf-resource-node__inner .react-flow__resize-control.rf-resource-node__resize-control {
     transition: none;
   }
 }
 
-/* React Flow's own `NodeResizeControl`, in the Thing's palette: one bottom-right
-   control, and here rather than beside `CanvasThing` because the control is the
-   framework's — the Thing being resized knows nothing about it.
+/* React Flow's own `NodeResizeControl`, in the Resource's palette: one bottom-right
+   control, and here rather than beside `CanvasResource` because the control is the
+   framework's — the Resource being resized knows nothing about it.
 
    **The wrapper is named to win the cascade, not for reach.** The default
    variant carries React Flow's own `.handle`, and `.react-flow__resize-control.handle`
@@ -188,31 +188,31 @@ body {
    bare `.handle`, which belongs to React Flow and which no module here names.
 
    The control is the hit target and the mark is only what it draws, and the
-   whole interactive box stays inside the Thing: `translate` is overridden rather
+   whole interactive box stays inside the Resource: `translate` is overridden rather
    than left as React Flow's centring of the box on the corner it resizes from.
    Centred, three quarters of the target lay over the pane while `opacity` kept
    it invisible, and hover is no answer to a pointer that has none — a touch
-   beside an unselected Open Thing's bottom-right corner began a resize on a
+   beside an unselected Open Resource's bottom-right corner began a resize on a
    control nothing had revealed. The inert mark keeps its corner anchor; its
    visual adjustment is CSS-only and changes no layout or interaction geometry.
 
    Anchoring it inside is what makes `z-index` load-bearing. The control is
-   rendered before the Thing so `canvas-thing.css` can reach the authoring handles
+   rendered before the Resource so `canvas-resource.css` can reach the authoring handles
    with `~`, and a positioned later sibling otherwise paints over it — with the
-   overhang gone, every point of the control lay under `.canvas-thing` and the
-   press landed on the Thing body instead. It takes the same layer the authoring
+   overhang gone, every point of the control lay under `.canvas-resource` and the
+   press landed on the Resource body instead. It takes the same layer the authoring
    handles take, for the same reason.
 
    `pointer-events` is gated on reveal, as the authoring handles gate theirs.
    Against the centred box that deadlocked the gesture outright — a pointer
-   arriving on the overhang hit the pane, the Thing stopped being hovered, and
+   arriving on the overhang hit the pane, the Resource stopped being hovered, and
    the control the hover was revealing was withheld from under it, so
-   `onResizeStart` never fired. Inside the Thing the gate cannot do that: being
-   on the control is being on the Thing, so the hover the reveal reads is already
+   `onResizeStart` never fired. Inside the Resource the gate cannot do that: being
+   on the control is being on the Resource, so the hover the reveal reads is already
    true. What the gate buys is the corner back — invisible and always grabbable,
-   it would otherwise swallow every press on the Thing's own bottom-right, the
+   it would otherwise swallow every press on the Resource's own bottom-right, the
    caret included. */
-.rf-thing-node__inner .react-flow__resize-control.rf-thing-node__resize-control {
+.rf-resource-node__inner .react-flow__resize-control.rf-resource-node__resize-control {
   z-index: 1;
   width: 48px;
   height: 48px;
@@ -229,10 +229,10 @@ body {
   transition: opacity 100ms ease;
 }
 
-.rf-thing-node__resize-mark {
-  /* This mark's own border weight — a singleton, drawn in the Thing's own ink
-     but not the Thing's own `--canvas-thing-border-width` (4px): the mark is a
-     small resize gizmo, not the Thing's paper edge, and the two values are not
+.rf-resource-node__resize-mark {
+  /* This mark's own border weight — a singleton, drawn in the Resource's own ink
+     but not the Resource's own `--canvas-resource-border-width` (4px): the mark is a
+     small resize gizmo, not the Resource's paper edge, and the two values are not
      the same fact. */
   --resize-mark-border-width: 2px;
 
@@ -242,65 +242,68 @@ body {
   width: 20px;
   height: 20px;
   background: #000;
-  border: var(--resize-mark-border-width) solid var(--canvas-thing-ink-color);
+  border: var(--resize-mark-border-width) solid var(--canvas-resource-ink-color);
   opacity: 0;
   pointer-events: none;
   transition: opacity 100ms ease;
 }
 
 /* Hover discovers the control, Selection keeps it stable for touch (no hover
-   state to reveal it), and keyboard-visible Thing focus offers the same authoring
-   affordance — three independent ways an Open Thing is "in play" (ADR 0066).
+   state to reveal it), and keyboard-visible Resource focus offers the same authoring
+   affordance — three independent ways an Open Resource is "in play" (ADR 0066).
    Pointer focus alone must not keep the control up after Open/Close and departure.
    Hover and focus are read off `.react-flow__node`, the element React Flow
    itself makes hoverable and focusable; Selected is read off `data-selected`,
-   which only `.rf-thing-node__inner` carries.
+   which only `.rf-resource-node__inner` carries.
 
    Every one of the three is gated on `data-dragging`, for the reason the anchors
-   below are: moving a Thing satisfies all three at once — the pointer stays on
-   the Thing it carries and React Flow Selects it — so a Thing being carried
+   below are: moving a Resource satisfies all three at once — the pointer stays on
+   the Resource it carries and React Flow Selects it — so a Resource being carried
    would otherwise offer the corner that resizes it. Stating the condition on
    each arm keeps it where the reveal is decided rather than in a second rule
    racing this one on specificity, as `data-resizing` already is. */
 .react-flow__node:hover
-  .rf-thing-node__inner[data-dragging='false']
-  .react-flow__resize-control.rf-thing-node__resize-control,
-.rf-thing-node__inner[data-selected='true'][data-dragging='false']
-  .react-flow__resize-control.rf-thing-node__resize-control,
+  .rf-resource-node__inner[data-dragging='false']
+  .react-flow__resize-control.rf-resource-node__resize-control,
+.rf-resource-node__inner[data-selected='true'][data-dragging='false']
+  .react-flow__resize-control.rf-resource-node__resize-control,
 .react-flow__node:is(:focus-visible, :has(:focus-visible))
-  .rf-thing-node__inner[data-dragging='false']
-  .react-flow__resize-control.rf-thing-node__resize-control {
+  .rf-resource-node__inner[data-dragging='false']
+  .react-flow__resize-control.rf-resource-node__resize-control {
   opacity: 1;
   pointer-events: auto;
 }
 
-.react-flow__node:hover .rf-thing-node__inner[data-dragging='false'] .rf-thing-node__resize-mark,
-.rf-thing-node__inner[data-selected='true'][data-dragging='false'] .rf-thing-node__resize-mark,
+.react-flow__node:hover
+  .rf-resource-node__inner[data-dragging='false']
+  .rf-resource-node__resize-mark,
+.rf-resource-node__inner[data-selected='true'][data-dragging='false']
+  .rf-resource-node__resize-mark,
 .react-flow__node:is(:focus-visible, :has(:focus-visible))
-  .rf-thing-node__inner[data-dragging='false']
-  .rf-thing-node__resize-mark {
+  .rf-resource-node__inner[data-dragging='false']
+  .rf-resource-node__resize-mark {
   opacity: 1;
 }
 
-.new-thing-preview {
+.new-resource-preview {
   position: absolute;
   opacity: 0.55;
   pointer-events: none;
 }
 
-/* A Thing's four Edge anchors, one on each side (ADR 0087).
+/* A Resource's four Edge anchors, one on each side (ADR 0087).
 
    They are anchors before they are affordances: an Edge attaches to one, and
-   React Flow draws no Edge at all for a Thing whose handles it cannot resolve.
-   So they render on every Thing and sit at `opacity: 0` until the reveal below
+   React Flow draws no Edge at all for a Resource whose handles it cannot resolve.
+   So they render on every Resource and sit at `opacity: 0` until the reveal below
    says otherwise. Never `display: none` — React Flow measures a handle, and a
    hidden one reports 0x0.
 
    The size is declared alongside the handle bounds in `authoring-handle.ts` so
    the two cannot drift. */
-.rf-thing-node__authoring-handle.react-flow__handle {
-  /* This handle's own border weight — a singleton, and not the Thing's own
-     `--canvas-thing-border-width` (4px): an anchor dot is not the Thing's
+.rf-resource-node__authoring-handle.react-flow__handle {
+  /* This handle's own border weight — a singleton, and not the Resource's own
+     `--canvas-resource-border-width` (4px): an anchor dot is not the Resource's
      paper edge, and the two happening to be close is not a reason to share
      one token between them. */
   --authoring-handle-border-width: 3px;
@@ -310,44 +313,44 @@ body {
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--thing-hover-duration) var(--thing-hover-easing);
+  transition: opacity var(--resource-hover-duration) var(--resource-hover-easing);
 }
 
-/* Idle, a Thing offers where an Edge may start; mid-drag, a Thing that is both
+/* Idle, a Resource offers where an Edge may start; mid-drag, a Resource that is both
    near the pointer and eligible for the release offers whichever end the drag
    is looking for — a target for an ordinary connection, and a source for a
    reconnection that has taken hold of an Edge's `from` end. Far or refused
-   Things stay quiet. The role is read off the drag rather than assumed, so the
+   Resources stay quiet. The role is read off the drag rather than assumed, so the
    second gesture has somewhere to land.
 
    Every rule below is conditioned on `data-connection-authoring`, because the
    four sides are **anchors** before they are affordances and they render on
-   every Thing: an Edge attaches to one, and React Flow draws no Edge at all for
-   a Thing whose handles it cannot resolve (ADR 0087). A Read embedding keeps
+   every Resource: an Edge attaches to one, and React Flow draws no Edge at all for
+   a Resource whose handles it cannot resolve (ADR 0087). A Read embedding keeps
    the anchors and withholds the gesture; Edit publishes the same affordance
    the host canvas does.
 
-   The two idle arms are gated on `data-dragging` as well, because a Thing being
+   The two idle arms are gated on `data-dragging` as well, because a Resource being
    moved has one gesture and offering the start of another is not part of it: a
-   drag keeps the pointer on the Thing and Selects it, so both idle reveals would
+   drag keeps the pointer on the Resource and Selects it, so both idle reveals would
    otherwise fire for the    whole of it. The two seeking arms are deliberately
    ungated: they are what a *neighbour* offers the drag that is drawing an Edge,
-   which is a different gesture from carrying a Thing, and nothing about it
+   which is a different gesture from carrying a Resource, and nothing about it
    changes here. */
 .react-flow__node:hover
-  .rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-connection-in-progress='false']
-  .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-selected='true'][data-connection-in-progress='false']
-  .rf-thing-node__authoring-handle--source,
-.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='target']
-  .rf-thing-node__authoring-handle--target,
-.rf-thing-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='source']
-  .rf-thing-node__authoring-handle--source {
+  .rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-connection-in-progress='false']
+  .rf-resource-node__authoring-handle--source,
+.rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-selected='true'][data-connection-in-progress='false']
+  .rf-resource-node__authoring-handle--source,
+.rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='target']
+  .rf-resource-node__authoring-handle--target,
+.rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='source']
+  .rf-resource-node__authoring-handle--source {
   opacity: 1;
   pointer-events: auto;
 }
 
-/* Resizing is the Thing's one active authoring gesture. The resize control stays
+/* Resizing is the Resource's one active authoring gesture. The resize control stays
    reachable until release, while the rail withdraws so no second operation
    competes with the pointer or remains visually armed.
 
@@ -356,36 +359,36 @@ body {
    fire mid-gesture is the whole of the withdrawal — and stating the condition
    where the reveal is decided keeps it out of a specificity race the two rules
    would otherwise run against each other. */
-.react-flow__node .rf-thing-node__inner[data-resizing='true'] .canvas-thing__rail {
+.react-flow__node .rf-resource-node__inner[data-resizing='true'] .canvas-resource__rail {
   opacity: 0;
   pointer-events: none;
 }
 
-/* A Thing is drawn in the Thing's vocabulary, never the chrome's. `--card`,
-   `--border` and `--radius-chrome-xl` stood here and made an opened Thing take
+/* A Resource is drawn in the Resource's vocabulary, never the chrome's. `--card`,
+   `--border` and `--radius-chrome-xl` stood here and made an opened Resource take
    chrome paper, a chrome hairline and a chrome corner, so a block that changed
-   only the chrome changed a Thing as well. `.canvas-thing` has always read the
+   only the chrome changed a Resource as well. `.canvas-resource` has always read the
    tokens below; this rule and the two after it had not. */
-.thing {
-  background: var(--canvas-thing-face-rest);
-  border: var(--canvas-thing-border-width) solid var(--canvas-thing-ink-color);
-  border-radius: var(--canvas-thing-radius);
+.resource {
+  background: var(--canvas-resource-face-rest);
+  border: var(--canvas-resource-border-width) solid var(--canvas-resource-ink-color);
+  border-radius: var(--canvas-resource-radius);
   padding: 0.85rem 1rem;
   overflow: hidden;
 }
 
-/* The production Thing front's own appearance — kind and interaction-state
+/* The production Resource front's own appearance — kind and interaction-state
    treatment, title, actions, title editor — lives with the production
-   `CanvasThing` module in `@project/ui`, as real CSS in the colocated
-   `canvas-thing.css`, not here. `.canvas-thing` survives here only as a stable
+   `CanvasResource` module in `@project/ui`, as real CSS in the colocated
+   `canvas-resource.css`, not here. `.canvas-resource` survives here only as a stable
    selector for this one rule: React Flow's own "this is the actively
-   presented Thing" fact, which is adapter/app state and has no reason to be
+   presented Resource" fact, which is adapter/app state and has no reason to be
    known inside the design-system package. */
-.rf-thing-node--active :is(.thing, .canvas-thing) {
-  /* The border stays the Thing's ink and is not restated: `--accent` was set
+.rf-resource-node--active :is(.resource, .canvas-resource) {
+  /* The border stays the Resource's ink and is not restated: `--accent` was set
      here, which on a cream face draws a border a shade off the paper and so
-     removed the Thing's edge for as long as it was the presented one. */
-  outline: 2px solid var(--canvas-thing-ink-color);
+     removed the Resource's edge for as long as it was the presented one. */
+  outline: 2px solid var(--canvas-resource-ink-color);
 }
 
 /* Where a selected Edge's controls are placed, and nothing about how they look.
@@ -419,90 +422,90 @@ body {
   transform: translateX(-50%);
 }
 
-.thing__title {
+.resource__title {
   margin: 0 0 0.4rem;
   font-size: 0.95rem;
 }
 
-/* `ThingContent` always emits `thing thing--full`, so these are its own base
+/* `ResourceContent` always emits `resource resource--full`, so these are its own base
    appearance, and they sit here rather than after the traversal block below on
-   purpose. `.thing--full .thing__title` and `.rf-thing-node__content .thing__title`
+   purpose. `.resource--full .resource__title` and `.rf-resource-node__content .resource__title`
    have the same specificity, so whichever is written second wins — and with
-   these last, a presented Thing's title took a fixed 1.3rem and stopped scaling
+   these last, a presented Resource's title took a fixed 1.3rem and stopped scaling
    with the frame, which is exactly what the comment below forbids. */
-.thing--full {
+.resource--full {
   background: transparent;
   border: none;
   padding: 0.5rem 0;
 }
 
-.thing--full .thing__title {
+.resource--full .resource__title {
   font-size: 1.3rem;
 }
 
-/* ---- The Thing reached during traversal ---- */
-/* Presenting draws the active thing's content instead of its title (ADR 0027).
-   Same box as every other thing — the Thing's 16:9 frame, which the camera then
+/* ---- The Resource reached during traversal ---- */
+/* Presenting draws the active resource's content instead of its title (ADR 0027).
+   Same box as every other resource — the Resource's 16:9 frame, which the camera then
    fills the screen with — so the type is sized in *container* units and scales
    with the frame. Setting it in pixels would size it against a box that is about
    to be magnified by an arbitrary factor. Content that still overflows is
-   clipped: the frame is fixed and a thing that does not fit it is an authoring
+   clipped: the frame is fixed and a resource that does not fit it is an authoring
    problem, exactly as a slide would be. */
-.rf-thing-node__content {
+.rf-resource-node__content {
   container-type: size;
-  width: var(--thing-width);
-  height: var(--thing-height);
+  width: var(--resource-width);
+  height: var(--resource-height);
 }
 
-.rf-thing-node__content .thing--full {
+.rf-resource-node__content .resource--full {
   width: 100%;
   height: 100%;
   padding: 4cqw 5cqw;
-  background: var(--canvas-thing-face-rest);
-  border: var(--canvas-thing-border-width) solid var(--canvas-thing-ink-color);
-  border-radius: var(--canvas-thing-radius);
+  background: var(--canvas-resource-face-rest);
+  border: var(--canvas-resource-border-width) solid var(--canvas-resource-ink-color);
+  border-radius: var(--canvas-resource-radius);
   overflow: hidden;
   text-align: left;
   font-size: 3.4cqw;
   line-height: 1.5;
 }
 
-.rf-thing-node__content .thing__title {
+.rf-resource-node__content .resource__title {
   margin: 0 0 2cqw;
   font-size: 5cqw;
   line-height: 1.2;
 }
 
-.rf-thing-node__content .thing__body > * {
+.rf-resource-node__content .resource__body > * {
   margin: 0 0 2cqw;
 }
 
-.rf-thing-node__content .thing__body :is(h1, h2, h3, h4) {
+.rf-resource-node__content .resource__body :is(h1, h2, h3, h4) {
   margin: 0 0 1.6cqw;
   font-size: 4.2cqw;
   line-height: 1.25;
 }
 
-.rf-thing-node__content .thing__body :is(ul, ol) {
+.rf-resource-node__content .resource__body :is(ul, ol) {
   padding-left: 4cqw;
 }
 
-.rf-thing-node__content .thing__body :is(code, pre) {
+.rf-resource-node__content .resource__body :is(code, pre) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
 }
 
-.rf-thing-node__content .thing__body pre {
+.rf-resource-node__content .resource__body pre {
   overflow-x: auto;
   padding: 2cqw;
-  border-radius: var(--canvas-thing-radius);
-  /* A tint of the Thing's own ink rather than a chrome fill, which is how
-     `markdown-thing-body.css` already grounds a code block on a Thing. */
+  border-radius: var(--canvas-resource-radius);
+  /* A tint of the Resource's own ink rather than a chrome fill, which is how
+     `markdown-resource-body.css` already grounds a code block on a Resource. */
   background: color-mix(in srgb, currentcolor 8%, transparent);
 }
 
 /* React Flow viewport coordinates keep a Space dock above its embedded nodes. */
-.thing-rail-layer {
+.resource-rail-layer {
   position: absolute;
   pointer-events: none;
 }

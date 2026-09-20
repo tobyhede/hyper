@@ -1,8 +1,8 @@
 import {
   newUuid,
   uuidSchema,
-  type ThingPlacement,
-  type ThingId,
+  type ResourcePlacement,
+  type ResourceId,
   type GraphEdge,
   type GraphId,
   type SpaceSnapshot,
@@ -31,9 +31,9 @@ import {
  * Both are loaded at module scope, so a literal that stops parsing takes the
  * story down with a message instead of rendering something subtly wrong.
  *
- * Each also **declares where it opens**, so `defaultDiagram` answers that for a
+ * Each also **declares where it opens**, so `defaultMap` answers that for a
  * story exactly as it does for the app. The fixture used to decide it — "the
- * first Diagram, else Flow" — which is the state translation ADR 0052's negative
+ * first Map, else Flow" — which is the state translation ADR 0052's negative
  * names. `story-spaces.test.ts` holds the declaration and what the Ladle specs
  * press to the same answer.
  */
@@ -43,55 +43,52 @@ const loaded = (result: LoadSpaceResult | LoadSpaceSnapshotResult): Space => {
   return result.space;
 };
 
-/** One Diagram of a target Space and one Graph that Diagram owns — what every Space Thing stores. */
-interface SpaceThingSelection {
-  readonly diagram: UUID;
+/** One Map of a target Space and one Graph that Map owns — what every Space Resource stores. */
+interface SpaceEndpointSelection {
+  readonly map: UUID;
   readonly graph: GraphId;
 }
 
 /**
- * What a Space Thing pointed at a fixture selects: the Diagram that Space opens
- * on, and that Diagram's Active Graph (ADR 0079, ADR 0026).
+ * What a Space Resource pointed at a fixture selects: the Map that Space opens
+ * on, and that Map's Active Graph (ADR 0079, ADR 0026).
  *
  * Derived from the target snapshot rather than written out beside each Space
- * Thing, because a transcribed pair is one that goes stale the moment a
- * fixture's `defaultDiagram` moves — and these load at module scope, so a stale
+ * Resource, because a transcribed pair is one that goes stale the moment a
+ * fixture's `defaultMap` moves — and these load at module scope, so a stale
  * pair takes the whole catalogue down rather than one story. It is the same rule
- * the lifecycle applies when it creates a Space Thing
+ * the lifecycle applies when it creates a Space Resource
  * (`packages/persistence/src/session-registry.ts`), which is what keeps a
- * fixture Space Thing indistinguishable from an authored one.
+ * fixture Space Resource indistinguishable from an authored one.
  */
-const opensOn = (target: SpaceSnapshot): SpaceThingSelection => {
-  const diagram = (target.document.diagrams ?? []).find(
-    ({ id }) => id === target.document.defaultDiagram,
-  );
-  if (diagram === undefined)
-    throw new Error(`Story Space ${target.document.title} declares no opening Diagram`);
-  const graph = diagram.graphs.find(({ id }) => id === diagram.activeGraph) ?? diagram.graphs[0];
-  if (graph === undefined)
-    throw new Error(`Story Diagram ${diagram.title} owns no Graph to select`);
-  return { diagram: diagram.id, graph: graph.id };
+const opensOn = (target: SpaceSnapshot): SpaceEndpointSelection => {
+  const map = (target.document.maps ?? []).find(({ id }) => id === target.document.defaultMap);
+  if (map === undefined)
+    throw new Error(`Story Space ${target.document.title} declares no opening Map`);
+  const graph = map.graphs.find(({ id }) => id === map.activeGraph) ?? map.graphs[0];
+  if (graph === undefined) throw new Error(`Story Map ${map.title} owns no Graph to select`);
+  return { map: map.id, graph: graph.id };
 };
 
-/** A Space Thing titled for the Space it shows, selecting what that Space opens on. */
-export const spaceThingDocument = (
+/** A Space Resource titled for the Space it shows, selecting what that Space opens on. */
+export const spaceResourceDocument = (
   title: string,
   target: SpaceSnapshot,
-): SpaceSnapshot['things'][number]['document'] => {
-  const { diagram, graph } = opensOn(target);
-  return { title, kind: 'space', spaceId: target.id, diagram, graph };
+): SpaceSnapshot['resources'][number]['document'] => {
+  const { map, graph } = opensOn(target);
+  return { title, kind: 'space', spaceId: target.id, map, graph };
 };
 
-const THING_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
-const THING_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
-const THING_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
-const THING_D = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
-const THING_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
+const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const RESOURCE_D = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 
-/** Five Things in a row. The sidebar draws none of them; the geometry only has to be legal. */
-const SPINE = [THING_A, THING_B, THING_C, THING_D, THING_E] as const;
+/** Five Resources in a row. The sidebar draws none of them; the geometry only has to be legal. */
+const SPINE = [RESOURCE_A, RESOURCE_B, RESOURCE_C, RESOURCE_D, RESOURCE_E] as const;
 
-const positions = (count: number): Record<string, ThingPlacement> =>
+const positions = (count: number): Record<string, ResourcePlacement> =>
   Object.fromEntries(
     SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0, open: false }]),
   );
@@ -103,24 +100,24 @@ const chain = (links: number): GraphEdge[] =>
     return index < links && to !== undefined ? [{ from, to }] : [];
   });
 
-/** Named once, because the Space both declares this Diagram and opens on it. */
+/** Named once, because the Space both declares this Map and opens on it. */
 const COLLECTION_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
 const COLLECTION_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 /**
- * A Space with two authored Diagrams and the four Graphs they own.
+ * A Space with two authored Maps and the four Graphs they own.
  *
  * **No Graph carries a colour.** A Graph without one takes a palette slot by
- * order through `graphColorMap`, and the flatten across Diagrams in declared
+ * order through `graphColorsByGraphId`, and the flatten across Maps in declared
  * order (ADR 0045) puts Long, Mid, Short and Echo in the first four slots — the
  * same blue, amber, green and pink the fixture used to write out by hand.
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
  *
- * **It names `defaultDiagram`**, which the tracked e2e fixture deliberately does
- * not: that one exists to prove a Space declaring Diagrams still arrives in Flow,
- * and this one exists to draw a sidebar with a Diagram pressed. Declaring it is
- * how the story gets that from `defaultDiagram` instead of from a rule the
+ * **It names `defaultMap`**, which the tracked e2e fixture deliberately does
+ * not: that one exists to prove a Space declaring Maps still arrives in Flow,
+ * and this one exists to draw a sidebar with a Map pressed. Declaring it is
+ * how the story gets that from `defaultMap` instead of from a rule the
  * harness keeps.
  *
  * Exported alongside the {@link authoredSpace} it loads into, because a story
@@ -133,8 +130,8 @@ export const authoredSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Space',
-    defaultDiagram: COLLECTION_ONE,
-    diagrams: [
+    defaultMap: COLLECTION_ONE,
+    maps: [
       {
         id: COLLECTION_ONE,
         title: 'Collection 1',
@@ -173,59 +170,59 @@ export const authoredSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  things: SPINE.map((id, index) => ({
+  resources: SPINE.map((id, index) => ({
     id,
-    document: { title: `Thing ${index + 1}`, kind: 'markdown', body: '' },
+    document: { title: `Resource ${index + 1}`, kind: 'markdown', body: '' },
   })),
 };
 
 /**
- * The same Space opened on Collection 2, which holds two of the five Things.
+ * The same Space opened on Collection 2, which holds two of the five Resources.
  *
- * The Things list's stories need a Diagram some Things are *absent* from, and
+ * The Resources list's stories need a Map some Resources are *absent* from, and
  * this **declares where it opens** like every other fixture here rather than
- * leaving a story to index into `diagrams` — array order is not a declaration,
- * and a Diagram inserted before it would move the story somewhere else in
+ * leaving a story to index into `maps` — array order is not a declaration,
+ * and a Map inserted before it would move the story somewhere else in
  * silence. `story-spaces.test.ts` holds both halves: where it opens, and that
- * Things remain outside it.
+ * Resources remain outside it.
  */
 export const sparseAuthoredSnapshot: SpaceSnapshot = {
   ...authoredSnapshot,
-  document: { ...authoredSnapshot.document, defaultDiagram: COLLECTION_TWO },
+  document: { ...authoredSnapshot.document, defaultMap: COLLECTION_TWO },
 };
 
 export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
 
 /**
  * {@link sparseAuthoredSnapshot} loaded, for a story that draws it directly
- * rather than through a live session — the Graph HUD's second Diagram story
+ * rather than through a live session — the Graph HUD's second Map story
  * among them, which needs a real `Space` to resolve `Collection 2` through
- * the same `defaultDiagram` rule the app does.
+ * the same `defaultMap` rule the app does.
  */
 export const sparseAuthoredSpace: Space = loaded(loadSpaceSnapshot(sparseAuthoredSnapshot));
 
 /**
- * {@link authoredSnapshot} one Edit later: a third Diagram, `Collection 3`.
+ * {@link authoredSnapshot} one Edit later: a third Map, `Collection 3`.
  *
  * What a story submits has to differ from what it loaded, or a failed save and
  * a successful one draw the same list and nothing proves the sidebar read the
- * session at all. The Diagram only has to be legal — a title, positions naming
- * Things this Space already holds, and one owned Graph whose Edge endpoints are
+ * session at all. The Map only has to be legal — a title, positions naming
+ * Resources this Space already holds, and one owned Graph whose Edge endpoints are
  * members of it (ADR 0040) — so it is built from the same spine helpers the two
- * Diagrams above it are, rather than by transcribing coordinates a third time.
+ * Maps above it are, rather than by transcribing coordinates a third time.
  *
- * It **appends**, and an Edit here that removed or replaced a Diagram or a Graph
+ * It **appends**, and an Edit here that removed or replaced a Map or a Graph
  * would not. The fixture that submits this seeds its opened canvas and its
  * Active Graph from the first Space it is handed and never reconciles them
  * against a later one, so withdrawing `Collection 1` would leave the story
- * naming a Diagram the Space no longer holds.
+ * naming a Map the Space no longer holds.
  */
 export const editedSnapshot: SpaceSnapshot = {
   ...authoredSnapshot,
   document: {
     ...authoredSnapshot.document,
-    diagrams: [
-      ...(authoredSnapshot.document.diagrams ?? []),
+    maps: [
+      ...(authoredSnapshot.document.maps ?? []),
       {
         id: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
         title: 'Collection 3',
@@ -244,24 +241,24 @@ export const editedSnapshot: SpaceSnapshot = {
 };
 
 /**
- * A newly created Space: one Thing, placed in one authored Diagram owning one
+ * A newly created Space: one Resource, placed in one authored Map owning one
  * empty Active Graph (ADR 0018, ADR 0080).
  *
  * `newSpace()` is the one encoding of that starting state, and a hand-written
- * snapshot beside it would be a second — the story would go on saying "one Thing
- * and no Diagram" long after the rule said something else. It returns the
- * **on-disk** shape, a space file and its thing files, which is why this is
+ * snapshot beside it would be a second — the story would go on saying "one Resource
+ * and no Map" long after the rule said something else. It returns the
+ * **on-disk** shape, a space file and its resource files, which is why this is
  * `loadSpace` rather than `loadSpaceSnapshot`.
  *
  * It mints fresh ids on every page load, and nothing reads one: no story and no
- * Ladle spec names a Thing, a Diagram or a Graph of this Space by id, only the
- * `Diagram 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
+ * Ladle spec names a Resource, a Map or a Graph of this Space by id, only the
+ * `Map 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
  * generator is named here rather than inside `newSpace`, which takes its
  * identity source like every other minting operation (ADR 0016); this fixture
  * is the composition root that supplies it.
  */
 const minted = newSpace(newUuid);
-export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.thingFiles));
+export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.resourceFiles));
 
 /**
  * Where a story's converted Graph takes its identity.
@@ -269,10 +266,10 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.thing
  * Here rather than in the fixture, because the only state that decides whether
  * a minted id is safe is the block of ids declared above it, and the two were
  * in different files: the fixture counted from one and handed out the very ids
- * `THING_A` and `THING_B` already carry. `convertSubject` would not have refused
+ * `RESOURCE_A` and `RESOURCE_B` already carry. `convertSubject` would not have refused
  * either — a conversion's freshness is checked against the Space's *Graphs*
- * (ADR 0045), and a Thing's id is not one — so a story that converted a View
- * would have minted a Graph wearing a Thing's identity, in silence.
+ * (ADR 0045), and a Resource's id is not one — so a story that converted a View
+ * would have minted a Graph wearing a Resource's identity, in silence.
  *
  * No story converts one today. The counter is the fixture's answer to ADR
  * 0016's composition seam, and nothing presses it; the collision is one Ladle
@@ -281,10 +278,10 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.thing
  * together, and `story-spaces.test.ts` holds them apart.
  *
  * The base is a **reserved block** rather than one past the highest id, so a
- * story that declares another Thing or Diagram does not have to move it — the
+ * story that declares another Resource or Map does not have to move it — the
  * literals above occupy `0x02`..`0x40`, and this leaves the whole space between
  * them and here. Hexadecimal throughout, which is what the ids are: the
- * decimal counter this replaced rendered `12` as `…0000012` while `THING_E` is
+ * decimal counter this replaced rendered `12` as `…0000012` while `RESOURCE_E` is
  * `…000000c`, so the two spellings did not even sort against each other.
  */
 export const MINTED_GRAPH_ID_BASE = 0x1000;
@@ -306,37 +303,37 @@ export const storyGraphIds = (): (() => GraphId) => {
  *
  * Purpose-built, and deliberately not the sidebar's `authoredSpace`: that one
  * exists to draw four Graphs in a list and every one of them is a line, so it
- * can show a one-member choice and nothing else. A fork needs a Thing with
- * several outgoing Edges, and there is no such Thing anywhere in the tracked
+ * can show a one-member choice and nothing else. A fork needs a Resource with
+ * several outgoing Edges, and there is no such Resource anywhere in the tracked
  * fixtures — the E2E fixture's Graphs are deliberately all lines too.
  *
- * Each **declares where it opens**, so `defaultDiagram` and ADR 0026's Active
- * Graph rule answer for a story exactly as they do for the app: the Diagram named
- * here owns one Graph, and a Diagram that names no `activeGraph` opens on the
+ * Each **declares where it opens**, so `defaultMap` and ADR 0026's Active
+ * Graph rule answer for a story exactly as they do for the app: the Map named
+ * here owns one Graph, and a Map that names no `activeGraph` opens on the
  * first it owns. A story therefore calls `present()` and nothing else to be
  * presenting the Graph it is about.
  *
- * The titles are a talk's, not `Thing N`: what the chrome draws is a choice
+ * The titles are a talk's, not `Resource N`: what the chrome draws is a choice
  * between destinations, and the design pass this catalogue exists for cannot
  * judge a row of choices whose labels are all the same length.
  */
-const traversalPositions = (ids: readonly ThingId[]): Record<string, ThingPlacement> =>
+const traversalPositions = (ids: readonly ResourceId[]): Record<string, ResourcePlacement> =>
   Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0, open: false }]));
 
-const traversalThings = (
-  titled: readonly (readonly [ThingId, string])[],
-): SpaceSnapshot['things'] =>
+const traversalResources = (
+  titled: readonly (readonly [ResourceId, string])[],
+): SpaceSnapshot['resources'] =>
   titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));
 
-const TRAVERSAL_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
-const TRAVERSAL_THINGS = [
+const TRAVERSAL_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const TRAVERSAL_RESOURCES = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000062'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000063'), 'How it works'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000064'), 'Wrap up'],
-] as const satisfies readonly (readonly [ThingId, string])[];
+] as const satisfies readonly (readonly [ResourceId, string])[];
 
 /**
- * A line: one move at each Thing, and a sink two moves in.
+ * A line: one move at each Resource, and a sink two moves in.
  *
  * The degenerate fork rather than a second mode (ADR 0024) — which is exactly
  * what the one-move story has to show, and what a sink reached by advancing
@@ -347,33 +344,33 @@ export const traversalSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Traversal',
-    defaultDiagram: TRAVERSAL_DIAGRAM,
-    diagrams: [
+    defaultMap: TRAVERSAL_MAP,
+    maps: [
       {
-        id: TRAVERSAL_DIAGRAM,
+        id: TRAVERSAL_MAP,
         title: 'Traversal',
         kind: 'positioned',
-        positions: traversalPositions(TRAVERSAL_THINGS.map(([id]) => id)),
+        positions: traversalPositions(TRAVERSAL_RESOURCES.map(([id]) => id)),
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000061'),
             title: 'Traversal',
             edges: [
-              { from: TRAVERSAL_THINGS[0][0], to: TRAVERSAL_THINGS[1][0] },
-              { from: TRAVERSAL_THINGS[1][0], to: TRAVERSAL_THINGS[2][0] },
+              { from: TRAVERSAL_RESOURCES[0][0], to: TRAVERSAL_RESOURCES[1][0] },
+              { from: TRAVERSAL_RESOURCES[1][0], to: TRAVERSAL_RESOURCES[2][0] },
             ],
           },
         ],
       },
     ],
   },
-  things: traversalThings(TRAVERSAL_THINGS),
+  resources: traversalResources(TRAVERSAL_RESOURCES),
 };
 
 export const traversalSpace: Space = loaded(loadSpaceSnapshot(traversalSnapshot));
 
-const DEEP_DIVE_DIAGRAM = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
-const DEEP_DIVE_THINGS = [
+const DEEP_DIVE_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const DEEP_DIVE_RESOURCES = [
   [uuidSchema.parse('00000000-0000-4000-8000-000000000072'), 'Introduction'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000073'), 'Read path'],
   [uuidSchema.parse('00000000-0000-4000-8000-000000000074'), 'Write path'],
@@ -382,15 +379,15 @@ const DEEP_DIVE_THINGS = [
     uuidSchema.parse('00000000-0000-4000-8000-000000000076'),
     'Operating notes, rollback and the on-call runbook',
   ],
-] as const satisfies readonly (readonly [ThingId, string])[];
+] as const satisfies readonly (readonly [ResourceId, string])[];
 
 /**
- * A fork: four Edges out of the Thing a traversal begins at, each to a sink.
+ * A fork: four Edges out of the Resource a traversal begins at, each to a sink.
  *
  * Four rather than two, and one title deliberately longer than the bounded
  * button can hold, because the row this chrome renders has to be judged on a
  * choice set that can genuinely outrun it — a Graph's out-degree has no upper
- * bound and a Thing's title no length limit, so a design that only ever sees two
+ * bound and a Resource's title no length limit, so a design that only ever sees two
  * short choices never shows what it does with either.
  */
 export const deepDiveSnapshot: SpaceSnapshot = {
@@ -398,19 +395,19 @@ export const deepDiveSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Deep dive',
-    defaultDiagram: DEEP_DIVE_DIAGRAM,
-    diagrams: [
+    defaultMap: DEEP_DIVE_MAP,
+    maps: [
       {
-        id: DEEP_DIVE_DIAGRAM,
+        id: DEEP_DIVE_MAP,
         title: 'Deep dive',
         kind: 'positioned',
-        positions: traversalPositions(DEEP_DIVE_THINGS.map(([id]) => id)),
+        positions: traversalPositions(DEEP_DIVE_RESOURCES.map(([id]) => id)),
         graphs: [
           {
             id: uuidSchema.parse('00000000-0000-4000-8000-000000000071'),
             title: 'Deep dive',
-            edges: DEEP_DIVE_THINGS.slice(1).map(([id]) => ({
-              from: DEEP_DIVE_THINGS[0][0],
+            edges: DEEP_DIVE_RESOURCES.slice(1).map(([id]) => ({
+              from: DEEP_DIVE_RESOURCES[0][0],
               to: id,
             })),
           },
@@ -418,7 +415,7 @@ export const deepDiveSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  things: traversalThings(DEEP_DIVE_THINGS),
+  resources: traversalResources(DEEP_DIVE_RESOURCES),
 };
 
 export const deepDiveSpace: Space = loaded(loadSpaceSnapshot(deepDiveSnapshot));
@@ -431,7 +428,7 @@ export const deepDiveSpace: Space = loaded(loadSpaceSnapshot(deepDiveSnapshot));
  * Where the Command Dock prototype's identities live: `0x80`..`0xbf`.
  *
  * A reserved block, like {@link MINTED_GRAPH_ID_BASE} and for the same reason.
- * Thirty-four Things, Diagrams and Graphs written out as full literals would bury
+ * Thirty-four Resources, Maps and Graphs written out as full literals would bury
  * the shape of the fixture in uuids, so they are minted from this base instead
  * — and the base is declared here, above everything that draws from it, so the
  * block a reader has to keep clear is visible in one place.
@@ -447,17 +444,17 @@ const DOCK_COLLECTION_ONE = dockId(0);
 const DOCK_COLLECTION_TWO = dockId(1);
 
 /**
- * The Things `Collection 1` places, and all three kinds among them.
+ * The Resources `Collection 1` places, and all three kinds among them.
  *
- * The kinds are the point rather than decoration: the Dock's Things list draws
- * `ThingKindIcon` on every row and the canvas draws the production `ThingNode`,
- * so a fixture of five markdown Things would let a list and a canvas disagree
- * about what a Space Thing looks like without either being wrong.
+ * The kinds are the point rather than decoration: the Dock's Resources list draws
+ * `ResourceKindIcon` on every row and the canvas draws the production `ResourceNode`,
+ * so a fixture of five markdown Resources would let a list and a canvas disagree
+ * about what a Space Resource looks like without either being wrong.
  *
  * The second title is the long one, carried over from the inventory fixture for
- * the same reason it exists there: three lines at 18px in a 260px Thing is what
+ * the same reason it exists there: three lines at 18px in a 260px Resource is what
  * the balance and the clamp are there to survive, and a Dock that occludes a
- * Thing is judged against a Thing that is actually full.
+ * Resource is judged against a Resource that is actually full.
  */
 const DOCK_PLACED = [
   { id: dockId(0x10), title: 'Opening', kind: 'markdown' },
@@ -472,19 +469,19 @@ const DOCK_PLACED = [
 ] as const;
 
 /**
- * The Things `Collection 1` does *not* place — what the Dock's Things surface offers.
+ * The Resources `Collection 1` does *not* place — what the Dock's Resources surface offers.
  *
  * **Twenty-nine rather than four, and that count is the fixture's whole claim.**
  * A list of four fits any surface and settles nothing, while a real Space's
- * unplaced Things outnumber its Diagrams and Graphs by an order of magnitude. The
+ * unplaced Resources outnumber its Maps and Graphs by an order of magnitude. The
  * open question the Dock's list surfaces are compared on — an edge drawer, an
  * anchored popover, a second dock — is whether each can carry that many rows
  * and still be dragged out of, so a fixture that cannot overrun a popover
  * cannot be evidence either way.
  *
- * The Space Things among them are not a separate fixture. They are what the
+ * The Space Resources among them are not a separate fixture. They are what the
  * Dock's Spaces list draws, which is the whole of the claim that a Space is a
- * Thing and needs no construct of its own.
+ * Resource and needs no construct of its own.
  */
 const DOCK_UNPLACED = [
   { title: 'Constraints', kind: 'markdown' },
@@ -499,7 +496,7 @@ const DOCK_UNPLACED = [
   { title: 'Edge authoring', kind: 'space' },
   { title: 'Traversal', kind: 'markdown' },
   { title: 'Entry points', kind: 'markdown' },
-  { title: 'Unreachable Things', kind: 'markdown' },
+  { title: 'Unreachable Resources', kind: 'markdown' },
   { title: 'Fork ranking', kind: 'markdown' },
   { title: 'Vocabulary', kind: 'markdown' },
   { title: 'Add vs Create', kind: 'markdown' },
@@ -518,29 +515,29 @@ const DOCK_UNPLACED = [
   { title: 'Traversal overview', kind: 'reference' },
 ] as const;
 
-/** Every Thing in the fixture, placed and unplaced, keyed by the title a reference thing names. */
-const DOCK_THING_IDS: ReadonlyMap<string, UUID> = new Map([
-  ...DOCK_PLACED.map((thing): [string, UUID] => [thing.title, thing.id]),
-  ...DOCK_UNPLACED.map((thing, index): [string, UUID] => [thing.title, dockId(0x20 + index)]),
+/** Every Resource in the fixture, placed and unplaced, keyed by the title a reference resource names. */
+const DOCK_RESOURCE_IDS: ReadonlyMap<string, UUID> = new Map([
+  ...DOCK_PLACED.map((resource): [string, UUID] => [resource.title, resource.id]),
+  ...DOCK_UNPLACED.map((resource, index): [string, UUID] => [resource.title, dockId(0x20 + index)]),
 ]);
 
-const dockThingId = (title: string): UUID => {
-  const id = DOCK_THING_IDS.get(title);
-  if (id === undefined) throw new Error(`Command Dock fixture has no Thing titled ${title}`);
+const dockResourceId = (title: string): UUID => {
+  const id = DOCK_RESOURCE_IDS.get(title);
+  if (id === undefined) throw new Error(`Command Dock fixture has no Resource titled ${title}`);
   return id;
 };
 
 /**
- * The Spaces a Space Thing here points at: the other tracked fixtures, in turn.
+ * The Spaces a Space Resource here points at: the other tracked fixtures, in turn.
  *
- * Real Spaces rather than minted ids, because a Space Thing's whole content is
- * the Space it names — a fixture pointing at nothing would draw a Space Thing
+ * Real Spaces rather than minted ids, because a Space Resource's whole content is
+ * the Space it names — a fixture pointing at nothing would draw a Space Resource
  * that could never resolve, and the Dock's Spaces list is exactly the surface
  * that would have to pretend otherwise.
  *
- * The snapshots themselves rather than their ids, because a Space Thing stores a
- * Diagram and a Graph of its target as well (ADR 0079) and {@link opensOn} reads
- * those off the Space the Thing points at.
+ * The snapshots themselves rather than their ids, because a Space Resource stores a
+ * Map and a Graph of its target as well (ADR 0079) and {@link opensOn} reads
+ * those off the Space the Resource points at.
  */
 const DOCK_TARGET_SPACES = [authoredSnapshot, traversalSnapshot, deepDiveSnapshot] as const;
 
@@ -548,10 +545,10 @@ const dockTargetSpace = (index: number): SpaceSnapshot =>
   DOCK_TARGET_SPACES[index % DOCK_TARGET_SPACES.length] ?? authoredSnapshot;
 
 /**
- * Which Thing each Reference Thing shows, named rather than derived from its title.
+ * Which Resource each Reference Resource shows, named rather than derived from its title.
  *
  * A rule that stripped a suffix would make the Target a fact about spelling —
- * `Strategy overview` would have to point at `Strategys` — and a Reference Thing whose
+ * `Strategy overview` would have to point at `Strategys` — and a Reference Resource whose
  * Target moves when someone rewords a title is not what ADR 0070 makes
  * immutable.
  */
@@ -565,44 +562,44 @@ const DOCK_REFERENCE_TARGETS = new Map([
 const dockReferenceTarget = (title: string): UUID => {
   const target = DOCK_REFERENCE_TARGETS.get(title);
   if (target === undefined)
-    throw new Error(`Command Dock fixture Reference Thing ${title} names no Target`);
-  return dockThingId(target);
+    throw new Error(`Command Dock fixture Reference Resource ${title} names no Target`);
+  return dockResourceId(target);
 };
 
-type DockThingKind = 'markdown' | 'space' | 'reference';
+type DockResourceKind = 'markdown' | 'space' | 'reference';
 
-const dockThingDocument = (
+const dockResourceDocument = (
   title: string,
-  kind: DockThingKind,
+  kind: DockResourceKind,
   index: number,
-): SpaceSnapshot['things'][number]['document'] => {
-  if (kind === 'space') return spaceThingDocument(title, dockTargetSpace(index));
+): SpaceSnapshot['resources'][number]['document'] => {
+  if (kind === 'space') return spaceResourceDocument(title, dockTargetSpace(index));
   if (kind === 'reference') return { title, kind, target: dockReferenceTarget(title) };
   return { title, kind, body: '' };
 };
 
-const DOCK_THINGS: SpaceSnapshot['things'] = [
-  ...DOCK_PLACED.map((thing, index) => ({
-    id: thing.id,
-    document: dockThingDocument(thing.title, thing.kind, index),
+const DOCK_RESOURCES: SpaceSnapshot['resources'] = [
+  ...DOCK_PLACED.map((resource, index) => ({
+    id: resource.id,
+    document: dockResourceDocument(resource.title, resource.kind, index),
   })),
-  ...DOCK_UNPLACED.map((thing, index) => ({
-    id: dockThingId(thing.title),
-    document: dockThingDocument(thing.title, thing.kind, index),
+  ...DOCK_UNPLACED.map((resource, index) => ({
+    id: dockResourceId(resource.title),
+    document: dockResourceDocument(resource.title, resource.kind, index),
   })),
 ];
 
-/** The first `links` steps along the placed Things: Graphs of one shape at three lengths. */
+/** The first `links` steps along the placed Resources: Graphs of one shape at three lengths. */
 const dockChain = (links: number): GraphEdge[] =>
-  DOCK_PLACED.flatMap((thing, index) => {
+  DOCK_PLACED.flatMap((resource, index) => {
     const to = DOCK_PLACED[index + 1];
-    return index < links && to !== undefined ? [{ from: thing.id, to: to.id }] : [];
+    return index < links && to !== undefined ? [{ from: resource.id, to: to.id }] : [];
   });
 
-const dockPositions = (count: number): Record<string, ThingPlacement> =>
+const dockPositions = (count: number): Record<string, ResourcePlacement> =>
   Object.fromEntries(
-    DOCK_PLACED.slice(0, count).map((thing, index) => [
-      thing.id,
+    DOCK_PLACED.slice(0, count).map((resource, index) => [
+      resource.id,
       { x: index * 420, y: 0, open: false },
     ]),
   );
@@ -611,19 +608,19 @@ const dockPositions = (count: number): Record<string, ThingPlacement> =>
  * The Space the Command Dock prototype draws.
  *
  * Purpose-built, and deliberately not {@link authoredSpace}: that one exists to
- * draw a sidebar and every Thing in it is placed, so a Things surface opened over
+ * draw a sidebar and every Resource in it is placed, so a Resources surface opened over
  * it would have nothing to offer. The Dock needs three values at once that no
- * existing fixture has together — **two Diagrams** to switch between, **three
- * Graphs over one Diagram** so emphasis is a visible answer rather than a
- * one-member choice, and **many more unplaced Things than placed ones**, which
+ * existing fixture has together — **two Maps** to switch between, **three
+ * Graphs over one Map** so emphasis is a visible answer rather than a
+ * one-member choice, and **many more unplaced Resources than placed ones**, which
  * is what its list surfaces are being compared on.
  *
  * **No Graph carries a colour**, exactly as `authoredSnapshot` does not: a Graph
- * without one takes a palette slot by order through `graphColorMap`. The
+ * without one takes a palette slot by order through `graphColorsByGraphId`. The
  * prototype this replaced wrote `#4c8dff`, `#d08a3a` and `#2f9e8f` out by hand,
  * which is a fixture free to disagree with the palette the canvas draws.
  *
- * It **declares where it opens**, so `defaultDiagram` answers that for the Dock
+ * It **declares where it opens**, so `defaultMap` answers that for the Dock
  * exactly as it does for the app.
  */
 export const commandDockSnapshot: SpaceSnapshot = {
@@ -631,8 +628,8 @@ export const commandDockSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Rendering',
-    defaultDiagram: DOCK_COLLECTION_ONE,
-    diagrams: [
+    defaultMap: DOCK_COLLECTION_ONE,
+    maps: [
       {
         id: DOCK_COLLECTION_ONE,
         title: 'Collection 1',
@@ -653,7 +650,7 @@ export const commandDockSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  things: DOCK_THINGS,
+  resources: DOCK_RESOURCES,
 };
 
 export const commandDockSpace: Space = loaded(loadSpaceSnapshot(commandDockSnapshot));
@@ -671,7 +668,7 @@ const chainId = (offset: number): UUID =>
   );
 
 /**
- * A Space whose Things are all Space Things: one link in a chain of crossings.
+ * A Space whose Resources are all Space Resources: one link in a chain of crossings.
  *
  * **Depth is what these exist for.** Meta held every other fixture directly, so
  * the deepest trail a reader could walk was two — Meta and the Space they
@@ -681,12 +678,12 @@ const chainId = (offset: number): UUID =>
  * collapsed form is judged on.
  *
  * They are ordinary Spaces and the crossing into them is the ordinary one: a
- * Space Thing names a target, and the target is a tracked fixture that loads.
- * Seeding a session with a path no Space Thing supports would draw a trail the
+ * Space Resource names a target, and the target is a tracked fixture that loads.
+ * Seeding a session with a path no Space Resource supports would draw a trail the
  * prototype could not have been walked into.
  *
  * Each takes a **block of sixteen** off {@link CHAIN_ID_BASE} — the Space, its
- * Diagram, its Graph, then one Thing per target — so a link that gains a target
+ * Map, its Graph, then one Resource per target — so a link that gains a target
  * cannot reach into the next link's ids.
  */
 const crossingSpace = (
@@ -698,14 +695,14 @@ const crossingSpace = (
   document: {
     version: 1,
     title,
-    defaultDiagram: chainId(block + 1),
-    diagrams: [
+    defaultMap: chainId(block + 1),
+    maps: [
       {
         id: chainId(block + 1),
         title: 'Catalogue',
         kind: 'positioned',
         positions: Object.fromEntries(
-          targets.map((_, index): [string, ThingPlacement] => [
+          targets.map((_, index): [string, ResourcePlacement] => [
             chainId(block + 3 + index),
             { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
           ]),
@@ -714,9 +711,9 @@ const crossingSpace = (
       },
     ],
   },
-  things: targets.map(([thingTitle, target], index) => ({
+  resources: targets.map(([resourceTitle, target], index) => ({
     id: chainId(block + 3 + index),
-    document: spaceThingDocument(thingTitle, target),
+    document: spaceResourceDocument(resourceTitle, target),
   })),
 });
 
@@ -749,9 +746,9 @@ const metaId = (offset: number): UUID =>
   );
 
 /**
- * Every Space there is, as the Space Things that reference them (ADR 0074).
+ * Every Space there is, as the Space Resources that reference them (ADR 0074).
  *
- * A Thing's title is its own and the Space it points at has its own name, so
+ * A Resource's title is its own and the Space it points at has its own name, so
  * one of these deliberately disagrees: `Design system` in the Command Dock
  * fixture targets the Space titled `Space`. That is not a fixture error — it is
  * the question a crossing trail has to answer, since the row you pressed and
@@ -766,15 +763,15 @@ const META_TARGETS = [
 ] as const satisfies readonly (readonly [string, SpaceSnapshot])[];
 
 /**
- * Meta's own identity, and the Diagram and Graph it owns — three values from the
+ * Meta's own identity, and the Map and Graph it owns — three values from the
  * reserved block rather than one shared between kinds.
  *
  * The Space used to spell its Id as the literal `metaId(0)` resolves to, so the
- * Space *was* its Catalogue Diagram as far as any Id comparison could tell, and
- * `/spaces/:spaceId/diagrams/:diagramId` drew the same 22 characters twice.
+ * Space *was* its Catalogue Map as far as any Id comparison could tell, and
+ * `/spaces/:spaceId/maps/:mapId` drew the same 22 characters twice.
  */
 const META_SPACE_ID = metaId(0);
-const META_DIAGRAM = metaId(1);
+const META_MAP = metaId(1);
 const META_GRAPH = metaId(2);
 
 /**
@@ -785,9 +782,9 @@ const META_GRAPH = metaId(2);
  * the one crumb a crossing trail can never pop — and a prototype whose trail
  * bottoms out in whichever Space the story happened to open cannot show that.
  *
- * Its Things are all Space Things, which is the whole of CONTEXT's claim that at
+ * Its Resources are all Space Resources, which is the whole of CONTEXT's claim that at
  * the top level "every Space there is" needs no construct of its own: the list
- * a Space offers is the Space Things in it, and up here that list is the
+ * a Space offers is the Space Resources in it, and up here that list is the
  * catalogue.
  */
 export const metaSnapshot: SpaceSnapshot = {
@@ -795,14 +792,14 @@ export const metaSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Meta Space',
-    defaultDiagram: META_DIAGRAM,
-    diagrams: [
+    defaultMap: META_MAP,
+    maps: [
       {
-        id: META_DIAGRAM,
+        id: META_MAP,
         title: 'Catalogue',
         kind: 'positioned',
         positions: Object.fromEntries(
-          META_TARGETS.map((_, index): [string, ThingPlacement] => [
+          META_TARGETS.map((_, index): [string, ResourcePlacement] => [
             metaId(0x8 + index),
             { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
           ]),
@@ -811,9 +808,9 @@ export const metaSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  things: META_TARGETS.map(([title, target], index) => ({
+  resources: META_TARGETS.map(([title, target], index) => ({
     id: metaId(0x8 + index),
-    document: spaceThingDocument(title, target),
+    document: spaceResourceDocument(title, target),
   })),
 };
 

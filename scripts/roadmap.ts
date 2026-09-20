@@ -649,13 +649,13 @@ const stableRoadmapUuid = (name: string): string => {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
 
-const markdownThing = (
+const markdownResource = (
   id: string,
   planned: PlannedReleaseIssue,
-  thingsDirectory: string,
+  resourcesDirectory: string,
   scratchRoot: string,
 ): string => {
-  const issuePath = relative(thingsDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
+  const issuePath = relative(resourcesDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
     sep,
     '/',
   );
@@ -702,19 +702,19 @@ export const writeReleaseSpace = (
   const idByReference = new Map(
     issues.map(({ reference }) => [reference, stableRoadmapUuid(`issue:${reference}`)]),
   );
-  const thingId = (reference: string): string => {
+  const resourceId = (reference: string): string => {
     const id = idByReference.get(reference);
-    if (id === undefined) throw new Error(`No roadmap Thing for ${reference}.`);
+    if (id === undefined) throw new Error(`No roadmap Resource for ${reference}.`);
     return id;
   };
 
-  const thingsDirectory = join(destination, 'things');
-  rmSync(thingsDirectory, { recursive: true, force: true });
-  mkdirSync(thingsDirectory, { recursive: true });
+  const resourcesDirectory = join(destination, 'resources');
+  rmSync(resourcesDirectory, { recursive: true, force: true });
+  mkdirSync(resourcesDirectory, { recursive: true });
   for (const planned of issues) {
     writeFileSync(
-      join(thingsDirectory, `${planned.reference.replace('/', '-')}.md`),
-      markdownThing(thingId(planned.reference), planned, thingsDirectory, scratchRoot),
+      join(resourcesDirectory, `${planned.reference.replace('/', '-')}.md`),
+      markdownResource(resourceId(planned.reference), planned, resourcesDirectory, scratchRoot),
     );
   }
 
@@ -722,12 +722,12 @@ export const writeReleaseSpace = (
   const criticalEdges = plan.criticalSubgraph.flatMap((issue) =>
     issue.issue.unmetBlockers
       .filter((blocker) => criticalReferences.has(blocker))
-      .map((blocker) => ({ from: thingId(blocker), to: thingId(issue.reference) })),
+      .map((blocker) => ({ from: resourceId(blocker), to: resourceId(issue.reference) })),
   );
   const criticalKeys = new Set(criticalEdges.map(({ from, to }) => `${from}\u0000${to}`));
   const parallelEdges = issues.flatMap((planned) =>
     planned.issue.unmetBlockers.flatMap((blocker) => {
-      const edge = { from: thingId(blocker), to: thingId(planned.reference) };
+      const edge = { from: resourceId(blocker), to: resourceId(planned.reference) };
       return criticalKeys.has(`${edge.from}\u0000${edge.to}`) ? [] : [edge];
     }),
   );
@@ -739,27 +739,30 @@ export const writeReleaseSpace = (
       if (criticalReferences.has(planned.reference)) {
         const slot = criticalSlotByDepth.get(planned.depth) ?? 0;
         criticalSlotByDepth.set(planned.depth, slot + 1);
-        return [thingId(planned.reference), { x: slot * 420, y: planned.depth * 300, open: false }];
+        return [
+          resourceId(planned.reference),
+          { x: slot * 420, y: planned.depth * 300, open: false },
+        ];
       }
       const slot = parallelSlotByDepth.get(planned.depth) ?? 0;
       parallelSlotByDepth.set(planned.depth, slot + 1);
       return [
-        thingId(planned.reference),
+        resourceId(planned.reference),
         { x: 460 + slot * 420, y: planned.depth * 300, open: false },
       ];
     }),
   );
 
-  const diagramId = stableRoadmapUuid(`diagram:${release.tag}`);
+  const mapId = stableRoadmapUuid(`map:${release.tag}`);
   const criticalGraphId = stableRoadmapUuid(`graph:${release.tag}:critical`);
   const parallelGraphId = stableRoadmapUuid(`graph:${release.tag}:parallel`);
   const space = {
     version: 1,
     id: stableRoadmapUuid(`space:${release.tag}`),
     title: `${release.title} roadmap`,
-    diagrams: [
+    maps: [
       {
-        id: diagramId,
+        id: mapId,
         title: 'Release dependency map',
         kind: 'positioned',
         positions,
@@ -780,7 +783,7 @@ export const writeReleaseSpace = (
         activeGraph: criticalGraphId,
       },
     ],
-    defaultDiagram: diagramId,
+    defaultMap: mapId,
   };
   mkdirSync(destination, { recursive: true });
   writeFileSync(join(destination, 'space.json'), `${JSON.stringify(space, null, 2)}\n`);

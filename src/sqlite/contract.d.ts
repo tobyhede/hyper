@@ -43,7 +43,7 @@ export type FieldOutputTypes = {
       readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
       readonly updatedAt: CodecTypes['sqlite/datetime@1']['output'];
     };
-    readonly Thing: {
+    readonly Resource: {
       readonly id: CodecTypes['sqlite/text@1']['output'];
       readonly spaceId: CodecTypes['sqlite/text@1']['output'];
       readonly document: CodecTypes['sqlite/json@1']['output'];
@@ -66,7 +66,7 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
       readonly updatedAt: CodecTypes['sqlite/datetime@1']['input'];
     };
-    readonly Thing: {
+    readonly Resource: {
       readonly id: CodecTypes['sqlite/text@1']['input'];
       readonly spaceId: CodecTypes['sqlite/text@1']['input'];
       readonly document: CodecTypes['sqlite/json@1']['input'];
@@ -89,7 +89,7 @@ export type StorageColumnTypes = {
       readonly revision: CodecTypes['sqlite/text@1']['output'];
       readonly updated_at: CodecTypes['sqlite/datetime@1']['output'];
     };
-    readonly things: {
+    readonly resources: {
       readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
       readonly document: CodecTypes['sqlite/json@1']['output'];
       readonly id: CodecTypes['sqlite/text@1']['output'];
@@ -112,7 +112,7 @@ export type StorageColumnInputTypes = {
       readonly revision: CodecTypes['sqlite/text@1']['input'];
       readonly updated_at: CodecTypes['sqlite/datetime@1']['input'];
     };
-    readonly things: {
+    readonly resources: {
       readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
       readonly document: CodecTypes['sqlite/json@1']['input'];
       readonly id: CodecTypes['sqlite/text@1']['input'];
@@ -221,7 +221,7 @@ type ContractBase = Omit<
               indexes: readonly [];
               foreignKeys: readonly [];
             };
-            readonly things: {
+            readonly resources: {
               columns: {
                 readonly id: {
                   readonly nativeType: 'text';
@@ -257,7 +257,7 @@ type ContractBase = Omit<
                 {
                   readonly source: {
                     readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'things';
+                    readonly tableName: 'resources';
                     readonly columns: readonly ['space_id'];
                   };
                   readonly target: {
@@ -284,7 +284,7 @@ type ContractBase = Omit<
       readonly namespace: '__unbound__' & NamespaceId;
       readonly model: 'RepositoryState';
     };
-    readonly things: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Thing' };
+    readonly resources: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Resource' };
   };
   readonly domain: {
     readonly namespaces: {
@@ -362,10 +362,10 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['metaSpaceId'];
                 };
               };
-              readonly things: {
+              readonly resources: {
                 readonly to: {
                   readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Thing';
+                  readonly model: 'Resource';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
@@ -387,7 +387,7 @@ type ContractBase = Omit<
               };
             };
           };
-          readonly Thing: {
+          readonly Resource: {
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
@@ -424,7 +424,7 @@ type ContractBase = Omit<
               };
             };
             readonly storage: {
-              readonly table: 'things';
+              readonly table: 'resources';
               readonly namespaceId: '__unbound__';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
@@ -467,7 +467,7 @@ type ContractBase = Omit<
         {
           readonly ref: {
             readonly namespace: '__unbound__';
-            readonly table: 'things';
+            readonly table: 'resources';
             readonly column: 'updated_at';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };

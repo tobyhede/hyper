@@ -12,12 +12,12 @@ describe('expectMenuGroups', () => {
     const menu = menuOf(`
       <div role="menuitem">Create Reference</div>
       <hr role="separator" />
-      <div role="menuitem">Copy link to Thing</div>
+      <div role="menuitem">Copy link to Resource</div>
       <hr role="separator" />
-      <div role="menuitem">Remove from Diagram</div>
+      <div role="menuitem">Remove from Map</div>
     `);
 
-    expectMenuGroups(menu, [['Create Reference'], ['Copy link to Thing'], ['Remove from Diagram']]);
+    expectMenuGroups(menu, [['Create Reference'], ['Copy link to Resource'], ['Remove from Map']]);
   });
 
   it('rejects a matching separator count sitting in the wrong place', () => {

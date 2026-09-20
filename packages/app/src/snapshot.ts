@@ -1,6 +1,6 @@
 import {
   SPACE_FILE_VERSION,
-  type ThingId,
+  type ResourceId,
   type Graph,
   type GraphId,
   type SpaceSnapshot,
@@ -44,21 +44,21 @@ export const createWorkingSpaceReader = (): ((snapshot: SpaceSnapshot) => Space)
  * Convert the validated runtime aggregate into the complete persistence seam.
  *
  * `space.graphs` is deliberately not written: it is a *derived* flatten across
- * the diagrams that own them (ADR 0040, ADR 0045), and the document has no
+ * the maps that own them (ADR 0040, ADR 0045), and the document has no
  * space-level collection for it to go back into. Every graph reaches the wire
- * inside the diagram that owns it, which `space.diagrams` already carries.
+ * inside the map that owns it, which `space.maps` already carries.
  */
 export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
   const document: SpaceSnapshot['document'] = {
     version: SPACE_FILE_VERSION,
     title: space.title,
   };
-  if (space.diagrams.length > 0) document.diagrams = [...space.diagrams];
-  if (space.defaultDiagram !== undefined) document.defaultDiagram = space.defaultDiagram;
+  if (space.maps.length > 0) document.maps = [...space.maps];
+  if (space.defaultMap !== undefined) document.defaultMap = space.defaultMap;
   return {
     id: space.id,
     document,
-    things: space.things.map(({ id, ...rest }) => ({
+    resources: space.resources.map(({ id, ...rest }) => ({
       id,
       document: rest,
     })),
@@ -66,59 +66,59 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
 };
 
 /**
- * The graphs a Thing has left, with every Edge incident to it gone.
+ * The graphs a Resource has left, with every Edge incident to it gone.
  *
- * A Thing that is not a member of a Diagram cannot be an endpoint of a Graph that
- * Diagram owns (ADR 0040), so this is what both removals owe: Remove from
- * Diagram, which applies it to the one Diagram the Edit writes, and Delete Thing
- * from Space, which applies it to every Diagram through
- * {@link withThingRemovedFromDiagrams}. One rule, in one place, so the two
+ * A Resource that is not a member of a Map cannot be an endpoint of a Graph that
+ * Map owns (ADR 0040), so this is what both removals owe: Remove from
+ * Map, which applies it to the one Map the Edit writes, and Delete Resource
+ * from Space, which applies it to every Map through
+ * {@link withResourceRemovedFromMaps}. One rule, in one place, so the two
  * scopes of the same deletion cannot come to disagree about what an incident
  * Edge is. The graphs themselves stay, empty ones included: deleting a graph is
  * its own action.
  */
-export const withoutIncidentEdges = (graphs: readonly Graph[], thingId: ThingId): Graph[] =>
+export const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: ResourceId): Graph[] =>
   graphs.map((graph) => ({
     ...graph,
-    edges: graph.edges.filter((edge) => edge.from !== thingId && edge.to !== thingId),
+    edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
   }));
 
 /**
- * The snapshot with one Thing gone from every Diagram: its membership, its
- * position and every Edge incident to it, in every Graph every Diagram owns.
+ * The snapshot with one Resource gone from every Map: its membership, its
+ * position and every Edge incident to it, in every Graph every Map owns.
  *
- * The cascade half of Delete Thing from Space, and the one write in this module
- * that is not about a single Diagram — which is exactly why it is here rather
- * than folded into {@link updatePositionedDiagram}. The Thing itself stays in
- * `things`: this answers what the Diagrams hold, and removing the Thing is the
- * caller's own statement in the same Edit. Empty Graphs and empty Diagrams
- * remain, because deleting a Thing is not an instruction to delete either
+ * The cascade half of Delete Resource from Space, and the one write in this module
+ * that is not about a single Map — which is exactly why it is here rather
+ * than folded into {@link updatePositionedMap}. The Resource itself stays in
+ * `resources`: this answers what the Maps hold, and removing the Resource is the
+ * caller's own statement in the same Edit. Empty Graphs and empty Maps
+ * remain, because deleting a Resource is not an instruction to delete either
  * (ADR 0040).
  *
- * Every Diagram that held the Thing **Open** also gets the room it was holding
- * back, through the same `Placement.reclaim` the single-Diagram removal uses.
+ * Every Map that held the Resource **Open** also gets the room it was holding
+ * back, through the same `Placement.reclaim` the single-Map removal uses.
  * Under the derivation ADR 0084 removed, dropping the entry dropped its
  * displacement with it and this could be a filter; now the room lives in the
- * neighbours' own stored coordinates, so a Diagram the Edit is not drawing would
- * otherwise keep it forever — with no Thing left on that canvas to Close and no
- * Edit that could give it back. Open/Closed is Diagram-owned (ADR 0064), so
- * whether there is any room to reclaim is asked of each Diagram separately and
+ * neighbours' own stored coordinates, so a Map the Edit is not drawing would
+ * otherwise keep it forever — with no Resource left on that canvas to Close and no
+ * Edit that could give it back. Open/Closed is Map-owned (ADR 0064), so
+ * whether there is any room to reclaim is asked of each Map separately and
  * is not what the drawing one answered.
  *
- * Answers the snapshot it was given when no Diagram held the Thing, so a deletion
- * that only ever affected the current Diagram — which the caller writes
- * separately — does not rebuild every other Diagram to say nothing about them.
+ * Answers the snapshot it was given when no Map held the Resource, so a deletion
+ * that only ever affected the current Map — which the caller writes
+ * separately — does not rebuild every other Map to say nothing about them.
  */
-export const withThingRemovedFromDiagrams = (
+export const withResourceRemovedFromMaps = (
   base: SpaceSnapshot,
-  thingId: ThingId,
+  resourceId: ResourceId,
 ): SpaceSnapshot => {
-  const diagrams = base.document.diagrams ?? [];
-  const affected = diagrams.some(
-    (diagram) =>
-      Object.hasOwn(diagram.positions, thingId) ||
-      diagram.graphs.some((graph) =>
-        graph.edges.some((edge) => edge.from === thingId || edge.to === thingId),
+  const maps = base.document.maps ?? [];
+  const affected = maps.some(
+    (map) =>
+      Object.hasOwn(map.positions, resourceId) ||
+      map.graphs.some((graph) =>
+        graph.edges.some((edge) => edge.from === resourceId || edge.to === resourceId),
       ),
   );
   if (!affected) return base;
@@ -126,43 +126,43 @@ export const withThingRemovedFromDiagrams = (
     ...base,
     document: {
       ...base.document,
-      diagrams: diagrams.map((diagram) => ({
-        ...diagram,
+      maps: maps.map((map) => ({
+        ...map,
         positions: Placement.toPositions(
-          Placement.remove(Placement.reclaim(Placement.fromDiagram(diagram), thingId), thingId),
+          Placement.remove(Placement.reclaim(Placement.fromMap(map), resourceId), resourceId),
         ),
-        graphs: withoutIncidentEdges(diagram.graphs, thingId),
+        graphs: withoutIncidentEdges(map.graphs, resourceId),
       })),
     },
   };
 };
 
-/** Everything a completed Edit writes into one Diagram. */
-export interface PositionedDiagramEdit {
-  readonly diagramId: UUID;
+/** Everything a completed Edit writes into one Map. */
+export interface PositionedMapEdit {
+  readonly mapId: UUID;
   readonly title: string;
   readonly positions: Placement;
   /**
-   * The graphs this Diagram owns after the Edit, in author order (ADR 0040).
+   * The graphs this Map owns after the Edit, in author order (ADR 0040).
    *
    * Replaced whole rather than merged, for the same reason the positions are:
    * the editor holds the whole truth of them. A graph is a nested owned value
-   * of exactly one Diagram, so there is nowhere else for this Edit's graphs to
+   * of exactly one Map, so there is nowhere else for this Edit's graphs to
    * be written and nothing at the space level left to reconcile them with.
    */
   readonly graphs: readonly Graph[];
-  /** The Graph the Diagram opens on. */
+  /** The Graph the Map opens on. */
   readonly activeGraphId: GraphId | null;
 }
 
 /** Fold a completed placement edit into a complete authoritative snapshot. */
-export const updatePositionedDiagram = (
+export const updatePositionedMap = (
   base: SpaceSnapshot,
-  { diagramId, title, positions, graphs, activeGraphId }: PositionedDiagramEdit,
+  { mapId, title, positions, graphs, activeGraphId }: PositionedMapEdit,
 ): SpaceSnapshot => {
-  const existing = (base.document.diagrams ?? []).find((diagram) => diagram.id === diagramId);
-  const diagram = {
-    id: diagramId,
+  const existing = (base.document.maps ?? []).find((map) => map.id === mapId);
+  const map = {
+    id: mapId,
     title,
     kind: 'positioned' as const,
     positions: Placement.toPositions(positions),
@@ -175,16 +175,16 @@ export const updatePositionedDiagram = (
         ? { activeGraph: existing.activeGraph }
         : {}),
   };
-  const diagrams = [...(base.document.diagrams ?? [])];
-  const existingIndex = diagrams.findIndex((candidate) => candidate.id === diagramId);
-  if (existingIndex === -1) diagrams.push(diagram);
-  else diagrams[existingIndex] = diagram;
+  const maps = [...(base.document.maps ?? [])];
+  const existingIndex = maps.findIndex((candidate) => candidate.id === mapId);
+  if (existingIndex === -1) maps.push(map);
+  else maps[existingIndex] = map;
   return {
     ...base,
     document: {
       ...base.document,
-      diagrams,
-      defaultDiagram: diagramId,
+      maps,
+      defaultMap: mapId,
     },
   };
 };

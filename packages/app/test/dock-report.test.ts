@@ -93,7 +93,7 @@ describe('what the Command Dock says when an exit does not happen', () => {
     }
   });
 
-  it('says a different thing for each, including for each recovery', () => {
+  it('says a different resource for each, including for each recovery', () => {
     const said = outcomes.map((outcome) => exitReportSentence('Rendering', outcome));
 
     expect(new Set(said).size).toBe(outcomes.length);

@@ -1,18 +1,18 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import type { ThingId } from '@project/core';
+import type { ResourceId } from '@project/core';
 import { Placement, positionedStrategy } from '../src/index';
-import type { LayoutStrategyThing, LayoutStrategyGraph } from '../src/index';
-import { uuid } from './thing-files';
+import type { LayoutStrategyResource, LayoutStrategyGraph } from '../src/index';
+import { uuid } from './resource-files';
 
 const SIZE = { width: 100, height: 50 };
 
-function thingsOf(...ids: string[]): LayoutStrategyThing[] {
+function resourcesOf(...ids: string[]): LayoutStrategyResource[] {
   return ids.map((id) => ({ id: uuid(id), ...SIZE }));
 }
 
 const graph: LayoutStrategyGraph = {
-  things: thingsOf(
+  resources: resourcesOf(
     '00000000-0000-4000-8000-000000000002',
     '00000000-0000-4000-8000-000000000003',
     '00000000-0000-4000-8000-000000000005',
@@ -35,7 +35,7 @@ const at = (entries: Record<string, [number, number]>): Placement =>
   Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
 
 describe('positionedStrategy', () => {
-  it('draws an Open Thing at its authored rect and moves nobody for it', async () => {
+  it('draws an Open Resource at its authored rect and moves nobody for it', async () => {
     const positions = Placement.fromEntries([
       [
         uuid('00000000-0000-4000-8000-000000000002'),
@@ -44,17 +44,17 @@ describe('positionedStrategy', () => {
       [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200, open: false }],
     ]);
     const laid = await positionedStrategy(positions)({
-      things: thingsOf(
+      resources: resourcesOf(
         uuid('00000000-0000-4000-8000-000000000002'),
         uuid('00000000-0000-4000-8000-000000000003'),
       ),
       edges: [],
     });
 
-    // The Open Thing's own rect is authored, so this reads it. Its neighbour is
-    // not moved here: displacement was applied by the Edit that opened the Thing
+    // The Open Resource's own rect is authored, so this reads it. Its neighbour is
+    // not moved here: displacement was applied by the Edit that opened the Resource
     // and is already in the coordinates this reads (ADR 0084).
-    expect(laid.things).toMatchObject([
+    expect(laid.resources).toMatchObject([
       { x: 0, y: 0, width: 360, height: 196 },
       { x: 300, y: 200 },
     ]);
@@ -64,7 +64,7 @@ describe('positionedStrategy', () => {
     expect(positionedStrategy(Placement.empty())(graph)).toBeInstanceOf(Promise);
   });
 
-  it('puts every thing exactly where the map says', async () => {
+  it('puts every resource exactly where the map says', async () => {
     const laid = await positionedStrategy(
       at({
         '00000000-0000-4000-8000-000000000002': [10, 20],
@@ -72,29 +72,29 @@ describe('positionedStrategy', () => {
         '00000000-0000-4000-8000-000000000005': [-40, 500],
       }),
     )(graph);
-    expect(laid.things.map((t) => [t.id, t.x, t.y])).toEqual([
+    expect(laid.resources.map((r) => [r.id, r.x, r.y])).toEqual([
       ['00000000-0000-4000-8000-000000000002', 10, 20],
       ['00000000-0000-4000-8000-000000000003', 300, 20],
       ['00000000-0000-4000-8000-000000000005', -40, 500],
     ]);
   });
 
-  it('omits things the authored placement omits', async () => {
+  it('omits resources the authored placement omits', async () => {
     const laid = await positionedStrategy(
       at({
         '00000000-0000-4000-8000-000000000002': [0, 0],
         '00000000-0000-4000-8000-000000000003': [200, 400],
       }),
     )(graph);
-    expect(laid.things.map((thing) => thing.id)).toEqual([
+    expect(laid.resources.map((resource) => resource.id)).toEqual([
       '00000000-0000-4000-8000-000000000002',
       '00000000-0000-4000-8000-000000000003',
     ]);
   });
 
-  it('draws no things when the authored placement is empty', async () => {
+  it('draws no resources when the authored placement is empty', async () => {
     const laid = await positionedStrategy(Placement.empty())(graph);
-    expect(laid.things).toEqual([]);
+    expect(laid.resources).toEqual([]);
   });
 
   it('ignores the edges and passes them through untouched', async () => {
@@ -106,20 +106,20 @@ describe('positionedStrategy', () => {
     const withoutEdges = await positionedStrategy(
       at({ '00000000-0000-4000-8000-000000000002': [0, 0] }),
     )({ ...graph, edges: [] });
-    expect(withoutEdges.things).toEqual(laid.things);
+    expect(withoutEdges.resources).toEqual(laid.resources);
   });
 
-  it('ignores positions for things the view is not showing', async () => {
+  it('ignores positions for resources the view is not showing', async () => {
     const laid = await positionedStrategy(
       at({
         '00000000-0000-4000-8000-000000000002': [5, 5],
         '00000000-0000-4000-8000-000000000099': [999, 999],
       }),
     )({
-      things: thingsOf('00000000-0000-4000-8000-000000000002'),
+      resources: resourcesOf('00000000-0000-4000-8000-000000000002'),
       edges: [],
     });
-    expect(laid.things.map((t) => [t.id, t.x, t.y])).toEqual([
+    expect(laid.resources.map((r) => [r.id, r.x, r.y])).toEqual([
       ['00000000-0000-4000-8000-000000000002', 5, 5],
     ]);
   });
@@ -128,10 +128,10 @@ describe('positionedStrategy', () => {
     expect(
       (
         await positionedStrategy(at({ '00000000-0000-4000-8000-000000000002': [0, 0] }))({
-          things: [],
+          resources: [],
           edges: [],
         })
-      ).things,
+      ).resources,
     ).toEqual([]);
   });
 });
@@ -141,14 +141,14 @@ const idsArb = fc
     minLength: 1,
     maxLength: 8,
   })
-  .map((ids): ThingId[] => ids.map(uuid));
+  .map((ids): ResourceId[] => ids.map(uuid));
 const coordArb = fc.integer({ min: -1000, max: 1000 });
 
 describe('positionedStrategy properties', () => {
-  it('positions exactly the things the authored placement mentions', async () => {
+  it('positions exactly the resources the authored placement mentions', async () => {
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb), async (ids, coords) => {
-        // Authored positions for a prefix of the things; the rest are omitted.
+        // Authored positions for a prefix of the resources; the rest are omitted.
         const authored = ids.slice(0, Math.floor(coords.length / 2));
         const positions = Placement.fromEntries(
           authored.map((id, i) => [
@@ -156,12 +156,15 @@ describe('positionedStrategy properties', () => {
             { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
           ]),
         );
-        const laid = await positionedStrategy(positions)({ things: thingsOf(...ids), edges: [] });
+        const laid = await positionedStrategy(positions)({
+          resources: resourcesOf(...ids),
+          edges: [],
+        });
 
-        expect(laid.things.map((thing) => thing.id)).toEqual(authored);
-        for (const thing of laid.things) {
-          expect(thing.x).toBeTypeOf('number');
-          expect(thing.y).toBeTypeOf('number');
+        expect(laid.resources.map((resource) => resource.id)).toEqual(authored);
+        for (const resource of laid.resources) {
+          expect(resource.x).toBeTypeOf('number');
+          expect(resource.y).toBeTypeOf('number');
         }
       }),
     );

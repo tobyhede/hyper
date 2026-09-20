@@ -15,20 +15,20 @@
  * The command set, in the order containment gives it:
  *
  *   Spaces  — which Space this is, rename it, cross into and out of one
- *   Diagrams — which is drawing, select another, add/rename/delete
+ *   Maps — which is drawing, select another, add/rename/delete
  *   Graphs  — which is active, select another, present, add/rename/delete
- *   Things   — Create, and the Things this Space holds
+ *   Resources   — Create, and the Resources this Space holds
  *
- * **A Thing's own commands are absent on purpose.** Open, Edit, Delete, a Thing's
- * links and taking a Thing back out of a Diagram belong to the Thing rail (ADR
- * 0073), which draws them on the Thing itself. This surface is *about* the
- * canvas; a Thing is the literal object on it. That is a dependency and not just
- * an exclusion — the Space Sidebar carried a Thing's links and its Delete in a
+ * **A Resource's own commands are absent on purpose.** Open, Edit, Delete, a Resource's
+ * links and taking a Resource back out of a Map belong to the Resource rail (ADR
+ * 0073), which draws them on the Resource itself. This surface is *about* the
+ * canvas; a Resource is the literal object on it. That is a dependency and not just
+ * an exclusion — the Space Sidebar carried a Resource's links and its Delete in a
  * footer, and this arrangement is only complete because the rail carries them
  * now.
  *
- * **A Space is a Space Thing, held by the Meta Space above it.** So the Spaces
- * *inside* a Space are Things in it and the Things surface already offers them,
+ * **A Space is a Space Resource, held by the Meta Space above it.** So the Spaces
+ * *inside* a Space are Resources in it and the Resources surface already offers them,
  * while the bar names the Opener and the Open Spaces menu holds the set open
  * beside it — drawn as the tree the Opener makes. Moving between them closes
  * nothing; Exit, in the Space menu, is what takes one out of the set (ADR 0068).
@@ -71,8 +71,8 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  ThingKindIcon,
-  thingKindName,
+  ResourceKindIcon,
+  resourceKindName,
   ChevronDownIcon,
   CloseIcon,
   CopyIcon,
@@ -89,20 +89,20 @@ import {
   FALLBACK_GRAPH_COLOR,
   GraphIcon,
   InlineTitleEditor,
-  DiagramIcon,
+  MapIcon,
   ParentIcon,
   PresentIcon,
   Separator,
   ChoiceMenu,
   ChoiceMenuTrigger,
-  DiagramMenuActions,
+  MapMenuActions,
   GraphMenuActions,
   CommandName,
   CommandToolbar,
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
-import type { Thing, ThingId, Graph, GraphId, Diagram, DiagramId, UUID } from '@project/core';
+import type { Resource, ResourceId, Graph, GraphId, Map, MapId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
@@ -131,19 +131,19 @@ import {
   openSpacesName,
   SPACES_LABEL,
 } from '../dock-model';
-import { THINGS_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
-import { ThingsPopover, type ThingsPopoverSpace } from './ThingsPopover';
+import { RESOURCES_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
+import { ResourcesPopover, type ResourcesPopoverSpace } from './ResourcesPopover';
 import './command-dock.css';
 
 /**
  * The two kinds Create offers, in the order the cluster draws them.
  *
- * **`reference` left, and it left the Dock rather than the list.** A Reference Thing is
- * always created *from* the Thing it points at, which supplies the Target
- * (ADR 0089), so the gesture is a row in that Thing's own command menu and
+ * **`reference` left, and it left the Dock rather than the list.** A Reference Resource is
+ * always created *from* the Resource it points at, which supplies the Target
+ * (ADR 0089), so the gesture is a row in that Resource's own command menu and
  * there is nothing here for it to be a peer of.
  */
-const THING_KINDS = ['markdown', 'space'] as const;
+const RESOURCE_KINDS = ['markdown', 'space'] as const;
 
 /**
  * A kind the Create cluster draws a control for.
@@ -153,7 +153,7 @@ const THING_KINDS = ['markdown', 'space'] as const;
  * this, so a kind added above has to say what pressing it does before the
  * application compiles.
  */
-export type DockThingKind = (typeof THING_KINDS)[number];
+export type DockResourceKind = (typeof RESOURCE_KINDS)[number];
 
 /**
  * Every disclosure opens the same way, whichever primitive draws it.
@@ -186,20 +186,20 @@ const DISCLOSURE_WIDTH = 'w-72';
  *
  * **What is unbound is not a narrower check but no check.** An item left to
  * infer its own `Value` binds to nothing: `<DropdownMenuRadioItem value="none">`
- * inside a group of `DiagramId`s infers `'none'`, compiles, and comes back out of
- * `onValueChange` wearing the brand — so `onSelect(diagramId: DiagramId)` is
+ * inside a group of `MapId`s infers `'none'`, compiles, and comes back out of
+ * `onValueChange` wearing the brand — so `onSelect(mapId: MapId)` is
  * handed a string that is not one, and its declared type is a lie the compiler
  * helped tell. Bound, that literal is a `TS2322` where it is written.
- * `ThingsPopover`'s `FilterToggle` binds the same way, and
+ * `ResourcesPopover`'s `FilterToggle` binds the same way, and
  * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the standing
  * evidence that the rule bites.
  *
- * **The Diagram and Graph sets no longer need a name here, and that is the
+ * **The Map and Graph sets no longer need a name here, and that is the
  * better answer rather than a looser one.** Both are `ChoiceMenu` now, which
  * renders the group *and* its items from one type parameter — so the two halves
  * cannot be named differently because no call site writes the second one.
  * Naming a type twice and trusting the author is what a shared composition
- * removes; `ChoiceMenu<DiagramId>` is the whole of it.
+ * removes; `ChoiceMenu<MapId>` is the whole of it.
  *
  * **Two of the Dock's remaining radio groups are deliberately absent** and
  * neither wants adding: a Graph's colour is a plain `string` on both sides
@@ -220,12 +220,12 @@ const SpaceItem = DropdownMenuRadioItem<UUID>;
  * components — so `PresentingExit`, which reads four of them, was declared to
  * take every command in the surface, and no signature in the file said what any
  * component actually used. `SpaceSidebar` did not do that: it took `canvas`,
- * `graph`, `addThing`, `createDiagram`, `persistence`, `selectedThing`,
+ * `graph`, `addResource`, `createMap`, `persistence`, `selectedResource`,
  * `entityActions` and `titleEdit`, and each of its own pieces took the group it
  * drew.
  *
  * The groups here are named after it wherever there is a counterpart —
- * `canvas` is the Diagrams and the one that is drawing, `graph` is the Graphs
+ * `canvas` is the Maps and the one that is drawing, `graph` is the Graphs
  * and Present, `persistence` is the report and its recoveries — which is what
  * made promoting this surface a move rather than a translation.
  *
@@ -242,7 +242,7 @@ export interface DockChrome {
    * `InlineTitleEditor` and which name is open is the bar's own slot
    * ({@link useDockRenaming}) — which is the whole reason the shared draft the
    * Sidebar needed is gone. But the *application* still has to know one is
-   * running: a live chrome rename withdraws Create Thing, Present, Delete Thing
+   * running: a live chrome rename withdraws Create Resource, Present, Delete Resource
    * and the canvas's own title editing, because each of those would re-derive
    * the canvas or take the caret from under it (`authoring-availability.ts`).
    *
@@ -258,13 +258,13 @@ export interface DockChrome {
    *
    * **The one fact that ends a rename which no identity in the bar can see
    * coming.** Every other ending is visible from here: the author presses Enter
-   * or Escape, moves to another Diagram, or the rename stops being available. A
+   * or Escape, moves to another Map, or the rename stops being available. A
    * replacement is none of those — accepting the stored Space installs a
    * different Space's document under the same ids, so the slot names the same
-   * Diagram, `chromeTitleEdit` is unchanged once placement resolves, and an
+   * Map, `chromeTitleEdit` is unchanged once placement resolves, and an
    * editor left open goes on standing over a Space that is gone, reseeded from
    * the accepted title. Completing it then writes a name the author typed
-   * against a Diagram they never saw.
+   * against a Map they never saw.
    *
    * It is a counter and not a `replaced` flag for the reason `replacementEpoch`
    * is one everywhere else: two replacements in a row are two facts, and a
@@ -279,7 +279,7 @@ export interface DockChrome {
   readonly space: DockSpace;
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
-  readonly things: DockThings;
+  readonly resources: DockResources;
   readonly persistence: DockPersistence;
 }
 
@@ -294,10 +294,10 @@ export interface DockSpace {
   /**
    * This Space's own name — `document.title` of the session the Dock is drawing.
    *
-   * **Not the Title of a Space Thing that points here.** The two agree only at
+   * **Not the Title of a Space Resource that points here.** The two agree only at
    * creation, which writes one string into both, and either may be renamed
    * afterwards without the other (`CONTEXT.md`); ADR 0083 keeps the target's
-   * name off the Thing's front, so nothing propagates in either direction.
+   * name off the Resource's front, so nothing propagates in either direction.
    */
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
@@ -317,19 +317,19 @@ export interface DockSpace {
    *
    * **From inside the Space, and only from inside it.** `renamed-space` writes
    * `document.title` of the session it is completed on and nothing else: no Space
-   * Thing pointing at this Space changes with it, because a Space's name and the
-   * Title of a Thing that references it are two stored values that agree only at
-   * creation, and ADR 0083 keeps the target's name off that Thing's front. So
+   * Resource pointing at this Space changes with it, because a Space's name and the
+   * Title of a Resource that references it are two stored values that agree only at
+   * creation, and ADR 0083 keeps the target's name off that Resource's front. So
    * there is nothing here for this surface to keep in step — the Open Spaces
    * rows and the Opener control each read their own session's title and redraw on
    * its publication (`open-spaces.ts`). Renaming *another* Space, from a Space
-   * Thing or from a row of that menu, is a `SpaceThingLifecycle` operation over
+   * Resource or from a row of that menu, is a `SpaceEndpointLifecycle` operation over
    * a second session (ADR 0076) and is deliberately not this.
    *
    * Nullable rather than optional so both callers state it, and `null` now means
    * the one guarantee it makes for {@link DockCanvas.onRename} and
    * {@link DockGraph.onRename}: the application has withdrawn chrome title
-   * editing — a live Thing title editor or content edit owns the caret, or the
+   * editing — a live Resource title editor or content edit owns the caret, or the
    * canvas has no placement to edit against — and all three names go together.
    */
   readonly onRename: ((title: string) => string | null) | null;
@@ -357,7 +357,7 @@ export interface DockSpace {
    * can be exited. This read {@link opener} instead — "is there a Space I was
    * opened from" — which answers `null` for every Space reached by its own
    * address as well, and so withheld Exit from a pasted link. The two happen to
-   * agree while the reader arrived by pressing Space Things, which is what hid
+   * agree while the reader arrived by pressing Space Resources, which is what hid
    * it.
    */
   readonly exitDisabled: boolean;
@@ -386,28 +386,28 @@ export interface SpaceExitReport {
 }
 
 /**
- * The canvas's one exclusive choice: which authored Diagram is drawing (ADR
+ * The canvas's one exclusive choice: which authored Map is drawing (ADR
  * 0079, ADR 0082).
  *
  * Named `canvas` after the group the Space Sidebar carried for the same purpose,
- * and carrying `selected` as the Diagram rather than as an id for the same reason
- * that one did — the title belongs to the Diagram, so a cluster naming what is
- * drawing reads it off the Diagram instead of deriving a second title.
+ * and carrying `selected` as the Map rather than as an id for the same reason
+ * that one did — the title belongs to the Map, so a cluster naming what is
+ * drawing reads it off the Map instead of deriving a second title.
  */
 export interface DockCanvas {
-  /** The Space's authored Diagrams, in the order it declares them. */
-  readonly diagrams: readonly Diagram[];
-  /** The Diagram that is drawing. */
-  readonly selected: Diagram;
-  readonly onSelect: (diagramId: DiagramId) => void;
+  /** The Space's authored Maps, in the order it declares them. */
+  readonly maps: readonly Map[];
+  /** The Map that is drawing. */
+  readonly selected: Map;
+  readonly onSelect: (mapId: MapId) => void;
   /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
-  readonly onRename: ((diagramId: DiagramId, title: string) => string | null) | null;
-  /** Create an empty Diagram and select it. */
+  readonly onRename: ((mapId: MapId, title: string) => string | null) | null;
+  /** Create an empty Map and select it. */
   readonly onCreate: () => void;
   /**
-   * Whether New Diagram's rename continuation landed — read when the menu closes.
+   * Whether New Map's rename continuation landed — read when the menu closes.
    *
-   * **The answer is the point.** New Diagram continues in the new Diagram's name,
+   * **The answer is the point.** New Map continues in the new Map's name,
    * so this cluster's menu must not take the caret back on close — but only once
    * the rename editor has actually opened. Asking at press time races the
    * post-selection window where rename is withdrawn; reading here keeps the two
@@ -415,22 +415,22 @@ export interface DockCanvas {
    */
   readonly didCreateMoveCaret: () => boolean;
   /**
-   * Whether New Diagram may run.
+   * Whether New Map may run.
    *
-   * Its own term beyond Create Thing's: creating a Diagram **selects** it, and the
-   * created Diagram is empty — so the canvas re-derives with no nodes and a Thing
+   * Its own term beyond Create Resource's: creating a Map **selects** it, and the
+   * created Map is empty — so the canvas re-derives with no nodes and a Resource
    * holding a live title draft unmounts, taking the draft, the announced reason
    * and the caret with it. A valid draft is safe, because pressing the control
    * blurs the input and a valid blur completes the Title (ADR 0065); a refused
    * one is re-focused instead and the press lands anyway.
    */
   readonly createDisabled: boolean;
-  readonly onDelete: (diagramId: DiagramId) => void;
+  readonly onDelete: (mapId: MapId) => void;
   /**
-   * Whether Delete Diagram may run, beyond the rule the row already knows.
+   * Whether Delete Map may run, beyond the rule the row already knows.
    *
-   * The last Diagram cannot be deleted (ADR 0079) and the surface reads that off
-   * `diagrams` itself — but that is one of *two* rules, and the second is not
+   * The last Map cannot be deleted (ADR 0079) and the surface reads that off
+   * `maps` itself — but that is one of *two* rules, and the second is not
    * derivable here: every entity Edit is withdrawn while a title editor or a
    * live content edit owns the caret (`authoring-availability.ts`). The command
    * this row dispatches does not exist in that state, so a row that read only
@@ -438,19 +438,19 @@ export interface DockCanvas {
    */
   readonly deleteDisabled: boolean;
   /**
-   * Copy the drawing Diagram's address — the one form a Diagram has.
+   * Copy the drawing Map's address — the one form a Map has.
    *
-   * A Diagram offers no permanent link because it has no second address to be
+   * A Map offers no permanent link because it has no second address to be
    * permanent *against*: its own address is the only one there is
-   * (`entity-actions.tsx`), where a Graph and a Thing each have a within-Diagram
+   * (`entity-actions.tsx`), where a Graph and a Resource each have a within-Map
    * form as well.
    */
   readonly onCopyLink: () => void;
 }
 
-/** The Graphs the selected Diagram owns, the Active one, and Present. */
+/** The Graphs the selected Map owns, the Active one, and Present. */
 export interface DockGraph {
-  /** The Graphs the selected Diagram owns, which are the only ones it draws. */
+  /** The Graphs the selected Map owns, which are the only ones it draws. */
   readonly graphs: readonly Graph[];
   readonly active: Graph;
   /** Every visible Graph's resolved colour, derived by the production palette. */
@@ -471,16 +471,16 @@ export interface DockGraph {
    * not by three: New Graph, Colour and Delete are entity Edits, and no entity
    * Edit runs while a title editor or a live content edit owns the caret
    * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
-   * this one, read off `graphs` here; the Diagram cluster splits create from
-   * delete because creating a Diagram **selects** it and so has a second reason
+   * this one, read off `graphs` here; the Map cluster splits create from
+   * delete because creating a Map **selects** it and so has a second reason
    * of its own, which no Graph command has.
    */
   readonly editsDisabled: boolean;
   /**
-   * Copy this Graph's within-Diagram address — "Copy link to Graph" reproduces
+   * Copy this Graph's within-Map address — "Copy link to Graph" reproduces
    * what is on screen, so a recipient lands where the sender was.
    *
-   * A Diagram **owns** its Graphs (ADR 0040) and a Graph also has its own
+   * A Map **owns** its Graphs (ADR 0040) and a Graph also has its own
    * permanent address, but the Graph menu offers only this one
    * (`.scratch/dock-menu-reorganisation/issues/01`).
    */
@@ -490,7 +490,7 @@ export interface DockGraph {
   /**
    * Whether Present may begin a traversal.
    *
-   * An empty Graph is legal and ordinary — creating a Diagram mints one — and it
+   * An empty Graph is legal and ordinary — creating a Map mints one — and it
    * has nothing to traverse, so `present()` would return having changed nothing
    * and an enabled control would swallow the press. Unavailable rather than
    * absent: a control that disappears teaches nothing about why.
@@ -499,7 +499,7 @@ export interface DockGraph {
 }
 
 /**
- * What the Things list draws and what activating a row does.
+ * What the Resources list draws and what activating a row does.
  *
  * **Two one-way writes rather than an `open` flag**, and that is what lets the
  * Dock own the slot without a second copy of the answer beside it. The
@@ -509,73 +509,73 @@ export interface DockGraph {
  * shape that lets the Dock's slot and the application's flag disagree, which is
  * how two disclosures come to be open at once.
  */
-export interface DockThingsList {
-  /** The Things this Diagram does not place — what the list offers. */
-  readonly things: readonly Thing[];
-  /** Every Thing in the Space, for resolving a Reference Thing row's Target Title. */
-  readonly allThings: readonly Thing[];
-  /** The Title of every Space a Space Thing in the list references. */
+export interface DockResourcesList {
+  /** The Resources this Map does not place — what the list offers. */
+  readonly resources: readonly Resource[];
+  /** Every Resource in the Space, for resolving a Reference Resource row's Target Title. */
+  readonly allResources: readonly Resource[];
+  /** The Title of every Space a Space Resource in the list references. */
   readonly spaceTitleById?: ReadonlyMap<UUID, string> | undefined;
   /**
    * Every Space this Meta Space holds bar the one being authored.
    *
-   * The list's second source. A Space is not a Thing and is in no Diagram, so it
-   * is not filtered against one; placing it authors the Space Thing that frames
+   * The list's second source. A Space is not a Resource and is in no Map, so it
+   * is not filtered against one; placing it authors the Space Resource that frames
    * it, which under ADR 0074 is the only way a Space is referenced at all.
    */
-  readonly spaces?: readonly ThingsPopoverSpace[] | undefined;
-  /** Place a Space by authoring the Space Thing that frames it, or answer with a refusal. */
-  readonly onAddSpace?: ((space: ThingsPopoverSpace) => Promise<string | null>) | undefined;
+  readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
+  /** Place a Space by authoring the Space Resource that frames it, or answer with a refusal. */
+  readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
   /** Returns a refusal that stays on the list, or null after a completed Add. */
-  readonly onAdd: (thing: Thing, activation: 'keyboard' | 'pointer') => string | null;
-  readonly onDragStart: (thingId: ThingId) => void;
+  readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
+  readonly onDragStart: (resourceId: ResourceId) => void;
   readonly onDragEnd?: (() => void) | undefined;
-  /** The row an addressed Thing marks as current, drawn whether or not it opened the list. */
-  readonly revealedThingId?: ThingId | null | undefined;
+  /** The row an addressed Resource marks as current, drawn whether or not it opened the list. */
+  readonly revealedResourceId?: ResourceId | null | undefined;
   /**
    * A request to disclose the list, or `null` for none outstanding.
    *
    * **A request rather than an `open` flag**, which is what lets the Dock own
    * the slot without a second copy of the answer beside it. The application has
    * two moments at which it asks for this list and none at which it reads back
-   * whether the list is open: a Diagram just created — by Add Diagram, or by
-   * having opened a Space into one — and a Thing addressed that the selected
-   * Diagram does not place.
+   * whether the list is open: a Map just created — by Add Map, or by
+   * having opened a Space into one — and a Resource addressed that the selected
+   * Map does not place.
    *
    * The Dock opens on the value **changing identity**, so the application raises
    * a fresh object per request and an unrelated edit recomputing an equal one
    * reopens nothing the reader has just closed. A request outstanding when the
    * Dock first mounts opens it without waiting a frame.
    */
-  readonly disclose?: DockThingsDisclosure | null | undefined;
-  /** Whether the Diagram can accept membership edits at all. */
+  readonly disclose?: DockResourcesDisclosure | null | undefined;
+  /** Whether the Map can accept membership edits at all. */
   readonly disabled: boolean;
 }
 
-/** One request to disclose the Things list, and the Thing it is about. */
-export interface DockThingsDisclosure {
+/** One request to disclose the Resources list, and the Resource it is about. */
+export interface DockResourcesDisclosure {
   /**
-   * The Thing the request is about, which the list marks.
+   * The Resource the request is about, which the list marks.
    *
-   * Not nullable: every disclosure the application makes is about a Thing. The
-   * one caller that asked for the list with nothing to mark was New Diagram
-   * revealing it on an empty Diagram, and that command discloses nothing now —
-   * it continues in the new Diagram's name (ADR 0089).
+   * Not nullable: every disclosure the application makes is about a Resource. The
+   * one caller that asked for the list with nothing to mark was New Map
+   * revealing it on an empty Map, and that command discloses nothing now —
+   * it continues in the new Map's name (ADR 0089).
    */
-  readonly thingId: ThingId;
+  readonly resourceId: ResourceId;
 }
 
-export interface DockThings {
+export interface DockResources {
   /**
-   * The Things, as a list this Dock draws.
+   * The Resources, as a list this Dock draws.
    *
    * **The Dock draws it rather than being handed it, and that is the whole of
-   * why the open state lives here.** The prototype's Things cluster disclosed a
+   * why the open state lives here.** The prototype's Resources cluster disclosed a
    * filtered Popover it drew itself, chosen over a Drawer from the screen edge
-   * and a second docked panel in a comparison over twenty-nine unplaced Things;
-   * the Popover won, and the reasons are written above {@link ThingsPopover} and
+   * and a second docked panel in a comparison over twenty-nine unplaced Resources;
+   * the Popover won, and the reasons are written above {@link ResourcesPopover} and
    * in `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. The Dock's
-   * promotion shipped the application's `ThingsDrawer` against that decision
+   * promotion shipped the application's `ResourcesDrawer` against that decision
    * because the drawer already had parity claims and the prototype's evidence
    * sat in a file marked throwaway; this slot was a `ReactNode` for as long as
    * the surface was a foreign component.
@@ -584,17 +584,17 @@ export interface DockThings {
    * open slot, so opening it closes whichever menu was open and opening a menu
    * closes it — which a handed-in surface holding its own `open` could not do.
    */
-  readonly list: DockThingsList;
+  readonly list: DockResourcesList;
   /**
-   * Create a Thing of one kind — the one command about the *set*.
+   * Create a Resource of one kind — the one command about the *set*.
    *
    * The kind is chosen at creation, so the menu offers three peers rather than a
    * split button with a hidden default. This is *Create*, distinct from adding
-   * an existing Thing, which is what the surface above is for.
+   * an existing Resource, which is what the surface above is for.
    */
-  readonly onCreate: (kind: DockThingKind) => void;
+  readonly onCreate: (kind: DockResourceKind) => void;
   /** Whether each Create peer may run — the kinds withdraw independently when in flight. */
-  readonly createDisabled: Readonly<Record<DockThingKind, boolean>>;
+  readonly createDisabled: Readonly<Record<DockResourceKind, boolean>>;
 }
 
 /** What went wrong, which is the only report persistence ever gives. */
@@ -653,7 +653,7 @@ function Divider({ orientation }: { readonly orientation: 'horizontal' | 'vertic
  * colour on the name as well as the glyph was tried and reverted: the palette
  * is pastel because it is drawn as a stroke on sand, and the same values set
  * as text on white chrome are too light to read as a name — and a name is the
- * thing on this surface that most has to. The glyph beside it carries the
+ * resource on this surface that most has to. The glyph beside it carries the
  * colour instead, where a shape rather than a legibility budget is what has to
  * survive.
  */
@@ -662,7 +662,7 @@ function IdentityLabel({ children }: { readonly children: ReactNode }) {
 }
 
 /** Which of the bar's three names a rename can be running on. */
-type DockIdentity = 'Space' | 'Diagram' | 'Graph';
+type DockIdentity = 'Space' | 'Map' | 'Graph';
 
 const identityDisclosureName = (kind: DockIdentity, title: string): string =>
   kind === 'Graph' ? `Active Graph: ${title}` : `${kind}: ${title}`;
@@ -704,10 +704,10 @@ function useIdentityCaret() {
 }
 
 /**
- * The Space, Diagram or Graph cluster: one named disclosure, and Rename in it.
+ * The Space, Map or Graph cluster: one named disclosure, and Rename in it.
  *
  * The name and the chevron are the named `ChoiceMenuTrigger` an Open Space
- * Thing already uses. Pressing either opens this identity's list. Rename is a
+ * Resource already uses. Pressing either opens this identity's list. Rename is a
  * row in that list; choosing it closes the menu and continues in
  * `InlineTitleEditor` — the same header editor these identities already used,
  * so Enter, Escape, blur and a refused draft stay as they were. The Edit
@@ -758,13 +758,13 @@ function IdentitySurface({
    * Two editors could stand at once — a blank draft is refused and
    * `InlineTitleEditor` holds a refused draft open, so pressing a second name
    * left the first one live — and the first cleanup to run then told the App no
-   * rename was live at all, handing Create Thing, Present and the canvas's own
+   * rename was live at all, handing Create Resource, Present and the canvas's own
    * title editing back underneath an editor still on screen.
    *
    * One slot under the whole bar makes that unrepresentable rather than
    * guarded: at most one name can be the renaming one, so the flag has one
    * writer, and the two endings no gesture can see coming — the reader moving
-   * to another Diagram, and ADR 0042's replacement — are the slot's own and are
+   * to another Map, and ADR 0042's replacement — are the slot's own and are
    * answered once in {@link CommandDock} instead of three times here.
    */
   const { renaming, onRenaming } = useContext(DockRenamingContext);
@@ -781,7 +781,7 @@ function IdentitySurface({
    * spend it.
    *
    * The endings the slot answers for the bar must not — the reader moved to
-   * another Diagram from this list, and pulling the caret onto the name they
+   * another Map from this list, and pulling the caret onto the name they
    * just moved away from is taking focus, not returning it.
    */
   const nameRef = useRef<HTMLButtonElement>(null);
@@ -794,8 +794,8 @@ function IdentitySurface({
   /**
    * Whether the command that closed this list left the caret alone.
    *
-   * Rename continues in the editor, and New Diagram continues in the new
-   * Diagram's name. Base UI's ordinary restoration would then land on the
+   * Rename continues in the editor, and New Map continues in the new
+   * Map's name. Base UI's ordinary restoration would then land on the
    * trigger a frame later — blurring an editor whose blur completes.
    */
   const caretMovedRef = useRef(false);
@@ -825,26 +825,26 @@ function IdentitySurface({
   }, [editing]);
 
   /**
-   * New Diagram continues by pressing a control the visible name is not.
+   * New Map continues by pressing a control the visible name is not.
    *
    * The name is the disclosure: a click on it opens the list. The application's
    * continuation still has to begin the editor the way a reader who chose
    * Rename does, without flashing that list, so the press lands on this
    * always-mounted address instead (`continuation.ts`).
-   * `waitUntilDiagramContinuationReady` and the New Diagram continuation in
+   * `waitUntilMapContinuationReady` and the New Map continuation in
    * `SpaceApp.test.tsx` hold that the address is present and that it begins
    * the editor without opening the list.
    */
   const continuation =
-    kind === 'Diagram' ? (
+    kind === 'Map' ? (
       <button
         type="button"
         className="sr-only"
         tabIndex={-1}
         aria-hidden
-        data-continuation-control="diagram-name"
+        data-continuation-control="map-name"
         disabled={onRename === null}
-        onClick={() => onRenaming('Diagram')}
+        onClick={() => onRenaming('Map')}
       />
     ) : null;
 
@@ -881,7 +881,7 @@ function IdentitySurface({
             const named = next.trim();
             if (named === '') return `A ${kind} needs a name.`;
             // **The Edit's answer, not the press.** A rename can be refused for
-            // more than a blank name — a Diagram that has stopped drawing, a title
+            // more than a blank name — a Map that has stopped drawing, a title
             // Authoring will not take — and `InlineTitleEditor` holds a refused
             // draft open and editable for exactly that. Closing on the press
             // instead would drop the author's words on the floor and leave the
@@ -933,20 +933,20 @@ function IdentitySurface({
 }
 
 /**
- * Diagram: `[name v]`. Graph: `[name v][>]`.
+ * Map: `[name v]`. Graph: `[name v][>]`.
  *
  * Each is one named `ToolbarGroup` inside the Dock's single `Toolbar` — ADR
- * 0073's pair, the same one a Thing rail is built from — so the controls share a
+ * 0073's pair, the same one a Resource rail is built from — so the controls share a
  * box treatment with the rail, the whole bar is one tab stop, and the arrows
  * cross a group boundary exactly as they cross any other gap. What the grouping
  * says is that these are commands *on* one named entity, which is exactly what a
- * rail says about a Thing.
+ * rail says about a Resource.
  *
  * Name and chevron are one disclosure. Rename sits with New, Copy link and
  * Delete on the current identity. Present is the exception on the Graph side:
  * it acts on the Active Graph the cluster is naming.
  */
-function DiagramControls({
+function MapControls({
   canvas,
   side = 'bottom',
 }: {
@@ -954,35 +954,33 @@ function DiagramControls({
   readonly side?: MenuSide;
 }) {
   return (
-    <ToolbarGroup aria-label="Diagram" className="command-dock__cluster">
+    <ToolbarGroup aria-label="Map" className="command-dock__cluster">
       <IdentitySurface
-        icon={<DiagramIcon />}
-        kind="Diagram"
+        icon={<MapIcon />}
+        kind="Map"
         testId="selected-canvas"
         title={canvas.selected.title}
-        triggerTitle="Switch Diagram"
+        triggerTitle="Switch Map"
         onRename={
           canvas.onRename === null
             ? null
             : (title) => canvas.onRename?.(canvas.selected.id, title) ?? null
         }
       >
-        {(disclosure) => (
-          <DiagramIdentityMenu canvas={canvas} side={side} disclosure={disclosure} />
-        )}
+        {(disclosure) => <MapIdentityMenu canvas={canvas} side={side} disclosure={disclosure} />}
       </IdentitySurface>
     </ToolbarGroup>
   );
 }
 
 /**
- * The list, the mark on the Diagram you are in and every key that moves
- * between them are `ChoiceMenu`'s — the same component an Open Space Thing
- * chooses its Diagram through. What stays here is what the list *is* and
+ * The list, the mark on the Map you are in and every key that moves
+ * between them are `ChoiceMenu`'s — the same component an Open Space Resource
+ * chooses its Map through. What stays here is what the list *is* and
  * what choosing one does, which on this surface is the canvas moving.
  * The commands below it are this cluster's own.
  */
-function DiagramIdentityMenu({
+function MapIdentityMenu({
   canvas,
   side,
   disclosure,
@@ -994,9 +992,9 @@ function DiagramIdentityMenu({
   const { trigger, renameItem, triggerId, open, onOpenChange } = disclosure;
   const { restoresFocusOnClose } = useIdentityCaret();
   return (
-    <ChoiceMenu<DiagramId>
-      label="Diagrams"
-      choices={canvas.diagrams}
+    <ChoiceMenu<MapId>
+      label="Maps"
+      choices={canvas.maps}
       chosen={canvas.selected.id}
       onChoose={canvas.onSelect}
       open={open}
@@ -1012,11 +1010,11 @@ function DiagramIdentityMenu({
       )}
       trigger={trigger}
     >
-      <DiagramMenuActions
+      <MapMenuActions
         title={canvas.selected.title}
         renameItem={renameItem}
         createDisabled={canvas.createDisabled}
-        deleteDisabled={canvas.deleteDisabled || canvas.diagrams.length <= 1}
+        deleteDisabled={canvas.deleteDisabled || canvas.maps.length <= 1}
         onCreate={canvas.onCreate}
         onCopyLink={canvas.onCopyLink}
         onDelete={() => canvas.onDelete(canvas.selected.id)}
@@ -1031,26 +1029,26 @@ function DiagramIdentityMenu({
  */
 function GraphControls({
   graph,
-  diagramTitle,
+  mapTitle,
   side = 'bottom',
   vertical = false,
 }: {
   readonly graph: DockGraph;
-  /** Only to caption the list: the Graphs a menu offers are the ones this Diagram owns. */
-  readonly diagramTitle: string;
+  /** Only to caption the list: the Graphs a menu offers are the ones this Map owns. */
+  readonly mapTitle: string;
   readonly side?: MenuSide;
   readonly vertical?: boolean;
 }) {
   /**
    * **Present leads along a row and trails down a column**, and this is the one
-   * thing in the Dock the edge reorders.
+   * resource in the Dock the edge reorders.
    *
    * Along a row it leads: it acts on the named entity the cluster is showing, so
    * it sits at the edge the eye enters from, ahead of the name it acts on.
    *
    * Down a column it cannot, because a column pays for it differently. A
    * leading verb needs a track of its own on *every* row — three of the four
-   * rows have no verb, and the 28px sits empty on each — and Things' Create
+   * rows have no verb, and the 28px sits empty on each — and Resources' Create
    * trails, so a leading Present makes the grid four tracks wide: 84px of a
    * 208px column spent on gutters. Trailing, both verbs share one track and the
    * column is three.
@@ -1107,7 +1105,7 @@ function GraphControls({
         {(disclosure) => (
           <GraphIdentityMenu
             graph={graph}
-            diagramTitle={diagramTitle}
+            mapTitle={mapTitle}
             side={side}
             disclosure={disclosure}
           />
@@ -1119,19 +1117,19 @@ function GraphControls({
 }
 
 /**
- * The same `ChoiceMenu` the Diagram cluster and an Open Space Thing draw,
+ * The same `ChoiceMenu` the Map cluster and an Open Space Resource draw,
  * with each row carrying the colour its Graph is drawn in — a choice's
  * own glyph is the choice's, which is why it rides on the choice rather
  * than being rendered here.
  */
 function GraphIdentityMenu({
   graph,
-  diagramTitle,
+  mapTitle,
   side,
   disclosure,
 }: {
   readonly graph: DockGraph;
-  readonly diagramTitle: string;
+  readonly mapTitle: string;
   readonly side: MenuSide;
   readonly disclosure: IdentityDisclosure;
 }) {
@@ -1139,7 +1137,7 @@ function GraphIdentityMenu({
   const { restoresFocusOnClose } = useIdentityCaret();
   return (
     <ChoiceMenu<GraphId>
-      label={`Graphs in ${diagramTitle}`}
+      label={`Graphs in ${mapTitle}`}
       choices={graph.graphs.map((each) => ({
         id: each.id,
         title: each.title,
@@ -1177,7 +1175,7 @@ function GraphIdentityMenu({
 }
 
 /**
- * Create Thing, as three peer commands in the Things cluster.
+ * Create Resource, as three peer commands in the Resources cluster.
  *
  * **The kinds were always peers; they are no longer disclosed.** The design this
  * replaces put them behind a `+` and recorded why they are peers rather than a
@@ -1192,13 +1190,13 @@ function GraphIdentityMenu({
  * altogether, which makes the argument stronger rather than weaker.
  *
  * The other half of that recorded design is untouched and still load-bearing:
- * Create stays *outside* the Things surface. That list is a long scrolling one
+ * Create stays *outside* the Resources surface. That list is a long scrolling one
  * an author drags out of, so a New pinned above it is a second region and a New
  * inside it scrolls away.
  *
  * **A glyph is asked to mean a verb here, which it is not asked to do anywhere
- * else in the product.** The same three silhouettes mark rows in the Things
- * list and Things on the canvas, where they say *what a Thing is*. Each control
+ * else in the product.** The same three silhouettes mark rows in the Resources
+ * list and Resources on the canvas, where they say *what a Resource is*. Each control
  * carries `Create <kind>` as its accessible name and its tooltip, so the
  * keyboard and the pointer are unambiguous; what is accepted is that a silent
  * visual reading could take the kind glyphs in a command slot for filters
@@ -1206,14 +1204,14 @@ function GraphIdentityMenu({
  *
  * They carry no chevron. In the cluster they sit where Present sits on the
  * Graph cluster — bare glyphs after the disclosure — and a second chevron
- * beside `Things ⌄` would read as a second disclosure of the same list.
+ * beside `Resources ⌄` would read as a second disclosure of the same list.
  */
 function CreatePeers({
   onCreate,
   disabled,
 }: {
-  readonly onCreate: (kind: DockThingKind) => void;
-  readonly disabled: Readonly<Record<DockThingKind, boolean>>;
+  readonly onCreate: (kind: DockResourceKind) => void;
+  readonly disabled: Readonly<Record<DockResourceKind, boolean>>;
 }) {
   return (
     /* **A nested group, and it is what lets the vertical dock pack.** Base UI's
@@ -1221,17 +1219,17 @@ function CreatePeers({
        it nests inside the cluster without taking the roving tabindex off the
        one `Toolbar` root — and it gives `command-dock.css` one element to place
        instead of two. Left as loose siblings the vertical column's grid
-       auto-places them onto a row each and the Things cluster grows past the
-       44px Diagram and 44px Graph beside it. */
-    <ToolbarGroup aria-label="Create a Thing" className="command-dock__create">
-      {THING_KINDS.map((kind) => (
+       auto-places them onto a row each and the Resources cluster grows past the
+       44px Map and 44px Graph beside it. */
+    <ToolbarGroup aria-label="Create a Resource" className="command-dock__create">
+      {RESOURCE_KINDS.map((kind) => (
         <ToolbarButton
           key={kind}
           variant="ghost"
           size="icon"
           className="nokey"
-          aria-label={`Create ${thingKindName(kind)}`}
-          title={`Create ${thingKindName(kind)}`}
+          aria-label={`Create ${resourceKindName(kind)}`}
+          title={`Create ${resourceKindName(kind)}`}
           disabled={disabled[kind]}
           onClick={() => onCreate(kind)}
         >
@@ -1239,7 +1237,7 @@ function CreatePeers({
               says `Create <kind>`, so a glyph announcing `<kind>` beside it is a
               second node repeating half of it. Both of these are mounted at
               rest, so the duplication is permanent rather than disclosed. */}
-          <ThingKindIcon kind={kind} decorative />
+          <ResourceKindIcon kind={kind} decorative />
         </ToolbarButton>
       ))}
     </ToolbarGroup>
@@ -1247,13 +1245,13 @@ function CreatePeers({
 }
 
 /**
- * `Things ⌄` — the same shape as `Diagram ⌄` and `Graph ⌄` beside it, and one
+ * `Resources ⌄` — the same shape as `Map ⌄` and `Graph ⌄` beside it, and one
  * trigger whichever surface opens.
  *
  * It carries a chevron because it discloses a list, which is what the chevron
- * says next to it on the other three. Space, Diagram and Graph name one entity
+ * says next to it on the other three. Space, Map and Graph name one entity
  * each, and that name is the same disclosure — Rename lives in the list.
- * "Things" names a set, and a set has no name to edit — so the word is a label
+ * "Resources" names a set, and a set has no name to edit — so the word is a label
  * inside the trigger rather than a button of its own, and the cluster is one
  * target instead of two.
  *
@@ -1278,20 +1276,20 @@ function SetTrigger({
   );
 }
 
-export function ThingsTrigger() {
+export function ResourcesTrigger() {
   return (
-    /* The Thing glyph the rows in its own list carry, not `OpenThingIcon`'s
-       expand arrows: beside a Space, a Diagram and a Graph's colour, the icon
+    /* The Resource glyph the rows in its own list carry, not `OpenResourceIcon`'s
+       expand arrows: beside a Space, a Map and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
-    <SetTrigger icon={<ThingKindIcon kind="markdown" />}>Things</SetTrigger>
+    <SetTrigger icon={<ResourceKindIcon kind="markdown" />}>Resources</SetTrigger>
   );
 }
 
 /**
  * Which of the Dock's list disclosures is open, if any.
  *
- * A `Menubar` makes the Dock's *menus* exclusive, but the Things list is a
+ * A `Menubar` makes the Dock's *menus* exclusive, but the Resources list is a
  * Popover rather than a menu — it holds a filter field and drag sources, and
  * menu semantics would take the arrow keys and typeahead the input needs and
  * would dismiss on activating a row. So the exclusivity a menubar gives its
@@ -1326,7 +1324,7 @@ const DockDisclosureContext = createContext<DockDisclosure>({
  * fact is the bar's, so it is held once and read by every name.
  *
  * A context for the same reason the disclosure is one: threading it through
- * `SpacesControl`, `DiagramControls` and `GraphControls` to reach a leaf is the
+ * `SpacesControl`, `MapControls` and `GraphControls` to reach a leaf is the
  * shape that makes the next person keep it locally instead. The default is an
  * inert slot, so an identity mounted outside a provider draws its name and
  * never opens an editor, rather than opening one nothing can end.
@@ -1348,8 +1346,8 @@ const DockRenamingContext = createContext<DockRenaming>({
  *
  * **Three rules that were three copies of themselves, answered once.**
  *
- * *A rename cannot outlive its subject.* The slot remembers the Diagram or Graph
- * the rename was begun against, so a reader who moves to another Diagram from
+ * *A rename cannot outlive its subject.* The slot remembers the Map or Graph
+ * the rename was begun against, so a reader who moves to another Map from
  * the menu beside the name releases it — the editor is seeded from a title, and
  * leaving it open would put the caret in a field editing something the reader
  * has already left. Read as a render-time transition rather than an effect,
@@ -1358,7 +1356,7 @@ const DockRenamingContext = createContext<DockRenaming>({
  * render.
  *
  * *A replacement ends it too, and nothing else can (ADR 0042).* The accepted
- * Space carries the same Diagram and Graph ids, so the subject is unchanged
+ * Space carries the same Map and Graph ids, so the subject is unchanged
  * across the very transition that discards the draft, and the application's own
  * `editingChromeTitle` is the *report* rather than the editor — lowering it
  * neither closes the editor nor stops it being completed. Nor can the
@@ -1366,7 +1364,7 @@ const DockRenamingContext = createContext<DockRenaming>({
  * passes through a render where `onRename` is `null` and the name draws
  * unavailable with the slot still taken. That looks like the draft going. It
  * comes back the moment placement resolves, reseeded from the *accepted*
- * Diagram's title — an editor the author never opened, over a Space they never
+ * Map's title — an editor the author never opened, over a Space they never
  * saw, one Enter away from renaming it. The caret is deliberately not returned
  * on either ending: the author did not end this, and pulling focus onto a name
  * in a Space that has just been replaced under them is taking focus rather than
@@ -1389,7 +1387,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
    */
   const identities = {
     Space: { subject: chrome.space.currentSpaceId, renameable: chrome.space.onRename !== null },
-    Diagram: { subject: chrome.canvas.selected.id, renameable: chrome.canvas.onRename !== null },
+    Map: { subject: chrome.canvas.selected.id, renameable: chrome.canvas.onRename !== null },
     Graph: { subject: chrome.graph.active.id, renameable: chrome.graph.onRename !== null },
   } satisfies Record<DockIdentity, { readonly subject: string; readonly renameable: boolean }>;
 
@@ -1428,7 +1426,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
  *
  * **Base UI's `Menubar` is the documented answer and it cannot be used here.**
  * It is a roving-focus container, and so is `Toolbar` — and the Dock is a
- * Toolbar because ADR 0073 makes a command cluster the component a Thing rail is
+ * Toolbar because ADR 0073 makes a command cluster the component a Resource rail is
  * built from. Nesting them puts `role="menubar"` inside `role="toolbar"` and two
  * focus managers over the same buttons: the menu opens, the toolbar takes focus
  * back, and it closes again within a frame. It fails silently, with nothing in
@@ -1447,7 +1445,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
  * now produced a menu that flashes and never appears.
  *
  * The id is `useId` rather than a caller-chosen string, so two disclosures
- * cannot collide by both calling themselves "things" and adding a control needs
+ * cannot collide by both calling themselves "resources" and adding a control needs
  * no registry kept in step.
  */
 interface DisclosureBinding {
@@ -1467,19 +1465,19 @@ function useDockDisclosure() {
 }
 
 /**
- * The Things disclosure's id, and the one in the Dock that is not a `useId`.
+ * The Resources disclosure's id, and the one in the Dock that is not a `useId`.
  *
  * Every other disclosure takes an opaque generated id, so two cannot collide by
- * both calling themselves "things" (see {@link useDockDisclosure}). This one is
+ * both calling themselves "resources" (see {@link useDockDisclosure}). This one is
  * named because it is the one disclosure the Dock itself opens on the
- * application's behalf — a Diagram just created, a Thing addressed that the
- * Diagram does not place — and {@link DockChrome} has to be able to seed the
+ * application's behalf — a Map just created, a Resource addressed that the
+ * Map does not place — and {@link DockChrome} has to be able to seed the
  * Dock's slot with it before any control has mounted to mint an id.
  */
-const THINGS_DISCLOSURE_ID = 'command-dock-things';
+const RESOURCES_DISCLOSURE_ID = 'command-dock-resources';
 
 /**
- * The Things list in its cluster, holding the Dock's one open slot.
+ * The Resources list in its cluster, holding the Dock's one open slot.
  *
  * The three states the application reports about whether this is open are applied
  * here rather than mirrored into a second flag: `initiallyOpen` seeds the slot
@@ -1487,9 +1485,15 @@ const THINGS_DISCLOSURE_ID = 'command-dock-things';
  * change rather than on the value. Each is a one-way write into the slot, so
  * there is no state here that can come to disagree with the application's.
  */
-function ThingsList({ list, side }: { readonly list: DockThingsList; readonly side: MenuSide }) {
+function ResourcesList({
+  list,
+  side,
+}: {
+  readonly list: DockResourcesList;
+  readonly side: MenuSide;
+}) {
   const { openId, setOpenId } = useContext(DockDisclosureContext);
-  const open = openId === THINGS_DISCLOSURE_ID;
+  const open = openId === RESOURCES_DISCLOSURE_ID;
   const disclosed = useRef(list.disclose ?? null);
   // The slot key is stable and the trigger's DOM id is not, because they answer
   // different questions: the Dock has to be able to name this slot before a
@@ -1499,9 +1503,9 @@ function ThingsList({ list, side }: { readonly list: DockThingsList; readonly si
   const triggerId = useId();
 
   // Withdrawing the list *closes* it rather than leaving it open behind a
-  // disabled trigger. Presenting and creating a Reference Thing both pass through here,
+  // disabled trigger. Presenting and creating a Reference Resource both pass through here,
   // and a list that reopened itself on the way back would take focus with it,
-  // landing the reader in the Things rather than on the canvas they returned to.
+  // landing the reader in the Resources rather than on the canvas they returned to.
   useEffect(() => {
     if (list.disabled && open) setOpenId(null);
   }, [list.disabled, open, setOpenId]);
@@ -1513,36 +1517,36 @@ function ThingsList({ list, side }: { readonly list: DockThingsList; readonly si
     const next = list.disclose ?? null;
     if (next === disclosed.current) return;
     disclosed.current = next;
-    if (next !== null) setOpenId(THINGS_DISCLOSURE_ID);
+    if (next !== null) setOpenId(RESOURCES_DISCLOSURE_ID);
   }, [list.disclose, setOpenId]);
 
   return (
-    <ThingsPopover
+    <ResourcesPopover
       open={open && !list.disabled}
-      onOpenChange={(next) => setOpenId(next ? THINGS_DISCLOSURE_ID : null)}
+      onOpenChange={(next) => setOpenId(next ? RESOURCES_DISCLOSURE_ID : null)}
       triggerId={triggerId}
       side={side}
       disabled={list.disabled}
-      triggerRender={<ToolbarButton variant="ghost" {...THINGS_TRIGGER} />}
-      triggerLabel={<ThingsTrigger />}
-      things={list.things}
-      allThings={list.allThings}
+      triggerRender={<ToolbarButton variant="ghost" {...RESOURCES_TRIGGER} />}
+      triggerLabel={<ResourcesTrigger />}
+      resources={list.resources}
+      allResources={list.allResources}
       spaceTitleById={list.spaceTitleById}
       spaces={list.spaces}
       onAddSpace={list.onAddSpace}
       onAdd={list.onAdd}
       onDragStart={list.onDragStart}
       onDragEnd={list.onDragEnd}
-      revealedThingId={list.revealedThingId}
+      revealedResourceId={list.revealedResourceId}
     />
   );
 }
 
-function ThingsControl({
-  things,
+function ResourcesControl({
+  resources,
   side = 'bottom',
 }: {
-  readonly things: DockThings;
+  readonly resources: DockResources;
   readonly side?: MenuSide;
 }) {
   /**
@@ -1555,48 +1559,48 @@ function ThingsControl({
    * announces once on the way past rather than on every item.
    */
   return (
-    <ToolbarGroup aria-label="Things" className="command-dock__cluster command-dock__things">
+    <ToolbarGroup aria-label="Resources" className="command-dock__cluster command-dock__resources">
       {/* **The list carries no commands, and that is the shape rather than a
-          gap in it.** Things names no one entity — a Thing's own commands are the
-          Thing rail's (ADR 0073) and this Dock deliberately carries none — and
+          gap in it.** Resources names no one entity — a Resource's own commands are the
+          Resource rail's (ADR 0073) and this Dock deliberately carries none — and
           its set commands, the three Creates, are the peers beside this trigger.
           Repeating Create inside the list as well would be the second path to
           one command that the Sidebar's own actions menu was built to remove.
 
-          It offers Space Things like any other Thing and does nothing special
-          with them: entering one is the canvas Thing's gesture (ADR 0068), not a
+          It offers Space Resources like any other Resource and does nothing special
+          with them: entering one is the canvas Resource's gesture (ADR 0068), not a
           list's. */}
-      <ThingsList list={things.list} side={side} />
+      <ResourcesList list={resources.list} side={side} />
       {/* **Trailing, where Present leads**, and the asymmetry is the point.
           Present acts on the named entity the cluster is showing — present *this
           Graph* — so it sits at the edge the eye enters from, ahead of the name
-          it acts on. Create acts on the **set**: Things names no one entity, which
+          it acts on. Create acts on the **set**: Resources names no one entity, which
           is why it has no name to edit, and a command about the set reads after
-          the disclosure that lists it. `[▢ Things ⌄][▢][▣][▢↗]` is "the Things,
+          the disclosure that lists it. `[▢ Resources ⌄][▢][▣][▢↗]` is "the Resources,
           and make one"; leading would be verbs with no subject in front of them.
 
           **The vertical dock packs this cluster rather than granting it tracks.**
           Three trailing commands would need three verb tracks, empty on the three
           rows that have one verb or none — 84px of a 208px column spent on
-          gutters. Instead the Things trigger gives up the `1fr` name track it
-          never needed: Space, Diagram and Graph name entities the author renamed,
-          so their names take the slack and truncate, while "Things" is a fixed
+          gutters. Instead the Resources trigger gives up the `1fr` name track it
+          never needed: Space, Map and Graph name entities the author renamed,
+          so their names take the slack and truncate, while "Resources" is a fixed
           word. See `command-dock.css`. */}
-      <CreatePeers onCreate={things.onCreate} disabled={things.createDisabled} />
+      <CreatePeers onCreate={resources.onCreate} disabled={resources.createDisabled} />
     </ToolbarGroup>
   );
 }
 
 /**
- * The Space's chevron: an ordinary menu, the same one Diagram and Graph carry.
+ * The Space's chevron: an ordinary menu, the same one Map and Graph carry.
  *
  * **It used to disclose a list of Spaces and that list is gone.** A Space is a
- * Space Thing, so the Spaces in this Space are Things in it, and the surface that
- * offers Things already offers them. Two disclosures over overlapping sets was
+ * Space Resource, so the Spaces in this Space are Resources in it, and the surface that
+ * offers Resources already offers them. Two disclosures over overlapping sets was
  * the duplication, and the one that had to go is the one whose set was a
  * subset.
  *
- * **The same grouping grammar as `DiagramMenuActions` and `GraphMenuActions`
+ * **The same grouping grammar as `MapMenuActions` and `GraphMenuActions`
  * minus the part that names a set** (`.scratch/dock-menu-reorganisation/issues/02`):
  * Rename beside Copy link to Space, then Exit Space — one separator between
  * the two groups. The list of Spaces this control does *not* draw is the
@@ -1608,7 +1612,7 @@ function ThingsControl({
  * ancestor was Exit, leaving and closing were the same gesture and neither
  * needed a name; now that moving closes nothing, the open set only grows unless
  * something takes from it. It sits in its own trailing group, separated by a
- * rule — the same position Delete holds on the Diagram and Graph menus — and
+ * rule — the same position Delete holds on the Map and Graph menus — and
  * it is disabled on the meta Space, which cannot be exited.
  *
  * **It is `openSpaces.exit`'s rules and not this module's.** `CONTEXT.md`'s Exit
@@ -1616,7 +1620,7 @@ function ThingsControl({
  * recovery each has, warn and permit for `rejected` — is implemented there, and
  * `ExitReport` below draws the three arms of the `ExitSpaceResult` it answers.
  *
- * There is still no **Delete**, which a Diagram and a Graph both offer: deleting
+ * There is still no **Delete**, which a Map and a Graph both offer: deleting
  * the Space you are standing in has nowhere to leave you, and this surface does
  * not answer that. Exit is not it — exiting discards a session's place in a
  * Space, and the Space is untouched.
@@ -1652,10 +1656,10 @@ function SpaceMenu({
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           {/* Its own trailing group, separated by a rule — the same position
-              Delete holds on the Diagram and Graph menus. It is **not**
+              Delete holds on the Map and Graph menus. It is **not**
               destructive though, and does not draw as it — exiting a Space
               discards a session's place in it, not the Space, and
-              re-entering costs one press on a Thing. Meta cannot be exited,
+              re-entering costs one press on a Resource. Meta cannot be exited,
               so there the row is present and unavailable rather than gone —
               and that is the *only* case, which `exitDisabled` is named for
               and `space.opener` was not.
@@ -1663,7 +1667,7 @@ function SpaceMenu({
               **Exit, because the glossary says Exit.** `CONTEXT.md` gives the
               word to the one action that closes an entered Space, and
               `openSpaces.exit` is spelled that way too; this drew "Close Space"
-              and so named a fourth thing beside Open, Close and Exit. */}
+              and so named a fourth resource beside Open, Close and Exit. */}
           <DropdownMenuItem
             className="gap-2"
             disabled={space.exitDisabled}
@@ -1881,7 +1885,7 @@ function OpenerAndOpenSpaces({
               }
             >
               {/* **At the root the chevron says what it discloses**, and it
-                    says it the way Things does — the same `SetTrigger`, so the
+                    says it the way Resources does — the same `SetTrigger`, so the
                     two cannot space themselves differently. Below the root the
                     Opener's name stands beside the chevron and the pair reads
                     as a place and a way out of it; at the top there is no
@@ -1911,7 +1915,7 @@ function OpenerAndOpenSpaces({
               sideOffset={DISCLOSURE_SIDE_OFFSET}
               className={`nokey ${DISCLOSURE_WIDTH}`}
             >
-              {/* A radio group, as Diagram and Graph both use, because this is
+              {/* A radio group, as Map and Graph both use, because this is
                     the same question those ask: which of a set is the one you
                     are looking at. What differs is only that the set is nested,
                     and the indent is the whole of that difference. */}
@@ -1951,7 +1955,7 @@ function OpenerAndOpenSpaces({
                       {row.spaceId === meta?.spaceId ? (
                         <ParentIcon />
                       ) : (
-                        <ThingKindIcon kind="space" decorative />
+                        <ResourceKindIcon kind="space" decorative />
                       )}
                       {row.title}
                       {/* **The regression `OpenSpaces` did not have.** The
@@ -2005,13 +2009,13 @@ function OpenerAndOpenSpaces({
  * this one was Entered from, marked with a direction rather than the Space glyph because both are Spaces
  * and only their position differs, and the `⌄` beside it switches among every
  * open Space (`OpenerAndOpenSpaces` above).
- * The **cluster** is the Space you are in — a Diagram or Graph cluster in every
+ * The **cluster** is the Space you are in — a Map or Graph cluster in every
  * respect: a named disclosure, and Rename a command in that list.
  *
- * **The Spaces inside this one are not in either.** They are Space Things, so
- * they are in the Things list with every other Thing — as Things, with nothing on
+ * **The Spaces inside this one are not in either.** They are Space Resources, so
+ * they are in the Resources list with every other Resource — as Resources, with nothing on
  * the row that goes into one. That is the difference the two surfaces keep: the Open Spaces menu
- * lists the Spaces already **open**, and the Things list holds Things. At the top
+ * lists the Spaces already **open**, and the Resources list holds Resources. At the top
  * — the Meta Space — that list is every Space there is, which is the "All
  * Spaces" every comparable tool builds a separate screen for.
  *
@@ -2053,7 +2057,7 @@ function SpacesControl({
       <Divider orientation={vertical ? 'horizontal' : 'vertical'} />
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
         <IdentitySurface
-          icon={<ThingKindIcon kind="space" decorative />}
+          icon={<ResourceKindIcon kind="space" decorative />}
           kind="Space"
           testId="space-title"
           title={space.title}
@@ -2235,7 +2239,7 @@ interface DragState {
  *
  * The pointer capture, the snap hint and the edge arithmetic are all here
  * rather than in the dock, which is what let a second docked surface — the
- * Things panel, while the list surface was still under comparison — be the same
+ * Resources panel, while the list surface was still under comparison — be the same
  * drag rather than a second copy of it. That panel is gone with the decision;
  * this stays one component because the arithmetic is the awkward part and a
  * later docked surface should not write it again.
@@ -2724,10 +2728,10 @@ export function CommandDock({
   const [dock, setDock] = useState<DockPosition>({ edge: initialEdge, along: 'center' });
   const [openId, setOpenId] = useState<string | null>(
     // The one disclosure the Dock opens for the application rather than for the
-    // reader: Add Diagram makes an empty Diagram, and the Things are what fills it.
-    // Seeded here so a Space opened into a new Diagram draws the list on its
+    // reader: Add Map makes an empty Map, and the Resources are what fills it.
+    // Seeded here so a Space opened into a new Map draws the list on its
     // first frame rather than one after it.
-    (chrome.things.list.disclose ?? null) === null ? null : THINGS_DISCLOSURE_ID,
+    (chrome.resources.list.disclose ?? null) === null ? null : RESOURCES_DISCLOSURE_ID,
   );
   const renaming = useDockRenaming(chrome);
   const vertical = orientationOf(dock.edge) === 'vertical';
@@ -2746,20 +2750,20 @@ export function CommandDock({
           label="Command Dock"
           report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
         >
-          {/* Space | Diagram Graph | Things.
+          {/* Space | Map Graph | Resources.
             The three selections first, then the inventory. Which Space, which
-            Diagram and which Graph are one question asked three times — each names
+            Map and which Graph are one question asked three times — each names
             the current one, discloses the set, and promotes at most one verb — and
-            Diagram and Graph are divided like the rest. They used to run together
-            on the grounds that a Graph is authored over a Diagram and so they are
+            Map and Graph are divided like the rest. They used to run together
+            on the grounds that a Graph is authored over a Map and so they are
             one region — which stopped being legible the moment Present moved to
             the head of the Graph cluster: an unseparated `[Collection 1 ⌄][▶ Long
-            ⌄]` reads as a Present belonging to the Diagram beside it. The
+            ⌄]` reads as a Present belonging to the Map beside it. The
             containment is still true and the order still says it; the rule no
             longer has to be carried by an absent line.
-            Things comes last because it is the odd cluster and should read as one:
+            Resources comes last because it is the odd cluster and should read as one:
             it names a set rather than a selection, so it has no name to edit and
-            nothing to promote but Create. Between Diagram and Space it looked like
+            nothing to promote but Create. Between Map and Space it looked like
             a fourth selection that had lost its name. */}
           {/* One open-id under the whole row, spent by every disclosure through
             `useDockDisclosure` — that, and not a convention each control keeps,
@@ -2767,16 +2771,16 @@ export function CommandDock({
             obviously wants cannot be used inside Toolbars. */}
           <SpacesControl space={chrome.space} side={side} vertical={vertical} />
           <Divider orientation={divider} />
-          <DiagramControls canvas={chrome.canvas} side={side} />
+          <MapControls canvas={chrome.canvas} side={side} />
           <Divider orientation={divider} />
           <GraphControls
             graph={chrome.graph}
-            diagramTitle={chrome.canvas.selected.title}
+            mapTitle={chrome.canvas.selected.title}
             side={side}
             vertical={vertical}
           />
           <Divider orientation={divider} />
-          <ThingsControl things={chrome.things} side={side} />
+          <ResourcesControl resources={chrome.resources} side={side} />
         </Dock>
       </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>
@@ -2793,7 +2797,7 @@ export function CommandDock({
  * to see any edge, or press the grip and pick a slot, and the orientation
  * follows either way.
  *
- * Drag a Thing out of the Things popover onto the canvas, or press the row where
- * it stands. Both are real and both are the same Edit: the Thing joins the
- * Diagram and the popover stays open, so the next one costs nothing either way.
+ * Drag a Resource out of the Resources popover onto the canvas, or press the row where
+ * it stands. Both are real and both are the same Edit: the Resource joins the
+ * Map and the popover stays open, so the next one costs nothing either way.
  */

@@ -14,13 +14,13 @@ const centreOf = (box: { x: number; y: number; width: number; height: number }) 
 /**
  * Turn a resting offset into the one the same rigid motion puts it at.
  *
- * A dragged Space Thing leans, and its embedded canvas leans with it about the
- * same centre — so an embedded Thing keeps its *distance* from the containing
- * Thing through a drag and not its x and y. Comparing raw offsets only holds
+ * A dragged Space Resource leans, and its embedded canvas leans with it about the
+ * same centre — so an embedded Resource keeps its *distance* from the containing
+ * Resource through a drag and not its x and y. Comparing raw offsets only holds
  * while nothing leans, which is what this helper used to assume.
  */
 /**
- * The lean, read from the Thing that publishes it rather than imported.
+ * The lean, read from the Resource that publishes it rather than imported.
  *
  * `@project/ui`'s barrel pulls its stylesheets, which Playwright's loader
  * cannot parse — and reading the live custom property is the better evidence
@@ -29,12 +29,12 @@ const centreOf = (box: { x: number; y: number; width: number; height: number }) 
  */
 const publishedLean = async (child: Locator): Promise<number> => {
   const declared = await child.evaluate((node) => {
-    const thing = node.querySelector('.canvas-thing') ?? node;
-    return getComputedStyle(thing).getPropertyValue('--canvas-thing-drag-tilt');
+    const resource = node.querySelector('.canvas-resource') ?? node;
+    return getComputedStyle(resource).getPropertyValue('--canvas-resource-drag-tilt');
   });
   const degrees = Number.parseFloat(declared);
   if (!Number.isFinite(degrees))
-    throw new Error(`The embedded Thing publishes no drag lean, only "${declared}"`);
+    throw new Error(`The embedded Resource publishes no drag lean, only "${declared}"`);
   return degrees;
 };
 
@@ -46,16 +46,16 @@ const leaned = (offset: { x: number; y: number }, degrees: number) => {
 };
 
 /** Assert rigid parent, child and optional connector motion before and after release. */
-export async function expectEmbeddedThingToFollowDrag(
+export async function expectEmbeddedResourceToFollowDrag(
   page: Page,
   parent: Locator,
   child: Locator,
   connectors: readonly Locator[] = [],
   incident?: { readonly connector: Locator; readonly endpoint: 'source' | 'target' },
 ): Promise<void> {
-  const beforeParent = await boxOf(parent, 'The Open Space Thing');
-  const beforeChild = await boxOf(child, 'The embedded Thing');
-  // Centres, not corners: the lean turns each Thing about its own centre too,
+  const beforeParent = await boxOf(parent, 'The Open Space Resource');
+  const beforeChild = await boxOf(child, 'The embedded Resource');
+  // Centres, not corners: the lean turns each Resource about its own centre too,
   // so a corner moves by the box's own rotation as well as the group's.
   const beforeParentCentre = centreOf(beforeParent);
   const offset = {
@@ -100,7 +100,7 @@ export async function expectEmbeddedThingToFollowDrag(
     incident: incident === undefined ? undefined : await endpointOf(incident),
   });
   /**
-   * `degrees` is the lean the containing Thing is under for this sample: the
+   * `degrees` is the lean the containing Resource is under for this sample: the
    * drag angle while the pointer is down, and zero once it is released. Passing
    * it explicitly is what keeps this an assertion about a *rigid* motion rather
    * than a tolerance wide enough to accept a drifting one.
@@ -124,13 +124,13 @@ export async function expectEmbeddedThingToFollowDrag(
     }
     if (sample.incident !== undefined && incidentOffset !== undefined) {
       const turned = leaned(incidentOffset, degrees);
-      // An Edge endpoint is allowed more room than a Thing, and only while the
-      // Thing turns. React Flow builds an endpoint from the node position plus
+      // An Edge endpoint is allowed more room than a Resource, and only while the
+      // Resource turns. React Flow builds an endpoint from the node position plus
       // a handle offset it measured once, and this canvas rotates the position
       // and cannot rotate that offset. So the endpoint lags its handle by
-      // `(I - R) * offset`, which is the offset's distance from the Thing's
-      // corner times the angle in radians — about 5px on a collapsed Thing at
-      // one degree. The lag is along the Thing's border rather than away from
+      // `(I - R) * offset`, which is the offset's distance from the Resource's
+      // corner times the angle in radians — about 5px on a collapsed Resource at
+      // one degree. The lag is along the Resource's border rather than away from
       // it, nothing stores it, and release returns the endpoint exactly.
       // `degrees` is zero for the released and settled samples, where this is
       // therefore still the same 3px as everything else.
@@ -155,9 +155,9 @@ export async function expectEmbeddedThingToFollowDrag(
       (previous.incident !== undefined && samePoint(current.incident, previous.incident)));
 
   // Left inset, below the floating rail. The rail is a full-width strip with
-  // `pointer-events: auto` on its actions when revealed, and Diagram + Graph
+  // `pointer-events: auto` on its actions when revealed, and Map + Graph
   // clusters make those actions wide enough to cover the horizontal centre
-  // (`canvas-thing.css`, `ThingRailActions`).
+  // (`canvas-resource.css`, `ResourceRailActions`).
   const lean = await publishedLean(child);
   const grab = { x: beforeParent.x + 8, y: beforeParent.y + 80 };
   await page.mouse.move(grab.x, grab.y);
@@ -166,26 +166,26 @@ export async function expectEmbeddedThingToFollowDrag(
     await page.mouse.move(grab.x + (150 * step) / 12, grab.y + (80 * step) / 12);
     await page.evaluate(() => new Promise(requestAnimationFrame));
     // The first frame of the gesture is exempt, and only that one. React Flow
-    // leans the Thing from its own store in the render that starts the drag,
+    // leans the Resource from its own store in the render that starts the drag,
     // while the canvas inside it is republished through an effect
-    // (`EmbeddedDiagramAuthoring` publishes, `SpaceCanvas` merges) and so lands
+    // (`EmbeddedMapAuthoring` publishes, `SpaceCanvas` merges) and so lands
     // one frame later. Every frame after it, the release and the settled state
     // are held to the rigid motion exactly.
     if (step > 1)
       expectAligned(
-        await geometry('The dragged Space Thing', 'The moving embedded Thing'),
+        await geometry('The dragged Space Resource', 'The moving embedded Resource'),
         offset,
         lean,
       );
   }
 
-  const during = await geometry('The dragged Space Thing', 'The moving embedded Thing');
+  const during = await geometry('The dragged Space Resource', 'The moving embedded Resource');
   expect(during.parent.x - beforeParent.x).toBeGreaterThan(100);
   expect(during.parent.y - beforeParent.y).toBeGreaterThan(50);
 
   await page.mouse.up();
   // Released, so the lean is gone and the resting offset is the one again.
-  const released = await geometry('The released Space Thing', 'The released embedded Thing');
+  const released = await geometry('The released Space Resource', 'The released embedded Resource');
   expectAligned(released, offset, 0);
 
   let previous = released;
@@ -193,7 +193,7 @@ export async function expectEmbeddedThingToFollowDrag(
   await expect
     .poll(async () => {
       await page.evaluate(() => new Promise(requestAnimationFrame));
-      settled = await geometry('The settled Space Thing', 'The retained embedded Thing');
+      settled = await geometry('The settled Space Resource', 'The retained embedded Resource');
       const stable = isStable(settled, previous);
       previous = settled;
       return stable;

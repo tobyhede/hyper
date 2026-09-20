@@ -46,7 +46,7 @@ describe('GraphHud', () => {
     const { container } = render(
       <GraphHud
         spaceTitle="Atlas"
-        diagramTitle="Overview"
+        mapTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           {
@@ -70,7 +70,7 @@ describe('GraphHud', () => {
     expect(minimap).not.toHaveAttribute('data-custom-node-color');
     expect(minimap).not.toHaveAttribute('data-custom-node-stroke');
     expect(screen.getByTestId('hud-space')).toHaveTextContent('Atlas');
-    expect(screen.getByTestId('hud-diagram')).toHaveTextContent('Overview');
+    expect(screen.getByTestId('hud-map')).toHaveTextContent('Overview');
     expect(
       within(screen.getByTestId('canvas-identity')).queryByRole('button'),
     ).not.toBeInTheDocument();
@@ -92,7 +92,7 @@ describe('GraphHud', () => {
     render(
       <GraphHud
         spaceTitle="Atlas"
-        diagramTitle="Overview"
+        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -111,7 +111,7 @@ describe('GraphHud', () => {
    * Flow's `style.css` sets only `position`, `z-index` and `margin`), so a
    * Panel swallows every gesture over its box. This one holds no control —
    * the identity is read-only and the key is a list — and it sits in the
-   * corner a Thing's resize control lives in, which is the harm
+   * corner a Resource's resize control lives in, which is the harm
    * `command-dock.css`'s bottom-edge offset already names. The two truncated
    * names are the exception and take the pointer back, because their `title`
    * is the only place a clipped name can be read.
@@ -120,7 +120,7 @@ describe('GraphHud', () => {
     render(
       <GraphHud
         spaceTitle="A Space with a very long name indeed"
-        diagramTitle="A Diagram with a very long name indeed"
+        mapTitle="A Map with a very long name indeed"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -128,7 +128,7 @@ describe('GraphHud', () => {
     );
 
     expect(screen.getByTestId('panel')).toHaveStyle({ pointerEvents: 'none' });
-    for (const name of [screen.getByTestId('hud-space'), screen.getByTestId('hud-diagram')]) {
+    for (const name of [screen.getByTestId('hud-space'), screen.getByTestId('hud-map')]) {
       expect(name).toHaveClass('pointer-events-auto');
     }
   });
@@ -139,14 +139,14 @@ describe('GraphHud', () => {
    * `truncate` ellipsises inside a 200px panel and the Command Dock's header
    * clips the same two names, so without the `title` there is nowhere left on
    * the surface to read a long one. The visible glyphs are decoration, so the
-   * words that say Space and Diagram have to be supplied for the reader that
+   * words that say Space and Map have to be supplied for the reader that
    * cannot see them.
    */
   it('names each identity row and keeps a clipped title readable', () => {
     render(
       <GraphHud
         spaceTitle="Atlas"
-        diagramTitle="Overview"
+        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -154,16 +154,16 @@ describe('GraphHud', () => {
     );
 
     expect(screen.getByTestId('hud-space')).toHaveAttribute('title', 'Atlas');
-    expect(screen.getByTestId('hud-diagram')).toHaveAttribute('title', 'Overview');
+    expect(screen.getByTestId('hud-map')).toHaveAttribute('title', 'Overview');
     const identity = screen.getByTestId('canvas-identity');
     expect(within(identity).getByText('Space')).toHaveClass('sr-only');
-    expect(within(identity).getByText('Diagram')).toHaveClass('sr-only');
+    expect(within(identity).getByText('Map')).toHaveClass('sr-only');
   });
 
   /**
    * Both identity glyphs are drawn at one size, in one box.
    *
-   * `DiagramIcon` had no size and drew at 16 inside the same 14px box the
+   * `MapIcon` had no size and drew at 16 inside the same 14px box the
    * 13px Space cube sits in, so the two rows had different glyph heights and
    * different optical centres. Lucide sets no `preserveAspectRatio`, so SVG's
    * default letterboxed the glyph rather than distorting it — which is why this
@@ -173,7 +173,7 @@ describe('GraphHud', () => {
     const { container } = render(
       <GraphHud
         spaceTitle="Atlas"
-        diagramTitle="Overview"
+        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -181,11 +181,11 @@ describe('GraphHud', () => {
     );
 
     const space = container.querySelector('[data-icon="space"]');
-    const diagram = container.querySelector('.lucide-layout-grid');
+    const map = container.querySelector('.lucide-layout-grid');
     expect(space).toHaveAttribute('width', '13');
     expect(space).toHaveAttribute('height', '13');
-    expect(diagram).toHaveAttribute('width', '13');
-    expect(diagram).toHaveAttribute('height', '13');
+    expect(map).toHaveAttribute('width', '13');
+    expect(map).toHaveAttribute('height', '13');
   });
 
   /**
@@ -204,7 +204,7 @@ describe('GraphHud', () => {
     render(
       <GraphHud
         spaceTitle="Atlas"
-        diagramTitle="Overview"
+        mapTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           { id: otherGraphId, title: 'Alternate', color: '#f4a259', edges: [] },
@@ -240,7 +240,7 @@ describe('GraphHud', () => {
     render(
       <GraphHud
         spaceTitle="Atlas"
-        diagramTitle="Overview"
+        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}

@@ -5,19 +5,19 @@
  * when something outside the package calls into it, and then every type that
  * module exports comes with it — those types are the vocabulary of the calls
  * being made, nameable the moment a consumer wants a variable for one, which is
- * why `GridStrategyOptions` and `ThingFileErrorKind` are
+ * why `GridStrategyOptions` and `ResourceFileErrorKind` are
  * here with nothing importing them. Functions are named one at a time, and a
  * helper no consumer needs to write stays in its module. Usually it sits behind
- * an offered form that calls it — `graphThingIds` calls `thingIdsForGraphs`,
- * `graphStartThing` calls `graphEntryThings`.
+ * an offered form that calls it — `graphResourceIds` calls `resourceIdsForGraphs`,
+ * `graphStartResource` calls `graphEntryResources`.
  *
  * Two modules are absent whole for that reason and not by oversight.
- * `frontmatter` is how `thing-file` reads a fence, and `parseThingFile` is the
+ * `frontmatter` is how `resource-file` reads a fence, and `parseResourceFile` is the
  * intake it exists to serve. `validate` runs inside `loadSpace`, which ADR 0010
  * makes the one intake — a caller never checks references itself, so it never
  * names the check, its input or its errors. `SpaceReferenceError` is the edge
  * worth knowing, and not because a union nobody narrows hides it: `loadSpace`
- * returns `SpaceError`, `SpaceError` names it, and `ThingFileError` sits in that
+ * returns `SpaceError`, `SpaceError` names it, and `ResourceFileError` sits in that
  * same union and is offered. Reachability separates nothing; the module each
  * belongs to does. Narrowing `SpaceError` by `kind` still reaches the
  * branch — what a consumer cannot do is write the type's name.
@@ -26,14 +26,14 @@
  * produces to the same set of names.
  */
 
-export { parseThingFile, parseImportThingFile, serializeThingFile } from './thing-file';
+export { parseResourceFile, parseImportResourceFile, serializeResourceFile } from './resource-file';
 export type {
-  ThingFile,
-  ThingFileError,
-  ThingFileErrorKind,
-  ParseThingFileResult,
-  ParseImportThingFileResult,
-} from './thing-file';
+  ResourceFile,
+  ResourceFileError,
+  ResourceFileErrorKind,
+  ParseResourceFileResult,
+  ParseImportResourceFileResult,
+} from './resource-file';
 
 // The rule for "the same Edge twice in one Graph" (ADR 0032).
 export { repeatedGraphEdges } from './graph-edges';
@@ -43,23 +43,23 @@ export type { GridStrategyOptions } from './grid';
 
 export { buildLayoutStrategyGraph } from './layout';
 export type {
-  LayoutStrategyThing,
+  LayoutStrategyResource,
   LayoutStrategyEdge,
   LayoutStrategyGraph,
   LayoutStrategy,
 } from './layout';
 
-// `resolveContentThing` is the only function here: identity lookup is reached
+// `resolveContentResource` is the only function here: identity lookup is reached
 // through `space.lookup`, which the Space carries, so the shallow `get*` pairs
 // that used to sit beside it have no callers left to name.
-export { resolveContentThing } from './lookup';
-export type { OwnedGraph, ResolvedContentThing, ResolvedDiagram, SpaceLookup } from './lookup';
+export { resolveContentResource } from './lookup';
+export type { OwnedGraph, ResolvedContentResource, ResolvedMap, SpaceLookup } from './lookup';
 
 export { initializeSpace, newSpace } from './new-space';
 export type { InitializeSpaceOptions, NewSpace } from './new-space';
 
 // One name carrying both the branded map type and the module that builds it.
-// Unpacking it would put `fromDiagram`, `equals` and `next` in this surface.
+// Unpacking it would put `fromMap`, `equals` and `next` in this surface.
 export { Placement } from './placement';
 
 export { positionedStrategy } from './positioned';
@@ -75,11 +75,11 @@ export type { SnapshotEditOutcome, SnapshotEditRefusal } from './snapshot-edits'
 // the defect. A test outside this package that stands a projected Edge up by
 // hand was spelling the format out, which is exactly that.
 //
-// The per-Graph handle family that stood beside it — `buildThingHandles`,
+// The per-Graph handle family that stood beside it — `buildResourceHandles`,
 // `filterHandlesByGraphs`, `inHandleId`, `outHandleId` and the two types they
 // were written in — left with ADR 0087. An Edge names no handle now, and the
 // anchor it attaches to is chosen while it is drawn.
-export { buildGraphRenderEdges, graphThingIds, graphRenderEdgeId } from './graph-rendering';
+export { buildGraphRenderEdges, graphResourceIds, graphRenderEdgeId } from './graph-rendering';
 export type { GraphRenderEdge } from './graph-rendering';
 
 // `documentRefusal` is offered although `loadSpace` asks it on every caller's
@@ -100,4 +100,4 @@ export type {
   SpaceAggregateLookup,
 } from './space-aggregate';
 
-export { outgoingEdges, graphStartThing } from './traversal';
+export { outgoingEdges, graphStartResource } from './traversal';

@@ -1,4 +1,4 @@
-import type { ThingId, GraphEdge, GraphId } from '@project/core';
+import type { ResourceId, GraphEdge, GraphId } from '@project/core';
 import type { Space } from './space';
 
 /**
@@ -10,13 +10,13 @@ import type { Space } from './space';
  * **overview** — the view that draws every Graph at once (ADR 0021) — not to
  * the domain.
  *
- * It named the two ports each Edge attached to until ADR 0087. A Thing carried
+ * It named the two ports each Edge attached to until ADR 0087. A Resource carried
  * an invisible `<graphId>::in` on its left and `<graphId>::out` on its right,
  * one pair per Graph, because elkjs needed ports to route through; ADR 0045
  * justified the *ids* separately, on React Flow's rule that same-kind handles be
  * distinguishable. Four anchors named for their sides satisfy that just as well,
  * and an Edge now attaches to whichever of them faces its neighbour — chosen
- * while it is drawn, from where the two Things are at that moment, which is not
+ * while it is drawn, from where the two Resources are at that moment, which is not
  * something this derivation could answer.
  */
 
@@ -25,15 +25,15 @@ import type { Space } from './space';
  * (`@project/core`'s `GraphEdge`), tagged with the Graph it belongs to so the
  * render layer can colour it. `buildLayoutStrategyGraph` narrows this to a
  * `LayoutStrategyEdge`, which is the same Edge without the Graph it is tagged
- * with — a strategy arranges the Things and answers no geometry for an Edge at
+ * with — a strategy arranges the Resources and answers no geometry for an Edge at
  * all (ADR 0086), and where an Edge attaches is decided while it is drawn
  * (ADR 0087).
  */
 export interface GraphRenderEdge {
   id: string;
   graphId: GraphId;
-  source: ThingId;
-  target: ThingId;
+  source: ResourceId;
+  target: ResourceId;
 }
 
 /**
@@ -50,23 +50,23 @@ export const graphRenderEdgeId = (graphId: GraphId, edge: GraphEdge): string =>
   `${graphId}::${edge.from}::${edge.to}`;
 
 /**
- * The distinct things the given graphs touch — graphs in the order supplied,
+ * The distinct resources the given graphs touch — graphs in the order supplied,
  * edges in authored order within each, and each edge's `from` before its `to`.
  *
- * A membership query, not a traversal: it answers *which* Things, and the order is
+ * A membership query, not a traversal: it answers *which* Resources, and the order is
  * only a stable one to list them in. A graph is a graph, so there is no single
  * order to visit them in and this does not claim one.
  *
- * A thing shared by several graphs appears once. Which graphs a view shows is the
- * view's decision (ADR 0005); this only answers what things that implies.
+ * A resource shared by several graphs appears once. Which graphs a view shows is the
+ * view's decision (ADR 0005); this only answers what resources that implies.
  */
-export function thingIdsForGraphs(space: Space, graphIds: readonly GraphId[]): ThingId[] {
-  const seen = new Set<ThingId>();
-  const ids: ThingId[] = [];
-  const add = (thingId: ThingId): void => {
-    if (seen.has(thingId)) return;
-    seen.add(thingId);
-    ids.push(thingId);
+export function resourceIdsForGraphs(space: Space, graphIds: readonly GraphId[]): ResourceId[] {
+  const seen = new Set<ResourceId>();
+  const ids: ResourceId[] = [];
+  const add = (resourceId: ResourceId): void => {
+    if (seen.has(resourceId)) return;
+    seen.add(resourceId);
+    ids.push(resourceId);
   };
 
   for (const graphId of graphIds) {
@@ -81,9 +81,9 @@ export function thingIdsForGraphs(space: Space, graphIds: readonly GraphId[]): T
   return ids;
 }
 
-/** The distinct things a single graph touches. See {@link thingIdsForGraphs}. */
-export function graphThingIds(space: Space, graphId: GraphId): ThingId[] {
-  return thingIdsForGraphs(space, [graphId]);
+/** The distinct resources a single graph touches. See {@link resourceIdsForGraphs}. */
+export function graphResourceIds(space: Space, graphId: GraphId): ResourceId[] {
+  return resourceIdsForGraphs(space, [graphId]);
 }
 
 /**

@@ -7,7 +7,7 @@ import {
 } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { canvasProjection } from '../src/canvas-projection';
-import { resolveDiagram } from '../src/diagram-resolution';
+import { resolveMap } from '../src/map-resolution';
 import { mintingIds } from './minting';
 
 /**
@@ -15,8 +15,8 @@ import { mintingIds } from './minting';
  *
  * Every other replacement of a Space's working snapshot re-opens that Space's
  * Navigation with it — `acceptStoredSpace` does, and every Edit that changes a
- * Diagram's Graph set answers the next Active Graph before it installs. The
- * coordinated Space Thing lifecycle is the one that did not: its recovery
+ * Map's Graph set answers the next Active Graph before it installs. The
+ * coordinated Space Resource lifecycle is the one that did not: its recovery
  * restores *every participant's* snapshot (`session-registry.ts`), and only the
  * Space the author answered the conflict on had a `SpaceAuthoring` to re-open.
  *
@@ -28,7 +28,7 @@ import { mintingIds } from './minting';
  * the projection and falls back to the first visible Graph, so it named and
  * commanded one Graph while `SpaceCanvas` and Navigation named another: Present
  * was enabled and did nothing, the two Copy links answered different URLs, and
- * the next Edit rode the stale id into the Diagram's `activeGraph` for intake
+ * the next Edit rode the stale id into the Map's `activeGraph` for intake
  * to reject.
  */
 
@@ -49,48 +49,48 @@ const mintsNothing =
   };
 
 const META_ID = id('00000000-0000-4000-8000-000000000001');
-const META_THING_ID = id('00000000-0000-4000-8000-000000000002');
-const META_DIAGRAM_ID = id('00000000-0000-4000-8000-000000000003');
+const META_RESOURCE_ID = id('00000000-0000-4000-8000-000000000002');
+const META_MAP_ID = id('00000000-0000-4000-8000-000000000003');
 const META_GRAPH_ID = id('00000000-0000-4000-8000-000000000004');
 const TARGET_ID = id('00000000-0000-4000-8000-000000000010');
-const TARGET_THING_ID = id('00000000-0000-4000-8000-000000000011');
-const TARGET_DIAGRAM_ID = id('00000000-0000-4000-8000-000000000012');
+const TARGET_RESOURCE_ID = id('00000000-0000-4000-8000-000000000011');
+const TARGET_MAP_ID = id('00000000-0000-4000-8000-000000000012');
 const TARGET_GRAPH_ID = id('00000000-0000-4000-8000-000000000013');
-const SPACE_THING_ID = id('00000000-0000-4000-8000-000000000014');
-const TARGET_THING_TWO = id('00000000-0000-4000-8000-000000000015');
+const SPACE_RESOURCE_ID = id('00000000-0000-4000-8000-000000000014');
+const TARGET_RESOURCE_TWO = id('00000000-0000-4000-8000-000000000015');
 const ADDED_GRAPH_ID = id('00000000-0000-4000-8000-0000000000f1');
-const CREATED_DIAGRAM_ID = id('00000000-0000-4000-8000-0000000000f2');
-const CREATED_DIAGRAM_GRAPH_ID = id('00000000-0000-4000-8000-0000000000f3');
+const CREATED_MAP_ID = id('00000000-0000-4000-8000-0000000000f2');
+const CREATED_MAP_GRAPH_ID = id('00000000-0000-4000-8000-0000000000f3');
 
 const targetSnapshot: SpaceSnapshot = {
   id: TARGET_ID,
   document: {
     version: 1,
     title: 'Architecture',
-    defaultDiagram: TARGET_DIAGRAM_ID,
-    diagrams: [
+    defaultMap: TARGET_MAP_ID,
+    maps: [
       {
-        id: TARGET_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: TARGET_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [TARGET_THING_ID]: { x: 0, y: 0, open: false },
-          [TARGET_THING_TWO]: { x: 300, y: 0, open: false },
+          [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [TARGET_RESOURCE_TWO]: { x: 300, y: 0, open: false },
         },
         graphs: [
           {
             id: TARGET_GRAPH_ID,
             title: 'Graph 1',
-            edges: [{ from: TARGET_THING_ID, to: TARGET_THING_TWO }],
+            edges: [{ from: TARGET_RESOURCE_ID, to: TARGET_RESOURCE_TWO }],
           },
         ],
         activeGraph: TARGET_GRAPH_ID,
       },
     ],
   },
-  things: [
-    { id: TARGET_THING_ID, document: { title: 'Architecture', kind: 'markdown', body: '' } },
-    { id: TARGET_THING_TWO, document: { title: 'Second', kind: 'markdown', body: '' } },
+  resources: [
+    { id: TARGET_RESOURCE_ID, document: { title: 'Architecture', kind: 'markdown', body: '' } },
+    { id: TARGET_RESOURCE_TWO, document: { title: 'Second', kind: 'markdown', body: '' } },
   ],
 };
 
@@ -99,30 +99,30 @@ const metaSnapshot: SpaceSnapshot = {
   document: {
     version: 1,
     title: 'Meta',
-    defaultDiagram: META_DIAGRAM_ID,
-    diagrams: [
+    defaultMap: META_MAP_ID,
+    maps: [
       {
-        id: META_DIAGRAM_ID,
-        title: 'Diagram 1',
+        id: META_MAP_ID,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_THING_ID]: { x: 0, y: 0, open: false },
-          [SPACE_THING_ID]: { x: 240, y: 80, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,
       },
     ],
   },
-  things: [
-    { id: META_THING_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+  resources: [
+    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
     {
-      id: SPACE_THING_ID,
+      id: SPACE_RESOURCE_ID,
       document: {
         title: 'Target',
         kind: 'space',
         spaceId: TARGET_ID,
-        diagram: TARGET_DIAGRAM_ID,
+        map: TARGET_MAP_ID,
         graph: TARGET_GRAPH_ID,
       },
     },
@@ -171,8 +171,8 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
     ],
   });
   await registry
-    .spaceThings(mintsNothing('The coordinated deletion minted an identity.'))
-    .delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID });
+    .spaceResources(mintsNothing('The coordinated deletion minted an identity.'))
+    .delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID });
   await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
 
   // The author answers on the containing Space, through the operation
@@ -186,14 +186,14 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
 };
 
 /**
- * The same recovery, taking the *selected Diagram* rather than its Active Graph.
+ * The same recovery, taking the *selected Map* rather than its Active Graph.
  *
  * Worse than the Graph half rather than milder: the restored Space still loads,
- * so nothing refuses it — `resolveDiagram` throws `DiagramNotFoundError` for a
+ * so nothing refuses it — `resolveMap` throws `MapNotFoundError` for a
  * Space with nothing wrong with it, and the canvas is replaced by the failure
  * surface.
  */
-const openRolledBackOverCreatedDiagram = async (): Promise<ReturnType<typeof composeApp>> => {
+const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof composeApp>> => {
   const control = new MemorySpaceBackendTestControl();
   const backend = new MemorySpaceBackend(
     META_ID,
@@ -213,10 +213,10 @@ const openRolledBackOverCreatedDiagram = async (): Promise<ReturnType<typeof com
 
   const target = composeApp({
     spaceSession: targetSession,
-    newId: mintingIds(CREATED_DIAGRAM_ID, CREATED_DIAGRAM_GRAPH_ID),
+    newId: mintingIds(CREATED_MAP_ID, CREATED_MAP_GRAPH_ID),
   });
-  expect(target.authoring.complete({ kind: 'created-diagram' }).kind).toBe('completed');
-  expect(target.navigation.getState().selectedDiagramId).toBe(CREATED_DIAGRAM_ID);
+  expect(target.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+  expect(target.navigation.getState().selectedMapId).toBe(CREATED_MAP_ID);
   await vi.waitFor(() => expect(targetSession.getState().persistence.kind).toBe('settled'));
 
   control.queueResult({
@@ -229,8 +229,8 @@ const openRolledBackOverCreatedDiagram = async (): Promise<ReturnType<typeof com
     ],
   });
   await registry
-    .spaceThings(mintsNothing('The coordinated deletion minted an identity.'))
-    .delete({ containingSpaceId: META_ID, thingId: SPACE_THING_ID });
+    .spaceResources(mintsNothing('The coordinated deletion minted an identity.'))
+    .delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID });
   await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
   const metaApp = composeApp({
     spaceSession: meta,
@@ -240,58 +240,58 @@ const openRolledBackOverCreatedDiagram = async (): Promise<ReturnType<typeof com
   return target;
 };
 
-describe('the selected Diagram after a coordinated recovery restores a participant', () => {
-  it('names a Diagram the restored Space holds', async () => {
-    const target = await openRolledBackOverCreatedDiagram();
+describe('the selected Map after a coordinated recovery restores a participant', () => {
+  it('names a Map the restored Space holds', async () => {
+    const target = await openRolledBackOverCreatedMap();
 
     const space = target.currentSpace();
-    const { selectedDiagramId } = target.navigation.getState();
+    const { selectedMapId } = target.navigation.getState();
 
-    expect(space.diagrams.map((diagram) => diagram.id)).toContain(selectedDiagramId);
-    expect(selectedDiagramId).toBe(TARGET_DIAGRAM_ID);
+    expect(space.maps.map((map) => map.id)).toContain(selectedMapId);
+    expect(selectedMapId).toBe(TARGET_MAP_ID);
   });
 
   it('leaves the canvas resolvable rather than the failure surface', async () => {
-    const target = await openRolledBackOverCreatedDiagram();
+    const target = await openRolledBackOverCreatedMap();
 
     const space = target.currentSpace();
-    const { selectedDiagramId, activeGraphId } = target.navigation.getState();
+    const { selectedMapId, activeGraphId } = target.navigation.getState();
 
     // What `App` does every render, and what threw for a Space that loads.
-    expect(() => resolveDiagram(space, selectedDiagramId)).not.toThrow();
+    expect(() => resolveMap(space, selectedMapId)).not.toThrow();
     expect(
-      canvasProjection(space, resolveDiagram(space, selectedDiagramId)).visibleGraphs.map(
+      canvasProjection(space, resolveMap(space, selectedMapId)).visibleGraphs.map(
         (graph) => graph.id,
       ),
     ).toContain(activeGraphId);
   });
 
-  it('derives the placement from the Diagram the repair selected', async () => {
-    const target = await openRolledBackOverCreatedDiagram();
+  it('derives the placement from the Map the repair selected', async () => {
+    const target = await openRolledBackOverCreatedMap();
 
-    // Authoring holds no placement of its own to reconcile: `diagramPlacement`
-    // reads `Placement.fromDiagram` of whatever Navigation currently selects,
-    // so it names the restored target Diagram's own Things once the repair has
+    // Authoring holds no placement of its own to reconcile: `mapPlacement`
+    // reads `Placement.fromMap` of whatever Navigation currently selects,
+    // so it names the restored target Map's own Resources once the repair has
     // moved Navigation off the dangling, rolled-back one.
-    const placement = target.authoring.diagramPlacement();
+    const placement = target.authoring.mapPlacement();
 
     expect([...placement.keys()].toSorted()).toEqual(
-      [TARGET_THING_ID, TARGET_THING_TWO].toSorted(),
+      [TARGET_RESOURCE_ID, TARGET_RESOURCE_TWO].toSorted(),
     );
   });
 });
 
 describe('the Active Graph after a coordinated recovery restores a participant', () => {
-  it('names a Graph the restored Diagram owns', async () => {
+  it('names a Graph the restored Map owns', async () => {
     const target = await openRolledBackTarget();
 
     const space = target.currentSpace();
-    const { activeGraphId, selectedDiagramId } = target.navigation.getState();
-    const visible = canvasProjection(space, resolveDiagram(space, selectedDiagramId)).visibleGraphs;
+    const { activeGraphId, selectedMapId } = target.navigation.getState();
+    const visible = canvasProjection(space, resolveMap(space, selectedMapId)).visibleGraphs;
 
     expect(visible.map((graph) => graph.id)).toContain(activeGraphId);
     // Re-resolved rather than merely valid: the Graph the restore removed is
-    // gone, so the Diagram's own Active Graph is the only answer left.
+    // gone, so the Map's own Active Graph is the only answer left.
     expect(activeGraphId).toBe(TARGET_GRAPH_ID);
   });
 
@@ -299,8 +299,8 @@ describe('the Active Graph after a coordinated recovery restores a participant',
     const target = await openRolledBackTarget();
 
     const space = target.currentSpace();
-    const { activeGraphId, selectedDiagramId } = target.navigation.getState();
-    const projection = canvasProjection(space, resolveDiagram(space, selectedDiagramId));
+    const { activeGraphId, selectedMapId } = target.navigation.getState();
+    const projection = canvasProjection(space, resolveMap(space, selectedMapId));
 
     // `App` hands `SpaceCanvas` the raw id and the Dock the Graph it finds, so
     // the two agree exactly when the find succeeds.

@@ -1,11 +1,11 @@
 import type { Graph } from '@project/core';
-import { DiagramIcon, GraphIcon, Separator, SpaceIcon, graphColor } from '@project/ui';
+import { MapIcon, GraphIcon, Separator, SpaceIcon, graphColor } from '@project/ui';
 import { MiniMap, Panel } from '@xyflow/react';
 
 export interface GraphHudProps {
-  /** The Space and Diagram this HUD's Graph key describes. */
+  /** The Space and Map this HUD's Graph key describes. */
   spaceTitle: string;
-  diagramTitle: string;
+  mapTitle: string;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: string | null;
@@ -42,7 +42,7 @@ const PANEL_INSET = 15;
  *
  * **The key panel takes no pointer and the map takes every one it is given.**
  * A `.react-flow__panel` carries no `pointer-events` rule of React Flow's own,
- * so both of these sit in the corner a Thing's resize control lives in and
+ * so both of these sit in the corner a Resource's resize control lives in and
  * would swallow the gestures aimed at it — the harm `command-dock.css`'s
  * bottom-edge offset already names. The key holds no control, so it hands them
  * straight back to the canvas; the two clipped names take theirs again, because
@@ -54,7 +54,7 @@ const PANEL_INSET = 15;
  */
 export function GraphHud({
   spaceTitle,
-  diagramTitle,
+  mapTitle,
   graphs,
   colorByGraphId,
   activeGraphId,
@@ -92,15 +92,11 @@ export function GraphHud({
             </p>
             <p className="m-0 flex items-center gap-[8px] text-chrome-xs text-foreground">
               <span className="flex w-[14px] shrink-0 justify-center" aria-hidden="true">
-                <DiagramIcon size={13} />
+                <MapIcon size={13} />
               </span>
-              <span className="sr-only">Diagram</span>
-              <span
-                className="pointer-events-auto truncate"
-                data-testid="hud-diagram"
-                title={diagramTitle}
-              >
-                {diagramTitle}
+              <span className="sr-only">Map</span>
+              <span className="pointer-events-auto truncate" data-testid="hud-map" title={mapTitle}>
+                {mapTitle}
               </span>
             </p>
           </div>

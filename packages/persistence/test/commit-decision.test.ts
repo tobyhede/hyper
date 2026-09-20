@@ -8,7 +8,7 @@ const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  things: [],
+  resources: [],
 };
 
 /*
@@ -62,20 +62,20 @@ describe('commitRequestRefusal', () => {
 const bareSpace = (id: UUID, title: string): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
-  things: [],
+  resources: [],
 });
 
-/** A Space complete enough for a Space Thing to select: one Diagram owning one Graph. */
-const targetSpace = (id: UUID, title: string, diagramId: UUID, graphId: UUID): SpaceSnapshot => ({
+/** A Space complete enough for a Space Resource to select: one Map owning one Graph. */
+const targetSpace = (id: UUID, title: string, mapId: UUID, graphId: UUID): SpaceSnapshot => ({
   id,
   document: {
     version: 1,
     title,
-    defaultDiagram: diagramId,
-    diagrams: [
+    defaultMap: mapId,
+    maps: [
       {
-        id: diagramId,
-        title: 'Diagram 1',
+        id: mapId,
+        title: 'Map 1',
         kind: 'positioned',
         positions: {},
         graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
@@ -83,28 +83,28 @@ const targetSpace = (id: UUID, title: string, diagramId: UUID, graphId: UUID): S
       },
     ],
   },
-  things: [],
+  resources: [],
 });
 
-/** A Meta Space with one Space Thing selecting `targetId`'s Diagram and Graph. */
+/** A Meta Space with one Space Resource selecting `targetId`'s Map and Graph. */
 const linkedMeta = (
   metaId: UUID,
   title: string,
-  thingId: UUID,
+  resourceId: UUID,
   targetId: UUID,
-  diagramId: UUID,
+  mapId: UUID,
   graphId: UUID,
 ): SpaceSnapshot => ({
   id: metaId,
   document: { version: 1, title },
-  things: [
+  resources: [
     {
-      id: thingId,
+      id: resourceId,
       document: {
         title: 'Target',
         kind: 'space',
         spaceId: targetId,
-        diagram: diagramId,
+        map: mapId,
         graph: graphId,
       },
     },
@@ -185,21 +185,21 @@ describe('decideCommit', () => {
     const META_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
     const CREATED_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d3');
     const EXISTING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d5');
-    const DIAGRAM_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d0');
+    const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d0');
     const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d2');
-    const SPACE_THING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d4');
+    const SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d4');
 
     const staleMeta = bareSpace(META_ID, 'Meta');
     const updatedMeta = linkedMeta(
       META_ID,
       'Meta',
-      SPACE_THING_ID,
+      SPACE_RESOURCE_ID,
       CREATED_ID,
-      DIAGRAM_ID,
+      MAP_ID,
       GRAPH_ID,
     );
     const existing = bareSpace(EXISTING_ID, 'Existing');
-    const created = targetSpace(CREATED_ID, 'Created', DIAGRAM_ID, GRAPH_ID);
+    const created = targetSpace(CREATED_ID, 'Created', MAP_ID, GRAPH_ID);
 
     // Deliberately not ascending by id: EXISTING_ID (…d5) is read before
     // META_ID (…d1), and the created Space's id (…d3) sorts between the two.
@@ -239,7 +239,7 @@ describe('decideCommit', () => {
     const corrupt: SpaceSnapshot = {
       id: ORDER_CORRUPT_ID,
       document: { version: 1, title: '' },
-      things: [],
+      resources: [],
     };
     const metaEntry: LoadedSpace = { snapshot: meta, revision: 1n, exportedRevision: null };
     const otherEntry: LoadedSpace = { snapshot: other, revision: 1n, exportedRevision: null };

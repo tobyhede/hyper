@@ -27,7 +27,7 @@ const read = (path: string): string => readFileSync(join(repositoryRoot, path), 
 /**
  * The baseline is read at a boundary rather than asserted into shape. The `as`
  * idiom other tests use for repository-owned JSON is precisely what this rule
- * now bans, so this file cannot use it without suppressing the thing it guards.
+ * now bans, so this file cannot use it without suppressing the rule it guards.
  */
 const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

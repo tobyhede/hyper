@@ -52,7 +52,7 @@ export function ChromeContinuation({
    * The subtree this Space's chrome is drawn in.
    *
    * **Scoped rather than `document`-wide**, because every open Space stays
-   * mounted — hidden with `hidden`, not unmounted, so a Space keeps its Diagram
+   * mounted — hidden with `hidden`, not unmounted, so a Space keeps its Map
    * selection and its traversal (`OpenSpacesApplication.tsx`). A whole-document
    * query takes the first match in document order, which is whichever Space was
    * opened first, and `focus()` on an element inside a `hidden` subtree does
@@ -104,7 +104,7 @@ export function ChromeContinuation({
       }
       /*
        * **A rename is begun by pressing this address, not the visible name.**
-       * The name discloses the list. New Diagram continues on a dedicated
+       * The name discloses the list. New Map continues on a dedicated
        * sibling the reader never sees, and that press starts the in-place editor
        * the way choosing Rename does. The editor focuses itself on mount, so a
        * `focus()` here would leave the caret on the button.
@@ -122,7 +122,7 @@ export function ChromeContinuation({
     if (target.scope === undefined || continuation.getState().pending !== pending) return;
     // React Flow can publish a new rail subject without re-rendering this
     // adapter. The scoped readiness case in chrome-continuation.test.tsx
-    // holds that this waits for the created Diagram, rather than its predecessor.
+    // holds that this waits for the created Map, rather than its predecessor.
     const observer = new MutationObserver(attempt);
     observer.observe(root, {
       childList: true,

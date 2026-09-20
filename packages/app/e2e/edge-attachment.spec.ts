@@ -1,4 +1,4 @@
-import { COLLAPSED_THING_SIZE } from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import { expect, test, type Page } from './fixtures';
 import {
   authoringHandle,
@@ -11,10 +11,10 @@ import {
 } from './graph';
 
 /**
- * Where an Edge meets a Thing (ADR 0087).
+ * Where an Edge meets a Resource (ADR 0087).
  *
- * An Edge attaches to the anchor on the side that faces the other Thing, chosen
- * while it is drawn from where the two Things are at that moment. Nothing about
+ * An Edge attaches to the anchor on the side that faces the other Resource, chosen
+ * while it is drawn from where the two Resources are at that moment. Nothing about
  * it is stored, and nothing decides it before the frame it is drawn in — which
  * is why these are browser tests: the rule itself is a pure function of two
  * rects and is covered in the node environment, and what only a browser can show
@@ -33,9 +33,9 @@ interface Point {
   readonly y: number;
 }
 
-/** Where an Edge meets one side of a Thing at the given flow position. */
+/** Where an Edge meets one side of a Resource at the given flow position. */
 function anchorAt(at: Point, side: Side): Point {
-  const { width, height } = COLLAPSED_THING_SIZE;
+  const { width, height } = COLLAPSED_RESOURCE_SIZE;
   switch (side) {
     case 'top':
       return { x: at.x + width / 2, y: at.y - RADIUS };
@@ -81,12 +81,12 @@ const near = (actual: Point, expected: Point, what: string): void => {
  *  the fixture's Active Graph, so its Edge takes the centre lane and connects
  *  anchor to anchor (ADR 0100). */
 const LONG = '00000000-0000-4000-8000-000000000023';
-const THING_A = '00000000-0000-4000-8000-000000000002';
-const THING_B = '00000000-0000-4000-8000-000000000003';
-const A_TO_B = `${LONG}::${THING_A}::${THING_B}`;
-const A_TO_A = `${LONG}::${THING_A}::${THING_A}`;
+const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
+const RESOURCE_B = '00000000-0000-4000-8000-000000000003';
+const A_TO_B = `${LONG}::${RESOURCE_A}::${RESOURCE_B}`;
+const A_TO_A = `${LONG}::${RESOURCE_A}::${RESOURCE_A}`;
 
-test('an Edge leaves and enters on the sides the two Things face', async ({ page }) => {
+test('an Edge leaves and enters on the sides the two Resources face', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const a = nodeByTitle(page, 'A').first();
@@ -104,7 +104,7 @@ test('an Edge leaves and enters on the sides the two Things face', async ({ page
   }
 
   // Put A below B. Nothing about the Edge is authored, so what changes is only
-  // where the two Things are — and the Edge now leaves A's top and enters B's
+  // where the two Resources are — and the Edge now leaves A's top and enters B's
   // bottom.
   await dragBy(page, a, 420, 488);
   await settled(page);
@@ -149,10 +149,10 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   await settled(page);
   const before = await page.locator('.react-flow__edge').count();
 
-  // A Graph may hold an Edge from a Thing to itself (ADR 0032). The facing rule
+  // A Graph may hold an Edge from a Resource to itself (ADR 0032). The facing rule
   // would answer this pair rather than fail on it — one rect against itself
   // settles on Bottom leaving and Top entering — and those two sides face away
-  // from each other with the Thing between them, so the curve would be drawn
+  // from each other with the Resource between them, so the curve would be drawn
   // through it. That is why the self-Edge is taken first.
   await a.hover();
   await connectHandles(
@@ -164,7 +164,7 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   await settled(page);
 
   // Two adjacent sides, so the curve goes round the corner rather than doubling
-  // back through the Thing it belongs to.
+  // back through the Resource it belongs to.
   const at = await positionOf(a);
   const ends = await endsOf(page, A_TO_A);
   near(ends.from, anchorAt(at, 'right'), 'the self-Edge leaving A');
@@ -177,7 +177,7 @@ test('a self-Edge draws a visible loop', async ({ page }) => {
   expect(paths.every((d) => d.length > 0 && !d.includes('NaN'))).toBe(true);
 });
 
-test('several Graphs over one pair of Things run as parallel lines below the active one', async ({
+test('several Graphs over one pair of Resources run as parallel lines below the active one', async ({
   page,
 }) => {
   await page.goto('/');
@@ -188,10 +188,10 @@ test('several Graphs over one pair of Things run as parallel lines below the act
   // Long, Mid and Short all carry A → B, and A and B sit level. Long is active,
   // so it connects on the centre line (asserted against the anchors above) and
   // carries the arrowhead; Mid and Short run below it (ADR 0100) — each a level
-  // line of its own, in its own colour, stopping short of both Things with no
+  // line of its own, in its own colour, stopping short of both Resources with no
   // marker.
   const lines = await page
-    .locator(`.react-flow__edge[data-id$="::${THING_A}::${THING_B}"]`)
+    .locator(`.react-flow__edge[data-id$="::${RESOURCE_A}::${RESOURCE_B}"]`)
     .evaluateAll((elements) =>
       elements.map((element) => {
         const path = element.querySelector('.react-flow__edge-path');

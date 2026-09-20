@@ -78,11 +78,11 @@ test('rapid edits commit in order and the latest position survives reload', asyn
 
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const thing = nodeByTitle(page, 'A').first();
-  await expect(thing).toBeVisible();
+  const resource = nodeByTitle(page, 'A').first();
+  await expect(resource).toBeVisible();
   await settled(page);
 
-  await dragBy(page, thing, 0, 180);
+  await dragBy(page, resource, 0, 180);
   await firstObserved;
   // The graph handler is parked on `firstGate`, so anything that throws before
   // the release leaves that commit — and the page — waiting until the test
@@ -91,7 +91,7 @@ test('rapid edits commit in order and the latest position survives reload', asyn
     // A commit in flight is reported by the navigation guard rather than by a
     // cue on the surface: the Dock says nothing while saving works.
     await expect.poll(() => navigationIsProtected(page)).toBe(true);
-    await dragBy(page, thing, 120, 120);
+    await dragBy(page, resource, 120, 120);
     expect(expectedRevisions).toEqual(['0']);
   } finally {
     releaseFirst();
@@ -100,7 +100,7 @@ test('rapid edits commit in order and the latest position survives reload', asyn
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
   await expect.poll(() => navigationIsProtected(page)).toBe(false);
   expect(expectedRevisions).toEqual(['0', '1']);
-  const durablePosition = await positionOf(thing);
+  const durablePosition = await positionOf(resource);
 
   await page.reload();
   const reloaded = nodeByTitle(page, 'A').first();
@@ -115,7 +115,7 @@ test(
   {
     tag: [
       '@parity:command-dock-recovers-retryable-failure',
-      '@parity:things-popover-coexists-with-persistence-failure',
+      '@parity:resources-popover-coexists-with-persistence-failure',
     ],
   },
   async ({ page }) => {
@@ -131,8 +131,8 @@ test(
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
     await settled(page);
-    await page.getByRole('button', { name: 'Things' }).click();
-    await page.getByRole('button', { name: 'Add E to Diagram' }).click();
+    await page.getByRole('button', { name: 'Resources' }).click();
+    await page.getByRole('button', { name: 'Add E to Map' }).click();
 
     // The report is a standing `Alert` beside the toolbar and never a cue in it:
     // status is not a command (ADR 0082), and there is no resting dot to read
@@ -145,7 +145,7 @@ test(
     await expect(failure).toBeVisible();
     const retry = failure.getByRole('button', { name: 'Retry' });
     await expect(retry).toBeVisible();
-    await expect(page.getByRole('dialog', { name: 'Things' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
     expect(attempts).toBe(1);
     await expect.poll(() => navigationIsProtected(page)).toBe(true);
 
@@ -180,10 +180,10 @@ test(
 
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
     await settled(page);
-    await dragBy(page, thing, 0, 180);
+    await dragBy(page, resource, 0, 180);
 
     const rejection = page.getByRole('alertdialog', { name: 'Changes couldn’t be saved' });
     // The application's sentence for `forbidden`, not the server's `detail`.
@@ -193,7 +193,7 @@ test(
     await expect(rejection).not.toContainText('Permission denied');
     await rejection.getByRole('button', { name: 'Continue editing' }).click();
     await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
-    await expect(thing).toBeVisible();
+    await expect(resource).toBeVisible();
   },
 );
 
@@ -234,10 +234,10 @@ test(
 
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
-    const thing = nodeByTitle(page, 'A').first();
-    await expect(thing).toBeVisible();
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
     await settled(page);
-    await dragBy(page, thing, 0, 180);
+    await dragBy(page, resource, 0, 180);
 
     // The same dialog a permanent rejection draws (`PersistenceControl` treats
     // the two `Rejection` kinds alike), but reached through the session's own
@@ -253,14 +253,14 @@ test(
     );
     await refusal.getByRole('button', { name: 'Continue editing' }).click();
     await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
-    await expect(thing).toBeVisible();
+    await expect(resource).toBeVisible();
 
     // Retry is not reachable from this state at all — no such control is drawn
     // — and the one recovery is a further Edit, which resumes the ordinary
     // commit path.
     await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
     await page.unroute('**/api/spaces');
-    await dragBy(page, thing, 0, 40);
+    await dragBy(page, resource, 0, 40);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute(
       'data-persistence-state',
       'settled',
@@ -280,10 +280,10 @@ test(
         selectCanvas(page, 'Collection 1'),
         selectCanvas(stalePage, 'Collection 1'),
       ]);
-      const currentThing = nodeByTitle(page, 'A').first();
-      const staleThing = nodeByTitle(stalePage, 'A').first();
-      await expect(currentThing).toBeVisible();
-      await expect(staleThing).toBeVisible();
+      const currentResource = nodeByTitle(page, 'A').first();
+      const staleResource = nodeByTitle(stalePage, 'A').first();
+      await expect(currentResource).toBeVisible();
+      await expect(staleResource).toBeVisible();
       await Promise.all([settled(page), settled(stalePage)]);
 
       let staleCommits = 0;
@@ -305,11 +305,11 @@ test(
         await route.continue();
       });
 
-      await dragBy(page, currentThing, 0, 180);
+      await dragBy(page, currentResource, 0, 180);
       await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-      const remotePosition = await positionOf(currentThing);
+      const remotePosition = await positionOf(currentResource);
 
-      await dragBy(stalePage, staleThing, 180, 0);
+      await dragBy(stalePage, staleResource, 180, 0);
       await staleCommitObserved;
       expect(staleCommits).toBe(1);
       await expect.poll(() => navigationIsProtected(stalePage)).toBe(true);
@@ -338,12 +338,12 @@ test(
       await expect(reload).toBeVisible();
       await reload.click();
 
-      const acceptedThing = nodeByTitle(stalePage, 'A').first();
-      await expect(acceptedThing).toBeVisible();
+      const acceptedResource = nodeByTitle(stalePage, 'A').first();
+      await expect(acceptedResource).toBeVisible();
       await settled(stalePage);
-      expect(await positionOf(acceptedThing)).toEqual(remotePosition);
+      expect(await positionOf(acceptedResource)).toEqual(remotePosition);
       // Fresh Navigation over the stored Space, not the emphasis this page was
-      // left in: Reload opens the authored Diagram the other page changed on its
+      // left in: Reload opens the authored Map the other page changed on its
       // first owned Graph, without replacing the mounted application surface.
       await expect(activeGraph(stalePage)).toHaveText('Long');
       await expect(stalePage.getByTestId('presenting-chrome')).not.toBeVisible();
@@ -359,7 +359,7 @@ test(
       expect(staleCommits).toBe(1);
       await expect.poll(() => navigationIsProtected(stalePage)).toBe(false);
 
-      await dragBy(stalePage, acceptedThing, 120, 80);
+      await dragBy(stalePage, acceptedResource, 120, 80);
       await expect(stalePage.getByTestId('persistence-status')).toHaveAttribute(
         'data-revision',
         '2',

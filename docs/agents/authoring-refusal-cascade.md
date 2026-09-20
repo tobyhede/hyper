@@ -30,14 +30,14 @@ disagreeing with the function.
 
 Every action but the three below asks this guard before its own checks:
 
-1. Does the selected Diagram still exist? → `diagram-not-found`
+1. Does the selected Map still exist? → `map-not-found`
 
 Three actions are derived **above** it and so ask nothing universal:
-`created-diagram`, `deleted-diagram` and `renamed-space` write keys of
-`document` rather than anything inside a Diagram, read the working snapshot
-direct, and answer their own placement. The last two still resolve a Diagram —
+`created-map`, `deleted-map` and `renamed-space` write keys of
+`document` rather than anything inside a Map, read the working snapshot
+direct, and answer their own placement. The last two still resolve a Map —
 for the placement the completion carries, not for permission — so
-`diagram-not-found` appears in their rows as an ordinary check, and in
+`map-not-found` appears in their rows as an ordinary check, and in
 `renamed-space` it is asked *after* the title checks: a blank name is a blank
 name whether or not the canvas has moved on.
 
@@ -45,21 +45,21 @@ name whether or not the canvas has moved on.
 
 Guards above are omitted below.
 
-### Thing edits
+### Resource edits
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `edited-thing` | `thing-not-found` → `thing-kind-immutable` → `reference-target-immutable` → `space-thing-target-immutable` → `thing-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-not-found` → `reference-target-must-own-content` → completed |
-| `created-thing` | none → completed |
+| `edited-resource` | `resource-not-found` → `resource-kind-immutable` → `reference-target-immutable` → `space-resource-target-immutable` → `resource-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-not-found` → `reference-target-must-own-content` → completed |
+| `created-resource` | none → completed |
 | `created-reference` | `reference-target-not-found` → `reference-target-must-own-content` → completed |
-| `opened-thing` | `thing-not-in-diagram` → (already Open ⇒ `unchanged`) → completed |
-| `closed-thing` | `thing-not-in-diagram` → (already Closed ⇒ `unchanged`) → completed |
-| `resized-thing` | `thing-not-in-diagram` → `thing-not-expanded` → (same size ⇒ `unchanged`) → completed |
-| `added-thing-to-diagram` | `thing-not-found` → `thing-already-in-diagram` → completed |
-| `removed-thing-from-diagram` | `thing-not-in-diagram` → completed |
-| `deleted-thing` | `thing-not-found` → `space-thing-deletion-unsupported` → `thing-has-references` → completed |
+| `opened-resource` | `resource-not-in-map` → (already Open ⇒ `unchanged`) → completed |
+| `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
+| `resized-resource` | `resource-not-in-map` → `resource-not-expanded` → (same size ⇒ `unchanged`) → completed |
+| `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
+| `removed-resource-from-map` | `resource-not-in-map` → completed |
+| `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
 
-`thing-not-expanded` is the code `resized-thing` raises for a Thing that is
+`resource-not-expanded` is the code `resized-resource` raises for a Resource that is
 **Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
 every code string is quoted exactly as `AuthoringRefusal['code']` declares it,
 retired wording included. A refusal code is a stable identity across the seam
@@ -71,9 +71,9 @@ that has not been decided.
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `create-and-connect` | `edge-thing-outside-diagram` → `diagram-active-graph-required` → completed |
-| `connected-things` | `graph-not-owned` → `edge-thing-outside-diagram` → `diagram-active-graph-required` → `edge-already-exists` → completed |
-| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Thing ⇒ `unchanged`) → `edge-thing-outside-diagram` → `edge-already-exists` → completed |
+| `create-and-connect` | `edge-resource-outside-map` → `map-active-graph-required` → completed |
+| `connected-resources` | `graph-not-owned` → `edge-resource-outside-map` → `map-active-graph-required` → `edge-already-exists` → completed |
+| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Resource ⇒ `unchanged`) → `edge-resource-outside-map` → `edge-already-exists` → completed |
 | `deleted-edge` | `graph-not-owned` → `edge-not-found` → completed |
 
 ### Graph edits
@@ -83,61 +83,61 @@ that has not been decided.
 | `added-graph` | none → completed |
 | `renamed-graph` | `graph-not-owned` → `graph-title-required` → (same title ⇒ `unchanged`) → completed |
 | `recolored-graph` | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
-| `deleted-graph` | `graph-not-owned` → `diagram-must-keep-graph` → completed |
+| `deleted-graph` | `graph-not-owned` → `map-must-keep-graph` → completed |
 
-### Diagram edits
+### Map edits
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `renamed-diagram` | `diagram-not-found` → `diagram-title-required` → (same title ⇒ `unchanged`) → completed |
-| `deleted-diagram` | `diagram-not-found` → `space-must-keep-diagram` → completed |
+| `renamed-map` | `map-not-found` → `map-title-required` → (same title ⇒ `unchanged`) → completed |
+| `deleted-map` | `map-not-found` → `space-must-keep-map` → completed |
 
-`diagram-not-found` here is not the universal gate 2 check: it is the action
-naming a Diagram other than the one the Edit resolved, which is an author's stale
+`map-not-found` here is not the universal gate 2 check: it is the action
+naming a Map other than the one the Edit resolved, which is an author's stale
 gesture rather than a broken invariant.
 
-`deleted-diagram` refuses the last Diagram (ADR 0079) and otherwise completes on a
-survivor: the selected Diagram if it survived, else the first, which is also what
-`defaultDiagram` becomes when the deleted Diagram was it.
+`deleted-map` refuses the last Map (ADR 0079) and otherwise completes on a
+survivor: the selected Map if it survived, else the first, which is also what
+`defaultMap` becomes when the deleted Map was it.
 
-### Diagram creation
+### Map creation
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `created-diagram` | none → completed |
+| `created-map` | none → completed |
 
 ### Space edits
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `renamed-space` | `space-title-required` → (same title ⇒ `unchanged`) → `diagram-not-found` → completed |
+| `renamed-space` | `space-title-required` → (same title ⇒ `unchanged`) → `map-not-found` → completed |
 
 `renamed-space` writes `document.title` and nothing else, and it raises no
-refusal of its own beyond the blank title: `diagram-not-found` is the code the
-chosen shape already had, and a Diagram condition invented for it would make an
-Edit that holds no Diagram say it needed one.
+refusal of its own beyond the blank title: `map-not-found` is the code the
+chosen shape already had, and a Map condition invented for it would make an
+Edit that holds no Map say it needed one.
 
 ### Movement
 
 | Action | Its own checks, in order |
 | --- | --- |
-| `settled-thing-movement` | none → completed |
+| `settled-resource-movement` | none → completed |
 
 ## The 24 codes
 
-1 contextual (`diagram-not-found`) plus 23 action-specific —
+1 contextual (`map-not-found`) plus 23 action-specific —
 none is produced anywhere else. 22 of those 23 are tabulated above;
-`diagram-required` is declared and presented but currently raised nowhere, so it
+`map-required` is declared and presented but currently raised nowhere, so it
 appears in no row.
 Count the codes, not the cells: several serve more than one action —
-`thing-not-found`, `thing-not-in-diagram`, `graph-not-owned`,
-`edge-thing-outside-diagram` and the two `reference-target-*` each appear in more than
+`resource-not-found`, `resource-not-in-map`, `graph-not-owned`,
+`edge-resource-outside-map` and the two `reference-target-*` each appear in more than
 one row.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
 code gets its copy, and the exhaustive placement records beside it are the one
 place each surface's field mapping lives: the domain names the code, the
-application owns the sentence. Five surfaces map it today — Markdown Thing
-editing (`title`), Reference Thing editing and Reference Thing creation (`title` / `target`),
+application owns the sentence. Five surfaces map it today — Markdown Resource
+editing (`title`), Reference Resource editing and Reference Resource creation (`title` / `target`),
 Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
 deletion (form only). Every record is
 `Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each
