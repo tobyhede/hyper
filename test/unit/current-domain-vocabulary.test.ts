@@ -1993,6 +1993,223 @@ describe('a Resource is named once (ADR 0085)', () => {
 });
 
 /**
+ * ADR 0101 gives Map and Resource their final first-public names. These two
+ * scans retire the nouns they replaced, using every identifier shape the four
+ * earlier vocabulary guards accumulated. The migration trees are history and
+ * are excluded here only: their snapshots must continue to describe the schema
+ * that existed when each migration was generated.
+ */
+const PREVIOUS_MAP = ['D', 'iagram'].join('');
+const PREVIOUS_RESOURCE = ['T', 'hing'].join('');
+
+const retiredIdentifierPattern = (retired: string): RegExp => {
+  const lowercase = retired.toLowerCase();
+  const uppercase = retired.toUpperCase();
+
+  return new RegExp(
+    [
+      // PascalCase compounds, opening and closing.
+      `${retired}[A-Z]`,
+      `[A-Za-z]${retired}s?\\b`,
+      // camelCase compounds.
+      `\\b${lowercase}[A-Z]`,
+      // Screaming case, both whole and within a larger constant.
+      `\\b${uppercase}S?\\b`,
+      `\\b${uppercase}_[A-Z]`,
+      // kebab-case, with the retired noun on either side.
+      `\\b${lowercase}-[a-z]`,
+      `\\b[a-z]+-${lowercase}s?\\b`,
+      // snake_case, with the retired noun on either side.
+      `\\b${lowercase}_[a-z]`,
+      `\\b[a-z]+_${lowercase}s?(?:_|\\b)`,
+      // A lowercase English suffix. The plural remains owned by the compound
+      // and collection arms rather than being reported twice.
+      `\\b${lowercase}(?!s?\\b)[a-z]`,
+      // A quoted storage or protocol identifier.
+      `["']${lowercase}s?["']`,
+      // Collection fields where a document or object declares one.
+      `\\b${lowercase}s["']?\\s*[:=]`,
+      // ...and where code reads it back from a value.
+      `\\.${lowercase}s\\b`,
+    ].join('|'),
+  );
+};
+
+const previousMapPattern = retiredIdentifierPattern(PREVIOUS_MAP);
+const previousResourcePattern = retiredIdentifierPattern(PREVIOUS_RESOURCE);
+const previousMapBare = new RegExp(`\\b${PREVIOUS_MAP}\\b`);
+const previousResourceBare = new RegExp(`\\b${PREVIOUS_RESOURCE}\\b`);
+
+const RETIRED_SCHEMA_TREES = ['migrations/', 'migrations-sqlite/'] as const;
+
+const currentVocabularyFiles = (): readonly string[] =>
+  scannableFiles().filter((file) => !RETIRED_SCHEMA_TREES.some((tree) => file.startsWith(tree)));
+
+const expectNoRetiredIdentifier = (pattern: RegExp): void => {
+  const found = currentVocabularyFiles().flatMap((file) => {
+    const source = readTracked(file);
+    return source === null
+      ? []
+      : spanningHits(source.replace(CITED_PATH, 'path'), pattern).map((hit) => `${file}:${hit}`);
+  });
+
+  expect(found).toEqual([]);
+};
+
+const expectNoRetiredBareType = (pattern: RegExp): void => {
+  const found = currentVocabularyFiles()
+    .filter(isImplementationSource)
+    .flatMap((file) => {
+      const source = readTracked(file);
+      return source === null ? [] : hits(source, pattern).map((hit) => `${file}:${hit}`);
+    });
+
+  expect(found).toEqual([]);
+};
+
+const expectSchemaExclusionsEarned = (): void => {
+  for (const tree of RETIRED_SCHEMA_TREES) {
+    const files = trackedFiles().filter((file) => file.startsWith(tree));
+    expect(files, `${tree} is excluded but contains no tracked files`).not.toEqual([]);
+    const sources = files.map((file) => readTracked(file) ?? '').join('\n');
+    expect(
+      [previousMapPattern, previousResourcePattern].flatMap((pattern) =>
+        spanningHits(sources, pattern),
+      ),
+      `${tree} no longer records either retired schema name`,
+    ).not.toEqual([]);
+  }
+};
+
+describe('a Map has no retired identifier (ADR 0101)', () => {
+  it('reaches source, documents, and both live database contracts', () => {
+    const scanned = currentVocabularyFiles();
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('docs/agents/rendering.md');
+    expect(scanned).toContain('src/prisma/contract.prisma');
+    expect(scanned).toContain('src/sqlite/contract.prisma');
+  });
+
+  it('finds no retired identifier shape', () => {
+    expectNoRetiredIdentifier(previousMapPattern);
+  });
+
+  it('finds no retired bare type in implementation source', () => {
+    expectNoRetiredBareType(previousMapBare);
+  });
+
+  it('keeps each migration-tree exclusion earned', () => {
+    expectSchemaExclusionsEarned();
+  });
+});
+
+describe('the retired Map noun guard reads every shape it governs', () => {
+  it('reports all eight arms and both collection-field shapes', () => {
+    const lowerName = PREVIOUS_MAP.toLowerCase();
+    const upperName = PREVIOUS_MAP.toUpperCase();
+    const retired = [
+      `type ${PREVIOUS_MAP}Id = string`,
+      `const selected${PREVIOUS_MAP} = value`,
+      `const ${lowerName}Id = value`,
+      `const mode = '${upperName}'`,
+      `const modes = '${upperName}S'`,
+      `const ${upperName}_ID = value`,
+      `${lowerName}-not-found`,
+      `data-${lowerName}-selector`,
+      `${lowerName}_id`,
+      `selected_${lowerName}_id`,
+      `const ${lowerName}less = true`,
+      `table: '${lowerName}s'`,
+      `{ ${lowerName}s: [] }`,
+      `space.${lowerName}s`,
+    ];
+
+    for (const line of retired) {
+      expect(previousMapPattern.test(line), line).toBe(true);
+    }
+    expect(previousMapBare.test(`type ${PREVIOUS_MAP} = Map`)).toBe(true);
+  });
+
+  it('stays silent on Map names belonging to JavaScript, React, Prisma, and the product', () => {
+    for (const line of [
+      'const miniMap = <MiniMap />',
+      'const flattened = values.flatMap(read)',
+      'const lookup: ReadonlyMap<string, string> = new Map()',
+      'const weak = new WeakMap<object, string>()',
+      'type TypeMaps = Record<string, string>',
+      '@@map("resources")',
+    ]) {
+      expect(previousMapPattern.test(line), line).toBe(false);
+      expect(previousMapBare.test(line), line).toBe(false);
+    }
+  });
+});
+
+describe('a Resource has no retired identifier (ADR 0101)', () => {
+  it('reaches source, documents, and both live database contracts', () => {
+    const scanned = currentVocabularyFiles();
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
+    expect(scanned).toContain('src/prisma/contract.prisma');
+    expect(scanned).toContain('src/sqlite/contract.prisma');
+  });
+
+  it('finds no retired identifier shape', () => {
+    expectNoRetiredIdentifier(previousResourcePattern);
+  });
+
+  it('finds no retired bare type in implementation source', () => {
+    expectNoRetiredBareType(previousResourceBare);
+  });
+
+  it('keeps each migration-tree exclusion earned', () => {
+    expectSchemaExclusionsEarned();
+  });
+});
+
+describe('the retired Resource noun guard reads every shape it governs', () => {
+  it('reports all eight arms and both collection-field shapes', () => {
+    const lowerName = PREVIOUS_RESOURCE.toLowerCase();
+    const upperName = PREVIOUS_RESOURCE.toUpperCase();
+    const retired = [
+      `type ${PREVIOUS_RESOURCE}Id = string`,
+      `const selected${PREVIOUS_RESOURCE} = value`,
+      `const ${lowerName}Id = value`,
+      `const mode = '${upperName}'`,
+      `const modes = '${upperName}S'`,
+      `const ${upperName}_ID = value`,
+      `${lowerName}-not-found`,
+      `data-${lowerName}-selector`,
+      `${lowerName}_id`,
+      `selected_${lowerName}_id`,
+      `const ${lowerName}like = true`,
+      `table: '${lowerName}s'`,
+      `{ ${lowerName}s: [] }`,
+      `space.${lowerName}s`,
+    ];
+
+    for (const line of retired) {
+      expect(previousResourcePattern.test(line), line).toBe(true);
+    }
+    expect(previousResourceBare.test(`type ${PREVIOUS_RESOURCE} = Resource`)).toBe(true);
+  });
+
+  it('stays silent on Map names belonging to JavaScript, React, Prisma, and the product', () => {
+    for (const line of [
+      'const miniMap = <MiniMap />',
+      'const flattened = values.flatMap(read)',
+      'const lookup: ReadonlyMap<string, string> = new Map()',
+      'const weak = new WeakMap<object, string>()',
+      'type TypeMaps = Record<string, string>',
+      '@@map("resources")',
+    ]) {
+      expect(previousResourcePattern.test(line), line).toBe(false);
+      expect(previousResourceBare.test(line), line).toBe(false);
+    }
+  });
+});
+
+/**
  * ADR 0010 makes Space the top-level domain value, minted only by `loadSpace`,
  * and retires the shipping-ledger word that named it before. `CONTEXT.md:9`
  * says so in as many words — "retired from the code, not merely avoided" — and

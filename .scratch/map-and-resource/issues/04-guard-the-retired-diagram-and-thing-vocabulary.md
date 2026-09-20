@@ -1,6 +1,6 @@
 # 04 — Guard the retired Diagram and Thing vocabulary
 
-**Status:** ready-for-agent
+**Status:** resolved
 **Blocked by:** 03 — Rename the Thing model to Resource, in both databases.
 
 **What to build:** A block in `test/unit/current-domain-vocabulary.test.ts` for each retired word, reporting it in every identifier shape it was written in, with a mirror block proving the guard reads those shapes and stays silent on the foreign ones.
@@ -40,4 +40,27 @@ Also carry forward the **collection-field** shapes the Graph block uses — `\bt
 
 ## Answer
 
-<!-- Filled in as the work lands. -->
+Resolved in `test/unit/current-domain-vocabulary.test.ts` with one live-tree scan
+and one mirror block for each retired noun. The shared pattern covers the eight
+required identifier arms — opening and closing PascalCase, camelCase,
+screaming case, kebab-case, snake_case, a lowercase suffix, and quoted storage
+identifiers — plus declared and accessed collection fields. A separate
+implementation-source arm rejects each retired bare type.
+
+The scans compose both retired words from fragments, so the guard file contains
+neither one literally and remains inside its own scan. They use `spanningHits`,
+mask cited paths before scanning, and exclude `migrations/` and
+`migrations-sqlite/` only within these ADR 0101 blocks. The exclusion is held
+honest by proving each tree still contains a historical retired-schema hit.
+
+The two mirror blocks prove every governed shape is reported and that the
+patterns stay silent on `MiniMap`, `flatMap`, `Map`, `ReadonlyMap`, `WeakMap`,
+`TypeMaps`, and Prisma's `@@map`. The existing Graph-initial explanation already
+states the narrower current rule: `(r)` is valid for Resources, while the
+retired Route initial remains invalid only when a Graph collection introduces
+the binding.
+
+Verification:
+
+- focused vocabulary suite — 86 tests passed;
+- `pnpm verify` — 229 files, 2,892 tests passed and 5 skipped.
