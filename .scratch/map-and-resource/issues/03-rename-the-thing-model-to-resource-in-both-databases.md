@@ -58,3 +58,34 @@ Verification:
   fresh database: both migrations applied, 5 files and 99 tests passed.
 - PostgreSQL integration is deferred to CI because no disposable PostgreSQL
   database was started for this ticket.
+
+## Correction — `verify` does observe this, and two defects were hiding each other
+
+The premise above — that a contract diverging from its migrations is visible
+only to CI's `postgres` and `sqlite` jobs — is wrong, and reviewing 02 is what
+showed it. `test/unit/prisma-foundation.test.ts` runs
+`prisma-next migrate --show --from 20260728T1242_initial --to @contract` and
+asserts `ok: true`. That is exactly this divergence, and it runs in `verify`.
+
+It did not fire on 02 because the *other* half of the same defect silenced it.
+`@contract` resolves through the emitted `src/prisma/contract.json`, and the
+sweep rewrote that **generated** file as text: it changed `things` to
+`resources` in the body but could not touch `storageHash`, which is a hex
+literal with nothing to match. So the committed artifact kept advertising
+`sha256:1f367854…`, the pre-rename contract — the very hash this ticket's
+PostgreSQL plan starts from — and the migration graph found a path to it. The
+honest emit hashes to `sha256:0a1d0e87…`, which nothing reached. Regenerating
+the four artifacts is what made the test fail, and these two migrations are
+what make it pass again.
+
+The general rule, which outlives this rename: **a sweep that edits a generated
+artifact as text can disarm the test that guards it**, because the artifact's
+own hash is the thing the test trusts and the thing the substitution cannot
+reach. `EXCLUDED_PATHS` protects the migration trees; it did not protect the
+emitted contracts, and those are equally derived. Regenerate, never substitute.
+
+This ticket's work landed on `map-resource-02` rather than its own branch: 02
+renamed the contracts as an unavoidable consequence of sweeping `.prisma`, so
+there is no state of 02 alone that passes its own bar — corrupt artifacts fail
+`contract:check`, honest ones fail `verify`, and both fail `db:migrate`. The
+two changes are atomic and are now one PR.

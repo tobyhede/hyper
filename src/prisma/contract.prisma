@@ -11,7 +11,7 @@ model Space {
   exportedRevision String?  @map("exported_revision")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        temporal.updatedAt() @map("updated_at")
-  resources           Resource[]
+  resources        Resource[]
   repositoryStates RepositoryState[]
 
   @@map("spaces")
