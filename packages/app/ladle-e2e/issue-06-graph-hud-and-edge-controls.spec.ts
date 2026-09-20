@@ -1,4 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
+import type { Diagram, Graph, SpaceSnapshot } from '@project/core';
+import { authoredSnapshot, sparseAuthoredSnapshot } from '../stories/support/spaces';
 
 /**
  * The selected Edge's controls and the canvas HUD, on the rendered stories.
@@ -12,6 +14,27 @@ import { expect, test, type Locator } from '@playwright/test';
  */
 
 const story = (name: string): string => `/?story=${name}&mode=preview`;
+
+/**
+ * The Diagram a story's Space opens on, read the way the application reads it —
+ * through `defaultDiagram`, never `diagrams[0]` (array order is not a
+ * declaration). What the Graph HUD assertions below hold the rendered key to.
+ */
+const openingDiagramOf = (snapshot: SpaceSnapshot): Diagram => {
+  const diagram = snapshot.document.diagrams?.find(
+    (candidate) => candidate.id === snapshot.document.defaultDiagram,
+  );
+  if (diagram === undefined) throw new Error('Story Space declares no opening Diagram.');
+  return diagram;
+};
+
+/** The Graph a Diagram is active on, falling back to its first (ADR 0026). */
+const activeGraphOf = (diagram: Diagram): Graph => {
+  const active =
+    diagram.graphs.find((graph) => graph.id === diagram.activeGraph) ?? diagram.graphs[0];
+  if (active === undefined) throw new Error('Diagram owns no Graph.');
+  return active;
+};
 
 /** Resolve a theme token the way the page paints it, not the way the recipe names it. */
 const resolveToken = (locator: Locator, token: string): Promise<string> =>
@@ -237,11 +260,16 @@ test(
 /**
  * The HUD on a real canvas: React Flow's own MiniMap over nodes it measured.
  *
- * What the story fixes is the key beside it — every Graph the Diagram draws,
- * each with its resolved colour, and exactly one emphasised. **Emphasis is not
- * filtering** (ADR 0040): the inactive Graphs stay listed and stay coloured.
- * That the emphasis *moves* with an activation, and that the Command Dock agrees
- * when it does, is the paired application evidence's claim — activation is the
+ * What the story fixes is the key beside it — the Graphs the open Diagram
+ * owns, in authored order, each with its resolved colour, and exactly one
+ * emphasised. **Emphasis is not filtering** (ADR 0040): the inactive Graphs
+ * stay listed and stay coloured. The expectations are read off the Space the
+ * story opens rather than written as a second literal list here — `Retained`
+ * opens on `Collection 1`, which owns three of the Space's four Graphs, and a
+ * literal `['Long', 'Mid', 'Short', 'Echo']` would be evidence of the flatten
+ * ticket 02 removed rather than of the rule that replaced it. That the
+ * emphasis *moves* with an activation, and that the Command Dock agrees when
+ * it does, is the paired application evidence's claim — activation is the
  * Dock's command and a story-only button for it would prove nothing here.
  */
 test(
@@ -250,10 +278,14 @@ test(
   async ({ page }) => {
     await page.goto(story('surfaces--graph-hud--retained'));
 
+    const diagram = openingDiagramOf(authoredSnapshot);
+    const titles = diagram.graphs.map((graph) => graph.title);
+    const active = activeGraphOf(diagram);
+
     const key = page.getByTestId('graph-legend');
     const items = key.locator('.legend__item');
-    await expect(items).toHaveCount(4);
-    expect(await items.allInnerTexts()).toEqual(['Long', 'Mid', 'Short', 'Echo']);
+    await expect(items).toHaveCount(titles.length);
+    expect(await items.allInnerTexts()).toEqual(titles);
     // The minimap is React Flow's own, drawing the nodes the flow measured —
     // the fixture supplies no substitute for it and no geometry of its own.
     const minimap = page.locator('.react-flow__minimap');
@@ -273,13 +305,64 @@ test(
     if (row === null || map === null) throw new Error('The HUD drew no measurable box.');
     expect(row.y + row.height).toBeLessThanOrEqual(map.y);
 
+    // **Scale, because a `NaN` viewBox passes every assertion above.** React
+    // Flow's `MiniMap` reads its width and height off `style` rather than a
+    // prop, divides the Diagram's bounding box by them to find its scale, and
+    // writes the result straight into the SVG's `viewBox` — an invalid
+    // `viewBox` makes the browser fall back to 1:1, so the first node (260 by
+    // 146 user units) paints over the whole map (ticket 01). A finite viewBox
+    // and a node rect smaller than the map are what a 1:1 fallback cannot
+    // produce.
+    const viewBoxAttribute = await page.locator('.react-flow__minimap-svg').getAttribute('viewBox');
+    if (viewBoxAttribute === null) throw new Error('The minimap SVG drew no viewBox.');
+    const viewBoxNumbers = viewBoxAttribute.trim().split(/\s+/).map(Number);
+    expect(viewBoxNumbers).toHaveLength(4);
+    for (const value of viewBoxNumbers) {
+      expect(Number.isFinite(value)).toBe(true);
+    }
+
+    const nodeBox = await page.locator('.react-flow__minimap-node').first().boundingBox();
+    if (nodeBox === null) throw new Error('The minimap drew no node.');
+    expect(nodeBox.width).toBeLessThan(map.width);
+    expect(nodeBox.height).toBeLessThan(map.height);
+
     // Exactly one, and the others are dimmed rather than dropped.
     await expect(key.locator('li[data-active="true"]')).toHaveCount(1);
-    await expect(key.locator('li[data-active="true"]')).toHaveText('Long');
-    await expect(key.locator('li[data-active="false"]')).toHaveCount(3);
+    await expect(key.locator('li[data-active="true"]')).toHaveText(active.title);
+    await expect(key.locator('li[data-active="false"]')).toHaveCount(titles.length - 1);
     const stripes = await items
       .locator('[aria-hidden="true"]')
       .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
-    expect(new Set(stripes).size).toBe(4);
+    expect(new Set(stripes).size).toBe(titles.length);
+  },
+);
+
+/**
+ * The key changes with the Diagram it opens on, not with the Space.
+ *
+ * `SparseDiagram` opens the tracked Space on `Collection 2` rather than
+ * `Collection 1` — one Graph, `Echo`, instead of three. The expectation is
+ * read off `sparseAuthoredSnapshot` the same way the `Retained` case reads
+ * its own, so this is the same rule proven on a second Diagram rather than a
+ * transcription of what today's fixture happens to draw.
+ * `packages/app/e2e/overview.spec.ts`'s "selecting a Diagram draws the Graphs
+ * it owns and only those" is the same claim in the browser, over the tracked
+ * fixture rather than this catalogue's.
+ */
+test(
+  'the Graph HUD key changes with the Diagram it opens on',
+  { tag: '@parity:graph-hud-key-follows-the-open-diagram' },
+  async ({ page }) => {
+    await page.goto(story('surfaces--graph-hud--sparse-diagram'));
+
+    const diagram = openingDiagramOf(sparseAuthoredSnapshot);
+    const titles = diagram.graphs.map((graph) => graph.title);
+    const active = activeGraphOf(diagram);
+
+    const items = page.getByTestId('graph-legend').locator('.legend__item');
+    await expect(items).toHaveCount(titles.length);
+    expect(await items.allInnerTexts()).toEqual(titles);
+    await expect(items.first()).toHaveAttribute('data-active', 'true');
+    await expect(items.first()).toHaveText(active.title);
   },
 );

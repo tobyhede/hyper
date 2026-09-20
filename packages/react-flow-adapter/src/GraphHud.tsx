@@ -13,6 +13,16 @@ export interface GraphHudProps {
 const INACTIVE_NODE_COLOR = 'var(--border)';
 
 /**
+ * The HUD panel's own border-box width, in pixels — the one number the
+ * panel div's inline style and the MiniMap's `style.width` both derive
+ * from, so widening the panel cannot silently leave the map behind.
+ */
+const PANEL_WIDTH = 214;
+const PANEL_BORDER_WIDTH = 1;
+/** The panel's content width: its border-box width minus its border on each side. */
+const MINIMAP_WIDTH = PANEL_WIDTH - PANEL_BORDER_WIDTH * 2;
+
+/**
  * The canvas HUD: a Graph key over an interactive minimap.
  *
  * **The key is kept deliberately**, although ADR 0053's Sidebar Graphs group
@@ -47,7 +57,10 @@ export function GraphHud({
         reach — separated a dark panel from a dark canvas; over sand it is a
         grey cloud under the legend.
       */}
-      <div className="w-[214px] overflow-hidden rounded-chrome-lg border border-border bg-card shadow-lg">
+      <div
+        className="overflow-hidden rounded-chrome-lg border border-border bg-card shadow-lg"
+        style={{ width: PANEL_WIDTH }}
+      >
         <div className="flex flex-col gap-[6px] px-[10px] py-[9px]" data-testid="graph-legend">
           <div className="flex items-center gap-[7px] font-mono text-chrome-2xs tracking-[0.12em] text-muted-foreground uppercase">
             <GraphIcon size={13} />
@@ -95,10 +108,22 @@ export function GraphHud({
           // nothing failed, because the rows were still in the DOM for a test to
           // find. The rest is size: the MiniMap sizes its SVG from these, and
           // its default border would float it inside the panel it fills.
+          //
+          // **`width` has to be the number `MINIMAP_WIDTH`, not a percentage.**
+          // `MiniMap` has no sizing prop — it reads `style.width`/`style.height`,
+          // casts them straight to `number` and divides its bounding box by
+          // them to find the SVG's scale (`elementWidth = style?.width as
+          // number`). A percentage survives that cast unconverted, so the
+          // division is `boundingRect.width / '100%'`, every derived number is
+          // `NaN`, the `viewBox` becomes the literal string `"NaN NaN NaN
+          // NaN"`, and an invalid `viewBox` makes the browser fall back to a
+          // 1:1 scale — the first node then paints over the whole map (ticket
+          // 01). `MINIMAP_WIDTH` is derived from the same `PANEL_WIDTH` the
+          // panel div's own inline style uses, so the two cannot drift apart.
           style={{
             position: 'relative',
             display: 'block',
-            width: '100%',
+            width: MINIMAP_WIDTH,
             height: 86,
             margin: 0,
             border: 'none',

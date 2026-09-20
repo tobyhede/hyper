@@ -167,34 +167,43 @@ test(
 /**
  * A Diagram draws the Graphs it owns. Selecting is navigation and writes
  * nothing (ADR 0031), so the revision is unmoved throughout.
+ *
+ * This is also the application half of the Graph HUD's `SparseDiagram` story
+ * (`packages/app/stories/surfaces/graph-hud.stories.tsx`, issue 06 ticket 02):
+ * the same claim, that the key is the selected Diagram's own Graphs and not
+ * the Space's, over the tracked fixture rather than the catalogue's.
  */
-test('selecting a Diagram draws the Graphs it owns and only those', async ({ page }) => {
-  await page.goto('/');
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-  const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
+test(
+  'selecting a Diagram draws the Graphs it owns and only those',
+  { tag: '@parity:graph-hud-key-follows-the-open-diagram' },
+  async ({ page }) => {
+    await page.goto('/');
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+    const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
-  await expect(selectedCanvas(page)).toContainText('Collection 1');
-  await expect(await diagramChoices(page)).toHaveCount(3);
-  await page.keyboard.press('Escape');
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
+    await expect(await diagramChoices(page)).toHaveCount(3);
+    await page.keyboard.press('Escape');
 
-  // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
-  await selectCanvas(page, 'Collection 1');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
-  await expect(legendItems).toHaveCount(3);
-  const owned = await graphChoices(page);
-  await expect(owned).toHaveCount(3);
-  await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
-  await page.keyboard.press('Escape');
+    // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
+    await selectCanvas(page, 'Collection 1');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+    await expect(legendItems).toHaveCount(3);
+    const owned = await graphChoices(page);
+    await expect(owned).toHaveCount(3);
+    await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
 
-  // Collection 2 owns Echo alone.
-  await selectCanvas(page, 'Collection 2');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(4);
-  await expect(legendItems).toHaveCount(1);
-  await expect(activeGraph(page)).toHaveText('Echo');
+    // Collection 2 owns Echo alone.
+    await selectCanvas(page, 'Collection 2');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(4);
+    await expect(legendItems).toHaveCount(1);
+    await expect(activeGraph(page)).toHaveText('Echo');
 
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-});
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+  },
+);
 
 /**
  * The two surfaces that name a Graph, held to the same answer.

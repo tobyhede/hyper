@@ -197,6 +197,14 @@ export const sparseAuthoredSnapshot: SpaceSnapshot = {
 export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
 
 /**
+ * {@link sparseAuthoredSnapshot} loaded, for a story that draws it directly
+ * rather than through a live session — the Graph HUD's second Diagram story
+ * among them, which needs a real `Space` to resolve `Collection 2` through
+ * the same `defaultDiagram` rule the app does.
+ */
+export const sparseAuthoredSpace: Space = loaded(loadSpaceSnapshot(sparseAuthoredSnapshot));
+
+/**
  * {@link authoredSnapshot} one Edit later: a third Diagram, `Collection 3`.
  *
  * What a story submits has to differ from what it loaded, or a failed save and
