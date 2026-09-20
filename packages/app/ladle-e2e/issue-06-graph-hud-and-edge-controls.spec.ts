@@ -371,11 +371,11 @@ test(
       .locator('.react-flow__panel')
       .filter({ has: page.getByTestId('canvas-identity') });
     const keyBox = await keyPanel.boundingBox();
-    const map = await minimap.boundingBox();
-    if (keyBox === null || map === null) throw new Error('The HUD drew no measurable box.');
-    expect(keyBox.y + keyBox.height).toBeCloseTo(map.y, 0);
-    expect(map.width).toBe(200);
-    expect(map.height).toBe(150);
+    const minimapBox = await minimap.boundingBox();
+    if (keyBox === null || minimapBox === null) throw new Error('The HUD drew no measurable box.');
+    expect(keyBox.y + keyBox.height).toBeCloseTo(minimapBox.y, 0);
+    expect(minimapBox.width).toBe(200);
+    expect(minimapBox.height).toBe(150);
 
     await expectMinimapDrawnToScale(page);
 
