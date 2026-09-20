@@ -329,6 +329,24 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     return this.#store.serialise(() => this.#replaceUnserialised(input, expectedMetaSpaceId));
   }
 
+  /**
+   * `revision` is a caller-supplied `bigint` -- unlike `#writeUpdate`'s own
+   * next revision or a value the decode side reads back out of a stored
+   * column, nothing here has read or written it against either database
+   * before `encodeStoredRevision` runs, so a value the codec refuses is a bug
+   * in the caller, not evidence of broken stored state. It is deliberately
+   * left as the plain `RevisionCodecError` `encodeStoredRevision` raises,
+   * unlike its siblings above: `AggregateInvariantError`'s own declaration
+   * (`@project/persistence`'s `repository.ts`) ties it to the shared
+   * `SpaceResourceRepository` seam -- `loadAggregate` and `commit`, the two
+   * operations `@project/http` reaches -- and `markExported` sits only on the
+   * wider `SpaceRepository` the CLI alone reaches (`export-aggregate.ts`'s
+   * `markAggregateExported`, the only production caller), so no HTTP route
+   * can ever classify this throw as 500 vs 503. That one caller already
+   * catches every rejection through `Promise.allSettled` and reports each by
+   * `.message` regardless of its class, so reclassifying it here would name
+   * an identity nothing downstream asks for.
+   */
   markExported(id: UUID, revision: bigint): Promise<void> {
     return this.#store.serialise(async () => {
       const tables = this.#store.tables(this.#store.orm);

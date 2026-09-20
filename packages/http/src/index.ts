@@ -406,14 +406,22 @@ export const createSpaceHttpApp = (
           // Broken stored state and an unreachable database are told apart by
           // type (`isAggregateInvariant`), the same rule `GET /api/aggregate`
           // applies below: a defect no retry cures answers 500
-          // `internal-error`, not 503 `persistence-unavailable` forever
-          // retried by a client that cannot fix it. `commit`
-          // (`SqlSpaceRepository`, `src/persistence/sql-space-repository.ts`)
-          // now raises the same `AggregateInvariantError` the aggregate read
-          // does — reading the revision a write is about to replace, or
-          // writing its own new one, under `#writeUpdate`'s row lock, and
-          // reading every stored Space to judge a complete-aggregate commit
-          // against — so this route can meet it too.
+          // `internal-error` rather than 503 `persistence-unavailable`. That
+          // is an operator-facing distinction only — status code and log
+          // signal — and not yet a client one: `commitFailureForProblem`
+          // (`packages/http/src/backend.ts`) still maps both problem codes to
+          // the same retryable `CommitResult`, pinned by
+          // `http-backend.test.ts`'s `'maps %s to retryable %s'` cases, which
+          // name `internal-error` among them. Whether a broken-stored-state
+          // commit should read differently to the author is tracked at
+          // `.scratch/database-persistence/issues/35-internal-error-has-no-distinct-client-treatment.md`.
+          // `commit` (`SqlSpaceRepository`,
+          // `src/persistence/sql-space-repository.ts`) now raises the same
+          // `AggregateInvariantError` the aggregate read does — reading the
+          // revision a write is about to replace, or writing its own new
+          // one, under `#writeUpdate`'s row lock, and reading every stored
+          // Space to judge a complete-aggregate commit against — so this
+          // route can meet it too.
           //
           // Unlike that read, this catch does not re-read on an invariant
           // failure. The aggregate GET's re-read exists for one specific

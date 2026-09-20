@@ -54,12 +54,17 @@ describe('revision codec', () => {
     expect(() => decodeStoredRevision('9'.repeat(19))).toThrow('exceeds the 2^63-1 ceiling');
   });
 
-  it('refuses to encode a negative revision', () => {
+  // A negative value never exceeds the ceiling -- it fails for the opposite
+  // reason, and the message has to say which one actually happened rather
+  // than naming the sibling check that didn't fire.
+  it('refuses to encode a negative revision, naming the negative value rather than the ceiling', () => {
     expect(() => encodeStoredRevision(-1n)).toThrow(RevisionCodecError);
-    expect(() => encodeStoredRevision(-1n)).toThrow('exceeds the 2^63-1 ceiling');
+    expect(() => encodeStoredRevision(-1n)).toThrow('is negative');
+    expect(() => encodeStoredRevision(-1n)).not.toThrow('exceeds the 2^63-1 ceiling');
   });
 
   it('refuses to encode a revision above the 2^63-1 ceiling', () => {
     expect(() => encodeStoredRevision(REVISION_CEILING + 1n)).toThrow(RevisionCodecError);
+    expect(() => encodeStoredRevision(REVISION_CEILING + 1n)).toThrow('exceeds the 2^63-1 ceiling');
   });
 });

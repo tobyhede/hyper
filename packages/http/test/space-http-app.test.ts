@@ -698,8 +698,11 @@ describe('Space HTTP aggregate commit', () => {
   // `AggregateInvariantError` can now reach this route, not only
   // `GET /api/aggregate`. Told apart from an unreachable database by type
   // (`isAggregateInvariant`), the same rule that route already applies: a
-  // defect no retry cures answers 500 `internal-error`, not 503
-  // `persistence-unavailable` forever retried by a client that cannot fix it.
+  // defect no retry cures answers 500 `internal-error` rather than 503
+  // `persistence-unavailable` — an operator-facing distinction, not yet a
+  // client one (`http-backend.test.ts` pins both problem codes to the same
+  // retryable `CommitResult`; see
+  // `.scratch/database-persistence/issues/35-internal-error-has-no-distinct-client-treatment.md`).
   it.each([
     { failure: 'a direct invariant failure', error: new AggregateInvariantError('broken') },
     {
