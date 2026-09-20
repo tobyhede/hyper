@@ -1,6 +1,6 @@
 # The fast path commits where the commit decision refuses
 
-Status: open
+Status: resolved
 Tags: Defect
 Blocked by: None — can start immediately.
 
@@ -35,7 +35,31 @@ The fast path holds no singleton lock on purpose, and its own comment says so: i
 
 No test exercises this. The divergence above is derived from reading the three files named, not from a run — the first checklist item is to make it fail before changing anything.
 
-- [ ] A failing test: against a store with Space rows and no `RepositoryState` row, a boundary-preserving single update at the expected revision is answered `rejected` / `invalid-commit`, and today is answered `committed`. Run it against both SQL targets, since both call the shared helper.
-- [ ] Decide whether the Meta identity is read unlocked in the fast path or the fast path is skipped when Meta is absent, and record the reasoning where a reader will meet it.
-- [ ] Apply the decision so `decideTopologyPreservingUpdate` cannot answer `write` for a store with no Meta identity, keeping the no-singleton-lock property the fast path exists for.
-- [ ] Confirm the two claims quoted above are true afterwards, or record a new ADR saying why the divergence stands. ADR 0095 itself is not editable.
+- [x] A failing test: against a store with Space rows and no `RepositoryState` row, a boundary-preserving single update at the expected revision is answered `rejected` / `invalid-commit`, and today is answered `committed`. Run it against both SQL targets, since both call the shared helper.
+- [x] Decide whether the Meta identity is read unlocked in the fast path or the fast path is skipped when Meta is absent, and record the reasoning where a reader will meet it.
+- [x] Apply the decision so `decideTopologyPreservingUpdate` cannot answer `write` for a store with no Meta identity, keeping the no-singleton-lock property the fast path exists for.
+- [x] Confirm the two claims quoted above are true afterwards, or record a new ADR saying why the divergence stands. ADR 0095 itself is not editable.
+
+## Answer
+
+Inside the commit transaction, the repository now reads `RepositoryState`
+without locking it as a one-way fast-path eligibility check.
+When no row exists, it disables the fast path and the complete-aggregate path's
+`decideCommit` returns the established
+`rejected` / `invalid-commit` answer. A present identity is parsed before the
+complete decision or when the public identity read returns it; the eligibility
+check itself needs only existence and grants no write authority.
+
+The read uses the transaction's existing database handle, remains unlocked and
+is deliberately one-way. Absence
+can only send a candidate through the complete decision; a Meta row established
+after that read is judged there against the state the transaction sees.
+Presence promises nothing about a later replacement and adds no authority the
+fast path did not already have. This fixes the reachable stored-without-Meta
+divergence without adding the singleton lock the optimisation exists to avoid.
+
+The regression lives in the shared `SpaceRepository.commit` contract, with a
+SQL-only harness operation that models the reachable interrupted-truncation
+state. Before the source change the focused SQLite case received `committed`;
+afterwards it receives the same refusal as `decideCommit`, leaves the Space at
+revision zero, and runs from the same contract against both SQL stores.

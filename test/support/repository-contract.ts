@@ -163,16 +163,22 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
 });
 
 /**
- * The one member `withRawRevisionHarness` needs from vitest's own per-test
- * context (`it`'s callback parameter, `ExtendedContext<Test>` in
- * `@vitest/runner`), named locally rather than importing that generic type
- * for one method.
+ * The one member the helpers below that skip an inapplicable harness need
+ * from vitest's own per-test context (`it`'s callback parameter,
+ * `ExtendedContext<Test>` in `@vitest/runner`), named locally rather than
+ * importing that generic type for one method.
  */
 type SkippableTestContext = { skip: () => void };
 
 export interface RepositoryHarness {
   repository: SpaceRepository;
   close(): Promise<void>;
+  /**
+   * Remove the stored Meta identity while leaving Space rows in place. SQL
+   * harnesses use this to model an interrupted destructive replacement; the
+   * memory repository cannot represent that broken stored state.
+   */
+  removeMetaIdentity?: () => Promise<void>;
   /**
    * Write a stored Space's `revision` (and optionally `exportedRevision`)
    * column text verbatim, bypassing the repository's own write path and the
@@ -249,6 +255,22 @@ export const spaceRepositoryContract = (
         return;
       }
       await body(harness.repository, harness.writeRawRevision);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  const withMissingMetaHarness = async (
+    context: SkippableTestContext,
+    body: (repository: SpaceRepository, removeMetaIdentity: () => Promise<void>) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.removeMetaIdentity === undefined) {
+        context.skip();
+        return;
+      }
+      await body(harness.repository, harness.removeMetaIdentity);
     } finally {
       await harness.close();
     }
@@ -608,6 +630,21 @@ export const spaceRepositoryContract = (
         revisions: [{ spaceId: SPACE_ID, revision: 1n }],
         deletedSpaceIds: [],
       });
+    });
+  });
+
+  it(`${name} refuses a topology-preserving update when stored Spaces have no Meta identity`, async (context) => {
+    await withMissingMetaHarness(context, async (repository, removeMetaIdentity) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await removeMetaIdentity();
+
+      await expect(commitUpdate(repository, retitled(first, 'Changed'), 0n)).resolves.toEqual({
+        kind: 'rejected',
+        code: 'invalid-commit',
+        message: 'The repository has no Meta Space',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
     });
   });
 

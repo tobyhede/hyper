@@ -178,12 +178,10 @@ const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undef
  * way -- a revision conflict, or a write that moves no snapshot boundary --
  * and hands everything else to that decision. `#commitTopologyPreservingUpdate`
  * runs this before `#lockMetaIdentity` is ever called, deliberately: the fast
- * path holds no singleton lock, and reading the Meta identity here would be
- * new locking behaviour ticket 24 does not add. Carried over unchanged from
- * both adapters this repository replaced -- `.scratch/database-persistence/
- * issues/29` is the known, separately-tracked consequence: a store holding
- * Space rows with no Meta identity takes this path and commits where the
- * complete-aggregate decision would refuse.
+ * path holds no singleton lock. A `write` it answers is then gated on one
+ * unlocked existence read of the Meta identity, because without that identity
+ * `decideCommit` would refuse every otherwise-writable update (ticket 29); an
+ * `answer` or `aggregate-path` never reaches that read.
  */
 const decideTopologyPreservingUpdate = (
   change: UpdateChange,
@@ -441,8 +439,18 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * `topology-preserving-update.ts`): a single update decided against the one
    * stored Space it names, never reading the complete aggregate.
    * `decideTopologyPreservingUpdate`'s own doc comment explains why this never
-   * calls `#lockMetaIdentity` -- carried over unchanged, including the known
-   * consequence `.scratch/database-persistence/issues/29` tracks separately.
+   * calls `#lockMetaIdentity`. The unlocked read below is a one-way eligibility
+   * check inside this transaction: absence sends the candidate to the complete
+   * decision, while presence grants no new write authority. It uses the same
+   * transaction handle as the candidate read, which matters on SQLite: opening
+   * a separate runtime here can contend with the transaction it is deciding.
+   *
+   * It is read last, gating only the `write` branch, because that is the only
+   * branch the identity bears on: a conflict and a boundary-moving snapshot
+   * are both answered without it, `#lockMetaIdentity`'s own doc comment saying
+   * revision conflicts are answerable with no Meta Space at all. So a stale
+   * revision -- the case the fast path exists to make cheap -- costs the same
+   * statements it did before ticket 29.
    */
   async #commitTopologyPreservingUpdate(
     tables: SqlTables<Order>,
@@ -456,6 +464,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     );
     if (decision.kind === 'aggregate-path') return undefined;
     if (decision.kind === 'answer') return decision.result;
+    if ((await tables.RepositoryState.read()) === null) return undefined;
 
     // Past this point the snapshot boundary is settled and this path commits,
     // so the write below is the first one and every earlier return has

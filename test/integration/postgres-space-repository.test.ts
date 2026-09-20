@@ -42,6 +42,9 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
   return {
     repository: new SqlSpaceRepository(postgresSqlStore),
     close: clearHyperContent,
+    removeMetaIdentity: async () => {
+      await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
+    },
     writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
       if (exportedRevision === undefined) {
         await db.orm.public.Space.where({ id: spaceId }).update({ revision });
