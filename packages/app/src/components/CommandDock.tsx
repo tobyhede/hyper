@@ -327,7 +327,7 @@ export interface DockSpace {
    * a second session (ADR 0076) and is deliberately not this.
    *
    * Nullable rather than optional so both callers state it, and `null` now means
-   * the one thing it means for {@link DockCanvas.onRename} and
+   * the one guarantee it makes for {@link DockCanvas.onRename} and
    * {@link DockGraph.onRename}: the application has withdrawn chrome title
    * editing — a live Thing title editor or content edit owns the caret, or the
    * canvas has no placement to edit against — and all three names go together.
@@ -389,7 +389,7 @@ export interface SpaceExitReport {
  * The canvas's one exclusive choice: which authored Diagram is drawing (ADR
  * 0079, ADR 0082).
  *
- * Named `canvas` after the group the Space Sidebar carried for the same thing,
+ * Named `canvas` after the group the Space Sidebar carried for the same purpose,
  * and carrying `selected` as the Diagram rather than as an id for the same reason
  * that one did — the title belongs to the Diagram, so a cluster naming what is
  * drawing reads it off the Diagram instead of deriving a second title.
@@ -503,7 +503,7 @@ export interface DockGraph {
  *
  * **Two one-way writes rather than an `open` flag**, and that is what lets the
  * Dock own the slot without a second copy of the answer beside it. The
- * application has exactly two things to say about whether this list is open —
+ * application has exactly two facts to report about whether this list is open —
  * `disclose` asks for it and `disabled` withdraws it — and nothing it reads
  * back, so neither is state it keeps. A controlled `open` pair here is the
  * shape that lets the Dock's slot and the application's flag disagree, which is
@@ -597,7 +597,7 @@ export interface DockThings {
   readonly createDisabled: Readonly<Record<DockThingKind, boolean>>;
 }
 
-/** What went wrong, which is the only thing persistence ever says. */
+/** What went wrong, which is the only report persistence ever gives. */
 export interface DockPersistence {
   /** How this Space's last commit went. `settled` and `pending` draw nothing. */
   readonly state: SpaceSessionState['persistence'];
@@ -733,7 +733,7 @@ function IdentitySurface({
    * What a behaviour test addresses this identity by.
    *
    * The three identities are one component drawn three times, so an accessible
-   * name is the only thing distinguishing them — and a test that reached for
+   * name is the only distinction between them — and a test that reached for
    * the title in the disclosure would have to know the title to find the
    * control that names it, which is the assertion inverted. The id names the
    * slot; the text in it is what is under test.
@@ -1438,7 +1438,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
  * So the exclusivity a menubar would have supplied is supplied by controlled
  * open state, which both `Menu.Root` and `Popover.Root` accept. That is not a
  * hand-rolled interaction: every dismissal, focus trap and key belongs to Base
- * UI still, and the only thing owned here is *which one* is open.
+ * UI still, and the only choice owned here is *which one* is open.
  *
  * **The id is also the trigger's.** A controlled Base UI root — `Menu.Root` as
  * much as `Popover.Root` — has to be told which element it belongs to: without
@@ -1481,7 +1481,7 @@ const THINGS_DISCLOSURE_ID = 'command-dock-things';
 /**
  * The Things list in its cluster, holding the Dock's one open slot.
  *
- * The three things the application says about whether this is open are applied
+ * The three states the application reports about whether this is open are applied
  * here rather than mirrored into a second flag: `initiallyOpen` seeds the slot
  * in {@link CommandDock}, `disabled` closes it, and `reveal` opens it on the
  * change rather than on the value. Each is a one-way write into the slot, so
@@ -1842,7 +1842,7 @@ function OpenerAndOpenSpaces({
               }
             >
               {/* A name and never an editor. A Space is renamed from inside it;
-                  this one is somewhere you are not, so the one thing it offers
+                  this one is somewhere you are not, so the one action it offers
                   is going there. */}
               <ParentIcon />
               <CommandName>{opener.title}</CommandName>
@@ -1897,7 +1897,7 @@ function OpenerAndOpenSpaces({
               )}
               {/* The same dot the unwell row carries, on the control that
                     discloses it — one treatment for one meaning, so the mark on
-                    the bar and the mark in the list read as the same thing. It
+                    the bar and the mark in the list read as one mark. It
                     is `aria-hidden` because the count above already says it;
                     two announcements of one state is the `title`-beside-`sr-only`
                     duplication the row below was fixed for. */}
@@ -2019,7 +2019,7 @@ function OpenerAndOpenSpaces({
  * never an editor: a Space is renamed from inside it, and two equally weighted
  * editable names would say you are in both.
  *
- * **Three things this removed rather than added.** There is no Exit button on
+ * **Three elements this removed rather than added.** There is no Exit button on
  * the bar — Exit is in the Space menu — no
  * separate list of open Spaces beside a trail of ancestors, and no tooltip
  * carrying depth — the Open Spaces menu's indent carries it. The Sidebar's tab strip
@@ -2042,7 +2042,7 @@ function SpacesControl({
   readonly vertical?: boolean;
 }) {
   return (
-    /* Two parts rather than one group, because they are two things: the way
+    /* Two parts rather than one group, because they have two jobs: the way
        back with the Open Spaces menu on it, and the commands on the Space you are in.
        The split is what lets the vertical dock put them on separate lines, and
        it costs no tab stop — the toolbar root is the Dock's, so both parts'
@@ -2113,7 +2113,7 @@ const MENU_SIDE = {
  * **Twelve rows in four labelled groups, and not eight.** The eight *targets* —
  * four corners and four edge-middles — are what the geometry offers a pointer,
  * because a corner is one place two edges both reach. A menu is not a place,
- * and a reader choosing from it is choosing the two things the drag chooses
+ * and a reader choosing from it is making the two choices the drag makes
  * separately: the edge, which decides the orientation, and the stop along it.
  * Collapsing them to eight would make the two corners that carry an orientation
  * choice indistinguishable from the two that do not.
@@ -2648,7 +2648,7 @@ function Dock({
  * spends a permanent slot in a five-cluster strip to report the expected
  * outcome is a slot spent on nothing. The states worth a pixel are the three
  * that need a reader: `failed`, `rejected`, `conflicted`. That is the
- * proposal, and it is the one thing here a reviewer should push back on if
+ * proposal, and it is the one claim here a reviewer should challenge if
  * they disagree — the alternative is a sixth cluster that is blank 99% of the
  * time.
  *

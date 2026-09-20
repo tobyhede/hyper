@@ -102,7 +102,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
 
   // One answer, and nothing behind it — not the things, and not even a file that
   // could not be read. `documentRefusal`'s docblock is where the argument for
-  // one composed gate lives; two things are only true at this call site.
+  // one composed gate lives; two facts are only known at this call site.
   //
   // It is asked before `importSpaceFileSchema`, which runs ahead of domain
   // intake, or that schema answers first: a cascade of moved keys for a version
@@ -113,7 +113,7 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   // its author to fix a file permission and only then tells them the work was
   // pointless. The mirror holds and is why this is not hoisted above the read
   // itself: with no space file there is no document, so `documentRefusal`
-  // decides nothing and the read failure is the only thing there is to say.
+  // decides nothing and the read failure is the only available report.
   const refusal = documentRefusal(spaceJson);
   if (refusal !== null) {
     throw new AggregateDirectoryError('parsing', [`${spaceFile}: ${refusal.message}`]);

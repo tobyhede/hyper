@@ -101,7 +101,7 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
  * finished, and every read of current state, every eligibility question and the
  * whole derivation of the next Space happen on this side of the seam.
  * `settled-thing-movement` alone carries geometry — the moved Things' own drop
- * points — because a pointer gesture is the only thing that knows where React
+ * points — because a pointer gesture is the only input that knows where React
  * Flow drew them; every other kind is written against the Diagram the Edit
  * derives against.
  */
@@ -299,7 +299,7 @@ export type AuthoringRefusal =
   | { readonly code: 'diagram-active-graph-required' };
 
 /**
- * The published state: what the collaborators say, plus the one thing only
+ * The published state: what the collaborators say, plus the one fact only
  * Authoring knows — that a replacement Space has been opened over them.
  *
  * Placement is absent because Authoring holds none: every Edit derives it
@@ -490,7 +490,7 @@ interface SpaceAuthoringDependencies {
    * as well as the entropy pool.
    *
    * It is also what makes {@link deriveCompletedEdit} the pure core its own
-   * comment claims: minting from the ambient CSPRNG was the one thing left in
+   * comment claims: minting from the ambient CSPRNG was the one source of nondeterminism left in
    * there that a second call could not reproduce.
    *
    * One function for all three kinds, because they are one type — the ids of

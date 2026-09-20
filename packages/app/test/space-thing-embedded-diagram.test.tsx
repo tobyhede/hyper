@@ -1307,7 +1307,7 @@ describe('the Diagram an Open Space Thing draws', () => {
    * unreachable, and a pair resolving to nothing means the Diagram it names was
    * deleted out from under it. The Thing has neither failed nor is it waiting:
    * its target read, so both selectors are drawn over the Diagrams that do
-   * exist, and the only thing missing is the one it points at.
+   * exist, and the only missing entity is the one it points at.
    */
   it('draws no view for a Thing whose selected Diagram the target no longer holds', async () => {
     await mount(

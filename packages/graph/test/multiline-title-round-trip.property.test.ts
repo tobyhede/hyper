@@ -8,7 +8,7 @@ import { uuid } from './thing-files';
  * A multiline Title survives a Thing file round trip (ADR 0083).
  *
  * The newlines in a Title are load-bearing — the first line names the Thing and
- * the lines after it qualify it — and the only thing between an authored Title
+ * the lines after it qualify it — and the only transformation between an authored Title
  * and a stored one is `stringify`/`parse` inside the frontmatter fence. The
  * `yaml` package writes a multiline string as a block scalar, so this is
  * expected to hold rather than expected to break, which is exactly why it needs
@@ -34,7 +34,7 @@ const EVERY_KIND: readonly ThingKind[] = ['markdown', 'reference', 'space'];
 /**
  * The same Title on each Thing kind. Every kind writes its Title through the one
  * `thingTitleSchema`, so a Title that only survived on a Markdown Thing would be
- * a fence or a field-order fault rather than a schema one — which is a thing
+ * a fence or a field-order fault rather than a schema one — which is a result
  * only writing all three out can tell us.
  */
 function thingOf(kind: ThingKind, title: string): Thing {

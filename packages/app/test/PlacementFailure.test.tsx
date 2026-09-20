@@ -34,7 +34,7 @@ describe('a placement failure', () => {
 
   /**
    * A strategy's message says which Thing it could not place; it does not say
-   * that the canvas is empty for that reason. The heading is the only thing
+   * that the canvas is empty for that reason. The heading is the only element
    * that does, so the panel is not the raw message under an alert role — and
    * it stays a real heading, reachable by heading navigation, not just visible
    * text.

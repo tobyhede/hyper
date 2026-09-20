@@ -113,7 +113,7 @@ describe('describeAggregateRefusal', () => {
 
   /*
    * Both descriptions and their order, not a count. `toHaveLength(2)` could not
-   * observe the one thing this test's name promises — a reordered or wrong pair
+   * observe the one behaviour this test's name promises — a reordered or wrong pair
    * passed it — and order is the part a caller depends on, since the renderer
    * maps over the errors intake gave it and the CLI prints the result as written.
    */

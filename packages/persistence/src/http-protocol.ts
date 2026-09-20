@@ -203,7 +203,7 @@ const exactRecord = (
  * should not read one way at the CLI and another on the wire.
  * `test/unit/import-decoding.test.ts` holds them to it.
  *
- * That test also pins the two things this formula quietly assumes. The fold to
+ * That test also pins the two assumptions this formula makes. The fold to
  * lower case loses nothing whose case is information — no message either schema
  * produces carries an acronym or a capitalised quoted identifier, Zod 3 writing
  * `Invalid uuid` rather than `Invalid UUID`. And `issues` is never empty: a

@@ -174,7 +174,7 @@ export function createBrowserLocation(
    *
    * Every operation below writes the whole of its own state *before* it moves a
    * collaborator, so a notification a collaborator raises part-way through
-   * already sees the settled position and decides the same thing this does. The
+   * already sees the settled position and reaches the same decision this does. The
    * second decision is then a no-op: `sync` skips a position it has recorded
    * and `publish` skips a state that has not changed. That ordering is the
    * functional-core rule the repository already asks for, and it is what makes

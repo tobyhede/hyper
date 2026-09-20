@@ -63,7 +63,7 @@ export interface DestinationSyncInput {
  *
  * It **extends** the address rather than restating its three fields, and the
  * Thing arrives inside it rather than beside it. Both were separate once and
- * both cost the same thing: a caller could hand `destinationSync` an address
+ * both carry the same risk: a caller could hand `destinationSync` an address
  * already carrying a Thing and a second Thing argument that disagreed with it,
  * and structural typing had nothing to say — the spread that built the position
  * silently preferred the loose one while the `synced` comparison had seen the

@@ -504,7 +504,7 @@ describe('an unwell Space the reader is not in', () => {
    * failed reported nowhere; it is always drawn now, so its trigger reports it.
    *
    * Assembled here rather than added to the stable sheet: it is the same
-   * production `CommandDock` over the same fixture, with the one thing the
+   * production `CommandDock` over the same fixture, with the one input the
    * session shape decides — the open set and the Opener — replaced. A story
    * export owes a parity claim and two suites (ADR 0052), and what is under
    * test is a derivation, not a treatment.
@@ -589,7 +589,7 @@ function TwoSpacesWithAnUnwellOpener() {
         });
         // A refused Edit commits nothing, so the wait below would spend its
         // whole timeout and then report the persistence state rather than the
-        // refusal that caused it. `openDockStory` checks the same thing.
+        // refusal that caused it. `openDockStory` checks the same outcome.
         if (edit.kind !== 'completed')
           throw new Error(`The Opener's Edit was ${edit.kind}, so no commit failed.`);
         await failedCommit(openedOpener.session);

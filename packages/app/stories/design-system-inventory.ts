@@ -38,7 +38,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/app/src/SpaceApp.tsx',
     reason:
-      'Isolated single-Space mounting adapter, reached only by `packages/app/test/space-mounting.ts`. Startup mounts `OpenSpacesApplication` for every host, so no story renders this and an import edge would be the only thing catalogue coverage could rest on.',
+      'Isolated single-Space mounting adapter, reached only by `packages/app/test/space-mounting.ts`. Startup mounts `OpenSpacesApplication` for every host, so no story renders this and an import edge would be the only evidence catalogue coverage could rest on.',
   },
   {
     module: 'packages/app/src/main.tsx',

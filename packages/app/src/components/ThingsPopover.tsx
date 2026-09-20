@@ -299,7 +299,7 @@ const NOTHING_REFUSED: StandingRefusal = { opening: 0, said: null };
  * Three surfaces were compared — a Drawer from the screen edge, a Popover
  * anchored to its trigger, and a second dock of its own — over a Space with
  * twenty-nine unplaced Things, which is the scale that separates them. The
- * Popover won on the two things the comparison was for: it is anchored to the
+ * Popover won on the two criteria in the comparison: it is anchored to the
  * control that opened it the way the menus beside it are, so the Dock reads as
  * one surface rather than a bar that sometimes summons a panel; and a drag out
  * of it survives its own dismissal, so adding several Things costs one
@@ -560,7 +560,7 @@ export function ThingsPopover({
           {/* **The search is first and the toggles are under it.** Typing a name
               is what a reader reaches for, and it is the control that needs no
               prior decision; the toggles say what the list is *made of*, which
-              is a thing you adjust once and leave. Putting the row of glyphs
+              is a setting you adjust once and leave. Putting the row of glyphs
               first made the reader answer a question they had not asked yet. */}
           <InputGroup>
             <InputGroupAddon align="inline-start">

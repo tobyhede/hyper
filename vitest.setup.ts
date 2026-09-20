@@ -244,7 +244,7 @@ if (typeof Range !== 'undefined' && !('getBoundingClientRect' in Range.prototype
  * is not a stub waiting for its reason to be deleted again.
  *
  * Guarded like the stubs above — the setup file also runs under
- * `environment: 'node'`, and any environment that implements the real thing
+ * `environment: 'node'`, and any environment that implements the real API
  * keeps it. The guard reads the value rather than asking `in`, because jsdom
  * *declares* `matchMedia` and leaves it `undefined`: the property is there and
  * calling it throws. Read off a widened reference so the check is about the value

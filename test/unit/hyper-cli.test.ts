@@ -120,7 +120,7 @@ describe('runHyper', () => {
 
   /*
    * Export is whole-aggregate, so there is no Space to name and no Space to get
-   * wrong; the one thing left that can be missing is the aggregate itself. An
+   * wrong; the one input left that can be missing is the aggregate itself. An
    * uninitialized repository is a fact about the database rather than bad input,
    * so it exits 1 rather than 2 and writes nothing.
    */
@@ -621,7 +621,7 @@ describe('runHyper', () => {
     // catch that, and a revision codec that narrowed through `Number` on
     // either database (ADR 0095's shared `decodeStoredRevision`/
     // `encodeStoredRevision`, `packages/persistence/src/revision-codec.ts`)
-    // is exactly the kind of thing that would reintroduce it.
+    // is exactly the kind of edit that would reintroduce it.
     //
     // A real initialization mints revision 0, so the revision is bent on the way
     // back out of the seam rather than stubbed: what is under test is the
@@ -738,7 +738,7 @@ describe('runHyper', () => {
   });
 
   /*
-   * There is no public merge, so the only thing an import into an initialized
+   * There is no public merge, so the only operation an import into an initialized
    * repository could do is destroy what is there. It refuses instead, and the
    * refusal has to name both the Meta identity in the way and the flag that
    * would proceed — the operator cannot recognise what they are about to lose

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * ADR 0062's ratchet is three things that have to stay together: the rule on as
+ * ADR 0062's ratchet has three parts that have to stay together: the rule on as
  * an error, a committed baseline recording what was already there, and
  * `--prune-suppressions` in the lint `verify` runs so the ceiling only falls.
  * Delete any one of them and the other two still look enforced, which is what

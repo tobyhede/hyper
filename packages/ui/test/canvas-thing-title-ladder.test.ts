@@ -6,7 +6,7 @@ import { COLLAPSED_THING_SIZE } from '@project/core';
 /**
  * The Title ladder's typography, read off the stylesheet that declares it.
  *
- * Two things are being held here and neither is visible to a renderer test.
+ * Two properties are being held here and neither is visible to a renderer test.
  *
  * The first is a **regression**: a Title with no break in it is the Title Hyper
  * has always drawn, and ADR 0083 says so in as many words. Its four numbers —

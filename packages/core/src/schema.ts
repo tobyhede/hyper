@@ -402,7 +402,7 @@ export const AGGREGATE_FILE_VERSION = 1;
 /**
  * `hyper.json` — the root of a canonical aggregate directory.
  *
- * It carries the one thing the directory cannot say for itself: which of its
+ * It carries the one fact the directory cannot say for itself: which of its
  * Spaces is Meta. No adapter may infer that from ordering, cardinality or
  * topology (ADR 0078), and a directory is exactly where such an inference would
  * be tempting — the first child, the alphabetically-least name — so the

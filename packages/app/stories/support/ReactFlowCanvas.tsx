@@ -91,7 +91,7 @@ export function useProjection(
   drawn: DrawnDiagram = INVENTORY_DIAGRAM,
 ): ProjectedCanvas | Error | null {
   const [projected, setProjected] = useState<ProjectedCanvas | Error | null>(null);
-  // Keyed on the two things that decide the whole derivation, so a story that
+  // Keyed on the two inputs that decide the whole derivation, so a story that
   // re-renders on every Active Graph change does not lay the Space out again.
   // Destructured first because the identity of `drawn` itself is not what
   // decides a re-layout, and a dependency on the object would make an inline
@@ -224,7 +224,7 @@ export function StoryCanvas({
 /**
  * The bordered, padded box a canvas-hosting story mounts `StoryCanvas` inside.
  *
- * The height is the one thing that legitimately varies per story — the HUD's
+ * The height is the one value that legitimately varies per story — the HUD's
  * minimap needs less room than the selected-Edge controls do to show a routed
  * Edge clearly — so it stays a caller-supplied Tailwind height class rather
  * than a second enum this module would have to keep in step with content it

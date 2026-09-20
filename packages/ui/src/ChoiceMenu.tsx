@@ -76,7 +76,7 @@ export interface ChoiceMenuProps<Id extends string> {
  * offer, which member is chosen and what choosing one does all arrive from the
  * caller, because they are nothing alike: the Dock's Diagram list moves the
  * canvas the reader is looking at, and a Space Thing's writes which Diagram that
- * Thing shows into the Thing. What is genuinely one thing is how a bound
+ * Thing shows into the Thing. What is genuinely shared is how a bound
  * single choice is *drawn and operated* — a labelled radio group, one mark on
  * the member you are on, the menu's own roving focus, type-ahead and dismissal
  * — and that is what lives here rather than at each surface.

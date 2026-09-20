@@ -12,7 +12,7 @@ import { cn } from './lib/utils';
  * and none of it is re-implemented here: these wrappers add the toolbar palette
  * and nothing else.
  *
- * Two things are deliberately left to the caller. **Escape** is not handled —
+ * Two responsibilities are deliberately left to the caller. **Escape** is not handled —
  * cmdk leaves it to whatever surface contains the list, and the authoring
  * contract makes the field draft consume the first Escape and the surface the
  * second, which only the caller can order. **Filtering** is cmdk's default

@@ -129,7 +129,7 @@ export interface OpenSpaces {
    * stack, and N compositions each holding the position they last synced to
    * would be N modules disagreeing about it. `openPath` is the
    * pathname-to-opening direction and this is its inverse, so both live with
-   * the one thing that knows how many Spaces there are.
+   * the one model that knows how many Spaces there are.
    */
   readonly browserLocation: BrowserLocation;
 }
@@ -329,13 +329,13 @@ export function createOpenSpaces({
       return;
     }
     // An opener has to name a Space that is open, and `from` was read before a
-    // wait of arbitrary length. Two things can have happened to it since. The
+    // wait of arbitrary length. Two events can have happened to it since. The
     // crossing can have been made from this very Space, which is what `enter`
     // on the active Space reads back once that Space exits inside the wait.
     // And the Space crossed from can itself have exited, whose re-homing ran
     // over a record this entry was not in yet to be re-homed. Either way there
     // is nothing left to hang off, and an opener naming a Space that is gone
-    // is the one thing that takes this entry out of the list that is the only
+    // is the one action that takes this entry out of the list that is the only
     // way back to it. What the second case loses is the exited Space's own
     // opener, which its re-homing discarded before this runs, so a crossing
     // raced this way joins at the root rather than where it would have landed
