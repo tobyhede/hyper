@@ -13,7 +13,7 @@
 
 **Generating a migration does not need a live database.** The Card ticket assumed it did, wrote that assumption into its own Hazards section and into a PR description, and both had to be corrected afterwards. `prisma-next migrate` refuses without a connection because it *applies*; `prisma-next migration plan` generates one fully offline.
 
-**Pass `--from <head-hash>` explicitly.** `migration plan` with no `--from` plans from `<empty>` — 8 operations including a `CREATE SCHEMA` rather than the 4 this needs — and silently adds a second root to the migration graph. It was caught last time only by reading the operation count and the `from`/`to` hashes the plan prints.
+**Pass `--from <head-hash>` explicitly.** `migration plan` with no `--from` plans from `<empty>` — on PostgreSQL, 8 operations including a `CREATE SCHEMA` rather than the 4 this needs — and silently adds a second root to the migration graph. It was caught last time only by reading the operation count and the `from`/`to` hashes the plan prints.
 
 ## The rename is destructive, and that is accepted
 
@@ -22,7 +22,7 @@
 **This is two migrations, not one.** SQLite arrived after the Card rename, so `src/prisma/contract.prisma` and `src/sqlite/contract.prisma` each need their own, generated against their own head.
 
 - [ ] Both contracts declare `model Resource` mapped to `resources`.
-- [ ] One forward migration per database, generated offline with an explicit `--from`, each with four operations and no `CREATE SCHEMA`.
+- [ ] One forward migration per database, generated offline with an explicit `--from`, and no `CREATE SCHEMA`. **The two operation counts differ.** PostgreSQL plans four — `dropTable`, `createTable`, `createIndex`, `addForeignKey` — exactly as `20260910T1429_rename_card_to_thing` does. SQLite plans three — `dropTable`, `createTable`, `createIndex` — because `@prisma-next/sqlite/migration` has no `addForeignKey`: the foreign key is a `foreignKey(...)` table constraint inside `createTable`, which is how `20260916T1302_initial` writes the one on `things`.
 - [ ] Each migration's doc comment states that it destroys stored rows and names the export/import recovery.
 - [ ] The pre-existing migration files in both trees are byte-identical afterwards.
 - [ ] Runtime SQL identifier literals (`things`, `things_pkey`, `things_space_id_idx`, `things_space_id_fkey`) moved wherever they are written as strings rather than generated.

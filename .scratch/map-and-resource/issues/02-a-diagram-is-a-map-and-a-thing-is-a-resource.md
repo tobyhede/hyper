@@ -9,7 +9,7 @@
 
 **Before running anything, the tree must be clear.** Every branch alive during the sweep is a full-range replay from its merge-base — never a tips-only rewrite, which changes the shape of the conflicts without reducing them (30 to 9, measured last cycle). PR #243 lands first: it modifies `test/unit/current-domain-vocabulary.test.ts`, which 04 rewrites, and `packages/persistence/src/repository.ts`, which declares the `SpaceResourceRepository` the script pre-renames.
 
-**Scale:** 488 files rewritten, 128 paths renamed, in one pass. ADR 0085 needed two sweeps to do less.
+**Scale:** 487 files rewritten, 128 paths renamed, in one pass. ADR 0085 needed two sweeps to do less.
 
 **`pnpm exec prettier --write .` is not optional.** Both nouns change length, lines re-wrap, and `format:check` is red without it.
 

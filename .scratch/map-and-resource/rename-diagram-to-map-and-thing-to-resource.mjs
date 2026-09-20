@@ -186,18 +186,27 @@ const BARE_CITATION = /\b[a-z][a-z0-9-]*\/\d{2}\b/g;
  * incoming domain noun would not land beside the word it had taken. The risk
  * now runs the other way: the sweep turns a genuine English "the same thing"
  * into "the same resource", which is not a collision but simply wrong text, and
- * it is invisible in a 488-file diff.
+ * it is invisible in a 487-file diff.
  *
  * A determiner is the tell. The domain noun in prose is capitalised here by
  * convention — "a Thing", "every Thing" — so a *lowercase* noun behind an
  * English determiner is either ordinary English or a sentence that already
  * failed the convention. Both want a human. This over-reports on purpose: a
  * list to read is the cheap half, and the expensive half is not having one.
+ *
+ * **Every line is read, in every file, with no prose-line heuristic in front of
+ * it.** An earlier version reported a non-Markdown line only when it opened
+ * like prose — a `*`, `//`, `-`, `#`, `>`, a backtick or a capital — and that
+ * filter hid 100 of the 491 sites, every one of them genuine English: the
+ * `it('… a thing …')` and `test('… a thing …')` descriptions, string literals
+ * like `'Two spaces in this edit claim the same thing.'`, and the wrapped
+ * middle lines of block and JSX comments. It bought nothing in return, because
+ * the shape needs a determiner, a *space* and the noun, which no identifier
+ * spells — the 100 it hid contained no code at all.
  */
 const DETERMINER =
   '(?:same|a|an|one|the only|any|every|each|first|last|real|main|right|whole|another|no|two|three|several|such a|this|that|which|other|next|sort of|kind of)';
 const PROSE_NOUN = new RegExp(`\\b${DETERMINER} (?:things?|diagrams?)\\b`, 'gi');
-const PROSE_LINE = /^\s*(\*|\/\/|-|#|>|$|[A-Z`])/;
 
 /**
  * A sentinel no source in this repository contains. Spelled without control
@@ -316,9 +325,7 @@ for (const file of tracked) {
 
   // Every lowercase retired noun behind an English determiner, in prose, with
   // its line, so the preparatory read is generated rather than grepped.
-  const markdown = file.endsWith('.md');
   before.split('\n').forEach((line, index) => {
-    if (!markdown && !PROSE_LINE.test(line)) return;
     for (const match of line.match(PROSE_NOUN) ?? []) {
       if (/[A-Z]/.test(match.split(' ').at(-1) ?? '')) continue;
       prose.push(`${file}:${index + 1}  ${match}  —  ${line.trim().slice(0, 96)}`);
