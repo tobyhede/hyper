@@ -220,7 +220,7 @@ describe('the browser location', () => {
   });
 
   /**
-   * A cleared report and a corrected location are one thing, not two.
+   * A cleared report and a corrected location are one repair, not two.
    *
    * The choice is the Diagram already selected, so the position does not move
    * and no entry is earned — while the location the reader is still on is the
@@ -285,7 +285,7 @@ describe('the browser location', () => {
   /**
    * Activating a Graph makes the same deliberate move a Diagram choice does — it
    * clears the addressed Thing and answers the report — and differs in exactly
-   * one thing, which is the reason it may not simply call the same operation:
+   * one operation, which is the reason it may not simply call the same operation:
    * it does not change the Diagram, so the published projection stays.
    */
   it('answers the report from an activated Graph without disturbing the render adapter', () => {

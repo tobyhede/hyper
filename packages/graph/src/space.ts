@@ -333,7 +333,7 @@ function buildSpace(input: {
  * SAFETY: it sits here rather than at each loader because `buildSpace` is the
  * function that has just run the reference check the brand asserts. The
  * argument is the Space without it, so the cast can add nothing else: every
- * field is still checked against the declared shape, and the only thing being
+ * field is still checked against the declared shape, and the only assertion being
  * asserted is that this value came through intake.
  */
 const intake = (space: Omit<Space, typeof SPACE_INTAKE>): Space => space as Space;

@@ -340,7 +340,7 @@ export const CloseIcon = () => <X size={14} strokeWidth={3} />;
 export const LinkActionsIcon = (props: ThingActionIconProps) => <Link size={14} {...props} />;
 
 /**
- * Open an entity's actions menu, where the menu is not mostly one thing.
+ * Open an entity's actions menu, where the menu does not primarily serve one action.
  *
  * The conventional "more" glyph, and conventional is the whole argument: a
  * Space title or a Sidebar row carries no other command to be generic beside,

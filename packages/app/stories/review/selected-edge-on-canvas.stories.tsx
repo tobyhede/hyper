@@ -30,12 +30,12 @@ CloseIn.meta = { iframed: true };
 /**
  * The endpoint editor open over the canvas, anchored to the Edge's controls.
  *
- * **The two halves are drawn at different scales**, which is the first thing
+ * **The two halves are drawn at different scales**, which is the first difference
  * this story showed and which no component story could: the toolbar is inside
  * `EdgeLabelRenderer` and so is painted at the viewport's zoom, while the
  * popover is portalled to the document by Base UI and is painted at 1:1. At the
  * opening zoom the editor is several times the size of the control that opened
- * it, and covers the two Things the Edge runs between. Left as a thing to look
+ * it, and covers the two Things the Edge runs between. Left as a detail to look
  * at rather than fixed here.
  */
 export const EditorOnCanvas: Story = () => <SelectedEdgeCanvasFixture editorOpen />;

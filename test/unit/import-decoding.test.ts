@@ -37,7 +37,7 @@ import {
  * caller. The duplication is the deliberate half; the drift is not, and nothing
  * but this stops the CLI and the wire describing one failure two ways.
  *
- * One thing did get easier. The old door parsed with `importSpaceSchema` and the
+ * One part did get easier. The old door parsed with `importSpaceSchema` and the
  * wire with `spaceSnapshotSchema`, so every fixture had to be built to fail
  * identically under both; `identifySpace` parses the identified snapshot with
  * `spaceSnapshotSchema`, the very schema the wire uses, so what is left under
@@ -55,7 +55,7 @@ describe('import decoding', () => {
    * Every fixture here names every id it carries, so the object `identifySpace`
    * parses is the object the wire is handed and the two summarisers are given
    * one issue list. A mint would make them different documents and the parity
-   * below would be comparing two things rather than one — so a mint throws
+   * below would be comparing two values rather than one — so a mint throws
    * instead of quietly succeeding (ADR 0016: the caller owns identity).
    */
   const unmintable = (): UUID => {
@@ -150,7 +150,7 @@ describe('import decoding', () => {
    * The label is the one word allowed to differ: `identified space` names what
    * the importer was holding, `create change snapshot` what the codec was
    * handed. Each function's root-path placeholder — `space` here, `snapshot`
-   * there — names the same thing and is out of play, both fixtures being objects
+   * there — names the same case and is out of play, both fixtures being objects
    * whose every issue has a path.
    */
   it('describes one malformed document the same way for the CLI and for the wire', () => {

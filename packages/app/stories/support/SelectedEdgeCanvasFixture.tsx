@@ -29,7 +29,7 @@ import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
  *
  * **This is a `Review/` story on purpose.** It carries no parity claim and
  * asserts nothing — it exists to be *looked at*, because the isolated component
- * stories cannot show the one thing that decides whether this surface works.
+ * stories cannot show the one state that decides whether this surface works.
  * `EdgeLabelRenderer` portals the controls into the flow's transformed layer, so
  * they are drawn at the viewport's scale: the fixture opens at roughly 0.55 and
  * the controls are correspondingly small, which a story rendering the component

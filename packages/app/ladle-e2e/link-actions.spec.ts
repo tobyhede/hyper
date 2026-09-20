@@ -18,7 +18,7 @@ const THING_COPY_LINK = /^Copy link to Thing(?! in Diagram)/;
  * a Sidebar row". The Command Dock has clusters rather than rows and no
  * `onContextMenu` anywhere, so that behaviour did not move: it belongs to the
  * Thing rail (ADR 0073), which is what the last two tests in this file press.
- * What is left of the Sidebar's half is the one thing the Dock still decides
+ * What is left of the Sidebar's half is the one choice the Dock still decides
  * about the Space's own menu — which address it offers, and that Rename is a
  * command in it — restated below in the Dock's own words and untagged, the claim
  * it stood for having been retired rather than renamed.

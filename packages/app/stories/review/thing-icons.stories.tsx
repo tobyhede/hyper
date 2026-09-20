@@ -570,7 +570,7 @@ function GlyphNodeElement({
 /**
  * Lucide's own drawing attributes, so a candidate weighs what it would weigh.
  *
- * `dash` is the one thing here lucide does not ship. There is no
+ * `dash` is the one glyph here lucide does not ship. There is no
  * `sticky-note-dashed` — the family stops at `-check`, `-plus`, `-x` — so the
  * dashed twin is the same glyph with a dash pattern on its stroke. That is not
  * a liberty: `canvas-thing.css` already draws a Reference Thing with `border-style:
@@ -709,7 +709,7 @@ const REFERENCE_BADGE = { mark: 'arrow-up-right' } as const satisfies ReferenceO
 const REFERENCE_OPTIONS: readonly ReferenceOption[] = [
   {
     title: 'Edge dotted, corner solid',
-    note: "The canvas's own convention, and nothing added. Cheapest, and the only option that needs no second shape — but it is a difference in stroke, which is the first thing a small glyph loses.",
+    note: "The canvas's own convention, and nothing added. Cheapest, and the only option that needs no second shape — but it is a difference in stroke, which is the first detail a small glyph loses.",
     dash: '9 5',
     dashBodyOnly: true,
   },

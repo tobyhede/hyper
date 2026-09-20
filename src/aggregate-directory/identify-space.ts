@@ -42,7 +42,7 @@ interface SchemaIssue {
  * one — but only while no message carries a word whose case is information.
  * None does: Zod 3 writes `Invalid uuid`, no reachable message echoes the input
  * back, and every literal `@project/core` declares is already lower case, so
- * the kinds a discriminator quotes survive intact. It costs exactly one thing,
+ * the kinds a discriminator quotes survive intact. It costs exactly one concession,
  * the capital on the second sentence of that discriminator message. The test
  * scans real failures from both schemas for an acronym or a capitalised quoted
  * identifier, so the day Zod or a literal grows one, this stops being safe out
@@ -68,7 +68,7 @@ export const describeSchemaFailure = (issues: readonly SchemaIssue[], label: str
  *
  * **This is the importer's job, not a repository's.** Both adapters used to
  * mint here — `resolveImport` in `PostgresSpaceRepository` and `identifyImport`
- * in the memory double — which made the same rule a thing two implementations
+ * in the memory double — which made the same rule something two implementations
  * had to agree about, with a shared contract test standing over them to check
  * that they did. `initializeAggregate` and `replaceAggregate` take fully
  * identified snapshots (ADR 0078), so the minting has one home on the way in

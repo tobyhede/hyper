@@ -481,7 +481,7 @@ describe('the vocabulary that guard reads', () => {
  * ADR 0054 rolls the unreleased prototype forward, and issue `04` foreclosed
  * every back-compat path for that key by name — so there is no live source this
  * scan would be protecting, and a document outside this repository still
- * carrying it is not a thing a scan over tracked files can reach anyway.
+ * carrying it is not content a scan over tracked files can reach anyway.
  *
  * The names below have no qualified sense anywhere, unlike ADR 0041's, so this
  * scan carries no exemption list beyond the historical trees. What it caught on
@@ -578,7 +578,7 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
 
   it('reaches the kinds of file this rename actually touched', () => {
     // The two files the rename left something behind in: the Space command
-    // surface, which held one identifier over two things, and the agent-facing
+    // surface, which used one identifier for two concepts, and the agent-facing
     // document that pointed at a deleted module. A file list that quietly
     // stopped resolving would report nothing forever. The surface is the
     // Command Dock now — `SpaceSidebar.tsx` stood here until ADR 0082 retired
@@ -1025,7 +1025,7 @@ describe('the retired name for the surface over the open set is gone', () => {
  * The retired names for the Opener and the Dock control that names it.
  *
  * `CONTEXT.md` names the Space a Space was Entered from its **Opener**. The Dock
- * called the same thing, and the control drawing it, a step — one back, or the
+ * given the same name, and the control drawing it, a step — one back, or the
  * parent's — which is a trail's word for a history `CONTEXT.md` defines as a
  * record, not a path. Built from fragments for the reason the block above is.
  *
@@ -2263,7 +2263,7 @@ describe('a Space is named once (ADR 0010)', () => {
  * **phrases** the retired senses were written in, and the import alias that
  * existed only to dodge the collision between sense 1 and sense 2.
  *
- * So the guard holds three things, and is honest that it holds no more:
+ * So the guard holds three guarantees, and is honest that it holds no more:
  *
  *  - The boundary phrase, in the compound, hyphenated and prose shapes. It
  *    named one Space's own diagram and thing structure, which is the
@@ -2340,7 +2340,7 @@ const AGGREGATE_RETIREMENT_NOTICE = `${keptAggregate} ${RETIRED_ROOT} as a name 
 const withoutAggregateNotice = (source: string): string =>
   source.split(AGGREGATE_RETIREMENT_NOTICE).join('retired');
 
-describe('aggregate names one thing (ADR 0088)', () => {
+describe('aggregate has one meaning (ADR 0088)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {

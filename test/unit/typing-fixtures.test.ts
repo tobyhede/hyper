@@ -362,7 +362,7 @@ describe('every tool actually read every fixture', () => {
   it('oxlint linted every fixture', () => {
     // oxlint's report names only files it had something to say about, so a clean
     // `must-pass` fixture is absent from it either way. `number_of_files` is the
-    // one thing it prints that distinguishes "read and clean" from "never read".
+    // one detail it prints that distinguishes "read and clean" from "never read".
     expect(
       oxlintFilesLinted,
       'oxlint linted a different number of files than there are fixtures',

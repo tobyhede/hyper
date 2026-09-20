@@ -291,7 +291,7 @@ export function ThingNode({
    * Forwarded whole rather than flag-and-operation, because a command list is
    * already both: each command carries what running it does, and a command the
    * composition withheld is simply not in the list. What is decided here is the
-   * one thing this layer knows and the composition does not — a read-only
+   * one fact this layer knows and the composition does not — a read-only
    * canvas draws content and no commands, so the menu goes with the rest of the
    * rail rather than being the one control that survived it.
    */

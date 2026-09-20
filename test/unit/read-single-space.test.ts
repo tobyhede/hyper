@@ -285,7 +285,7 @@ describe('readSingleSpace', () => {
   it('reports an unreadable space file ahead of any refusal it cannot decide', async () => {
     // The mirror of the case above, and the reason the refusal is not simply
     // hoisted above every read: with no space file there is no document, so a
-    // read failure is the only thing there is to say.
+    // read failure is the only available report.
     const temporaryDirectory = await makeTemporaryDirectory();
     const talkDirectory = join(temporaryDirectory, 'talk');
     await mkdir(talkDirectory);

@@ -115,7 +115,7 @@ export const openSpacesName = (open: number, unwell: number): string =>
 /**
  * Which edge the Dock is against.
  *
- * The edge decides three things at once and they are not independent: the
+ * The edge makes three decisions at once and they are not independent: the
  * orientation the Dock draws in, which way its menus open, and how much
  * clearance it needs from the browser's own furniture.
  *
@@ -413,7 +413,7 @@ export type ExitOutcome = Exclude<ExitSpaceResult, { kind: 'exited' }>;
 type ExitRefusal = Extract<ExitSpaceResult, { kind: 'refused' }>['refusal'];
 
 /**
- * The one thing that distinguishes the sentences: what the reader can do.
+ * The one distinction between the sentences: what the reader can do.
  *
  * `persistence-recovery-required` is one code and two situations, and a reader
  * sent to Resolve when the fix is Retry has been sent to the wrong control — so
@@ -436,7 +436,7 @@ const exitReportKey = (outcome: ExitOutcome): ExitReportKey =>
  * `if`s answers for an arm it has never heard of, and the answer it gives is
  * silence — which for a refusal means a command that does nothing and says
  * nothing about why. ADR 0082 binds the surface to name which open Space is
- * unwell, so silence is the one thing this may not do.
+ * unwell, so silence is the one outcome this may not produce.
  */
 const EXIT_REPORT = {
   'persistence-rejected': (title) =>

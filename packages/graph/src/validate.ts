@@ -88,7 +88,7 @@ interface GraphOccurrence {
  *
  * **One failed reference earns one diagnosis.** Independent faults accumulate —
  * an author fixing a space wants all of them — but a single bad reference never
- * cascades into several kinds saying the same thing from different angles.
+ * cascades into several kinds reporting the same fault from different angles.
  * That is why the endpoint and Active Graph checks below each choose between two
  * kinds rather than reporting both, and why a repeated graph id is one error
  * naming every occurrence rather than one error per occurrence after the first.
@@ -151,7 +151,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // deleted thing (ADR 0025).
     //
     // A key naming a missing thing still joins `members`, which is what keeps
-    // this the *only* thing said about it: an edge into that thing is then a
+    // this the *only* fault reported for it: an edge into that thing is then a
     // consequence of this fault rather than a second one.
     const members = new Set<string>();
     for (const key of Object.keys(diagram.positions)) {

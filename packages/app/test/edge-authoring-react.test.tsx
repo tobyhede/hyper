@@ -1288,7 +1288,7 @@ describe('spending a continuation on the canvas', () => {
    * takes, where Authoring has just minted a Thing and the projection carrying
    * it arrives with the Edges untouched. `decorated` memoises on that same
    * reference, so React Flow's store keeps the edges it has and the drawn nodes
-   * are the only thing that moves. Without the node subscription the spend
+   * are the only state that moves. Without the node subscription the spend
    * waits on whatever unrelated render happens along — and on nothing at all if
    * none does, which is a caret left on `document.body` and, for `reveal`, a
    * camera that never arrives.

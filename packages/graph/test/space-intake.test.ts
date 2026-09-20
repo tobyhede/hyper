@@ -16,7 +16,7 @@ import { referenceFile, thingFile, uuid } from './thing-files';
  * and the pair of them is exactly where a divergence would hide.
  *
  * The old `validate.test.ts` handed hand-built broken diagrams straight to
- * `validateReferences`. That module is internal, its input shape is not a thing
+ * `validateReferences`. That module is internal, its input shape is not a value
  * any caller holds, and half of what it accepted was a shape the schema rejects
  * — so those cases are here instead, stated over documents a loader could
  * actually be given.
@@ -259,7 +259,7 @@ describe.each([
     it('loads a diagram whose only graph holds no edges', () => {
       // Creating a Diagram creates its initial empty Active Graph in the same Edit
       // (ADR 0040), and converting a View returns exactly that (ADR 0045), so
-      // this is the first thing a conversion writes. Closure over an empty edge
+      // this is the first result a conversion writes. Closure over an empty edge
       // set is vacuous, not exempt.
       const space = loaded(
         load({

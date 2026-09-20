@@ -77,7 +77,7 @@ const httpRestrictions = async (): Promise<RestrictedImports> => {
   // destructure still needs a cast.
   const [severity, options] = rule as readonly unknown[];
   // 2 is `error`. A zone downgraded to a warning would still be "configured"
-  // while `--max-warnings=0` is the only thing left stopping the import.
+  // while `--max-warnings=0` is the only guard left stopping the import.
   expect(severity).toBe(2);
   if (!isRestrictedImports(options)) {
     throw new Error("@project/http's no-restricted-imports options have an unexpected shape.");

@@ -222,7 +222,7 @@ test(
  * carries none of its own pointer handlers (`hasPointerEvents` in `NodeWrapper`).
  * All of those are off while presenting, so a Thing is `pointer-events: none` and
  * the pane takes the click — a real click cannot reach a Thing at all, which is
- * why aiming one here is not a thing to work around.
+ * why aiming one here is not a problem to work around.
  *
  * The second assertion is what survives if that ever changes: the event is
  * dispatched straight to the element, past `pointer-events` and past the
@@ -471,7 +471,7 @@ test.describe('at a phone width', () => {
    * survived into a presentation, so it could be reopened mid-traversal and had
    * to own the keys pressed inside it — one Escape dismissed the sheet and left
    * the traversal where it was. The Dock has no Sheet and no trigger that
-   * outlives the surface: presenting removes the whole thing, so there is
+   * outlives the surface: presenting removes the entire surface, so there is
    * nothing to reopen and no key to arbitrate. What replaced the obligation is
    * `mobile-dock.spec.ts`, which holds the surface to fitting rather than to
    * dismissing.

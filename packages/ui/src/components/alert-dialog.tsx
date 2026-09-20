@@ -96,7 +96,7 @@ function AlertDialogFooter({ className, ...props }: React.ComponentProps<'div'>)
       // so it meets the popup's edges and takes its bottom corners. Inset, the
       // fill read as a grey thing floating inside the dialog with a white strip
       // beneath it — invisible while `bg-muted/50` was a dark grey on a dark
-      // popup, and the first thing the eye lands on once both went light.
+      // popup, and the first control the eye lands on once both went light.
       className={cn(
         '-mx-(--alert-dialog-spacing) -mb-(--alert-dialog-spacing) flex gap-2 rounded-b-xl border-t bg-muted/50 p-(--alert-dialog-spacing) sm:justify-end',
         className,

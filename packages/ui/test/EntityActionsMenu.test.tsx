@@ -287,7 +287,7 @@ describe('the entity actions menu', () => {
   });
 
   /**
-   * Why the live region may sit outside the popup, which is the one thing that
+   * Why the live region may sit outside the popup, which is the one condition that
    * makes the swap audible: Base UI's own `markOthers` collects every
    * `[aria-live]` element in the document and keeps it — and its ancestors —
    * out of the set it hides, precisely so a region outside a modal popup still

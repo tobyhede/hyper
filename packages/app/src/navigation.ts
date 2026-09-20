@@ -85,7 +85,7 @@ export function navigationAddress(state: NavigationState): NavigationAddress {
 /**
  * The Thing being presented, or `null` in overview.
  *
- * One definition, because two things are the same fact about it: `activeThingId`,
+ * One definition, because two fields express the same fact about it: `activeThingId`,
  * which App renders from, and {@link navigationAddress}'s `presentingThingId`.
  * Written out twice they can drift, and the copy that drifts silently is the
  * address — App lists `activeThingId` as the render-time dependency standing in

@@ -34,7 +34,7 @@ export interface AppShellProps {
 }
 
 /**
- * The app frame: a full-bleed canvas, and the two things pinned over it.
+ * The app frame: a full-bleed canvas, and the two surfaces pinned over it.
  *
  * **It used to be a sidebar beside a canvas, and the sidebar is what went.**
  * ADR 0053 put the Space's commands in a persistent left `Sidebar` and priced
@@ -47,7 +47,7 @@ export interface AppShellProps {
  * `skeleton.tsx` and `use-mobile.ts` behind it
  * (`.scratch/command-dock/issues/08`), so there is nothing left to compose back.
  *
- * What is left is three things a canvas cannot do for itself: pin the viewport
+ * What is left is three responsibilities a canvas cannot fulfil itself: pin the viewport
  * so the page never scrolls, yield the strip a drawer overlays, and give the
  * standing notice a containing block that strip has already been taken out of.
  * That is thinner than it was, and it is still the frame — the alternative is

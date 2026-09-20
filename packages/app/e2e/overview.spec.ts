@@ -111,7 +111,7 @@ test(
  * (`.scratch/command-dock/issues/12`).
  *
  * This test used to assert the opposite — that a selected Thing's rail painted
- * the Active Graph's colour. Three things replace it, and none of them is a
+ * the Active Graph's colour. Three cues replace it, and none of them is a
  * weaker version of the claim: the band paints nothing; the commands on it are
  * the *same* surface the Command Dock is drawn on, compared property by property
  * against the Dock actually on screen rather than against numbers copied out of

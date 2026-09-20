@@ -102,7 +102,7 @@ interface IndexExports {
    * the index itself, a namespace re-export, a default. Each is a way of
    * widening the surface without touching a clause, and the type-only form of
    * each carries no runtime key, so the `Object.keys` check below cannot see
-   * them either. This bucket is the only thing that can.
+   * them either. This bucket is the only category that can.
    */
   readonly unlisted: readonly string[];
 }

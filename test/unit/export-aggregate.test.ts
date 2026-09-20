@@ -398,7 +398,7 @@ describe('canonical export', () => {
    * where a check on the destination alone would still pass.
    */
   /*
-   * Staged verification is the last thing standing between a serialization
+   * Staged verification is the last safeguard standing between a serialization
    * defect and a destination that cannot be imported, and the only way it can
    * fail is one: `loadAggregate` has already validated, so a refusal here means
    * the canonical bytes say something the stored aggregate did not.

@@ -51,7 +51,7 @@ const canonicalPlacement = (point: ThingPlacement): ThingPlacement => {
  * A diagram's graphs, rebuilt key by key and emitted in the order the diagram
  * holds them.
  *
- * Ordering is the one thing this does *not* impose, and the asymmetry with the
+ * Ordering is the one constraint this does *not* impose, and the asymmetry with the
  * positions beside it comes from how the document is stored. `jsonb` reorders
  * an object's keys on write and preserves an array's order. A diagram's
  * positions are an object, so the order they were written in is gone by the

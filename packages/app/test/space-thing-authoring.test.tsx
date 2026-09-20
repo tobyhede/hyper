@@ -36,7 +36,7 @@ import { createThing, createThingControl, unavailable } from './command-dock';
  * (`space-thing-lifecycle.test.ts`) — atomicity, the reference cascade, every
  * persistence recovery — and nothing here re-derives any of it. What these
  * tests are about is the half that only exists once there is a surface: that
- * the menu reaches the pane, that one typed title seeds three things and then
+ * the menu reaches the pane, that one typed title seeds three entities and then
  * lets go of them, that referencing an existing Space adds a reference and
  * never a copy, and that a refusal keeps the field that could answer it.
  *
@@ -439,7 +439,7 @@ describe('Create Space Thing', () => {
   });
 
   /**
-   * One press mints three things — the Thing, the Space it names and that
+   * One press mints three entities — the Thing, the Space it names and that
    * Space's first Markdown Thing — and the first two take one `Space N`.
    *
    * `Space N` is numbered over the containing Space's own Thing titles, which is
@@ -741,7 +741,7 @@ describe('referencing an existing Space', () => {
    *
    * What the Thing records is the Diagram that Space itself opens on and that
    * Diagram's own Active Graph (ADR 0079, ADR 0026) — `Current` and not `Draft`,
-   * which is the only thing `Collection 1`'s two Graphs are here to tell apart.
+   * which is the only distinction `Collection 1`'s two Graphs are here to expose.
    * The target's stored document is asserted whole, because initialization is a
    * commit and a commit that ran against a Space needing nothing would show up
    * nowhere else.

@@ -21,7 +21,7 @@ import {
  * The Spaces the catalogue's stories draw.
  *
  * ADR 0052 makes the stable stories production-parity evidence, so a fixture
- * that *transcribes* what production derives is the one thing they must not be:
+ * that *transcribes* what production derives is the one role they must not take:
  * the sidebar's Graph colours used to be hex literals copied out of
  * `GRAPH_PALETTE` under a comment promising they matched, which is parity held
  * by a comment. These go through the same intake production does — a story
@@ -266,7 +266,7 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.thing
 /**
  * Where a story's converted Graph takes its identity.
  *
- * Here rather than in the fixture, because the only thing that decides whether
+ * Here rather than in the fixture, because the only state that decides whether
  * a minted id is safe is the block of ids declared above it, and the two were
  * in different files: the fixture counted from one and handed out the very ids
  * `THING_A` and `THING_B` already carry. `convertSubject` would not have refused
@@ -277,7 +277,7 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.thing
  * No story converts one today. The counter is the fixture's answer to ADR
  * 0016's composition seam, and nothing presses it; the collision is one Ladle
  * spec away rather than on screen now. Co-locating it is what stops that being
- * a thing to remember: an id declared above and the counter below it are read
+ * one constraint to remember: an id declared above and the counter below it are read
  * together, and `story-spaces.test.ts` holds them apart.
  *
  * The base is a **reserved block** rather than one past the highest id, so a
@@ -612,7 +612,7 @@ const dockPositions = (count: number): Record<string, ThingPlacement> =>
  *
  * Purpose-built, and deliberately not {@link authoredSpace}: that one exists to
  * draw a sidebar and every Thing in it is placed, so a Things surface opened over
- * it would have nothing to offer. The Dock needs three things at once that no
+ * it would have nothing to offer. The Dock needs three values at once that no
  * existing fixture has together — **two Diagrams** to switch between, **three
  * Graphs over one Diagram** so emphasis is a visible answer rather than a
  * one-member choice, and **many more unplaced Things than placed ones**, which

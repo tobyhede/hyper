@@ -175,7 +175,7 @@ describe('projection handle invariants', () => {
 
         // The projection does not run again during a drag, so a side chosen here
         // would be right only once the gesture settled (ADR 0087). Leaving both
-        // unnamed is what hands the choice to the Edge, which is the one thing
+        // unnamed is what hands the choice to the Edge, which is the one role
         // that can follow the drag.
         for (const edge of edges) {
           expect(edge.sourceHandle, `edge ${edge.id} source handle`).toBeUndefined();

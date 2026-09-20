@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * hunk. Once the marker is committed it is context rather than change, so the
  * check is silent about it from the next commit onward; it is a guard against
  * introducing one in the run that introduces it, not against carrying one.
- * This reads the files themselves, which is the only thing that stays true
+ * This reads the files themselves, which is the only method that stays valid
  * afterwards.
  */
 

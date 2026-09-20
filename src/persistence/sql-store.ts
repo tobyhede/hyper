@@ -263,7 +263,7 @@ export interface SqlTables<Order> {
  *   already decoded it; `JSON.parse` on SQLite's TEXT, which only decodes at
  *   the ORM boundary for a root read, not a nested `include`.
  * - `isDuplicateKey(error, table)` — recognises a primary-key collision, the
- *   one thing the two databases raise differently under a losing insert.
+ *   one error the two databases raise differently under a losing insert.
  * - `serialise` — PostgreSQL runs the operation directly; SQLite queues it
  *   per file handle (`src/sqlite/serialise.ts`), because the driver opens a
  *   connection per operation and the file has one writer.

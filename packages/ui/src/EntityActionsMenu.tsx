@@ -78,7 +78,7 @@ type TriggerRender = ComponentProps<typeof DropdownMenuTrigger>['render'];
  *
  * A command the entity does not have is simply absent from the list it is built
  * into — never present and disabled. The reason is about destinations rather
- * than about any one surface: an address that does not exist is not a thing to
+ * than about any one surface: an address that does not exist is not an option to
  * offer and refuse. A command that exists and is *out of reach now* is the
  * other case, and that one is drawn present and unavailable.
  */

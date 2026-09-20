@@ -160,7 +160,7 @@ export const ThingRailSharedActions = forwardRef<HTMLDivElement, ThingRailShared
  * `thing__rail-action` survives as the canvas hook this component needs and not
  * as a second appearance.
  *
- * It also owns the three things every rail control has to do to sit on a
+ * It also owns the three responsibilities every rail control has to sit on a
  * canvas, so no call site restates them:
  *
  * - `nodrag nopan` keep a press on the control off React Flow's pan and drag.

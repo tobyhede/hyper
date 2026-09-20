@@ -329,7 +329,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * whole Edge lifecycle.
    *
    * The toolbar's Add Thing is withdrawn on the first two terms above and so is
-   * every control drawn on a Thing. **Edge authoring was the one thing reading a
+   * every control drawn on a Thing. **Edge authoring was the one capability reading a
    * shorter rule**, and the gap was not cosmetic: a pane covering the canvas
    * must withdraw its keyboard commands as well as its spatial gestures.
    *
@@ -361,7 +361,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * Things on it yet — one is already taking the Edit, the other has nowhere to
    * write. React Flow's own
    * `nodesConnectable` read `editable && !presenting` for as long as it was
-   * inert, and the first thing forwarding it to the authoring handles did was
+   * inert, and the first attempt to forward it to the authoring handles did was
    * break that presented-Thing connection. An expression nothing reads is not a
    * decision that was made.
    */

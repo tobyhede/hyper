@@ -79,8 +79,8 @@
 /*
  * **Sand is the canvas and nothing else.** The beige is the paper the Things are
  * laid on; it is not a tint the chrome inherits. The chrome is a neutral grey
- * scale over sand, so the only two things on screen carrying warmth are the
- * canvas and a Thing's own face, and the only thing carrying colour is a Graph.
+ * scale over sand, so the only two surfaces on screen carrying warmth are the
+ * canvas and a Thing's own face, and the only element carrying colour is a Graph.
  *
  * These values were settled in the Command Dock prototype, which drew a light
  * canvas while this block was still dark and so had to fork every token it

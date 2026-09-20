@@ -7,7 +7,7 @@
 
 /** The opening fence, either line ending. Written out as LF (see
  *  `serializeThingFile`); accepted as CRLF, because a Windows checkout or a
- *  `core.autocrlf` config makes every thing in the repository start `---\r\n`
+ *  `core.autocrlf` config makes every Thing file in the repository start `---\r\n`
  *  and reading is not the place to have an opinion about that. */
 export const OPENING_FENCE = /^---\r?\n/;
 

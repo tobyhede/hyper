@@ -14,7 +14,7 @@ describe('canvasContent', () => {
   it('waits for the editor to take a ready placement before drawing it', () => {
     // A resolved placement is not yet Things on the canvas: `syncProjection`
     // installs it, and drawing before that would hand React Flow a node array
-    // the editor store does not own — the one thing a controlled flow must not
+    // the editor store does not own — the one state a controlled flow must not
     // do, and the reason changes had to be filtered by ownership.
     expect(canvasContent({ kind: 'ready', strategyGraph: placed }, false)).toEqual({
       kind: 'placeholder',

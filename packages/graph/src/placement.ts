@@ -48,7 +48,7 @@ declare const PLACEMENT: unique symbol;
  * The points go back out `Readonly` for the same reason read the other way:
  * construction being closed says nothing about the values already inside, and
  * `placement.get(id)!.x = 1` would author a position past `next` and `place`
- * both — the only two things allowed to decide what a placement authors.
+ * both — the only two operations allowed to decide what a placement authors.
  */
 export type Placement = ReadonlyMap<ThingId, Readonly<ThingPlacement>> & {
   readonly [PLACEMENT]: true;
