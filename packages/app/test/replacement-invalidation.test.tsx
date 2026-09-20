@@ -99,7 +99,7 @@ const snapshot = (
   body: string,
   x: number,
   y: number,
-  open = false,
+  { open = false }: { readonly open?: boolean } = {},
 ): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: SPACE_ID,
@@ -125,15 +125,9 @@ const snapshot = (
   });
 
 const LOCAL = snapshot('Local space', 'Local diagram', 'Local thing', 'Local source', 10, 20);
-const LOCAL_OPEN = snapshot(
-  'Local space',
-  'Local diagram',
-  'Local thing',
-  'Local source',
-  10,
-  20,
-  true,
-);
+const LOCAL_OPEN = snapshot('Local space', 'Local diagram', 'Local thing', 'Local source', 10, 20, {
+  open: true,
+});
 const REMOTE = snapshot(
   'Remote space',
   'Remote diagram',
@@ -146,7 +140,7 @@ const MARKDOWN_SOURCE = 'Markdown source of Local thing';
 const MARKDOWN_EDIT = 'Edit Markdown source of Local thing';
 const MARKDOWN_DRAFT = 'Unsaved prose that Reload must discard';
 
-/** Replace CodeMirror source through its public editable surface. */
+/** Paste into the Markdown source textbox the editor exposes. */
 const replaceMarkdownSource = (value: string): HTMLElement => {
   const source = screen.getByRole('textbox', { name: MARKDOWN_SOURCE });
   source.focus();
@@ -205,11 +199,8 @@ async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSessi
  * Discover the conflict with the draft already open: a commit against the
  * revision this session acknowledged, which the backend has moved past.
  */
-const raiseConflict = async (
-  session: SpaceSession,
-  local: SpaceSnapshot = LOCAL,
-): Promise<void> => {
-  session.submit(local);
+const raiseConflict = async (session: SpaceSession): Promise<void> => {
+  session.submit(session.getState().working);
   await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
   await screen.findByTestId('persistence-accept-remote');
 };
@@ -234,7 +225,7 @@ async function stageOpenMarkdownDraft(session: SpaceSession): Promise<void> {
   const source = replaceMarkdownSource(MARKDOWN_DRAFT);
   expect(source).toHaveTextContent(MARKDOWN_DRAFT);
   expect(session.getState().persistence.kind).toBe('settled');
-  await raiseConflict(session, LOCAL_OPEN);
+  await raiseConflict(session);
   expect(screen.getByRole('textbox', { name: MARKDOWN_SOURCE, hidden: true })).toHaveTextContent(
     MARKDOWN_DRAFT,
   );
