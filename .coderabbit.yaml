@@ -241,13 +241,17 @@ reviews:
         job generates and masks its own password so forked pull requests need no
         repository secret; do not propose a secret in its place.
 
-    - path: '{migrations/**/migration.ts,src/prisma/contract.prisma,src/prisma/db.ts,src/prisma/sql-store.ts,src/sqlite/contract.prisma,src/sqlite/db.ts,src/sqlite/sql-store.ts,src/sqlite/serialise.ts}'
+    - path: '{migrations/**/migration.ts,src/prisma/**,src/sqlite/**}'
       instructions: >-
         Hand-written, not generated — `path_filters` above already excludes
         every generated contract and migration snapshot
         (`contract.json`/`contract.d.ts` per database, `migrations/**/*.json`,
         `migrations/**/*.d.ts`) from context entirely, so nothing reaches this
-        review as a Prisma Next artifact. What is left under
+        review as a Prisma Next artifact, which is why this glob names the two
+        directories rather than enumerating their files: a hand-written file
+        added later under `src/prisma/**` or `src/sqlite/**` still gets this
+        instruction, because `path_filters`, not this list, is what keeps a
+        generated one out. What is left under
         `migrations/**`, `src/prisma/**` and `src/sqlite/**` is the Prisma
         Next schema (`contract.prisma`), a migration's own `operations`
         (`migrations/**/migration.ts` — e.g. an `alterColumnType`'s implicit

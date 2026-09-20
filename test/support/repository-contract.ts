@@ -638,13 +638,16 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * The SQL repository's shared `#writeUpdate` helper (`sql-space-repository.ts`,
-   * ticket 24) runs an unconditional `deleteExcept` after every update it
-   * writes, including on the fast path -- whose own `preservesSnapshotBoundary`
-   * never lets the Thing set change before reaching it, so that delete keeps
-   * nothing out. This pins the invariant its own doc comment states: a
-   * topology-preserving commit over several Things, changing none of their
-   * membership, leaves every one of them in place.
+   * On the SQL repository (`sql-space-repository.ts`, ticket 24), the shared
+   * `#writeUpdate` helper runs an unconditional `deleteExcept` after every
+   * update it writes, including on the fast path -- whose own
+   * `preservesSnapshotBoundary` never lets the Thing set change before
+   * reaching it, so that delete keeps nothing out there either. Nothing in
+   * this case forces that path, though: on the memory double it never reaches
+   * `#writeUpdate` at all. What every implementation is held to, whichever
+   * path it takes, is the invariant itself: a topology-preserving commit over
+   * several Things, changing none of their membership, leaves every one of
+   * them in place.
    */
   it(`${name} keeps every Thing through a topology-preserving commit's own delete`, async () => {
     await withHarness(async (repository) => {

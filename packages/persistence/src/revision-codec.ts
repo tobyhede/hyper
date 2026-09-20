@@ -60,7 +60,10 @@ export const decodeStoredRevision = (value: string): bigint => {
  * first place.
  */
 export const encodeStoredRevision = (value: bigint): string => {
-  if (value < 0n || value > REVISION_CEILING) {
+  if (value < 0n) {
+    throw new RevisionCodecError(`Revision ${value} is negative`);
+  }
+  if (value > REVISION_CEILING) {
     throw new RevisionCodecError(`Revision ${value} exceeds the 2^63-1 ceiling`);
   }
   return value.toString();

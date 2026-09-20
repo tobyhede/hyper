@@ -123,27 +123,6 @@ const encodeNextRevisionReclassified = (spaceId: UUID, value: bigint): string =>
 };
 
 /**
- * `encodeStoredRevision`, reclassifying a `RevisionCodecError` it raises as
- * `AggregateInvariantError` -- used only by `markExported`'s own `revision`
- * argument, "the revision projected by a completed external export"
- * (`SpaceRepository.markExported`'s own doc comment). Not the same claim as
- * either sibling above: it is not `#writeUpdate`'s own next revision, and
- * unlike `storedRevisionInvariant`'s decode side it is not a value already
- * sitting in a stored column either -- it is the exported revision about to
- * be written to `exportedRevision`, so the message names that.
- */
-const encodeExportedRevisionReclassified = (spaceId: UUID, value: bigint): string => {
-  try {
-    return encodeStoredRevision(value);
-  } catch (error) {
-    if (!(error instanceof RevisionCodecError)) throw error;
-    throw new AggregateInvariantError(`Space ${spaceId}'s exported revision is not usable`, {
-      cause: error,
-    });
-  }
-};
-
-/**
  * `commit`'s fast path's own decision (ADR 0095), which may also hand the
  * commit to the complete-aggregate decision.
  */
@@ -350,13 +329,28 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     return this.#store.serialise(() => this.#replaceUnserialised(input, expectedMetaSpaceId));
   }
 
+  /**
+   * `revision` is a caller-supplied `bigint` -- unlike `#writeUpdate`'s own
+   * next revision or a value the decode side reads back out of a stored
+   * column, nothing here has read or written it against either database
+   * before `encodeStoredRevision` runs, so a value the codec refuses is a bug
+   * in the caller, not evidence of broken stored state. It is deliberately
+   * left as the plain `RevisionCodecError` `encodeStoredRevision` raises,
+   * unlike its siblings above: `AggregateInvariantError`'s own declaration
+   * (`@project/persistence`'s `repository.ts`) ties it to the shared
+   * `SpaceResourceRepository` seam -- `loadAggregate` and `commit`, the two
+   * operations `@project/http` reaches -- and `markExported` sits only on the
+   * wider `SpaceRepository` the CLI alone reaches (`export-aggregate.ts`'s
+   * `markAggregateExported`, the only production caller), so no HTTP route
+   * can ever classify this throw as 500 vs 503. That one caller already
+   * catches every rejection through `Promise.allSettled` and reports each by
+   * `.message` regardless of its class, so reclassifying it here would name
+   * an identity nothing downstream asks for.
+   */
   markExported(id: UUID, revision: bigint): Promise<void> {
     return this.#store.serialise(async () => {
       const tables = this.#store.tables(this.#store.orm);
-      const updated = await tables.Space.setExportedRevision(
-        id,
-        encodeExportedRevisionReclassified(id, revision),
-      );
+      const updated = await tables.Space.setExportedRevision(id, encodeStoredRevision(revision));
       if (!updated) throw new Error(`Space ${id} does not exist`);
     });
   }

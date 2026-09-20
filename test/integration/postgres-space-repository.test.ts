@@ -3,6 +3,7 @@ import {
   AggregateInvariantError,
   createWorkingSpaceLoader,
   REVISION_CEILING,
+  RevisionCodecError,
   type LoadedSpace,
 } from '@project/persistence';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
@@ -1171,16 +1172,18 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   });
 
   // `markExported`'s own `revision` argument is a caller-supplied `bigint`,
-  // the same shape `#writeUpdate`'s own next revision took before
-  // `encodeNextRevisionReclassified` was added for it -- so a value the
-  // shared codec refuses on the way out has to raise the same identifiable
-  // `AggregateInvariantError` here too, rather than letting
-  // `RevisionCodecError` escape unclassified.
-  it('raises an identifiable invariant failure for an exported revision above the 2^63-1 ceiling', async () => {
+  // not a value read from or already written into either database -- so a
+  // value the shared codec refuses on the way out is a bug in the caller
+  // rather than broken stored state, and is left to escape as the plain
+  // `RevisionCodecError` `encodeStoredRevision` raises (`sql-space-
+  // repository.ts`'s `markExported` doc comment) instead of being
+  // reclassified as `AggregateInvariantError` the way `#writeUpdate`'s own
+  // next revision is.
+  it('raises the codec failure for an exported revision above the 2^63-1 ceiling', async () => {
     await seed(SPACE_ID, [snapshot]);
 
     await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow(
-      AggregateInvariantError,
+      RevisionCodecError,
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
       snapshot,
