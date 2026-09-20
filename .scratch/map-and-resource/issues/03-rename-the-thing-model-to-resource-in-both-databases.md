@@ -1,6 +1,6 @@
 # 03 — Rename the Thing model to Resource, in both databases
 
-**Status:** ready-for-agent
+**Status:** resolved
 **Blocked by:** 02 — A Diagram is a Map and a Thing is a Resource.
 
 **What to build:** `model Thing` becomes `model Resource` and `@@map("things")` becomes `@@map("resources")` in both database contracts, with one forward migration each, and the runtime SQL identifier literals move with them.
@@ -30,4 +30,31 @@
 
 ## Answer
 
-<!-- Filled in as the work lands. -->
+Resolved with one generated forward migration for each database. Ticket 02's
+atomic vocabulary sweep had already changed the live PostgreSQL and SQLite
+contracts and their runtime SQL identifiers to `Resource`/`resources`; this
+ticket regenerated both emitted contracts from those sources and connected
+them to the previously unchanged migration histories.
+
+Both plans were generated offline with their explicit head storage hashes:
+
+- PostgreSQL starts at
+  `sha256:1f367854ac0c2c316a2d9cfdbb704f5531beb59c0d04722e62220c5aaf9aad35`
+  and contains exactly four operations: drop `things`, create `resources`,
+  create `resources_space_id_idx`, and add `resources_space_id_fkey`.
+- SQLite starts at
+  `sha256:500b8c46f9e1b6fc97b6575af513184ac010b76b622c3bcbebf6065b151b26a1`
+  and contains exactly three operations: create `resources` with its inline
+  foreign key, create `resources_space_id_idx`, and drop `things`.
+
+Neither plan creates a schema, and no pre-existing migration file changed. Each
+generated migration documents that the drop-and-create destroys stored Resource
+rows and tells a developer to export before migrating and import afterwards.
+
+Verification:
+
+- `pnpm verify` — passed: 229 files, 2,880 tests passed and 5 skipped.
+- `SQLITE_PATH=<temporary-file> pnpm test:integration:sqlite` — passed on a
+  fresh database: both migrations applied, 5 files and 99 tests passed.
+- PostgreSQL integration is deferred to CI because no disposable PostgreSQL
+  database was started for this ticket.

@@ -30,9 +30,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:0a1d0e875a03edce09456c6716c79931aa35b795c9bcf011f205571631d97a0c'>;
+  StorageHashBase<'sha256:1f367854ac0c2c316a2d9cfdbb704f5531beb59c0d04722e62220c5aaf9aad35'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:26bc77f03788a526b20f8ac61c5d438d7c0bdb48156350feb364c8f0e868f393'>;
+  ExecutionHashBase<'sha256:7d7e4f57ba56add119c339e20ea34c4ab063ceca9ea075f32e0d70c6a57a2bd1'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
@@ -49,18 +49,18 @@ export type FieldOutputTypes = {
       readonly singletonId: CodecTypes['pg/int4@1']['output'];
       readonly metaSpaceId: CodecTypes['pg/uuid@1']['output'];
     };
-    readonly Resource: {
-      readonly id: CodecTypes['pg/uuid@1']['output'];
-      readonly spaceId: CodecTypes['pg/uuid@1']['output'];
-      readonly document: CodecTypes['pg/jsonb@1']['output'];
-      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
-    };
     readonly Space: {
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly document: CodecTypes['pg/jsonb@1']['output'];
       readonly revision: CodecTypes['pg/text@1']['output'];
       readonly exportedRevision: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly Thing: {
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly spaceId: CodecTypes['pg/uuid@1']['output'];
+      readonly document: CodecTypes['pg/jsonb@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
     };
@@ -72,18 +72,18 @@ export type FieldInputTypes = {
       readonly singletonId: CodecTypes['pg/int4@1']['input'];
       readonly metaSpaceId: CodecTypes['pg/uuid@1']['input'];
     };
-    readonly Resource: {
-      readonly id: CodecTypes['pg/uuid@1']['input'];
-      readonly spaceId: CodecTypes['pg/uuid@1']['input'];
-      readonly document: CodecTypes['pg/jsonb@1']['input'];
-      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
-    };
     readonly Space: {
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly document: CodecTypes['pg/jsonb@1']['input'];
       readonly revision: CodecTypes['pg/text@1']['input'];
       readonly exportedRevision: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly Thing: {
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly spaceId: CodecTypes['pg/uuid@1']['input'];
+      readonly document: CodecTypes['pg/jsonb@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
     };
@@ -95,19 +95,19 @@ export type StorageColumnTypes = {
       readonly meta_space_id: CodecTypes['pg/uuid@1']['output'];
       readonly singleton_id: CodecTypes['pg/int4@1']['output'];
     };
-    readonly resources: {
-      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-      readonly document: CodecTypes['pg/jsonb@1']['output'];
-      readonly id: CodecTypes['pg/uuid@1']['output'];
-      readonly space_id: CodecTypes['pg/uuid@1']['output'];
-      readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
-    };
     readonly spaces: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
       readonly document: CodecTypes['pg/jsonb@1']['output'];
       readonly exported_revision: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly revision: CodecTypes['pg/text@1']['output'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
+    };
+    readonly things: {
+      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
+      readonly document: CodecTypes['pg/jsonb@1']['output'];
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly space_id: CodecTypes['pg/uuid@1']['output'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
     };
   };
@@ -118,19 +118,19 @@ export type StorageColumnInputTypes = {
       readonly meta_space_id: CodecTypes['pg/uuid@1']['input'];
       readonly singleton_id: CodecTypes['pg/int4@1']['input'];
     };
-    readonly resources: {
-      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-      readonly document: CodecTypes['pg/jsonb@1']['input'];
-      readonly id: CodecTypes['pg/uuid@1']['input'];
-      readonly space_id: CodecTypes['pg/uuid@1']['input'];
-      readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
-    };
     readonly spaces: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
       readonly document: CodecTypes['pg/jsonb@1']['input'];
       readonly exported_revision: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly revision: CodecTypes['pg/text@1']['input'];
+      readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
+    };
+    readonly things: {
+      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
+      readonly document: CodecTypes['pg/jsonb@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly space_id: CodecTypes['pg/uuid@1']['input'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
     };
   };
@@ -193,59 +193,6 @@ type ContractBase = Omit<
                 },
               ];
             };
-            readonly resources: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'uuid';
-                  readonly codecId: 'pg/uuid@1';
-                  readonly nullable: false;
-                  readonly default: {
-                    readonly kind: 'function';
-                    readonly expression: 'gen_random_uuid()';
-                  };
-                  readonly typeRef: 'Uuid';
-                };
-                readonly space_id: {
-                  readonly nativeType: 'uuid';
-                  readonly codecId: 'pg/uuid@1';
-                  readonly nullable: false;
-                  readonly typeRef: 'Uuid';
-                };
-                readonly document: {
-                  readonly nativeType: 'jsonb';
-                  readonly codecId: 'pg/jsonb@1';
-                  readonly nullable: false;
-                };
-                readonly created_at: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-                readonly updated_at: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz@1';
-                  readonly nullable: false;
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [{ readonly columns: readonly ['space_id'] }];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'resources';
-                    readonly columns: readonly ['space_id'];
-                  };
-                  readonly target: {
-                    readonly namespaceId: 'public' & NamespaceId;
-                    readonly tableName: 'spaces';
-                    readonly columns: readonly ['id'];
-                  };
-                },
-              ];
-            };
             readonly spaces: {
               columns: {
                 readonly id: {
@@ -294,6 +241,59 @@ type ContractBase = Omit<
               indexes: readonly [];
               foreignKeys: readonly [];
             };
+            readonly things: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'gen_random_uuid()';
+                  };
+                  readonly typeRef: 'Uuid';
+                };
+                readonly space_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly typeRef: 'Uuid';
+                };
+                readonly document: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                };
+                readonly created_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly updated_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [{ readonly columns: readonly ['space_id'] }];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'things';
+                    readonly columns: readonly ['space_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'spaces';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
           };
         };
       };
@@ -318,7 +318,7 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'RepositoryState';
     };
-    readonly resources: { readonly namespace: 'public' & NamespaceId; readonly model: 'Resource' };
+    readonly things: { readonly namespace: 'public' & NamespaceId; readonly model: 'Thing' };
   };
   readonly domain: {
     readonly namespaces: {
@@ -354,54 +354,6 @@ type ContractBase = Omit<
               readonly fields: {
                 readonly singletonId: { readonly column: 'singleton_id' };
                 readonly metaSpaceId: { readonly column: 'meta_space_id' };
-              };
-            };
-          };
-          readonly Resource: {
-            readonly fields: {
-              readonly id: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
-              };
-              readonly spaceId: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
-              };
-              readonly document: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
-              };
-              readonly createdAt: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
-              };
-              readonly updatedAt: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
-              };
-            };
-            readonly relations: {
-              readonly space: {
-                readonly to: {
-                  readonly namespace: 'public' & NamespaceId;
-                  readonly model: 'Space';
-                };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['spaceId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-            };
-            readonly storage: {
-              readonly table: 'resources';
-              readonly namespaceId: 'public';
-              readonly fields: {
-                readonly id: { readonly column: 'id' };
-                readonly spaceId: { readonly column: 'space_id' };
-                readonly document: { readonly column: 'document' };
-                readonly createdAt: { readonly column: 'created_at' };
-                readonly updatedAt: { readonly column: 'updated_at' };
               };
             };
           };
@@ -444,10 +396,10 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['metaSpaceId'];
                 };
               };
-              readonly resources: {
+              readonly things: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
-                  readonly model: 'Resource';
+                  readonly model: 'Thing';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
@@ -464,6 +416,54 @@ type ContractBase = Omit<
                 readonly document: { readonly column: 'document' };
                 readonly revision: { readonly column: 'revision' };
                 readonly exportedRevision: { readonly column: 'exported_revision' };
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly updatedAt: { readonly column: 'updated_at' };
+              };
+            };
+          };
+          readonly Thing: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly spaceId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly document: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
+              };
+            };
+            readonly relations: {
+              readonly space: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Space';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['spaceId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'things';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly spaceId: { readonly column: 'space_id' };
+                readonly document: { readonly column: 'document' };
                 readonly createdAt: { readonly column: 'created_at' };
                 readonly updatedAt: { readonly column: 'updated_at' };
               };
@@ -498,7 +498,7 @@ type ContractBase = Omit<
         {
           readonly ref: {
             readonly namespace: 'public';
-            readonly table: 'resources';
+            readonly table: 'spaces';
             readonly column: 'updated_at';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };
@@ -507,7 +507,7 @@ type ContractBase = Omit<
         {
           readonly ref: {
             readonly namespace: 'public';
-            readonly table: 'spaces';
+            readonly table: 'things';
             readonly column: 'updated_at';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };

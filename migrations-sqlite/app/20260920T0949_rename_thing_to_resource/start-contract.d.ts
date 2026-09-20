@@ -16,9 +16,9 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:301f96a6f8786de4f7a45c0b1574e7bed9dd2868a5e445510fe32d0d29973001'>;
+  StorageHashBase<'sha256:500b8c46f9e1b6fc97b6575af513184ac010b76b622c3bcbebf6065b151b26a1'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:5282b6091e26ba5dfb56feeb9a788d9f937328a35816f953b05008ddddb77b7c'>;
+  ExecutionHashBase<'sha256:3a90adf23ead13df33159d39784aebaca85997a7e11b6b92346615986381dcf3'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
 
@@ -35,18 +35,18 @@ export type FieldOutputTypes = {
       readonly singletonId: CodecTypes['sqlite/integer@1']['output'];
       readonly metaSpaceId: CodecTypes['sqlite/text@1']['output'];
     };
-    readonly Resource: {
-      readonly id: CodecTypes['sqlite/text@1']['output'];
-      readonly spaceId: CodecTypes['sqlite/text@1']['output'];
-      readonly document: CodecTypes['sqlite/json@1']['output'];
-      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
-      readonly updatedAt: CodecTypes['sqlite/datetime@1']['output'];
-    };
     readonly Space: {
       readonly id: CodecTypes['sqlite/text@1']['output'];
       readonly document: CodecTypes['sqlite/json@1']['output'];
       readonly revision: CodecTypes['sqlite/text@1']['output'];
       readonly exportedRevision: CodecTypes['sqlite/text@1']['output'] | null;
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
+      readonly updatedAt: CodecTypes['sqlite/datetime@1']['output'];
+    };
+    readonly Thing: {
+      readonly id: CodecTypes['sqlite/text@1']['output'];
+      readonly spaceId: CodecTypes['sqlite/text@1']['output'];
+      readonly document: CodecTypes['sqlite/json@1']['output'];
       readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
       readonly updatedAt: CodecTypes['sqlite/datetime@1']['output'];
     };
@@ -58,18 +58,18 @@ export type FieldInputTypes = {
       readonly singletonId: CodecTypes['sqlite/integer@1']['input'];
       readonly metaSpaceId: CodecTypes['sqlite/text@1']['input'];
     };
-    readonly Resource: {
-      readonly id: CodecTypes['sqlite/text@1']['input'];
-      readonly spaceId: CodecTypes['sqlite/text@1']['input'];
-      readonly document: CodecTypes['sqlite/json@1']['input'];
-      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
-      readonly updatedAt: CodecTypes['sqlite/datetime@1']['input'];
-    };
     readonly Space: {
       readonly id: CodecTypes['sqlite/text@1']['input'];
       readonly document: CodecTypes['sqlite/json@1']['input'];
       readonly revision: CodecTypes['sqlite/text@1']['input'];
       readonly exportedRevision: CodecTypes['sqlite/text@1']['input'] | null;
+      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+      readonly updatedAt: CodecTypes['sqlite/datetime@1']['input'];
+    };
+    readonly Thing: {
+      readonly id: CodecTypes['sqlite/text@1']['input'];
+      readonly spaceId: CodecTypes['sqlite/text@1']['input'];
+      readonly document: CodecTypes['sqlite/json@1']['input'];
       readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
       readonly updatedAt: CodecTypes['sqlite/datetime@1']['input'];
     };
@@ -81,19 +81,19 @@ export type StorageColumnTypes = {
       readonly meta_space_id: CodecTypes['sqlite/text@1']['output'];
       readonly singleton_id: CodecTypes['sqlite/integer@1']['output'];
     };
-    readonly resources: {
-      readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
-      readonly document: CodecTypes['sqlite/json@1']['output'];
-      readonly id: CodecTypes['sqlite/text@1']['output'];
-      readonly space_id: CodecTypes['sqlite/text@1']['output'];
-      readonly updated_at: CodecTypes['sqlite/datetime@1']['output'];
-    };
     readonly spaces: {
       readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
       readonly document: CodecTypes['sqlite/json@1']['output'];
       readonly exported_revision: CodecTypes['sqlite/text@1']['output'] | null;
       readonly id: CodecTypes['sqlite/text@1']['output'];
       readonly revision: CodecTypes['sqlite/text@1']['output'];
+      readonly updated_at: CodecTypes['sqlite/datetime@1']['output'];
+    };
+    readonly things: {
+      readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
+      readonly document: CodecTypes['sqlite/json@1']['output'];
+      readonly id: CodecTypes['sqlite/text@1']['output'];
+      readonly space_id: CodecTypes['sqlite/text@1']['output'];
       readonly updated_at: CodecTypes['sqlite/datetime@1']['output'];
     };
   };
@@ -104,19 +104,19 @@ export type StorageColumnInputTypes = {
       readonly meta_space_id: CodecTypes['sqlite/text@1']['input'];
       readonly singleton_id: CodecTypes['sqlite/integer@1']['input'];
     };
-    readonly resources: {
-      readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
-      readonly document: CodecTypes['sqlite/json@1']['input'];
-      readonly id: CodecTypes['sqlite/text@1']['input'];
-      readonly space_id: CodecTypes['sqlite/text@1']['input'];
-      readonly updated_at: CodecTypes['sqlite/datetime@1']['input'];
-    };
     readonly spaces: {
       readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
       readonly document: CodecTypes['sqlite/json@1']['input'];
       readonly exported_revision: CodecTypes['sqlite/text@1']['input'] | null;
       readonly id: CodecTypes['sqlite/text@1']['input'];
       readonly revision: CodecTypes['sqlite/text@1']['input'];
+      readonly updated_at: CodecTypes['sqlite/datetime@1']['input'];
+    };
+    readonly things: {
+      readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
+      readonly document: CodecTypes['sqlite/json@1']['input'];
+      readonly id: CodecTypes['sqlite/text@1']['input'];
+      readonly space_id: CodecTypes['sqlite/text@1']['input'];
       readonly updated_at: CodecTypes['sqlite/datetime@1']['input'];
     };
   };
@@ -178,53 +178,6 @@ type ContractBase = Omit<
                 },
               ];
             };
-            readonly resources: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly space_id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly document: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/json@1';
-                  readonly nullable: false;
-                };
-                readonly created_at: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-                readonly updated_at: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [{ readonly columns: readonly ['space_id'] }];
-              foreignKeys: readonly [
-                {
-                  readonly source: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'resources';
-                    readonly columns: readonly ['space_id'];
-                  };
-                  readonly target: {
-                    readonly namespaceId: '__unbound__' & NamespaceId;
-                    readonly tableName: 'spaces';
-                    readonly columns: readonly ['id'];
-                  };
-                },
-              ];
-            };
             readonly spaces: {
               columns: {
                 readonly id: {
@@ -268,6 +221,53 @@ type ContractBase = Omit<
               indexes: readonly [];
               foreignKeys: readonly [];
             };
+            readonly things: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'sqlite/text@1';
+                  readonly nullable: false;
+                };
+                readonly space_id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'sqlite/text@1';
+                  readonly nullable: false;
+                };
+                readonly document: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'sqlite/json@1';
+                  readonly nullable: false;
+                };
+                readonly created_at: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'sqlite/datetime@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly updated_at: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'sqlite/datetime@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [{ readonly columns: readonly ['space_id'] }];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: '__unbound__' & NamespaceId;
+                    readonly tableName: 'things';
+                    readonly columns: readonly ['space_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: '__unbound__' & NamespaceId;
+                    readonly tableName: 'spaces';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
           };
         };
       };
@@ -284,10 +284,7 @@ type ContractBase = Omit<
       readonly namespace: '__unbound__' & NamespaceId;
       readonly model: 'RepositoryState';
     };
-    readonly resources: {
-      readonly namespace: '__unbound__' & NamespaceId;
-      readonly model: 'Resource';
-    };
+    readonly things: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Thing' };
   };
   readonly domain: {
     readonly namespaces: {
@@ -323,54 +320,6 @@ type ContractBase = Omit<
               readonly fields: {
                 readonly singletonId: { readonly column: 'singleton_id' };
                 readonly metaSpaceId: { readonly column: 'meta_space_id' };
-              };
-            };
-          };
-          readonly Resource: {
-            readonly fields: {
-              readonly id: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
-              };
-              readonly spaceId: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
-              };
-              readonly document: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/json@1' };
-              };
-              readonly createdAt: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
-              };
-              readonly updatedAt: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
-              };
-            };
-            readonly relations: {
-              readonly space: {
-                readonly to: {
-                  readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Space';
-                };
-                readonly cardinality: 'N:1';
-                readonly on: {
-                  readonly localFields: readonly ['spaceId'];
-                  readonly targetFields: readonly ['id'];
-                };
-              };
-            };
-            readonly storage: {
-              readonly table: 'resources';
-              readonly namespaceId: '__unbound__';
-              readonly fields: {
-                readonly id: { readonly column: 'id' };
-                readonly spaceId: { readonly column: 'space_id' };
-                readonly document: { readonly column: 'document' };
-                readonly createdAt: { readonly column: 'created_at' };
-                readonly updatedAt: { readonly column: 'updated_at' };
               };
             };
           };
@@ -413,10 +362,10 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['metaSpaceId'];
                 };
               };
-              readonly resources: {
+              readonly things: {
                 readonly to: {
                   readonly namespace: '__unbound__' & NamespaceId;
-                  readonly model: 'Resource';
+                  readonly model: 'Thing';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
@@ -433,6 +382,54 @@ type ContractBase = Omit<
                 readonly document: { readonly column: 'document' };
                 readonly revision: { readonly column: 'revision' };
                 readonly exportedRevision: { readonly column: 'exported_revision' };
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly updatedAt: { readonly column: 'updated_at' };
+              };
+            };
+          };
+          readonly Thing: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+              };
+              readonly spaceId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
+              };
+              readonly document: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/json@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
+              };
+            };
+            readonly relations: {
+              readonly space: {
+                readonly to: {
+                  readonly namespace: '__unbound__' & NamespaceId;
+                  readonly model: 'Space';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['spaceId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'things';
+              readonly namespaceId: '__unbound__';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly spaceId: { readonly column: 'space_id' };
+                readonly document: { readonly column: 'document' };
                 readonly createdAt: { readonly column: 'created_at' };
                 readonly updatedAt: { readonly column: 'updated_at' };
               };
@@ -461,7 +458,7 @@ type ContractBase = Omit<
         {
           readonly ref: {
             readonly namespace: '__unbound__';
-            readonly table: 'resources';
+            readonly table: 'spaces';
             readonly column: 'updated_at';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };
@@ -470,7 +467,7 @@ type ContractBase = Omit<
         {
           readonly ref: {
             readonly namespace: '__unbound__';
-            readonly table: 'spaces';
+            readonly table: 'things';
             readonly column: 'updated_at';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'timestampNow' };
