@@ -225,3 +225,15 @@ having been run on the tree being committed is worse than no evidence, because
 it is what a reader trusts. The three reverted changes were all present in the
 working tree when the suite was run and all absent from — or partly absent
 from — what was committed.
+
+**The handoff table's `padding-inline-end` claim is false.** "Two this ticket
+did not take, because they still had a consumer when it ran" says deleting
+`insetEnd` "would take the `padding-inline-end` rule in `styles.css` with it."
+`.shell__main` in `packages/app/src/styles.css` declares only `flex: 1;
+min-height: 0;` — there is no `padding-inline-end` rule there. The padding is
+applied inline, by `AppShell`'s `style={{ paddingInlineEnd: insetEnd }}`;
+`styles.css` carries a comment beside `.shell__main` that explains that, not a
+declaration of its own. An implementer following this ticket's handoff table
+would go hunting for a CSS rule that does not exist.
+`22-retire-the-registry-drawer-and-the-yielded-strip.md` carries the corrected
+accounting of what `styles.css` actually holds.

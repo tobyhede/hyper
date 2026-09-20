@@ -87,3 +87,33 @@ it went both ways.
   both citations were followed. The guard reads `<NN>-<slug>.md`, so an unnumbered
   document in an `issues/` directory is outside it — which is the right answer for
   a file that was never claiming an address.
+
+## Comments
+
+An amendment to "How each pair was resolved" above, kept out of that section so
+the record of what the renumber pass actually did stays intact.
+
+**The `command-dock` pair's citation count was wrong.** It named six citations
+of `16-retire-the-registry-drawer-and-the-yielded-strip` and reported all six
+followed: `AGENTS.md`, `packages/ui/src/AppShell.tsx`,
+`packages/app/stories/design-system-inventory.ts`, `command-dock/08`,
+`command-dock/10`, `command-dock/spec.md`. There was a seventh —
+`packages/app/src/styles.css`, which still named the file by its old number —
+and it was missed. Six of seven were followed at the time; `styles.css` was
+found and corrected afterward.
+
+**The miss was isolated to this pair.** The other two renumbers were re-checked:
+`16-navigation-answers-its-own-address` and `17-collapse-card-creation` have no
+surviving citation anywhere outside this file's own account of them, so their
+"every citation followed" holds. What failed here was the enumeration, not the
+following — the list of sites was built short, and every site on it was then
+followed correctly.
+
+**Nothing in `verify` could have caught it, and that is the same shape this
+ticket was written about.** `test/unit/scratch-ticket-numbers.test.ts` asserts
+that a number is claimed once within an effort; it does not assert that a ticket
+path cited from somewhere else resolves to a file. So a citation left pointing
+at a filename that no longer exists is invisible to the bar, exactly as two ADRs
+sharing a number were invisible to `adr-status-blocks.test.ts` before `b8de678b`.
+The enumeration being hand-built is what the method rests on, and there is no
+guard standing behind it.
