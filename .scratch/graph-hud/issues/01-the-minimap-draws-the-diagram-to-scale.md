@@ -1,6 +1,9 @@
 # 01 — The canvas HUD's minimap draws the Diagram to scale
 
-Status: ready-for-agent
+Status: resolved
+Superseded by: 04 — the numeric width this introduced is deleted there, because the
+nesting that made a width necessary is what ticket 04 removes. The regression
+assertion added here survives unchanged.
 Blocked by: nothing — can start immediately. It blocks nothing either; ticket 03
 touches the same component, so whoever goes second rebases.
 

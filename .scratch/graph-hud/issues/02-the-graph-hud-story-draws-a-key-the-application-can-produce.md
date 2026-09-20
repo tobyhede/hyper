@@ -1,6 +1,6 @@
 # 02 — The Graph HUD story draws a key the application can produce
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: nothing — can start immediately. It blocks 03, which cannot draw an
 honest Diagram line over a key that flattens every Diagram's Graphs together.
 

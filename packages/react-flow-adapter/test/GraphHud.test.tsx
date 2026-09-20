@@ -1,58 +1,52 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
-import type { Node as FlowNode } from '@xyflow/react';
 import { vi } from 'vitest';
 import { GraphHud } from '../src/GraphHud';
 import { uuid } from './uuid';
 
 vi.mock('@xyflow/react', () => ({
-  Panel: ({ position, children }: { position: string; children: React.ReactNode }) => (
-    <aside data-testid="panel" data-position={position}>
+  Panel: ({
+    position,
+    style,
+    children,
+  }: {
+    position: string;
+    style?: React.CSSProperties;
+    children: React.ReactNode;
+  }) => (
+    <aside data-testid="panel" data-position={position} style={style}>
       {children}
     </aside>
   ),
   MiniMap: ({
-    nodeColor,
-    nodeStrokeColor,
-  }: {
-    nodeColor: string | ((node: FlowNode) => string);
-    nodeStrokeColor: string | ((node: FlowNode) => string);
-  }) => {
-    const color = (value: string | ((node: FlowNode) => string), node: FlowNode) =>
-      typeof value === 'function' ? value(node) : value;
-    return (
-      <div
-        data-testid="minimap"
-        data-active-fill={color(nodeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000001'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-        data-active-stroke={color(nodeStrokeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000001'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-        data-other-fill={color(nodeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000002'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-        data-other-stroke={color(nodeStrokeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000002'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-      />
-    );
-  },
+    style,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    bgColor?: string;
+    nodeColor?: unknown;
+    nodeStrokeColor?: unknown;
+    pannable?: boolean;
+    zoomable?: boolean;
+  }) => (
+    <div
+      data-testid="minimap"
+      data-custom-background={props.bgColor === undefined ? undefined : 'true'}
+      data-custom-node-color={props.nodeColor === undefined ? undefined : 'true'}
+      data-custom-node-stroke={props.nodeStrokeColor === undefined ? undefined : 'true'}
+      data-pannable={props.pannable === undefined ? undefined : String(props.pannable)}
+      data-zoomable={props.zoomable === undefined ? undefined : String(props.zoomable)}
+      style={style}
+    />
+  ),
 }));
 
 describe('GraphHud', () => {
-  it('groups the graph key above a minimap coloured by active-graph membership', () => {
+  it('draws an attached identity and Graph key above a sibling minimap', () => {
     const activeGraphId = uuid('00000000-0000-4000-8000-000000000010');
     const { container } = render(
       <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           {
@@ -64,20 +58,24 @@ describe('GraphHud', () => {
         ]}
         colorByGraphId={{ [activeGraphId]: '#1f77b4' }}
         activeGraphId={activeGraphId}
-        activeGraphThingIds={new Set([uuid('00000000-0000-4000-8000-000000000001')])}
       />,
     );
 
     expect(screen.getByTestId('panel')).toHaveAttribute('data-position', 'bottom-right');
-    const legend = screen.getByTestId('graph-legend');
+    expect(screen.getByTestId('panel')).toHaveStyle({ marginBottom: 'calc(15px + 150px)' });
     const minimap = screen.getByTestId('minimap');
+    expect(screen.getByTestId('panel')).not.toContainElement(minimap);
+    expect(minimap.getAttribute('style')).toBe('width: 200px; height: 150px;');
+    expect(minimap).not.toHaveAttribute('data-custom-background');
+    expect(minimap).not.toHaveAttribute('data-custom-node-color');
+    expect(minimap).not.toHaveAttribute('data-custom-node-stroke');
+    expect(minimap).not.toHaveAttribute('data-pannable');
+    expect(minimap).not.toHaveAttribute('data-zoomable');
+    expect(screen.getByTestId('hud-space')).toHaveTextContent('Atlas');
+    expect(screen.getByTestId('hud-diagram')).toHaveTextContent('Overview');
     expect(
-      legend.compareDocumentPosition(minimap) & globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(minimap).toHaveAttribute('data-active-fill', 'var(--secondary)');
-    expect(minimap).toHaveAttribute('data-active-stroke', '#1f77b4');
-    expect(minimap).toHaveAttribute('data-other-fill', 'var(--secondary)');
-    expect(minimap).toHaveAttribute('data-other-stroke', 'var(--border)');
+      within(screen.getByTestId('canvas-identity')).queryByRole('button'),
+    ).not.toBeInTheDocument();
     expect(container).toHaveTextContent('Primary');
     expect(container).toHaveTextContent('Alternate');
   });
@@ -97,13 +95,14 @@ describe('GraphHud', () => {
     const otherGraphId = uuid('00000000-0000-4000-8000-000000000011');
     render(
       <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           { id: otherGraphId, title: 'Alternate', color: '#f4a259', edges: [] },
         ]}
         colorByGraphId={{ [activeGraphId]: '#123456' }}
         activeGraphId={activeGraphId}
-        activeGraphThingIds={new Set()}
       />,
     );
 
@@ -132,10 +131,11 @@ describe('GraphHud', () => {
   it('keeps list semantics despite the unstyled list', () => {
     render(
       <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
-        activeGraphThingIds={new Set()}
       />,
     );
 

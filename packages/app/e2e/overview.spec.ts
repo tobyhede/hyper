@@ -224,6 +224,12 @@ test(
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(legendItems).toHaveCount(3);
 
+    // The read-only identity says what the key belongs to, using the same
+    // selected Space and Diagram the Dock names rather than resolving again.
+    await expect(page.getByTestId('hud-space')).toHaveText('Diagram fixture');
+    await expect(page.getByTestId('hud-diagram')).toHaveText('Collection 1');
+    await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
+
     // Titles, in the same order from the selected Diagram.
     const choices = await graphChoices(page);
     expect(await legendItems.allInnerTexts()).toEqual(await choices.allInnerTexts());
@@ -533,6 +539,9 @@ test(
     }));
     await page.getByRole('button', { name: 'Zoom out' }).click();
     await settled(page);
+    // Widening moves the fixed HUD away without changing the authored node
+    // position, leaving the last Thing's resize handle reachable.
+    await page.setViewportSize({ width: 1600, height: 720 });
     const resizeBox = await boxOf(resizeControl, "Reference Thing A′'s resize control");
     // The drag has to end **inside the viewport**: a `mousemove` past the
     // window's edge is clamped, and the gesture then ends where it never went

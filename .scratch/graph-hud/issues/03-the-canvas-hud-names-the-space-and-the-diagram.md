@@ -1,6 +1,10 @@
 # 03 — The canvas HUD names the Space and the Diagram
 
-Status: ready-for-agent
+Status: wontfix
+Superseded by: 04, which carries the same deliverable. 03 was written against the
+nested-MiniMap HUD; an attempt at it spread to 14 files fighting that structure
+(preserved on branch `wip/ticket-03-nested-hud`). Its "What it does not become"
+list is the part worth keeping and ticket 04 cites it.
 Blocked by: 02. The identity line and the key have to agree, and until the
 fixture stops flattening every Diagram's Graphs together the story would draw
 `Collection 1` over a key holding a Graph that Diagram does not own.

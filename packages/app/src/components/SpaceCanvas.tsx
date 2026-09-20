@@ -266,10 +266,12 @@ export interface SpaceCanvasProps {
    * a term recombined here (`authoring-availability.ts`).
    */
   reportEmbeddedDiagramEditing: (editing: boolean) => void;
+  /** Identity of the authored surface this canvas and its HUD are drawing. */
+  spaceTitle: string;
+  diagramTitle: string;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
   activeGraphId: GraphId | null;
-  activeGraphThingIds: ReadonlySet<string>;
   /** What each Space Thing's target offers it, for the Things of kind `space` on this canvas. */
   spaceThingTargets?: SpaceThingTargets;
   /**
@@ -316,10 +318,11 @@ export function SpaceCanvas({
   onTitleEditingChange,
   thingResize,
   reportEmbeddedDiagramEditing,
+  spaceTitle,
+  diagramTitle,
   graphs,
   colorByGraphId,
   activeGraphId,
-  activeGraphThingIds,
   spaceThingTargets,
   thingEntityActions,
 }: SpaceCanvasProps) {
@@ -1293,10 +1296,11 @@ export function SpaceCanvas({
       <ZoomSlider />
       {graphs.length > 0 && (
         <GraphHud
+          spaceTitle={spaceTitle}
+          diagramTitle={diagramTitle}
           graphs={graphs}
           colorByGraphId={colorByGraphId}
           activeGraphId={activeGraphId}
-          activeGraphThingIds={activeGraphThingIds}
         />
       )}
       <OverviewCamera presenting={presenting} />

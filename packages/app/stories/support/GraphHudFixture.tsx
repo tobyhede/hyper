@@ -1,7 +1,7 @@
 import type { Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphId } from '@project/core';
-import { graphThingIds, type Space } from '@project/graph';
+import type { Space } from '@project/graph';
 import { GraphHud } from '@project/react-flow-adapter';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
@@ -77,7 +77,6 @@ export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtur
    */
   const colors = graphColorMap(space);
   const emphasised = activeGraphId === undefined ? opening.activeGraph.id : activeGraphId;
-  const activeGraphThingIds = new Set(emphasised === null ? [] : graphThingIds(space, emphasised));
 
   /**
    * Real React Flow nodes, one per Thing of the Space this story draws.
@@ -108,10 +107,11 @@ export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtur
     <StoryCanvasFrame height="h-[26rem]">
       <StoryCanvas nodes={nodes} viewport={{ fit: true }} minZoom={0.05} className="h-full">
         <GraphHud
+          spaceTitle={space.title}
+          diagramTitle={opening.diagram.title}
           graphs={opening.diagram.graphs}
           colorByGraphId={colors}
           activeGraphId={emphasised}
-          activeGraphThingIds={activeGraphThingIds}
         />
       </StoryCanvas>
     </StoryCanvasFrame>

@@ -714,7 +714,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD keys every Graph the open Diagram owns and emphasises the active one, beside a real MiniMap.',
+      'The canvas HUD names the current Space and open Diagram read-only, keys every Graph that Diagram owns and emphasises the active one, attached above a real MiniMap.',
   },
   {
     id: 'graph-hud-key-follows-the-open-diagram',

@@ -238,10 +238,11 @@ describe('opening framing on a mounted canvas', () => {
                 cancelResize: () => undefined,
               }}
               reportEmbeddedDiagramEditing={() => undefined}
+              spaceTitle="Test Space"
+              diagramTitle="Test Diagram"
               graphs={[]}
               colorByGraphId={{}}
               activeGraphId={null}
-              activeGraphThingIds={new Set()}
             />
           </ReactFlowProvider>
         </Subscribed>
@@ -368,10 +369,11 @@ describe('opening framing on a mounted canvas', () => {
               cancelResize: () => undefined,
             }}
             reportEmbeddedDiagramEditing={() => undefined}
+            spaceTitle="Test Space"
+            diagramTitle="Test Diagram"
             graphs={[]}
             colorByGraphId={{}}
             activeGraphId={null}
-            activeGraphThingIds={new Set()}
           />
         </ReactFlowProvider>
       </OpenSpacesContext.Provider>,

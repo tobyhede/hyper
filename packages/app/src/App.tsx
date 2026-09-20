@@ -24,7 +24,7 @@ import {
 } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import { createNonThrowingReporter, type SpaceSummary } from '@project/persistence';
-import { graphThingIds, Placement } from '@project/graph';
+import { Placement } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
 import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
@@ -1221,11 +1221,6 @@ export const createApp = (
       return () => window.removeEventListener('beforeunload', onBeforeUnload);
     }, [sessionState.persistence.kind]);
 
-    const activeGraphThingIds = useMemo(
-      () => new Set(activeGraphId === null ? [] : graphThingIds(renderedSpace, activeGraphId)),
-      [renderedSpace, activeGraphId],
-    );
-
     // The two selection writes the canvas makes that are not React Flow's own —
     // continuing at a connected Thing, and the focus-to-selection bridge for an
     // Edge. Both are plain store writes with nothing to decide.
@@ -1984,10 +1979,11 @@ export const createApp = (
                 onTitleEditingChange={setEditingThingTitle}
                 thingResize={thingResize}
                 reportEmbeddedDiagramEditing={reportEmbeddedDiagramEditing}
+                spaceTitle={renderedSpace.title}
+                diagramTitle={selectedDiagram.diagram.title}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}
                 activeGraphId={activeGraphId}
-                activeGraphThingIds={activeGraphThingIds}
                 spaceThingTargets={spaceThingTargets}
                 thingEntityActions={thingRailActions}
               />

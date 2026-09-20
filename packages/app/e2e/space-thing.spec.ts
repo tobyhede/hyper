@@ -1100,6 +1100,10 @@ test(
   { tag: '@parity:space-thing-canvas-padding' },
   async ({ page }) => {
     const thing = await openSpaceThingOnItsDiagram(page);
+    // The padding probe uses `elementFromPoint`; keep its right edge clear of
+    // the fixed bottom-right HUD so it asks about the embedded canvas.
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await settled(page);
     await exerciseSpaceThingPadding(page, thing, embeddedNodes(page).first());
   },
 );
