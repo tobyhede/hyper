@@ -430,7 +430,7 @@ test(
 );
 
 /**
- * The two things Done and Escape do not cover.
+ * The two cases Done and Escape do not cover.
  *
  * Cancel is a *discard*, and every other Cancel in this suite is clicked on a pane
  * whose source was never touched — so nothing failed if Cancel committed. And the
@@ -1256,7 +1256,7 @@ test(
  * accident. This node re-renders mid-drag by construction: the render adapter
  * republishes the projection on every preview frame.
  *
- * `SpaceCanvas.test.tsx` asserts the same thing in jsdom, where `TouchEvent` is
+ * `SpaceCanvas.test.tsx` asserts the same behaviour in jsdom, where `TouchEvent` is
  * a synthetic object with none of the browser's `touch-action` or passivity
  * semantics and no compatibility `pointer*` events at all — which is precisely
  * why the release cannot be proven there. Here it is Chromium's own input
@@ -1281,7 +1281,7 @@ test.describe('resizing by touch', () => {
    * `pointerdown`/`pointerup` from it, so the release — the thing `ThingNode`'s
    * window listener answers with `finishResize` — would never happen. CDP's
    * `Input.dispatchTouchEvent` is what `touchscreen.tap()` uses underneath and
-   * produces the real thing, compatibility pointer events included.
+   * produces actual browser behaviour, compatibility pointer events included.
    *
    * `id` is what d3-drag tracks the gesture by. `touchEnd` carries no points:
    * the array is the fingers still down, so an empty one releases the gesture

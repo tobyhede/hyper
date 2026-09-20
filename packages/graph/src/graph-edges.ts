@@ -4,8 +4,8 @@ import type { GraphEdge } from '@project/core';
  * What a Graph's own Edges say about each other.
  *
  * A Graph *is* a set of Edges the author draws (ADR 0032): cycles and self-Edges
- * are legal structure, and the one thing that is not is the exact same pair
- * twice in one Graph. Intake uses this operation to identify every duplicate.
+ * are legal structure; only the exact same pair twice in one Graph is not.
+ * Intake uses this operation to identify every duplicate.
  */
 
 /**

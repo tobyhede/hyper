@@ -126,7 +126,7 @@ test('Create Space Thing from the strip names the new Thing on the canvas', asyn
  * New Diagram at phone width, and the Delete that undoes it.
  *
  * Both are rows in the Diagram menu rather than a permanent control and a row
- * menu, which is the one thing the narrower box changed about them.
+ * menu, which is the one detail the narrower box changed about them.
  */
 test('New Diagram selects an empty authored Diagram, and Delete returns to the one before', async ({
   page,
@@ -156,7 +156,7 @@ test('New Diagram selects an empty authored Diagram, and Delete returns to the o
  * New Graph at phone width, and the Delete that undoes it.
  *
  * Both are rows in the Graph menu rather than a permanent control, which is the
- * one thing the narrower box changed about them.
+ * one detail the narrower box changed about them.
  */
 test('New Graph activates an empty Graph, and Delete returns to the one before', async ({
   page,
@@ -414,7 +414,7 @@ test('a persistence failure stays inside the viewport beside a side-edge Dock', 
  *
  * 844x220 is a phone turned on its side with the browser chrome in place — the
  * shortest box the app is asked to draw a column in. What ADR 0082 owes here is
- * the same thing it owes at 390px: every cluster keeps its name and its place,
+ * the same guarantee it owes at 390px: every cluster keeps its name and its place,
  * and *"everything it offers is reachable and operable from the keyboard
  * alone."*
  *

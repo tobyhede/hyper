@@ -80,7 +80,7 @@ describe('readAggregate', () => {
   /*
    * The likeliest way to arrive without one is by pointing the command at a
    * single Space directory, which is no longer what public import takes. The
-   * message names the file so the answer is the next thing read.
+   * message names the file so the answer is the next document read.
    */
   it('refuses a directory with no aggregate file, naming it', async () => {
     const root = await makeTemporaryDirectory();

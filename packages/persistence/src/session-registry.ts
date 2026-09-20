@@ -1046,7 +1046,7 @@ export function createSpaceSessionRegistry(
      * the price of a second initializer beside `working-space.ts`, and ADR 0079
      * puts that boundary in one place.
      *
-     * The one thing that makes that commit legal is a carve-out the adapters
+     * The one rule that makes that commit legal is a carve-out the adapters
      * already share: a diagramless ordinary Space is necessarily *unreferenced*
      * — intake refuses a Space Thing whose target supplies no Diagram — so
      * initialization's own commit would otherwise be refused for leaving it

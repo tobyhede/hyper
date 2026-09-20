@@ -8,7 +8,7 @@ import { repeatedGraphEdges } from '../src/graph-edges';
  * Its two readers phrase the answer differently — intake reports every repeat as
  * a load diagnostic naming both indices, and application authoring refuses
  * the first one a View hands back — so this is where the rule itself is pinned,
- * rather than twice in the vocabularies of the two things that ask it.
+ * rather than twice in the vocabularies of the two modules that ask it.
  */
 const thing = (n: number): GraphEdge['from'] =>
   uuidSchema.parse(`00000000-0000-4000-8000-${n.toString().padStart(12, '0')}`);

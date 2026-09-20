@@ -524,7 +524,7 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
  * the retired open-Spaces strip beside `openSpaceStatusLabel`, the words the
  * Command Dock spends, and that one import marked the whole module rendered and
  * carried `components/tabs.tsx` in behind it. A dead surface passed the ratchet
- * unlisted, which is the one thing this walk exists to prevent. Both modules are
+ * unlisted, which is the one omission this walk exists to prevent. Both modules are
  * deleted now (`.scratch/command-dock/issues/08`) and the words live in
  * `packages/ui/src/open-space-status.ts`, so the example is history rather than
  * a module to look at — the rule it bought is not. Read off the name's own

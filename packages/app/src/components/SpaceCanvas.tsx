@@ -173,7 +173,7 @@ export interface SpaceCanvasProps {
   activeThingId: string | null;
   /**
    * That a traversal is running — the Navigation mode, not an availability
-   * answer. Two things read it, and neither is an authoring operation: the
+   * answer. Two consumers read it, and neither is an authoring operation: the
    * camera that returns to the overview when the traversal ends (ADR 0027), and
    * the click that resumes an embedded read of a Space that has been Exited,
    * which nothing edits. What presenting *withdraws* from authoring is
@@ -182,7 +182,7 @@ export interface SpaceCanvasProps {
   presenting: boolean;
   /**
    * That the selected Diagram's placement has resolved and the store has taken
-   * it — the fact, not an operation, and read by one thing: the aria
+   * it — the fact, not an operation, and read by one consumer: the aria
    * description React Flow gives every node.
    *
    * It is here rather than folded into `availability` because that description
@@ -1154,7 +1154,7 @@ export function SpaceCanvas({
       // Nothing on a Thing answers a double click. ADR 0065 made the Title a
       // one-activation control, so the second click of a pair lands in the field
       // the first one opened — and that field, like the control, carries
-      // `.nopan`, the one thing React Flow's zoom filter exempts. The Thing body
+      // `.nopan`, the one class React Flow's zoom filter exempts. The Thing body
       // carries no such class, so a double click there would zoom the canvas
       // while meaning nothing to the Thing. Off for the whole canvas rather than
       // per node, so the gesture does not change meaning two pixels away from a

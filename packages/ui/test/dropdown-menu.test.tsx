@@ -165,7 +165,7 @@ describe('DropdownMenu', () => {
    * anyway.
    *
    * This is the failure the bound form above prevents, written out rather than
-   * described — `'middle'` is not one of the two things this group deals in, it
+   * described — `'middle'` is not one of the two states this group handles, it
    * renders, it is chosen, and `next` arrives typed `'left' | 'right'` while
    * holding `'middle'`. A consumer that trusted the declaration and dropped its
    * runtime lookup is then reading a value off a list that cannot contain it.

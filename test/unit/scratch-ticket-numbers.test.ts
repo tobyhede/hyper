@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * A ticket number is an address, and an address names one thing.
+ * A ticket number is an address, and an address names one destination.
  *
  * `.scratch` tickets cite each other by number, `AGENTS.md` cites them by
  * number, and a skill handed "issue 16" resolves it by listing the effort's

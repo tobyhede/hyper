@@ -79,7 +79,7 @@ export interface GraphHudFixtureProps {
  * The unchanged `GraphHud`, inside a minimal real React Flow canvas.
  *
  * Nothing is replaced or stubbed: this is `<ReactFlow>` with actual nodes and
- * React Flow's own MiniMap drawing them. The one thing the fixture supplies
+ * React Flow's own MiniMap drawing them. The one input the fixture supplies
  * beyond the Space is the viewport the canvas is given, because a story frame
  * has no Space app around it to size one.
  */

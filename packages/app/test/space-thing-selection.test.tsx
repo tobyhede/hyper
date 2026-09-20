@@ -24,7 +24,7 @@ import { openTestSpace } from './opened-space';
  * The two selections an Open Space Thing authors.
  *
  * A Space Thing's content is the Diagram it selects of the Space it
- * references (ADR 0068), so Opening it is what exposes the only two things
+ * references (ADR 0068), so Opening it is what exposes the only two properties
  * about it an author can change — and the target reference is deliberately not
  * one of them: it is chosen once, at creation, and no control on the Open Thing
  * reaches it.
@@ -410,7 +410,7 @@ describe('an Open Space Thing', () => {
    * A selection is authored state and not a view preference, so it has to
    * survive the snapshot it was written into being reopened. Asserting the
    * session alone would not say that: the same two ids have to come back as the
-   * *selected* rows of a freshly composed app, which is the only thing that
+   * *selected* rows of a freshly composed app, which is the only evidence that
    * proves the Thing reads its own stored selection rather than defaulting.
    */
   it('keeps both selections in the snapshot, and shows them selected on reopening', async () => {

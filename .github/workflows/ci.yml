@@ -92,7 +92,7 @@ jobs:
     #
     # `contract:check` is not part of `verify` and rides here rather than in
     # `coverage` because it is another static check of the tree; running it in
-    # both would pay for it twice to learn the same thing.
+    # both would pay for it twice to learn the same lesson.
     steps:
       # Every action is pinned to the commit its tag named when it was added or
       # last bumped, because a tag can be repointed at new code and a SHA
@@ -409,7 +409,7 @@ jobs:
       # under the container's `HOME` — `/github/home`, which Actions mounts and
       # sets for every `container:` job — against the key the non-container jobs
       # use for `/home/runner/…`, restoring each job's archive into the other's
-      # wrong path. pnpm is the one thing the image lacks, so `action-setup`
+      # wrong path. pnpm is the one tool the image lacks, so `action-setup`
       # stays and the store is cached below under a key that cannot collide.
       #
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -484,7 +484,7 @@ jobs:
     # tag *and* digest (a bump moves both, together with `@playwright/test` in
     # the lockfile), `--ipc=host` for Chromium's `/dev/shm`, `--init` for the
     # helpers that reparent onto a PID 1 that is not ours, and `setup-node`
-    # overlaying `.node-version` without taking over the pnpm cache. Two things differ,
+    # overlaying `.node-version` without taking over the pnpm cache. Two details differ,
     # and both are commented where they appear: the cache key and the artifact
     # name.
     container:

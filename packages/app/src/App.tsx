@@ -178,7 +178,7 @@ export const createApp = (
     const navigationState = authoringState.navigation;
     const selectedDiagramId = navigationState.selectedDiagramId;
     /**
-     * The two things the browser's location tells this component (ADR 0081).
+     * The two facts the browser's location tells this component (ADR 0081).
      *
      * Read rather than owned: the location follows one Space, is answered by
      * `browser-location.ts`, and outlives any one mount. What is *not* here is
@@ -858,7 +858,7 @@ export const createApp = (
      * failures were timeouts on a machine running several suites at once, where
      * the *unmodified* tree failed twelve.
      *
-     * Two things make the claim structurally impossible as well as unobserved.
+     * Two facts make the claim structurally impossible as well as unobserved.
      * Every identifier the decoration memo reads is in its dependency list, and
      * the one input whose contents can change behind a stable identity —
      * `spaceThingTargets`, which reads another Space live — is refreshed at its
@@ -1494,7 +1494,7 @@ export const createApp = (
      * surfaces cannot come to disagree about what a Graph's "Copy link" means.
      *
      * An id the entity does not offer is simply absent, which is the rule that
-     * module states: a destination that does not exist is not a thing to offer
+     * module states: a destination that does not exist is not an option to offer
      * and refuse.
      */
     const runEntityCommand = (entity: SpaceEntity, id: EntityCommandId) => () => {

@@ -26,7 +26,7 @@ type PersistenceContract<T> = T extends
  * types `y` loosely enough that a key the received type no longer has is not an
  * error: ticket `13` removed `initialization` from `LoadedSpace` end to end,
  * `pnpm verify` passed with the compiler looking straight at the stale field,
- * and CI's `postgres` job was the first thing to say so half an hour later. The
+ * and CI's `postgres` job was the first check to say so half an hour later. The
  * suite is inside the root program — `tsc` read the file — so another command to
  * remember would not have closed it. Binding the expectation to the received
  * type does, because the received type is then what decides which keys the

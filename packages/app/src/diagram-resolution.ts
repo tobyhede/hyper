@@ -3,7 +3,7 @@ import { Placement, type ResolvedDiagram, type Space } from '@project/graph';
 
 /**
  * A Diagram that cannot be resolved: either the Space names no opening Diagram,
- * or an id names none. One error, because both mean the same thing — the canvas
+ * or an id names none. One error, because both mean the canvas context is unavailable — the canvas
  * has nothing to draw and the caller asked for something that is not there.
  *
  * There is no reason field. A `reason` union whose second arm has no thrower is

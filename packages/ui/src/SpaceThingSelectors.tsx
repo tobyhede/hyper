@@ -164,7 +164,7 @@ interface SpaceThingSelectorProps {
  * Dock's identical-looking list moves the canvas the author is standing on.
  * Both arrive from the caller for exactly that reason.
  *
- * Three things are this Thing's and are supplied from here.
+ * Three attributes are this Thing's and are supplied from here.
  *
  * `nokey` on the trigger and on the popup. React Flow subscribes its live
  * Space-key pan activation on the document and excludes a target through a

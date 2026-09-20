@@ -385,7 +385,7 @@ describe('CanvasThing Open and Close operation', () => {
     const actions = screen.getByTestId('canvas-thing-actions');
     const buttons = Array.from(actions.querySelectorAll('button'));
     // One rail, one control treatment. A commit control that carried its own box
-    // or its own type would read as a different kind of thing to the Close
+    // or its own type would read as a different kind of control to the Close
     // button it sits beside.
     for (const button of buttons) {
       expect(button).toHaveClass('thing__rail-action');

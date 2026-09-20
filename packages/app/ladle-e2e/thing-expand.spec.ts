@@ -171,7 +171,7 @@ test(
     const sourceHandle = specimen.locator('.rf-thing-node__authoring-handle--source').first();
     await expect(sourceHandle).toHaveCSS('opacity', '0');
     expect(await sourceHandle.evaluate(transitionDuration, 'opacity')).toBe(120);
-    // The rail carries no colour to fade now, so the quieting is the two things
+    // The rail carries no colour to fade now, so the quieting affects the two elements
     // that do: the commands and the kind glyph
     // (`.scratch/command-dock/issues/12`).
     expect(
@@ -445,7 +445,7 @@ test('the rail replaces its Edit action with the two ends of a running edit', as
   // the control keeps its slot and says it is unavailable.
   await expect(thing.getByRole('button', { name: 'Close Thing Strategies' })).toBeDisabled();
   // Three controls, one treatment: a commit control with its own box or its own
-  // type would read as a different kind of thing to the Close button beside it.
+  // type would read as a different kind of control to the Close button beside it.
   const boxes = await actions.getByRole('button').evaluateAll((buttons) =>
     buttons.map((button) => {
       const style = getComputedStyle(button);
@@ -626,7 +626,7 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   // Each key is drawn as a cap — its own bordered, filled box — rather than as
   // glyphs set into the muted line, which is what made this legible. And the
   // grouping is a gap rule: a cap sits close to its own word, the two pairs
-  // further apart, so the line reads as two things rather than one run.
+  // further apart, so the line reads as two elements rather than one run.
   const gaps = await hint.evaluate((element) => {
     const pair = element.querySelector('.markdown-thing-body__shortcut');
     if (pair === null) throw new Error('missing shortcut pair');

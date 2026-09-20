@@ -63,7 +63,7 @@ export type DrawerSide = 'left' | 'right';
  *
  * Exported because a surface the drawer overlays has to yield exactly this much
  * to stay clear of it (`AppShell`'s `insetEnd`), and a second copy of the number
- * is a second copy that can disagree. `DrawerPopup` is the only thing that
+ * is a second copy that can disagree. `DrawerPopup` is the only component that
  * applies it as a width.
  */
 export const DRAWER_WIDTH = '20rem';

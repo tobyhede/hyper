@@ -21,7 +21,7 @@ const referencedSpaceIds = (things: readonly Thing[]): readonly UUID[] => [
 /**
  * What one target's read came back with, kept apart from the others'.
  *
- * `answered` separates the two things an absent target can mean, which is the
+ * `answered` separates the two states an absent target can represent, which is the
  * whole reason the reads are settled one by one: `read` resolves `undefined`
  * for a Space that is gone or no longer passes intake — an answer *about* that
  * Space — and rejects when the transport could not get one at all.

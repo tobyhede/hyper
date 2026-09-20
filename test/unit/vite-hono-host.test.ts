@@ -245,7 +245,7 @@ describe('Vite Hono host', () => {
     //
     // An unreachable database is answered 503 too, since no other status in the
     // set is true of this state either. The detail is what tells the two apart,
-    // and it is the only thing that does — a client that acts on the difference
+    // and it is the only detail that does — a client that acts on the difference
     // reads this, so it is pinned here.
     expect(decodeProblemDetails(JSON.parse(await response.text()))).toMatchObject({
       status: 503,

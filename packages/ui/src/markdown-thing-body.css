@@ -169,7 +169,7 @@
    it in plain muted text. A cap is recognised as an object without being read;
    glyphs set into running text at low contrast have to be parsed, and that is
    what made the earlier line illegible. `Kbd`'s default variant is that cap and
-   the design system already ships it; the only thing added here is the Thing's
+   the design system already ships it; the only rule added here is the Thing's
    own palette, because `bg-muted` is the application's paper and this sits on
    the Thing's.
 

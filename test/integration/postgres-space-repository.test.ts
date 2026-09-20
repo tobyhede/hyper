@@ -16,7 +16,7 @@ import { spaceRepositoryContract } from '../support/repository-contract';
 import { expectPersisted } from '../support/persistence-contract';
 
 /**
- * Every Hyper row, gone. The same thing `--dangerous-truncate` does, and safe
+ * Every Hyper row, gone. The same deletion `--dangerous-truncate` performs, and safe
  * for the same reason the replacement cases below are: `fileParallelism` is
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */
@@ -1782,7 +1782,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   it('stores a Space whose graph id equals one of its thing ids', async () => {
     // Entity kinds do not share an identity space. Intake checks each kind
     // separately — things among things, graphs among graphs — so a UUID naming
-    // both a thing and a graph names two different things unambiguously.
+    // both a thing and a graph names two different entities unambiguously.
     const shared: SpaceSnapshot = {
       id: SPACE_ID,
       document: {

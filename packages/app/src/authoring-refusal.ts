@@ -21,7 +21,7 @@ type PresentedAuthoringRefusal =
  *
  * Both switches in this module answer that fact — an ordinary Authoring
  * refusal and a coordinated Space Thing one — and a Diagram that has gone means
- * the same thing either way. It is written here rather than in each arm for
+ * the same message either way. It is written here rather than in each arm for
  * the reason the Space Thing translation below states for aggregate refusals:
  * the two can reach the author on the same screen, so one of them reading
  * differently would be a difference nothing could explain.
@@ -180,7 +180,7 @@ export const presentEdgeEndpointRefusal = (
  *
  * Total by construction rather than by an exhaustive record: a surface with no
  * field has nowhere else for a code to go, so a second twenty-two-line table
- * saying `form` twenty-two times would be a thing to keep in step and never a
+ * saying `form` twenty-two times would be a burden to keep in step and never a
  * thing to decide.
  */
 export const presentEdgeDeletionRefusal = (
@@ -262,7 +262,7 @@ const STORED_SPACE_REFS_RECITED = 3;
  *
  * It reads the fields rather than switching on `kind` because the identity is
  * carried by two shapes across fifteen-odd kinds, and a switch would be that
- * list written out to say one of two things. The cost is that the compiler
+ * list written out to carry one of two meanings. The cost is that the compiler
  * does not hold the sentence above: an arm added with its identity under a
  * third field name returns `null` here and no test fails. The sentence still
  * stands on its own in that case, which is why this is a legibility loss

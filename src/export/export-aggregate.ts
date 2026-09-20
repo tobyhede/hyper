@@ -66,7 +66,7 @@ const mintsNothing = (): UUID => {
  *
  * It is not an equality check against the stored snapshots, and deliberately.
  * Canonical export is canonical rather than byte-preserving (ADR 0030) — it
- * normalizes Markdown line endings, among other things — so a stored Space and
+ * normalizes Markdown line endings, among other effects — so a stored Space and
  * its exported form may legitimately differ. What must hold is that the result
  * is a valid, Meta-rooted aggregate naming the same Meta Space.
  *

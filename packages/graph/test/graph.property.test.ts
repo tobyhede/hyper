@@ -207,8 +207,8 @@ describe('what intake refuses, over generated documents', () => {
 
   it('detects an endpoint the owning diagram does not hold, and says it is a space thing', () => {
     // The closure rule ADR 0040 adds, and the reason it cannot be checked
-    // against the space: every id here names a real thing, so the only thing
-    // wrong is *where* it is. Dropping any one thing's position drops it from the
+    // against the space: every id here names a real thing, so the only fault is
+    // *where* it is. Dropping any one thing's position drops it from the
     // diagram's membership, and every edge that touched it is then unclosed.
     fc.assert(
       fc.property(diagramsArb, fc.nat(), (diagrams, raw) => {

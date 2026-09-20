@@ -60,7 +60,7 @@ export function NewThingPreview({
         className="new-thing-preview"
         data-testid="new-thing-preview"
         // A ghost of a Thing the author has not created. It draws through the
-        // production `CanvasThing` so the preview and the real thing cannot
+        // production `CanvasThing` so the preview and the rendered Resource cannot
         // drift, and that component names itself an `article` for the Thing it
         // is — which this is not one of yet. Hidden from the accessibility tree
         // so no Thing is announced before there is a Thing.

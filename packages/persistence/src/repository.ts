@@ -14,7 +14,7 @@ import type {
  *
  * Its own type because two unrelated failures arrive at a reader the same way —
  * this one, and a database that is simply unreachable — and a bare `Error`
- * makes them one thing. They are not one thing: broken stored state is a defect
+ * makes them one state. They are not one state: broken stored state is a defect
  * this deployment carries and no retry cures, while an unreachable database is
  * temporary and a later attempt is exactly the answer. `src/http/space-host.ts`
  * answers them with different statuses, and start-up stops retrying on this

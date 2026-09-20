@@ -680,7 +680,7 @@ interface ContentEditActionsProps {
  * stated with `aria-keyshortcuts` and drawn by the body's own shortcut hint,
  * which is where a canvas Thing names a key.
  *
- * `holdFocus` is the one thing these two ask for that the other rail controls
+ * `holdFocus` is the one behaviour these two ask for that the other rail controls
  * do not, and it is asked for because the caret is in the content while the
  * control is on the band: without it the press that activates one is also a
  * focus leaving the writing surface, mid-edit and for a control that may well

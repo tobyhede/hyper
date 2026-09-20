@@ -103,7 +103,7 @@ test(
           expected.length === 1 ? ['title'] : ['title', 'subtitle', 'caption'],
         );
 
-        // Nothing beneath the Title. The heading is the only thing in the body,
+        // Nothing beneath the Title. The heading is the only element in the body,
         // no content surface is mounted on a closed Thing, and the Thing's own
         // text is the Title Lines and nothing else — which is what the two
         // undecided reference lines would fail.

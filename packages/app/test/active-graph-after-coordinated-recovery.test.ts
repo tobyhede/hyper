@@ -37,7 +37,7 @@ const id = (value: string): UUID => uuidSchema.parse(value);
 /**
  * A minter for a collaborator this test expects to mint nothing.
  *
- * ADR 0016 has a test name the ids it is about to assert on, and three things
+ * ADR 0016 has a test name the ids it is about to assert on, and three collaborators
  * here take a minter while only one of them mints. Sharing the Target's would
  * let an unexpected mint duplicate its Graph id into another Space and pass;
  * this fails at the call instead.

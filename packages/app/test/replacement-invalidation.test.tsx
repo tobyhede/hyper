@@ -241,7 +241,7 @@ async function stageOpenMarkdownDraft(session: SpaceSession): Promise<void> {
 
 /**
  * The accepted Space is the one on screen — read off the shell's title, which is
- * the Space's own name and the one thing the replacement renames that no
+ * the Space's own name and the one entity the replacement renames that no
  * draft, Thing or placement is involved in.
  *
  * Waited for *before* each draft assertion so that a surviving draft fails on the

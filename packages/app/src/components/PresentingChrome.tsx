@@ -168,7 +168,7 @@ export function PresentingChrome({
     >
       <div className="flex items-center gap-4 p-3 @max-3xl:flex-col @max-3xl:items-stretch">
         {/*
-          One polite region over both, because they are one thing: what the
+          One polite region over both, because they form one announcement: what the
           presenter can do from the Thing they are on. A changed choice set is
           announced where it changed, without focus being moved to say it.
         */}
@@ -195,7 +195,7 @@ export function PresentingChrome({
                 neither is a text change — so with `aria-atomic="false"` the
                 region had nothing to read and a screen-reader presenter arrowed
                 across a fork in silence. Focus deliberately does not move for
-                those keys, so this is the only thing left that can say what
+                those keys, so this is the only surface left that can say what
                 changed. It carries the same wording as the control it names.
               */}
               {selected !== undefined && (

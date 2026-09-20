@@ -170,7 +170,7 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The one thing no tracked fixture has, and the reason these Spaces exist.
+   * The one state no tracked fixture has, and the reason these Spaces exist.
    *
    * The E2E fixture's Graphs are deliberately all lines and the sidebar's Space
    * is four more of them, so nothing already in the tree gives the presenting
@@ -208,7 +208,7 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The Command Dock's Space, held to the three things it exists to supply.
+   * The Command Dock's Space, held to the three values it exists to supply.
    *
    * The prototype it feeds compares list surfaces, Diagram switching and Graph
    * emphasis, and each of those needs a shape no other fixture has: **more
