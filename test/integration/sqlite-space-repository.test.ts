@@ -2,13 +2,33 @@ import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { AggregateInvariantError } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSqliteDatabase } from '../../src/sqlite/db';
-import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { spaceRepositoryContract } from '../support/repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
-spaceRepositoryContract('SqliteSpaceRepository', async () => {
+// Ticket 24: `SqlSpaceRepository` now owns `commit` too, so the whole
+// contract -- lifecycle and commit alike -- runs directly against it; the
+// ticket 22/23 tracer and lifecycle-only wiring this block used to carry
+// beside it are gone, superseded by this one call covering everything they
+// each covered separately.
+spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
   const harness = await openSqliteRepository();
-  return { repository: harness.repository, close: harness.close };
+  return {
+    repository: harness.repository,
+    close: harness.close,
+    writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
+      if (exportedRevision === undefined) {
+        await harness.database.orm.Space.where({ id: spaceId }).update({ revision });
+        return;
+      }
+      await harness.database.orm.Space.where({ id: spaceId }).update({
+        revision,
+        exportedRevision,
+      });
+    },
+  };
 });
 
 const SPACE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
@@ -91,7 +111,7 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
   exportedRevision,
 });
 
-describe('SqliteSpaceRepository', () => {
+describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -219,15 +239,10 @@ describe('SqliteSpaceRepository', () => {
 
     const row = await database.orm.Space.where({ id: SPACE_ID }).first();
     expect(row?.revision).toBe('0');
-
-    const maxSigned = (2n ** 63n - 1n).toString();
-    await database.orm.Space.where({ id: SPACE_ID }).update({
-      revision: maxSigned,
-      exportedRevision: '0',
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
-      stored(first, 2n ** 63n - 1n, 0n),
-    );
+    // The ceiling itself, and revisions past `Number.MAX_SAFE_INTEGER`, round
+    // trip identically on both databases now that `revision` is TEXT on
+    // PostgreSQL too — proved once in `repository-contract.ts` (ticket 22)
+    // rather than repeated per database here.
   });
 
   it('commits a topology-preserving update and reloads it', async () => {
@@ -302,38 +317,41 @@ describe('SqliteSpaceRepository', () => {
     await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
   });
 
-  it('commits and reloads revisions above Number.MAX_SAFE_INTEGER as canonical decimal text', async () => {
-    const { repository, database } = await opened();
+  // ADR 0095: the serialise queue orders every repository operation in the
+  // process, over one file handle — not one queue per `SqlSpaceRepository`
+  // instance. Two repositories built over the same `SqliteDatabase` (as the
+  // HTTP runtime and `test/support/sqlite-harness.ts` each do) share it.
+  // Without that, this same shape — two overlapping first initializations —
+  // opens two SQLite connections that genuinely contend, and either surfaces
+  // as `database is locked` or waits out a meaningful slice of the 5000ms
+  // busy timeout; sharing the queue keeps them from ever overlapping at the
+  // driver, the same way one instance calling `initializeAggregate` twice
+  // does above.
+  it('serialises overlapping operations across two repositories over one file handle', async () => {
+    const { database } = await opened();
     const first = space(SPACE_ID, 'One', [THING_ID]);
-    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
-    const aboveSafe = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
-    await database.orm.Space.where({ id: SPACE_ID }).update({
-      revision: aboveSafe.toString(),
-    });
-    const changed = retitled(first, 'Above safe');
+    const repositoryA = new SqlSpaceRepository(sqliteSqlStore(database));
+    const repositoryB = new SqlSpaceRepository(sqliteSqlStore(database));
 
-    await expect(
-      repository.commit({
-        changes: [
-          {
-            kind: 'update',
-            spaceId: SPACE_ID,
-            snapshot: changed,
-            expectedRevision: aboveSafe,
-          },
-        ],
-      }),
-    ).resolves.toEqual({
-      kind: 'committed',
-      revisions: [{ spaceId: SPACE_ID, revision: aboveSafe + 1n }],
-      deletedSpaceIds: [],
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
-      stored(changed, aboveSafe + 1n, null),
-    );
-    const row = await database.orm.Space.where({ id: SPACE_ID }).first();
-    expect(row?.revision).toBe((aboveSafe + 1n).toString());
+    const started = performance.now();
+    const results = await Promise.allSettled([
+      repositoryA.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
+      repositoryB.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [structuredClone(first)] }),
+    ]);
+    const elapsed = performance.now() - started;
+
+    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+    expect(
+      results.flatMap((result) => (result.status === 'fulfilled' ? [result.value.kind] : [])),
+    ).toEqual(expect.arrayContaining(['initialized', 'existing']));
+    expect(elapsed).toBeLessThan(WELL_UNDER_BUSY_TIMEOUT_MS);
+    await expect(repositoryA.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
   });
+
+  // Moved to `repository-contract.ts` (ticket 22): "stores and commits a
+  // revision above Number.MAX_SAFE_INTEGER as canonical decimal text" proves
+  // this same round trip on both databases now that PostgreSQL's `revision`
+  // is TEXT too.
 
   it('serialises overlapping in-process commits at different Spaces well under the busy timeout', async () => {
     const { repository } = await opened();
@@ -488,14 +506,12 @@ describe('SqliteSpaceRepository', () => {
   const proposed = space(SPACE_ID, 'Proposal', [THING_ID]);
   const proposal = { metaSpaceId: SPACE_ID, spaces: [proposed] };
 
-  const expectReadAndInitializeRefuse = async (
-    repository: SqliteSpaceRepository,
-  ): Promise<void> => {
+  const expectReadAndInitializeRefuse = async (repository: SpaceRepository): Promise<void> => {
     await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     await expect(repository.initializeAggregate(proposal)).rejects.toThrow(AggregateInvariantError);
   };
 
-  const expectTruncatedTo = async (repository: SqliteSpaceRepository): Promise<void> => {
+  const expectTruncatedTo = async (repository: SpaceRepository): Promise<void> => {
     await expect(repository.loadAggregate()).resolves.toEqual({
       kind: 'loaded',
       aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(proposed, 0n, null)] },
@@ -546,6 +562,37 @@ describe('SqliteSpaceRepository', () => {
       kind: 'replaced',
     });
     await expectTruncatedTo(repository);
+  });
+
+  // `commit`'s fast path reads its candidate through `#loadStoredSpaceRow`,
+  // the same private helper `loadSpace` calls directly, so a stored document
+  // that fails intake escapes a fast-path `commit` exactly as unclassified as
+  // it escapes `loadSpace` for the same row -- neither is
+  // `AggregateInvariantError`, unlike `loadAggregate`/`initializeAggregate`/
+  // `replaceAggregate` (through `#loadEverySpace`) two cases above this one.
+  it("commit's fast path leaves a broken stored document as unclassified as loadSpace does", async () => {
+    const { repository, database } = await opened();
+    // `title` is required, so this row is JSON that fails Space intake -- the
+    // same construction as "truncates a stored Space whose document does not
+    // parse" above.
+    await database.orm.Space.create(storedRow(SPACE_ID, { version: 1 }));
+    await database.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
+
+    await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
+      AggregateInvariantError,
+    );
+    await expect(
+      repository.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: { id: SPACE_ID, document: { version: 1, title: 'Repaired' }, things: [] },
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    ).rejects.not.toBeInstanceOf(AggregateInvariantError);
   });
 
   it('truncates a stored Space whose document is not JSON', async () => {
@@ -610,9 +657,10 @@ describe('SqliteSpaceRepository', () => {
 
   it('truncates a stored Space whose revision is not canonical', async () => {
     const { repository, database } = await opened();
-    // A raw ORM write is required: the repository's own `toDatabaseRevision`
-    // refuses a non-canonical value before it ever reaches the column, so only
-    // a write that bypasses it can store one to read back.
+    // A raw ORM write is required: the repository's own `encodeStoredRevision`
+    // (the shared codec, ADR 0095) refuses a non-canonical value before it
+    // ever reaches the column, so only a write that bypasses it can store one
+    // to read back.
     await database.orm.Space.create({
       id: OTHER_SPACE_ID,
       document: { version: 1, title: 'Orphan' },
@@ -655,7 +703,7 @@ describe('SqliteSpaceRepository', () => {
       await reopened.close();
       await harness.close();
     };
-    const repository = new SqliteSpaceRepository(reopened);
+    const repository = new SqlSpaceRepository(sqliteSqlStore(reopened));
     await expect(repository.loadAggregate()).resolves.toEqual({
       kind: 'loaded',
       aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },

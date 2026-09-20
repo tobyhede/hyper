@@ -691,6 +691,30 @@ describe('Space HTTP aggregate commit', () => {
     await expectProblem(response, 'persistence-unavailable');
     expect(logError).toHaveBeenCalledWith('Failed to commit spaces', failure);
   });
+
+  // `SqlSpaceRepository#commit` (`src/persistence/sql-space-repository.ts`)
+  // wraps a stored revision it cannot read back as broken stored state,
+  // exactly as its aggregate read's own decode step already does — so an
+  // `AggregateInvariantError` can now reach this route, not only
+  // `GET /api/aggregate`. Told apart from an unreachable database by type
+  // (`isAggregateInvariant`), the same rule that route already applies: a
+  // defect no retry cures answers 500 `internal-error`, not 503
+  // `persistence-unavailable` forever retried by a client that cannot fix it.
+  it.each([
+    { failure: 'a direct invariant failure', error: new AggregateInvariantError('broken') },
+    {
+      failure: 'an invariant failure carried only on cause',
+      error: new Error('transaction rollback failed', {
+        cause: new AggregateInvariantError('broken'),
+      }),
+    },
+  ])('answers 500 internal-error for $failure', async ({ error }) => {
+    const response = await postCommit(
+      createSpaceHttpApp(repository({ commit: () => Promise.reject(error) })),
+    );
+
+    await expectProblem(response, 'internal-error');
+  });
 });
 
 describe('Space HTTP commit request policy', () => {

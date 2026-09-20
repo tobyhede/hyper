@@ -3,11 +3,8 @@ export * from './backend';
  * (ADR 0095). The rest of the module is private to it. */
 export { commitRequestRefusal, committedRevision, decideCommit } from './commit-decision';
 /* The wire contract's two ends live in different processes. These are the
- * codecs the portable HTTP package reads the wire through; the legacy Node host
- * that used to share them is gone. `CANONICAL_DECIMAL` belongs with them because
- * `HttpSpaceBackend` validates a revision header against it before decoding. */
+ * codecs the portable HTTP package reads the wire through. */
 export {
-  CANONICAL_DECIMAL,
   COMMIT_OUTCOME_WIRE,
   commitOutcomeDecoder,
   decodeCommitRequest,
@@ -43,6 +40,20 @@ export type {
   ProblemDetails,
   ProblemError,
 } from './http-protocol';
+/* The one shared codec for a stored Revision column (ADR 0095): canonical
+ * non-negative decimal TEXT on both databases, bound to the same 2^63−1
+ * ceiling `http-protocol.ts`'s wire decode also enforces.
+ * `src/persistence/*-space-repository.ts` reads and writes revisions through
+ * this rather than each adapter owning its own format/ceiling check.
+ * `CANONICAL_DECIMAL` belongs here too because `HttpSpaceBackend` validates a
+ * revision header against it before decoding. */
+export {
+  CANONICAL_DECIMAL,
+  REVISION_CEILING,
+  RevisionCodecError,
+  decodeStoredRevision,
+  encodeStoredRevision,
+} from './revision-codec';
 /* Two test-facing helpers, two doors, and the difference is what they are.
  * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
  * constructor, so a caller that cannot import it cannot construct the adapter

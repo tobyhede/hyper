@@ -64,13 +64,13 @@ export class MemorySpaceRepository implements SpaceRepository {
    *
    * A named constructor rather than a third meaning for the `metaSpaceId`
    * argument, and it exists because **no sequence of seam calls reaches this
-   * state on either adapter**, so the shared contract cannot set it up.
-   * `PostgresSpaceRepository` writes the singleton Meta row inside the same
-   * transaction that writes the Spaces (`replaceAllSpaces`), and every other
+   * state on the SQL repository**, so the shared contract cannot set it up.
+   * `SqlSpaceRepository` writes the singleton Meta row inside the same
+   * transaction that writes the Spaces (`#replaceAllSpaces`), and every other
    * path that would store a Space without one — `commit` — is refused with
    * `invalid-commit` first. The state is what an out-of-band deletion of the
-   * singleton row, or a half-migrated database, leaves behind; both adapters
-   * refuse it, and this is what lets the memory one be asked.
+   * singleton row, or a half-migrated database, leaves behind; the SQL
+   * repository refuses it, and this is what lets the memory one be asked.
    */
   static withoutMetaIdentity(spaces: readonly LoadedSpace[]): MemorySpaceRepository {
     const repository = new MemorySpaceRepository();

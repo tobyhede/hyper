@@ -87,7 +87,7 @@
               "exportedRevision": {
                 "nullable": true,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/int8@1",
                   "kind": "scalar"
                 }
               },
@@ -101,7 +101,7 @@
               "revision": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/int8@1",
                   "kind": "scalar"
                 }
               },
@@ -325,8 +325,8 @@
                   "nullable": false
                 },
                 "exported_revision": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
+                  "codecId": "pg/int8@1",
+                  "nativeType": "int8",
                   "nullable": true
                 },
                 "id": {
@@ -340,12 +340,12 @@
                   "typeRef": "Uuid"
                 },
                 "revision": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/int8@1",
                   "default": {
                     "kind": "literal",
-                    "value": "0"
+                    "value": 0
                   },
-                  "nativeType": "text",
+                  "nativeType": "int8",
                   "nullable": false
                 },
                 "updated_at": {
@@ -440,7 +440,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:1f367854ac0c2c316a2d9cfdbb704f5531beb59c0d04722e62220c5aaf9aad35",
+    "storageHash": "sha256:edd3e82bd27149cf492fffa9809063fb66dc08e33f86e46b70e2e81e5502bbbd",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",

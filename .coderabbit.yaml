@@ -64,6 +64,8 @@ reviews:
   path_filters:
     - '!src/prisma/contract.json'
     - '!src/prisma/contract.d.ts'
+    - '!src/sqlite/contract.json'
+    - '!src/sqlite/contract.d.ts'
     - '!migrations/**/*.json'
     - '!migrations/**/*.d.ts'
 
@@ -239,17 +241,18 @@ reviews:
         job generates and masks its own password so forked pull requests need no
         repository secret; do not propose a secret in its place.
 
-    - path: '{migrations/**,src/prisma/**}'
+    - path: '{migrations/**,src/prisma/**,src/sqlite/**}'
       instructions: >-
         Prisma Next 0.16.0 emits these artifacts and owns their shape — do not
         suggest editing them; raise a concern about the source schema instead.
-        Two pinned workarounds are deliberate and documented in
-        `docs/agents/editing-and-persistence.md`: the
-        four exact `@prisma-next/*` root devDependencies exist only so generated
-        types resolve under pnpm's strict layout, and the single `int8`
-        compatibility cast in `toDatabaseRevision` keeps revisions as `bigint`.
-        Do not propose removing either, and never convert a revision through
-        `Number`.
+        One pinned workaround is deliberate and documented in
+        `docs/agents/editing-and-persistence.md`: every `@prisma-next/*`
+        package a generated `contract.d.ts` imports types from is an exact
+        `0.16.0` root devDependency, only so generated types resolve under
+        pnpm's strict layout — do not propose removing one. A Revision is
+        canonical decimal TEXT on both databases behind the shared codec in
+        `packages/persistence/src/revision-codec.ts` (ADR 0095); never convert
+        a revision through `Number`.
 
     - path: 'docs/adr/**'
       instructions: >-
@@ -440,7 +443,7 @@ knowledge_base:
       - files: 'docs/agents/domain.md'
         applyTo: 'docs/adr/**/*.md,CONTEXT.md'
       - files: 'docs/agents/editing-and-persistence.md'
-        applyTo: 'packages/persistence/**,packages/graph/**,packages/app/src/space-authoring.ts,migrations/**,src/prisma/**'
+        applyTo: 'packages/persistence/**,packages/graph/**,packages/app/src/space-authoring.ts,migrations/**,src/prisma/**,src/sqlite/**'
       - files: 'docs/agents/rendering.md'
         applyTo: 'packages/react-flow-adapter/**,packages/app/src/components/**,packages/app/src/edge-authoring*.ts,packages/app/src/canvas-projection.ts,packages/app/src/render-adapter.ts,packages/app/src/camera.ts'
       - files: 'docs/agents/http.md'

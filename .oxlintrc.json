@@ -58,33 +58,41 @@
   // rule each override waits on before it goes live repo-wide.
   "overrides": [
     {
-      // The Postgres repository's own boundary code: classifying caught driver
-      // errors (`error: unknown` is the caught-exception case, structurally the
-      // same as the rule's own exempted `cause` parameter) and coercing
-      // `number | string | bigint` wire/DB revisions, where `typeof` discriminates
-      // an already-closed union rather than narrowing untyped external input.
-      "files": ["src/persistence/postgres-space-repository.ts"],
+      // ADR 0095's `SqlStore` contract (`src/persistence/sql-store.ts`) and its
+      // two per-database implementations. `SqlStore.readDocument`/
+      // `isDuplicateKey` are declared over `unknown` on purpose: each database
+      // answers a different representation for "the stored document" and "the
+      // error a losing insert raised" — `unknown` in and a schema-parsed value
+      // or a `boolean` out is the honest contract for a boundary the interface
+      // exists to abstract over, not a narrowing skipped. The two
+      // implementations below carry the concrete boundary code this contract
+      // describes: `isDuplicateKey`'s caught-error classification is the
+      // `error: unknown`/`cause`-shaped case a caught driver error is —
+      // structurally the same as the rule's own exempted `cause` parameter,
+      // where `typeof` discriminates an already-closed union rather than
+      // narrowing untyped external input — and SQLite's `readDocument` is
+      // `storedJson` moved here unchanged: the same root-read-vs-nested-
+      // `include`-read TEXT/decoded-object split `sql-store.ts`'s own doc
+      // comments explain (`test/integration/sqlite-space-repository.test.ts`
+      // initialize/load).
+      "files": [
+        "src/persistence/sql-store.ts",
+        "src/prisma/sql-store.ts",
+        "src/sqlite/sql-store.ts"
+      ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off",
-        "anti-slop/no-runtime-typeof": "off",
-        // toDatabaseRevision's `value as unknown as number`: bigint and number
-        // have no direct assertion path, and a real `Number(value)` call could
-        // lose precision above Number.MAX_SAFE_INTEGER — see the SAFETY comment
-        // on that function for the full rationale.
-        "anti-slop/no-chained-type-assertions": "off"
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-runtime-typeof": "off"
       }
     },
     {
-      // The SQLite repository is the same class of boundary as the PostgreSQL
-      // one: classifying caught driver errors, converting TEXT revisions at the
-      // adapter edge, and parsing Json columns that the driver sometimes
-      // answers as already-decoded objects and sometimes as stored TEXT
-      // (`test/integration/sqlite-space-repository.test.ts` initialize/load).
-      "files": ["src/persistence/sqlite-space-repository.ts"],
+      // `SqlSpaceRepository`'s private `parseSnapshot`: `loadSpaceSnapshot`'s
+      // one intake (ADR 0010) is the parser this `input: unknown` parameter
+      // exists to reach, not a narrowing that was skipped.
+      "files": ["src/persistence/sql-space-repository.ts"],
       "rules": {
-        "anti-slop/no-unknown-parameters": "off",
-        "anti-slop/no-runtime-typeof": "off",
-        "anti-slop/no-unknown-returns": "off"
+        "anti-slop/no-unknown-parameters": "off"
       }
     },
     {
@@ -123,7 +131,7 @@
       // its full runtime context (React Flow's store/provider tree). There is
       // no in-repo real implementation of either library to inject instead;
       // the boundary itself is the seam, same as `no-runtime-typeof`'s
-      // postgres/http-protocol exceptions above but for a vendored render
+      // SqlStore/http-protocol exceptions above but for a vendored render
       // dependency rather than a wire format.
       // `RoutedEdge.test.tsx` is the same seam read the other way: the Edge asks
       // React Flow's store where its two Things are now, and the stand-in is what

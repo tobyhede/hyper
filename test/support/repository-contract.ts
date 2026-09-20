@@ -1,5 +1,6 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
+import { AggregateInvariantError, REVISION_CEILING } from '@project/persistence';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -161,9 +162,32 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
   exportedRevision,
 });
 
+/**
+ * The one member `withRawRevisionHarness` needs from vitest's own per-test
+ * context (`it`'s callback parameter, `ExtendedContext<Test>` in
+ * `@vitest/runner`), named locally rather than importing that generic type
+ * for one method.
+ */
+type SkippableTestContext = { skip: () => void };
+
 export interface RepositoryHarness {
   repository: SpaceRepository;
   close(): Promise<void>;
+  /**
+   * Write a stored Space's `revision` (and optionally `exportedRevision`)
+   * column text verbatim, bypassing the repository's own write path and the
+   * shared codec's format/ceiling check (ADR 0095). It is how the cases below
+   * construct stored state no adapter's own `commit`/`initializeAggregate`
+   * can produce — a non-canonical revision, or one already at the 2^63−1
+   * ceiling — and it is `undefined` on a harness with no raw column to write
+   * (the memory double, which mints every revision in-process and so can
+   * never hold one that fails the codec).
+   */
+  writeRawRevision?: (input: {
+    readonly spaceId: UUID;
+    readonly revision: string;
+    readonly exportedRevision?: string | null;
+  }) => Promise<void>;
 }
 
 const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revision: bigint) =>
@@ -197,6 +221,34 @@ export const spaceRepositoryContract = (
     const harness = await createHarness();
     try {
       await body(harness.repository);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  /**
+   * `withHarness`, plus the raw revision-column write the ceiling and
+   * canonical-decimal cases need. A harness with no `writeRawRevision` (the
+   * memory double) has nothing for these to prove — a stored revision it
+   * cannot represent in the first place — so the case is marked skipped
+   * through vitest's own `context.skip()` rather than returning with no
+   * assertion, which a runner reports as passed and a reader cannot tell
+   * apart from a case that actually ran.
+   */
+  const withRawRevisionHarness = async (
+    context: SkippableTestContext,
+    body: (
+      repository: SpaceRepository,
+      writeRawRevision: NonNullable<RepositoryHarness['writeRawRevision']>,
+    ) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.writeRawRevision === undefined) {
+        context.skip();
+        return;
+      }
+      await body(harness.repository, harness.writeRawRevision);
     } finally {
       await harness.close();
     }
@@ -426,6 +478,113 @@ export const spaceRepositoryContract = (
         kind: 'loaded',
         aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(first, 0n, null)] },
       });
+    });
+  });
+
+  it(`${name} refuses to record an exported revision for a Space it does not store`, async () => {
+    await withHarness(async (repository) => {
+      await expect(repository.markExported(MISSING_SPACE_ID, 0n)).rejects.toThrow(
+        `Space ${MISSING_SPACE_ID} does not exist`,
+      );
+    });
+  });
+
+  it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
+    await withHarness(async (repository) => {
+      const spaces = [
+        space(SPACE_ID, 'First', [THING_ID]),
+        space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
+      ];
+
+      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
+      expect(result.kind).toBe('aggregate-refused');
+      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-space-id', spaceId: SPACE_ID }),
+      );
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  /*
+   * A Thing belongs to exactly one Space of the aggregate, and an aggregate
+   * that says otherwise is refused whole. There is no longer a second,
+   * insert-only reading in which a proposal collides with a Thing some
+   * *surviving stored* Space owns: both lifecycle doors take the aggregate
+   * entire, so what is stored after the call is what the call proposed, and
+   * ownership is settled inside that proposal alone (ADR 0078). The two
+   * distinct codes this pair of cases used to hold apart went with it.
+   */
+  it(`${name} refuses an aggregate that repeats a Thing identity, storing none of it`, async () => {
+    await withHarness(async (repository) => {
+      const spaces = [
+        space(SPACE_ID, 'First', [THING_ID]),
+        space(OTHER_SPACE_ID, 'Second', [THING_ID]),
+      ];
+
+      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
+      expect(result.kind).toBe('aggregate-refused');
+      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-thing-id', thingId: THING_ID }),
+      );
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
+    await withHarness(async (repository) => {
+      const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
+      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
+
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
+      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
+      // A refusal stores none of what it was offered, not even the Space that
+      // would have loaded on its own.
+      expect(await repository.listSpaces()).toEqual([]);
+    });
+  });
+
+  /*
+   * Replacement drops every stored Space, so a Thing a doomed Space owns is free
+   * for the replacement to claim. Ownership is judged against what the
+   * replacement proposes, never against what the same call is about to delete —
+   * which is what taking the aggregate entire buys over inserting into whatever
+   * is already there.
+   */
+  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
+    await withHarness(async (repository) => {
+      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
+      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
+
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
+          SPACE_ID,
+        ),
+      ).resolves.toEqual({
+        kind: 'replaced',
+        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
+      expect(new Set(await repository.listSpaces())).toEqual(
+        new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
+      );
+    });
+  });
+
+  // Ticket 27 proved this for SQLite, whose TEXT column always could hold a
+  // non-canonical revision; ADR 0095's TEXT columns make it reachable on
+  // PostgreSQL too, so it belongs here rather than in one database's own
+  // integration file.
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
+
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     });
   });
 
@@ -1029,95 +1188,85 @@ export const spaceRepositoryContract = (
     });
   });
 
-  it(`${name} refuses to record an exported revision for a Space it does not store`, async () => {
-    await withHarness(async (repository) => {
-      await expect(repository.markExported(MISSING_SPACE_ID, 0n)).rejects.toThrow(
-        `Space ${MISSING_SPACE_ID} does not exist`,
-      );
-    });
-  });
+  // Revisions above `Number.MAX_SAFE_INTEGER` are ordinary once a database
+  // stores them as text rather than a native integer (ADR 0095) — both
+  // databases hold and round-trip one identically now, so this is shared
+  // rather than PostgreSQL's own weaker "the expected revision isn't
+  // narrowed" case and SQLite's two ("speaks bigint at the repository
+  // boundary…", "commits and reloads revisions above…").
+  it(`${name} stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      const aboveSafe = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+      await writeRawRevision({ spaceId: SPACE_ID, revision: aboveSafe.toString() });
 
-  it(`${name} refuses an aggregate that repeats a Space identity, storing none of it`, async () => {
-    await withHarness(async (repository) => {
-      const spaces = [
-        space(SPACE_ID, 'First', [THING_ID]),
-        space(SPACE_ID, 'Repeat', [OTHER_THING_ID]),
-      ];
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, aboveSafe, null));
 
-      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
-      expect(result.kind).toBe('aggregate-refused');
-      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
-      expect(result.errors).toContainEqual(
-        expect.objectContaining({ kind: 'duplicate-space-id', spaceId: SPACE_ID }),
-      );
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  /*
-   * A Thing belongs to exactly one Space of the aggregate, and an aggregate
-   * that says otherwise is refused whole. There is no longer a second,
-   * insert-only reading in which a proposal collides with a Thing some
-   * *surviving stored* Space owns: both lifecycle doors take the aggregate
-   * entire, so what is stored after the call is what the call proposed, and
-   * ownership is settled inside that proposal alone (ADR 0078). The two
-   * distinct codes this pair of cases used to hold apart went with it.
-   */
-  it(`${name} refuses an aggregate that repeats a Thing identity, storing none of it`, async () => {
-    await withHarness(async (repository) => {
-      const spaces = [
-        space(SPACE_ID, 'First', [THING_ID]),
-        space(OTHER_SPACE_ID, 'Second', [THING_ID]),
-      ];
-
-      const result = await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces });
-      expect(result.kind).toBe('aggregate-refused');
-      if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
-      expect(result.errors).toContainEqual(
-        expect.objectContaining({ kind: 'duplicate-thing-id', thingId: THING_ID }),
-      );
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
-    await withHarness(async (repository) => {
-      const valid = space(SPACE_ID, 'Must roll back', [THING_ID]);
-      const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_THING_ID);
-
-      await expect(
-        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
-      ).resolves.toMatchObject({ kind: 'aggregate-refused' });
-      // A refusal stores none of what it was offered, not even the Space that
-      // would have loaded on its own.
-      expect(await repository.listSpaces()).toEqual([]);
-    });
-  });
-
-  /*
-   * Replacement drops every stored Space, so a Thing a doomed Space owns is free
-   * for the replacement to claim. Ownership is judged against what the
-   * replacement proposes, never against what the same call is about to delete —
-   * which is what taking the aggregate entire buys over inserting into whatever
-   * is already there.
-   */
-  it(`${name} replaces everything stored, freeing the Thing ids it clears`, async () => {
-    await withHarness(async (repository) => {
-      await seed(repository, space(SPACE_ID, 'Cleared', [THING_ID]));
-      const replacement = space(OTHER_SPACE_ID, 'Replacement', [THING_ID]);
-
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: OTHER_SPACE_ID, spaces: [replacement] },
-          SPACE_ID,
-        ),
-      ).resolves.toEqual({
-        kind: 'replaced',
-        aggregate: { metaSpaceId: OTHER_SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+      const changed = retitled(first, 'Above safe');
+      await expect(commitUpdate(repository, changed, aboveSafe)).resolves.toEqual({
+        kind: 'committed',
+        revisions: [{ spaceId: SPACE_ID, revision: aboveSafe + 1n }],
+        deletedSpaceIds: [],
       });
-      await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-      expect(new Set(await repository.listSpaces())).toEqual(
-        new Set([{ id: OTHER_SPACE_ID, title: 'Replacement' }]),
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
+        stored(changed, aboveSafe + 1n, null),
+      );
+    });
+  });
+
+  // The shared codec refuses a revision past 2^63−1 on the way out just as it
+  // does on the way in (ADR 0095): a Space already sitting at the ceiling —
+  // constructed here the only way one legitimately could, since no ordinary
+  // commit ever reaches it — refuses the commit that would carry it one past
+  // rather than storing a value the codec could not read back. The failure is
+  // named (`AggregateInvariantError`, the same identity a stored row that
+  // fails intake raises) rather than merely asserted to exist, and the
+  // refused commit is proven to have left the stored revision exactly where
+  // it was — "refused rather than stored".
+  it(`${name} refuses to store a revision above the 2^63-1 ceiling`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: REVISION_CEILING.toString() });
+
+      await expect(
+        commitUpdate(repository, retitled(first, 'Past the ceiling'), REVISION_CEILING),
+      ).rejects.toThrow(AggregateInvariantError);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
+        stored(first, REVISION_CEILING, null),
+      );
+    });
+  });
+
+  // The codec's ceiling applies to a value already sitting in the column, not
+  // only to one a commit would produce: a stored revision past 2^63−1 is
+  // broken stored state exactly as a non-canonical one is (the case above
+  // this one), and an aggregate read of it raises the same identity.
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: (REVISION_CEILING + 1n).toString() });
+
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+    });
+  });
+
+  // `commit`'s fast path decides against the one stored Space its candidate
+  // names, read through the same decode step `#loadEverySpace`'s aggregate
+  // read uses for a revision -- so a non-canonical stored revision met there
+  // is broken stored state exactly as it is on the aggregate path, and has to
+  // raise the same identity rather than the shared codec's bare error
+  // escaping the commit unclassified.
+  it(`${name} raises an identifiable invariant failure for a commit whose fast-path candidate has a non-canonical stored revision`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
+
+      await expect(commitUpdate(repository, retitled(first, 'Changed'), 0n)).rejects.toThrow(
+        AggregateInvariantError,
       );
     });
   });

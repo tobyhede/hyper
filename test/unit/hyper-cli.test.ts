@@ -618,8 +618,10 @@ describe('runHyper', () => {
   it('reports the stored space identity and lossless bigint revision', async () => {
     // Past `Number.MAX_SAFE_INTEGER`, so a revision that went through `Number`
     // anywhere would print 9007199254740992 and fail here. Revision 0 cannot
-    // catch that, and the `int8` workaround in `toDatabaseRevision` is exactly
-    // the kind of thing that would reintroduce it.
+    // catch that, and a revision codec that narrowed through `Number` on
+    // either database (ADR 0095's shared `decodeStoredRevision`/
+    // `encodeStoredRevision`, `packages/persistence/src/revision-codec.ts`)
+    // is exactly the kind of thing that would reintroduce it.
     //
     // A real initialization mints revision 0, so the revision is bent on the way
     // back out of the seam rather than stubbed: what is under test is the
@@ -708,11 +710,12 @@ describe('runHyper', () => {
   });
 
   /*
-   * PostgreSQL's replacement can conflict on a stored Space that changed mid-
-   * replacement without the Meta identity itself moving at all — the row lock
-   * loop in `PostgresSpaceRepository.replaceAggregate` re-reads the current
-   * Meta identity after rolling back, and that read answers the same id the
-   * command already expected. The sentence must not claim that id is new.
+   * The SQL repository's replacement can conflict on a stored Space that
+   * changed mid-replacement without the Meta identity itself moving at all —
+   * the row lock loop in `SqlSpaceRepository.replaceAggregate` re-reads the
+   * current Meta identity after rolling back, and that read answers the same
+   * id the command already expected. The sentence must not claim that id is
+   * new.
    */
   it('does not claim the Meta identity moved when replacement conflicts with the same id it expected', async () => {
     const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');

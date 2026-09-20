@@ -8,8 +8,10 @@ import {
   writeSpaceDirectory as writeLoadedSpaceDirectory,
 } from '../../src/aggregate-directory';
 import { runHyper } from '../../src/cli/run';
-import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { createSqliteDatabase } from '../../src/sqlite/db';
+import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { runHyperScript } from '../support/hyper-command';
 import { migrateSqliteFile } from '../support/sqlite-harness';
 
@@ -115,11 +117,11 @@ describe('hyper:sqlite CLI', () => {
    */
   const withRepository = async <T>(
     path: string,
-    body: (repository: SqliteSpaceRepository) => Promise<T>,
+    body: (repository: SpaceRepository) => Promise<T>,
   ): Promise<T> => {
     const database = createSqliteDatabase(path);
     try {
-      return await body(new SqliteSpaceRepository(database));
+      return await body(new SqlSpaceRepository(sqliteSqlStore(database)));
     } finally {
       await database.close();
     }

@@ -403,6 +403,36 @@ export const createSpaceHttpApp = (
           }
         } catch (error) {
           invokeLogError(logError, 'Failed to commit spaces', error);
+          // Broken stored state and an unreachable database are told apart by
+          // type (`isAggregateInvariant`), the same rule `GET /api/aggregate`
+          // applies below: a defect no retry cures answers 500
+          // `internal-error`, not 503 `persistence-unavailable` forever
+          // retried by a client that cannot fix it. `commit`
+          // (`SqlSpaceRepository`, `src/persistence/sql-space-repository.ts`)
+          // now raises the same `AggregateInvariantError` the aggregate read
+          // does — reading the revision a write is about to replace, or
+          // writing its own new one, under `#writeUpdate`'s row lock, and
+          // reading every stored Space to judge a complete-aggregate commit
+          // against — so this route can meet it too.
+          //
+          // Unlike that read, this catch does not re-read on an invariant
+          // failure. The aggregate GET's re-read exists for one specific
+          // race: `loadAggregate` reads the Meta identity and every stored
+          // Space as two statements, so a rival commit landing between them
+          // can make a healthy store look like "Spaces without Meta" for an
+          // instant. `commit` reads that same pair inside one transaction,
+          // but never raises that race as a thrown invariant failure —
+          // `decideCommit` answers a missing Meta identity as a `rejected`
+          // result, not a throw (`commit-decision.ts`). The invariant
+          // failures that can reach here instead come from a stored row that
+          // will not parse or a revision the codec refuses, which describe
+          // corrupt stored data rather than a timing window, so a second
+          // attempt would not answer differently. Retrying a write is also
+          // not the free operation retrying a read is, so `repository.commit`
+          // is not called a second time here.
+          if (isAggregateInvariant(error)) {
+            return problem(context, 'internal-error', 'Stored repository state is not usable.');
+          }
           return problem(context, 'persistence-unavailable', 'Try the request again later.');
         }
       },

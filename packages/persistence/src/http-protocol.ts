@@ -8,16 +8,7 @@ import type {
   SpaceCommit,
   SpaceSummary,
 } from './backend';
-
-/**
- * A non-negative decimal with no leading zeros, bounded at 19 digits — the width
- * of a PostgreSQL `bigint` — so a hostile peer cannot hand `BigInt` an
- * arbitrarily long digit string to parse. Range is the caller's business; this
- * is only a bound on the work parsing will do, which is why the `Retry-After`
- * header in `http.ts` shares it despite being a different protocol concern.
- */
-export const CANONICAL_DECIMAL = /^(0|[1-9]\d{0,18})$/;
-const BIGINT_MAX = 9_223_372_036_854_775_807n;
+import { CANONICAL_DECIMAL, REVISION_CEILING } from './revision-codec';
 
 export const problemCatalogue = {
   'invalid-request': {
@@ -240,8 +231,8 @@ const decodeRevision = (value: unknown, label: string): bigint => {
     throw new Error(`${label} must be a canonical non-negative decimal string`);
   }
   const revision = BigInt(value);
-  if (revision > BIGINT_MAX) {
-    throw new Error(`${label} must be within the PostgreSQL bigint range`);
+  if (revision > REVISION_CEILING) {
+    throw new Error(`${label} must not exceed 2^63-1`);
   }
   return revision;
 };

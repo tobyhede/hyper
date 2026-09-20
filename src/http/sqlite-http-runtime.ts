@@ -1,12 +1,13 @@
 import { isAbsolute } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { newUuid } from '@project/core';
-import { SqliteSpaceRepository } from '../persistence/sqlite-space-repository';
+import { SqlSpaceRepository } from '../persistence/sql-space-repository';
 import {
   createSqliteDatabase,
   requireConfiguredSqlitePath,
   type SqliteDatabase,
 } from '../sqlite/db';
+import { sqliteSqlStore } from '../sqlite/sql-store';
 import { establishMetaSpace, retryMetaSpaceEstablishment } from '../startup/database-startup';
 import { createSpaceHost, type SpaceHostApplication } from './space-host';
 
@@ -66,7 +67,7 @@ export const createApp = async ({
   report = reportEstablishmentFailure,
   database = openConfiguredDatabase(),
 }: SqliteHttpRuntimeOptions = {}): Promise<SpaceHostApplication> => {
-  const repository = new SqliteSpaceRepository(database);
+  const repository = new SqlSpaceRepository(sqliteSqlStore(database));
   try {
     await establishMetaSpace(repository, newUuid);
   } catch (error) {

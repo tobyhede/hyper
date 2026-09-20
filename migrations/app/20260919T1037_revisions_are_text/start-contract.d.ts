@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:1f367854ac0c2c316a2d9cfdbb704f5531beb59c0d04722e62220c5aaf9aad35'>;
+  StorageHashBase<'sha256:edd3e82bd27149cf492fffa9809063fb66dc08e33f86e46b70e2e81e5502bbbd'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:7d7e4f57ba56add119c339e20ea34c4ab063ceca9ea075f32e0d70c6a57a2bd1'>;
 export type ProfileHash =
@@ -52,8 +52,8 @@ export type FieldOutputTypes = {
     readonly Space: {
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly document: CodecTypes['pg/jsonb@1']['output'];
-      readonly revision: CodecTypes['pg/text@1']['output'];
-      readonly exportedRevision: CodecTypes['pg/text@1']['output'] | null;
+      readonly revision: CodecTypes['pg/int8@1']['output'];
+      readonly exportedRevision: CodecTypes['pg/int8@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['output'];
     };
@@ -75,8 +75,8 @@ export type FieldInputTypes = {
     readonly Space: {
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly document: CodecTypes['pg/jsonb@1']['input'];
-      readonly revision: CodecTypes['pg/text@1']['input'];
-      readonly exportedRevision: CodecTypes['pg/text@1']['input'] | null;
+      readonly revision: CodecTypes['pg/int8@1']['input'];
+      readonly exportedRevision: CodecTypes['pg/int8@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz@1']['input'];
     };
@@ -98,9 +98,9 @@ export type StorageColumnTypes = {
     readonly spaces: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
       readonly document: CodecTypes['pg/jsonb@1']['output'];
-      readonly exported_revision: CodecTypes['pg/text@1']['output'] | null;
+      readonly exported_revision: CodecTypes['pg/int8@1']['output'] | null;
       readonly id: CodecTypes['pg/uuid@1']['output'];
-      readonly revision: CodecTypes['pg/text@1']['output'];
+      readonly revision: CodecTypes['pg/int8@1']['output'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['output'];
     };
     readonly things: {
@@ -121,9 +121,9 @@ export type StorageColumnInputTypes = {
     readonly spaces: {
       readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
       readonly document: CodecTypes['pg/jsonb@1']['input'];
-      readonly exported_revision: CodecTypes['pg/text@1']['input'] | null;
+      readonly exported_revision: CodecTypes['pg/int8@1']['input'] | null;
       readonly id: CodecTypes['pg/uuid@1']['input'];
-      readonly revision: CodecTypes['pg/text@1']['input'];
+      readonly revision: CodecTypes['pg/int8@1']['input'];
       readonly updated_at: CodecTypes['pg/timestamptz@1']['input'];
     };
     readonly things: {
@@ -211,17 +211,17 @@ type ContractBase = Omit<
                   readonly nullable: false;
                 };
                 readonly revision: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'int8';
+                  readonly codecId: 'pg/int8@1';
                   readonly nullable: false;
                   readonly default: {
                     readonly kind: 'literal';
-                    readonly value: DefaultLiteralValue<'pg/text@1', '0'>;
+                    readonly value: DefaultLiteralValue<'pg/int8@1', 0>;
                   };
                 };
                 readonly exported_revision: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
+                  readonly nativeType: 'int8';
+                  readonly codecId: 'pg/int8@1';
                   readonly nullable: true;
                 };
                 readonly created_at: {
@@ -369,11 +369,11 @@ type ContractBase = Omit<
               };
               readonly revision: {
                 readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int8@1' };
               };
               readonly exportedRevision: {
                 readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int8@1' };
               };
               readonly createdAt: {
                 readonly nullable: false;

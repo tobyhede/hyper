@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSqliteDatabase } from '../../src/sqlite/db';
-import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -35,7 +36,7 @@ export const openSqliteRepository = async () => {
   return {
     path,
     database,
-    repository: new SqliteSpaceRepository(database),
+    repository: new SqlSpaceRepository(sqliteSqlStore(database)),
     close: async () => {
       try {
         await database.close();

@@ -2344,10 +2344,10 @@ describe('aggregate names one thing (ADR 0088)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The repository that held both senses and the alias between them, the
-    // schema whose comment called one Space an aggregate, and the glossary that
-    // now has an entry for the word.
-    expect(scanned).toContain('src/persistence/postgres-space-repository.ts');
+    // The repository that holds both senses and once held the alias between
+    // them, the schema whose comment called one Space an aggregate, and the
+    // glossary that now has an entry for the word.
+    expect(scanned).toContain('src/persistence/sql-space-repository.ts');
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).toContain('CONTEXT.md');
   });

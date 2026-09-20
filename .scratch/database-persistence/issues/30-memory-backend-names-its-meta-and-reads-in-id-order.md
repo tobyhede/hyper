@@ -21,7 +21,7 @@ MemorySpaceBackend.asMeta(loaded: LoadedSpace, control?: MemorySpaceBackendTestC
 - [x] The Meta id is required. Inferring it from the first seeded Space and the zero-UUID fallback are deleted.
 - [x] The test control has one position, after the Spaces. The overload that also accepted it in the second slot is deleted, with the test and comment that existed to defend it.
 - [x] Every construction that relied on the guess moves to `asMeta` or names its Meta explicitly. Constructions that already name Meta are unchanged.
-- [x] No aggregate validation is added: a seed that names a Meta but holds no Spaces, used only as a commit sink, stays legal. Validating in `loadAggregate` is a separate follow-up.
+- [x] No aggregate validation is added: a seed that names a Meta but holds no Spaces, used only as a commit sink, stays legal. Validating in `loadAggregate` is a separate follow-up — ticket 33.
 - [x] If ordering Things by id breaks a significant number of app tests that depend on snapshot order, stop and report rather than rewrite them. (One test relied on incidental order — the leftover `MemorySpaceBackend` insertion-order behaviour this ticket removes — and not on a domain ordering concept; it was adjusted to match Things by id rather than position. See report.)
 - [x] The `SpaceBackend` contract and the memory backend's own tests pass.
 - [x] `pnpm verify` is green. `pnpm e2e` is inapplicable — only a test double and tests change — and the report says so.

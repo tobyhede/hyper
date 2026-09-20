@@ -7,8 +7,9 @@ import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
-import { SqliteSpaceRepository } from '../../src/persistence/sqlite-space-repository';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { createSqliteDatabase, requireConfiguredSqlitePath } from '../../src/sqlite/db';
+import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearSqliteContent } from '../support/clear-sqlite-content';
 import {
   dragThingAndCapturePosition,
@@ -81,7 +82,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
       // all — a killed process, a CI timeout — and a file left dirty before the
       // outer cleanup existed.
       await clearSqliteContent(seedDatabase);
-      const seedRepository = new SqliteSpaceRepository(seedDatabase);
+      const seedRepository = new SqlSpaceRepository(sqliteSqlStore(seedDatabase));
       // The Diagram is part of the fixture, and has to be — see the matching
       // comment in `postgres-persistence.spec.ts`, which this mirrors exactly:
       // a diagramless Space's first working load would mint an *empty*
@@ -147,7 +148,9 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     // the handle is gone.
     const afterFirstDatabase = createSqliteDatabase(path);
     try {
-      const stored = await new SqliteSpaceRepository(afterFirstDatabase).loadSpace(spaceId);
+      const stored = await new SqlSpaceRepository(sqliteSqlStore(afterFirstDatabase)).loadSpace(
+        spaceId,
+      );
       expect(stored?.revision).toBe(1n);
     } finally {
       await afterFirstDatabase.close();
@@ -172,7 +175,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     // what says it recorded the edit rather than the fixture.
     const exportDatabase = createSqliteDatabase(path);
     try {
-      const exportRepository = new SqliteSpaceRepository(exportDatabase);
+      const exportRepository = new SqlSpaceRepository(sqliteSqlStore(exportDatabase));
       exportDirectory = await mkdtemp(join(tmpdir(), 'hyper-sqlite-e2e-export-'));
       const exported = await exportAggregate(exportRepository, exportDirectory);
       expect(exported.kind).toBe('exported');
@@ -213,7 +216,8 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
       try {
         await clearSqliteContent(cleanupDatabase);
         spaceRemains =
-          (await new SqliteSpaceRepository(cleanupDatabase).loadSpace(spaceId)) !== undefined;
+          (await new SqlSpaceRepository(sqliteSqlStore(cleanupDatabase)).loadSpace(spaceId)) !==
+          undefined;
       } finally {
         await cleanupDatabase.close();
       }

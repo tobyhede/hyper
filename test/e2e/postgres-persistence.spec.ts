@@ -7,8 +7,8 @@ import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
-import { PostgresSpaceRepository } from '../../src/persistence/postgres-space-repository';
-import { db } from '../../src/prisma/db';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import {
   dragThingAndCapturePosition,
@@ -46,7 +46,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
 };
 
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
-  const repository = new PostgresSpaceRepository(db);
+  const repository = new SqlSpaceRepository(postgresSqlStore);
   const spaceId = newUuid();
   const thingId = newUuid();
   const diagramId = newUuid();
@@ -199,7 +199,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
       await clearHyperContent();
       spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
     } finally {
-      await db.close();
+      await postgresSqlStore.close();
     }
   }
 
