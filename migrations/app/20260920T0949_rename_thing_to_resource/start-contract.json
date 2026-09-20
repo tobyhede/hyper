@@ -8,12 +8,12 @@
       "model": "RepositoryState",
       "namespace": "public"
     },
-    "resources": {
-      "model": "Resource",
-      "namespace": "public"
-    },
     "spaces": {
       "model": "Space",
+      "namespace": "public"
+    },
+    "things": {
+      "model": "Thing",
       "namespace": "public"
     }
   },
@@ -68,7 +68,109 @@
               "table": "repository_state"
             }
           },
-          "Resource": {
+          "Space": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              },
+              "document": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "exportedRevision": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "revision": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "repositoryStates": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "metaSpaceId"
+                  ]
+                },
+                "to": {
+                  "model": "RepositoryState",
+                  "namespace": "public"
+                }
+              },
+              "things": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "spaceId"
+                  ]
+                },
+                "to": {
+                  "model": "Thing",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "document": {
+                  "column": "document"
+                },
+                "exportedRevision": {
+                  "column": "exported_revision"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "revision": {
+                  "column": "revision"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "spaces"
+            }
+          },
+          "Thing": {
             "fields": {
               "createdAt": {
                 "nullable": false,
@@ -142,109 +244,7 @@
                 }
               },
               "namespaceId": "public",
-              "table": "resources"
-            }
-          },
-          "Space": {
-            "fields": {
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz@1",
-                  "kind": "scalar"
-                }
-              },
-              "document": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/jsonb@1",
-                  "kind": "scalar"
-                }
-              },
-              "exportedRevision": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/uuid@1",
-                  "kind": "scalar"
-                }
-              },
-              "revision": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "updatedAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "repositoryStates": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "metaSpaceId"
-                  ]
-                },
-                "to": {
-                  "model": "RepositoryState",
-                  "namespace": "public"
-                }
-              },
-              "resources": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "spaceId"
-                  ]
-                },
-                "to": {
-                  "model": "Resource",
-                  "namespace": "public"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "createdAt": {
-                  "column": "created_at"
-                },
-                "document": {
-                  "column": "document"
-                },
-                "exportedRevision": {
-                  "column": "exported_revision"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "revision": {
-                  "column": "revision"
-                },
-                "updatedAt": {
-                  "column": "updated_at"
-                }
-              },
-              "namespaceId": "public",
-              "table": "spaces"
+              "table": "things"
             }
           }
         }
@@ -308,77 +308,6 @@
               },
               "uniques": []
             },
-            "resources": {
-              "columns": {
-                "created_at": {
-                  "codecId": "pg/timestamptz@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "document": {
-                  "codecId": "pg/jsonb@1",
-                  "nativeType": "jsonb",
-                  "nullable": false
-                },
-                "id": {
-                  "codecId": "pg/uuid@1",
-                  "default": {
-                    "expression": "gen_random_uuid()",
-                    "kind": "function"
-                  },
-                  "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
-                },
-                "space_id": {
-                  "codecId": "pg/uuid@1",
-                  "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
-                },
-                "updated_at": {
-                  "codecId": "pg/timestamptz@1",
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [
-                {
-                  "onDelete": "cascade",
-                  "source": {
-                    "columns": [
-                      "space_id"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "resources"
-                  },
-                  "target": {
-                    "columns": [
-                      "id"
-                    ],
-                    "namespaceId": "public",
-                    "tableName": "spaces"
-                  }
-                }
-              ],
-              "indexes": [
-                {
-                  "columns": [
-                    "space_id"
-                  ]
-                }
-              ],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": []
-            },
             "spaces": {
               "columns": {
                 "created_at": {
@@ -433,6 +362,77 @@
                 ]
               },
               "uniques": []
+            },
+            "things": {
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/timestamptz@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "document": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                },
+                "space_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false,
+                  "typeRef": "Uuid"
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "space_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "things"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "spaces"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "space_id"
+                  ]
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             }
           }
         },
@@ -440,7 +440,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:0a1d0e875a03edce09456c6716c79931aa35b795c9bcf011f205571631d97a0c",
+    "storageHash": "sha256:1f367854ac0c2c316a2d9cfdbb704f5531beb59c0d04722e62220c5aaf9aad35",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",
@@ -450,7 +450,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:26bc77f03788a526b20f8ac61c5d438d7c0bdb48156350feb364c8f0e868f393",
+    "executionHash": "sha256:7d7e4f57ba56add119c339e20ea34c4ab063ceca9ea075f32e0d70c6a57a2bd1",
     "mutations": {
       "defaults": [
         {
@@ -465,7 +465,7 @@
           "ref": {
             "column": "updated_at",
             "namespace": "public",
-            "table": "resources"
+            "table": "spaces"
           }
         },
         {
@@ -480,7 +480,7 @@
           "ref": {
             "column": "updated_at",
             "namespace": "public",
-            "table": "spaces"
+            "table": "things"
           }
         }
       ]
