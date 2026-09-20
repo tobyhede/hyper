@@ -85,7 +85,7 @@ export interface FixtureCanvasThing {
  * "still loading" and reports to Ladle E2E as a missing element, with the cause
  * visible only as an unhandled rejection in the console.
  */
-function useProjection(
+export function useProjection(
   activeGraphId: GraphId | null,
   selectedThingId: ThingId | null = null,
   drawn: DrawnDiagram = INVENTORY_DIAGRAM,

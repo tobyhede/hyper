@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
+import { fireEvent, render, screen, within, type RenderResult } from '@testing-library/react';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -115,7 +115,7 @@ describe('graph viewport', () => {
     expect(viewportTransform()).not.toMatch(/NaN/);
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
-    await screen.findByText('Remote space');
+    await within(screen.getByTestId('command-dock')).findByText('Remote space');
 
     expect(viewportTransform()).not.toMatch(/NaN/);
   });

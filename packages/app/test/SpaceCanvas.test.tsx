@@ -194,10 +194,11 @@ function mountGraph(
         onTitleEditingChange={titleEditingChanged}
         thingResize={thingResize}
         reportEmbeddedDiagramEditing={() => undefined}
+        spaceTitle="Test Space"
+        diagramTitle="Test Diagram"
         graphs={[]}
         colorByGraphId={{}}
         activeGraphId={null}
-        activeGraphThingIds={new Set()}
       />
     </ReactFlowProvider>
   );

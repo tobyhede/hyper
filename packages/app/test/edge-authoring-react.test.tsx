@@ -363,10 +363,11 @@ function CanvasHarness({
           cancelResize: () => undefined,
         }}
         reportEmbeddedDiagramEditing={() => undefined}
+        spaceTitle="Test Space"
+        diagramTitle="Test Diagram"
         graphs={currentSpace().graphs}
         colorByGraphId={{}}
         activeGraphId={GRAPH_ID}
-        activeGraphThingIds={new Set([THING_A, THING_B])}
       />
     </>
   );

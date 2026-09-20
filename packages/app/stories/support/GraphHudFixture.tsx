@@ -1,101 +1,82 @@
-import type { Node } from '@xyflow/react';
+import { useMemo } from 'react';
 import '@xyflow/react/dist/style.css';
 import type { GraphId } from '@project/core';
-import { graphThingIds } from '@project/graph';
-import { GraphHud } from '@project/react-flow-adapter';
-// Through the package's own subpath imports, as `#components/*` already is: a
-// story sits two directories above `src`, and climbing there by relative path is
-// how a package boundary gets crossed without naming one (AGENTS.md).
-import { THING_SIZE } from '#src/thing';
-import { graphColorMap } from '#src/colors';
+import type { Space } from '@project/graph';
+import { GraphHud, nodeTypes, edgeTypes } from '@project/react-flow-adapter';
+import { canvasProjection } from '#src/canvas-projection';
+import { resolveDiagram } from '#src/diagram-resolution';
 import { authoredSpace } from './spaces';
-import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
+import { StoryCanvas, StoryCanvasFrame, useProjection } from './ReactFlowCanvas';
 
-/**
- * The HUD's Graphs, colours and Active Graph, derived the way the canvas derives
- * them.
- *
- * `graphColorMap` is the application's own resolution and `GraphHud` reads it
- * through the shared `graphColor` seam the Sidebar reads — so a colour on screen
- * here is one the Space app would agree with, rather than a hex literal a
- * fixture chose. The Graphs are the tracked story Space's, flattened across its
- * Diagrams in declared order exactly as `space.graphs` is.
- */
+/** The Space a story draws unless it names another. */
 const SPACE = authoredSpace;
-const COLORS = graphColorMap(SPACE);
-
-/**
- * The Graph the story opens on, read out at module scope.
- *
- * A `throw` here rather than a fallback: a Space with no Graph would render a
- * HUD with nothing to say, and failing at load says so with a sentence instead
- * of drawing something subtly empty.
- */
-const openingGraph = (): GraphId => {
-  const first = SPACE.graphs[0];
-  if (first === undefined) throw new Error('The story Space declares no Graph.');
-  return first.id;
-};
-
-/**
- * Real React Flow nodes, one per Thing of the story Space.
- *
- * The MiniMap draws what the flow actually measured, so the geometry has to be
- * the framework's rather than a stand-in: these are ordinary nodes React Flow
- * lays out, measures and reports bounds for, at the size the application's own
- * `THING_SIZE` declares. **The positions are the fixture's**, which is the one
- * thing a story is allowed to supply here — a Space's placement is a Diagram
- * strategy's answer, and running one to draw a HUD would put a placement
- * computation between this story and the surface it is about. They are staggered
- * so the minimap frame has two dimensions to show rather than a single line.
- */
-const NODES: readonly Node[] = SPACE.things.map((thing, index) => ({
-  id: thing.id,
-  position: { x: index * 320, y: (index % 2) * 180 },
-  data: { label: thing.title },
-  // Declared rather than left to be measured, as the production projection
-  // declares its own: the MiniMap draws only nodes React Flow already has
-  // dimensions for, so a node waiting on a ResizeObserver is one the minimap
-  // silently omits.
-  width: THING_SIZE.width,
-  height: THING_SIZE.height,
-  style: { width: THING_SIZE.width, height: THING_SIZE.height },
-}));
 
 export interface GraphHudFixtureProps {
   /**
-   * Which Graph is emphasised.
-   *
-   * A fixture input, and deliberately not a control: activation belongs to the
-   * Space Sidebar, and a story-only button that moved the emphasis would be
-   * evidence of the button rather than of the HUD. That the two surfaces agree
-   * *through* an activation is the paired application evidence's claim (ADR
-   * 0052), in `overview.spec.ts`.
+   * The Space the story draws. Its `defaultDiagram` selects the Diagram.
    */
+  readonly space?: Space;
+  /** Which Graph is emphasised. */
   readonly activeGraphId?: GraphId | null;
 }
 
 /**
  * The unchanged `GraphHud`, inside a minimal real React Flow canvas.
  *
- * Nothing is replaced or stubbed: this is `<ReactFlow>` with actual nodes and
- * React Flow's own MiniMap drawing them. The one thing the fixture supplies
- * beyond the Space is the viewport the canvas is given, because a story frame
- * has no Space app around it to size one.
+ * **The nodes are the production projection's, so the minimap draws the Diagram
+ * and not the Space.** `useProjection` runs the same `canvasProjection` the
+ * canvas publishes, whose membership is `diagramThings(space, diagram)` — so a
+ * Diagram that places two of the Space's five Things puts two marks on the
+ * minimap, and the key beside it and the map under it mean the same "open
+ * Diagram". The fixture used to map `space.things` itself, which drew all five
+ * either way and left the two halves disagreeing.
+ *
+ * The projection's nodes are production `ThingFlowNode`s, so the canvas is
+ * given the adapter's own `nodeTypes`/`edgeTypes`: without them React Flow
+ * cannot find `type: 'thing'`, falls back to its default node and draws five
+ * empty rectangles with the titles missing.
+ *
+ * Node dimensions come with the placement rather than from a fixture constant —
+ * `projectThingNodes` declares `width`/`height` for every placed Thing — which
+ * is what the MiniMap needs, since it omits any node still waiting on a
+ * ResizeObserver.
+ *
+ * The key's Graphs and colours are that same projection's `visibleGraphs` and
+ * `colors`, derived from **the Space this fixture was handed** rather than from
+ * the default one: a map built from the wrong Space answers `undefined` for
+ * every Graph of another and `graphColor` falls back to neutral grey without
+ * complaining, so a second-Space story would have drawn a colourless key and
+ * nothing would have failed.
  */
-export function GraphHudFixture({ activeGraphId = openingGraph() }: GraphHudFixtureProps) {
-  const activeGraphThingIds = new Set(
-    activeGraphId === null ? [] : graphThingIds(SPACE, activeGraphId),
-  );
+export function GraphHudFixture({ space = SPACE, activeGraphId }: GraphHudFixtureProps) {
+  const opening = useMemo(() => resolveDiagram(space), [space]);
+  const emphasised = activeGraphId === undefined ? opening.activeGraph.id : activeGraphId;
+  const projected = useProjection(emphasised, null, {
+    space,
+    diagramId: opening.diagram.id,
+  });
+  const projection = useMemo(() => canvasProjection(space, opening), [opening, space]);
+
+  if (projected === null) return null;
+  if (projected instanceof Error) return <p role="alert">Placement failed: {projected.message}</p>;
 
   return (
     <StoryCanvasFrame height="h-[26rem]">
-      <StoryCanvas nodes={NODES} viewport={{ fit: true }} minZoom={0.05} className="h-full">
+      <StoryCanvas
+        nodes={projected.nodes}
+        edges={projected.edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        viewport={{ fit: true }}
+        minZoom={0.05}
+        className="h-full"
+      >
         <GraphHud
-          graphs={SPACE.graphs}
-          colorByGraphId={COLORS}
-          activeGraphId={activeGraphId}
-          activeGraphThingIds={activeGraphThingIds}
+          spaceTitle={space.title}
+          diagramTitle={opening.diagram.title}
+          graphs={projection.visibleGraphs}
+          colorByGraphId={projection.colors}
+          activeGraphId={emphasised}
         />
       </StoryCanvas>
     </StoryCanvasFrame>

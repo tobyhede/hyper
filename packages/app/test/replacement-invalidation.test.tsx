@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
   type RenderResult,
 } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -249,7 +250,7 @@ async function stageOpenMarkdownDraft(session: SpaceSession): Promise<void> {
  * the Thing the open editor was covering.
  */
 const replacementLanded = async (): Promise<void> => {
-  expect(await screen.findByText('Remote space')).toBeVisible();
+  expect(await within(screen.getByTestId('command-dock')).findByText('Remote space')).toBeVisible();
 };
 
 const nodeOf = (id: string): HTMLElement => {

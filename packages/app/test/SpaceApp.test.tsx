@@ -1,4 +1,12 @@
-import { act, fireEvent, render, screen, waitFor, type RenderResult } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+  type RenderResult,
+} from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
@@ -257,7 +265,9 @@ describe('Space app conflict recovery', () => {
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
 
-    expect(await screen.findByText('Remote space')).toBeVisible();
+    expect(
+      await within(screen.getByTestId('command-dock')).findByText('Remote space'),
+    ).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Remote thing' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Local thing' })).not.toBeInTheDocument();
     expect(session.getState().working).toEqual(remote);
@@ -614,7 +624,7 @@ describe('Space app failure reporting', () => {
         const alert = await screen.findByRole('alert');
         expect(alert).toHaveTextContent('Link not copied');
         expect(alert).toHaveTextContent('The browser refused clipboard access.');
-        expect(screen.getByText('Space')).toBeInTheDocument();
+        expect(within(screen.getByTestId('command-dock')).getByText('Space')).toBeInTheDocument();
 
         // The command did not do what its label says, so a rail item does not
         // say it did — it reads the failure in place, over the Thing the reader

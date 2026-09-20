@@ -1,58 +1,52 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
-import type { Node as FlowNode } from '@xyflow/react';
 import { vi } from 'vitest';
 import { GraphHud } from '../src/GraphHud';
 import { uuid } from './uuid';
 
 vi.mock('@xyflow/react', () => ({
-  Panel: ({ position, children }: { position: string; children: React.ReactNode }) => (
-    <aside data-testid="panel" data-position={position}>
+  Panel: ({
+    position,
+    style,
+    children,
+  }: {
+    position: string;
+    style?: React.CSSProperties;
+    children: React.ReactNode;
+  }) => (
+    <aside data-testid="panel" data-position={position} style={style}>
       {children}
     </aside>
   ),
   MiniMap: ({
-    nodeColor,
-    nodeStrokeColor,
-  }: {
-    nodeColor: string | ((node: FlowNode) => string);
-    nodeStrokeColor: string | ((node: FlowNode) => string);
-  }) => {
-    const color = (value: string | ((node: FlowNode) => string), node: FlowNode) =>
-      typeof value === 'function' ? value(node) : value;
-    return (
-      <div
-        data-testid="minimap"
-        data-active-fill={color(nodeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000001'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-        data-active-stroke={color(nodeStrokeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000001'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-        data-other-fill={color(nodeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000002'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-        data-other-stroke={color(nodeStrokeColor, {
-          id: uuid('00000000-0000-4000-8000-000000000002'),
-          position: { x: 0, y: 0 },
-          data: {},
-        })}
-      />
-    );
-  },
+    style,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    bgColor?: string;
+    nodeColor?: unknown;
+    nodeStrokeColor?: unknown;
+    pannable?: boolean;
+    zoomable?: boolean;
+  }) => (
+    <div
+      data-testid="minimap"
+      data-custom-background={props.bgColor === undefined ? undefined : 'true'}
+      data-custom-node-color={props.nodeColor === undefined ? undefined : 'true'}
+      data-custom-node-stroke={props.nodeStrokeColor === undefined ? undefined : 'true'}
+      data-pannable={props.pannable === undefined ? undefined : String(props.pannable)}
+      data-zoomable={props.zoomable === undefined ? undefined : String(props.zoomable)}
+      style={style}
+    />
+  ),
 }));
 
 describe('GraphHud', () => {
-  it('groups the graph key above a minimap coloured by active-graph membership', () => {
+  it('draws an attached identity and Graph key above a sibling minimap', () => {
     const activeGraphId = uuid('00000000-0000-4000-8000-000000000010');
     const { container } = render(
       <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           {
@@ -64,22 +58,134 @@ describe('GraphHud', () => {
         ]}
         colorByGraphId={{ [activeGraphId]: '#1f77b4' }}
         activeGraphId={activeGraphId}
-        activeGraphThingIds={new Set([uuid('00000000-0000-4000-8000-000000000001')])}
       />,
     );
 
     expect(screen.getByTestId('panel')).toHaveAttribute('data-position', 'bottom-right');
-    const legend = screen.getByTestId('graph-legend');
+    expect(screen.getByTestId('panel')).toHaveStyle({ marginBottom: 'calc(15px + 150px)' });
     const minimap = screen.getByTestId('minimap');
+    expect(screen.getByTestId('panel')).not.toContainElement(minimap);
+    expect(minimap.getAttribute('style')).toBe('width: 200px; height: 150px;');
+    expect(minimap).not.toHaveAttribute('data-custom-background');
+    expect(minimap).not.toHaveAttribute('data-custom-node-color');
+    expect(minimap).not.toHaveAttribute('data-custom-node-stroke');
+    expect(screen.getByTestId('hud-space')).toHaveTextContent('Atlas');
+    expect(screen.getByTestId('hud-diagram')).toHaveTextContent('Overview');
     expect(
-      legend.compareDocumentPosition(minimap) & globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(minimap).toHaveAttribute('data-active-fill', 'var(--secondary)');
-    expect(minimap).toHaveAttribute('data-active-stroke', '#1f77b4');
-    expect(minimap).toHaveAttribute('data-other-fill', 'var(--secondary)');
-    expect(minimap).toHaveAttribute('data-other-stroke', 'var(--border)');
+      within(screen.getByTestId('canvas-identity')).queryByRole('button'),
+    ).not.toBeInTheDocument();
     expect(container).toHaveTextContent('Primary');
     expect(container).toHaveTextContent('Alternate');
+  });
+
+  /**
+   * The minimap pans and zooms the canvas, as it did before it was unnested.
+   *
+   * These are not decoration. `XYMinimap` calls d3-zoom on the MiniMap's own
+   * SVG unconditionally — `selection.call(zoomAndPanHandler, {})` in
+   * `@xyflow/system` — and d3-zoom's own wheel and mousedown handlers
+   * `preventDefault` and `stopImmediatePropagation` whatever these props say.
+   * So the 200×150 box swallows the gesture either way; the props decide only
+   * whether it answers one. Dropped, the map is a dead patch over the canvas.
+   */
+  it('keeps the minimap panning and zooming the canvas', () => {
+    render(
+      <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    const minimap = screen.getByTestId('minimap');
+    expect(minimap).toHaveAttribute('data-pannable', 'true');
+    expect(minimap).toHaveAttribute('data-zoomable', 'true');
+  });
+
+  /**
+   * The key panel presses nothing, so it takes no pointer over the canvas.
+   *
+   * `.react-flow__panel` carries no `pointer-events` rule of its own (React
+   * Flow's `style.css` sets only `position`, `z-index` and `margin`), so a
+   * Panel swallows every gesture over its box. This one holds no control —
+   * the identity is read-only and the key is a list — and it sits in the
+   * corner a Thing's resize control lives in, which is the harm
+   * `command-dock.css`'s bottom-edge offset already names. The two truncated
+   * names are the exception and take the pointer back, because their `title`
+   * is the only place a clipped name can be read.
+   */
+  it('lets the canvas take every pointer the key panel does not need', () => {
+    render(
+      <GraphHud
+        spaceTitle="A Space with a very long name indeed"
+        diagramTitle="A Diagram with a very long name indeed"
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    expect(screen.getByTestId('panel')).toHaveStyle({ pointerEvents: 'none' });
+    for (const name of [screen.getByTestId('hud-space'), screen.getByTestId('hud-diagram')]) {
+      expect(name).toHaveClass('pointer-events-auto');
+    }
+  });
+
+  /**
+   * A clipped name is still readable, and a screen reader is told which is which.
+   *
+   * `truncate` ellipsises inside a 200px panel and the Command Dock's header
+   * clips the same two names, so without the `title` there is nowhere left on
+   * the surface to read a long one. The visible glyphs are decoration, so the
+   * words that say Space and Diagram have to be supplied for the reader that
+   * cannot see them.
+   */
+  it('names each identity row and keeps a clipped title readable', () => {
+    render(
+      <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    expect(screen.getByTestId('hud-space')).toHaveAttribute('title', 'Atlas');
+    expect(screen.getByTestId('hud-diagram')).toHaveAttribute('title', 'Overview');
+    const identity = screen.getByTestId('canvas-identity');
+    expect(within(identity).getByText('Space')).toHaveClass('sr-only');
+    expect(within(identity).getByText('Diagram')).toHaveClass('sr-only');
+  });
+
+  /**
+   * Both identity glyphs are drawn at one size, in one box.
+   *
+   * `DiagramIcon` had no size and drew at 16 inside the same 14px box the
+   * 13px Space cube sits in, so the two rows had different glyph heights and
+   * different optical centres. Lucide sets no `preserveAspectRatio`, so SVG's
+   * default letterboxed the glyph rather than distorting it — which is why this
+   * reads the declared size rather than a rendered box jsdom does not lay out.
+   */
+  it('draws both identity glyphs at the same size', () => {
+    const { container } = render(
+      <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    const space = container.querySelector('[data-icon="space"]');
+    const diagram = container.querySelector('.lucide-layout-grid');
+    expect(space).toHaveAttribute('width', '13');
+    expect(space).toHaveAttribute('height', '13');
+    expect(diagram).toHaveAttribute('width', '13');
+    expect(diagram).toHaveAttribute('height', '13');
   });
 
   /**
@@ -97,13 +203,14 @@ describe('GraphHud', () => {
     const otherGraphId = uuid('00000000-0000-4000-8000-000000000011');
     render(
       <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           { id: otherGraphId, title: 'Alternate', color: '#f4a259', edges: [] },
         ]}
         colorByGraphId={{ [activeGraphId]: '#123456' }}
         activeGraphId={activeGraphId}
-        activeGraphThingIds={new Set()}
       />,
     );
 
@@ -132,10 +239,11 @@ describe('GraphHud', () => {
   it('keeps list semantics despite the unstyled list', () => {
     render(
       <GraphHud
+        spaceTitle="Atlas"
+        diagramTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
-        activeGraphThingIds={new Set()}
       />,
     );
 

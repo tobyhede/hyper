@@ -1,5 +1,6 @@
 import type { Story } from '@ladle/react';
 import { GraphHudFixture } from '../support/GraphHudFixture';
+import { sparseAuthoredSpace } from '../support/spaces';
 
 export default { title: 'Surfaces/Graph HUD' };
 
@@ -18,3 +19,16 @@ export default { title: 'Surfaces/Graph HUD' };
  */
 export const Retained: Story = () => <GraphHudFixture />;
 Retained.meta = { iframed: true };
+
+/**
+ * The same tracked Space, opened on its other Diagram.
+ *
+ * `authoredSpace` owns two Diagrams — `Collection 1`, above, owning three
+ * Graphs, and `Collection 2`, owning one. `sparseAuthoredSpace` is the same
+ * Space declaring `Collection 2` as its `defaultDiagram`, so this story's key
+ * holds exactly the one Graph that Diagram owns and none of `Collection 1`'s.
+ * That is the evidence a single Diagram's story cannot give: a key which
+ * changes with the Diagram it opens on, shown rather than merely asserted.
+ */
+export const SparseDiagram: Story = () => <GraphHudFixture space={sparseAuthoredSpace} />;
+SparseDiagram.meta = { iframed: true };

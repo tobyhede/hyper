@@ -167,34 +167,93 @@ test(
 /**
  * A Diagram draws the Graphs it owns. Selecting is navigation and writes
  * nothing (ADR 0031), so the revision is unmoved throughout.
+ *
+ * This is also the application half of the Graph HUD's `SparseDiagram` story
+ * (`packages/app/stories/surfaces/graph-hud.stories.tsx`, issue 06 ticket 02):
+ * the same claim, that the key is the selected Diagram's own Graphs and not
+ * the Space's, over the tracked fixture rather than the catalogue's.
  */
-test('selecting a Diagram draws the Graphs it owns and only those', async ({ page }) => {
-  await page.goto('/');
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-  const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
+test(
+  'selecting a Diagram draws the Graphs it owns and only those',
+  { tag: '@parity:graph-hud-key-follows-the-open-diagram' },
+  async ({ page }) => {
+    await page.goto('/');
+    const persistence = page.getByTestId('persistence-status');
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+    const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
 
-  await expect(selectedCanvas(page)).toContainText('Collection 1');
-  await expect(await diagramChoices(page)).toHaveCount(3);
-  await page.keyboard.press('Escape');
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
+    await expect(await diagramChoices(page)).toHaveCount(3);
+    await page.keyboard.press('Escape');
 
-  // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
-  await selectCanvas(page, 'Collection 1');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
-  await expect(legendItems).toHaveCount(3);
-  const owned = await graphChoices(page);
-  await expect(owned).toHaveCount(3);
-  await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
-  await page.keyboard.press('Escape');
+    // Collection 1 owns Long, Mid and Short over the shared spine: 4 + 3 + 2.
+    await selectCanvas(page, 'Collection 1');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+    await expect(legendItems).toHaveCount(3);
+    const owned = await graphChoices(page);
+    await expect(owned).toHaveCount(3);
+    await expect(owned.filter({ hasText: 'Echo' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
 
-  // Collection 2 owns Echo alone.
-  await selectCanvas(page, 'Collection 2');
-  await expect(page.locator('.react-flow__edge')).toHaveCount(4);
-  await expect(legendItems).toHaveCount(1);
-  await expect(activeGraph(page)).toHaveText('Echo');
+    // Collection 2 owns Echo alone.
+    await selectCanvas(page, 'Collection 2');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(4);
+    await expect(legendItems).toHaveCount(1);
+    await expect(activeGraph(page)).toHaveText('Echo');
 
-  await expect(persistence).toHaveAttribute('data-revision', '0');
-});
+    await expect(persistence).toHaveAttribute('data-revision', '0');
+  },
+);
+
+/**
+ * The HUD's key sits over the canvas without taking it.
+ *
+ * A `.react-flow__panel` is `position: absolute` with no `pointer-events` rule
+ * of React Flow's own, so a Panel swallows every gesture over its box — and the
+ * HUD stands in the corner a Thing's bottom-right resize control lives in,
+ * which is the harm `command-dock.css`'s bottom-edge offset already names for
+ * the Dock. The key holds no control, so it hands the pointer back; the two
+ * clipped names keep theirs, because their `title` is the only place a name
+ * `truncate` has ellipsised can still be read.
+ *
+ * The three gestures this buys back are asserted where they live rather than
+ * restated here — the Open Thing drag in `editing.spec.ts`, Reference Thing A′'s
+ * resize below, and the Space Thing padding probe in `space-thing.spec.ts` all
+ * reach past the HUD to the canvas. This is the mechanism under them.
+ */
+test(
+  'the canvas HUD key hands the canvas back every pointer it does not need',
+  { tag: '@parity:graph-hud-key-hands-back-the-pointers-it-does-not-need' },
+  async ({ page }) => {
+    await page.goto('/');
+    await settled(page);
+
+    /** What a press at this point would land on. */
+    const topmostAt = (x: number, y: number): Promise<string> =>
+      page.evaluate(
+        ([px, py]: readonly number[]) => {
+          const element = document.elementFromPoint(px ?? 0, py ?? 0);
+          if (element === null) return 'nothing';
+          if (element.closest('[data-testid="hud-space"], [data-testid="hud-diagram"]') !== null)
+            return 'name';
+          if (element.closest('.react-flow__panel') !== null) return 'hud';
+          return 'canvas';
+        },
+        [x, y],
+      );
+
+    const key = await boxOf(page.getByTestId('graph-legend'), "the HUD's Graph key");
+    expect(await topmostAt(key.x + key.width / 2, key.y + key.height / 2)).toBe('canvas');
+    expect(await topmostAt(key.x + 4, key.y + 4)).toBe('canvas');
+
+    // The clipped names are the exception, so their `title` can be read.
+    const name = page.getByTestId('hud-space');
+    const nameBox = await boxOf(name, "the HUD's Space name");
+    expect(await topmostAt(nameBox.x + 4, nameBox.y + nameBox.height / 2)).toBe('name');
+    await expect(name).toHaveAttribute('title', 'Diagram fixture');
+    await expect(page.getByTestId('hud-diagram')).toHaveAttribute('title', 'Collection 1');
+  },
+);
 
 /**
  * The two surfaces that name a Graph, held to the same answer.
@@ -214,6 +273,12 @@ test(
     await page.goto('/');
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(legendItems).toHaveCount(3);
+
+    // The read-only identity says what the key belongs to, using the same
+    // selected Space and Diagram the Dock names rather than resolving again.
+    await expect(page.getByTestId('hud-space')).toHaveText('Diagram fixture');
+    await expect(page.getByTestId('hud-diagram')).toHaveText('Collection 1');
+    await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
 
     // Titles, in the same order from the selected Diagram.
     const choices = await graphChoices(page);
