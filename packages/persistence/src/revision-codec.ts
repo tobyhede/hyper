@@ -4,7 +4,7 @@
  * Revision column can hold — so a hostile peer cannot hand `BigInt` an
  * arbitrarily long digit string to parse. Range is `REVISION_CEILING`'s
  * business, not this pattern's; this is only a bound on the work parsing will
- * do, which is why the `Retry-After` header in `packages/http/src/http.ts`
+ * do, which is why the `Retry-After` header in `packages/http/src/backend.ts`
  * shares it despite being a different protocol concern.
  */
 export const CANONICAL_DECIMAL = /^(0|[1-9]\d{0,18})$/;

@@ -24,20 +24,18 @@ export default class M extends Migration<Start, End> {
    * decimal digits with no loss.
    *
    * `revision`'s old `int8` default (`DEFAULT 0`) is dropped before the type
-   * change rather than left for `alterColumnType` to recast — Postgres carries
-   * an existing default across a type change by recasting the default
-   * expression too, and recasting the integer literal `0` to `text` lands as
-   * the bare token `0` rather than the quoted string literal `'0'`. That is a
-   * valid `text` default (`column_default` reads `0`), but it fails this
-   * repo's `SCHEMA_VERIFY_FAILED` check: the live default's `resolved.value`
-   * reads back as the JS number `0`, not the contract's string `"0"`, because
-   * `@prisma-next/target-postgres`'s `default-normalizer.ts` parses any
-   * digit-only default text as a numeric `literal` (`parsePostgresDefault`)
-   * and only widens that back to a string for an `int8`/`bigint` column past
-   * `Number.MAX_SAFE_INTEGER` — a `text` column's digit-only default has no
-   * such guard. Dropping the default first means there is nothing for the
-   * type change to recast, and the explicit `setDefault` below writes the
-   * quoted `'0'` this contract expects.
+   * change, because Postgres carries an existing default across a type change
+   * by recasting the default expression too, and recasting the integer
+   * literal `0` to `text` lands as the bare token `0` rather than the quoted
+   * string literal `'0'`. `@prisma-next/target-postgres`'s
+   * `default-normalizer.ts` parses any digit-only default text as a numeric
+   * `literal` (`parsePostgresDefault`) and only widens that back to a string
+   * for an `int8`/`bigint` column past `Number.MAX_SAFE_INTEGER` — a `text`
+   * column's digit-only default has no such guard, so a recast `0` would read
+   * back as the JS number `0` rather than this contract's string `"0"`.
+   * Dropping the default first leaves nothing for the type change to recast;
+   * the explicit `setDefault` below writes the quoted `'0'` this contract
+   * expects.
    */
   override get operations() {
     return [

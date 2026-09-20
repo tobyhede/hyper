@@ -1,8 +1,8 @@
 /**
  * A JSON-compatible value, and the one converter every write of a stored
- * `document` column goes through on both databases (ADR 0095) — hoisted here,
- * rather than duplicated per adapter as it was before this ticket, because it
- * is identical logic, not a database difference. Refuses a non-finite number
+ * `document` column goes through on both databases (ADR 0095) — declared once
+ * here rather than duplicated per database, because it is identical logic,
+ * not a database difference. Refuses a non-finite number
  * or a genuinely non-JSON value (a function, a `bigint`, …) and drops an
  * object property whose value is `undefined` rather than writing a `null` the
  * author never authored.
@@ -75,75 +75,67 @@ export interface SqlLoadedSpaceRow {
 /**
  * The structural handle onto the generated ORM's `Space`/`Thing`/
  * `RepositoryState` collections that this repository calls through —
- * "declared by the repository over the calls it makes" (ADR 0095), grown as
- * later tickets add more calls rather than modelling the ORM's full surface.
- * Property syntax throughout, so a real collection's more permissive method
- * signatures are checked contravariantly against these and both generated
- * ORMs are assignable without a cast; no optional row field, and every
- * document stays `unknown` until a schema parses it.
+ * declared by the repository over exactly the calls it makes (ADR 0095),
+ * rather than modelling the ORM's full surface. Property syntax throughout,
+ * so a real collection's more permissive method signatures are checked
+ * contravariantly against these and both generated ORMs are assignable
+ * without a cast; no optional row field, and every document stays `unknown`
+ * until a schema parses it.
  *
  * `Order` is the one opaque type parameter each database module derives from
  * its own generated collection type (`src/prisma/sql-store.ts`,
  * `src/sqlite/sql-store.ts`) rather than this file authoring its shape — what
  * a field accessor's `.asc()` answers inside `.orderBy(...)`.
  *
- * `Space.loadWithThings` is `.where({ id }).include('things', (things) =>
- * things.select('id', 'document').orderBy((thing) => thing.id.asc())).first()`
- * composed once, inside each database module's own `tables()`, rather than a
- * chain this interface exposes for the repository to compose generically.
- * `.include`'s own generated signature carries a *second* opaque type — the
- * relation's refined collection — that cannot be named without depending on
- * `@prisma-next/sql-orm-client` internals no package.json lists directly, and
- * cannot be kept opaque across this module boundary either; ticket 22's
- * Answer (`.scratch/database-persistence/issues/22-…`) records what was
- * tried. Composing `.include(...)` inside the database module — ordinary
- * forward-typed code, the same shape `loadStoredSpace` already ran in both
- * adapters that existed then — sidesteps the cross-module generic relation
- * entirely; only its *result* crosses this interface, typed as the concrete
- * `SqlLoadedSpaceRow`.
- *
- * Beyond `loadWithThings`, every other member is either a plain,
- * already-composed CRUD operation with a shared implementation in this file
- * (no relation, no `Order`, ordinary forward-typed code both database
- * modules call with their own generated collection — see the exported
- * functions below `SqlStore`) or, for `Space.loadEvery`, a second
- * already-composed read that carries the *same* raw-document treatment
- * `loadWithThings` does not need but the aggregate-wide read always has: a
- * document that fails even to parse as JSON must reach the repository as
- * data to classify (`AggregateInvariantError`, ADR 0094's truncation of
- * broken stored state), never as a driver codec's own thrown `TypeError`. On
- * PostgreSQL that is nothing special -- `jsonb` refuses non-JSON text before
- * it is ever stored, so `loadEvery` reads through the ordinary ORM the same
- * way `loadWithThings` does. On SQLite it is not: `document` decodes through
- * the driver's json codec on *any* ORM-level read that selects it, throwing
- * on text that is not JSON, so `Space.loadEvery` there reads through the
- * lower-level `sql`/`execute` builder instead (the same technique the
- * deleted `SqliteSpaceRepository.loadEverySpace` used), which can override a
- * column's codec on the way out and hand back the raw text for the
- * repository's own per-row classification to parse and catch. That
- * lower-level `execute` is why SQLite's own `Handle`
- * (`src/sqlite/sql-store.ts`) carries more than the bare `Orm` -- see that
- * module's doc comment.
- *
- * `Thing.deleteExcept` is the one CRUD member each database module still
- * implements for itself: its second `.where(...)` call takes a query-builder
- * callback (`(thing) => thing.id.notIn(keepIds)`) whose filter-expression
- * type comes from the same ORM-client internals `.include` cannot be named
- * from either, so it stays local rather than joining the shared functions
- * below. `commit`'s own write path (`Space.writeDocumentUnderLock`/
- * `setRevision`, `Thing.upsert`) is one helper shared by the fast
- * (topology-preserving) path and the complete-aggregate path, absorbed from
- * the deleted `src/persistence/topology-preserving-update.ts` -- see
- * `SqlSpaceRepository`'s own doc comment for the write order that helper
- * keeps.
+ * Every member is a plain, already-composed CRUD operation with a shared
+ * implementation below (`buildSpaceTable`/`buildThingTable`/
+ * `buildRepositoryStateTable` and the functions they call), except three that
+ * each database module still composes for itself — `Space.loadWithThings`,
+ * `Space.loadEvery` and `Thing.deleteExcept` — each carrying its own doc
+ * comment below explaining why.
  */
 export interface SqlTables<Order> {
   readonly Space: {
     readonly orderBy: (build: (space: { readonly id: { readonly asc: () => Order } }) => Order) => {
       readonly all: () => PromiseLike<readonly SqlSpaceListRow[]>;
     };
+    /**
+     * `.where({ id }).include('things', (things) => things.select('id',
+     * 'document').orderBy((thing) => thing.id.asc())).first()`, composed
+     * once inside each database module's own `tables()` rather than a chain
+     * this interface exposes for the repository to compose generically.
+     * `.include`'s own generated signature carries a *second* opaque type —
+     * the relation's refined collection — that cannot be named without
+     * depending on `@prisma-next/sql-orm-client` internals no package.json
+     * lists directly, and cannot be kept opaque across this module boundary
+     * either; ticket 22's Answer
+     * (`.scratch/database-persistence/issues/22-…`) records what was tried.
+     * Composing `.include(...)` inside the database module — ordinary
+     * forward-typed code, the same shape the repository's own
+     * `#loadStoredSpaceRow` calls through this — sidesteps the cross-module
+     * generic relation entirely; only its *result* crosses this interface,
+     * typed as the concrete `SqlLoadedSpaceRow`.
+     */
     readonly loadWithThings: (id: string) => Promise<SqlLoadedSpaceRow | null>;
-    /** Every stored Space, with its Things, ascending by id -- the Meta lifecycle's aggregate read. */
+    /**
+     * Every stored Space, with its Things, ascending by id -- the Meta
+     * lifecycle's aggregate read. Carries the *same* raw-document treatment
+     * `loadWithThings` above does not need but this always has: a document
+     * that fails even to parse as JSON must reach the repository as data to
+     * classify (`AggregateInvariantError`, ADR 0094's truncation of broken
+     * stored state), never as a driver codec's own thrown `TypeError`. On
+     * PostgreSQL that is nothing special -- `jsonb` refuses non-JSON text
+     * before it is ever stored, so this reads through the ordinary ORM the
+     * same way `loadWithThings` does. On SQLite it is not: `document`
+     * decodes through the driver's json codec on *any* ORM-level read that
+     * selects it, throwing on text that is not JSON, so `Space.loadEvery`
+     * there reads through the lower-level `sql`/`execute` builder instead,
+     * which can override a column's codec on the way out and hand back the
+     * raw text for the repository's own per-row classification to parse and
+     * catch. That lower-level `execute` is why SQLite's own `Handle`
+     * (`src/sqlite/sql-store.ts`) carries more than the bare `Orm` -- see
+     * that module's doc comment.
+     */
     readonly loadEvery: () => PromiseLike<readonly SqlLoadedSpaceRow[]>;
     /** `SqlSpaceRevisionRow`'s own doc comment explains why `document` is never among these. */
     readonly loadAllForReplacement: () => PromiseLike<readonly SqlSpaceRevisionRow[]>;
@@ -179,7 +171,7 @@ export interface SqlTables<Order> {
     /** Answers whether the row existed to update. */
     readonly setExportedRevision: (id: string, revision: string) => Promise<boolean>;
     /**
-     * `commit`'s own row lock (ADR 0095, ticket 24): write one Space's real
+     * `commit`'s own row lock (ADR 0095): write one Space's real
      * document under the row's write lock, and answer the revision the row
      * carried when that lock was granted — `undefined` when there is no such
      * row. Leaves `revision` itself untouched, so the caller's comparison
@@ -187,7 +179,9 @@ export interface SqlTables<Order> {
      * separate write once that comparison holds. Distinct from `relock`
      * above, which never writes a row's real content — a commit's write
      * genuinely means to replace the document once the lock is confirmed, so
-     * it cannot share `relock`'s placeholder.
+     * it cannot share `relock`'s placeholder. `SqlSpaceRepository`'s own doc
+     * comment states the write order the one helper shared by the fast
+     * (topology-preserving) path and the complete-aggregate path keeps.
      */
     readonly writeDocumentUnderLock: (id: string, document: unknown) => Promise<string | undefined>;
     /** The second write `writeDocumentUnderLock`'s caller makes once its revision comparison holds. */
@@ -202,7 +196,7 @@ export interface SqlTables<Order> {
     /**
      * Create or replace one Thing's document, answering the Space id the row
      * actually belongs to — which the caller compares against the Space it
-     * meant to write. `commit`'s update path (ticket 24) has no losing insert
+     * meant to write. `commit`'s update path has no losing insert
      * to catch the way `create` does: the row already exists, and this
      * overwrites it, so ownership is read back instead of thrown from a
      * duplicate key.
@@ -214,11 +208,15 @@ export interface SqlTables<Order> {
     }) => Promise<{ readonly spaceId: string }>;
     /**
      * Delete every Thing owned by `spaceId` whose id is not in `keepIds` —
-     * `commit`'s own drop of the Things a snapshot removed (ticket 24). Runs
-     * on both the fast and complete-aggregate write paths through the one
-     * shared write helper; an empty `keepIds` deletes every Thing the Space
-     * owns, and on the fast path `keepIds` is always every Thing already
-     * there, so nothing is ever actually dropped.
+     * `commit`'s own drop of the Things a snapshot removed. Runs on both the
+     * fast and complete-aggregate write paths through the one shared write
+     * helper; an empty `keepIds` deletes every Thing the Space owns, and on
+     * the fast path `keepIds` is always every Thing already there, so
+     * nothing is ever actually dropped. The one CRUD member each database
+     * module still composes for itself: its second `.where(...)` call takes
+     * a query-builder callback (`(thing) => thing.id.notIn(keepIds)`) whose
+     * filter-expression type comes from the same ORM-client internals
+     * `.include` cannot be named from either.
      */
     readonly deleteExcept: (spaceId: string, keepIds: readonly string[]) => Promise<void>;
     /**
@@ -253,7 +251,7 @@ export interface SqlTables<Order> {
  *   already-unbound `database.orm` on SQLite) so `tables(orm)` takes the same
  *   shape whichever database supplied it. `Handle` is opaque to this
  *   repository beyond that: PostgreSQL's is the bare ORM namespace, and
- *   SQLite's (ticket 23) additionally carries what `Space.loadEvery` needs to
+ *   SQLite's additionally carries what `Space.loadEvery` needs to
  *   read a document that may not even be JSON without the driver's codec
  *   throwing (`src/sqlite/sql-store.ts`'s doc comment).
  * - `tables(orm)` — the structural view over `orm` (or a transaction's own
@@ -270,15 +268,20 @@ export interface SqlTables<Order> {
  *   per file handle (`src/sqlite/serialise.ts`), because the driver opens a
  *   connection per operation and the file has one writer.
  * - `close` — releases whatever connection or handle the database opened.
+ *
+ * Property syntax throughout, like `SqlTables` above and for the same reason
+ * (ADR 0095): a method signature is checked bivariantly, which would loosen
+ * what assignability proves for `Handle` and `Order` wherever they appear in
+ * parameter position below.
  */
 export interface SqlStore<Handle, Order> {
   readonly orm: Handle;
-  tables(orm: Handle): SqlTables<Order>;
-  transaction<T>(fn: (orm: Handle) => Promise<T>): Promise<T>;
-  readDocument(value: unknown): unknown;
-  isDuplicateKey(error: unknown, table: string): boolean;
-  serialise<T>(operation: () => Promise<T>): Promise<T>;
-  close(): Promise<void>;
+  readonly tables: (orm: Handle) => SqlTables<Order>;
+  readonly transaction: <T>(fn: (orm: Handle) => Promise<T>) => Promise<T>;
+  readonly readDocument: (value: unknown) => unknown;
+  readonly isDuplicateKey: (error: unknown, table: string) => boolean;
+  readonly serialise: <T>(operation: () => Promise<T>) => Promise<T>;
+  readonly close: () => Promise<void>;
 }
 
 /**
@@ -287,13 +290,15 @@ export interface SqlStore<Handle, Order> {
  * slice of the raw generated collection named for exactly the calls it
  * makes — property syntax, no optional field — so the same "assignable
  * without a cast" proof `SqlTables` itself rests on covers these too.
- * `src/prisma/sql-store.ts` and `src/sqlite/sql-store.ts` each call these
- * with their own generated `Space`/`Thing`/`RepositoryState`, and keep only
- * `loadWithThings`, `loadEvery`, `orderBy` and `deleteExcept`'s query-builder
- * `.notIn(...)` call local — the members `SqlTables`'s own doc comment
- * explains cannot cross this boundary generically, or whose filter callback
- * this module cannot name without depending on the same ORM-client internals
- * that block `.include`.
+ * `buildSpaceTable`/`buildThingTable`/`buildRepositoryStateTable` below
+ * assemble a whole `SqlTables<Order>` from these, and `src/prisma/sql-store.ts`
+ * and `src/sqlite/sql-store.ts` each call one set of those three with their
+ * own generated `Space`/`Thing`/`RepositoryState` — keeping only
+ * `loadWithThings`, `loadEvery` and `deleteExcept`'s query-builder `.notIn(...)`
+ * call local, passed in as the few remaining per-database closures. Those are
+ * the members `SqlTables`'s own doc comment explains cannot cross this
+ * boundary generically, or whose filter callback this module cannot name
+ * without depending on the same ORM-client internals that block `.include`.
  */
 
 /** What `Space.where({ id })` answers on either database. */
@@ -509,6 +514,61 @@ export const createRepositoryState = async (
 export const deleteRepositoryState = async (state: RepositoryStateWithSingleton): Promise<void> => {
   await state.where({ singletonId: 1 }).delete();
 };
+
+/**
+ * `SqlTables<Order>['Space']`, assembled once from the CRUD functions above
+ * plus the two closures each database module still composes for itself
+ * (`loadWithThings`, `loadEvery` — `SqlTables`'s own doc comment explains
+ * why). `space` is checked structurally against the intersection of every
+ * CRUD function's own parameter type, the same "assignable without a cast"
+ * proof each of those already rests on individually.
+ */
+export const buildSpaceTable = <Order>(
+  space: SpaceWithId &
+    SpaceCreatable &
+    SpaceIdListable &
+    SpaceRevisionListable<Order> &
+    Orderable<Order>,
+  loadWithThings: (id: string) => Promise<SqlLoadedSpaceRow | null>,
+  loadEvery: () => PromiseLike<readonly SqlLoadedSpaceRow[]>,
+): SqlTables<Order>['Space'] => ({
+  orderBy: (build) => space.orderBy(build),
+  loadWithThings,
+  loadEvery,
+  loadAllForReplacement: () => loadAllForReplacement(space),
+  relock: (id) => relockSpace(space, id),
+  create: (input) => createSpaceRow(space, input),
+  listIds: () => listSpaceIds(space),
+  deleteById: (id) => deleteSpaceById(space, id),
+  setExportedRevision: (id, revision) => setExportedRevision(space, id, revision),
+  writeDocumentUnderLock: (id, document) => writeDocumentUnderLock(space, id, document),
+  setRevision: (id, revision) => setSpaceRevision(space, id, revision),
+});
+
+/**
+ * `SqlTables<Order>['Thing']`, assembled once from the CRUD functions above
+ * plus `deleteExcept`, the one member each database module still composes
+ * for itself (`SqlTables`'s own doc comment explains why).
+ */
+export const buildThingTable = (
+  thing: ThingCreatable & ThingUpsertable & ThingDeletableForSpace,
+  deleteExcept: (spaceId: string, keepIds: readonly string[]) => Promise<void>,
+): SqlTables<unknown>['Thing'] => ({
+  create: (input) => createThingRow(thing, input),
+  upsert: (input) => upsertThingRow(thing, input),
+  deleteExcept,
+  deleteAllForSpace: (spaceId) => deleteThingsForSpace(thing, spaceId),
+});
+
+/** `SqlTables<Order>['RepositoryState']`, assembled once from the CRUD functions above. */
+export const buildRepositoryStateTable = (
+  state: RepositoryStateWithSingleton,
+): SqlTables<unknown>['RepositoryState'] => ({
+  read: () => readRepositoryState(state),
+  relock: (metaSpaceId) => relockRepositoryState(state, metaSpaceId),
+  create: (metaSpaceId) => createRepositoryState(state, metaSpaceId),
+  delete: () => deleteRepositoryState(state),
+});
 
 /**
  * The one member `SqlTables`'s doc comment says crosses the module boundary

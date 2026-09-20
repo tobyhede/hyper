@@ -69,35 +69,56 @@ const ascendingSnapshotId = (left: SpaceSnapshot, right: SpaceSnapshot): number 
 type UpdateChange = Extract<SpaceChange, { kind: 'update' }>;
 
 /**
- * `decodeStoredRevision`/`encodeStoredRevision`, reclassified for
- * `#writeUpdate`: a revision the codec refuses -- stored text that is not
- * canonical decimal, or a value past the 2^63-1 ceiling on either side of the
- * round trip -- is broken stored state (ADR 0095), the same identity
- * `#loadEverySpace`'s own decode step already raises it as. `#writeUpdate`
- * reads and writes a Space's revision under the row lock it just took,
- * outside `#loadEverySpace`'s complete read, so it is the other place a
- * stored or about-to-be-stored revision can raise `RevisionCodecError` and
- * needs the same reclassification rather than escaping a commit unclassified
- * as a defect no retry cures answered `persistence-unavailable`.
+ * `decodeStoredRevision`/`encodeStoredRevision`, reclassified for the commit
+ * path: a revision the codec refuses -- stored text that is not canonical
+ * decimal, or a value past the 2^63-1 ceiling on either side of the round
+ * trip -- is broken stored state (ADR 0095), the same identity
+ * `#loadEverySpace`'s own decode step already raises it as. Three places
+ * outside `#loadEverySpace`'s complete read decode or encode a Space's
+ * revision during a commit -- `#writeUpdate`'s row-lock write and its prior-
+ * revision comparison, and `#loadStoredSpaceRowForCommit`'s two callers, the
+ * fast path's candidate read and the post-rollback conflict reload -- and all
+ * three need the same reclassification rather than letting `RevisionCodecError`
+ * escape a commit unclassified as a defect no retry cures answered
+ * `persistence-unavailable`. Decode and encode are named separately below
+ * because they are not the same claim: a decode failure is about a revision
+ * the database already holds, an encode failure is about the next revision
+ * the commit itself just computed and has not written anywhere yet.
  */
-const revisionInvariant = (spaceId: UUID, error: unknown): AggregateInvariantError =>
+const storedRevisionInvariant = (spaceId: UUID, error: unknown): AggregateInvariantError =>
   new AggregateInvariantError(`Stored Space ${spaceId}'s revision is not usable`, { cause: error });
 
-const decodeRevisionInvariant = (spaceId: UUID, value: string): bigint => {
+/**
+ * `decodeStoredRevision`, reclassifying a `RevisionCodecError` it raises as
+ * `storedRevisionInvariant` -- used for a value already sitting in the
+ * `revision` column: `#writeUpdate`'s prior-revision comparison, and (through
+ * `#loadStoredSpaceRow`) `#loadStoredSpaceRowForCommit`'s two callers.
+ */
+const decodeRevisionReclassified = (spaceId: UUID, value: string): bigint => {
   try {
     return decodeStoredRevision(value);
   } catch (error) {
     if (!(error instanceof RevisionCodecError)) throw error;
-    throw revisionInvariant(spaceId, error);
+    throw storedRevisionInvariant(spaceId, error);
   }
 };
 
-const encodeRevisionInvariant = (spaceId: UUID, value: bigint): string => {
+/**
+ * `encodeStoredRevision`, reclassifying a `RevisionCodecError` it raises as
+ * `AggregateInvariantError` -- used only by `#writeUpdate`'s own next
+ * revision, which is not stored state: it is the value this commit computed
+ * and is about to write, so the message names the commit's own output rather
+ * than `storedRevisionInvariant`'s claim that the database already held
+ * something unusable.
+ */
+const encodeNextRevisionReclassified = (spaceId: UUID, value: bigint): string => {
   try {
     return encodeStoredRevision(value);
   } catch (error) {
     if (!(error instanceof RevisionCodecError)) throw error;
-    throw revisionInvariant(spaceId, error);
+    throw new AggregateInvariantError(`Space ${spaceId}'s next revision is not usable`, {
+      cause: error,
+    });
   }
 };
 
@@ -232,6 +253,18 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * read, `commit`'s write loop having nothing to read here) and outside one,
    * over `#store.tables(#store.orm)` (`loadSpace` above, and the post-conflict
    * reload `#commitUnserialised` makes after a rolled-back transaction).
+   *
+   * A failure to decode this one row -- a document that fails intake, or (like
+   * `#loadEverySpace`'s own decode step) a stored revision the shared codec
+   * refuses -- escapes unclassified rather than raising
+   * `AggregateInvariantError`: `loadSpace` above answers for one Space, not the
+   * aggregate, and keeps the narrower error deliberately (ticket 27, "one
+   * Space failing intake is that resource's answer to give, not evidence the
+   * aggregate cannot be read"). The fast path's candidate read and the
+   * post-conflict reload call `#loadStoredSpaceRowForCommit` below instead,
+   * which reclassifies a revision decode failure only -- a commit's own
+   * correctness depends on reading the revision it is about to compare or
+   * conflict on, where it does not equally depend on that Space's document.
    */
   async #loadStoredSpaceRow(tables: SqlTables<Order>, id: UUID): Promise<LoadedSpace | undefined> {
     const stored = await tables.Space.loadWithThings(id);
@@ -252,6 +285,29 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       exportedRevision:
         stored.exportedRevision === null ? null : decodeStoredRevision(stored.exportedRevision),
     };
+  }
+
+  /**
+   * `#loadStoredSpaceRow`, reclassifying a `RevisionCodecError` it raises as
+   * `AggregateInvariantError` (`storedRevisionInvariant`) rather than letting
+   * it escape a commit unclassified. Used by the two commit-path readers of
+   * one stored Space's row that are not `loadSpace` itself: the fast path's
+   * candidate read (`#commitTopologyPreservingUpdate`) and the post-rollback
+   * conflict reload (`#commitUnserialised`). `#loadStoredSpaceRow` is left as
+   * it is -- `loadSpace`/`listSpaces` share it and keep the narrower,
+   * unclassified error deliberately -- so this wraps the call rather than
+   * changing what it answers.
+   */
+  async #loadStoredSpaceRowForCommit(
+    tables: SqlTables<Order>,
+    id: UUID,
+  ): Promise<LoadedSpace | undefined> {
+    try {
+      return await this.#loadStoredSpaceRow(tables, id);
+    } catch (error) {
+      if (!(error instanceof RevisionCodecError)) throw error;
+      throw storedRevisionInvariant(id, error);
+    }
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {
@@ -321,7 +377,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
           conflicts: [
             {
               spaceId: error.spaceId,
-              current: await this.#loadStoredSpaceRow(
+              current: await this.#loadStoredSpaceRowForCommit(
                 this.#store.tables(this.#store.orm),
                 error.spaceId,
               ),
@@ -378,7 +434,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     if (change === undefined) return undefined;
     const decision = decideTopologyPreservingUpdate(
       change,
-      await this.#loadStoredSpaceRow(tables, change.spaceId),
+      await this.#loadStoredSpaceRowForCommit(tables, change.spaceId),
     );
     if (decision.kind === 'aggregate-path') return undefined;
     if (decision.kind === 'answer') return decision.result;
@@ -422,11 +478,14 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     const priorRevision = await tables.Space.writeDocumentUnderLock(snapshot.id, snapshot.document);
     if (
       priorRevision === undefined ||
-      decodeRevisionInvariant(snapshot.id, priorRevision) !== expectedRevision
+      decodeRevisionReclassified(snapshot.id, priorRevision) !== expectedRevision
     ) {
       throw new StaleSpaceRevisionError(snapshot.id);
     }
-    await tables.Space.setRevision(snapshot.id, encodeRevisionInvariant(snapshot.id, newRevision));
+    await tables.Space.setRevision(
+      snapshot.id,
+      encodeNextRevisionReclassified(snapshot.id, newRevision),
+    );
     await this.#upsertThings(tables, snapshot);
     await tables.Thing.deleteExcept(
       snapshot.id,
@@ -466,33 +525,33 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * `MemorySpaceRepository` answers them first.
    *
    * The self-update can find the row gone: a concurrent replacement deleted
-   * and rewrote it between the read above and this update. `retryAfterReplacement`
-   * re-reads and re-locks once for exactly that case, and answers with **the
-   * identity the retry itself locks** -- the one now actually stored -- never
-   * the one this call read before the replacement. Ticket 23's race test on
-   * the (then two-adapter) PostgreSQL repository settled this
-   * (`test/integration/postgres-space-repository.test.ts`, "conflicts a
-   * replacement authorized against an identity a concurrent replacement
-   * retired" and "judges a complete-aggregate commit against an identity a
-   * concurrent replacement retired"): answering with the pre-replacement
-   * identity lets a stale `replaceAggregate` caller's expected identity match
-   * it and silently overwrite the concurrent replacement, and lets a commit's
-   * `decideCommit` validate the *current* stored Spaces against an identity no
-   * longer among them, refusing a valid aggregate as broken.
+   * and rewrote it between the read above and this update. A second, final
+   * attempt re-reads and re-locks once for exactly that case, and answers
+   * with **the identity the retry itself locks** -- the one now actually
+   * stored -- never the one the first attempt read before the replacement.
+   * Ticket 23's race test on the (then two-adapter) PostgreSQL repository
+   * settled this (`test/integration/postgres-space-repository.test.ts`,
+   * "conflicts a replacement authorized against an identity a concurrent
+   * replacement retired" and "judges a complete-aggregate commit against an
+   * identity a concurrent replacement retired"): answering with the
+   * pre-replacement identity lets a stale `replaceAggregate` caller's
+   * expected identity match it and silently overwrite the concurrent
+   * replacement, and lets a commit's `decideCommit` validate the *current*
+   * stored Spaces against an identity no longer among them, refusing a valid
+   * aggregate as broken. Two attempts, as a bounded loop rather than
+   * recursion on a boolean retry flag, so the "one retry, then give up" shape
+   * reads directly off the loop bound instead of off an argument only this
+   * method's own second call site ever passes.
    */
-  async #lockMetaIdentity(
-    tables: SqlTables<Order>,
-    retryAfterReplacement = true,
-  ): Promise<UUID | undefined> {
-    const state = await tables.RepositoryState.read();
-    if (state === null) return undefined;
-    const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
-    const stillPresent = await tables.RepositoryState.relock(metaSpaceId);
-    if (!stillPresent) {
-      if (retryAfterReplacement) return this.#lockMetaIdentity(tables, false);
-      throw new Error('Repository state disappeared while locking it');
+  async #lockMetaIdentity(tables: SqlTables<Order>): Promise<UUID | undefined> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const state = await tables.RepositoryState.read();
+      if (state === null) return undefined;
+      const metaSpaceId = uuidSchema.parse(state.metaSpaceId);
+      const stillPresent = await tables.RepositoryState.relock(metaSpaceId);
+      if (stillPresent) return metaSpaceId;
     }
-    return metaSpaceId;
+    throw new Error('Repository state disappeared while locking it');
   }
 
   /**
@@ -506,8 +565,14 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * read from, and every caller of this method is an aggregate-level read
    * whose failure a reader classifies (`docs/agents/editing-and-persistence.md`).
    * Nothing inside the `try` performs I/O -- `tables.Space.loadEvery()` above
-   * already has, on both databases -- so nothing here can misclassify a
-   * connection failure as broken stored state.
+   * already has, on both databases -- so the catch below is unconditional, by
+   * position rather than by type: a connection failure cannot reach it, and
+   * narrowing to today's three known causes would answer a fourth, future
+   * decode failure as *unclassified* instead -- exactly the "unavailable,
+   * retry forever" misclassification this error class exists to prevent,
+   * just failing quietly rather than loudly (ticket 27, "The per-row catch
+   * is unconditional, by position rather than by type", declined narrowing
+   * this same shape on this same reasoning).
    *
    * `loadSpace`/`listSpaces` keep the narrower, unclassified error
    * deliberately: one Space failing intake is that resource's answer to give,
@@ -532,13 +597,6 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
             space.exportedRevision === null ? null : decodeStoredRevision(space.exportedRevision),
         };
       } catch (error) {
-        if (
-          !(error instanceof SnapshotValidationError) &&
-          !(error instanceof RevisionCodecError) &&
-          !(error instanceof SyntaxError)
-        ) {
-          throw error;
-        }
         throw new AggregateInvariantError(`Stored Space ${space.id} does not parse`, {
           cause: error,
         });

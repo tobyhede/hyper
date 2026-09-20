@@ -162,6 +162,14 @@ const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: big
   exportedRevision,
 });
 
+/**
+ * The one member `withRawRevisionHarness` needs from vitest's own per-test
+ * context (`it`'s callback parameter, `ExtendedContext<Test>` in
+ * `@vitest/runner`), named locally rather than importing that generic type
+ * for one method.
+ */
+type SkippableTestContext = { skip: () => void };
+
 export interface RepositoryHarness {
   repository: SpaceRepository;
   close(): Promise<void>;
@@ -195,29 +203,21 @@ const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revi
   });
 
 /**
- * The lifecycle group -- everything `spaceRepositoryContract` below owes
- * that does not touch `commit` -- run on its own against a repository that
- * implements only the lifecycle members (ADR 0095's one SQL repository has
- * no `commit` yet; tickets 23-24). `spaceRepositoryContract` calls this
- * first with its own, wider harness (a `RepositoryHarness` is one, since
- * `SpaceRepository` has everything `LifecycleRepository` needs and more), so
- * every case here still runs against both full adapters exactly once -- this
- * split changes nothing about what they are held to, only what a
- * commit-less repository can be held to as well.
+ * Seeding runs through `initializeAggregate` rather than through a constructor
+ * argument, unlike the `SpaceBackend` contract. That is the door (ADR 0078):
+ * rows reach a PostgreSQL-backed repository only through the two lifecycle
+ * operations or a commit, all of which are part of the seam under test, and a
+ * test helper seeds through the same ones the product uses.
+ *
+ * The first Space named is the Meta identity, stated rather than inferred —
+ * every case below passes its whole aggregate in one call, so there is no batch
+ * position for Meta to be read off.
  */
-export type LifecycleRepository = Omit<SpaceRepository, 'commit'>;
-
-export interface LifecycleRepositoryHarness {
-  repository: LifecycleRepository;
-  close(): Promise<void>;
-  writeRawRevision?: RepositoryHarness['writeRawRevision'];
-}
-
-export const spaceRepositoryLifecycleContract = (
+export const spaceRepositoryContract = (
   name: string,
-  createHarness: () => Promise<LifecycleRepositoryHarness>,
+  createHarness: () => Promise<RepositoryHarness>,
 ): void => {
-  const withHarness = async (body: (repository: LifecycleRepository) => Promise<void>) => {
+  const withHarness = async (body: (repository: SpaceRepository) => Promise<void>) => {
     const harness = await createHarness();
     try {
       await body(harness.repository);
@@ -230,25 +230,31 @@ export const spaceRepositoryLifecycleContract = (
    * `withHarness`, plus the raw revision-column write the ceiling and
    * canonical-decimal cases need. A harness with no `writeRawRevision` (the
    * memory double) has nothing for these to prove — a stored revision it
-   * cannot represent in the first place — so the body is skipped rather than
-   * asserting anything.
+   * cannot represent in the first place — so the case is marked skipped
+   * through vitest's own `context.skip()` rather than returning with no
+   * assertion, which a runner reports as passed and a reader cannot tell
+   * apart from a case that actually ran.
    */
   const withRawRevisionHarness = async (
+    context: SkippableTestContext,
     body: (
-      repository: LifecycleRepository,
-      writeRawRevision: NonNullable<LifecycleRepositoryHarness['writeRawRevision']>,
+      repository: SpaceRepository,
+      writeRawRevision: NonNullable<RepositoryHarness['writeRawRevision']>,
     ) => Promise<void>,
   ) => {
     const harness = await createHarness();
     try {
-      if (harness.writeRawRevision === undefined) return;
+      if (harness.writeRawRevision === undefined) {
+        context.skip();
+        return;
+      }
       await body(harness.repository, harness.writeRawRevision);
     } finally {
       await harness.close();
     }
   };
 
-  const seed = async (repository: LifecycleRepository, ...spaces: readonly SpaceSnapshot[]) => {
+  const seed = async (repository: SpaceRepository, ...spaces: readonly SpaceSnapshot[]) => {
     const meta = spaces[0];
     if (meta === undefined) throw new Error('Seeding needs at least a Meta Space');
     const result = await repository.initializeAggregate({ metaSpaceId: meta.id, spaces });
@@ -572,8 +578,8 @@ export const spaceRepositoryLifecycleContract = (
   // non-canonical revision; ADR 0095's TEXT columns make it reachable on
   // PostgreSQL too, so it belongs here rather than in one database's own
   // integration file.
-  it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async () => {
-    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
@@ -581,63 +587,6 @@ export const spaceRepositoryLifecycleContract = (
       await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
     });
   });
-};
-
-/**
- * Seeding runs through `initializeAggregate` rather than through a constructor
- * argument, unlike the `SpaceBackend` contract. That is the door (ADR 0078):
- * rows reach a PostgreSQL-backed repository only through the two lifecycle
- * operations or a commit, all of which are part of the seam under test, and a
- * test helper seeds through the same ones the product uses.
- *
- * The first Space named is the Meta identity, stated rather than inferred —
- * every case below passes its whole aggregate in one call, so there is no batch
- * position for Meta to be read off.
- */
-export const spaceRepositoryContract = (
-  name: string,
-  createHarness: () => Promise<RepositoryHarness>,
-): void => {
-  spaceRepositoryLifecycleContract(name, createHarness);
-
-  const withHarness = async (body: (repository: SpaceRepository) => Promise<void>) => {
-    const harness = await createHarness();
-    try {
-      await body(harness.repository);
-    } finally {
-      await harness.close();
-    }
-  };
-
-  /**
-   * `withHarness`, plus the raw revision-column write the ceiling and
-   * canonical-decimal cases need. A harness with no `writeRawRevision` (the
-   * memory double) has nothing for these to prove — a stored revision it
-   * cannot represent in the first place — so the body is skipped rather than
-   * asserting anything.
-   */
-  const withRawRevisionHarness = async (
-    body: (
-      repository: SpaceRepository,
-      writeRawRevision: NonNullable<RepositoryHarness['writeRawRevision']>,
-    ) => Promise<void>,
-  ) => {
-    const harness = await createHarness();
-    try {
-      if (harness.writeRawRevision === undefined) return;
-      await body(harness.repository, harness.writeRawRevision);
-    } finally {
-      await harness.close();
-    }
-  };
-
-  const seed = async (repository: SpaceRepository, ...spaces: readonly SpaceSnapshot[]) => {
-    const meta = spaces[0];
-    if (meta === undefined) throw new Error('Seeding needs at least a Meta Space');
-    const result = await repository.initializeAggregate({ metaSpaceId: meta.id, spaces });
-    if (result.kind !== 'initialized') throw new Error(`Seeding failed: ${result.kind}`);
-    return result.aggregate.spaces;
-  };
 
   /*
    * The migration that adds the singleton Meta row deliberately leaves it empty
@@ -1245,8 +1194,8 @@ export const spaceRepositoryContract = (
   // rather than PostgreSQL's own weaker "the expected revision isn't
   // narrowed" case and SQLite's two ("speaks bigint at the repository
   // boundary…", "commits and reloads revisions above…").
-  it(`${name} stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text`, async () => {
-    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+  it(`${name} stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
       const aboveSafe = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
@@ -1275,8 +1224,8 @@ export const spaceRepositoryContract = (
   // fails intake raises) rather than merely asserted to exist, and the
   // refused commit is proven to have left the stored revision exactly where
   // it was — "refused rather than stored".
-  it(`${name} refuses to store a revision above the 2^63-1 ceiling`, async () => {
-    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+  it(`${name} refuses to store a revision above the 2^63-1 ceiling`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: REVISION_CEILING.toString() });
@@ -1294,13 +1243,31 @@ export const spaceRepositoryContract = (
   // only to one a commit would produce: a stored revision past 2^63−1 is
   // broken stored state exactly as a non-canonical one is (the case above
   // this one), and an aggregate read of it raises the same identity.
-  it(`${name} raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling`, async () => {
-    await withRawRevisionHarness(async (repository, writeRawRevision) => {
+  it(`${name} raises an identifiable invariant failure for a stored Space whose revision exceeds the 2^63-1 ceiling`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [THING_ID]);
       await seed(repository, first);
       await writeRawRevision({ spaceId: SPACE_ID, revision: (REVISION_CEILING + 1n).toString() });
 
       await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+    });
+  });
+
+  // `commit`'s fast path decides against the one stored Space its candidate
+  // names, read through the same decode step `#loadEverySpace`'s aggregate
+  // read uses for a revision -- so a non-canonical stored revision met there
+  // is broken stored state exactly as it is on the aggregate path, and has to
+  // raise the same identity rather than the shared codec's bare error
+  // escaping the commit unclassified.
+  it(`${name} raises an identifiable invariant failure for a commit whose fast-path candidate has a non-canonical stored revision`, async (context) => {
+    await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
+      const first = space(SPACE_ID, 'One', [THING_ID]);
+      await seed(repository, first);
+      await writeRawRevision({ spaceId: SPACE_ID, revision: '01' });
+
+      await expect(commitUpdate(repository, retitled(first, 'Changed'), 0n)).rejects.toThrow(
+        AggregateInvariantError,
+      );
     });
   });
 };

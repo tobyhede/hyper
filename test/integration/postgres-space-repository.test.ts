@@ -843,6 +843,62 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     });
   });
 
+  /*
+   * M13 (second review pass of the one-SQL-repository branch): `Space.relock`
+   * (`src/persistence/sql-store.ts`) writes a placeholder `{}` document to
+   * take a row's write lock during `replaceAggregate`'s per-row re-lock loop,
+   * rather than round-tripping the row's real one. `#replaceUnserialised`'s
+   * own doc comment says that is safe because every relocked row is either
+   * truncated in the same transaction (`#replaceAllSpaces` -> `#truncate
+   * HyperContent`, which deletes every currently stored row, relocked or not)
+   * or the whole transaction rolls back on a `StaleSpaceRevisionError` -- but
+   * nothing had held the rollback half. `SPACE_ID` sorts before `OTHER_
+   * SPACE_ID`, so `loadAllForReplacement`'s ascending order relocks `SPACE_ID`
+   * first; this forces the second row, `OTHER_SPACE_ID`, to conflict only
+   * after `SPACE_ID`'s own placeholder write has already landed inside the
+   * same (still-open) transaction, then proves that placeholder never
+   * survives the rollback the conflict causes.
+   */
+  it("rolls back an earlier row's relock placeholder when a later row in the same replacement conflicts", async () => {
+    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
+
+    const lockHeld = Promise.withResolvers<undefined>();
+    const releaseLock = Promise.withResolvers<undefined>();
+    const blocker = db.transaction(async ({ orm }) => {
+      // Take OTHER_SPACE_ID's row lock exactly where the racing replacement's
+      // own relock loop would reach it second, so that call's relock of
+      // SPACE_ID (first in id order) is forced to land, inside its own
+      // still-open transaction, before this transaction retires OTHER_SPACE_
+      // ID's revision out from under the racing call's lock-free read of it.
+      await orm.public.Space.where({ id: OTHER_SPACE_ID }).update({ revision: '0' });
+      lockHeld.resolve(undefined);
+      await releaseLock.promise;
+      // What the held lock stands in for: OTHER_SPACE_ID moves to a revision
+      // the racing replacement's own `loadAllForReplacement` read did not see.
+      await orm.public.Space.where({ id: OTHER_SPACE_ID }).update({ revision: '1' });
+    });
+    await lockHeld.promise;
+
+    const racing = repository.replaceAggregate(
+      { metaSpaceId: SPACE_ID, spaces: [snapshot] },
+      SPACE_ID,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    releaseLock.resolve(undefined);
+    await blocker;
+
+    await expect(racing).resolves.toMatchObject({ kind: 'conflict' });
+    // SPACE_ID's row was relocked -- its placeholder document written -- before
+    // OTHER_SPACE_ID's conflict rolled the whole transaction back. If the
+    // rollback had not reverted that write, this would read back `{}` rather
+    // than the Space `linkedSnapshot` itself stored.
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
+      snapshot: linkedSnapshot,
+      revision: 0n,
+      exportedRevision: null,
+    });
+  });
+
   it('persists first-working-load initialization for a fresh repository host', async () => {
     await seed(SPACE_ID, [snapshot]);
 

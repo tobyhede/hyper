@@ -1,23 +1,11 @@
 import type { SqlTables } from '../persistence/sql-store';
 import {
   asOrderable,
-  createRepositoryState,
-  createSpaceRow,
-  createThingRow,
+  buildRepositoryStateTable,
+  buildSpaceTable,
+  buildThingTable,
   defineSqlStore,
-  deleteRepositoryState,
-  deleteSpaceById,
-  deleteThingsForSpace,
-  listSpaceIds,
-  loadAllForReplacement,
   type Orderable,
-  readRepositoryState,
-  relockRepositoryState,
-  relockSpace,
-  setExportedRevision,
-  setSpaceRevision,
-  upsertThingRow,
-  writeDocumentUnderLock,
 } from '../persistence/sql-store';
 import { db } from './db';
 
@@ -108,34 +96,15 @@ export const postgresSqlStore = defineSqlStore({
   orm: db.orm.public,
   tables(orm: Orm): SqlTables<InferredOrder> {
     return {
-      Space: {
-        orderBy: (build) => orm.Space.orderBy(build),
-        loadWithThings: (id: string) => loadWithThings(orm, id),
-        loadEvery: () => loadEvery(orm),
-        loadAllForReplacement: () => loadAllForReplacement(orm.Space),
-        relock: (id: string) => relockSpace(orm.Space, id),
-        create: (input) => createSpaceRow(orm.Space, input),
-        listIds: () => listSpaceIds(orm.Space),
-        deleteById: (id: string) => deleteSpaceById(orm.Space, id),
-        setExportedRevision: (id: string, revision: string) =>
-          setExportedRevision(orm.Space, id, revision),
-        writeDocumentUnderLock: (id: string, document: unknown) =>
-          writeDocumentUnderLock(orm.Space, id, document),
-        setRevision: (id: string, revision: string) => setSpaceRevision(orm.Space, id, revision),
-      },
-      Thing: {
-        create: (input) => createThingRow(orm.Thing, input),
-        upsert: (input) => upsertThingRow(orm.Thing, input),
-        deleteExcept: (spaceId: string, keepIds: readonly string[]) =>
-          deleteThingsExcept(orm, spaceId, keepIds),
-        deleteAllForSpace: (spaceId: string) => deleteThingsForSpace(orm.Thing, spaceId),
-      },
-      RepositoryState: {
-        read: () => readRepositoryState(orm.RepositoryState),
-        relock: (metaSpaceId: string) => relockRepositoryState(orm.RepositoryState, metaSpaceId),
-        create: (metaSpaceId: string) => createRepositoryState(orm.RepositoryState, metaSpaceId),
-        delete: () => deleteRepositoryState(orm.RepositoryState),
-      },
+      Space: buildSpaceTable(
+        orm.Space,
+        (id: string) => loadWithThings(orm, id),
+        () => loadEvery(orm),
+      ),
+      Thing: buildThingTable(orm.Thing, (spaceId: string, keepIds: readonly string[]) =>
+        deleteThingsExcept(orm, spaceId, keepIds),
+      ),
+      RepositoryState: buildRepositoryStateTable(orm.RepositoryState),
     };
   },
   transaction<T>(fn: (orm: Orm) => Promise<T>): Promise<T> {

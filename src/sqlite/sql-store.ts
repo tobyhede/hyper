@@ -1,23 +1,11 @@
 import type { SqlTables } from '../persistence/sql-store';
 import {
   asOrderable,
-  createRepositoryState,
-  createSpaceRow,
-  createThingRow,
+  buildRepositoryStateTable,
+  buildSpaceTable,
+  buildThingTable,
   defineSqlStore,
-  deleteRepositoryState,
-  deleteSpaceById,
-  deleteThingsForSpace,
-  listSpaceIds,
-  loadAllForReplacement,
   type Orderable,
-  readRepositoryState,
-  relockRepositoryState,
-  relockSpace,
-  setExportedRevision,
-  setSpaceRevision,
-  upsertThingRow,
-  writeDocumentUnderLock,
 } from '../persistence/sql-store';
 import type { SqliteDatabase } from './db';
 import { serialiseSqlite } from './serialise';
@@ -26,9 +14,8 @@ type Orm = SqliteDatabase['orm'];
 /**
  * The transaction context `SqliteDatabase['transaction']`'s callback receives.
  * `Handle` below is built from this rather than from `Orm` alone, because
- * `Space.loadEvery` needs the same lower-level `sql`/`execute` access
- * `SqliteSpaceRepository.loadEverySpace` used before ticket 23 (see
- * `SqlTables`'s doc comment in `../persistence/sql-store`).
+ * `Space.loadEvery` below needs the same lower-level `sql`/`execute` access
+ * (see `SqlTables`'s doc comment in `../persistence/sql-store`).
  */
 type Tx = Parameters<Parameters<SqliteDatabase['transaction']>[0]>[0];
 
@@ -99,11 +86,11 @@ const loadWithThings = (orm: Orm, id: string) =>
  * `document` that is not even JSON reaches the repository's own per-row
  * classification as raw text instead of throwing inside the driver's json
  * codec before any of this module's code runs (`SqlTables`'s doc comment).
- * This is `SqliteSpaceRepository.loadEverySpace`'s pre-ticket-23 read,
- * unchanged in technique and moved here; its own extended doc comment (see
- * `git log` on that file) is the fuller account of why two raw-text
- * statements rather than one `include` read, and why `document`'s codec is
- * overridden to `'sqlite/text@1'` on the way out.
+ * Two raw-text statements rather than one `include` read, because the
+ * lower-level builder used below has no relation support of its own to
+ * express the nested `things` read in one statement; `document`'s codec is
+ * overridden to `'sqlite/text@1'` on the way out so the raw stored text
+ * reaches the repository unparsed.
  *
  * `database.sql`/`database.raw` are stateless plan builders — the exact same
  * type whichever handle names them (`SqliteClient.sql`/`SqliteTransactionContext.sql`
@@ -212,37 +199,15 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
     orm: nonTransactionalHandle,
     tables(handle: Handle): SqlTables<InferredOrder> {
       return {
-        Space: {
-          orderBy: (build) => handle.orm.Space.orderBy(build),
-          loadWithThings: (id: string) => loadWithThings(handle.orm, id),
-          loadEvery: () => loadEvery(database, handle),
-          loadAllForReplacement: () => loadAllForReplacement(handle.orm.Space),
-          relock: (id: string) => relockSpace(handle.orm.Space, id),
-          create: (input) => createSpaceRow(handle.orm.Space, input),
-          listIds: () => listSpaceIds(handle.orm.Space),
-          deleteById: (id: string) => deleteSpaceById(handle.orm.Space, id),
-          setExportedRevision: (id: string, revision: string) =>
-            setExportedRevision(handle.orm.Space, id, revision),
-          writeDocumentUnderLock: (id: string, document: unknown) =>
-            writeDocumentUnderLock(handle.orm.Space, id, document),
-          setRevision: (id: string, revision: string) =>
-            setSpaceRevision(handle.orm.Space, id, revision),
-        },
-        Thing: {
-          create: (input) => createThingRow(handle.orm.Thing, input),
-          upsert: (input) => upsertThingRow(handle.orm.Thing, input),
-          deleteExcept: (spaceId: string, keepIds: readonly string[]) =>
-            deleteThingsExcept(handle.orm, spaceId, keepIds),
-          deleteAllForSpace: (spaceId: string) => deleteThingsForSpace(handle.orm.Thing, spaceId),
-        },
-        RepositoryState: {
-          read: () => readRepositoryState(handle.orm.RepositoryState),
-          relock: (metaSpaceId: string) =>
-            relockRepositoryState(handle.orm.RepositoryState, metaSpaceId),
-          create: (metaSpaceId: string) =>
-            createRepositoryState(handle.orm.RepositoryState, metaSpaceId),
-          delete: () => deleteRepositoryState(handle.orm.RepositoryState),
-        },
+        Space: buildSpaceTable(
+          handle.orm.Space,
+          (id: string) => loadWithThings(handle.orm, id),
+          () => loadEvery(database, handle),
+        ),
+        Thing: buildThingTable(handle.orm.Thing, (spaceId: string, keepIds: readonly string[]) =>
+          deleteThingsExcept(handle.orm, spaceId, keepIds),
+        ),
+        RepositoryState: buildRepositoryStateTable(handle.orm.RepositoryState),
       };
     },
     transaction<T>(fn: (handle: Handle) => Promise<T>): Promise<T> {
