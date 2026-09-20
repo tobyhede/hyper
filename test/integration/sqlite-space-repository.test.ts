@@ -22,6 +22,9 @@ spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
   return {
     repository: harness.repository,
     close: harness.close,
+    removeMetaIdentity: async () => {
+      await harness.database.orm.RepositoryState.where({ singletonId: 1 }).delete();
+    },
     writeRawRevision: async ({ spaceId, revision, exportedRevision }) => {
       if (exportedRevision === undefined) {
         await harness.database.orm.Space.where({ id: spaceId }).update({ revision });

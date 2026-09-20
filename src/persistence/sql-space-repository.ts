@@ -178,12 +178,9 @@ const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undef
  * way -- a revision conflict, or a write that moves no snapshot boundary --
  * and hands everything else to that decision. `#commitTopologyPreservingUpdate`
  * runs this before `#lockMetaIdentity` is ever called, deliberately: the fast
- * path holds no singleton lock, and reading the Meta identity here would be
- * new locking behaviour ticket 24 does not add. Carried over unchanged from
- * both adapters this repository replaced -- `.scratch/database-persistence/
- * issues/29` is the known, separately-tracked consequence: a store holding
- * Space rows with no Meta identity takes this path and commits where the
- * complete-aggregate decision would refuse.
+ * path holds no singleton lock. It does make one unlocked existence read of
+ * the Meta identity first, because without that identity `decideCommit` would
+ * refuse every otherwise-writable update (ticket 29).
  */
 const decideTopologyPreservingUpdate = (
   change: UpdateChange,
@@ -441,8 +438,11 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * `topology-preserving-update.ts`): a single update decided against the one
    * stored Space it names, never reading the complete aggregate.
    * `decideTopologyPreservingUpdate`'s own doc comment explains why this never
-   * calls `#lockMetaIdentity` -- carried over unchanged, including the known
-   * consequence `.scratch/database-persistence/issues/29` tracks separately.
+   * calls `#lockMetaIdentity`. The unlocked read below is a one-way eligibility
+   * check inside this transaction: absence sends the candidate to the complete
+   * decision, while presence grants no new write authority. It uses the same
+   * transaction handle as the candidate read, which matters on SQLite: opening
+   * a separate runtime here can contend with the transaction it is deciding.
    */
   async #commitTopologyPreservingUpdate(
     tables: SqlTables<Order>,
@@ -450,6 +450,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   ): Promise<RepositoryCommitResult | undefined> {
     const change = topologyPreservingCandidate(request);
     if (change === undefined) return undefined;
+    if ((await tables.RepositoryState.read()) === null) return undefined;
     const decision = decideTopologyPreservingUpdate(
       change,
       await this.#loadStoredSpaceRowForCommit(tables, change.spaceId),
@@ -692,9 +693,12 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   async #loadMetaSpaceIdUnserialised(): Promise<UUID | undefined> {
-    const tables = this.#store.tables(this.#store.orm);
-    const state = await tables.RepositoryState.read();
+    const state = await this.#readMetaIdentityState();
     return state === null ? undefined : uuidSchema.parse(state.metaSpaceId);
+  }
+
+  #readMetaIdentityState(): Promise<{ readonly metaSpaceId: string } | null> {
+    return this.#store.tables(this.#store.orm).RepositoryState.read();
   }
 
   async #initializeUnserialised(input: AggregateInput): Promise<InitializeAggregateResult> {
