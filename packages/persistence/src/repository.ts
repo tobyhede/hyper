@@ -28,8 +28,10 @@ import type {
  * not name the identity of the error its own repository handed it.
  *
  * Every implementation of the seam raises it — the one SQL repository
- * (`SqlSpaceRepository`, ADR 0095) and the memory double alike — or a
- * memory-backed test proves nothing about the database.
+ * (`SqlSpaceRepository`, ADR 0095) and its memory double,
+ * `MemorySpaceRepository`, alike — or a memory-backed test proves nothing
+ * about the database. `MemorySpaceBackend` is not on this seam: it doubles the
+ * browser-side `SpaceBackend`, whose HTTP implementation never raises this.
  */
 export class AggregateInvariantError extends Error {}
 
