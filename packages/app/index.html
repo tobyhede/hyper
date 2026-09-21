@@ -6,7 +6,34 @@
     <title>Graph-Native Technical Presentations</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        The startup view, written out because the first wait happens before any
+        script exists to draw one: this is what fills the gap between first
+        paint and the bundle. React's `StartupPending` draws the same logo and
+        message and adds the spinner, and the first commit into `#root` removes
+        this. No spinner here, which would mean hand-rolled keyframes, and no
+        class names, the stylesheets not having arrived either.
+        `packages/app/test/startup-pending-parity.test.tsx` is what holds the
+        two copies to one logo, message and background.
+      -->
+      <div
+        style="
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 1rem;
+          background-color: #e5dbc7;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        "
+      >
+        <img src="/infinity-cube-logo.svg" alt="" width="96" />
+        <p style="margin: 0; font-size: 0.875rem; color: #57606d">Starting…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

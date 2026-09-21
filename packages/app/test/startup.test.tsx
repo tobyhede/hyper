@@ -91,6 +91,67 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   }
 });
 
+it('draws the starting view until the opening settles, then the opened Space', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
+  const spaces = createOpenSpaces({
+    backend,
+    metaSpaceId: SPACE_ID,
+    metaSpaceTitle: snapshot.document.title,
+    newId: () => RESOURCE_ID,
+    history: recordingHistory(),
+  });
+  const opened = await spaces.open(SPACE_ID);
+
+  // The crossing startup waits on, held open by the test so the frame before it
+  // settles is observable at all. Resolving it is what the second half asserts
+  // against, so the wait is a value here rather than a timer.
+  let settle = (): void => undefined;
+  const crossing = new Promise<void>((resolveCrossing) => {
+    settle = () => resolveCrossing();
+  });
+
+  try {
+    await act(() => {
+      root.render(
+        <Application
+          resolve={() =>
+            crossing.then(() => ({
+              kind: 'opened' as const,
+              opened,
+              spaces,
+            }))
+          }
+        />,
+      );
+      return Promise.resolve();
+    });
+
+    const starting = within(container).getByRole('status');
+    expect(starting).toHaveTextContent('Starting…');
+    // Decorative: the message is the accessible text, so the mark carries an
+    // empty `alt` and is read by its source rather than by a role.
+    const mark = starting.querySelector('img');
+    expect(mark?.getAttribute('src')).toBe('/infinity-cube-logo.svg');
+    expect(mark?.getAttribute('alt')).toBe('');
+    expect(container.querySelector('.react-flow')).not.toBeInTheDocument();
+
+    await act(async () => {
+      settle();
+      await crossing;
+    });
+
+    await waitFor(() => expect(container.querySelector('.react-flow')).toBeInTheDocument());
+    expect(within(container).getByTestId('space-title')).toHaveTextContent('Stored space');
+    expect(container).not.toHaveTextContent('Starting…');
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+  }
+});
+
 it('renders complete startup failure details instead of leaving an empty root', async () => {
   const container = document.createElement('div');
   document.body.append(container);

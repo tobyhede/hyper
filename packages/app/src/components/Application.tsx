@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { startApplication, type ApplicationStartupResolver } from '../startup';
+import { StartupPending } from './StartupPending';
 
 /**
  * One application lifetime over a startup resolver. Browser and catalogue hosts
@@ -29,7 +30,10 @@ export function Application({ resolve }: { readonly resolve: ApplicationStartupR
     };
     return { resolve: () => (pending ??= once()) };
   });
-  const [view, setView] = useState<ReactNode>(null);
+  // The startup view, until the resolver settles and startup renders over it.
+  // The served HTML draws the same logo and message, so the wait is continuous
+  // from first paint rather than blank on either side of the bundle arriving.
+  const [view, setView] = useState<ReactNode>(<StartupPending />);
   useEffect(() => {
     let mounted = true;
     void startApplication(

@@ -13,6 +13,32 @@ test(
 );
 
 test(
+  'starting story announces the wait once, under the product mark',
+  { tag: '@parity:operational-feedback-startup-pending' },
+  async ({ page }) => {
+    await page.goto('/?story=components--operational-feedback--starting&mode=preview');
+
+    const status = page.getByRole('status');
+    await expect(status).toHaveText('Starting…');
+    // One live region, and the mark inside it: decorative, so it carries an
+    // empty `alt` and adds nothing to what the region announces.
+    await expect(status).toHaveCount(1);
+    const mark = status.locator('img');
+    await expect(mark).toHaveAttribute('src', '/infinity-cube-logo.svg');
+    await expect(mark).toHaveAttribute('alt', '');
+    // The asset is really served, rather than a broken image drawn at the right
+    // address: a failed load leaves `naturalWidth` at 0.
+    await expect
+      .poll(() =>
+        mark.evaluate(
+          (image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+  },
+);
+
+test(
   'space app story announces the failure with its diagnostic detail reachable by keyboard',
   { tag: '@parity:operational-feedback-space-app-failure' },
   async ({ page }) => {

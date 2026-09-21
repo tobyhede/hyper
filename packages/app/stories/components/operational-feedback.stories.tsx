@@ -2,9 +2,13 @@ import type { Story } from '@ladle/react';
 import { PlacementFailure } from '#components/PlacementFailure';
 import { PlacementPending } from '#components/PlacementPending';
 import { StartupFailure } from '#components/StartupFailure';
+import { StartupPending } from '#components/StartupPending';
 import { SpaceAppFailureView } from '#components/SpaceAppFailureView';
 
 export default { title: 'Components/Operational Feedback' };
+
+/** What the whole app draws from first paint until the opened Space arrives. */
+export const Starting: Story = () => <StartupPending />;
 
 /** What the whole app renders when it cannot start at all. */
 export const Startup: Story = () => (
