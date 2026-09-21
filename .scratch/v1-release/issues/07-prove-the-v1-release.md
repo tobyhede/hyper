@@ -2,7 +2,26 @@
 
 Status: ready-for-agent
 Tags: release/v1
-Blocked by: 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`
+Blocked by: 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`;
+  `command-dock/28`; `database-persistence/26`; `database-persistence/31`;
+  `database-persistence/34`; `database-persistence/36`; `database-persistence/37`; `database-persistence/38`
+
+## Release-candidate architecture prerequisites — 2026-09-20
+
+The architecture-ticket audit adds eight existing tickets to `release/v1` at the
+user's request. Seven join this gate directly; `database-persistence/25` reaches
+it through `/26`. See the [audit record](../architecture-ticket-audit-2026-09-20.md)
+for checked evidence, remaining decisions and scope. They are final-candidate
+prerequisites, not retroactive blockers on the earlier End-to-end checkpoint.
+
+`needs-triage` and `needs-info` tickets require their recorded design or disposition
+before completion; release membership does not make them implementation-ready.
+In particular, ticket 34 permits a reasoned `wontfix` disposition rather than
+requiring removal of a working capability. `pnpm roadmap` derives the critical
+subgraph from the real dependencies; independent prerequisites may appear in its
+parallel section and still block this gate.
+
+## Proof
 
 **What to build:** Close every V1 Definition of Done line with executable evidence
 or an explicit deferred-scope link and apply ticket 14's complete, commit-specific
