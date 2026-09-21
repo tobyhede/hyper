@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-human — everything is built. The real-PostgreSQL misconfiguration proof is written (`test/integration/postgres-misconfiguration.test.ts`) but has not yet run against a real server: it runs in CI's `postgres` job. Tick the fourth criterion once that job is green on this branch (see _Resolution_).
+**Status:** resolved
 
 **Tags:** Defect
 
@@ -25,11 +25,11 @@ Delete the repository's positional transaction classifier and its private forwar
 - [x] Through the repository interface, a refused PostgreSQL connection raises PersistenceUnavailableError for listSpaces, loadSpace, loadMetaSpaceId and markExported, as well as transactional reads, commits and aggregate lifecycle operations. Preserve the original failure as cause.
 - [x] A commit that loses a revision race and then encounters an outage during its post-rollback reload is unavailable. Cover the corresponding Meta identity read used after an aggregate replacement conflict without nesting serialisation or reading through an aborted transaction.
 - [x] Store-interface tests cover normalised connection failures, normalised and raw unavailable SQLSTATEs, structured socket failures, wrapped causes and cyclic cause chains. Raw acquisition codes 53300 and 57P03 remain unavailable; 28P01, 28000 and 3D000, unrelated errors and unknown codes do not become unavailable.
-- [ ] Reproduce at least one real PostgreSQL misconfiguration, such as an incorrect password, and record the error shape reaching the repository. Verify it stays unclassified through a transactional operation as well as a direct read.
+- [x] Reproduce at least one real PostgreSQL misconfiguration, such as an incorrect password, and record the error shape reaching the repository. Verify it stays unclassified through a transactional operation as well as a direct read.
 - [x] SQLite operations after the underlying database is closed directly retain the unavailable outcome on transactional and direct paths. Existing BUSY/LOCKED behaviour remains covered, and unrelated plain errors stay unclassified.
 - [x] HTTP proves a recognised direct-read outage is 503 persistence-unavailable and an unclassified configuration failure is 500 internal-error. Startup tests prove configuration failures count toward the existing confirming-failure limit and terminate retries, while recognised outages keep the existing outage retry behaviour.
 - [x] Already classified broken stored state retains precedence; existing unavailable failures are not redundantly wrapped. Repository classification no longer inspects driver fields or infers availability from callback progress.
-- [ ] Update the existing unavailable-operation tests and explanatory comments to state the new rule, record any SQLite compatibility exception and the socket allowlist rationale, and pass the relevant repository, HTTP, startup and database integration checks plus normal verification.
+- [x] Update the existing unavailable-operation tests and explanatory comments to state the new rule, record any SQLite compatibility exception and the socket allowlist rationale, and pass the relevant repository, HTTP, startup and database integration checks plus normal verification.
 
 ## Resolution (2026-09-21, agent on branch `unavailable-arm`)
 
@@ -69,7 +69,7 @@ For each, on a fresh runtime per operation (a failed marker read is cached per r
 
 A third case runs `retryMetaSpaceEstablishment` over the wrong-password URL with the default marker. It expects start-up to give up after two waits (`5_000`, `10_000`), with both reported failures unclassified and carrying `28P01`. Its `wait` rejects after five calls, so a refusal read as an outage fails the case rather than retrying until the timeout.
 
-**Not yet observed against a real server.** Port 55432 was taken by another process on the machine this was written on, so PostgreSQL was not started, and nothing here has met a real SCRAM login yet. Each case was run through the refusing stand-in by pointing `DATABASE_URL` at it, once answering `28P01` and once `3D000`, and each was green. With the PostgreSQL store's `isUnavailable` forced to `true`, every case went red, the start-up case through its bounded `wait`. The first CI `postgres` run on this branch is the observation. If a real server's shape differs from the table, record what it produced here and correct the assertion to it; do not correct the classification. The fourth criterion is ticked only once that run is green.
+**Observed against a real server.** Port 55432 was taken on the machine this was written on, so the proof was first run through the refusing stand-in, once answering `28P01` and once `3D000`, and was green; with the PostgreSQL store's `isUnavailable` forced to `true`, every case went red, the start-up case through its bounded `wait`. CI run 35571560104 (`661ddfa4`) then ran `test/integration/postgres-misconfiguration.test.ts` in the `postgres` job against PostgreSQL 17 doing a real SCRAM login: all 9 cases passed, so a real server produces the shapes in the table above, and the rest of `test:integration:postgres` and every other CI job passed with it.
 
 ### Proofs
 
