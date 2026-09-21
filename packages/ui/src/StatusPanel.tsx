@@ -84,6 +84,15 @@ export function StatusFailure({
 export interface StatusBusyProps {
   readonly label: string;
   readonly className?: string;
+  /**
+   * Artwork drawn above the label, inside the same live region.
+   *
+   * Decorative by contract: the label is the accessible text, so a mark carries
+   * an empty `alt` and contributes nothing to what the region announces. Given
+   * none, the panel draws exactly the labelled row it always did — the column
+   * gap has one child to separate.
+   */
+  readonly mark?: ReactNode;
 }
 
 /**
@@ -93,12 +102,15 @@ export interface StatusBusyProps {
  * icon's own default `role="status"`/`aria-label="Loading"` would otherwise
  * duplicate it on a second, `aria-hidden` node, so both are cleared here.
  */
-export function StatusBusy({ label, className }: StatusBusyProps) {
+export function StatusBusy({ label, className, mark }: StatusBusyProps) {
   return (
     <Center className={className}>
-      <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner role={undefined} aria-label={undefined} aria-hidden="true" />
-        <span>{label}</span>
+      <div role="status" className="flex flex-col items-center gap-4 text-sm text-muted-foreground">
+        {mark}
+        <span className="flex items-center gap-2">
+          <Spinner role={undefined} aria-label={undefined} aria-hidden="true" />
+          <span>{label}</span>
+        </span>
       </div>
     </Center>
   );

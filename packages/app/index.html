@@ -6,7 +6,60 @@
     <title>Graph-Native Technical Presentations</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        The startup view, written out because the first wait happens before any
+        script exists to draw one: this is what fills the gap between first
+        paint and the bundle. React's `StartupPending` draws the same logo and
+        message and adds the spinner, and the first commit into `#root` removes
+        this. No spinner here, which would mean hand-rolled keyframes, and no
+        class names, the stylesheets not having arrived either.
+        `packages/app/test/startup-pending-parity.test.tsx` is what holds the
+        two copies to one logo, message and background, and to the three values
+        that make the handoff invisible: the mark's width, the column's gap and
+        the message's size. jsdom applies no Tailwind, so it resolves the React
+        copy's utilities through the theme rather than reading a computed style.
+      -->
+      <div
+        style="
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 1rem;
+          background-color: #e5dbc7;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        "
+      >
+        <img src="/infinity-cube-logo.svg" alt="" width="96" />
+        <p id="startup-message" style="margin: 0; font-size: 0.875rem; color: #57606d">Starting…</p>
+      </div>
+    </div>
+    <script>
+      /*
+        Only React's first commit into `#root` removes the startup view above, so
+        a module script that never evaluates would leave it claiming progress
+        that will never arrive. This corrects the claim. The message element's
+        absence is the guard: after that commit there is nothing left to correct.
+        Capture phase, because a script that fails to load fires `error` on the
+        element and that event does not bubble. The two targets are the whole of
+        what is owed a correction — an uncaught throw, and a script that never
+        arrived — so a served asset that fails leaves the wait honest.
+        `packages/app/e2e/startup-pending.spec.ts` holds both halves.
+      */
+      addEventListener(
+        'error',
+        (event) => {
+          const message = document.getElementById('startup-message');
+          if (message === null) return;
+          if (event.target !== window && !(event.target instanceof HTMLScriptElement)) return;
+          message.textContent = 'Application could not start. See the browser console.';
+        },
+        true,
+      );
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

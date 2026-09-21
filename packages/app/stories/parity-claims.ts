@@ -500,6 +500,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A narrow chrome keeps the choices in their own row above Back, guidance and Overview.',
   },
   {
+    id: 'operational-feedback-startup-pending',
+    storyFile: 'components/operational-feedback.stories.tsx',
+    storyExport: 'Starting',
+    claim:
+      'Startup draws the product mark over one announced “Starting…”, from first paint until the opened Space replaces it.',
+  },
+  {
     id: 'operational-feedback-startup-failure',
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Startup',

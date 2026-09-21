@@ -137,6 +137,22 @@ describe('StatusBusy', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Arranging…');
   });
 
+  it('draws an optional mark inside the one status region, beside the label', () => {
+    render(<StatusBusy label="Starting…" mark={<img src="/mark.svg" alt="" />} />);
+
+    const regions = screen.getAllByRole('status');
+    expect(regions).toHaveLength(1);
+    const status = regions[0];
+    expect(status).toHaveTextContent('Starting…');
+    expect(status?.querySelector('img')).toHaveAttribute('src', '/mark.svg');
+  });
+
+  it('draws no mark when the caller supplies none', () => {
+    const { container } = render(<StatusBusy label="Arranging…" />);
+
+    expect(container.querySelector('img')).toBeNull();
+  });
+
   it('does not give its decorative spinner its own competing status role', () => {
     const { container } = render(<StatusBusy label="Arranging…" />);
 
