@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import postgres from '@prisma-next/postgres/runtime';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   isDriverConnectionFailure,
   isUnavailableStatementFailure,
   UNAVAILABLE_SQLSTATES,
 } from '../../src/persistence/sql-store';
+import type { Contract } from '../../src/prisma/contract.d';
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 
 /**
  * What `@prisma-next/sql-errors`' `SqlConnectionError` carries, built by hand
@@ -131,5 +135,28 @@ describe('isUnavailableStatementFailure', () => {
     first.cause = second;
 
     expect(isUnavailableStatementFailure(first)).toBe(false);
+  });
+});
+
+/*
+ * Ticket 38. Each database's store answers whether a failure is evidence the
+ * database is unavailable, and the repository asks it rather than reading
+ * driver fields itself. `postgresSqlStore` is built over a runtime that is
+ * never connected: answering the predicate touches no database.
+ */
+describe('postgresSqlStore.isUnavailable', () => {
+  const store = postgresSqlStore(
+    postgres<Contract>({ contractJson, url: 'postgres://hyper:unused@127.0.0.1:1/hyper' }),
+  );
+
+  afterAll(async () => {
+    await store.close();
+  });
+
+  it.each([
+    ['a connection the server dropped', connectionError('Connection terminated', false)],
+    ['a refused connection the driver normalised', connectionError('connect ECONNREFUSED', false)],
+  ])('recognises %s whatever its transient flag says', (_label, error) => {
+    expect(store.isUnavailable(error)).toBe(true);
   });
 });

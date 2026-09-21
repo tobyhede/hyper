@@ -264,6 +264,12 @@ export interface SqlTables<Order> {
  *   the ORM boundary for a root read, not a nested `include`.
  * - `isDuplicateKey(error, table)` — recognises a primary-key collision, the
  *   one error the two databases raise differently under a losing insert.
+ * - `isUnavailable(error)` — whether a failure carries evidence that the
+ *   database is not answering for now (ticket 38). Each database owns the
+ *   knowledge of what its driver raises; `SqlSpaceRepository` asks this for a
+ *   failure nothing else has named, and wraps a `true` answer in
+ *   `PersistenceUnavailableError`. `false` means no such evidence, not that
+ *   the failure is permanent, and `true` does not make retrying a write safe.
  * - `serialise` — PostgreSQL runs the operation directly; SQLite queues it
  *   per file handle (`src/sqlite/serialise.ts`), because the driver opens a
  *   connection per operation and the file has one writer.
@@ -280,6 +286,7 @@ export interface SqlStore<Handle, Order> {
   readonly transaction: <T>(fn: (orm: Handle) => Promise<T>) => Promise<T>;
   readonly readDocument: (value: unknown) => unknown;
   readonly isDuplicateKey: (error: unknown, table: string) => boolean;
+  readonly isUnavailable: (error: unknown) => boolean;
   readonly serialise: <T>(operation: () => Promise<T>) => Promise<T>;
   readonly close: () => Promise<void>;
 }

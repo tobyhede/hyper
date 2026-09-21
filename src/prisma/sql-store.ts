@@ -5,6 +5,8 @@ import {
   buildSpaceTable,
   buildResourceTable,
   defineSqlStore,
+  isDriverConnectionFailure,
+  isUnavailableStatementFailure,
   type Orderable,
 } from '../persistence/sql-store';
 import type { PostgresDatabase } from './db';
@@ -116,6 +118,9 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
     },
     isDuplicateKey(error: unknown, table: string): boolean {
       return isPrimaryKeyConflict(error, table);
+    },
+    isUnavailable(error: unknown): boolean {
+      return isDriverConnectionFailure(error) || isUnavailableStatementFailure(error);
     },
     serialise<T>(operation: () => Promise<T>): Promise<T> {
       return operation();

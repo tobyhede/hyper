@@ -5,6 +5,7 @@ import {
   buildSpaceTable,
   buildResourceTable,
   defineSqlStore,
+  isDriverConnectionFailure,
   type Orderable,
 } from '../persistence/sql-store';
 import type { SqliteDatabase } from './db';
@@ -218,6 +219,9 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
     readDocument,
     isDuplicateKey(error: unknown, table: string): boolean {
       return isUniqueViolation(error, table);
+    },
+    isUnavailable(error: unknown): boolean {
+      return isDriverConnectionFailure(error);
     },
     serialise<T>(operation: () => Promise<T>): Promise<T> {
       return serialiseSqlite(database, operation);
