@@ -1,6 +1,6 @@
 # 32 — `#loadStoredSpaceRow` parses a stored row twice
 
-Status: ready-for-agent
+Status: resolved
 Tags: Defect
 Blocked by: None.
 
@@ -47,7 +47,7 @@ Left unfixed on the one-SQL-repository branch's review pass: it predates the bra
 ## Acceptance (draft, for whoever picks this up)
 
 - [x] Decide whether `#loadStoredSpaceRow` should stop pre-parsing with `spaceDocumentSchema`/`resourceDocumentSchema` and rely on `parseSnapshot`/`loadSpaceSnapshot` alone.
-- [ ] If so, remove the pre-parse, confirm no caller depended on the narrower failure mode the direct `.parse()` calls produced, and run `pnpm verify`, `pnpm test:integration:sqlite`, `pnpm test:integration:postgres`.
+- [x] If so, remove the pre-parse, confirm no caller depended on the narrower failure mode the direct `.parse()` calls produced, and run `pnpm verify`, `pnpm test:integration:sqlite`, `pnpm test:integration:postgres`. Run by CI on PR #259 (run 35562558942, head `a77bc662`): `static-checks`, `coverage`, `sqlite` and `postgres` all green.
 - [x] ~~If not~~ — not applicable: the pre-parse is removed (see Answer). (e.g. the pre-parse is found to serve a purpose beyond validation, such as narrowing `unknown` for a type downstream needs), record why here instead.
 
 ## Answer
