@@ -616,6 +616,69 @@ export const isDriverConnectionFailure = (cause: unknown): boolean => {
   return false;
 };
 
+/**
+ * The SQLSTATEs a statement can fail with that mean the database is contended
+ * or not answering rather than that the request or the code is wrong: a later
+ * attempt of the same request is the cure. The one place the set is kept;
+ * ticket 31's `## Answer` (amendment) records why each is in and why its
+ * neighbours are not.
+ *
+ * - `08000`, `08001`, `08003`, `08004`, `08006` — connection exceptions.
+ *   `08P01` (protocol violation) is left out: it is a client or server defect.
+ * - `40001` serialization failure and `40P01` deadlock detected — the database
+ *   aborted this transaction so another could proceed.
+ * - `53300` too many connections.
+ * - `55P03` lock not available.
+ * - `57P01` admin shutdown, `57P02` crash shutdown, `57P03` cannot connect now.
+ *   `57014` (query cancelled) is left out: a cancel can be deliberate.
+ *
+ * All are PostgreSQL's. `@prisma-next/driver-sqlite` maps its own failures
+ * onto `23xxx` or `HY000` and raises BUSY and LOCKED as `SqlConnectionError`,
+ * so none of these arrives from SQLite.
+ */
+export const UNAVAILABLE_SQLSTATES = [
+  '08000',
+  '08001',
+  '08003',
+  '08004',
+  '08006',
+  '40001',
+  '40P01',
+  '53300',
+  '55P03',
+  '57P01',
+  '57P02',
+  '57P03',
+] as const;
+
+/**
+ * Whether a failure carries, anywhere on its cause chain, the driver's own
+ * `SqlQueryError` with a SQLSTATE in {@link UNAVAILABLE_SQLSTATES}.
+ * `@prisma-next/driver-postgres`' `normalizePgError` turns every error
+ * carrying a SQLSTATE into that type, so contention and shutdown arrive as a
+ * query error, not the `SqlConnectionError` {@link isDriverConnectionFailure}
+ * reads. `SqlSpaceRepository` names it `PersistenceUnavailableError`.
+ *
+ * Read by the own `kind` field `SqlQueryError.is` reads and the structured
+ * `sqlState` it carries, never by message, for the reason
+ * `isDriverConnectionFailure` gives. The same bounded walk, because a
+ * deadlock or serialization failure at COMMIT reaches the repository wrapped.
+ * `test/unit/sql-connection-failure.test.ts` holds each of these.
+ */
+export const isUnavailableStatementFailure = (cause: unknown): boolean => {
+  const seen = new Set<unknown>();
+  let current = cause;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if ('kind' in current && current.kind === 'sql_query' && 'sqlState' in current) {
+      const { sqlState } = current;
+      if (UNAVAILABLE_SQLSTATES.some((code) => code === sqlState)) return true;
+    }
+    current = current.cause;
+  }
+  return false;
+};
+
 export const asOrderable = <Order>(space: Orderable<Order>): Orderable<Order> => space;
 
 /**

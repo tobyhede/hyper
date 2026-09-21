@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isDriverConnectionFailure } from '../../src/persistence/sql-store';
+import {
+  isDriverConnectionFailure,
+  isUnavailableStatementFailure,
+  UNAVAILABLE_SQLSTATES,
+} from '../../src/persistence/sql-store';
 
 /**
  * What `@prisma-next/sql-errors`' `SqlConnectionError` carries, built by hand
@@ -8,6 +12,15 @@ import { isDriverConnectionFailure } from '../../src/persistence/sql-store';
  */
 const connectionError = (message: string, transient: boolean): Error =>
   Object.assign(new Error(message), { kind: 'sql_connection', transient });
+
+/**
+ * What `@prisma-next/sql-errors`' `SqlQueryError` carries: every SQLSTATE
+ * failure `@prisma-next/driver-postgres`' `normalizePgError` sees becomes one,
+ * with the code on `sqlState`, and SQLite's normaliser maps its own codes onto
+ * the same field.
+ */
+const queryError = (message: string, sqlState: string): Error =>
+  Object.assign(new Error(message), { kind: 'sql_query', sqlState });
 
 /*
  * Ticket 31. Both drivers normalise a failed statement's connection trouble to
@@ -53,5 +66,70 @@ describe('isDriverConnectionFailure', () => {
     first.cause = second;
 
     expect(isDriverConnectionFailure(first)).toBe(false);
+  });
+});
+
+/*
+ * Ticket 31, amended. A PostgreSQL statement that fails for contention or an
+ * outage reaches the repository as `SqlQueryError`, not `SqlConnectionError`,
+ * because the driver turns every SQLSTATE failure into the former. These are
+ * the database choosing a victim, refusing to wait, or not being up yet —
+ * conditions a later attempt is exactly the answer to — so they are named
+ * unavailable by the structured `sqlState` field, never by message.
+ */
+describe('isUnavailableStatementFailure', () => {
+  it.each(UNAVAILABLE_SQLSTATES)('recognises SQLSTATE %s', (sqlState) => {
+    expect(isUnavailableStatementFailure(queryError('failed', sqlState))).toBe(true);
+  });
+
+  it('names the set the amendment records', () => {
+    expect([...UNAVAILABLE_SQLSTATES].sort()).toEqual(
+      [
+        '08000',
+        '08001',
+        '08003',
+        '08004',
+        '08006',
+        '40001',
+        '40P01',
+        '53300',
+        '55P03',
+        '57P01',
+        '57P02',
+        '57P03',
+      ].sort(),
+    );
+  });
+
+  // A deadlock or serialization failure at COMMIT reaches the repository
+  // wrapped, with the statement's own error only on `.cause`.
+  it('walks the cause chain the runtime wraps a failed COMMIT in', () => {
+    const wrapped = new Error('Transaction commit failed', {
+      cause: queryError('could not serialize access', '40001'),
+    });
+
+    expect(isUnavailableStatementFailure(wrapped)).toBe(true);
+  });
+
+  it('refuses a defect, a message that merely names a code, and a connection failure', () => {
+    // Unique violation, SQLite's catch-all, and a cancelled statement.
+    expect(isUnavailableStatementFailure(queryError('duplicate key', '23505'))).toBe(false);
+    expect(isUnavailableStatementFailure(queryError('no such table', 'HY000'))).toBe(false);
+    expect(isUnavailableStatementFailure(queryError('canceling statement', '57014'))).toBe(false);
+    // The code on something the driver did not normalise, and in prose.
+    expect(
+      isUnavailableStatementFailure(Object.assign(new Error('deadlock'), { sqlState: '40P01' })),
+    ).toBe(false);
+    expect(isUnavailableStatementFailure(new Error('deadlock detected (40P01)'))).toBe(false);
+    expect(isUnavailableStatementFailure(connectionError('database is locked', true))).toBe(false);
+    expect(isUnavailableStatementFailure(undefined)).toBe(false);
+  });
+
+  it('terminates on a cyclic cause chain', () => {
+    const first = new Error('first');
+    const second = new Error('second', { cause: first });
+    first.cause = second;
+
+    expect(isUnavailableStatementFailure(first)).toBe(false);
   });
 });

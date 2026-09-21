@@ -1,9 +1,16 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { AggregateInvariantError, PersistenceUnavailableError } from '@project/persistence';
+import {
+  AggregateInvariantError,
+  classifyStoredFailure,
+  PersistenceUnavailableError,
+} from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SqlTables } from '../../src/persistence/sql-store';
+import type { SqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
+import { retryMetaSpaceEstablishment } from '../../src/startup/database-startup';
 import { captureError } from '../support/capture-error';
 import { spaceRepositoryContract } from '../support/repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
@@ -117,6 +124,8 @@ const retitled = (snapshot: SpaceSnapshot, title: string): SpaceSnapshot => ({
   ...snapshot,
   document: { ...snapshot.document, title },
 });
+
+type RepositoryStateTable = SqlTables<unknown>['RepositoryState'];
 
 const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: bigint | null) => ({
   snapshot,
@@ -483,6 +492,121 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     );
     expect(initializing).toBeInstanceOf(PersistenceUnavailableError);
     expect(initializing?.cause).toMatchObject({ message: 'SQLite client is closed' });
+  });
+
+  /**
+   * The harness's own store, with one `RepositoryState` member replaced. Both
+   * stand-ins below reach the repository exactly where the real member's
+   * result would, inside the transaction, after its callback has run -- so
+   * what they exercise is the naming of a failure *past* `#transaction`'s
+   * position rule, which is the only place these two defects live.
+   */
+  const withRepositoryState = (
+    database: SqliteDatabase,
+    replace: (state: RepositoryStateTable) => RepositoryStateTable,
+  ) => {
+    const store = sqliteSqlStore(database);
+    const tables: typeof store.tables = (handle) => {
+      const real = store.tables(handle);
+      return { ...real, RepositoryState: replace(real.RepositoryState) };
+    };
+    return new SqlSpaceRepository({ ...store, tables });
+  };
+
+  /**
+   * What `@prisma-next/driver-postgres`' `normalizePgError` makes of a
+   * statement PostgreSQL failed with a SQLSTATE: `@prisma-next/sql-errors`'
+   * `SqlQueryError`, the code on `sqlState`. Built by hand because that
+   * package is the driver's dependency, not this repository's; SQLite never
+   * raises one of these codes, which is why a SQLite file stands in for the
+   * database here and only the failure is PostgreSQL's.
+   */
+  const queryError = (sqlState: string): Error =>
+    Object.assign(new Error(`statement failed with ${sqlState}`), {
+      kind: 'sql_query',
+      sqlState,
+    });
+
+  // Ticket 31, amended. A deadlock victim is contention, not a defect: the
+  // database chose this transaction to abort so the other could proceed, and
+  // the same request is expected to succeed on a later attempt.
+  it('names a statement PostgreSQL aborted for contention unavailable', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const deadlock = queryError('40P01');
+    const deadlocked = withRepositoryState(database, (state) => ({
+      ...state,
+      read: () => Promise.reject(deadlock),
+    }));
+
+    const error = await captureError(() => deadlocked.loadAggregate());
+
+    expect(error).toBeInstanceOf(PersistenceUnavailableError);
+    expect(error?.cause).toBe(deadlock);
+  });
+
+  it('leaves a statement failure that is a defect unclassified', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const duplicate = queryError('23505');
+    const failing = withRepositoryState(database, (state) => ({
+      ...state,
+      read: () => Promise.reject(duplicate),
+    }));
+
+    expect(classifyStoredFailure(await captureError(() => failing.loadAggregate()))).toBe(
+      'unclassified',
+    );
+  });
+
+  // Before the amendment the deadlock was unclassified, and two in a row made
+  // start-up give up for good on what a third attempt cures.
+  it('keeps start-up trying through contention', async () => {
+    const { database } = await opened();
+    let reads = 0;
+    const contended = withRepositoryState(database, (state) => ({
+      ...state,
+      read: () => {
+        reads += 1;
+        return reads <= 3 ? Promise.reject(queryError('40001')) : state.read();
+      },
+    }));
+    const ids = [SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      contended,
+      () => {
+        const id = ids.shift();
+        if (id === undefined) throw new Error('Establishment minted more ids than it names');
+        return id;
+      },
+      { wait: () => Promise.resolve(), report: () => undefined },
+    );
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+  });
+
+  // A concurrent replacement deleting and rewriting the singleton row between
+  // the read and the relock, twice running, is a race that has passed by the
+  // next attempt -- not stored state that is broken, and not a defect.
+  it('names a Meta identity that keeps moving while it is locked unavailable', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const racing = withRepositoryState(database, (state) => ({
+      ...state,
+      relock: () => Promise.resolve(false),
+    }));
+
+    await expect(racing.loadAggregate()).rejects.toBeInstanceOf(PersistenceUnavailableError);
   });
 
   /*

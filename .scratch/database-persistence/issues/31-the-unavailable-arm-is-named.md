@@ -61,6 +61,24 @@ What stays unclassified: a PostgreSQL non-transactional read (`listSpaces`, `loa
 
 `test/e2e/` checked: both restart proofs drive a happy-path edit and reload through the application surface, and nothing here changes the chrome or a successful response. `sqlite-contention.test.ts` is unchanged and green.
 
+**Amendment, 2026-09-21 — contention and shutdown are unavailable too.** A code review of this Answer found two failures it had left unclassified that are neither defects nor broken state, so both answered 500 and counted toward start-up giving up, where before this ticket they had answered 503.
+
+- **PostgreSQL SQLSTATE failures that mean "not now".** `@prisma-next/driver-postgres`' `normalizePgError` turns *every* error carrying a SQLSTATE into `SqlQueryError` (`kind: 'sql_query'`, the code on `sqlState`), including the ones that are contention or an outage, so `isDriverConnectionFailure` never sees them. They are now named by that structured field, walking the cause chain the same way, never by message: `isUnavailableStatementFailure` over `UNAVAILABLE_SQLSTATES`, the one place the set is kept (`src/persistence/sql-store.ts`), applied by `#naming` beside the connection predicate. The set:
+  - `08000`, `08001`, `08003`, `08004`, `08006` — connection exceptions. `08P01` (protocol violation) is left out as a client or server defect.
+  - `40001` serialization failure, `40P01` deadlock detected — the database aborted this transaction so another could proceed; the same request is expected to succeed later.
+  - `53300` too many connections.
+  - `55P03` lock not available.
+  - `57P01` admin shutdown, `57P02` crash shutdown, `57P03` cannot connect now. `57014` (query cancelled) is left out: a cancel can be deliberate, and a statement timeout is a configuration question.
+
+  None collides with SQLite: `@prisma-next/driver-sqlite` maps its failures onto `23xxx` or `HY000` and raises BUSY and LOCKED as `SqlConnectionError`. `test/unit/sql-connection-failure.test.ts` holds the predicate (each code, the COMMIT wrapper, and a `23505`, an `HY000`, a `57014`, an un-normalised error carrying `sqlState`, and prose naming a code all refused); `sqlite-space-repository.test.ts` holds the repository naming a `40P01` unavailable, leaving a `23505` unclassified, and start-up establishing through three `40001`s in a row where it used to give up after two.
+- **`#lockMetaIdentity` giving up.** When a concurrent replacement moves the singleton row under both attempts, it threw a plain `Error`. That is a race that has passed by the next attempt, so it now raises `PersistenceUnavailableError` (`sqlite-space-repository.test.ts`, "names a Meta identity that keeps moving while it is locked unavailable").
+
+`PersistenceUnavailableError`'s doc comment said it covered "contention it gave up waiting on", which was true only of SQLite's BUSY as this Answer first stood; it now lists what the repository actually raises it for.
+
+**Sorting `#commitInTransaction`'s updates by id was considered and not done.** The review's concrete trigger was two concurrent commits updating A,B and B,A deadlocking. Read, not reproduced: a complete-aggregate commit takes the singleton row's write lock (`RepositoryState.relock`, an `UPDATE`) in `#lockMetaIdentity` before it writes any Space, so two such commits queue on that row rather than interleaving; with no Meta row there is nothing to lock, but `decideCommit` then rejects the write ("The repository has no Meta Space") before any row is touched; and the fast path writes exactly one Space. So that interleaving cannot form between two commits as the code stands, and reordering the write loop would change the order `ResourceOwnershipError` is met in for no demonstrated cure. A deadlock that does occur is now `unavailable` either way.
+
+The misconfiguration that `#transaction`'s by-position rule also names unavailable is ticket 36; the cached contract-marker failure under "Found on the way" is ticket 37.
+
 ## Comments
 
 **Audit, 2026-09-21.** Read against `d456b00c`.

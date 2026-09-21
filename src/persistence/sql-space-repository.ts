@@ -27,6 +27,7 @@ import type {
 } from './space-repository';
 import {
   isDriverConnectionFailure,
+  isUnavailableStatementFailure,
   type SqlLoadedSpaceRow,
   type SqlStore,
   type SqlTables,
@@ -226,8 +227,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
 
   /**
    * Every public operation, naming the driver's own connection failure
-   * (`isDriverConnectionFailure`) `PersistenceUnavailableError` on its way
-   * out (ticket 31), so a reader asks one predicate rather than re-deriving
+   * (`isDriverConnectionFailure`), and a statement it failed for contention
+   * or shutdown (`isUnavailableStatementFailure`), `PersistenceUnavailableError`
+   * on its way out (ticket 31), so a reader asks one predicate rather than re-deriving
    * "unreachable" from a failure being something else. A failure already
    * named -- broken stored state, or a transaction `#transaction` saw never
    * open -- keeps its name; broken stored state wins, as
@@ -239,8 +241,17 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     try {
       return await operation();
     } catch (error) {
-      if (classifyStoredFailure(error) === 'unclassified' && isDriverConnectionFailure(error)) {
-        throw new PersistenceUnavailableError('The database connection failed', { cause: error });
+      if (classifyStoredFailure(error) === 'unclassified') {
+        if (isDriverConnectionFailure(error)) {
+          throw new PersistenceUnavailableError('The database connection failed', {
+            cause: error,
+          });
+        }
+        if (isUnavailableStatementFailure(error)) {
+          throw new PersistenceUnavailableError('The database refused the statement for now', {
+            cause: error,
+          });
+        }
       }
       throw error;
     }
@@ -646,6 +657,12 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * recursion on a boolean retry flag, so the "one retry, then give up" shape
    * reads directly off the loop bound instead of off an argument only this
    * method's own second call site ever passes.
+   *
+   * Giving up is `PersistenceUnavailableError`: a row that moved under both
+   * attempts is replacements racing this transaction, which a later attempt
+   * is expected to get past -- not stored state that is broken, and not a
+   * defect (`sqlite-space-repository.test.ts`, "names a Meta identity that
+   * keeps moving while it is locked unavailable").
    */
   async #lockMetaIdentity(tables: SqlTables<Order>): Promise<UUID | undefined> {
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -655,7 +672,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       const stillPresent = await tables.RepositoryState.relock(metaSpaceId);
       if (stillPresent) return metaSpaceId;
     }
-    throw new Error('Repository state disappeared while locking it');
+    throw new PersistenceUnavailableError('Repository state disappeared while locking it');
   }
 
   /**
