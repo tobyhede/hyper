@@ -102,8 +102,23 @@ already owned and this box was a weaker duplicate of it.
 Guarding `PRE_REWRITES` behind a one-shot was considered and rejected: it makes
 a pure reviewable text transform stateful, moves the correctness into a marker
 whose staleness reintroduces this defect silently, and buys nothing for a
-spent one-shot script. If the script is ever wanted re-runnable, the honest fix
-is to scope the two `*Resource → *Endpoint` entries to the one HTTP test file
-they exist for — the tree-wide `SpaceResourceRepository → StoredSpaceRepository`
-entry is already idempotent, since the sweep never mints its input — which buys
-idempotency with no state at all.
+spent one-shot script. The honest fix is to scope the two `*Resource →
+*Endpoint` entries to the one HTTP test file they exist for — the tree-wide
+`SpaceResourceRepository → StoredSpaceRepository` entry is already idempotent,
+since the sweep never mints its input — which buys idempotency with no state at
+all. **That is now built**: both rules carry a `files` scope and `rewrite`
+honours it.
+
+**Why the dry run reported a clean tree.** `SWEEPABLE` is built from `RETIRED`
+plus the `PRE_REWRITES` keys, and a rule that has consumed its own output leaves
+none of those keys anywhere. So the finished-state dry run this ticket's Answer
+cites as proof of a clean sweep reported zero files *because of* the defect, not
+despite it. No gate derived from the rule keys can catch this, which is the
+general shape worth remembering: a content check built from the transform's own
+vocabulary goes blind exactly where the transform has eaten itself.
+
+What replaces it is a check that does not read the keys at all — the script now
+re-runs `rewrite` over its own output and exits non-zero naming every file a
+second pass would change again. That is a property of the transform rather than
+of the tree, so it holds for any future rule, including one nobody thought to
+scope.

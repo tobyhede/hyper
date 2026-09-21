@@ -14,6 +14,15 @@ export default class M extends Migration<Start, End> {
    * no table-rename operation, so the generated plan drops `things` and creates
    * an empty `resources` table without copying the stored Resource documents.
    *
+   * **The loss is wider than this table, and a reset is the only answer that
+   * fully works.** `spaces` is untouched here, so every surviving row's
+   * `document` still carries the retired `diagrams` and `defaultDiagram` keys.
+   * `spaceFileSchema` is a `z.strictObject`, so those rows now fail intake on
+   * unrecognized keys rather than loading — a developer who migrates without
+   * exporting first is left with unreadable Spaces, not the empty database this
+   * table's loss alone would suggest. No migration rewrites `spaces.document`,
+   * because ADR 0056 makes a reset the supported answer.
+   *
    * This loss is accepted because ADR 0056 makes every database derived and
    * resettable. A developer whose local content matters must export it first
    * with `pnpm hyper export <dir>`, run the migration, then import it again with
