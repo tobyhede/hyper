@@ -418,7 +418,6 @@ export const OpenReference: Story = () => {
         resourceId={resourceIds.openingReference}
         expanded={open}
         onOpenChange={changeOpen}
-        resourceEditingEnabled
         body={'## Strategies\n\nNo strategy is privileged.'}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"

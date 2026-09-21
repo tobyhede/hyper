@@ -23,8 +23,6 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 export type CanvasResourceDataPatch = Partial<
   Pick<
     ResourceNodeData,
-    | 'titleEditingEnabled'
-    | 'resourceEditingEnabled'
     | 'onEditResource'
     | 'onBeginTitleEditing'
     | 'resize'
@@ -143,19 +141,10 @@ export function decorateSharedResourceNode(
   const patch: Mutable<
     Pick<
       ResourceNodeData,
-      | 'titleEditingEnabled'
-      | 'resourceEditingEnabled'
-      | 'onEditResource'
-      | 'onBeginTitleEditing'
-      | 'resize'
-      | 'titleEditor'
-      | 'entityActions'
+      'onEditResource' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
     >
   > = {};
-  patch.titleEditingEnabled =
-    resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing;
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
-    patch.resourceEditingEnabled = true;
     patch.onEditResource = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   }

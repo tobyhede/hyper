@@ -232,7 +232,7 @@ describe('canvas Resource authoring', () => {
     // caret or the editor that would let it author the Target's content.
     const reference = onlyNode(result.current.nodes);
     expect(reference.data.onEditResource).toBeDefined();
-    expect(reference.data.titleEditingEnabled).toBe(true);
+    expect(reference.data.onBeginTitleEditing).toBeDefined();
     expect(reference.data.onBeginBodyEditing).toBeUndefined();
     expect(reference.data.bodyEditor).toBeUndefined();
   });
@@ -329,7 +329,6 @@ describe('canvas Resource authoring', () => {
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
 
     const editing = onlyNode(result.current.nodes);
-    expect(editing.data.titleEditingEnabled).toBe(false);
     expect(editing.data.onBeginTitleEditing).toBeUndefined();
     expect(editing.data.onBeginBodyEditing).toBeUndefined();
   });
@@ -445,8 +444,6 @@ describe('canvas Resource authoring', () => {
       act(() => result.current.beginTitleEditing(MISSING_RESOURCE_ID));
 
       const missing = onlyNode(result.current.nodes);
-      expect(missing.data.titleEditingEnabled).toBe(false);
-      expect(missing.data.resourceEditingEnabled).toBeUndefined();
       expect(missing.data.onEditResource).toBeUndefined();
       expect(missing.data.onBeginTitleEditing).toBeUndefined();
       expect(missing.data.onBeginBodyEditing).toBeUndefined();
@@ -458,13 +455,12 @@ describe('canvas Resource authoring', () => {
 
   it('withdraws authoring when the working Space changes without a projection render', () => {
     const { result, spaceSession } = mountAuthoring();
-    expect(onlyNode(result.current.nodes).data.resourceEditingEnabled).toBe(true);
+    expect(onlyNode(result.current.nodes).data.onEditResource).toBeDefined();
 
     act(() => spaceSession.submit(snapshotWithoutResource));
 
     const staleProjection = onlyNode(result.current.nodes);
-    expect(staleProjection.data.titleEditingEnabled).toBe(false);
-    expect(staleProjection.data.resourceEditingEnabled).toBeUndefined();
+    expect(staleProjection.data.onEditResource).toBeUndefined();
     expect(staleProjection.data.onBeginTitleEditing).toBeUndefined();
   });
 

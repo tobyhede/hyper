@@ -152,7 +152,7 @@ export function ResourceNode({
   );
 
   const markdownOperations: MarkdownOperations = {};
-  if (data.resourceEditingEnabled === true && data.onEditResource !== undefined) {
+  if (data.onEditResource !== undefined) {
     markdownOperations.onOpenChange = data.onEditResource;
   }
   if (data.onBeginBodyEditing !== undefined) {
@@ -183,7 +183,7 @@ export function ResourceNode({
         : { kind: 'markdown', source: data.body ?? '' },
     open: data.expanded === true,
   };
-  if (data.resourceEditingEnabled === true && data.onEditResource !== undefined) {
+  if (data.onEditResource !== undefined) {
     referenceFront.onOpenChange = data.onEditResource;
   }
   // A Space Resource's own front carries nothing it authors of the target: its
@@ -193,7 +193,7 @@ export function ResourceNode({
     kind: 'space',
     open: data.expanded === true,
   };
-  if (data.resourceEditingEnabled === true && data.onEditResource !== undefined) {
+  if (data.onEditResource !== undefined) {
     spaceFront.onOpenChange = data.onEditResource;
   }
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
@@ -258,14 +258,11 @@ export function ResourceNode({
   );
 
   /*
-   * A control reaches the Resource only when the composition both offered it and
-   * said how it is performed. The flag and the operation answer different
-   * questions — whether this Resource takes part at all, and what happens when the
-   * control is used — and `SpaceCanvas` supplies them together, but the type
-   * lets them diverge. Taking the flag alone put a live control on the Resource
-   * whose activation ran nothing; forwarding the operation with `?.` made the
-   * miss silent. `CanvasResource` draws no control it has no operation for, so
-   * withholding it here is the same answer one layer up.
+   * A control reaches the Resource only when the composition supplied the
+   * operation that performs it. Presence is the capability — there is no
+   * separate flag left to disagree with it — so `CanvasResource` draws no
+   * control it has no operation for, and withholding it here is the same
+   * answer one layer up.
    */
   const canvasResourceOptionalProps: Mutable<
     Pick<
@@ -280,11 +277,7 @@ export function ResourceNode({
   if (reportBodyHeight !== undefined) {
     canvasResourceOptionalProps.onBodyHeightChange = onBodyHeightChange;
   }
-  if (
-    data.bodyEditor === undefined &&
-    data.titleEditingEnabled === true &&
-    data.onBeginTitleEditing !== undefined
-  ) {
+  if (data.onBeginTitleEditing !== undefined) {
     canvasResourceOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
   }
   /*
@@ -302,8 +295,7 @@ export function ResourceNode({
   /* The editor's presence is the editing state, and it arrives with the two
      operations that end it — so nothing here has to stand in for a completion
      the composition did not supply. */
-  const titleEditor =
-    !data.readOnly && data.bodyEditor === undefined ? data.titleEditor : undefined;
+  const titleEditor = !data.readOnly ? data.titleEditor : undefined;
 
   /*
    * What an open Resource draws below its title (ADR 0064).
