@@ -12,6 +12,13 @@ import type { ProductRequestResolver, ProductResponse } from '../http/src/index'
 
 interface FetchApplication extends ProductRequestResolver {
   fetch(request: Request, env?: unknown): Response | Promise<Response>;
+  /** Releases what the runtime opened; a runtime that opens nothing has none. */
+  close?(): Promise<void>;
+}
+
+/** The one member of Vite's development and preview `httpServer` this host reads. */
+interface ClosingServer {
+  once(event: 'close', listener: () => void): unknown;
 }
 
 interface SpaceHttpRuntime {
@@ -87,6 +94,7 @@ const installMiddleware = (
   runtime: Promise<unknown>,
   modulePath: string,
   runtimeOptions: unknown,
+  httpServer: ClosingServer | null,
 ): void => {
   const host = runtime.then(async (loaded) => {
     const created = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
@@ -118,6 +126,23 @@ const installMiddleware = (
   // and takes the server down with it. Marking it handled costs nothing: the
   // same settled promise still delivers the real error to `next` per request.
   host.catch(() => undefined);
+  // Vite restarts a development host in-process — editing a config file is
+  // enough — and builds the replacement server, which runs `configureServer`
+  // and opens a second runtime, before it closes this one. So the runtime is
+  // released when this host's Node server closes, on restart and on shutdown
+  // alike. Vite does not await the listener, so a failure to close is reported
+  // here rather than thrown into its shutdown; a runtime that never loaded has
+  // nothing to release, and its failure is already `next`'s to report.
+  httpServer?.once('close', () => {
+    void host
+      .then(
+        ({ created }) => created.close?.(),
+        () => undefined,
+      )
+      .catch((error: unknown) => {
+        console.error('Failed to close the Space HTTP runtime', error);
+      });
+  });
   register((request, response, next) => {
     if (isApiRequest(request)) {
       void host.then(({ handle }) => handle(request, response)).catch(next);
@@ -158,6 +183,7 @@ export function spaceHttpPlugin(options: SpaceHttpPluginOptions): Plugin {
         server.ssrLoadModule(options.developmentModule),
         options.developmentModule,
         options.runtimeOptions,
+        server.httpServer,
       );
     },
     configurePreviewServer(server) {
@@ -167,6 +193,7 @@ export function spaceHttpPlugin(options: SpaceHttpPluginOptions): Plugin {
         load(options.previewModule),
         options.previewModule,
         options.runtimeOptions,
+        server.httpServer,
       );
     },
   };

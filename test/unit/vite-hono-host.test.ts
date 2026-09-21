@@ -19,6 +19,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
+import type { DatabaseTarget } from '../../src/database/database-target';
+import { createDatabaseHttpApp } from '../../src/http/database-http-runtime';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -89,25 +91,14 @@ const startHost = async (
         ? Promise.resolve({ createApp })
         : Promise.reject(new Error(`Unexpected preview module ${modulePath}`)),
   });
-  const configure = hook === 'preview' ? plugin.configurePreviewServer : plugin.configureServer;
-  if (typeof configure !== 'function') throw new Error(`Expected ${hook} hook`);
-  // SAFETY: `this` is unused by either hook's implementation, and the fake
-  // server exposes exactly the members `configureServer`/`configurePreviewServer`
-  // read (`ssrLoadModule`, `middlewares.use`) — not Vite's full server interface.
-  void configure.call(
-    {} as never,
-    {
-      ssrLoadModule: () => Promise.resolve({ createApp }),
-      middlewares: { use: (installed: Middleware) => (middleware = installed) },
-    } as never,
-  );
-  if (middleware === undefined) throw new Error('Expected HTTP middleware');
-
-  const installed = middleware;
   const connections: IncomingMessage['socket'][] = [];
+  // The real Node server stands in for Vite's `httpServer`, so closing the host
+  // below is the same event Vite's own close — and its in-process restart —
+  // raises on it.
   const server = createServer((request, response) => {
     connections.push(request.socket);
-    installed(request, response, (error) => {
+    if (middleware === undefined) throw new Error('Expected HTTP middleware');
+    middleware(request, response, (error) => {
       if (error === undefined) fallback(request, response);
       else {
         response.statusCode = 500;
@@ -115,15 +106,34 @@ const startHost = async (
       }
     });
   });
+  const configure = hook === 'preview' ? plugin.configurePreviewServer : plugin.configureServer;
+  if (typeof configure !== 'function') throw new Error(`Expected ${hook} hook`);
+  // SAFETY: `this` is unused by either hook's implementation, and the fake
+  // server exposes exactly the members `configureServer`/`configurePreviewServer`
+  // read (`ssrLoadModule`, `middlewares.use`, `httpServer`) — not Vite's full
+  // server interface.
+  void configure.call(
+    {} as never,
+    {
+      ssrLoadModule: () => Promise.resolve({ createApp }),
+      middlewares: { use: (installed: Middleware) => (middleware = installed) },
+      httpServer: server,
+    } as never,
+  );
+  if (middleware === undefined) throw new Error('Expected HTTP middleware');
+
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (address === null || typeof address === 'string') throw new Error('Expected TCP address');
+  // Once: a test that closes its host to observe shutdown is closed again by
+  // `afterEach`, and a second `server.close` rejects as not running.
+  const closed = new Promise<void>((resolve) => server.once('close', resolve));
   const host = {
     url: `http://127.0.0.1:${address.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      ),
+    close: () => {
+      if (server.listening) server.close();
+      return closed;
+    },
   };
   hosts.push(host);
   return { host, createApp, connections };
@@ -883,5 +893,52 @@ describe('Database HTTP runtime', () => {
       if (url === undefined) delete process.env['DATABASE_URL'];
       else process.env['DATABASE_URL'] = url;
     }
+  });
+});
+
+/*
+ * Vite restarts a development host in-process — a config file edit is enough —
+ * and builds the replacement server, which runs `configureServer` and so opens
+ * a second database target, before it closes the old one (`restartServer` in
+ * Vite's `dist/node/chunks`). Whatever the old host opened is released only if
+ * closing the host reaches it, so each case closes a real host over a target
+ * whose `close` is observable instead of a live database.
+ */
+describe('Database HTTP runtime shutdown', () => {
+  const targetClosing = (close: () => Promise<void>): DatabaseTarget => ({
+    open: () => Promise.resolve({ repository: new MemorySpaceRepository(), close }),
+  });
+
+  it.each(['development', 'preview'] as const)(
+    'closes the opened database target when the %s host closes',
+    async (hook) => {
+      const close = vi.fn(() => Promise.resolve());
+      const { host } = await startHost(
+        await createDatabaseHttpApp(targetClosing(close)),
+        undefined,
+        hook,
+      );
+      // The host has served through the application, so it is fully composed.
+      expect((await fetch(`${host.url}/api/spaces`)).status).toBe(200);
+      expect(close).not.toHaveBeenCalled();
+
+      await host.close();
+
+      await vi.waitFor(() => expect(close).toHaveBeenCalledOnce());
+    },
+  );
+
+  it('reports a target that fails to close rather than throwing into the host', async () => {
+    const failure = new Error('handle would not close');
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { host } = await startHost(
+      await createDatabaseHttpApp(targetClosing(() => Promise.reject(failure))),
+    );
+
+    await expect(host.close()).resolves.toBeUndefined();
+
+    await vi.waitFor(() =>
+      expect(reported).toHaveBeenCalledWith('Failed to close the Space HTTP runtime', failure),
+    );
   });
 });

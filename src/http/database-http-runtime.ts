@@ -21,13 +21,23 @@ export interface DatabaseHttpRuntimeOptions {
   readonly report?: (cause: unknown) => void;
 }
 
+/**
+ * The host application, plus the release of the database target it opened.
+ * The Vite host calls `close` when its server closes — an in-process restart
+ * opens the next target before it closes this host — so the handle does not
+ * outlive the host that owns it.
+ */
+export type DatabaseHttpApplication = SpaceHostApplication & {
+  close(): Promise<void>;
+};
+
 export const createDatabaseHttpApp = async (
   target: DatabaseTarget,
   {
     wait = (milliseconds) => sleep(milliseconds, undefined, { ref: false }),
     report = reportEstablishmentFailure,
   }: DatabaseHttpRuntimeOptions = {},
-): Promise<SpaceHostApplication> => {
+): Promise<DatabaseHttpApplication> => {
   const opened = await target.open();
   try {
     await establishMetaSpace(opened.repository, newUuid);
@@ -43,5 +53,7 @@ export const createDatabaseHttpApp = async (
       })
       .catch(() => undefined);
   }
-  return createSpaceHost(opened.repository, newUuid);
+  return Object.assign(createSpaceHost(opened.repository, newUuid), {
+    close: () => opened.close(),
+  });
 };
