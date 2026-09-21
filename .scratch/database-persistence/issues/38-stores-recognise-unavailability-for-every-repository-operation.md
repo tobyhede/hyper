@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-human — everything but the real PostgreSQL reproduction and `pnpm test:integration:postgres` is built; both need a `.env` this worktree does not have (see _Resolution_).
+**Status:** ready-for-human — everything is built. The real-PostgreSQL misconfiguration proof is written (`test/integration/postgres-misconfiguration.test.ts`) but has not yet run against a real server: it runs in CI's `postgres` job. Tick the fourth criterion once that job is green on this branch (see _Resolution_).
 
 **Tags:** Defect
 
@@ -54,7 +54,22 @@ A loopback server that answers the startup message with a FATAL `ErrorResponse` 
 - `listSpaces` with the default `verifyMarker: "onFirstUse"`, as its runtime's first statement, receives `CliStructuredError` `code: '3006'` "Database error while reading contract marker", with no `cause`. This is ticket 37. It stays unclassified: such a read, as the first statement of a runtime during an outage, answers 500, not 503. Observed against port 1 (a real `ECONNREFUSED`) for both `listSpaces` and `loadMetaSpaceId`.
 - A server that is not listening (port 1): `loadAggregate`, `loadSpace` and `markExported` get Node's raw `Error` `code: 'ECONNREFUSED'`; `listSpaces`/`loadMetaSpaceId` (marker off) get `SqlConnectionError` with that error on `cause`.
 
-**Not done: a real PostgreSQL misconfiguration.** This worktree has no `.env`, so neither `pnpm postgres:up` nor `pnpm test:integration:postgres` was run. The acceptance criterion needs a real server with a wrong password in `DATABASE_URL`, with the shape reaching `#naming` recorded here. The wire-level stand-in above goes through the same `pg` handshake code but is not a real server.
+**A real PostgreSQL misconfiguration: written, awaiting its first run.** `test/integration/postgres-misconfiguration.test.ts` is in `pnpm test:integration:postgres`. It derives two URLs from the migrated `DATABASE_URL`, read through `configuredDatabaseUrl` (`src/prisma/db.ts`, which `createPostgresDatabase` now also reads through):
+
+- the same URL with a wrong password, which the server refuses through its SCRAM login: expected `28P01`;
+- the same credentials naming `hyper_ticket_38_absent`: expected `3D000`.
+
+For each, on a fresh runtime per operation (a failed marker read is cached per runtime, ticket 37), it asserts that neither is `PersistenceUnavailableError` and that `classifyStoredFailure` answers `unclassified`. It also asserts the stand-in's shapes above, now as hypotheses about a real server:
+
+| Operation | `verifyMarker` | Expected shape |
+| --- | --- | --- |
+| `loadAggregate` (transaction) | `'onFirstUse'` and `false` | raw `pg` `DatabaseError`: `code` the SQLSTATE, `severity: 'FATAL'`, no `kind`, no `cause` |
+| `listSpaces` (direct) | `false` | `SqlQueryError` `kind: 'sql_query'`, `sqlState` the SQLSTATE, `cause` that `DatabaseError` |
+| `listSpaces` (direct) | `'onFirstUse'` | `CliStructuredError` `code: '3006'`, no `cause`; the SQLSTATE is nowhere on the chain (ticket 37) |
+
+A third case runs `retryMetaSpaceEstablishment` over the wrong-password URL with the default marker. It expects start-up to give up after two waits (`5_000`, `10_000`), with both reported failures unclassified and carrying `28P01`. Its `wait` rejects after five calls, so a refusal read as an outage fails the case rather than retrying until the timeout.
+
+**Not yet observed against a real server.** Port 55432 was taken by another process on the machine this was written on, so PostgreSQL was not started, and nothing here has met a real SCRAM login yet. Each case was run through the refusing stand-in by pointing `DATABASE_URL` at it, once answering `28P01` and once `3D000`, and each was green. With the PostgreSQL store's `isUnavailable` forced to `true`, every case went red, the start-up case through its bounded `wait`. The first CI `postgres` run on this branch is the observation. If a real server's shape differs from the table, record what it produced here and correct the assertion to it; do not correct the classification. The fourth criterion is ticked only once that run is green.
 
 ### Proofs
 
