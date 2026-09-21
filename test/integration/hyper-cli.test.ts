@@ -10,6 +10,7 @@ import {
 } from '../../src/aggregate-directory';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
+import { postgresTestDatabase } from '../support/postgres-database';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { runHyperScript } from '../support/hyper-command';
 
@@ -84,7 +85,7 @@ const metaSpaceSnapshot: SpaceSnapshot = {
 const linkedPair = { metaSpaceId: META_SPACE_ID, spaces: [targetSpaceSnapshot, metaSpaceSnapshot] };
 
 describe('hyper CLI', () => {
-  const repository = new SqlSpaceRepository(postgresSqlStore);
+  const repository = new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase));
   const temporaryDirectories = new Set<string>();
 
   const temporaryDirectory = async (prefix: string): Promise<string> => {
@@ -156,7 +157,7 @@ describe('hyper CLI', () => {
 
   afterAll(async () => {
     await clearHyperContent();
-    await postgresSqlStore.close();
+    await postgresTestDatabase.close();
   });
 
   it('imports through the real command and durably reports the stored space', async () => {
@@ -379,86 +380,6 @@ describe('hyper CLI', () => {
         ],
       },
     });
-  });
-
-  it('creates and opens a fully identified new space when the database is empty', async () => {
-    const result = await runHyperCommand([]);
-
-    expect(result.status).toBe(0);
-    expect(result.stderr).toBe('');
-    const catalog = await repository.listSpaces();
-    expect(catalog).toHaveLength(1);
-    const created = catalog[0];
-    if (created === undefined) throw new Error('Expected the new space in the catalog');
-    expect(result.stdout).toBe(`Opened space ${created.id} at revision 0\n`);
-    expect(created.title).toBe('New space');
-    const stored = await repository.loadSpace(created.id);
-    // A new Space begins complete: its Resource is already placed in an authored
-    // default Map with one empty Active Graph (ADR 0079, ADR 0080). Every id
-    // in it is minted, so the shape is asserted against the ones that arrived.
-    const map = stored?.snapshot.document.maps?.[0];
-    if (map === undefined) throw new Error('Expected the new space to arrive with its Map');
-    const graph = map.graphs[0];
-    if (graph === undefined) throw new Error('Expected the new Map to arrive with its Graph');
-    const resourceId = stored?.snapshot.resources[0]?.id;
-    if (resourceId === undefined)
-      throw new Error('Expected the new space to arrive with its Resource');
-    expect(stored).toEqual({
-      snapshot: {
-        id: created.id,
-        document: {
-          version: 1,
-          title: 'New space',
-          maps: [
-            {
-              id: map.id,
-              title: 'Map 1',
-              kind: 'positioned',
-              positions: { [resourceId]: { x: 0, y: 0, open: false } },
-              graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
-              activeGraph: graph.id,
-            },
-          ],
-          defaultMap: map.id,
-        },
-        resources: [
-          {
-            id: resourceId,
-            document: { title: 'Resource 1', kind: 'markdown', body: '' },
-          },
-        ],
-      },
-      revision: 0n,
-      exportedRevision: null,
-    });
-    for (const id of [resourceId, map.id, graph.id]) {
-      expect(uuidSchema.safeParse(id).success).toBe(true);
-    }
-  });
-
-  it('reopens the sole stored space without duplicating it', async () => {
-    const firstResult = await runHyperCommand([]);
-    expect(firstResult.status).toBe(0);
-    const firstCatalog = await repository.listSpaces();
-    const created = firstCatalog[0];
-    if (created === undefined) throw new Error('Expected the first command to create a space');
-    const firstStored = await repository.loadSpace(created.id);
-    expect(firstResult).toEqual({
-      status: 0,
-      stdout: `Opened space ${created.id} at revision 0\n`,
-      stderr: '',
-    });
-    expect(firstStored?.revision).toBe(0n);
-
-    const secondResult = await runHyperCommand([]);
-
-    expect(secondResult).toEqual({
-      status: 0,
-      stdout: `Opened space ${created.id} at revision 0\n`,
-      stderr: '',
-    });
-    await expect(repository.listSpaces()).resolves.toEqual([created]);
-    await expect(repository.loadSpace(created.id)).resolves.toEqual(firstStored);
   });
 
   it('reports a malformed resource path and stores no partial space', async () => {

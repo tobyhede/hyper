@@ -1,12 +1,6 @@
 import { newUuid } from '@project/core';
-import { runCliMain } from './main';
+import { postgresTarget } from '../prisma/target';
+import { runDatabaseCli } from './database-entry';
 import { cliArguments, processIo } from './process';
-import { SqlSpaceRepository } from '../persistence/sql-space-repository';
-import { postgresSqlStore } from '../prisma/sql-store';
 
-process.exitCode = await runCliMain(cliArguments(), {
-  repository: new SqlSpaceRepository(postgresSqlStore),
-  io: processIo,
-  newId: newUuid,
-  close: () => postgresSqlStore.close(),
-});
+process.exitCode = await runDatabaseCli(postgresTarget, cliArguments(), processIo, newUuid);

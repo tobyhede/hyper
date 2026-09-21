@@ -1,20 +1,10 @@
-import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
-
-const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+import baseConfig from './vitest.config';
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@project/core': resolve('./packages/core/src/index.ts'),
-      '@project/graph': resolve('./packages/graph/src/index.ts'),
-      '@project/http': resolve('./packages/http/src/index.ts'),
-      '@project/persistence': resolve('./packages/persistence/src/index.ts'),
-      '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),
-      '@project/ui': resolve('./packages/ui/src/index.ts'),
-    },
-  },
+  ...baseConfig,
   test: {
+    ...baseConfig.test,
     environment: 'node',
     include: ['test/integration/sqlite-*.test.ts'],
     testTimeout: 30_000,

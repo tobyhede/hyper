@@ -1,6 +1,10 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
-import { AggregateInvariantError, REVISION_CEILING } from '@project/persistence';
+import {
+  AggregateInvariantError,
+  createWorkingSpaceLoader,
+  REVISION_CEILING,
+} from '@project/persistence';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -124,6 +128,39 @@ const targetSpace = (id: UUID, title: string, resourceIds: readonly UUID[]): Spa
   },
 });
 
+const graphedSpace = (
+  id: UUID,
+  title: string,
+  resourceIds: readonly [UUID, UUID],
+  input: { readonly mapId?: UUID; readonly graphId?: UUID; readonly graphTitle?: string } = {},
+): SpaceSnapshot => {
+  const [from, to] = resourceIds;
+  const mapId = input.mapId ?? MAP_ID;
+  const graphId = input.graphId ?? GRAPH_ID;
+  return {
+    id,
+    document: {
+      version: 1,
+      title,
+      defaultMap: mapId,
+      maps: [
+        {
+          id: mapId,
+          title: 'Owner',
+          kind: 'positioned',
+          positions: {
+            [from]: { x: 0, y: 0, open: false },
+            [to]: { x: 300, y: 0, open: false },
+          },
+          graphs: [{ id: graphId, title: input.graphTitle ?? 'Graph', edges: [{ from, to }] }],
+          activeGraph: graphId,
+        },
+      ],
+    },
+    resources: [resource(from, 'From'), resource(to, 'To')],
+  };
+};
+
 /**
  * A Space whose one map owns one graph with one edge out of the map.
  *
@@ -173,6 +210,13 @@ type SkippableTestContext = { skip: () => void };
 export interface RepositoryHarness {
   repository: SpaceRepository;
   close(): Promise<void>;
+  /** Close and reopen the durable target, returning a fresh repository host. */
+  reopenRepository?: () => Promise<SpaceRepository>;
+  /** Store a SQL state that valid repository writes cannot produce. */
+  arrangeBrokenState?: (
+    kind: 'invalid-space-document' | 'invalid-aggregate',
+    ids: { readonly spaceId: UUID; readonly otherSpaceId: UUID },
+  ) => Promise<{ readonly expectedMetaSpaceId: UUID }>;
   /**
    * Remove the stored Meta identity while leaving Space rows in place. SQL
    * harnesses use this to model an interrupted destructive replacement; the
@@ -276,6 +320,41 @@ export const spaceRepositoryContract = (
     }
   };
 
+  const withReopenHarness = async (
+    context: SkippableTestContext,
+    body: (repository: SpaceRepository, reopen: () => Promise<SpaceRepository>) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.reopenRepository === undefined) {
+        context.skip();
+        return;
+      }
+      await body(harness.repository, harness.reopenRepository);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  const withBrokenStateHarness = async (
+    context: SkippableTestContext,
+    body: (
+      repository: SpaceRepository,
+      arrange: NonNullable<RepositoryHarness['arrangeBrokenState']>,
+    ) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.arrangeBrokenState === undefined) {
+        context.skip();
+        return;
+      }
+      await body(harness.repository, harness.arrangeBrokenState);
+    } finally {
+      await harness.close();
+    }
+  };
+
   const seed = async (repository: SpaceRepository, ...spaces: readonly SpaceSnapshot[]) => {
     const meta = spaces[0];
     if (meta === undefined) throw new Error('Seeding needs at least a Meta Space');
@@ -283,6 +362,114 @@ export const spaceRepositoryContract = (
     if (result.kind !== 'initialized') throw new Error(`Seeding failed: ${result.kind}`);
     return result.aggregate.spaces;
   };
+
+  it(`${name} preserves the established aggregate across a fresh repository host`, async (context) => {
+    await withReopenHarness(context, async (repository, reopen) => {
+      const first = space(SPACE_ID, 'Durable', [RESOURCE_ID]);
+      await seed(repository, first);
+
+      const reopened = await reopen();
+      await expect(reopened.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
+      });
+    });
+  });
+
+  it(`${name} persists first-working-load initialization for a fresh repository host`, async (context) => {
+    await withReopenHarness(context, async (repository, reopen) => {
+      const initial = space(SPACE_ID, 'Mapless', [RESOURCE_ID]);
+      await seed(repository, initial);
+      const ids = [MAP_ID, GRAPH_ID];
+      const first = await createWorkingSpaceLoader(repository, () => {
+        const id = ids.shift();
+        if (id === undefined) throw new Error('initializer minted too many identities');
+        return id;
+      })(SPACE_ID);
+
+      expect(first).toMatchObject({ revision: 1n });
+      expect(first?.snapshot.document.maps?.[0]).toMatchObject({
+        id: MAP_ID,
+        positions: {},
+        activeGraph: GRAPH_ID,
+      });
+
+      const reopened = await reopen();
+      await expect(
+        createWorkingSpaceLoader(reopened, () => {
+          throw new Error('an initialized Space must not mint identities');
+        })(SPACE_ID),
+      ).resolves.toEqual({
+        snapshot: first?.snapshot,
+        revision: 1n,
+        exportedRevision: null,
+      });
+    });
+  });
+
+  for (const brokenState of ['invalid-space-document', 'invalid-aggregate'] as const) {
+    it(`${name} replaces ${brokenState} stored state through the destructive lifecycle door`, async (context) => {
+      await withBrokenStateHarness(context, async (repository, arrange) => {
+        const { expectedMetaSpaceId } = await arrange(brokenState, {
+          spaceId: SPACE_ID,
+          otherSpaceId: OTHER_SPACE_ID,
+        });
+        const replacement = space(SPACE_ID, 'Replacement', [RESOURCE_ID]);
+
+        await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+        await expect(
+          repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }),
+        ).rejects.toThrow(AggregateInvariantError);
+        await expect(
+          repository.replaceAggregate(
+            { metaSpaceId: SPACE_ID, spaces: [replacement] },
+            expectedMetaSpaceId,
+          ),
+        ).resolves.toMatchObject({ kind: 'replaced' });
+        await expect(repository.loadAggregate()).resolves.toEqual({
+          kind: 'loaded',
+          aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(replacement, 0n, null)] },
+        });
+      });
+    });
+  }
+
+  it(`${name} leaves a broken stored document unclassified on the single-Space fast path`, async (context) => {
+    await withBrokenStateHarness(context, async (repository, arrange) => {
+      await arrange('invalid-space-document', {
+        spaceId: SPACE_ID,
+        otherSpaceId: OTHER_SPACE_ID,
+      });
+      const repaired = space(SPACE_ID, 'Repaired', []);
+
+      await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
+        AggregateInvariantError,
+      );
+      await expect(commitUpdate(repository, repaired, 0n)).rejects.not.toBeInstanceOf(
+        AggregateInvariantError,
+      );
+    });
+  });
+
+  it(`${name} truncates stored Spaces without a Meta identity only when none was expected`, async (context) => {
+    await withMissingMetaHarness(context, async (repository, removeMetaIdentity) => {
+      const orphan = space(OTHER_SPACE_ID, 'Orphan', [OTHER_RESOURCE_ID]);
+      await seed(repository, orphan);
+      await removeMetaIdentity();
+      const replacement = space(SPACE_ID, 'Replacement', [RESOURCE_ID]);
+
+      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: SPACE_ID, spaces: [replacement] },
+          OTHER_SPACE_ID,
+        ),
+      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: undefined });
+      await expect(
+        repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, undefined),
+      ).resolves.toMatchObject({ kind: 'replaced' });
+    });
+  });
 
   it(`${name} initializes and replaces only through explicit Meta-rooted aggregates`, async () => {
     await withHarness(async (repository) => {
@@ -1184,6 +1371,91 @@ export const spaceRepositoryContract = (
     });
   });
 
+  it(`${name} scopes Graph identities to their containing Space`, async () => {
+    await withHarness(async (repository) => {
+      const child = graphedSpace(OTHER_SPACE_ID, 'Child', [SECOND_RESOURCE_ID, OTHER_RESOURCE_ID], {
+        graphTitle: 'Child graph',
+      });
+      const metaBase = graphedSpace(SPACE_ID, 'Meta', [RESOURCE_ID, MISSING_RESOURCE_ID], {
+        graphTitle: 'Meta graph',
+      });
+      const metaFrom = metaBase.resources[0];
+      const metaTo = metaBase.resources[1];
+      if (metaFrom === undefined || metaTo === undefined) {
+        throw new Error('Fixture requires two Resources');
+      }
+      const meta: SpaceSnapshot = {
+        ...metaBase,
+        resources: [
+          metaFrom,
+          spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
+          metaTo,
+        ],
+      };
+
+      await seed(repository, meta, child);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(meta, 0n, null));
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(stored(child, 0n, null));
+    });
+  });
+
+  it(`${name} refuses an unreferenced ordinary Space even when its Graph identity is reused`, async () => {
+    await withHarness(async (repository) => {
+      const meta = graphedSpace(SPACE_ID, 'Meta', [RESOURCE_ID, MISSING_RESOURCE_ID]);
+      const child = graphedSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID, SECOND_RESOURCE_ID]);
+
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [meta, child] }),
+      ).resolves.toEqual({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
+      });
+      await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+    });
+  });
+
+  it(`${name} permits a Graph and Resource to share an identity`, async () => {
+    await withHarness(async (repository) => {
+      const shared = graphedSpace(SPACE_ID, 'Shared identity', [RESOURCE_ID, SECOND_RESOURCE_ID], {
+        graphId: RESOURCE_ID,
+      });
+
+      await seed(repository, shared);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(shared, 0n, null));
+    });
+  });
+
+  it(`${name} refuses two Maps in one Space that own the same Graph identity`, async () => {
+    await withHarness(async (repository) => {
+      const first = graphedSpace(SPACE_ID, 'Duplicate graph', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+      const firstMap = first.document.maps?.[0];
+      if (firstMap === undefined) throw new Error('Fixture requires its first Map');
+      const colliding: SpaceSnapshot = {
+        ...first,
+        document: {
+          ...first.document,
+          maps: [
+            firstMap,
+            {
+              ...firstMap,
+              id: SECOND_MAP_ID,
+              title: 'Second owner',
+              activeGraph: GRAPH_ID,
+            },
+          ],
+        },
+      };
+
+      await expect(
+        repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [colliding] }),
+      ).resolves.toMatchObject({
+        kind: 'aggregate-refused',
+        errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0 }],
+      });
+      await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+    });
+  });
+
   it(`${name} keeps the Resources a commit names and drops the ones it omits`, async () => {
     await withHarness(async (repository) => {
       const first = space(SPACE_ID, 'One', [RESOURCE_ID, SECOND_RESOURCE_ID]);
@@ -1261,6 +1533,15 @@ export const spaceRepositoryContract = (
       });
 
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, 0n));
+    });
+  });
+
+  it(`${name} refuses to mark an exported revision above the storage ceiling`, async (context) => {
+    await withRawRevisionHarness(context, async (repository) => {
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+      await seed(repository, first);
+      await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow();
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
     });
   });
 

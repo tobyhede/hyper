@@ -1,11 +1,6 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import {
-  AggregateInvariantError,
-  REVISION_CEILING,
-  RevisionCodecError,
-} from '@project/persistence';
+import { AggregateInvariantError } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSqliteDatabase } from '../../src/sqlite/db';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
@@ -22,6 +17,36 @@ spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
   return {
     repository: harness.repository,
     close: harness.close,
+    reopenRepository: harness.reopenRepository,
+    arrangeBrokenState: async (kind, ids) => {
+      if (kind === 'invalid-space-document') {
+        await harness.database.orm.Space.create({
+          id: ids.spaceId,
+          document: { version: 1 },
+          revision: '0',
+        });
+        await harness.database.orm.RepositoryState.create({
+          singletonId: 1,
+          metaSpaceId: ids.spaceId,
+        });
+        return { expectedMetaSpaceId: ids.spaceId };
+      }
+      await harness.database.orm.Space.create({
+        id: ids.spaceId,
+        document: { version: 1, title: 'Meta' },
+        revision: '0',
+      });
+      await harness.database.orm.Space.create({
+        id: ids.otherSpaceId,
+        document: { version: 1, title: 'Unreferenced' },
+        revision: '0',
+      });
+      await harness.database.orm.RepositoryState.create({
+        singletonId: 1,
+        metaSpaceId: ids.spaceId,
+      });
+      return { expectedMetaSpaceId: ids.spaceId };
+    },
     removeMetaIdentity: async () => {
       await harness.database.orm.RepositoryState.where({ singletonId: 1 }).delete();
     },
@@ -46,7 +71,6 @@ const SECOND_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-00000000001
 const OTHER_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000012');
 const GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000020');
 const MAP_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000021');
-const MISSING_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000016');
 const LINK_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013');
 
 const resource = (id: UUID, title: string) => ({
@@ -88,25 +112,6 @@ const targetSpace = (id: UUID, title: string, resourceIds: readonly UUID[]): Spa
   },
 });
 
-const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSnapshot => ({
-  ...space(id, title, [memberId]),
-  document: {
-    version: 1,
-    title,
-    maps: [
-      {
-        id: MAP_ID,
-        title: 'Dangling',
-        kind: 'positioned',
-        positions: { [memberId]: { x: 0, y: 0, open: false } },
-        graphs: [
-          { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
-        ],
-      },
-    ],
-  },
-});
-
 const retitled = (snapshot: SpaceSnapshot, title: string): SpaceSnapshot => ({
   ...snapshot,
   document: { ...snapshot.document, title },
@@ -132,181 +137,6 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     return harness;
   };
 
-  it('answers uninitialized before any aggregate is established', async () => {
-    const { repository } = await opened();
-
-    await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
-    await expect(repository.listSpaces()).resolves.toEqual([]);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  it('initializes, lists and loads a Meta-rooted aggregate', async () => {
-    const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
-
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
-    ).resolves.toEqual({
-      kind: 'initialized',
-      aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
-    });
-    expect(new Set(await repository.listSpaces())).toEqual(
-      new Set([{ id: SPACE_ID, title: 'One' }]),
-    );
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
-    await expect(repository.loadSpace(MISSING_SPACE_ID)).resolves.toBeUndefined();
-    await expect(repository.loadAggregate()).resolves.toEqual({
-      kind: 'loaded',
-      aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
-    });
-  });
-
-  it('classifies an identical later initialization as existing and a different one as already-initialized', async () => {
-    const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
-
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
-    ).resolves.toMatchObject({ kind: 'initialized' });
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [structuredClone(first)] }),
-    ).resolves.toMatchObject({ kind: 'existing' });
-    await expect(
-      repository.initializeAggregate({
-        metaSpaceId: SPACE_ID,
-        spaces: [retitled(first, 'Different')],
-      }),
-    ).resolves.toMatchObject({ kind: 'already-initialized' });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
-  });
-
-  it('ignores object-key insertion order when classifying initialization', async () => {
-    const { repository } = await opened();
-    const first: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: { version: 1, title: 'Meta' },
-      resources: [
-        {
-          id: RESOURCE_ID,
-          document: { title: 'Resource', kind: 'markdown', body: 'Body' },
-        },
-      ],
-    };
-    const reordered: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: { title: 'Meta', version: 1 },
-      resources: [
-        {
-          id: RESOURCE_ID,
-          document: { body: 'Body', kind: 'markdown', title: 'Resource' },
-        },
-      ],
-    };
-
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
-    ).resolves.toMatchObject({ kind: 'initialized' });
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [reordered] }),
-    ).resolves.toMatchObject({ kind: 'existing' });
-  });
-
-  it('refuses an invalid aggregate and stores none of it', async () => {
-    const { repository } = await opened();
-    const valid = space(SPACE_ID, 'Must roll back', [RESOURCE_ID]);
-    const dangling = spaceWithDanglingEdge(OTHER_SPACE_ID, 'Dangling', OTHER_RESOURCE_ID);
-
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [valid, dangling] }),
-    ).resolves.toMatchObject({ kind: 'aggregate-refused' });
-    expect(await repository.listSpaces()).toEqual([]);
-  });
-
-  it("returns a Space's Resources in ascending id order however they were supplied", async () => {
-    const { repository } = await opened();
-    const descending = space(SPACE_ID, 'Unordered', [
-      OTHER_RESOURCE_ID,
-      SECOND_RESOURCE_ID,
-      RESOURCE_ID,
-    ]);
-    const ascending = space(SPACE_ID, 'Unordered', [
-      RESOURCE_ID,
-      SECOND_RESOURCE_ID,
-      OTHER_RESOURCE_ID,
-    ]);
-
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [descending] }),
-    ).resolves.toEqual({
-      kind: 'initialized',
-      aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(ascending, 0n, null)] },
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(ascending, 0n, null));
-  });
-
-  it('speaks bigint at the repository boundary and stores canonical decimal text', async () => {
-    const { repository, database } = await opened();
-    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
-    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
-
-    const loaded = await repository.loadSpace(SPACE_ID);
-    expect(loaded?.revision).toBe(0n);
-
-    const row = await database.orm.Space.where({ id: SPACE_ID }).first();
-    expect(row?.revision).toBe('0');
-    // The ceiling itself, and revisions past `Number.MAX_SAFE_INTEGER`, round
-    // trip identically on both databases now that `revision` is TEXT on
-    // PostgreSQL too — proved once in `repository-contract.ts` (ticket 22)
-    // rather than repeated per database here.
-  });
-
-  // `markExported`'s own `revision` argument is a caller-supplied `bigint`,
-  // not a value read from or already written into either database -- so a
-  // value the shared codec refuses on the way out is a bug in the caller
-  // rather than broken stored state, and is left to escape as the plain
-  // `RevisionCodecError` `encodeStoredRevision` raises (`sql-space-
-  // repository.ts`'s `markExported` doc comment) instead of being
-  // reclassified as `AggregateInvariantError` the way `#writeUpdate`'s own
-  // next revision is.
-  it('raises the codec failure for an exported revision above the 2^63-1 ceiling', async () => {
-    const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
-    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
-
-    await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow(
-      RevisionCodecError,
-    );
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
-  });
-
-  it('commits a topology-preserving update and reloads it', async () => {
-    const { repository } = await opened();
-    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
-    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
-    const changed = retitled(first, 'Changed');
-
-    await expect(
-      repository.commit({
-        changes: [
-          {
-            kind: 'update',
-            spaceId: SPACE_ID,
-            snapshot: changed,
-            expectedRevision: 0n,
-          },
-        ],
-      }),
-    ).resolves.toEqual({
-      kind: 'committed',
-      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
-      deletedSpaceIds: [],
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
-  });
-
-  // The pinned driver opens a new database handle for every transaction, so two
-  // overlapping transactions through this one client are two SQLite connections
-  // on one file. Neither case below may wait out the driver's 5000ms busy_timeout.
   const WELL_UNDER_BUSY_TIMEOUT_MS = 1_000;
 
   it('serves two overlapping aggregate reads through one client without waiting on each other', async () => {
@@ -531,12 +361,6 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
    * initializing fail it as an invariant and leave it alone; replacement
    * truncates it (ADR 0094), still authorized by the Meta identity it read.
    */
-  const storedRow = (id: UUID, document: Readonly<Record<string, string | number>>) => ({
-    id,
-    document,
-    revision: '0',
-  });
-
   const proposed = space(SPACE_ID, 'Proposal', [RESOURCE_ID]);
   const proposal = { metaSpaceId: SPACE_ID, spaces: [proposed] };
 
@@ -551,83 +375,6 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(proposed, 0n, null)] },
     });
   };
-
-  it('truncates Spaces stored without a Meta identity, and only when it expected none', async () => {
-    const { repository, database } = await opened();
-    await database.orm.Space.create(storedRow(OTHER_SPACE_ID, { version: 1, title: 'Orphan' }));
-
-    await expectReadAndInitializeRefuse(repository);
-    await expect(repository.loadMetaSpaceId()).resolves.toBeUndefined();
-    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toEqual({
-      kind: 'conflict',
-      currentMetaSpaceId: undefined,
-    });
-    await expect(repository.replaceAggregate(proposal, undefined)).resolves.toMatchObject({
-      kind: 'replaced',
-    });
-    await expectTruncatedTo(repository);
-  });
-
-  it('truncates a stored aggregate that fails complete intake', async () => {
-    const { repository, database } = await opened();
-    await database.transaction(async ({ orm }) => {
-      await orm.Space.create(storedRow(SPACE_ID, { version: 1, title: 'Meta' }));
-      await orm.Space.create(storedRow(OTHER_SPACE_ID, { version: 1, title: 'Unreferenced' }));
-      await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
-    });
-
-    await expectReadAndInitializeRefuse(repository);
-    await expect(repository.replaceAggregate(proposal, SPACE_ID)).resolves.toMatchObject({
-      kind: 'replaced',
-    });
-    await expectTruncatedTo(repository);
-  });
-
-  it('truncates a stored Space whose document does not parse', async () => {
-    const { repository, database } = await opened();
-    await database.transaction(async ({ orm }) => {
-      // `title` is required, so this row is JSON that fails Space intake.
-      await orm.Space.create(storedRow(OTHER_SPACE_ID, { version: 1 }));
-      await orm.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
-    });
-
-    await expectReadAndInitializeRefuse(repository);
-    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
-      kind: 'replaced',
-    });
-    await expectTruncatedTo(repository);
-  });
-
-  // `commit`'s fast path reads its candidate through `#loadStoredSpaceRow`,
-  // the same private helper `loadSpace` calls directly, so a stored document
-  // that fails intake escapes a fast-path `commit` exactly as unclassified as
-  // it escapes `loadSpace` for the same row -- neither is
-  // `AggregateInvariantError`, unlike `loadAggregate`/`initializeAggregate`/
-  // `replaceAggregate` (through `#loadEverySpace`) two cases above this one.
-  it("commit's fast path leaves a broken stored document as unclassified as loadSpace does", async () => {
-    const { repository, database } = await opened();
-    // `title` is required, so this row is JSON that fails Space intake -- the
-    // same construction as "truncates a stored Space whose document does not
-    // parse" above.
-    await database.orm.Space.create(storedRow(SPACE_ID, { version: 1 }));
-    await database.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
-
-    await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
-      AggregateInvariantError,
-    );
-    await expect(
-      repository.commit({
-        changes: [
-          {
-            kind: 'update',
-            spaceId: SPACE_ID,
-            snapshot: { id: SPACE_ID, document: { version: 1, title: 'Repaired' }, resources: [] },
-            expectedRevision: 0n,
-          },
-        ],
-      }),
-    ).rejects.not.toBeInstanceOf(AggregateInvariantError);
-  });
 
   it('truncates a stored Space whose document is not JSON', async () => {
     const { path, repository } = await opened();
@@ -689,26 +436,6 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expectTruncatedTo(repository);
   });
 
-  it('truncates a stored Space whose revision is not canonical', async () => {
-    const { repository, database } = await opened();
-    // A raw ORM write is required: the repository's own `encodeStoredRevision`
-    // (the shared codec, ADR 0095) refuses a non-canonical value before it
-    // ever reaches the column, so only a write that bypasses it can store one
-    // to read back.
-    await database.orm.Space.create({
-      id: OTHER_SPACE_ID,
-      document: { version: 1, title: 'Orphan' },
-      revision: '01',
-    });
-    await database.orm.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
-
-    await expectReadAndInitializeRefuse(repository);
-    await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
-      kind: 'replaced',
-    });
-    await expectTruncatedTo(repository);
-  });
-
   it('refuses a Meta identity naming a Space the file does not store', async () => {
     const { repository, database } = await opened();
 
@@ -723,24 +450,6 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expect(repository.loadAggregate()).resolves.toMatchObject({
       kind: 'loaded',
       aggregate: { metaSpaceId: SPACE_ID },
-    });
-  });
-
-  it('still shows the established aggregate after close and reopen against the same file', async () => {
-    const harness = await opened();
-    const first = space(SPACE_ID, 'Durable', [RESOURCE_ID]);
-    await harness.repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
-    await harness.database.close();
-
-    const reopened = createSqliteDatabase(harness.path);
-    close = async () => {
-      await reopened.close();
-      await harness.close();
-    };
-    const repository = new SqlSpaceRepository(sqliteSqlStore(reopened));
-    await expect(repository.loadAggregate()).resolves.toEqual({
-      kind: 'loaded',
-      aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(first, 0n, null)] },
     });
   });
 

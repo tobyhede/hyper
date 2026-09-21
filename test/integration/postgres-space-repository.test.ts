@@ -1,15 +1,8 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import {
-  AggregateInvariantError,
-  createWorkingSpaceLoader,
-  REVISION_CEILING,
-  RevisionCodecError,
-  type LoadedSpace,
-} from '@project/persistence';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { toJsonValue } from '../../src/persistence/sql-store';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
-import { db } from '../../src/prisma/db';
+import { postgresTestDatabase as db } from '../support/postgres-database';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { spaceRepositoryContract } from '../support/repository-contract';
@@ -40,8 +33,32 @@ import { expectPersisted } from '../support/persistence-contract';
 spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
   await clearHyperContent();
   return {
-    repository: new SqlSpaceRepository(postgresSqlStore),
+    repository: new SqlSpaceRepository(postgresSqlStore(db)),
     close: clearHyperContent,
+    reopenRepository: () => Promise.resolve(new SqlSpaceRepository(postgresSqlStore(db))),
+    arrangeBrokenState: async (kind, ids) => {
+      if (kind === 'invalid-space-document') {
+        await db.orm.public.Space.create({
+          id: ids.spaceId,
+          document: { version: 1 },
+          revision: '0',
+        });
+        await db.orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: ids.spaceId });
+        return { expectedMetaSpaceId: ids.spaceId };
+      }
+      await db.orm.public.Space.create({
+        id: ids.spaceId,
+        document: { version: 1, title: 'Meta' },
+        revision: '0',
+      });
+      await db.orm.public.Space.create({
+        id: ids.otherSpaceId,
+        document: { version: 1, title: 'Unreferenced' },
+        revision: '0',
+      });
+      await db.orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: ids.spaceId });
+      return { expectedMetaSpaceId: ids.spaceId };
+    },
     removeMetaIdentity: async () => {
       await db.orm.public.RepositoryState.where({ singletonId: 1 }).delete();
     },
@@ -58,28 +75,17 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const OMITTED_RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const MISSING_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
-const GRAPH_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const MISSING_RESOURCE_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
 const OTHER_SPACE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 const OTHER_RESOURCE_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
 const CONCURRENT_SPACE_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 const CONCURRENT_RESOURCE_ID = uuidSchema.parse('9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a');
-const MIXED_FIRST_RESOURCE_ID = uuidSchema.parse('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 const UNRESOLVED_RESOURCE_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
-const ORDERED_SPACE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
 const LINK_RESOURCE_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
-const MAP_ID = uuidSchema.parse('0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a');
-const OTHER_MAP_ID = uuidSchema.parse('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
 const OTHER_SPACE_MAP_ID = uuidSchema.parse('0c0c0c0c-0c0c-4c0c-8c0c-0c0c0c0c0c0c');
 const OTHER_SPACE_GRAPH_ID = uuidSchema.parse('0d0d0d0d-0d0d-4d0d-8d0d-0d0d0d0d0d0d');
 const CONCURRENT_MAP_ID = uuidSchema.parse('0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e');
 const CONCURRENT_GRAPH_ID = uuidSchema.parse('0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f');
-const ORDERED_RESOURCE_IDS = [
-  uuidSchema.parse('eeeeeeee-1111-4eee-8eee-eeeeeeeeeeee'),
-  uuidSchema.parse('eeeeeeee-2222-4eee-8eee-eeeeeeeeeeee'),
-  uuidSchema.parse('eeeeeeee-3333-4eee-8eee-eeeeeeeeeeee'),
-] as const;
 const RACE_CHILD_SPACE_ID = uuidSchema.parse('1a1a1a1a-1a1a-4a1a-8a1a-1a1a1a1a1a1a');
 const RACE_CHILD_MAP_ID = uuidSchema.parse('1b1b1b1b-1b1b-4b1b-8b1b-1b1b1b1b1b1b');
 const RACE_CHILD_GRAPH_ID = uuidSchema.parse('1c1c1c1c-1c1c-4c1c-8c1c-1c1c1c1c1c1c');
@@ -206,7 +212,7 @@ const linkedSnapshot: SpaceSnapshot = {
 // identity a concurrent replacement retired" -- so the separate block was
 // deleted as a literal duplicate rather than kept beside it.
 describe('SqlSpaceRepository (PostgreSQL)', () => {
-  const repository = new SqlSpaceRepository(postgresSqlStore);
+  const repository = new SqlSpaceRepository(postgresSqlStore(db));
   const createdSpaceIds = new Set<UUID>();
   const commitSpace = (next: SpaceSnapshot, expectedRevision: bigint) =>
     repository.commit({
@@ -259,61 +265,6 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   // Only PostgreSQL can hold this state. `MemorySpaceRepository` stores
   // snapshots that were already parsed on the way in, so it has no way to
   // present a document that fails intake on the way out.
-  it('raises an identifiable invariant failure for a stored document that cannot be parsed', async () => {
-    createdSpaceIds.add(SPACE_ID);
-    await db.transaction(async ({ orm }) => {
-      await orm.public.Space.create({
-        // `title` is required by `spaceDocumentSchema`, so this row parses as
-        // JSON and fails intake — corruption, a hand-edited row or a format the
-        // code has since rolled forward past.
-        id: SPACE_ID,
-        document: { version: 1 },
-        revision: '0',
-      });
-      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
-    });
-
-    await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
-  });
-
-  // `commit`'s fast path reads its candidate through `#loadStoredSpaceRow`,
-  // the same private helper `loadSpace` calls directly, so a stored document
-  // that fails intake escapes a fast-path `commit` exactly as unclassified as
-  // it escapes `loadSpace` for the same row -- neither is
-  // `AggregateInvariantError`, unlike `loadAggregate` immediately above.
-  it("commit's fast path leaves a broken stored document as unclassified as loadSpace does", async () => {
-    createdSpaceIds.add(SPACE_ID);
-    await db.transaction(async ({ orm }) => {
-      await orm.public.Space.create({
-        // Same construction as "raises an identifiable invariant failure for
-        // a stored document that cannot be parsed" above: `title` is
-        // required, so this row parses as JSON and fails intake.
-        id: SPACE_ID,
-        document: { version: 1 },
-        revision: '0',
-      });
-      await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
-    });
-
-    await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
-      AggregateInvariantError,
-    );
-    await expect(
-      commitSpace({ id: SPACE_ID, document: { version: 1, title: 'Repaired' }, resources: [] }, 0n),
-    ).rejects.not.toBeInstanceOf(AggregateInvariantError);
-  });
-
-  // PostgreSQL's `document` column is `jsonb`, so it refuses text that is not
-  // JSON before it is ever stored — unlike SQLite's TEXT column, which stores
-  // anything (`sqlite-space-repository.test.ts`'s "truncates a stored Space
-  // whose document is not JSON"). This is what ticket 27's Decided section
-  // means by PostgreSQL keeping this case out of reach: the database itself is
-  // the guard, not `loadEverySpace`. `db.sql` (the low-level row builder) is
-  // used rather than `orm.public.Space`, because the ORM would JSON-encode a
-  // JS string into a valid JSON *string value* rather than writing raw text —
-  // and `update` rather than `insert`, because only `update`'s
-  // expression-callback overload can carry a raw column override; `insert`
-  // accepts only plain typed values.
   it('refuses a write of text that is not JSON into spaces.document', async () => {
     createdSpaceIds.add(OTHER_SPACE_ID);
     await db.transaction(async ({ orm }) => {
@@ -344,65 +295,6 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       resources: [],
     };
 
-    const expectReplacedBy = async (expectedMetaSpaceId: UUID | undefined) => {
-      createdSpaceIds.add(SPACE_ID);
-      await expect(repository.loadAggregate()).rejects.toThrow(AggregateInvariantError);
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: SPACE_ID, spaces: [replacement] },
-          expectedMetaSpaceId,
-        ),
-      ).resolves.toMatchObject({ kind: 'replaced' });
-      await expect(repository.loadAggregate()).resolves.toEqual({
-        kind: 'loaded',
-        aggregate: {
-          metaSpaceId: SPACE_ID,
-          spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
-        },
-      });
-    };
-
-    it('truncates a stored document that cannot be parsed', async () => {
-      createdSpaceIds.add(OTHER_SPACE_ID);
-      await db.transaction(async ({ orm }) => {
-        await orm.public.Space.create({
-          id: OTHER_SPACE_ID,
-          document: { version: 1 },
-          revision: '0',
-        });
-        await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
-      });
-
-      await expectReplacedBy(OTHER_SPACE_ID);
-    });
-
-    it('truncates a stored aggregate that fails complete intake', async () => {
-      createdSpaceIds.add(OTHER_SPACE_ID);
-      createdSpaceIds.add(CONCURRENT_SPACE_ID);
-      await db.transaction(async ({ orm }) => {
-        await orm.public.Space.create({
-          id: OTHER_SPACE_ID,
-          document: { version: 1, title: 'Meta' },
-          revision: '0',
-        });
-        await orm.public.Space.create({
-          id: CONCURRENT_SPACE_ID,
-          document: { version: 1, title: 'Unreferenced' },
-          revision: '0',
-        });
-        await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: OTHER_SPACE_ID });
-      });
-
-      await expectReplacedBy(OTHER_SPACE_ID);
-    });
-
-    /*
-     * With no Meta row there is no singleton lock to queue two truncations on,
-     * so the Space row locks are all that serialise them. The blocking
-     * transaction holds one so both replacements have read before either
-     * writes. Each must settle as a result, never as a raw unique-key or
-     * deadlock error, and the store must hold one proposal whole.
-     */
     it('settles two overlapping truncations of Spaces stored without Meta as results', async () => {
       createdSpaceIds.add(OTHER_SPACE_ID);
       createdSpaceIds.add(CONCURRENT_SPACE_ID);
@@ -459,49 +351,6 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
         },
       ]).toContainEqual(loaded);
     });
-
-    it('truncates Spaces stored without a Meta identity only when it expected none', async () => {
-      createdSpaceIds.add(OTHER_SPACE_ID);
-      await db.orm.public.Space.create({
-        id: OTHER_SPACE_ID,
-        document: { version: 1, title: 'Orphan' },
-        revision: '0',
-      });
-
-      await expect(
-        repository.replaceAggregate(
-          { metaSpaceId: SPACE_ID, spaces: [replacement] },
-          OTHER_SPACE_ID,
-        ),
-      ).resolves.toEqual({ kind: 'conflict', currentMetaSpaceId: undefined });
-      await expectReplacedBy(undefined);
-    });
-  });
-
-  it('initializes a completely identified aggregate and exposes it through load and list', async () => {
-    createdSpaceIds.add(SPACE_ID);
-    const initialized = await repository.initializeAggregate({
-      metaSpaceId: SPACE_ID,
-      spaces: [snapshot],
-    });
-
-    // The whole aggregate comes back, Meta identity included — the door
-    // establishes a repository rather than inserting a Space, so what it
-    // answers with is the repository's new state (ADR 0078).
-    expect(initialized).toEqual({
-      kind: 'initialized',
-      aggregate: {
-        metaSpaceId: SPACE_ID,
-        spaces: [{ snapshot, revision: 0n, exportedRevision: null }],
-      },
-    });
-    if (initialized.kind !== 'initialized') {
-      throw new Error(`The aggregate was not established: ${initialized.kind}`);
-    }
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(initialized.aggregate.spaces[0]);
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Repository space' },
-    ]);
   });
 
   it('classifies initialization when a concurrent winner takes a shared Resource identity', async () => {
@@ -904,41 +753,6 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     });
   });
 
-  it('persists first-working-load initialization for a fresh repository host', async () => {
-    await seed(SPACE_ID, [snapshot]);
-
-    const ids = [MAP_ID, GRAPH_ID];
-    const first = await createWorkingSpaceLoader(repository, () => {
-      const id = ids.shift();
-      if (id === undefined) throw new Error('initializer minted too many identities');
-      return id;
-    })(SPACE_ID);
-
-    // The revision alone, because `initialization` is gone: it existed so the
-    // App could reveal the Resources list after New Map, and New Map now
-    // continues in the new Map's name instead (ADR 0089), so nothing reads
-    // it. What this file is here to prove is unchanged — the initialization was
-    // *committed* rather than derived per host, which is the revision and the
-    // stored Map below.
-    expectPersisted(first).toMatchObject({ revision: 1n });
-    expectPersisted(first?.snapshot.document.maps?.[0]).toMatchObject({
-      id: MAP_ID,
-      positions: {},
-      activeGraph: GRAPH_ID,
-    });
-
-    const freshHost = new SqlSpaceRepository(postgresSqlStore);
-    await expect(
-      createWorkingSpaceLoader(freshHost, () => {
-        throw new Error('an initialized Space must not mint identities');
-      })(SPACE_ID),
-    ).resolves.toEqual({
-      snapshot: first?.snapshot,
-      revision: 1n,
-      exportedRevision: null,
-    });
-  });
-
   it('prevents direct deletion of the Meta Space while repository state names it', async () => {
     await seed(SPACE_ID, [snapshot]);
 
@@ -1121,271 +935,10 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({ revision: 0n });
   });
 
-  it('commits an authoritative complete snapshot and advances its revision', async () => {
-    await seed(SPACE_ID, [snapshot]);
-    const changed: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Committed space' },
-      resources: [
-        {
-          id: RESOURCE_ID,
-          document: {
-            title: 'Changed resource',
-            kind: 'markdown',
-            body: 'The newer complete snapshot wins.',
-          },
-        },
-      ],
-    };
-
-    expect(await commitSpace(changed, 0n)).toEqual({
-      kind: 'committed',
-      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
-      deletedSpaceIds: [],
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: changed,
-      revision: 1n,
-      exportedRevision: null,
-    });
-  });
-
-  it('records the projected revision without hiding a concurrent edit', async () => {
-    await seed(SPACE_ID, [snapshot]);
-    const exported = await repository.loadSpace(SPACE_ID);
-    expect(exported).toBeDefined();
-    if (exported === undefined) throw new Error('The seeded space disappeared');
-    const changed: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Edited during export' },
-    };
-
-    await expect(commitSpace(changed, exported.revision)).resolves.toEqual({
-      kind: 'committed',
-      revisions: [{ spaceId: SPACE_ID, revision: 1n }],
-      deletedSpaceIds: [],
-    });
-    await repository.markExported(SPACE_ID, exported.revision);
-
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: changed,
-      revision: 1n,
-      exportedRevision: 0n,
-    });
-  });
-
-  // `markExported`'s own `revision` argument is a caller-supplied `bigint`,
-  // not a value read from or already written into either database -- so a
-  // value the shared codec refuses on the way out is a bug in the caller
-  // rather than broken stored state, and is left to escape as the plain
-  // `RevisionCodecError` `encodeStoredRevision` raises (`sql-space-
-  // repository.ts`'s `markExported` doc comment) instead of being
-  // reclassified as `AggregateInvariantError` the way `#writeUpdate`'s own
-  // next revision is.
-  it('raises the codec failure for an exported revision above the 2^63-1 ceiling', async () => {
-    await seed(SPACE_ID, [snapshot]);
-
-    await expect(repository.markExported(SPACE_ID, REVISION_CEILING + 1n)).rejects.toThrow(
-      RevisionCodecError,
-    );
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-  });
-
-  it('returns the current aggregate for a stale revision without changing it', async () => {
-    await seed(SPACE_ID, [snapshot]);
-    const current: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Current space' },
-    };
-    const stale: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Stale overwrite' },
-    };
-    await commitSpace(current, 0n);
-
-    expect(await commitSpace(stale, 0n)).toEqual({
-      kind: 'conflict',
-      conflicts: [
-        {
-          spaceId: SPACE_ID,
-          current: { snapshot: current, revision: 1n, exportedRevision: null },
-        },
-      ],
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: current,
-      revision: 1n,
-      exportedRevision: null,
-    });
-  });
-
-  it('loads the space document and resources from one aggregate revision', async () => {
-    const atRevision = (revision: number): SpaceSnapshot => ({
-      ...snapshot,
-      document: { ...snapshot.document, title: `Revision ${revision}` },
-      resources: [
-        {
-          ...snapshot.resources[0]!,
-          document: { ...snapshot.resources[0]!.document, title: `Revision ${revision}` },
-        },
-      ],
-    });
-    await seed(SPACE_ID, [atRevision(0)]);
-
-    const writeRevisions = async () => {
-      for (let revision = 1; revision <= 50; revision += 1) {
-        expectPersisted(
-          await commitSpace(atRevision(revision), BigInt(revision - 1)),
-        ).toMatchObject({
-          kind: 'committed',
-          revisions: [{ spaceId: SPACE_ID, revision: BigInt(revision) }],
-        });
-      }
-    };
-    const readRevisions = async () => {
-      for (let read = 0; read < 75; read += 1) {
-        const loaded = await repository.loadSpace(SPACE_ID);
-        expect(loaded).toBeDefined();
-        if (loaded === undefined) throw new Error('The seeded space disappeared');
-
-        const marker = `Revision ${loaded.revision}`;
-        expect(loaded.snapshot.document.title).toBe(marker);
-        expect(loaded.snapshot.resources).toHaveLength(1);
-        expect(loaded.snapshot.resources[0]?.document.title).toBe(marker);
-      }
-    };
-
-    await Promise.all([writeRevisions(), ...Array.from({ length: 4 }, readRevisions)]);
-  });
-
-  it('returns resources in id order however they were stored', async () => {
-    // Resource order is now the include aggregate's ORDER BY rather than a separate
-    // query's, so it needs pinning at the one place that can tell the
-    // difference: resources supplied in reverse id order. Every other fixture here
-    // supplies them already sorted, where an unordered aggregate would pass.
-    const [first, second, third] = ORDERED_RESOURCE_IDS;
-    const resource = (id: UUID, title: string) => ({
-      id,
-      document: { title, kind: 'markdown' as const, body: title },
-    });
-    createdSpaceIds.add(ORDERED_SPACE_ID);
-    const result = await repository.initializeAggregate({
-      metaSpaceId: ORDERED_SPACE_ID,
-      spaces: [
-        {
-          id: ORDERED_SPACE_ID,
-          document: { version: 1, title: 'Ordered resources' },
-          resources: [
-            resource(third, 'Third'),
-            resource(second, 'Second'),
-            resource(first, 'First'),
-          ],
-        },
-      ],
-    });
-    expect(result.kind).toBe('initialized');
-    if (result.kind !== 'initialized') {
-      throw new Error(`The aggregate was not established: ${result.kind}`);
-    }
-
-    const order = (stored: LoadedSpace) => ({
-      ids: stored.snapshot.resources.map((resource) => resource.id),
-      titles: stored.snapshot.resources.map((resource) => resource.document.title),
-    });
-    const ascending = { ids: [first, second, third], titles: ['First', 'Second', 'Third'] };
-
-    // Two reads, not one: the aggregate the door answers with comes from the
-    // read-back inside its own transaction, and `loadSpace` is the same
-    // aggregate read outside one. Only asserting the second would leave the
-    // in-transaction path — the one place this read sees uncommitted rows —
-    // unordered and unnoticed.
-    expect(order(result.aggregate.spaces[0]!)).toEqual(ascending);
-
-    const loaded = await repository.loadSpace(ORDERED_SPACE_ID);
-    expect(loaded).toBeDefined();
-    if (loaded === undefined) throw new Error('The seeded space disappeared');
-    expect(order(loaded)).toEqual(ascending);
-  });
-
-  it('rejects a commit for an unknown space', async () => {
-    const missing: SpaceSnapshot = {
-      id: MISSING_SPACE_ID,
-      document: { version: 1, title: 'Missing space' },
-      resources: [],
-    };
-
-    expect(await commitSpace(missing, 0n)).toEqual({
-      kind: 'conflict',
-      conflicts: [{ spaceId: MISSING_SPACE_ID, current: undefined }],
-    });
-    await expect(repository.loadSpace(MISSING_SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  it('rejects a domain-invalid snapshot without changing the stored aggregate', async () => {
-    await seed(SPACE_ID, [snapshot]);
-    const invalid: SpaceSnapshot = {
-      ...snapshot,
-      document: {
-        ...snapshot.document,
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Owner',
-            kind: 'positioned',
-            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Dangling graph',
-                edges: [{ from: RESOURCE_ID, to: MISSING_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-    };
-
-    expectPersisted(await commitSpace(invalid, 0n)).toMatchObject({
-      kind: 'aggregate-refused',
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-  });
-
-  it('rejects a resource owned by another space and rolls back the whole commit', async () => {
-    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
-    const claimed: SpaceSnapshot = {
-      ...linkedSnapshot,
-      document: { ...linkedSnapshot.document, title: 'Must roll back' },
-      resources: [...linkedSnapshot.resources, otherSnapshot.resources[0]!],
-    };
-
-    expectPersisted(await commitSpace(claimed, 0n)).toMatchObject({
-      kind: 'aggregate-refused',
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: linkedSnapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
-      snapshot: otherSnapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-  });
-
   it('serializes concurrent topology commits so the loser observes the complete winner', async () => {
     await seed(SPACE_ID, [snapshot]);
-    const firstRepository = new SqlSpaceRepository(postgresSqlStore);
-    const secondRepository = new SqlSpaceRepository(postgresSqlStore);
+    const firstRepository = new SqlSpaceRepository(postgresSqlStore(db));
+    const secondRepository = new SqlSpaceRepository(postgresSqlStore(db));
     const firstTarget: SpaceSnapshot = {
       id: OTHER_SPACE_ID,
       document: {
@@ -1512,383 +1065,5 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       },
     });
     await expect(repository.loadSpace(losingTargetId)).resolves.toBeUndefined();
-  });
-
-  it('replaces every stored Space and Resource when the aggregate is replaced', async () => {
-    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
-    const replacement: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Only remaining space' },
-      resources: [snapshot.resources[0]!],
-    };
-
-    // Authorized by the Meta identity the caller is replacing, not by a mode
-    // parameter (ADR 0078). The proposal drops both the Space Resource and the
-    // Space it reached, which is the only way `otherSnapshot` can leave — a
-    // proposal keeping the link and dropping the target would be refused as a
-    // missing Space Resource target rather than performed.
-    await expect(
-      repository.replaceAggregate({ metaSpaceId: SPACE_ID, spaces: [replacement] }, SPACE_ID),
-    ).resolves.toEqual({
-      kind: 'replaced',
-      aggregate: {
-        metaSpaceId: SPACE_ID,
-        spaces: [{ snapshot: replacement, revision: 0n, exportedRevision: null }],
-      },
-    });
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Only remaining space' },
-    ]);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: replacement,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  it('refuses an invalid replacement before it truncates anything', async () => {
-    await seed(SPACE_ID, [linkedSnapshot, otherSnapshot]);
-    const replacement: SpaceSnapshot = {
-      ...snapshot,
-      document: { ...snapshot.document, title: 'Must roll back' },
-    };
-    const invalid: SpaceSnapshot = {
-      id: CONCURRENT_SPACE_ID,
-      document: {
-        version: 1,
-        title: 'Invalid later space',
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Dangling map',
-            kind: 'positioned',
-            positions: {},
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Dangling graph',
-                edges: [{ from: UNRESOLVED_RESOURCE_ID, to: MISSING_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      resources: [],
-    };
-
-    // Complete intake runs before the transaction opens, so "rolls back" is now
-    // "never started": there is one validated proposal rather than a batch
-    // written Space by Space, and a refusal cannot leave half of it behind.
-    // What still has to hold is the stored side — both seeded Spaces untouched
-    // at the revision they were seeded at.
-    expectPersisted(
-      await repository.replaceAggregate(
-        { metaSpaceId: SPACE_ID, spaces: [replacement, invalid] },
-        SPACE_ID,
-      ),
-    ).toMatchObject({ kind: 'aggregate-refused' });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: linkedSnapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual({
-      snapshot: otherSnapshot,
-      revision: 0n,
-      exportedRevision: null,
-    });
-    await expect(repository.loadSpace(CONCURRENT_SPACE_ID)).resolves.toBeUndefined();
-  });
-
-  // Moved to `repository-contract.ts` (ticket 22): "stores and commits a
-  // revision above Number.MAX_SAFE_INTEGER as canonical decimal text" proves
-  // the full round trip on both databases now that `revision` is TEXT on
-  // PostgreSQL too, superseding this file's weaker "does not narrow the
-  // expected revision" case.
-
-  it('stores two Spaces of one aggregate that reuse a graph id', async () => {
-    // A graph id is unique across the space that holds it and no wider — its
-    // owner is one map (ADR 0040), and the flatten a space-subject view draws
-    // is what makes the space the scope (ADR 0045). Two spaces reusing one is
-    // therefore fine.
-    // There is no graphs table and no maps table (ADR 0030 keeps both nested),
-    // and every query in the repository is by space id or resource id, so no lookup
-    // anywhere can be made ambiguous by the reuse below. Space and resource ids are
-    // rows and stay globally unique — enforced by their primary keys, which the
-    // duplicate-identity and resource-ownership rules in the shared contract cover.
-    //
-    // Guards a decision, not a bug: scanning every stored document to reject
-    // this would cost a full table read per Space stored and protect nothing.
-    //
-    // The Space Resource sharpens it rather than merely satisfying the
-    // referenced-Space rule: it names `MAP_ID` and `GRAPH_ID` while sitting
-    // in a Space whose own Map and Graph carry those very ids, so a
-    // resolver that looked them up anywhere but in the target would find the
-    // wrong pair and still find something.
-    const first: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: {
-        version: 1,
-        title: 'First space',
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Owner',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Shared graph id',
-                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      resources: [
-        { id: RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
-        { id: OMITTED_RESOURCE_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
-        {
-          id: LINK_RESOURCE_ID,
-          document: {
-            title: 'To the second space',
-            kind: 'space',
-            spaceId: OTHER_SPACE_ID,
-            map: MAP_ID,
-            graph: GRAPH_ID,
-          },
-        },
-      ],
-    };
-    const second: SpaceSnapshot = {
-      id: OTHER_SPACE_ID,
-      document: {
-        version: 1,
-        title: 'Second space',
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Owner',
-            kind: 'positioned',
-            positions: {
-              [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [MIXED_FIRST_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Same graph id, other space',
-                edges: [{ from: OTHER_RESOURCE_ID, to: MIXED_FIRST_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      resources: [
-        { id: OTHER_RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
-        {
-          id: MIXED_FIRST_RESOURCE_ID,
-          document: { title: 'To', kind: 'markdown', body: 'Second.' },
-        },
-      ],
-    };
-
-    await seed(SPACE_ID, [first, second]);
-
-    expectPersisted(await repository.loadSpace(SPACE_ID)).toMatchObject({
-      snapshot: {
-        document: { maps: [{ graphs: [{ id: GRAPH_ID, title: 'Shared graph id' }] }] },
-      },
-    });
-    expectPersisted(await repository.loadSpace(OTHER_SPACE_ID)).toMatchObject({
-      snapshot: {
-        document: {
-          maps: [{ graphs: [{ id: GRAPH_ID, title: 'Same graph id, other space' }] }],
-        },
-      },
-    });
-  });
-
-  it('refuses the same pair when nothing reaches the second Space', async () => {
-    // The pair above with the Space Resource taken out, and it is the *link* that
-    // the refusal is about, never the shared graph id. There is one door and
-    // one collection now — the batch boundary that used to be worth contrasting
-    // against a sequence of inserts no longer exists — so what this holds down
-    // is that graph-id reuse stays legal while the Space nothing references
-    // does not (`ordinary-space-unreferenced`).
-    const first: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: {
-        version: 1,
-        title: 'First space',
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Owner',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Shared graph id',
-                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      resources: [
-        { id: RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'First.' } },
-        { id: OMITTED_RESOURCE_ID, document: { title: 'To', kind: 'markdown', body: 'First.' } },
-      ],
-    };
-    const second: SpaceSnapshot = {
-      id: OTHER_SPACE_ID,
-      document: {
-        version: 1,
-        title: 'Second space',
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Owner',
-            kind: 'positioned',
-            positions: {
-              [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [MIXED_FIRST_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Same graph id',
-                edges: [{ from: OTHER_RESOURCE_ID, to: MIXED_FIRST_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      resources: [
-        { id: OTHER_RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'Second.' } },
-        {
-          id: MIXED_FIRST_RESOURCE_ID,
-          document: { title: 'To', kind: 'markdown', body: 'Second.' },
-        },
-      ],
-    };
-
-    await expect(
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first, second] }),
-    ).resolves.toEqual({
-      kind: 'aggregate-refused',
-      errors: [{ kind: 'ordinary-space-unreferenced', spaceId: OTHER_SPACE_ID }],
-    });
-    await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
-  });
-
-  it('stores a Space whose graph id equals one of its resource ids', async () => {
-    // Entity kinds do not share an identity space. Intake checks each kind
-    // separately — resources among resources, graphs among graphs — so a UUID naming
-    // both a resource and a graph names two different entities unambiguously.
-    const shared: SpaceSnapshot = {
-      id: SPACE_ID,
-      document: {
-        version: 1,
-        title: 'Graph id equals resource id',
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'Owner',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: RESOURCE_ID,
-                title: 'Graph named like a resource',
-                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-      resources: [
-        { id: RESOURCE_ID, document: { title: 'From', kind: 'markdown', body: 'Shared.' } },
-        { id: OMITTED_RESOURCE_ID, document: { title: 'To', kind: 'markdown', body: 'Shared.' } },
-      ],
-    };
-
-    await seed(SPACE_ID, [shared]);
-
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual({
-      snapshot: shared,
-      revision: 0n,
-      exportedRevision: null,
-    });
-  });
-
-  it('rejects two maps owning a graph under one id', async () => {
-    // Single-Space intake's job, and the reason nothing above it looks at graph
-    // ids at all. A graph id is unique across the space although one map
-    // owns it (ADR 0045), so the collision worth catching is the one that spans
-    // owners — and it is caught by the same `loadSpaceSnapshot` a commit goes
-    // through, before the lifecycle door opens a transaction.
-    const collidingGraphs: SpaceSnapshot = {
-      ...snapshot,
-      document: {
-        ...snapshot.document,
-        maps: [
-          {
-            id: MAP_ID,
-            title: 'First owner',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'First',
-                edges: [{ from: RESOURCE_ID, to: OMITTED_RESOURCE_ID }],
-              },
-            ],
-          },
-          {
-            id: OTHER_MAP_ID,
-            title: 'Second owner',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false },
-              [OMITTED_RESOURCE_ID]: { x: 300, y: 0, open: false },
-            },
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Second',
-                edges: [{ from: OMITTED_RESOURCE_ID, to: RESOURCE_ID }],
-              },
-            ],
-          },
-        ],
-      },
-    };
-
-    expectPersisted(
-      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [collidingGraphs] }),
-    ).toMatchObject({
-      kind: 'aggregate-refused',
-      errors: [{ kind: 'invalid-space-snapshot', snapshotIndex: 0 }],
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toBeUndefined();
-    await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 });

@@ -63,35 +63,6 @@ describe('SQLite HTTP runtime', () => {
     expect(reported).toEqual([]);
   });
 
-  it('establishes Default Content and serves the collection and Meta Space', async () => {
-    const harness = await openSqliteRepository();
-    const application = await createApp({
-      database: harness.database,
-      wait: () => new Promise<void>(() => undefined),
-    });
-    close = harness.close;
-
-    const listed = await application.fetch(new Request('http://hyper.test/api/spaces'));
-    expect(listed.status).toBe(200);
-    const summaries = decodeSpaceSummaries(
-      // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
-      JSON.parse(await listed.text()) as unknown,
-    );
-    expect(summaries).toEqual([expect.objectContaining({ title: 'New space' })]);
-    const metaId = summaries[0]?.id;
-    if (metaId === undefined) throw new Error('Expected a Space summary');
-
-    const loaded = await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
-    expect(loaded.status).toBe(200);
-    const body = decodeLoadedSpace(
-      // SAFETY: JSON.parse is the HTTP body boundary; decodeLoadedSpace parses next.
-      JSON.parse(await loaded.text()) as unknown,
-    );
-    expect(body.revision).toBe(0n);
-    expect(body.snapshot.id).toBe(metaId);
-    expect(body.snapshot.document.title).toBe('New space');
-  });
-
   it('leaves an already-initialized file alone and still serves it after reopen', async () => {
     const harness = await openSqliteRepository();
     const first = await createApp({
@@ -322,10 +293,10 @@ describe('SQLite HTTP runtime', () => {
   // `isAggregateInvariant` calls (`src/http/space-host.ts:85` re-reads once
   // rather than rethrowing; `:149` classifies) are exercised for it: the read
   // fails identically every time this row is behind it, so `GET /` answers
-  // `internal-error` — a permanent defect — and start-up's retry
-  // (`retryMetaSpaceEstablishment`) gives up after two consecutive invariant
-  // failures rather than spending its unbounded retry budget on it.
-  it('answers internal-error for a non-JSON stored Meta document, and start-up gives up establishing it', async () => {
+  // `internal-error` — a permanent defect. The target-parameterized runtime
+  // suite owns the retry/give-up policy; this case keeps the real SQLite codec
+  // and wire-classification proof only.
+  it('answers internal-error for a non-JSON stored Meta document', async () => {
     const harness = await openSqliteRepository();
     close = harness.close;
     const spaceId = uuidSchema.parse('00000000-0000-4000-8000-0000000000aa');
@@ -347,50 +318,16 @@ describe('SQLite HTTP runtime', () => {
     }
 
     const reports: unknown[] = [];
-    let notifyGaveUp: (() => void) | undefined;
-    const gaveUp = new Promise<void>((resolve) => {
-      notifyGaveUp = resolve;
-    });
     const report = (cause: unknown): void => {
       reports.push(cause);
-      if (cause instanceof Error && cause.message.startsWith('Gave up establishing')) {
-        notifyGaveUp?.();
-      }
-    };
-
-    // The only row here whose `wait` resolves — the others park the retry on a
-    // promise that never settles — so it is the only one that lets the loop
-    // run. `retryMetaSpaceEstablishment` bounds nothing but *consecutive*
-    // invariant failures: a failure it classifies as anything else resets that
-    // counter and loops again, forever. So a classification regression would
-    // not just fail this expectation, it would leave the detached retry
-    // spinning against the SQLite file for the rest of the run, after the
-    // timeout failed the test. Counting the waits is what stops that: past the
-    // bound the retry is parked the way the other rows park it, and the race
-    // fails here instead of hanging.
-    const RETRY_WAIT_BOUND = 4;
-    let waits = 0;
-    let notifyRunaway: ((outcome: 'ran-away') => void) | undefined;
-    const ranAway = new Promise<'ran-away'>((resolve) => {
-      notifyRunaway = resolve;
-    });
-    const wait = (): Promise<void> => {
-      waits += 1;
-      if (waits > RETRY_WAIT_BOUND) {
-        notifyRunaway?.('ran-away');
-        return new Promise<void>(() => undefined);
-      }
-      return Promise.resolve();
     };
 
     const application = await createApp({
       database: harness.database,
-      wait,
+      wait: () => new Promise<void>(() => undefined),
       report,
     });
-    const outcome = await Promise.race([gaveUp.then(() => 'gave-up' as const), ranAway]);
-    expect(outcome).toBe('gave-up');
-    expect(reports.length).toBeGreaterThanOrEqual(2);
+    expect(reports).toHaveLength(1);
 
     const response = await application.resolveProductRequest(
       '/',

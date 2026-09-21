@@ -1,7 +1,7 @@
-import 'dotenv/config';
 import { defineConfig } from '@prisma-next/sqlite/config';
+import { sqliteMigrationComposition } from './src/sqlite/composition';
 
-const sqlitePath = process.env['SQLITE_PATH']?.trim();
+const sqlitePath = sqliteMigrationComposition().path;
 
 const config: Parameters<typeof defineConfig>[0] = sqlitePath
   ? {
