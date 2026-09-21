@@ -593,6 +593,27 @@ export interface Orderable<Order> {
 }
 
 /**
+ * Whether any error on a failure's cause chain satisfies `holds` — the one
+ * walk every store's `isUnavailable` reads a failure through (ticket 38).
+ *
+ * The chain, because `@prisma-next/sql-runtime` carries a failed COMMIT's own
+ * error, and the callback error behind a failed rollback, only on `.cause`;
+ * bounded by a seen set, because a chain is data a driver built and a cycle in
+ * one would otherwise hang the reader. `test/unit/sql-connection-failure.test.ts`
+ * holds both.
+ */
+export const someCause = (failure: unknown, holds: (link: Error) => boolean): boolean => {
+  const seen = new Set<unknown>();
+  let current = failure;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (holds(current)) return true;
+    current = current.cause;
+  }
+  return false;
+};
+
+/**
  * Whether a failure carries the driver's own `SqlConnectionError` anywhere on
  * its cause chain — what both `@prisma-next/driver-postgres` and
  * `@prisma-next/driver-sqlite` normalise a statement's connection trouble to,

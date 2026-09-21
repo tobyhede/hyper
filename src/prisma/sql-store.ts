@@ -7,6 +7,8 @@ import {
   defineSqlStore,
   isDriverConnectionFailure,
   isUnavailableStatementFailure,
+  someCause,
+  UNAVAILABLE_SQLSTATES,
   type Orderable,
 } from '../persistence/sql-store';
 import type { PostgresDatabase } from './db';
@@ -46,6 +48,16 @@ const isPrimaryKeyConflict = (error: unknown, table: string): boolean => {
     candidate.constraint === `${table}_pkey`
   );
 };
+
+/**
+ * `pg`'s own `DatabaseError` from a failed startup handshake, carrying an
+ * unavailable SQLSTATE on its `code` field.
+ */
+const isRawUnavailableSqlState = (error: unknown): boolean =>
+  someCause(
+    error,
+    (link) => 'code' in link && UNAVAILABLE_SQLSTATES.some((code) => code === link.code),
+  );
 
 /**
  * `Space.where({ id }).include('resources', …).first()`, composed once here
@@ -120,7 +132,11 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
       return isPrimaryKeyConflict(error, table);
     },
     isUnavailable(error: unknown): boolean {
-      return isDriverConnectionFailure(error) || isUnavailableStatementFailure(error);
+      return (
+        isDriverConnectionFailure(error) ||
+        isUnavailableStatementFailure(error) ||
+        isRawUnavailableSqlState(error)
+      );
     },
     serialise<T>(operation: () => Promise<T>): Promise<T> {
       return operation();

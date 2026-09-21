@@ -26,6 +26,14 @@ const connectionError = (message: string, transient: boolean): Error =>
 const queryError = (message: string, sqlState: string): Error =>
   Object.assign(new Error(message), { kind: 'sql_query', sqlState });
 
+/**
+ * What `pg`'s `DatabaseError` carries when a connection's startup handshake
+ * fails: the SQLSTATE on `code`, not normalised by the driver because
+ * `pool.connect()` is outside its statement path.
+ */
+const rawPgError = (message: string, code: string): Error =>
+  Object.assign(new Error(message), { code, severity: 'FATAL' });
+
 /*
  * Ticket 31. Both drivers normalise a failed statement's connection trouble to
  * `SqlConnectionError`, and the repository names it unavailable. The driver's
@@ -158,5 +166,30 @@ describe('postgresSqlStore.isUnavailable', () => {
     ['a refused connection the driver normalised', connectionError('connect ECONNREFUSED', false)],
   ])('recognises %s whatever its transient flag says', (_label, error) => {
     expect(store.isUnavailable(error)).toBe(true);
+  });
+
+  it.each(UNAVAILABLE_SQLSTATES)(
+    'recognises SQLSTATE %s on a statement the driver normalised',
+    (sqlState) => {
+      expect(store.isUnavailable(queryError('failed', sqlState))).toBe(true);
+    },
+  );
+
+  // `pg` raises a failed startup handshake from `pool.connect()`, which the
+  // driver does not normalise: the SQLSTATE is on `pg`'s own `code` field.
+  it.each(['53300', '57P03'])('recognises SQLSTATE %s raised while connecting', (code) => {
+    expect(store.isUnavailable(rawPgError('the server refused this client for now', code))).toBe(
+      true,
+    );
+  });
+
+  // Authentication and a missing database are the configuration or the
+  // server refusing this client, which no wait cures (ticket 36).
+  it.each([
+    ['28P01', 'password authentication failed for user "hyper"'],
+    ['28000', 'no pg_hba.conf entry for host'],
+    ['3D000', 'database "missing" does not exist'],
+  ])('leaves SQLSTATE %s raised while connecting unclassified', (code, message) => {
+    expect(store.isUnavailable(rawPgError(message, code))).toBe(false);
   });
 });
