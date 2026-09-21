@@ -47,6 +47,13 @@ it belongs to the Space Card work below.
 
 ### Executable dependency graph
 
+**2026-09-20 candidate update:** the user added the architecture review's eight
+audited tickets to the final release prerequisites. The
+[audit record](../architecture-ticket-audit-2026-09-20.md) records the scope and
+remaining design decisions; V1/07's `Blocked by` field owns their connection to
+the gate. This supersedes this handoff's older assertion that no release decision
+remains: the newly admitted tickets include explicit design/disposition work.
+
 `pnpm roadmap` derives the dependency graph and the critical subgraph from the
 implementation tickets' own `Blocked by` fields. It is the authority for what is
 blocked, what is pickable and in what order the work to End-to-end falls, and
