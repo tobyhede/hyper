@@ -304,7 +304,8 @@
         "test/unit/raw-http-request.test.ts",
         "test/unit/vite-hono-host.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
-        "test/unit/export-aggregate-recovery.test.ts"
+        "test/unit/export-aggregate-recovery.test.ts",
+        "test/support/refusing-postgres-server.ts"
       ],
       "rules": {
         "anti-slop/no-runtime-typeof": "off"

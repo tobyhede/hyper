@@ -4,10 +4,14 @@ import {
   classifyStoredFailure,
   PersistenceUnavailableError,
 } from '@project/persistence';
-import { afterEach, describe, expect, it } from 'vitest';
+import postgres from '@prisma-next/postgres/runtime';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import type { SqlTables } from '../../src/persistence/sql-store';
+import type { Contract as PostgresContract } from '../../src/prisma/contract.d';
+import postgresContractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 import type { SqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { retryMetaSpaceEstablishment } from '../../src/startup/database-startup';
@@ -519,23 +523,40 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   });
 
   /**
-   * The harness's own store, with one `RepositoryState` member replaced. Both
-   * stand-ins below reach the repository exactly where the real member's
-   * result would, inside the transaction, after its callback has run -- so
-   * what they exercise is the naming of a failure *past* `#transaction`'s
-   * position rule, which is the only place these two defects live.
+   * The harness's own store, with one `RepositoryState` member replaced. Each
+   * stand-in below reaches the repository exactly where the real member's
+   * result would, inside the transaction, after its callback has run.
+   * `isUnavailable` is the store's own unless a case says otherwise.
    */
   const withRepositoryState = (
     database: SqliteDatabase,
     replace: (state: RepositoryStateTable) => RepositoryStateTable,
+    isUnavailable?: SqliteStore['isUnavailable'],
   ) => {
     const store = sqliteSqlStore(database);
     const tables: typeof store.tables = (handle) => {
       const real = store.tables(handle);
       return { ...real, RepositoryState: replace(real.RepositoryState) };
     };
-    return new SqlSpaceRepository({ ...store, tables });
+    return new SqlSpaceRepository({
+      ...store,
+      tables,
+      isUnavailable: isUnavailable ?? store.isUnavailable,
+    });
   };
+
+  /**
+   * PostgreSQL's recognition of an unavailable failure (ticket 38), read off a
+   * store whose runtime is never connected.
+   */
+  const unconnectedPostgres = postgres<PostgresContract>({
+    contractJson: postgresContractJson,
+    url: 'postgres://hyper:unused@127.0.0.1:1/hyper',
+  });
+  const postgresRecognition = postgresSqlStore(unconnectedPostgres).isUnavailable;
+  afterAll(async () => {
+    await unconnectedPostgres.close();
+  });
 
   /**
    * What `@prisma-next/driver-postgres`' `normalizePgError` makes of a
@@ -543,7 +564,8 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
    * `SqlQueryError`, the code on `sqlState`. Built by hand because that
    * package is the driver's dependency, not this repository's; SQLite never
    * raises one of these codes, which is why a SQLite file stands in for the
-   * database here and only the failure is PostgreSQL's.
+   * database here and only the failure — and the PostgreSQL store's
+   * recognition of it, `postgresRecognition` — is PostgreSQL's.
    */
   const queryError = (sqlState: string): Error =>
     Object.assign(new Error(`statement failed with ${sqlState}`), {
@@ -561,10 +583,11 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
     });
     const deadlock = queryError('40P01');
-    const deadlocked = withRepositoryState(database, (state) => ({
-      ...state,
-      read: () => Promise.reject(deadlock),
-    }));
+    const deadlocked = withRepositoryState(
+      database,
+      (state) => ({ ...state, read: () => Promise.reject(deadlock) }),
+      postgresRecognition,
+    );
 
     const error = await captureError(() => deadlocked.loadAggregate());
 
@@ -579,10 +602,11 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
     });
     const duplicate = queryError('23505');
-    const failing = withRepositoryState(database, (state) => ({
-      ...state,
-      read: () => Promise.reject(duplicate),
-    }));
+    const failing = withRepositoryState(
+      database,
+      (state) => ({ ...state, read: () => Promise.reject(duplicate) }),
+      postgresRecognition,
+    );
 
     expect(classifyStoredFailure(await captureError(() => failing.loadAggregate()))).toBe(
       'unclassified',
@@ -594,13 +618,17 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   it('keeps start-up trying through contention', async () => {
     const { database } = await opened();
     let reads = 0;
-    const contended = withRepositoryState(database, (state) => ({
-      ...state,
-      read: () => {
-        reads += 1;
-        return reads <= 3 ? Promise.reject(queryError('40001')) : state.read();
-      },
-    }));
+    const contended = withRepositoryState(
+      database,
+      (state) => ({
+        ...state,
+        read: () => {
+          reads += 1;
+          return reads <= 3 ? Promise.reject(queryError('40001')) : state.read();
+        },
+      }),
+      postgresRecognition,
+    );
     const ids = [SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID];
 
     const metaSpaceId = await retryMetaSpaceEstablishment(

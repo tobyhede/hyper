@@ -230,6 +230,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * state wins, as `classifyStoredFailure` says. Anything else leaves
    * unclassified, which is a real answer: each reader decides what it says for
    * a failure neither arm describes.
+   *
+   * What decides is only what the failure carries, never how far the operation
+   * got: a failure raised before a transaction callback runs is judged like any
+   * other. Ticket 31 named every such failure unavailable by position, which
+   * also named a wrong password or a missing database an outage (ticket 36);
+   * ticket 38 replaced that rule with the store's own recognition, which is
+   * what lets a read outside any transaction be named too.
    */
   async #naming<T>(operation: () => Promise<T>): Promise<T> {
     try {
@@ -239,38 +246,6 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         throw new PersistenceUnavailableError('The database is not answering', { cause: error });
       }
       throw error;
-    }
-  }
-
-  /**
-   * `#store.transaction`, naming a transaction the database never opened
-   * `PersistenceUnavailableError` -- by position, whatever the driver threw
-   * (ticket 31).
-   *
-   * By position because the canonical outage never reaches here as the
-   * driver's own type. A PostgreSQL server that is down refuses the pool's
-   * connection, and `@prisma-next/driver-postgres` does not normalise an error
-   * from acquiring a connection, only from a statement run on one: what
-   * escapes is Node's own `ECONNREFUSED` (`test/unit/postgres-unreachable.test.ts`).
-   * A SQLite client closed underneath the repository refuses before any
-   * connection with a plain `Error` (`test/integration/sqlite-space-repository.test.ts`,
-   * "names a database that will not open a transaction unavailable"). Neither
-   * carries anything but prose to recognise it by, and both are the database
-   * not answering. Once the callback has run, a failure is the callback's or a
-   * statement's, and `#naming` classifies it by what it carries instead.
-   */
-  async #transaction<T>(fn: (handle: Handle) => Promise<T>): Promise<T> {
-    const progress = { opened: false };
-    try {
-      return await this.#store.transaction((handle) => {
-        progress.opened = true;
-        return fn(handle);
-      });
-    } catch (error) {
-      if (progress.opened) throw error;
-      throw new PersistenceUnavailableError('The database did not open a transaction', {
-        cause: error,
-      });
     }
   }
 
@@ -479,7 +454,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
-    return this.#transaction(async (handle) => {
+    return this.#store.transaction(async (handle) => {
       const tables = this.#store.tables(handle);
       const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
@@ -774,7 +749,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   async #loadAggregateUnserialised(): Promise<AggregateLoadResult> {
-    return this.#transaction(async (handle) => {
+    return this.#store.transaction(async (handle) => {
       const tables = this.#store.tables(handle);
       const metaSpaceId = await this.#lockMetaIdentity(tables);
       if (metaSpaceId === undefined) {
@@ -798,7 +773,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     try {
-      return await this.#transaction(async (handle) => {
+      return await this.#store.transaction(async (handle) => {
         const tables = this.#store.tables(handle);
         const metaSpaceId = await this.#lockMetaIdentity(tables);
         if (metaSpaceId !== undefined) {
@@ -840,7 +815,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     try {
-      return await this.#transaction(async (handle) => {
+      return await this.#store.transaction(async (handle) => {
         const tables = this.#store.tables(handle);
         const metaSpaceId = await this.#lockMetaIdentity(tables);
         // Rows are read raw rather than through `#loadEverySpace`: truncation
