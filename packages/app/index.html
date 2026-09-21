@@ -15,7 +15,10 @@
         this. No spinner here, which would mean hand-rolled keyframes, and no
         class names, the stylesheets not having arrived either.
         `packages/app/test/startup-pending-parity.test.tsx` is what holds the
-        two copies to one logo, message and background.
+        two copies to one logo, message and background, and to the three values
+        that make the handoff invisible: the mark's width, the column's gap and
+        the message's size. jsdom applies no Tailwind, so it resolves the React
+        copy's utilities through the theme rather than reading a computed style.
       -->
       <div
         style="
