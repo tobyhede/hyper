@@ -7,6 +7,11 @@ import type { Contract } from '../../src/prisma/contract.d';
 import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
 import { configuredDatabaseUrl } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
+import {
+  META_SPACE_RETRY_INITIAL_DELAY_MS,
+  META_SPACE_RETRY_MAX_DELAY_MS,
+  retryMetaSpaceEstablishment,
+} from '../../src/startup/database-startup';
 import { captureError } from '../support/capture-error';
 
 /*
@@ -123,5 +128,51 @@ describe.each([
     expect(error).toMatchObject({ name: 'CliStructuredError', code: '3006' });
     expect(error?.cause).toBeUndefined();
     expect(causeChain(error)).not.toContainEqual(expect.objectContaining({ code: sqlState }));
+  });
+});
+
+/*
+ * Ticket 38 (and ticket 36): start-up over a real server that will not take
+ * this password. The refusal is unclassified, so the second attempt confirms
+ * it and the retry stops, rather than waiting forever for an outage to end.
+ * Establishment fails at its first read, before it mints anything.
+ */
+describe('retryMetaSpaceEstablishment over PostgreSQL given a wrong password', () => {
+  it('gives up once a second attempt confirms the refusal', async () => {
+    const database = postgres<Contract>({ contractJson, url: wrongPasswordUrl() });
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+    try {
+      const metaSpaceId = await retryMetaSpaceEstablishment(
+        new SqlSpaceRepository(postgresSqlStore(database)),
+        () => {
+          throw new Error('Start-up minted an identity before reaching the database.');
+        },
+        {
+          // Bounded, so a refusal read as an outage fails here rather than
+          // retrying against the server until the test times out.
+          wait: (milliseconds) => {
+            waits.push(milliseconds);
+            return waits.length > 5
+              ? Promise.reject(new Error('Start-up kept retrying a wrong password.'))
+              : Promise.resolve();
+          },
+          report: (error) => reported.push(error),
+        },
+      );
+
+      expect(metaSpaceId).toBeUndefined();
+      expect(waits).toEqual([
+        META_SPACE_RETRY_INITIAL_DELAY_MS,
+        Math.min(META_SPACE_RETRY_INITIAL_DELAY_MS * 2, META_SPACE_RETRY_MAX_DELAY_MS),
+      ]);
+      expect(reported.map(classifyStoredFailure)).toEqual(['unclassified', 'unclassified']);
+      expect(reported).toEqual([
+        expect.objectContaining({ code: '28P01' }),
+        expect.objectContaining({ code: '28P01' }),
+      ]);
+    } finally {
+      await database.close();
+    }
   });
 });
