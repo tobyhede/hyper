@@ -97,14 +97,26 @@ const EXCLUDED_PATHS = [
  * `graphColorMap` gives up the `…Map` suffix, which ADR 0101 reserves for the
  * entity. It returns a `Record` keyed by Graph id and says so.
  *
+ * **A rule whose key is a spelling the sweep itself produces carries a `files`
+ * scope, and the scope is the whole reason the field exists.** `SpaceResource`
+ * and `AggregateResource` are what `SpaceThing` and `AggregateThing` become one
+ * stage later in the same pass, so an unscoped rule cannot tell the 35
+ * pre-existing HTTP-sense sites ADR 0101 names from its own output. ADR 0101
+ * gives those sites one address between them, so the scope is exact rather than
+ * approximate. `SpaceResourceRepository` and `graphColorMap` need no scope:
+ * neither `SpaceThingRepository` nor `graphColorDiagram` exists, so the sweep
+ * cannot mint either key.
+ *
  * Ordered longest-first so a longer key wins over a shorter one that is a
  * prefix of it.
  */
+const HTTP_SEAM_ALIASES = 'packages/http/test/space-http-app-types.test.ts';
+
 const PRE_REWRITES = [
   ['SpaceResourceRepository', 'StoredSpaceRepository'],
   ['spaceResourceRepository', 'storedSpaceRepository'],
-  ['AggregateResource', 'AggregateEndpoint'],
-  ['SpaceResource', 'SpaceEndpoint'],
+  ['AggregateResource', 'AggregateEndpoint', HTTP_SEAM_ALIASES],
+  ['SpaceResource', 'SpaceEndpoint', HTTP_SEAM_ALIASES],
   ['graphColorMap', 'graphColorsByGraphId'],
 ];
 
@@ -215,9 +227,12 @@ const PROSE_NOUN = new RegExp(`\\b${DETERMINER} (?:things?|diagrams?)\\b`, 'gi')
  */
 const mask = (index) => `@@PROTECTED_${index}@@`;
 
-const rewrite = (text) => {
+const rewrite = (text, file) => {
   let masked = text;
-  for (const [from, to] of PRE_REWRITES) masked = masked.split(from).join(to);
+  for (const [from, to, scope] of PRE_REWRITES) {
+    if (scope !== undefined && file !== scope) continue;
+    masked = masked.split(from).join(to);
+  }
 
   PROTECTED.forEach((token, index) => {
     masked = masked.split(token).join(mask(index));
@@ -255,7 +270,7 @@ if (previewIndex !== -1) {
   const target = process.argv[previewIndex + 1];
   const source = readFileSync(join(repoRoot, target), 'utf8');
   const destination = join(dirname(process.argv[1]), 'preview.out');
-  writeFileSync(destination, rewrite(source));
+  writeFileSync(destination, rewrite(source, target));
   console.log(destination);
   process.exit(0);
 }
@@ -307,14 +322,21 @@ const SWEEPABLE = new RegExp(
 let changedFiles = 0;
 const citations = new Map();
 const prose = [];
+const nonIdempotent = [];
 for (const file of tracked) {
   if (BINARY.test(file)) continue;
   const absolute = join(repoRoot, file);
   if (!existsSync(absolute)) continue;
   const before = readFileSync(absolute, 'utf8');
   if (!SWEEPABLE.test(before)) continue;
-  const after = rewrite(before);
+  const after = rewrite(before, file);
   if (after === before) continue;
+
+  // A second pass over this file's own output must be a no-op. Without this the
+  // only evidence of a non-idempotent rule is a `--dry` that reports zero files
+  // — which reads exactly like a clean sweep, because `SWEEPABLE` is built from
+  // the rule keys and a rule that has eaten its own output leaves none of them.
+  if (rewrite(after, file) !== after) nonIdempotent.push(file);
 
   // Every bare `<feature>/NN` the rewrite touched, for the manual citation read
   // the shape mask cannot do for us.
@@ -383,6 +405,15 @@ if (citations.size > 0) {
 if (prose.length > 0) {
   console.log(`\n${prose.length} lowercase retired nouns in prose — read each before sweeping:`);
   for (const line of prose) console.log(`  ${line}`);
+}
+if (nonIdempotent.length > 0) {
+  console.error(
+    `\n${nonIdempotent.length} files where a second pass would change the output again.` +
+      ' A rule is rewriting a spelling this sweep produces; scope it with `files`' +
+      ' before trusting any of this run:',
+  );
+  for (const file of nonIdempotent) console.error(`  ${file}`);
+  process.exitCode = 1;
 }
 if (verbose) {
   console.log('\npaths:');
