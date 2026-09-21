@@ -25,13 +25,7 @@ import type {
   ReplaceAggregateResult,
   SpaceRepository,
 } from './space-repository';
-import {
-  isDriverConnectionFailure,
-  isUnavailableStatementFailure,
-  type SqlLoadedSpaceRow,
-  type SqlStore,
-  type SqlTables,
-} from './sql-store';
+import { type SqlLoadedSpaceRow, type SqlStore, type SqlTables } from './sql-store';
 
 class SnapshotValidationError extends Error {}
 
@@ -226,32 +220,23 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * Every public operation, naming the driver's own connection failure
-   * (`isDriverConnectionFailure`), and a statement it failed for contention
-   * or shutdown (`isUnavailableStatementFailure`), `PersistenceUnavailableError`
-   * on its way out (ticket 31), so a reader asks one predicate rather than re-deriving
-   * "unreachable" from a failure being something else. A failure already
-   * named -- broken stored state, or a transaction `#transaction` saw never
-   * open -- keeps its name; broken stored state wins, as
-   * `classifyStoredFailure` says. Anything else leaves unclassified, which is
-   * a real answer: each reader decides what it says for a failure neither
-   * arm describes.
+   * Every public operation, naming a failure its store recognises as the
+   * database not answering (`SqlStore.isUnavailable`, ticket 38)
+   * `PersistenceUnavailableError` on its way out, with the failure on `cause`,
+   * so a reader asks one predicate rather than re-deriving "unreachable" from a
+   * failure being something else. The store is asked only about a failure
+   * nothing has named yet: broken stored state, or an unavailable failure
+   * already named, keeps its name and is not wrapped again -- broken stored
+   * state wins, as `classifyStoredFailure` says. Anything else leaves
+   * unclassified, which is a real answer: each reader decides what it says for
+   * a failure neither arm describes.
    */
   async #naming<T>(operation: () => Promise<T>): Promise<T> {
     try {
       return await operation();
     } catch (error) {
-      if (classifyStoredFailure(error) === 'unclassified') {
-        if (isDriverConnectionFailure(error)) {
-          throw new PersistenceUnavailableError('The database connection failed', {
-            cause: error,
-          });
-        }
-        if (isUnavailableStatementFailure(error)) {
-          throw new PersistenceUnavailableError('The database refused the statement for now', {
-            cause: error,
-          });
-        }
+      if (classifyStoredFailure(error) === 'unclassified' && this.#store.isUnavailable(error)) {
+        throw new PersistenceUnavailableError('The database is not answering', { cause: error });
       }
       throw error;
     }
