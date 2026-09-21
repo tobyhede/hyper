@@ -54,26 +54,41 @@ which `startup-pending-parity.test.tsx` holds against `tailwind.css` (`--backgro
 `--muted-foreground`); the font stack is the third and is not held, a fallback list
 being cosmetic.
 
-**One Playwright test was written, proved, and then deliberately withdrawn.**
-`packages/app/e2e/startup-pending.spec.ts` held `/src/main.tsx` and `/api/spaces` open
-with `page.route`, asserted the served copy before the script ran (logo and message
-visible, no live region yet), released the bundle and asserted the React view, then
-released the aggregate and asserted `space-title`. It passed twice locally and was not
-a race — the waits were held rather than chased. It is gone because the wait it observes
-is reached by holding a response rather than by a browser gesture, which is the same
-ground `operational-feedback-placement-pending` is exempt on, and the claim now carries
-`applicationEvidence` naming the two unit tests instead. The spec is recoverable from
-this paragraph if the exemption is ever judged the wrong call; `waitForLoadState('load')`
-plus a 15s expect timeout after releasing the bundle is the one non-obvious part, the
-cold Vite host needing longer than the default 5s.
+**The claim has a real application proof, and the exemption it briefly carried is
+withdrawn.** `packages/app/e2e/startup-pending.spec.ts` holds `/src/main.tsx` and
+`/api/spaces` open with `page.route`: it asserts the served copy before the script runs
+(logo and message visible, no live region yet), releases the bundle and asserts the React
+view, then releases the aggregate and asserts `space-title` with the message gone. The
+spec was withdrawn mid-ticket on the reasoning that startup settles too fast to observe
+— which was wrong, and is recorded here because it is the kind of wrong worth keeping:
+`page.route` **holds** the wait open rather than chasing it, so there is no race to lose.
+`operational-feedback-placement-pending`'s exemption is permission to ship without an
+application proof, not a reason to decline one that works. The claim therefore declares
+no `applicationEvidence`, and `ui:catalog:check` finds its one tagged test in
+`packages/app/e2e`.
+
+**Two non-obvious parts of that spec, both earned.** After releasing the bundle it waits
+for `load` and gives the first status assertion 15s: every other spec reaches its first
+assertion after a `load` that already absorbed the host's cold module transform, while
+this one asserts *before* the script is even requested, so the wait for it has to be
+explicit. And each hold counts the requests that reach its handler, asserted before that
+hold is released. That is the answer to the one genuine objection to the approach:
+`src/main.tsx` is the dev host's entry path and `api/spaces` is a wire path, so either
+pattern can stop matching — and a pattern that matches nothing holds nothing, letting
+startup complete before the first assertion and every assertion below it pass against
+the opened Space instead of the wait. **Checked rather than assumed**: pointing the
+bundle pattern at `src/main-moved.tsx` leaves the three static-copy assertions *green*
+— `commit` returns before the script executes either way — and the run now fails on the
+counter, with the message naming the reason. Without the counters that mutation is a
+silent false green.
 
 **Run locally:** `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm ui:catalog:check`,
 `pnpm lint`, `pnpm lint:anti-slop`, `prettier --check .`, `pnpm test` (230 files, 2893
 passed, 6 skipped), the four new or changed unit files individually, the
-`operational-feedback` Ladle suite (5 passed), and the withdrawn spec before it was
-withdrawn. An earlier `pnpm test` run reported 24 failures in five untouched jsdom files
-(`space-resource-embedded-map` among them) and the re-run was clean, which is the
-under-load flake other tickets in this tree already record.
+`operational-feedback` Ladle suite (5 passed), and `startup-pending.spec.ts` on its own —
+green, plus the deliberate red above. An earlier `pnpm test` run reported 24 failures in
+five untouched jsdom files (`space-resource-embedded-map` among them) and the re-run was
+clean, which is the under-load flake other tickets in this tree already record.
 
 **Not run:** `pnpm verify`, `pnpm e2e`, `pnpm e2e:ladle` in full — the bar moved to CI
 for this ticket.

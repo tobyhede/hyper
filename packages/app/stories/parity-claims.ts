@@ -505,8 +505,6 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Starting',
     claim:
       'Startup draws the product mark over one announced “Starting…”, from first paint until the opened Space replaces it.',
-    applicationEvidence:
-      'Startup against a memory catalog settles faster than Playwright can observe the frame before it; holding the responses open to see it would be driving the state rather than reaching it. Covered instead by packages/app/test/startup.test.tsx, which holds the crossing as a value and asserts the view before and after it settles, and by packages/app/test/startup-pending-parity.test.tsx, which holds index.html’s first-paint copy to the same logo, message and background.',
   },
   {
     id: 'operational-feedback-startup-failure',
