@@ -7,9 +7,9 @@ import {
   defineSqlStore,
   type Orderable,
 } from '../persistence/sql-store';
-import { db } from './db';
+import type { PostgresDatabase } from './db';
 
-type Orm = typeof db.orm.public;
+type Orm = PostgresDatabase['orm']['public'];
 
 /**
  * `Order`, named once from a real, harmless reference to the live `orm` —
@@ -19,9 +19,6 @@ type Orm = typeof db.orm.public;
  * through `typeof` below, hence the `_` — TypeScript's own convention for
  * "used as a type, not a value".
  */
-const _orderProbe = asOrderable(db.orm.public.Space);
-type InferredOrder = typeof _orderProbe extends Orderable<infer O> ? O : never;
-
 interface SqlPrimaryKeyConflictFields {
   readonly kind?: unknown;
   readonly sqlState?: unknown;
@@ -92,34 +89,39 @@ const deleteResourcesExcept = async (
 };
 
 /** PostgreSQL's `SqlStore`: `document` already decoded by the `jsonb` codec, never re-parsed here. */
-export const postgresSqlStore = defineSqlStore({
-  orm: db.orm.public,
-  tables(orm: Orm): SqlTables<InferredOrder> {
-    return {
-      Space: buildSpaceTable(
-        orm.Space,
-        (id: string) => loadWithResources(orm, id),
-        () => loadEvery(orm),
-      ),
-      Resource: buildResourceTable(orm.Resource, (spaceId: string, keepIds: readonly string[]) =>
-        deleteResourcesExcept(orm, spaceId, keepIds),
-      ),
-      RepositoryState: buildRepositoryStateTable(orm.RepositoryState),
-    };
-  },
-  transaction<T>(fn: (orm: Orm) => Promise<T>): Promise<T> {
-    return db.transaction(({ orm }) => fn(orm.public));
-  },
-  readDocument(value: unknown): unknown {
-    return value;
-  },
-  isDuplicateKey(error: unknown, table: string): boolean {
-    return isPrimaryKeyConflict(error, table);
-  },
-  serialise<T>(operation: () => Promise<T>): Promise<T> {
-    return operation();
-  },
-  close(): Promise<void> {
-    return db.close();
-  },
-});
+export const postgresSqlStore = (database: PostgresDatabase) => {
+  const orm = database.orm.public;
+  const _orderProbe = asOrderable(orm.Space);
+  type InferredOrder = typeof _orderProbe extends Orderable<infer O> ? O : never;
+  return defineSqlStore({
+    orm,
+    tables(orm: Orm): SqlTables<InferredOrder> {
+      return {
+        Space: buildSpaceTable(
+          orm.Space,
+          (id: string) => loadWithResources(orm, id),
+          () => loadEvery(orm),
+        ),
+        Resource: buildResourceTable(orm.Resource, (spaceId: string, keepIds: readonly string[]) =>
+          deleteResourcesExcept(orm, spaceId, keepIds),
+        ),
+        RepositoryState: buildRepositoryStateTable(orm.RepositoryState),
+      };
+    },
+    transaction<T>(fn: (orm: Orm) => Promise<T>): Promise<T> {
+      return database.transaction(({ orm }) => fn(orm.public));
+    },
+    readDocument(value: unknown): unknown {
+      return value;
+    },
+    isDuplicateKey(error: unknown, table: string): boolean {
+      return isPrimaryKeyConflict(error, table);
+    },
+    serialise<T>(operation: () => Promise<T>): Promise<T> {
+      return operation();
+    },
+    close(): Promise<void> {
+      return database.close();
+    },
+  });
+};

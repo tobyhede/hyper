@@ -52,7 +52,7 @@
     "e2e:sqlite": "playwright test --config playwright.sqlite.config.ts",
     "test:integration:postgres": "pnpm contract:emit && pnpm db:migrate && vitest run --config vitest.integration.config.ts",
     "test:integration:sqlite": "pnpm contract:emit:sqlite && pnpm db:migrate:sqlite && vitest run --config vitest.sqlite.config.ts",
-    "dev:sqlite": "mkdir -p .scratch/sqlite && export SQLITE_PATH=\"${SQLITE_PATH:-$PWD/.scratch/sqlite/hyper.db}\" && case \"$SQLITE_PATH\" in /*) ;; *) echo \"SQLITE_PATH must be an absolute path: $SQLITE_PATH\" >&2; exit 1;; esac && pnpm db:migrate:sqlite && pnpm --filter @project/app dev:sqlite",
+    "dev:sqlite": "tsx scripts/dev-sqlite.ts",
     "verify:static": "pnpm typecheck:toolchain && pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check",
     "verify": "pnpm verify:static && pnpm test:coverage",
     "verify:local": "pnpm verify:static && pnpm test:coverage --maxWorkers=2 --minWorkers=1"

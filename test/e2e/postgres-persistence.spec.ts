@@ -1,19 +1,17 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
-import { exportAggregate } from '../../src/export/export-aggregate';
-import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
+import { postgresTestDatabase } from '../support/postgres-database';
 import {
   dragResourceAndCapturePosition,
+  expectRestartProofExport,
   expectResourceRestoredAt,
   openStoredSpace,
+  restartProofFixture,
 } from '../support/restart-proof';
 import { POSTGRES_E2E_PORT } from '../../packages/app/e2e/projects';
 
@@ -46,7 +44,12 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
 };
 
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
-  const repository = new SqlSpaceRepository(postgresSqlStore);
+  // The same handle `clearHyperContent` holds, not a second one beside it.
+  // That module opens its client at import, so a client of this spec's own
+  // would leave that one live after the `finally` below closed only its own —
+  // one pool per process is what the closing `finally` can actually account
+  // for.
+  const repository = new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase));
   const spaceId = newUuid();
   const resourceId = newUuid();
   const mapId = newUuid();
@@ -56,7 +59,6 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
   let secondHost: ViteDevServer | undefined;
   let firstContext: BrowserContext | undefined;
   let secondContext: BrowserContext | undefined;
-  let exportDirectory: string | undefined;
   let spaceRemains: boolean | undefined;
 
   try {
@@ -84,34 +86,10 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // This Space is Meta, and says so rather than being inferred to be. A
     // one-Space aggregate has nowhere else for the root to be, but naming it is
     // what the lifecycle takes (ADR 0078) — array position no longer decides.
+    const fixture = restartProofFixture({ spaceId, resourceId, mapId, graphId, title });
     const initialized = await repository.initializeAggregate({
       metaSpaceId: spaceId,
-      spaces: [
-        {
-          id: spaceId,
-          document: {
-            version: 1,
-            title,
-            maps: [
-              {
-                id: mapId,
-                title: 'Map 1',
-                kind: 'positioned',
-                positions: { [resourceId]: { x: 0, y: 0, open: false } },
-                graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
-                activeGraph: graphId,
-              },
-            ],
-            defaultMap: mapId,
-          },
-          resources: [
-            {
-              id: resourceId,
-              document: { title: 'Restart resource', kind: 'markdown', body: 'Durable.' },
-            },
-          ],
-        },
-      ],
+      spaces: [fixture],
     });
     if (initialized.kind !== 'initialized') {
       throw new Error(`The fixture aggregate was not established: ${initialized.kind}`);
@@ -149,32 +127,12 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // and still record *something*, so the assertion that matters is the
     // projected revision: `markExported` runs after the bytes land, and 1n is
     // what says it recorded the edit rather than the fixture.
-    exportDirectory = await mkdtemp(join(tmpdir(), 'hyper-postgres-e2e-export-'));
-    const exported = await exportAggregate(repository, exportDirectory);
-    expect(exported.kind).toBe('exported');
-    const aggregateFile: unknown = JSON.parse(
-      await readFile(join(exportDirectory, AGGREGATE_FILE_NAME), 'utf8'),
-    );
-    expect(aggregateFile).toEqual({ version: 1, metaSpaceId: spaceId });
-    // The Space directory is named for the Space, which is where an aggregate
-    // writes every Space Id down (ADR 0078) — so its presence under this name
-    // is the check, not a search for a file called `space.json` somewhere.
-    const spaceFile: unknown = JSON.parse(
-      await readFile(join(exportDirectory, spaceId, 'space.json'), 'utf8'),
-    );
-    expect(spaceFile).toMatchObject({ id: spaceId, title });
-    await expect(repository.loadSpace(spaceId)).resolves.toMatchObject({
-      revision: 1n,
-      exportedRevision: 1n,
-    });
+    await expectRestartProofExport(repository, fixture);
   } finally {
     await secondContext?.close();
     await firstContext?.close();
     await secondHost?.close();
     await firstHost?.close();
-    if (exportDirectory !== undefined) {
-      await rm(exportDirectory, { recursive: true, force: true });
-    }
     // Cleanup records what it observed rather than asserting it. An assertion
     // here throws over whatever failure sent us into this block, and would also
     // strand the connection below unclosed.
@@ -199,7 +157,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
       await clearHyperContent();
       spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
     } finally {
-      await postgresSqlStore.close();
+      await postgresTestDatabase.close();
     }
   }
 

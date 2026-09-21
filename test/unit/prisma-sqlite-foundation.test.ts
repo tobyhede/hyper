@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import contractJson from '../../src/sqlite/contract.json' with { type: 'json' };
-import { createSqliteDatabase } from '../../src/sqlite/db';
+import {
+  configuredSqlitePath,
+  createSqliteDatabase,
+  requireConfiguredSqlitePath,
+} from '../../src/sqlite/db';
 
 const viteConfig = readFileSync(
   fileURLToPath(new URL('../../packages/app/vite.config.ts', import.meta.url)),
@@ -12,6 +16,10 @@ const viteConfig = readFileSync(
 );
 const sqliteViteConfig = readFileSync(
   fileURLToPath(new URL('../../packages/app/vite.sqlite.config.ts', import.meta.url)),
+  'utf8',
+);
+const databaseViteConfig = readFileSync(
+  fileURLToPath(new URL('../../packages/app/database-vite-config.ts', import.meta.url)),
   'utf8',
 );
 
@@ -63,6 +71,32 @@ describe('Prisma Next SQLite foundation', () => {
     expect(database.contract.domain.namespaces.__unbound__.models).toHaveProperty('Space');
   });
 
+  it('applies the same absolute-path rule to every SQLite caller', () => {
+    vi.stubEnv('SQLITE_PATH', 'relative/hyper.db');
+    expect(() => requireConfiguredSqlitePath()).toThrow(
+      'SQLITE_PATH must be an absolute path: relative/hyper.db',
+    );
+  });
+
+  it('allows offline migration planning without a configured path', () => {
+    vi.stubEnv('SQLITE_PATH', '');
+    expect(configuredSqlitePath()).toBeUndefined();
+  });
+
+  it('keeps the CLI existing-file rule separate from migration', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'hyper-sqlite-existing-'));
+    try {
+      const path = join(parent, 'missing.db');
+      vi.stubEnv('SQLITE_PATH', path);
+      expect(configuredSqlitePath()).toBe(path);
+      expect(() => requireConfiguredSqlitePath({ existing: true })).toThrow(
+        `SQLite database file does not exist: ${path}. Run pnpm db:migrate:sqlite first.`,
+      );
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
   it('fails clearly when the SQLite parent directory is missing', () => {
     expect(() => createSqliteDatabase('/no-such-hyper-sqlite-parent/hyper.db')).toThrow(
       /SQLite parent directory is missing or unwritable/,
@@ -92,9 +126,10 @@ describe('Prisma Next SQLite foundation', () => {
   );
 
   it('leaves PostgreSQL as the default Vite host', () => {
-    expect(viteConfig).toContain('postgres-http-runtime.ts');
-    expect(viteConfig).toContain('dist-http/postgres-http-runtime.js');
-    expect(viteConfig).not.toContain('sqlite-http-runtime.ts');
-    expect(sqliteViteConfig).toContain('sqlite-http-runtime.ts');
+    expect(viteConfig).toContain('postgresViteTarget');
+    expect(sqliteViteConfig).toContain('sqliteViteTarget');
+    expect(databaseViteConfig).toContain('postgres-http-runtime.ts');
+    expect(databaseViteConfig).toContain('dist-http/postgres-http-runtime.js');
+    expect(databaseViteConfig).toContain('sqlite-http-runtime.ts');
   });
 });

@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       '@project/core': resolve('./packages/core/src/index.ts'),
       '@project/graph': resolve('./packages/graph/src/index.ts'),
+      '@project/http': resolve('./packages/http/src/index.ts'),
       '@project/persistence': resolve('./packages/persistence/src/index.ts'),
       '@project/react-flow-adapter': resolve('./packages/react-flow-adapter/src/index.ts'),
       '@project/ui': resolve('./packages/ui/src/index.ts'),
@@ -17,6 +18,14 @@ export default defineConfig({
     environment: 'node',
     include: ['test/integration/**/*.test.ts'],
     exclude: ['test/integration/sqlite-*.test.ts'],
+    /**
+     * Which database this run can reach. `test:integration:postgres` migrates
+     * `DATABASE_URL` and performs no SQLite migration, so the `database-*`
+     * files — which declare one arm per database target — read this to run
+     * their PostgreSQL arm alone. Their SQLite arm runs under
+     * `vitest.sqlite.config.ts`, in the job that owns a migrated `SQLITE_PATH`.
+     */
+    env: { HYPER_DATABASE_TARGET: 'postgres' },
     testTimeout: 30_000,
     /**
      * One database, so one file at a time (issue `12`).

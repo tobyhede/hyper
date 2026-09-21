@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { db } from '../../src/prisma/db';
+import { postgresTestDatabase as db } from '../support/postgres-database';
 
 describe('Prisma Next PostgreSQL contract', () => {
   const spaces = db.orm.public.Space;

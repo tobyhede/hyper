@@ -33,13 +33,19 @@ export const openSqliteRepository = async () => {
   const path = join(directory, 'hyper.db');
   migrateSqliteFile(path);
   const database = createSqliteDatabase(path);
+  let activeDatabase = database;
   return {
     path,
     database,
     repository: new SqlSpaceRepository(sqliteSqlStore(database)),
+    reopenRepository: async () => {
+      await activeDatabase.close();
+      activeDatabase = createSqliteDatabase(path);
+      return new SqlSpaceRepository(sqliteSqlStore(activeDatabase));
+    },
     close: async () => {
       try {
-        await database.close();
+        await activeDatabase.close();
       } catch {
         // Already closed by a close/reopen case that constructed a successor.
       }

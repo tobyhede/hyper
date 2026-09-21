@@ -767,18 +767,18 @@ const isAuthoredSource = (file: string): boolean =>
   (!file.includes('/') && file.endsWith('.ts'));
 
 /**
- * The modules that are pnpm's vocabulary rather than ours: the alias
- * table, the Vite configs that import it, and the toolchain check that
- * reads the package list plus its test. `vite.sqlite.config.ts` reuses
- * `vite.config.ts`'s already-resolved aliases rather than importing the
- * alias table a second time, so it carries no hit and is not listed here.
+ * The modules that are pnpm's vocabulary rather than ours: the alias table,
+ * the shared database Vite config and HTTP server build config that import it,
+ * and the toolchain check that reads the package list plus its test. The two
+ * target-specific Vite configs delegate to that one shared owner and carry no
+ * exemption.
  * Composed from the fragment above for the same reason every retired name in
  * this file is — written out, this file would hold the word it bans, and it
  * is scanned now that `test/` is in scope.
  */
 const MONOREPO_VOCABULARY: readonly string[] = [
   `packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`,
-  'packages/app/vite.config.ts',
+  'packages/app/database-vite-config.ts',
   'packages/app/http-server-build.config.ts',
   'scripts/check-typescript-toolchain.ts',
   'test/unit/check-typescript-toolchain.test.ts',
@@ -2854,7 +2854,7 @@ describe('aggregate has one meaning (ADR 0088)', () => {
  *  - a TypeScript type alias, the vocabulary the vendored anti-slop rule set
  *    is written in throughout — none of it ours to sweep;
  *  - a path or import alias — the build-tooling module that names the
- *    `@project/*` path table (see `docs/agents/build-tooling.md`), the three
+ *    `@project/*` path table (see `docs/agents/build-tooling.md`), the five
  *    Vite/Vitest configs that spend `resolve.alias`, and the shadcn CLI's own
  *    generated config and vendored guidance about it — none of it a name our
  *    code chose.
@@ -2971,13 +2971,11 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
   'tools/oxlint/anti-slop/rules/no-object-parameters.ts',
   'tools/oxlint/anti-slop/rules/no-unsafe-dictionary-type.ts',
   `packages/app/${PATH_ALIAS_MODULE}.ts`,
-  'packages/app/vite.config.ts',
-  'packages/app/vite.sqlite.config.ts',
+  'packages/app/database-vite-config.ts',
   'packages/app/http-server-build.config.ts',
   'packages/app/e2e/space-resource-drag-benchmark-vite.config.ts',
   'vitest.config.ts',
   'vitest.integration.config.ts',
-  'vitest.sqlite.config.ts',
   'packages/app/components.json',
   'packages/ui/components.json',
   'test/unit/current-domain-vocabulary.test.ts',

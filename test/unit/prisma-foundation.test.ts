@@ -63,9 +63,11 @@ describe('Prisma Next foundation', () => {
   it('constructs the runtime client without a blank DATABASE_URL binding', async () => {
     vi.stubEnv('DATABASE_URL', ' \t ');
 
-    const { db } = await import('../../src/prisma/db');
+    const { createPostgresDatabase } = await import('../../src/prisma/db');
+    const db = createPostgresDatabase();
 
     expect(db.contract.domain.namespaces.public.models).toHaveProperty('Space');
+    await db.close();
   });
 
   it('bootstraps singleton repository state from the legacy Entry Space', () => {

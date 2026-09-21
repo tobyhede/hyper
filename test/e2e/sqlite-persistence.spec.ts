@@ -1,20 +1,17 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type BrowserContext } from '@playwright/test';
 import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
-import { exportAggregate } from '../../src/export/export-aggregate';
-import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { createSqliteDatabase, requireConfiguredSqlitePath } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearSqliteContent } from '../support/clear-sqlite-content';
 import {
   dragResourceAndCapturePosition,
+  expectRestartProofExport,
   expectResourceRestoredAt,
   openStoredSpace,
+  restartProofFixture,
 } from '../support/restart-proof';
 import { SQLITE_E2E_PORT } from '../../packages/app/e2e/projects';
 
@@ -62,7 +59,6 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
   let secondHost: ViteDevServer | undefined;
   let firstContext: BrowserContext | undefined;
   let secondContext: BrowserContext | undefined;
-  let exportDirectory: string | undefined;
   let spaceRemains: boolean | undefined;
   let seeded = false;
 
@@ -87,34 +83,10 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
       // comment in `postgres-persistence.spec.ts`, which this mirrors exactly:
       // a mapless Space's first working load would mint an *empty*
       // Map (ADR 0079), stranding the fixture's Resource off every canvas.
+      const fixture = restartProofFixture({ spaceId, resourceId, mapId, graphId, title });
       const initialized = await seedRepository.initializeAggregate({
         metaSpaceId: spaceId,
-        spaces: [
-          {
-            id: spaceId,
-            document: {
-              version: 1,
-              title,
-              maps: [
-                {
-                  id: mapId,
-                  title: 'Map 1',
-                  kind: 'positioned',
-                  positions: { [resourceId]: { x: 0, y: 0, open: false } },
-                  graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
-                  activeGraph: graphId,
-                },
-              ],
-              defaultMap: mapId,
-            },
-            resources: [
-              {
-                id: resourceId,
-                document: { title: 'Restart resource', kind: 'markdown', body: 'Durable.' },
-              },
-            ],
-          },
-        ],
+        spaces: [fixture],
       });
       if (initialized.kind !== 'initialized') {
         throw new Error(`The fixture aggregate was not established: ${initialized.kind}`);
@@ -176,25 +148,10 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     const exportDatabase = createSqliteDatabase(path);
     try {
       const exportRepository = new SqlSpaceRepository(sqliteSqlStore(exportDatabase));
-      exportDirectory = await mkdtemp(join(tmpdir(), 'hyper-sqlite-e2e-export-'));
-      const exported = await exportAggregate(exportRepository, exportDirectory);
-      expect(exported.kind).toBe('exported');
-      const aggregateFile: unknown = JSON.parse(
-        await readFile(join(exportDirectory, AGGREGATE_FILE_NAME), 'utf8'),
+      await expectRestartProofExport(
+        exportRepository,
+        restartProofFixture({ spaceId, resourceId, mapId, graphId, title }),
       );
-      expect(aggregateFile).toEqual({ version: 1, metaSpaceId: spaceId });
-      // The Space directory is named for the Space, which is where an
-      // aggregate writes every Space Id down (ADR 0078) — so its presence
-      // under this name is the check, not a search for a file called
-      // `space.json` somewhere.
-      const spaceFile: unknown = JSON.parse(
-        await readFile(join(exportDirectory, spaceId, 'space.json'), 'utf8'),
-      );
-      expect(spaceFile).toMatchObject({ id: spaceId, title });
-      await expect(exportRepository.loadSpace(spaceId)).resolves.toMatchObject({
-        revision: 1n,
-        exportedRevision: 1n,
-      });
     } finally {
       await exportDatabase.close();
     }
@@ -203,9 +160,6 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
     await firstContext?.close();
     await secondHost?.close();
     await firstHost?.close();
-    if (exportDirectory !== undefined) {
-      await rm(exportDirectory, { recursive: true, force: true });
-    }
     // Clean up the Space and Resource this proof minted, as the PostgreSQL proof
     // does — so a rerun against the same `SQLITE_PATH` (a developer iterating
     // without re-migrating) meets an empty file rather than an

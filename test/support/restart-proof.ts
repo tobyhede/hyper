@@ -1,5 +1,11 @@
 import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
-import { encodeCompactUuid, type UUID } from '@project/core';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { encodeCompactUuid, type SpaceSnapshot, type UUID } from '@project/core';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { exportAggregate } from '../../src/export/export-aggregate';
+import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
 
 /**
@@ -13,6 +19,63 @@ import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e
 export interface OpenedStoredSpace {
   readonly context: BrowserContext;
   readonly page: Page;
+}
+
+export const restartProofFixture = (input: {
+  readonly spaceId: UUID;
+  readonly resourceId: UUID;
+  readonly mapId: UUID;
+  readonly graphId: UUID;
+  readonly title: string;
+}): SpaceSnapshot => ({
+  id: input.spaceId,
+  document: {
+    version: 1,
+    title: input.title,
+    maps: [
+      {
+        id: input.mapId,
+        title: 'Map 1',
+        kind: 'positioned',
+        positions: { [input.resourceId]: { x: 0, y: 0, open: false } },
+        graphs: [{ id: input.graphId, title: 'Graph 1', edges: [] }],
+        activeGraph: input.graphId,
+      },
+    ],
+    defaultMap: input.mapId,
+  },
+  resources: [
+    {
+      id: input.resourceId,
+      document: { title: 'Restart resource', kind: 'markdown', body: 'Durable.' },
+    },
+  ],
+});
+
+export async function expectRestartProofExport(
+  repository: SpaceRepository,
+  fixture: SpaceSnapshot,
+): Promise<void> {
+  const directory = await mkdtemp(join(tmpdir(), 'hyper-restart-proof-export-'));
+  try {
+    await expect(exportAggregate(repository, directory)).resolves.toMatchObject({
+      kind: 'exported',
+    });
+    const aggregateFile: unknown = JSON.parse(
+      await readFile(join(directory, AGGREGATE_FILE_NAME), 'utf8'),
+    );
+    expect(aggregateFile).toEqual({ version: 1, metaSpaceId: fixture.id });
+    const spaceFile: unknown = JSON.parse(
+      await readFile(join(directory, fixture.id, 'space.json'), 'utf8'),
+    );
+    expect(spaceFile).toMatchObject({ id: fixture.id, title: fixture.document.title });
+    await expect(repository.loadSpace(fixture.id)).resolves.toMatchObject({
+      revision: 1n,
+      exportedRevision: 1n,
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 /**
