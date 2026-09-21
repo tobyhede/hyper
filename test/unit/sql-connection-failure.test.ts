@@ -8,6 +8,9 @@ import {
 import type { Contract } from '../../src/prisma/contract.d';
 import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
 import { postgresSqlStore } from '../../src/prisma/sql-store';
+import { createSqliteDatabase } from '../../src/sqlite/db';
+import { sqliteSqlStore } from '../../src/sqlite/sql-store';
+import { captureError } from '../support/capture-error';
 
 /**
  * What `@prisma-next/sql-errors`' `SqlConnectionError` carries, built by hand
@@ -213,5 +216,45 @@ describe('postgresSqlStore.isUnavailable', () => {
     ['3D000', 'database "missing" does not exist'],
   ])('leaves SQLSTATE %s raised while connecting unclassified', (code, message) => {
     expect(store.isUnavailable(rawPgError(message, code))).toBe(false);
+  });
+});
+
+/*
+ * Ticket 38. SQLite's store recognises what its driver normalises — BUSY and
+ * LOCKED arrive as `SqlConnectionError` (ticket 18) — and, as a contained
+ * compatibility check, the one failure the pinned runtime raises for a client
+ * that has been closed, which carries nothing but its message.
+ */
+describe('sqliteSqlStore.isUnavailable', () => {
+  it.each([
+    ['SQLite BUSY, immediate or exhausted', connectionError('database is locked', true)],
+    ['SQLite LOCKED', connectionError('database table is locked', true)],
+  ])('recognises %s', (_label, error) => {
+    const store = sqliteSqlStore(createSqliteDatabase());
+
+    expect(store.isUnavailable(error)).toBe(true);
+  });
+
+  it('recognises the error the pinned runtime raises for a closed client', async () => {
+    const database = createSqliteDatabase();
+    const store = sqliteSqlStore(database);
+    await database.close();
+
+    const closed = await captureError(() => database.transaction(() => Promise.resolve()));
+
+    expect(closed).toMatchObject({ message: 'SQLite client is closed' });
+    expect(store.isUnavailable(closed)).toBe(true);
+    expect(store.isUnavailable(new Error('wrapped', { cause: closed }))).toBe(true);
+  });
+
+  it('leaves unrelated plain errors unclassified', () => {
+    const store = sqliteSqlStore(createSqliteDatabase());
+
+    expect(store.isUnavailable(new Error('SQLite client already connected'))).toBe(false);
+    expect(store.isUnavailable(new TypeError('SQLite client is closed'))).toBe(false);
+    expect(store.isUnavailable(queryError('UNIQUE constraint failed: spaces.id', '23505'))).toBe(
+      false,
+    );
+    expect(store.isUnavailable(socketError('ECONNREFUSED'))).toBe(false);
   });
 });
