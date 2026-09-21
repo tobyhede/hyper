@@ -83,3 +83,60 @@ test(
     await expect(page.getByText('Starting…')).toHaveCount(0);
   },
 );
+
+/**
+ * The startup view is removed by React's first commit into `#root` and by
+ * nothing else, so a module script that never evaluates leaves it claiming
+ * progress that will never arrive. Aborting the bundle request is that failure
+ * at its starkest: the served copy is on screen and nothing is coming to
+ * replace it.
+ */
+test('reports a bundle that never runs, rather than claiming progress forever', async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.route('**/src/main.tsx', async (route) => {
+    requests += 1;
+    await route.abort();
+  });
+
+  await page.goto('/');
+
+  expect(
+    requests,
+    'no request matched the bundle pattern, so the bundle was never aborted',
+  ).toBeGreaterThan(0);
+  await expect(page.getByText('Application could not start')).toBeVisible();
+  await expect(page.getByText('Starting…')).toHaveCount(0);
+});
+
+/**
+ * The correction above is owed only to a bundle that never runs. A served asset
+ * that fails is not that: the module script is still coming, so the wait is
+ * still honest and the view must keep saying so. The bundle is held for the
+ * assertions, which is what makes the window this covers observable at all —
+ * React's commit would otherwise replace the view either way and hide the
+ * difference.
+ */
+test('keeps waiting when a served asset fails, rather than blaming the application', async ({
+  page,
+}) => {
+  const bundle = await holdResponses(page, '**/src/main.tsx');
+  let logoRequests = 0;
+  await page.route('**/infinity-cube-logo.svg', async (route) => {
+    logoRequests += 1;
+    await route.abort();
+  });
+
+  await page.goto('/', { waitUntil: 'commit' });
+
+  await expect
+    .poll(() => logoRequests, {
+      message: 'no request matched the logo pattern, so no asset failure was provoked',
+    })
+    .toBeGreaterThan(0);
+  await expect(page.getByText('Starting…')).toBeVisible();
+  await expect(page.getByText('Application could not start')).toHaveCount(0);
+
+  bundle.release();
+});

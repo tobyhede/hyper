@@ -34,9 +34,32 @@
         "
       >
         <img src="/infinity-cube-logo.svg" alt="" width="96" />
-        <p style="margin: 0; font-size: 0.875rem; color: #57606d">Starting…</p>
+        <p id="startup-message" style="margin: 0; font-size: 0.875rem; color: #57606d">Starting…</p>
       </div>
     </div>
+    <script>
+      /*
+        Only React's first commit into `#root` removes the startup view above, so
+        a module script that never evaluates would leave it claiming progress
+        that will never arrive. This corrects the claim. The message element's
+        absence is the guard: after that commit there is nothing left to correct.
+        Capture phase, because a script that fails to load fires `error` on the
+        element and that event does not bubble. The two targets are the whole of
+        what is owed a correction — an uncaught throw, and a script that never
+        arrived — so a served asset that fails leaves the wait honest.
+        `packages/app/e2e/startup-pending.spec.ts` holds both halves.
+      */
+      addEventListener(
+        'error',
+        (event) => {
+          const message = document.getElementById('startup-message');
+          if (message === null) return;
+          if (event.target !== window && !(event.target instanceof HTMLScriptElement)) return;
+          message.textContent = 'Application could not start. See the browser console.';
+        },
+        true,
+      );
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

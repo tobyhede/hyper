@@ -82,6 +82,22 @@ bundle pattern at `src/main-moved.tsx` leaves the three static-copy assertions *
 counter, with the message naming the reason. Without the counters that mutation is a
 silent false green.
 
+**The static copy outlives a bundle that never runs, so it corrects itself.** Only
+React's first commit into `#root` removes the startup view, so a module script that
+404s or throws while evaluating leaves "Starting…" claiming progress that will never
+arrive — where the blank page it replaced claimed nothing. `startApplication` cannot
+cover that: it is inside the module that failed. A classic `error` listener registered
+before the module script swaps the message for the failure view's "Application could not
+start", and the message element's absence is its guard, so after React commits there is
+nothing left to correct. It answers two targets and no others — an uncaught throw
+(`window`) and a script that failed to load — because a served asset that 404s leaves the
+wait honest and must not blame the application. Both halves are held in
+`packages/app/e2e/startup-pending.spec.ts`, each proved red first: aborting the bundle
+left a permanent "Starting…", and aborting the logo wiped it for a false failure. A
+timeout was rejected rather than untried — this spec's own first assertion needs 15s for
+the host's cold module transform, so any threshold short enough to be useful would call a
+working app broken. Raised in review of PR 255.
+
 **Run locally:** `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm ui:catalog:check`,
 `pnpm lint`, `pnpm lint:anti-slop`, `prettier --check .`, `pnpm test` (230 files, 2893
 passed, 6 skipped), the four new or changed unit files individually, the
