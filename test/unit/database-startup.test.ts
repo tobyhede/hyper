@@ -1,6 +1,8 @@
 import { uuidSchema, type UUID } from '@project/core';
+import postgres from '@prisma-next/postgres/runtime';
 import {
   AggregateInvariantError,
+  classifyStoredFailure,
   PersistenceUnavailableError,
   type AggregateLoadResult,
   type LoadedSpace,
@@ -17,7 +19,12 @@ import {
   retryMetaSpaceEstablishment,
 } from '../../src/startup/database-startup';
 import { defaultContentAggregate } from '../../src/startup/default-content';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import type { Contract } from '../../src/prisma/contract.d';
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { startRefusingPostgresServer } from '../support/refusing-postgres-server';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -442,6 +449,70 @@ describe('retryMetaSpaceEstablishment', () => {
     });
 
     expect(metaSpaceId).toBe(SPACE_ID);
+  });
+});
+
+/*
+ * Ticket 38 (and ticket 36), through a real repository over the PostgreSQL
+ * driver: what start-up does with a server that refuses this client depends on
+ * what the refusal carries. A wrong password is unclassified, confirms itself
+ * on the second attempt, and stops the retry; too many connections is an
+ * outage, which never confirms anything and is waited out.
+ */
+describe('retryMetaSpaceEstablishment over a PostgreSQL server that refuses this client', () => {
+  const refusedBy = async (sqlState: string, message: string) => {
+    const server = await startRefusingPostgresServer(sqlState, message);
+    const database = postgres<Contract>({ contractJson, url: server.url });
+    return {
+      repository: new SqlSpaceRepository(postgresSqlStore(database)),
+      close: async () => {
+        await database.close();
+        await server.close();
+      },
+    };
+  };
+
+  it('gives up on a wrong password once a second attempt confirms it', async () => {
+    const { repository, close } = await refusedBy(
+      '28P01',
+      'password authentication failed for user "hyper"',
+    );
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+    try {
+      const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+        wait: recordingWait(waits),
+        report: (error) => reported.push(error),
+      });
+
+      expect(metaSpaceId).toBeUndefined();
+      expect(waits).toEqual([META_SPACE_RETRY_INITIAL_DELAY_MS, 10_000]);
+      expect(reported).toHaveLength(2);
+      expect(reported.map(classifyStoredFailure)).toEqual(['unclassified', 'unclassified']);
+    } finally {
+      await close();
+    }
+  });
+
+  it('keeps waiting out too many connections past the confirming limit', async () => {
+    const { repository, close } = await refusedBy('53300', 'sorry, too many clients already');
+    const stopped = new Error('the test stops waiting');
+    const reported: unknown[] = [];
+    let waits = 0;
+    try {
+      // Five attempts, then a `wait` that ends the loop: an outage never gives
+      // up by itself, so the test is what stops it.
+      const retrying = retryMetaSpaceEstablishment(repository, establishmentIds(), {
+        wait: () => (++waits > 5 ? Promise.reject(stopped) : Promise.resolve()),
+        report: (error) => reported.push(error),
+      });
+
+      await expect(retrying).rejects.toBe(stopped);
+      expect(reported).toHaveLength(5);
+      expect(reported.map(classifyStoredFailure)).toEqual(Array(5).fill('unavailable'));
+    } finally {
+      await close();
+    }
   });
 });
 
