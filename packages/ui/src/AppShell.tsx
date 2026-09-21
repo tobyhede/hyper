@@ -29,19 +29,24 @@ export interface AppShellProps {
  * block to be positioned against. That is thinner than it was, and it is still the
  * frame — the alternative is every mount repeating the same rules around its
  * own canvas.
+ *
+ * The main area is that containing block itself, which is why there are two
+ * elements here rather than three. A `.shell__area` child used to carry the
+ * `position: relative` because this element carried an inline
+ * `padding-inline-end` for the strip a drawer overlaid, and an absolutely
+ * positioned box resolves against its containing block's *padding* box — so the
+ * notice would have ignored the padding and sat under the drawer. Nothing yields
+ * a strip now, so the two boxes coincide and one element does both jobs.
  */
 export function AppShell({ notice, children }: AppShellProps) {
   return (
     <div className="shell">
       <div className="shell__main">
-        {/* The containing block the notice below is positioned against. */}
-        <div className="shell__area">
-          {children}
-          {/* The slot is unconditional and its own CSS hides it while the notice
-              renders nothing, so a caller passes one component for the whole
-              condition rather than repeating that component's own test here. */}
-          <div className="shell__notice">{notice}</div>
-        </div>
+        {children}
+        {/* The slot is unconditional and its own CSS hides it while the notice
+            renders nothing, so a caller passes one component for the whole
+            condition rather than repeating that component's own test here. */}
+        <div className="shell__notice">{notice}</div>
       </div>
     </div>
   );

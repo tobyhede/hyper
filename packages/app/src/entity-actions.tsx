@@ -303,7 +303,7 @@ export function spaceEntityActions({
     // A menu row names the Resource, so it says the Resource's name (ADR 0083).
     const permanent: ProductDestination = { kind: 'resource', spaceId, resourceId: resource.id };
     // A Map's members *are* its position keys (ADR 0040). A Resource the Resources
-    // drawer reveals but this Map does not place has no within-Map
+    // list reveals but this Map does not place has no within-Map
     // address at all, so the one link it has is its own — and there is nothing
     // left for a permanent link to differ from. Withheld, never shown and
     // refused: `map-resource` would 404 on the address it copied.

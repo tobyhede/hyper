@@ -89,9 +89,10 @@ none of them blocking each other:
   lands and "caret moved" means landed, not requested (PR #209). **26** makes
   Space, Diagram and Graph one disclosure: name and chevron open the list,
   Rename is a row in it.
-- **17** resolved delete: `Button`'s unused `label` variant is gone. **22**
-  is the same shape still open — the registry `Drawer`, `needs-triage`.
-  **25** is also `needs-triage`.
+- **17** resolved delete: `Button`'s unused `label` variant is gone. **22** is
+  the same shape and resolved the same way — the `Drawer` (a Base UI wrapper,
+  not a registry copy, which `22` checked), its `DRAWER_WIDTH` and `AppShell`'s
+  `insetEnd` are gone. **25** is `needs-triage`.
 - **18** closed as `wontfix`. Clicking a Space, Diagram or Graph name cannot
   reach a Thing's Open — the canvas keyboard guards decline a key that came
   from the Dock — and that is a claim on `dock-interactions.spec.ts`. **26**

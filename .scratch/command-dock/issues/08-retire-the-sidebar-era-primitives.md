@@ -229,11 +229,23 @@ from — what was committed.
 **The handoff table's `padding-inline-end` claim is false.** "Two this ticket
 did not take, because they still had a consumer when it ran" says deleting
 `insetEnd` "would take the `padding-inline-end` rule in `styles.css` with it."
-`.shell__main` in `packages/app/src/styles.css` declares only `flex: 1;
-min-height: 0;` — there is no `padding-inline-end` rule there. The padding is
-applied inline, by `AppShell`'s `style={{ paddingInlineEnd: insetEnd }}`;
-`styles.css` carries a comment beside `.shell__main` that explains that, not a
-declaration of its own. An implementer following this ticket's handoff table
-would go hunting for a CSS rule that does not exist.
+`.shell__main` in `packages/app/src/styles.css` declared only `flex: 1;
+min-height: 0;` — there was no `padding-inline-end` rule there. The padding was
+applied inline, by `AppShell`'s `style={{ paddingInlineEnd: insetEnd }}`, and
+`styles.css` carried a comment beside `.shell__main` that explained that rather
+than a declaration of its own. An implementer following this ticket's handoff
+table would have gone hunting for a CSS rule that never existed.
 `22-retire-the-registry-drawer-and-the-yielded-strip.md` carries the corrected
-accounting of what `styles.css` actually holds.
+accounting — and has since taken the decision: `insetEnd`, the inline
+`paddingInlineEnd` it set and that `.shell__main` comment are all deleted, so
+neither the rule this table names nor the inline style that stood in for it is
+in the tree now.
+
+**`22` has answered the handoff above, and two of this table's words did not
+survive it.** `drawer.tsx` is not a registry component — it is a hand-composed
+Base UI wrapper, which `22` checked and this ticket did not — so read "the
+registry `Drawer`" in the table and the paragraph above it as that wrapper. And
+it no longer "carries an inventory entry rather than a deletion": `22` deleted
+the module, its test, its exports and that entry, together with `insetEnd`. The
+table stays as the handoff this ticket wrote; `22` is what to read for the
+outcome.

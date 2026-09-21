@@ -1,4 +1,16 @@
-# 22 — Retire the registry Drawer and the strip the shell yields to it
+# 22 — Retire the Drawer and the strip the shell yields to it
+
+> **Read the Answer at the foot of this file first.** Every section above it
+> describes the question as it stood while it was open, in the present tense it
+> was written in; the `Status:` line and the Answer are what hold now.
+> `docs/agents/workflow.md` states that for an accepted ADR — the body records
+> why a decision looked right at the time and the status line is the only edit
+> it ever receives — and says nothing about tickets. This file borrows it, on
+> the same ground: a body rewritten to match its own outcome loses the
+> reasoning the outcome was taken against. It borrows it loosely, though, and
+> that is the difference worth knowing — where a sentence above was
+> self-falsifying rather than merely dated, it has been corrected in place
+> instead.
 
 > **Renumbered from `16` by `tracker-hygiene/01`.** It shared that number with
 > `16-create-thing-is-three-peers.md`, which `13` cites bare, so `16` stayed
@@ -15,9 +27,9 @@ Blocked by: nothing. `10` is what left all three without a consumer.
 
 **The decision to take:** delete `drawer.tsx`'s `Drawer`, its `DRAWER_WIDTH`, and
 `AppShell`'s `insetEnd` — or decide deliberately to keep them and say why here.
-Three source-code comments currently say "taking these is a decision of its
-own", and this file is that decision. Until it is taken, the drawer keeps its inventory
-entry and `insetEnd` keeps its doc comment, and both point here.
+Three source-code comments said "taking these is a decision of its
+own", and this file is that decision. Until it was taken, the drawer kept its inventory
+entry and `insetEnd` kept its doc comment, and both pointed here.
 
 **A fourth unconsumed thing was briefly filed here and has moved to `17`.**
 `Button`'s `label` variant lost its last consumer to `09`, but the argument
@@ -132,14 +144,19 @@ to carry it instead. And `insetEnd` is the shell's one answer to "something
 overlays the end edge", which the next such surface would have to rewrite
 rather than pass.
 
-That tension is the thing to settle. It is not settled by this file.
+That tension is the thing to settle. The Answer at the foot of this file settles
+it, against the "for keeping" side as written here.
 
 **A note on this file's own title and the word "registry" above.** Both are
 inherited from `08` and `10`, which called this "the registry Drawer" before
 anyone checked the claim; the correction above found it false. Renaming the
 file is not worth it on its own — six other sites already cite it by filename,
 and `tracker-hygiene/01`'s renumbering pass already missed one citation once —
-so the title stands as written. Read `Drawer` throughout this file as
+so the *filename* stands as written, with "registry" still in it. The heading
+above and this ticket's `spec.md` row both drop the word, which nothing cites
+and which is false: that divergence is deliberate, so a reader who greps the
+filename and a reader who reads either title land in the same place without
+being told something untrue on the way. Read `Drawer` throughout this file as
 `packages/ui/src/components/drawer.tsx`'s hand-composed Base UI wrapper, not a
 stored copy of a shadcn registry component.
 
@@ -188,6 +205,13 @@ generalises, for whoever takes it up.
 Each says the retirement is undone and points here. If the decision is taken
 either way, all six are edited with it.
 
+**Taking it edited five of the six.** `AppShell.tsx`'s prop and its doc comment
+went with the deletion, `design-system-inventory.ts`'s entry and
+`styles.css`'s comment likewise, `AGENTS.md`'s `ui` bullet now records that the
+pair went, and `spec.md`'s row carries `resolved` and a title without
+"registry". `10` is the sixth and was edited only to close its pointer, not to
+restate the outcome — see the Answer.
+
 - `packages/ui/src/AppShell.tsx` — `insetEnd`'s doc comment.
 - `packages/app/stories/design-system-inventory.ts` — the `drawer.tsx` entry.
 - `packages/app/src/styles.css` — the comment above `.shell__main`.
@@ -232,11 +256,20 @@ block the notice resolves against), and the Dock's docking-box comment in
 area. Both paragraphs above `.shell__main` in `styles.css` went whole: the
 second was the case for not animating a strip that no longer exists.
 
-Left alone, and not this ticket's: `App.tsx`'s `addExistingResource` comment,
-`canvas-projection.ts` and `entity-actions.tsx` still call the Resources Popover
-"the drawer" — stale naming for a surface that exists, not a reference to the
-deleted module. `08` and `10` are resolved and keep their pointers here as
-history. The four sibling primitives above are still undecided.
+**Stale naming of the surface that still exists — all four corrected.**
+This list was first written as three sites left alone, and a review found it
+hand-built and short by one: `CONTEXT.md`'s **Resources View** entry called the
+Popover "a drawer" as the *current* rendering, which is the domain document
+stating a false fact about the product, and is exactly the enumeration failure
+the "Sites that cite this ticket" section above warns a reader about. That
+entry, `App.tsx`'s `addExistingResource` comment and `canvas-projection.ts`'s
+comment now name the Popover, and `entity-actions.tsx:306` — the fourth, the one
+the short list missed — says "the Resources list". Each was stale naming for a
+surface that exists, not a reference to the deleted module.
+
+`08` and `10` are resolved and keep their bodies as history; each now carries a
+closing note saying the decision was taken here and what it took. The four
+sibling primitives above are still undecided.
 
 This ticket's body predates the Thing → Resource and Diagram → Map rename and is
 left in the vocabulary it was written in; this Answer uses the current names.

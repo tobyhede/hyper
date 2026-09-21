@@ -148,8 +148,8 @@ No strategy is the primary one. A space is arranged by whichever the author or t
 _Avoid_: arrangement (applying a strategy produces no separate entity — the Resources themselves carry the positions), algorithm, engine.
 
 **Resources View**:
-An application-supplied collection of the Space's Resources absent from the selected Map. Its current rendering is a drawer reached from the Command Dock's Resources cluster, but that mounting location is not part of the collection's identity (ADR 0082).
-_Avoid_: Space-Resource palette, Resource panel, drawer or Dock as the domain name.
+An application-supplied collection of the Space's Resources absent from the selected Map. Its current rendering is a popover anchored to the Command Dock's Resources cluster, but that mounting location is not part of the collection's identity (ADR 0082).
+_Avoid_: Space-Resource palette, Resource panel, drawer, popover or Dock as the domain name.
 
 **Exporting**:
 Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Exporting is not what makes an edit durable; it records each Space outside Hyper at the revision it was read at.

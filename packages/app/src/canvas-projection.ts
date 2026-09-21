@@ -75,7 +75,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   // The Map chooses the Resources it draws. In particular, a Map's sparse
   // placement omits Resources from its canvas; the Resources list is the surface that
   // reveals those Resources without manufacturing positions (ADR 0040, ADR 0069) —
-  // the Sidebar's Resources collection before ADR 0082, the Dock's drawer now.
+  // the Sidebar's Resources collection before ADR 0082, the Dock's Popover now.
   const resourceIds = mapResources(space, resolved.map).map((resource) => resource.id);
   const authored = Placement.fromMap(resolved.map);
   const openResourceIds = new Set(
