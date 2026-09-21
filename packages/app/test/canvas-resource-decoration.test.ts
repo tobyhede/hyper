@@ -109,8 +109,6 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(RESOURCE_ID, 'markdown'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.titleEditingEnabled).toBe(true);
-    expect(patch.resourceEditingEnabled).toBe(true);
     expect(patch.onEditResource).toBeTypeOf('function');
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
@@ -124,9 +122,8 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(RESOURCE_ID, 'markdown', true),
       context({ bodyEditing: true }),
     );
-    expect(patch.titleEditingEnabled).toBe(false);
     expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.resourceEditingEnabled).toBe(true);
+    expect(patch.onEditResource).toBeTypeOf('function');
   });
 
   it('withholds every authoring control from a projected Resource absent from the working Space', () => {
@@ -134,8 +131,6 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(MISSING_RESOURCE_ID, 'markdown', true),
       context(),
     );
-    expect(patch.titleEditingEnabled).toBe(false);
-    expect(patch.resourceEditingEnabled).toBeUndefined();
     expect(patch.onEditResource).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeUndefined();
     expect(patch.resize).toBeUndefined();

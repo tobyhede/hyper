@@ -54,19 +54,19 @@ export type ResourceNodeData = {
    * goes wrong for the next kind that resolves its content elsewhere too.
    */
   kind: Resource['kind'];
-  /** Local Resource-authoring controls supplied by the application composition. */
-  titleEditingEnabled?: boolean;
   /**
-   * Whether Resource-level authoring is offered here: this Resource is in the working
-   * Space and the canvas is authorable.
+   * Opens or Closes this Resource, absent where Resource-level authoring is
+   * withheld: this Resource is outside the working Space, or the canvas is not
+   * authorable. Presence is the whole capability — there is no separate flag
+   * left to disagree with it.
    *
-   * **Not "owns content to edit"**, which is what it meant while a Reference Resource had no
-   * Open front. It gates `onEditResource`, and a Reference Resource Opens and Closes through
-   * that same operation (ADR 0070), so a Reference Resource sets it exactly as a Markdown
-   * Resource does. What separates the kinds is `onBeginBodyEditing`, which the
-   * application withholds from everything but `markdown`.
+   * **Not "owns content to edit"**, which is what withholding it meant while a
+   * Reference Resource had no Open front. A Reference Resource Opens and
+   * Closes through this same operation (ADR 0070), so a Reference Resource is
+   * offered it exactly as a Markdown Resource is. What separates the kinds is
+   * `onBeginBodyEditing`, which the application withholds from everything but
+   * `markdown`.
    */
-  resourceEditingEnabled?: boolean;
   onEditResource?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
   /**

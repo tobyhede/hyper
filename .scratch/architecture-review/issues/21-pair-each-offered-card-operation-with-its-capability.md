@@ -1,219 +1,351 @@
-# Each offered Card operation carries its own capability
+# Each offered Resource operation carries its own capability
 
-Status: ready-for-agent
+Status: resolved
 Tags: Improvement
-Blocked by: `.scratch/layout-only-v1/issues/04-make-space-cards-select-initialized-layouts.md`
+Blocked by: none
 
 Surfaced by: the 9 September 2026 architecture review, candidate 4 (the top
-recommendation of the reviewed report), then settled by a grilling loop. Sibling
-of issue 20, which is candidate 1 of the same review: that one collapsed the
-*question* "may this be authored now" into one module, and this one fixes how
-one of its answers is carried across the props seam. The rejected alternatives
-are recorded under "Decided" so none is re-opened.
+recommendation), then settled by a grilling loop. Sibling issue 20 collapsed the
+question “may this be authored now” into one module; this ticket simplifies how
+one answer crosses the props seam. The 21 September audit confirms the refactor
+is still justified and refreshes the implementation locations and evidence.
 
 ## The defect
 
-`CardNodeData` (`packages/react-flow-adapter/src/projection.ts`) carries two
-operations as a **boolean beside a callback**, where the boolean and the
-callback are the same fact:
+`ResourceNodeData` (`packages/react-flow-adapter/src/projection.ts`) carries two
+operations as a boolean beside an independently optional callback:
 
-| Flag | Operation | Both written at |
-| --- | --- | --- |
-| `titleEditingEnabled` (`:79`) | `onBeginTitleEditing` (`:88`) | `canvas-card-authoring.ts:285` and `:293` |
-| `cardEditingEnabled` (`:86`) | `onEditCard` (`:87`) | `canvas-card-authoring.ts:289` and `:290` |
+| Flag                     | Operation             | Both written in              |
+| ------------------------ | --------------------- | ---------------------------- |
+| `titleEditingEnabled`    | `onBeginTitleEditing` | `decorateSharedResourceNode` |
+| `resourceEditingEnabled` | `onEditResource`      | `decorateSharedResourceNode` |
 
-The conditions are identical, term for term:
+The owner is now `packages/app/src/canvas-resource-decoration.ts`, extracted
+from `canvas-resource-authoring.ts`. It writes each pair under identical
+conditions: membership in the working Space and `authorOnCanvas`, plus
+`!bodyEditing` for beginning a title edit.
 
-```ts
-// canvas-card-authoring.ts:285
-titleEditingEnabled: cardBelongsToWorkingSpace && availability.authorOnCanvas && !bodyEditing,
-// canvas-card-authoring.ts:292-293
-if (cardBelongsToWorkingSpace && availability.authorOnCanvas && !bodyEditing) {
-  data.onBeginTitleEditing = () => beginTitleEditing(node.id);
-}
-```
+The type permits the flag and operation to disagree. `ResourceNode.tsx`
+reconciles the pair at four sites: Open/Close forwarding for the Markdown,
+Reference Resource and Space Resource fronts, and begin-title-edit forwarding.
+Deleting the flags removes that disagreement and the reconciliation rather
+than moving a decision to another module. It improves depth by shrinking the
+interface and locality by leaving ordinary availability with the composition.
 
-Both members are declared independently optional, so the type permits a flag
-with no operation. `CardNode` therefore trusts neither alone and re-checks the
-pair at four sites — three of them the same line, once per Card front:
+The same data already carries `titleEditor`, `bodyEditor` and `resize` as single
+optional objects containing the operations each needs. Their presence is the
+capability; there is no separate flag to reconcile. Open/Close and begin-title-edit
+need only one function each, so they need no wrapper object.
 
-- `CardNode.tsx:98` — `cardEditingEnabled === true && onEditCard !== undefined` (markdown)
-- `CardNode.tsx:127` — the same (alias)
-- `CardNode.tsx:141` — the same (space)
-- `CardNode.tsx:217-219` — `bodyEditor === undefined && titleEditingEnabled === true && onBeginTitleEditing !== undefined`
+### The story harness retains a wrong default
 
-Those four conjunctions are the repair. The comment above them
-(`CardNode.tsx:205-214`) states the defect exactly and then works around it:
-*"The flag and the operation answer different questions … and `SpaceCanvas`
-supplies them together, but the type lets them diverge."*
-
-### The same object already gets it right, three times
-
-`titleEditor` (`:102`), `bodyEditor` (`:134`) and `resize` (`:156`) are single
-optional objects whose **presence is the capability** and which carry the
-operations that capability needs. Nothing beside them is a flag and `CardNode`
-reconciles nothing.
-
-`projection.ts:104-111` records what the split shape cost when `titleEditor` had
-it: *"Split into a boolean and two independent optional callbacks, the adapter
-had to manufacture total functions out of partial data, and an absent completion
-answered `null` — which `CanvasCard` reads as accepted, closing the editor on a
-rename that never happened."* This ticket applies that already-taken decision to
-the two members that were left behind.
-
-### It has already produced a defect in shipped story evidence
-
-`stories/support/ReactFlowCanvas.tsx:397` is the one place in the tree where the
-two genuinely diverge, and it diverges wrongly:
+`packages/app/stories/support/ReactFlowCanvas.tsx` writes:
 
 ```ts
-cardEditingEnabled: cardEditingEnabled ?? source.data.kind === 'markdown',
-onEditCard: onOpenChange ?? (() => 'completed'),
+resourceEditingEnabled: resourceEditingEnabled ?? source.data.kind === 'markdown',
+onEditResource: onOpenChange ?? (() => 'completed'),
 ```
 
-The operation is always supplied; the flag defaults off for every kind but
-`markdown`. That default is a rule the application abandoned with ADR 0070 —
-`projection.ts:80-88` says so in as many words: *"**Not 'owns content to edit'**
-… an Alias Opens and Closes through that same operation (ADR 0070), so an Alias
-sets it exactly as a Markdown Card does."* So every Alias and Space specimen in
-the catalogue draws without an Open control that the application draws, and
-`card.stories.tsx:303` exists only to force the flag back on for the one story
-that needed it. A story drawing a Card the application does not have is the one
-thing ADR 0052 evidence must not do, and it is the same failure mode issue 20
-found at `SpaceSidebarFixture.tsx:225`.
+The operation is always supplied, but the flag defaults off for other kinds.
+That kind restriction is wrong under ADR 0070: Reference Resources Open and
+Close through the same operation as Markdown Resources.
+
+This is a latent default defect, not evidence that every current Reference or
+Space specimen lacks Open. The sole Reference use of `CanvasResourceNodeSpecimen`
+in `resource.stories.tsx` explicitly enables the flag. The Enter Space story
+renders `CanvasResource` directly and supplies `onOpenChange`. Removing the bad
+default and the Reference override together should preserve that story's
+controls. Do not assume several story snapshots must change.
 
 ## What to build
 
-Delete `titleEditingEnabled` and `cardEditingEnabled` from `CardNodeData`. The
-presence of `onBeginTitleEditing` and `onEditCard` becomes the capability, as it
-already is for the three objects beside them. Nothing is renamed and no new type
-is introduced.
+Delete `titleEditingEnabled` and `resourceEditingEnabled` from `ResourceNodeData`.
+For ordinary authorable Resources, the presence of `onBeginTitleEditing` and
+`onEditResource` is the capability. Keep both callback names and introduce no
+new type. The dormant embedded `readOnly` exception below remains deliberate.
 
-- `projection.ts` — remove `:79` and `:86` and their doc comments. The paragraph
-  at `:80-88` moves onto `onEditCard`, which is what it is actually about.
-- `canvas-card-authoring.ts:285` — the always-written `titleEditingEnabled` key
-  goes; the conditional block at `:292-293` is unchanged and is now the whole
-  answer. `:289`'s `data.cardEditingEnabled = true` goes; `:290` is unchanged.
-- `CardNode.tsx:98`, `:127`, `:141` — each becomes `if (data.onEditCard !== undefined)`.
-- `CardNode.tsx:217-219` — becomes `if (data.onBeginTitleEditing !== undefined)`.
-- `stories/support/ReactFlowCanvas.tsx` — `cardEditingEnabled` the specimen prop
-  is renamed for the operation it withholds, and its kind-derived default is
-  **deleted rather than moved**: with the flag gone there is nothing to derive it
-  onto, and the default was wrong under ADR 0070 anyway. `card.stories.tsx:303`
-  drops the override it only needed because of that default.
+- `packages/react-flow-adapter/src/projection.ts`: delete both flags. Move the
+  explanation that Open/Close applies across kinds onto `onEditResource`,
+  adjusting prose so it no longer describes a separate gate.
+- `packages/app/src/canvas-resource-decoration.ts`: remove both flag names from
+  `CanvasResourceDataPatch` and the local `Pick` in `decorateSharedResourceNode`.
+  Remove the flag assignments and leave the callback conditions as the whole
+  availability answer.
+- `packages/react-flow-adapter/src/ResourceNode.tsx`: each of the three
+  Open/Close conjunctions becomes `data.onEditResource !== undefined`.
+  Begin-title-edit forwarding checks only
+  `data.onBeginTitleEditing !== undefined`.
+- `packages/app/stories/support/ReactFlowCanvas.tsx`: rename the specimen's
+  `resourceEditingEnabled` knob for the operation it withholds and conditionally
+  supply that operation. Delete the kind-derived default rather than moving it
+  onto the callback. Remove `titleEditingEnabled` from the data construction.
+- `packages/app/stories/components/resource.stories.tsx`: remove the Reference
+  specimen override that only compensates for the harness default.
+- Update explanatory comments and test fixtures that describe the removed
+  pairs. Do not remove unrelated historical mentions merely because they use
+  the same spelling.
 
 ### The two residual second opinions go with them
 
-`CardNode` holds two `data.bodyEditor === undefined` terms of its own, and both
-are the same defect one layer down:
+`ResourceNode` also holds two `data.bodyEditor === undefined` terms:
 
-- `:217` — subsumed. The composition's own term is `!bodyEditing`, which is
-  Space-wide, so a live body edit withholds `onBeginTitleEditing` from **every**
-  Card. The adapter's per-Card restatement can only ever agree.
-- `:228` — unreachable. `Caret` (`canvas-card-authoring.ts:21-24`) is a single
-  nullable union, so one Card cannot hold a title caret and a body caret at once
-  and `titleEditor` and `bodyEditor` cannot both be set.
+- The begin-title-edit term is subsumed by composition's Space-wide
+  `!bodyEditing` condition, which withholds the callback from every Resource.
+- The title-editor selection term is unreachable in production. `Caret` in
+  `canvas-resource-authoring.ts` is one nullable title/body union, so the hook
+  cannot supply both editors simultaneously. Remove only the body-editor term;
+  retain `!data.readOnly` when selecting `titleEditor`.
 
-If either turns out to be load-bearing, that is a fact about the composition
-being wrong and is reported rather than guarded around.
+The hook decorates its input projection anew; it does not reuse its previously
+decorated output as the next input. The audit found no stale callback path that
+makes either term load-bearing. If implementation reveals one, report the
+composition defect rather than restoring a second availability opinion here.
 
 ## Decided
 
-Settled by the grilling loop of 9 September 2026. Recorded so none is re-opened.
+Settled by the grilling loop of 9 September 2026; current evidence clarified by
+the 21 September audit. These decisions are not reopened.
 
-1. **Scope is the two flag/operation pairs, and nothing else.**
-   `connectionAuthoringEnabled` (`projection.ts`, written only at
-   `embedded-layout.ts:96`) and `readOnly` (`:61`, written `true` only at
-   `SpaceCanvas.tsx:542`) are **not** pairs: neither has an operation in
-   `CardNodeData` to be paired with — connection authoring's operation is React
-   Flow's own `isConnectable` — so "pair the operation with its capability" has
-   nothing to bite on. Both are surface-wide suppressions and both stay. Folding
-   them in is the all-or-nothing authoring aggregate the report warns against.
+1. **Scope is the two flag/operation pairs.** `connectionAuthoringEnabled` and
+   `readOnly` stay. Neither has a matching operation in `ResourceNodeData`;
+   connection authoring also uses React Flow's `isConnectable`. Do not introduce
+   an all-or-nothing authoring aggregate.
 
-2. **Presence is the capability; no wrapper object.** `titleEditor`, `bodyEditor`
-   and `resize` earn their object shape because each carries two or more things
-   that must travel together. Open/Close and begin-title-edit carry exactly one
-   function each, so an object around them would add a name and pair nothing.
+2. **Presence is the capability; no wrapper object.** The editor and resize
+   objects carry several things that must travel together. Each operation here
+   is one function, so an object would add a name and pair nothing.
 
-3. **`readOnly` is the sole answer for the dormant embedded Card, and gets a
-   test.** `SpaceCanvas.tsx:539-550` sets `readOnly: true` while *supplying* both
-   operations, redefined to mean "resume the embedded session" — so this is the
-   one live case where an operation is present precisely so it will not be drawn,
-   and where presence is deliberately not the capability. Three layers currently
-   say no: the flag, `readOnly` in `CardNode.tsx:228`/`:368`/`:426`, and `readOnly`
-   again in `CanvasCard.tsx:244`/`:266`. Two remain, which is already one opinion
-   too many. What the flag was covering has to become an assertion instead — see
-   Tests.
+3. **`readOnly` suppresses the dormant embedded Resource's visible controls.**
+   `SpaceCanvas`'s retained embedding spreads existing node data, sets
+   `readOnly: true`, and supplies callbacks that resume the embedded session.
+   It does not explicitly switch either flag off; the flags are not the
+   suppression to rely on today. `ResourceNode` forwards `readOnly` to
+   `CanvasResource`, which withholds Open/Close and begin-title-edit controls.
+   Preserve that behavior and assert it with callbacks supplied.
 
-4. **The operations keep both consumers.** `SpaceCanvas.tsx:608` and `:660` call
-   `embedded.data.onEditCard?.(true)` and `embedded.data.onBeginTitleEditing?.()`
-   directly, as keyboard commands that never reach `CardNode`. Splitting the
-   keyboard operation off node data to make drawn-control presence unambiguous
-   was considered and rejected: it would put a second transport beside the one
-   React Flow already gives us, to disambiguate a case `readOnly` answers.
+4. **The callbacks keep both consumers.** `SpaceCanvas` keyboard handlers call
+   `embedded.data.onEditResource?.(true)` and
+   `embedded.data.onBeginTitleEditing?.()` directly. They must still resume a
+   dormant session. Splitting keyboard operations into a second transport was
+   rejected; `readOnly` already distinguishes visible controls from those
+   commands.
 
-5. **No `CONTEXT.md` change, and "capability" is not canonicalised.**
-   **Availability** already names the domain question — whether an operation may
-   be started now — and this ticket changes only how one of its answers is
-   *carried* between two modules. That is a type shape, not a domain concept, and
-   `CONTEXT.md` is a glossary rather than a design record. The loose "Resizing is
-   a Card capability" at `CONTEXT.md:143` is ordinary English and stays.
+5. **No `CONTEXT.md` change and no new canonical “capability” term.** Availability
+   already names the domain question. This change concerns how an answer
+   travels between modules, not a new domain concept.
 
-6. **No ADR.** It reverses cheaply, surprises no future reader, and there is no
-   genuine trade-off — it fails all three tests.
+6. **No ADR.** The change reverses cheaply and introduces no trade-off requiring
+   a new decision record.
 
-7. **The seven flag assertions are rewritten, not deleted.**
-   `canvas-card-authoring.test.tsx:218`, `:315`, `:431`, `:432`, `:444`, `:449`
-   and `:450` each pin a real availability rule. Only the *divergence* becomes
-   unrepresentable; the rules do not. Deleting them would lose four availability
-   rules to a refactor meant to remove a repair.
+7. **Availability assertions are rewritten, not deleted.** There are now seven
+   flag assertions in `canvas-resource-authoring.test.tsx` and six in
+   `canvas-resource-decoration.test.ts`. Preserve the rules through callback
+   presence/absence assertions. Consolidate duplicates where those assertions
+   already exist; only the representable disagreement disappears.
 
-8. **The story knob is renamed rather than left alone.** Under ADR 0052 the story
-   is evidence for the component's real interface, so a knob named after a deleted
-   property is a second vocabulary for the same thing — the drift the flags caused
-   in the first place. This is what pulls `pnpm e2e:ladle` into the bar.
+8. **Rename the story knob.** A knob named after a deleted property would keep
+   a second vocabulary for the same operation. ADR 0052 requires the catalogue
+   to remain evidence for the actual interface.
 
-9. **Sequenced after `layout-only-v1/04`, not merged with it.** Ticket 04 has to
-   touch `canvas-card-authoring.ts`'s Space Card path. Being in the same file does
-   not make two changes one obligation.
+9. **The sequencing prerequisite is complete.** `layout-only-v1/04` is `done`.
+   Its Space Resource selection work was separate and no longer blocks this
+   ticket.
 
-10. **Not folded into candidate 2.** The reviewed report's candidate 2
-    (Layout-scoped derivation) touches `canvas-projection.ts`, which writes
-    `readOnly: false` at `:112` and nothing else here. The two share no decision.
+10. **Keep this separate from Map-scoped derivation.** The original review's
+    candidate 2 concerned `canvas-projection.ts`; these changes share no
+    decision with that candidate.
 
 ## Tests
 
-The pairing stops being a runtime fact and becomes a type fact, so what needs a
-test is not the pairing but the one case Decided #3 leaves resting on `readOnly`
-alone.
-
-- **New, in `packages/react-flow-adapter/test/CardNode.test.tsx`**: a node with
-  `readOnly: true` **and** `onEditCard` supplied draws no Open/Close control, and
-  the same with `onBeginTitleEditing` draws no title-edit affordance. Today that
-  is implied by the flag rather than asserted, and the flag is what is being
-  deleted. Verify it fails with `readOnly` removed from `CardNode.tsx:396`/`:408`
-  before committing it — a test that passes either way pins nothing.
-- `CardNode.test.tsx`'s props builder (`:153-154`, `:175-176`, `:193-194`) drops
-  both flag fields; the fifteen call sites that set them
-  (`:277`, `:320`, `:347`, `:348`, `:362`, `:378`, `:384`, `:414`, `:424`,
-  `:440`, `:460`, `:491`, `:756`, `:777`) supply or withhold the operation
-  instead. A case that set the flag *without* the operation, if any exists, was
-  testing the repair branch and goes.
-- The seven `canvas-card-authoring.test.tsx` assertions re-point at
-  `onBeginTitleEditing === undefined` / `onEditCard === undefined` (Decided #7).
-- No new test for the deleted `bodyEditor === undefined` terms: both are
-  unreachable or subsumed, and a test for an unreachable branch is a test of the
-  guard rather than of the behaviour.
+- Add explicit cases in `packages/react-flow-adapter/test/ResourceNode.test.tsx`
+  with `readOnly: true` and supplied callbacks: no Open control when Closed,
+  no Close control when Open, and no begin-title-edit affordance. Before
+  removing the flags, set them true in these fixtures so the test proves
+  `readOnly`, not absent flags. Verify the cases fail when the relevant
+  `readOnly` forwarding to `CanvasResource` is removed; restore that forwarding.
+- Preserve the existing test that an active title editor disappears when the
+  Resource becomes read-only.
+- Remove flags from the adapter test props builder and migrate fixtures to
+  supply or withhold callbacks. Remove flag-without-operation repair cases;
+  retain meaningful absence-of-operation coverage.
+- Rewrite the seven hook assertions and six decoration assertions described in
+  Decided #7. Keep evidence for body editing, working-Space membership and
+  authoring withdrawal at the composition interface.
+- **Explicitly retire or reframe the impossible simultaneous-editor fixture.**
+  `ResourceNode.test.tsx`'s “does not offer or mount title editing while the
+  Markdown body owns the caret” test (lines 440–457 at audit) supplies both
+  `titleEditor` and `bodyEditor`. Removing the second guard would mount the
+  title textbox and fail this assertion. The production Caret cannot produce
+  that input. Do not restore the guard to satisfy it; preserve the real
+  availability rule in the composition tests instead. This consequence was
+  established by inspection, not by a mutation run during the audit.
+- Preserve dormant embedding keyboard behavior and the existing Ladle proofs
+  for read-only suppression and the Open Reference Resource's Close control.
+  Add no new test solely to exercise a deleted unreachable guard.
 
 ## Verification bar
 
 - `pnpm verify`
-- `pnpm e2e` — a UI change, and it must stay green **and unchanged**; this is a
-  collapse with no product behaviour in it
-- `pnpm e2e:ladle` — `ReactFlowCanvas` and `card.stories.tsx` are touched, and it
-  is its own CI job that neither `verify` nor `e2e` runs
+- `pnpm e2e` — application behavior and its expectations should remain unchanged.
+- `pnpm e2e:ladle` — the harness and Resource stories change; this separate job
+  is run by neither `verify` nor `e2e`.
 
-`e2e:ladle` is the one that can actually fail here. Deleting the harness default
-at `ReactFlowCanvas.tsx:397` changes what several Alias and Space specimens draw
-— they gain the Open control the application has and the catalogue did not. That
-is the fix, not a regression, but the story snapshots move with it.
+All three remain required after implementation. Do not pre-authorize snapshot
+or behavioral expectation updates: identify an actual changed specimen and
+explain why the change restores production parity before changing its proof.
+
+## Answer
+
+Both flags are deleted and both apply as designed. Files touched, one line each:
+
+- `packages/react-flow-adapter/src/projection.ts` — deleted `titleEditingEnabled`
+  and `resourceEditingEnabled` from `ResourceNodeData`; moved the "Reference
+  Resource Opens through the same operation" prose onto `onEditResource`'s own
+  doc comment.
+- `packages/app/src/canvas-resource-decoration.ts` — removed both flag names
+  from `CanvasResourceDataPatch` and the local `Pick` in
+  `decorateSharedResourceNode`; deleted the two flag assignments, leaving the
+  existing `onEditResource`/`onBeginTitleEditing` callback conditions as the
+  whole availability answer.
+- `packages/react-flow-adapter/src/ResourceNode.tsx` — the three Open/Close
+  conjunctions (Markdown, Reference Resource, Space Resource fronts) now read
+  `data.onEditResource !== undefined`; begin-title-edit forwarding now reads
+  only `data.onBeginTitleEditing !== undefined` (the `!data.bodyEditor`
+  half of that guard is deleted, subsumed by composition's Space-wide
+  `!bodyEditing`); the `titleEditor` selection guard drops its `bodyEditor
+  === undefined` term and keeps `!data.readOnly`; rewrote the stale
+  flag-and-operation doc comment above `canvasResourceOptionalProps`.
+- `packages/app/stories/support/ReactFlowCanvas.tsx` — renamed
+  `CanvasResourceNodeSpecimen`'s `resourceEditingEnabled` knob to
+  `openOperationEnabled` (default `true`, no kind check), and the specimen now
+  conditionally assigns `data.onEditResource` from that knob instead of
+  unconditionally assigning the operation behind an independently wrong
+  kind-derived flag.
+- `packages/app/stories/components/resource.stories.tsx` — removed the
+  `OpenReference` story's `resourceEditingEnabled` override, which existed
+  only to compensate for the harness's kind-derived default; the story now
+  gets the Open operation from the corrected specimen default.
+- `packages/app/test/canvas-resource-decoration.test.ts` — migrated the six
+  flag assertions (Decided #7): two were straight duplicates of an adjacent
+  callback-presence assertion and were deleted, one (`resourceEditingEnabled`
+  stayed `true` while a body caret is live) became
+  `expect(patch.onEditResource).toBeTypeOf('function')`, and the remaining
+  three duplicates were dropped in favour of the `onEditResource`/
+  `onBeginTitleEditing` presence checks already beside them.
+- `packages/app/test/canvas-resource-authoring.test.tsx` — migrated the seven
+  hook-level flag assertions the same way: four were duplicates of an adjacent
+  operation-presence assertion and were deleted; three needed a new
+  presence/absence assertion on `onEditResource` or `onBeginTitleEditing`
+  where nothing else in the test covered that fact yet.
+- `packages/react-flow-adapter/test/ResourceNode.test.tsx` — removed both
+  flags from the `Overrides` type and the `props()` builder; removed every
+  flag from fixture call sites, keeping the callbacks; consolidated the
+  "flag raised over a missing operation" describe block down to its one
+  still-meaningful case (title unrenameable with no operation supplied) and
+  merged its duplicate Open-control case into the existing "offers no
+  affordance on a Resource with no Open operation supplied" test; retired the
+  "does not offer or mount title editing while the Markdown body owns the
+  caret" test with an explanatory comment (see below) instead of adapting it;
+  added a new `describe('ResourceNode readOnly suppresses controls despite a
+  supplied operation')` block with the three readOnly regression cases the
+  ticket asks for.
+- `packages/react-flow-adapter/test/projection-types.test.ts` — added two
+  `expectTypeOf` assertions pinning that `titleEditingEnabled` and
+  `resourceEditingEnabled` no longer extend `keyof ResourceNodeData`, beside
+  the existing (differently-named) negative check.
+- `docs/agents/rendering.md` — rewrote the bullet that documented the
+  flag-and-operation reconciliation, since it described exactly the mechanism
+  this ticket deleted; it now states the presence-only rule and names the
+  surviving `readOnly` suppression path.
+
+**The impossible simultaneous-editor fixture was retired, not reframed.**
+`ResourceNode.test.tsx`'s "does not offer or mount title editing while the
+Markdown body owns the caret" supplied `titleEditor` and `bodyEditor` together,
+which production's `Caret` (one nullable title/body union) cannot produce.
+Reframing it to a reachable combination (`bodyEditor` alone, no `titleEditor`)
+would have proved nothing about the deleted guard, because `ResourceNode`'s
+`state === 'editing'` branch already keys off `titleEditor`'s own presence, not
+`bodyEditor`. The test is replaced with a comment pointing at
+`canvas-resource-authoring.test.tsx`'s "withholds competing Resource edits
+while a body caret is live", which is the composition-seam test that actually
+proves the real rule (title editing withheld Space-wide while a body caret is
+live).
+
+**readOnly regression tests: red, then green, both actually run.** The three
+new cases in `ResourceNode.test.tsx` (`readOnly` withholding Open, Close, and
+begin-title-edit despite a supplied operation) were run against a deliberately
+broken tree — both `readOnly={data.readOnly}` forwards to `CanvasResource` in
+`ResourceNode.tsx` changed to `readOnly={false}` — and all three failed red:
+
+```
+FAIL … withholds the Open control from a read-only Closed Resource
+FAIL … withholds the Close control from a read-only Open Resource
+FAIL … withholds the begin-title-edit affordance from a read-only Resource
+Tests  3 failed | 45 skipped (48)
+```
+
+Each failure showed the withheld control rendered anyway (`Open Resource A`,
+`Close Resource A`, `Edit Title A`, respectively) — i.e. exactly the
+regression a reintroduced flag-based gate would hide, since these fixtures
+supply the operation. The forwarding was then restored and the same three
+cases, and the full 48-test file, passed green. No `.bak` or stray file was
+left behind; `git diff` on `ResourceNode.tsx` shows only the intended
+production edit.
+
+**No stale reference left behind.** A repo-wide grep for `titleEditingEnabled`
+and `resourceEditingEnabled` after the change finds them only where expected:
+the negative `expectTypeOf` assertions in `projection-types.test.ts`, and one
+unrelated historical mention in `authoring-availability.ts` that predates and
+is unrelated to these two fields (it documents a different, already-retired
+prop of the same name that once carried `soleAuthoringSurface` directly onto
+the canvas, before this module existed to consolidate that question — left
+untouched as accurate history).
+
+**Verification, actually run on the finished tree:**
+
+- `pnpm verify` — green. `verify:static` (toolchain, both typechecks, UI
+  catalogue, lint, anti-slop, format) all green; `test:coverage` reports
+  **237 test files passed, 3011 tests passed, 13 skipped** (exit code 0).
+- `pnpm e2e` — green, **227 passed** (2.8m), including the Reference Resource
+  Open/Close and Space Resource Open/Close specs the flag removal touches
+  (`editing.spec.ts`, `overview.spec.ts`, `space-resource.spec.ts`).
+- `pnpm e2e:ladle` — green, **115 passed** (40.6s), including
+  `resource-expand.spec.ts`'s "Open Reference Resource story renders Target
+  Markdown read-only under the Reference Resource Title" — the Ladle proof
+  that exercises the corrected `OpenReference` story and harness default.
+
+No behavioral expectation was changed to make a test pass; every changed
+assertion follows directly from the callback-presence rule the ticket
+specifies, and the one story specimen whose default changed (kind-derived →
+unconditional) is exactly the "latent default defect" the ticket names, fixed
+by deleting the wrong default rather than by adjusting a proof around it.
+
+No remaining blockers.
+
+## Comments
+
+### Audit, 21 September 2026
+
+Recommendation: **Strong; retain ready-for-agent**. Both pairs and their four
+adapter reconciliations remain. Removed the completed blocker, refreshed names
+and ownership, added the decoration tests and impossible-editor fixture to the
+migration work, and corrected the story and dormant-read suppression claims.
+The settled two-pair design and rejected alternatives remain intact.
+
+Observed: **83 tests passed across 3 files**:
+
+```sh
+pnpm exec vitest run packages/react-flow-adapter/test/ResourceNode.test.tsx packages/app/test/canvas-resource-decoration.test.ts packages/app/test/canvas-resource-authoring.test.tsx
+```
+
+These are existing-behavior audit results, not completion of the implementation
+verification bar. Full verify, application E2E and Ladle E2E were not run in the
+audit. No implementation changes have been made for this ticket.
+
+### Amendments the audit made to settled decisions
+
+The audit above was never committed on its own: it first landed in the commit that closes this ticket, so its Comment's "No implementation changes have been made for this ticket" was true when written and not of the commit that carries it. It also amended three settled points, and the implementation relied on the first. Recorded here so the change to decisions marked "not reopened" is visible; the original wording is `git show 0ae8f235:<this file>`.
+
+- **Decided #7.** Original: "The seven flag assertions are rewritten, not deleted. … Only the *divergence* becomes unrepresentable; the rules do not. Deleting them would lose four availability rules to a refactor meant to remove a repair." The audit dropped the last sentence and added "Consolidate duplicates where those assertions already exist", under which the implementation deleted duplicate assertions. The rules themselves stay pinned by callback presence and absence in `canvas-resource-authoring.test.tsx` and `canvas-resource-decoration.test.ts`.
+- **Decided #3.** Original: "Two remain, which is already one opinion too many." Dropped by the audit; `readOnly` still suppresses in both `ResourceNode` and `CanvasResource`.
+- **Verification bar.** Original: "That is the fix, not a regression, but the story snapshots move with it." The audit replaced this with "Do not assume several story snapshots must change." The implementation changed no snapshot files, because the only Reference specimen already raised the retired flag.

@@ -153,8 +153,6 @@ interface Overrides {
   isConnectable?: boolean;
   title?: string;
   kind?: ResourceNodeData['kind'];
-  titleEditingEnabled?: boolean;
-  resourceEditingEnabled?: boolean;
   titleEditor?: ResourceTitleEditor;
   onEditResource?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
@@ -173,8 +171,6 @@ function props({
   isConnectable = true,
   title = 'A',
   kind = 'markdown',
-  titleEditingEnabled = false,
-  resourceEditingEnabled = false,
   titleEditor,
   onEditResource,
   onBeginTitleEditing,
@@ -190,8 +186,6 @@ function props({
     resourceId,
     title,
     kind,
-    titleEditingEnabled,
-    resourceEditingEnabled,
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -295,7 +289,6 @@ describe('ResourceNode canvas Resource state adapter', () => {
         {...props({
           kind: 'reference',
           title: 'A, again',
-          resourceEditingEnabled: true,
           onEditResource,
         })}
       />,
@@ -320,7 +313,6 @@ describe('ResourceNode canvas Resource state adapter', () => {
           kind: 'space',
           expanded: true,
           body: 'must not render',
-          resourceEditingEnabled: true,
           onEditResource,
           onBeginBodyEditing,
         })}
@@ -347,8 +339,6 @@ describe('ResourceNode Open authoring', () => {
       <ResourceNode
         {...props({
           selected: true,
-          titleEditingEnabled: true,
-          resourceEditingEnabled: true,
           onEditResource,
           onBeginTitleEditing,
         })}
@@ -361,8 +351,8 @@ describe('ResourceNode Open authoring', () => {
     expect(onBeginTitleEditing).not.toHaveBeenCalled();
   });
 
-  it('offers no affordance on a Resource that owns no content to edit', () => {
-    render(<ResourceNode {...props({ selected: true, titleEditingEnabled: true })} />);
+  it('offers no affordance on a Resource with no Open operation supplied', () => {
+    render(<ResourceNode {...props({ selected: true })} />);
 
     expect(screen.queryByRole('button', { name: /^Open Resource/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
@@ -370,21 +360,13 @@ describe('ResourceNode Open authoring', () => {
 });
 
 /**
- * A flag says the composition *offers* a control; the operation is how the
- * control is performed, and the two travel together from `SpaceCanvas`. Raised
- * over a missing operation, the flag alone used to draw a live control that did
- * nothing when activated. `CanvasResource` omits a control it has no operation for,
- * and the adapter must not manufacture one on its behalf.
+ * Presence of the operation is the whole capability. `CanvasResource` omits a
+ * control it has no operation for, and the adapter must not manufacture one on
+ * its behalf.
  */
 describe('ResourceNode withholds a control the composition supplied no operation for', () => {
-  it('draws no Edit control for a flag raised over a missing operation', () => {
-    render(<ResourceNode {...props({ selected: true, resourceEditingEnabled: true })} />);
-
-    expect(screen.queryByRole('button', { name: /^Open Resource/ })).not.toBeInTheDocument();
-  });
-
-  it('leaves the title unrenameable for a flag raised over a missing operation', () => {
-    render(<ResourceNode {...props({ selected: true, titleEditingEnabled: true })} />);
+  it('leaves the title unrenameable when no title-editing operation is supplied', () => {
+    render(<ResourceNode {...props({ selected: true })} />);
     const heading = screen.getByRole('heading', { name: 'A' });
 
     // The heading is the Title Lines; `data-editable` is the Title's own box,
@@ -416,9 +398,7 @@ describe('ResourceNode title authoring', () => {
   it('begins inline title editing from the Title control', () => {
     const onBeginTitleEditing = vi.fn();
     const { rerender } = render(
-      <ResourceNode
-        {...props({ selected: true, titleEditingEnabled: true, onBeginTitleEditing })}
-      />,
+      <ResourceNode {...props({ selected: true, onBeginTitleEditing })} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
@@ -428,33 +408,12 @@ describe('ResourceNode title authoring', () => {
       <ResourceNode
         {...props({
           selected: true,
-          titleEditingEnabled: true,
           titleEditor: { onComplete: () => null, onCancel: () => undefined },
           onBeginTitleEditing,
         })}
       />,
     );
     expect(screen.getByRole('textbox', { name: 'Resource title' })).toHaveValue('A');
-  });
-
-  it('does not offer or mount title editing while the Markdown body owns the caret', () => {
-    const onBeginTitleEditing = vi.fn();
-    render(
-      <ResourceNode
-        {...props({
-          expanded: true,
-          body: 'Markdown',
-          titleEditingEnabled: true,
-          onBeginTitleEditing,
-          titleEditor: { onComplete: () => null, onCancel: vi.fn() },
-          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
-        })}
-      />,
-    );
-
-    expect(screen.queryByRole('textbox', { name: 'Resource title' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
-    expect(onBeginTitleEditing).not.toHaveBeenCalled();
   });
 
   it('keeps an invalid title local, completes a valid one with Enter, and returns focus to the node', () => {
@@ -464,7 +423,6 @@ describe('ResourceNode title authoring', () => {
     renderInNode(
       props({
         selected: true,
-        titleEditingEnabled: true,
         titleEditor: { onComplete: onCompleteTitleEditing, onCancel: () => undefined },
       }),
     );
@@ -495,7 +453,6 @@ describe('ResourceNode title authoring', () => {
           <ResourceNode
             {...props({
               selected: true,
-              titleEditingEnabled: true,
               titleEditor: {
                 onComplete: onCompleteTitleEditing,
                 onCancel: onCancelTitleEditing,
@@ -521,6 +478,41 @@ describe('ResourceNode title authoring', () => {
     expect(leakedClick).not.toHaveBeenCalled();
     expect(leakedPointer).not.toHaveBeenCalled();
     expect(leakedKey).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Decided #3 (architecture-review/21): `readOnly` is the suppression a dormant
+ * embedded Resource relies on, not the two deleted flags. `ResourceNode`
+ * forwards `data.readOnly` to `CanvasResource`, which withholds Open/Close and
+ * begin-title-edit regardless of whether the composition supplied the
+ * operation — these cases supply it, so the assertion is genuinely about
+ * `readOnly` and not about an absent operation.
+ */
+describe('ResourceNode readOnly suppresses controls despite a supplied operation', () => {
+  it('withholds the Open control from a read-only Closed Resource', () => {
+    const onEditResource = vi.fn();
+    render(<ResourceNode {...props({ selected: true, readOnly: true, onEditResource })} />);
+
+    expect(screen.queryByRole('button', { name: 'Open Resource A' })).not.toBeInTheDocument();
+  });
+
+  it('withholds the Close control from a read-only Open Resource', () => {
+    const onEditResource = vi.fn();
+    render(
+      <ResourceNode
+        {...props({ selected: true, readOnly: true, expanded: true, body: 'x', onEditResource })}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Close Resource A' })).not.toBeInTheDocument();
+  });
+
+  it('withholds the begin-title-edit affordance from a read-only Resource', () => {
+    const onBeginTitleEditing = vi.fn();
+    render(<ResourceNode {...props({ selected: true, readOnly: true, onBeginTitleEditing })} />);
+
+    expect(screen.queryByRole('button', { name: 'Edit Title A' })).not.toBeInTheDocument();
   });
 });
 
@@ -888,7 +880,6 @@ describe('ResourceNode Expanded Resource front', () => {
           title: 'Return',
           expanded: true,
           body: SOURCE,
-          resourceEditingEnabled: true,
           onEditResource: vi.fn(),
         })}
       />,
@@ -908,7 +899,6 @@ describe('ResourceNode Expanded Resource front', () => {
         {...props({
           expanded: true,
           body: SOURCE,
-          titleEditingEnabled: true,
           titleEditor: { onComplete: () => null, onCancel: () => undefined },
         })}
       />,

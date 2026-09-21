@@ -372,7 +372,13 @@ export interface CanvasResourceNodeSpecimenProps {
   readonly selected?: boolean;
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
-  readonly resourceEditingEnabled?: boolean;
+  /**
+   * Whether this specimen supplies the Open/Close operation, `onEditResource`.
+   * Every Resource kind Opens and Closes through the same operation (ADR
+   * 0070), so this defaults to true regardless of kind; a story asking for a
+   * Resource with no Open capability at all sets it false.
+   */
+  readonly openOperationEnabled?: boolean;
   readonly nodeSize?: { readonly width: number; readonly height: number };
   readonly expanded?: boolean;
   readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -395,7 +401,7 @@ export function CanvasResourceNodeSpecimen({
   selected = false,
   editingTitle = false,
   graphColor,
-  resourceEditingEnabled,
+  openOperationEnabled = true,
   nodeSize,
   expanded,
   onOpenChange,
@@ -430,11 +436,9 @@ export function CanvasResourceNodeSpecimen({
       onDeleteMap: null,
     })({ kind: 'resource', resource, map }),
     readOnly,
-    titleEditingEnabled: true,
-    resourceEditingEnabled: resourceEditingEnabled ?? source.data.kind === 'markdown',
-    onEditResource: onOpenChange ?? (() => 'completed'),
     onBeginTitleEditing: () => undefined,
   };
+  if (openOperationEnabled) data.onEditResource = onOpenChange ?? (() => 'completed');
   if (expanded !== undefined) data.expanded = expanded;
   if (title !== undefined) data.title = title;
   if (body !== undefined) data.body = body;

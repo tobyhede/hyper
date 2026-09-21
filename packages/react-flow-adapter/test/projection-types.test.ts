@@ -30,4 +30,8 @@ it('cannot ask for a title editor without what ends it', () => {
 
 it('keeps no separate flag that could be raised over a missing operation', () => {
   expectTypeOf<'editingTitle'>().not.toExtend<keyof ResourceNodeData>();
+  // architecture-review/21 deleted these two: presence of `onEditResource`
+  // and `onBeginTitleEditing` is now the whole capability.
+  expectTypeOf<'titleEditingEnabled'>().not.toExtend<keyof ResourceNodeData>();
+  expectTypeOf<'resourceEditingEnabled'>().not.toExtend<keyof ResourceNodeData>();
 });
