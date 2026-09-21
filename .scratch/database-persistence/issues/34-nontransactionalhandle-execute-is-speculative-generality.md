@@ -1,6 +1,6 @@
 # 34 — `nonTransactionalHandle.execute` is speculative generality
 
-Status: needs-triage
+Status: wontfix
 Tags: Cleanup, release/v1
 Blocked by: None.
 
@@ -56,3 +56,9 @@ A stub-or-throw `execute` on `nonTransactionalHandle` was also considered and re
 
 - [ ] Decide whether the two-type-parameter split (or a conditional-type variant) is worth attempting for real, given point 2/3 above — if so, prototype it against **both** `src/prisma/sql-store.ts` and `src/sqlite/sql-store.ts` and confirm `tsc`/`pnpm -r typecheck` green with no new type assertion before touching the shared interface.
 - [ ] If not: leave `nonTransactionalHandle.execute` as is (a correct, if currently unreached, implementation) and close this as `wontfix` with that reasoning restated at the point of closing.
+
+## Comments
+
+**Audit, 2026-09-21 — closed `wontfix`, as the ticket's own second acceptance item proposes.**
+
+The claim still holds against `d456b00c`: every caller of `#loadEverySpace` builds its `tables` from a `#store.transaction` handle, and the non-transactional `tables(this.#store.orm)` sites (`listSpaces`, `loadSpace`, `markExported`, the post-conflict reload, `#loadMetaSpaceIdUnserialised`) never reach `Space.loadEvery`. The line numbers above have moved (`#commitInTransaction`'s read is now `:412`, `#authoritativeAggregate` `:632`, `#loadEverySpace` `:606`). The reason for not attempting the type split is unchanged: PostgreSQL's `Handle` and transaction handle are the same type, so the overload form cannot compile for the shared class, and the conditional-type form is unproven. `nonTransactionalHandle.execute` stays: a correct, currently unreached implementation that `Handle`'s doc comment promises is a working value.

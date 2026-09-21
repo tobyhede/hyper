@@ -14,16 +14,16 @@ were preserved and corrected in place; no implementation was changed.
 | [database-persistence/26](../database-persistence/issues/26-one-database-target-composition.md) | Host still rejects relative SQLite paths while CLI resolves them; the dev shell still chooses its default before dotenv. Two runtime compositions remain. SQLite already has an invariant give-up test, so do not call all its retry proof absent. | Ready for agent after 25; blocks final proof. |
 | [database-persistence/31](../database-persistence/issues/31-the-unavailable-arm-is-named.md) | Six current classification sites plus two blanket GET catches. Part A is designed; Part B still asks cap versus reported persistent failure. Correct the promise of no named-arm behaviour change: those two GET catches also change status for broken state. | Needs info for Part B; blocks final proof. |
 | [database-persistence/34](../database-persistence/issues/34-nontransactionalhandle-execute-is-speculative-generality.md) | Non-transactional execute remains unreached. There are five non-transactional tables call sites, including the omitted post-conflict reload. Removal has type-shape costs and no demonstrated runtime defect. | Needs triage; explicit keep/remove disposition blocks final proof. |
-| [database-persistence/36](../database-persistence/issues/36-replaceallspaces-has-no-stated-error-interface.md) | Replacement lacks initialization's duplicate-Thing proposal contract case. Catch filters are recoverable cases, not exhaustive thrown sets; the relock loop raises stale revision before the shared method. No repository operation itself answers HTTP 503. | Coverage/interface cleanup, not a proven reachable defect; blocks final proof. |
-| [database-persistence/37](../database-persistence/issues/37-a-revision-cannot-be-constructed-out-of-range.md) | Revision remains bigint and advancement adds 1n. There are three reclassification catches plus an error constructor. A valid maximum cannot advance; SQL raw-revision proofs skip memory. | Needs triage for ownership and ceiling outcome; blocks final proof. |
-| [database-persistence/38](../database-persistence/issues/38-sqltables-is-nineteen-members-over-one-difference.md) | The ordering callback leaks one fixed query. Order is used, not technically phantom. Identical table expressions do not erase generated typing constraints; merging lock operations must not spread placeholder-write obligations. | Needs triage; blocks final proof. |
+| [database-persistence/39](../database-persistence/issues/39-replaceallspaces-has-no-stated-error-interface.md) | Replacement lacks initialization's duplicate-Thing proposal contract case. Catch filters are recoverable cases, not exhaustive thrown sets; the relock loop raises stale revision before the shared method. No repository operation itself answers HTTP 503. | Coverage/interface cleanup, not a proven reachable defect; blocks final proof. |
+| [database-persistence/40](../database-persistence/issues/40-a-revision-cannot-be-constructed-out-of-range.md) | Revision remains bigint and advancement adds 1n. There are three reclassification catches plus an error constructor. A valid maximum cannot advance; SQL raw-revision proofs skip memory. | Needs triage for ownership and ceiling outcome; blocks final proof. |
+| [database-persistence/41](../database-persistence/issues/41-sqltables-is-nineteen-members-over-one-difference.md) | The ordering callback leaks one fixed query. Order is used, not technically phantom. Identical table expressions do not erase generated typing constraints; merging lock operations must not spread placeholder-write obligations. | Needs triage; blocks final proof. |
 
 ## Dependency model
 
 The only hard dependency among these eight is 25 → 26. The suggested sequence
-31 → 37 → 38 concerns overlapping edits and design vocabulary, not inability to
+31 → 40 → 41 concerns overlapping edits and design vocabulary, not inability to
 start. Those suggestions now live outside `Blocked by`, so the generator does
-not misrepresent them as prerequisites. Ticket 36 can accompany 31; 34 and 38
+not misrepresent them as prerequisites. Ticket 39 can accompany 31; 34 and 41
 can be investigated together or separately.
 
 All eight carry `release/v1`. [V1/07](issues/07-prove-the-v1-release.md) names the

@@ -1,6 +1,9 @@
 import { uuidSchema, type UUID } from '@project/core';
+import postgres from '@prisma-next/postgres/runtime';
 import {
   AggregateInvariantError,
+  classifyStoredFailure,
+  PersistenceUnavailableError,
   type AggregateLoadResult,
   type LoadedSpace,
 } from '@project/persistence';
@@ -16,7 +19,12 @@ import {
   retryMetaSpaceEstablishment,
 } from '../../src/startup/database-startup';
 import { defaultContentAggregate } from '../../src/startup/default-content';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import type { Contract } from '../../src/prisma/contract.d';
+import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { startRefusingPostgresServer } from '../support/refusing-postgres-server';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -209,7 +217,10 @@ class ScriptedRepository extends MemorySpaceRepository {
   }
 }
 
-const unreachable = (): Error => new Error('connect ECONNREFUSED 127.0.0.1:5432');
+const unreachable = (): Error =>
+  new PersistenceUnavailableError('connect ECONNREFUSED 127.0.0.1:5432');
+/** Neither named arm: a code defect, or a driver failure nobody anticipated. */
+const unclassified = (): Error => new TypeError('Cannot read properties of undefined');
 const invariant = (): Error =>
   new AggregateInvariantError('Stored Spaces exist without a Meta Space');
 
@@ -325,6 +336,60 @@ describe('retryMetaSpaceEstablishment', () => {
     expect(reported).toEqual([expect.any(AggregateInvariantError)]);
   });
 
+  // Ticket 31, Part B. Only an unreachable database is worth waiting out. A
+  // failure neither named arm describes used to reset the count and continue,
+  // so a defect no retry cures was read once a minute, forever, at the 60s
+  // ceiling. It now counts toward giving up exactly as an invariant failure
+  // does: two running, so a one-off is not a verdict and a defect — which
+  // fails the same way every time — is.
+  it('stops at a failure it cannot classify once a second attempt confirms it', async () => {
+    const repository = new ScriptedRepository(Array.from({ length: 10 }, unclassified));
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: recordingWait(waits),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBeUndefined();
+    expect(waits).toEqual([META_SPACE_RETRY_INITIAL_DELAY_MS, 10_000]);
+    expect(reported).toEqual([expect.any(TypeError), expect.any(TypeError)]);
+  });
+
+  it('keeps trying through one failure it cannot classify', async () => {
+    const repository = new ScriptedRepository([unclassified()]);
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: () => Promise.resolve(),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(reported).toEqual([expect.any(TypeError)]);
+  });
+
+  // Both are failures a wait does not cure, so they confirm each other; an
+  // outage between them says nothing about either and resets the count.
+  it('counts unclassified and invariant failures together, and an outage resets them', async () => {
+    const confirmed = new ScriptedRepository([unclassified(), invariant(), undefined]);
+    await expect(
+      retryMetaSpaceEstablishment(confirmed, establishmentIds(), {
+        wait: () => Promise.resolve(),
+        report: () => undefined,
+      }),
+    ).resolves.toBeUndefined();
+
+    const interrupted = new ScriptedRepository([unclassified(), unreachable(), invariant()]);
+    await expect(
+      retryMetaSpaceEstablishment(interrupted, establishmentIds(), {
+        wait: () => Promise.resolve(),
+        report: () => undefined,
+      }),
+    ).resolves.toBe(SPACE_ID);
+  });
+
   it('counts invariant failures consecutively, so an outage between them resets', async () => {
     // Three failures and two of them invariant, but never twice running: a
     // failure that says nothing about stored state cannot help confirm it.
@@ -384,6 +449,70 @@ describe('retryMetaSpaceEstablishment', () => {
     });
 
     expect(metaSpaceId).toBe(SPACE_ID);
+  });
+});
+
+/*
+ * Ticket 38 (and ticket 36), through a real repository over the PostgreSQL
+ * driver: what start-up does with a server that refuses this client depends on
+ * what the refusal carries. A wrong password is unclassified, confirms itself
+ * on the second attempt, and stops the retry; too many connections is an
+ * outage, which never confirms anything and is waited out.
+ */
+describe('retryMetaSpaceEstablishment over a PostgreSQL server that refuses this client', () => {
+  const refusedBy = async (sqlState: string, message: string) => {
+    const server = await startRefusingPostgresServer(sqlState, message);
+    const database = postgres<Contract>({ contractJson, url: server.url });
+    return {
+      repository: new SqlSpaceRepository(postgresSqlStore(database)),
+      close: async () => {
+        await database.close();
+        await server.close();
+      },
+    };
+  };
+
+  it('gives up on a wrong password once a second attempt confirms it', async () => {
+    const { repository, close } = await refusedBy(
+      '28P01',
+      'password authentication failed for user "hyper"',
+    );
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+    try {
+      const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+        wait: recordingWait(waits),
+        report: (error) => reported.push(error),
+      });
+
+      expect(metaSpaceId).toBeUndefined();
+      expect(waits).toEqual([META_SPACE_RETRY_INITIAL_DELAY_MS, 10_000]);
+      expect(reported).toHaveLength(2);
+      expect(reported.map(classifyStoredFailure)).toEqual(['unclassified', 'unclassified']);
+    } finally {
+      await close();
+    }
+  });
+
+  it('keeps waiting out too many connections past the confirming limit', async () => {
+    const { repository, close } = await refusedBy('53300', 'sorry, too many clients already');
+    const stopped = new Error('the test stops waiting');
+    const reported: unknown[] = [];
+    let waits = 0;
+    try {
+      // Five attempts, then a `wait` that ends the loop: an outage never gives
+      // up by itself, so the test is what stops it.
+      const retrying = retryMetaSpaceEstablishment(repository, establishmentIds(), {
+        wait: () => (++waits > 5 ? Promise.reject(stopped) : Promise.resolve()),
+        report: (error) => reported.push(error),
+      });
+
+      await expect(retrying).rejects.toBe(stopped);
+      expect(reported).toHaveLength(5);
+      expect(reported.map(classifyStoredFailure)).toEqual(Array(5).fill('unavailable'));
+    } finally {
+      await close();
+    }
   });
 });
 

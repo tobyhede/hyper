@@ -35,10 +35,20 @@ export const repositoryEnvPath = (from: string = moduleDirectory): string | unde
   return join(directory, '.env');
 };
 
-export const createPostgresDatabase = () => {
+/**
+ * `DATABASE_URL` as `createPostgresDatabase` reads it: the nearest `.env`
+ * loaded first (never overriding a variable already set), surrounding space
+ * trimmed, and a blank value answered as absent.
+ */
+export const configuredDatabaseUrl = (): string | undefined => {
   const envPath = repositoryEnvPath();
   if (envPath !== undefined) loadEnv({ path: envPath, quiet: true });
   const databaseUrl = process.env['DATABASE_URL']?.trim();
+  return databaseUrl === '' ? undefined : databaseUrl;
+};
+
+export const createPostgresDatabase = () => {
+  const databaseUrl = configuredDatabaseUrl();
   const options: Parameters<typeof postgres<Contract>>[0] = databaseUrl
     ? { contractJson, url: databaseUrl }
     : { contractJson };

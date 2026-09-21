@@ -1,9 +1,21 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
-import { AggregateInvariantError } from '@project/persistence';
-import { afterEach, describe, expect, it } from 'vitest';
+import {
+  AggregateInvariantError,
+  classifyStoredFailure,
+  PersistenceUnavailableError,
+} from '@project/persistence';
+import postgres from '@prisma-next/postgres/runtime';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SqlTables } from '../../src/persistence/sql-store';
+import type { Contract as PostgresContract } from '../../src/prisma/contract.d';
+import postgresContractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import { postgresSqlStore } from '../../src/prisma/sql-store';
+import type { SqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
+import { retryMetaSpaceEstablishment } from '../../src/startup/database-startup';
+import { captureError } from '../support/capture-error';
 import { spaceRepositoryContract } from '../support/repository-contract';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
@@ -116,6 +128,10 @@ const retitled = (snapshot: SpaceSnapshot, title: string): SpaceSnapshot => ({
   ...snapshot,
   document: { ...snapshot.document, title },
 });
+
+type RepositoryStateTable = SqlTables<unknown>['RepositoryState'];
+
+type SqliteStore = ReturnType<typeof sqliteSqlStore>;
 
 const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: bigint | null) => ({
   snapshot,
@@ -451,6 +467,317 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       kind: 'loaded',
       aggregate: { metaSpaceId: SPACE_ID },
     });
+  });
+
+  // Tickets 31 and 38: an unreachable database is named, not inferred from a
+  // failure being something else, and not from where it failed. A client
+  // closed underneath the repository raises the pinned runtime's plain
+  // closed-client `Error` from every operation, transactional or not, and the
+  // SQLite store recognises that one error (`src/sqlite/sql-store.ts`). The
+  // driver's own error stays on `.cause`, where an operator's log finds it.
+  it('names every operation on a closed database unavailable', async () => {
+    const { repository, database } = await opened();
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    await database.close();
+
+    const operations: readonly (readonly [string, () => Promise<void>])[] = [
+      ['loadAggregate', async () => void (await repository.loadAggregate())],
+      [
+        'commit',
+        async () =>
+          void (await repository.commit({
+            changes: [
+              {
+                kind: 'update',
+                spaceId: SPACE_ID,
+                snapshot: retitled(first, 'Never stored'),
+                expectedRevision: 0n,
+              },
+            ],
+          })),
+      ],
+      [
+        'initializeAggregate',
+        async () =>
+          void (await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] })),
+      ],
+      [
+        'replaceAggregate',
+        async () =>
+          void (await repository.replaceAggregate(
+            { metaSpaceId: SPACE_ID, spaces: [first] },
+            SPACE_ID,
+          )),
+      ],
+      ['listSpaces', async () => void (await repository.listSpaces())],
+      ['loadSpace', async () => void (await repository.loadSpace(SPACE_ID))],
+      ['loadMetaSpaceId', async () => void (await repository.loadMetaSpaceId())],
+      ['markExported', () => repository.markExported(SPACE_ID, 1n)],
+    ];
+    for (const [name, operation] of operations) {
+      const error = await captureError(operation);
+      expect(error, name).toBeInstanceOf(PersistenceUnavailableError);
+      expect(error?.cause, name).toMatchObject({ message: 'SQLite client is closed' });
+    }
+  });
+
+  /**
+   * The harness's own store, with one `RepositoryState` member replaced. Each
+   * stand-in below reaches the repository exactly where the real member's
+   * result would, inside the transaction, after its callback has run.
+   * `isUnavailable` is the store's own unless a case says otherwise.
+   */
+  const withRepositoryState = (
+    database: SqliteDatabase,
+    replace: (state: RepositoryStateTable) => RepositoryStateTable,
+    isUnavailable?: SqliteStore['isUnavailable'],
+  ) => {
+    const store = sqliteSqlStore(database);
+    const tables: typeof store.tables = (handle) => {
+      const real = store.tables(handle);
+      return { ...real, RepositoryState: replace(real.RepositoryState) };
+    };
+    return new SqlSpaceRepository({
+      ...store,
+      tables,
+      isUnavailable: isUnavailable ?? store.isUnavailable,
+    });
+  };
+
+  /**
+   * PostgreSQL's recognition of an unavailable failure (ticket 38), read off a
+   * store whose runtime is never connected.
+   */
+  const unconnectedPostgres = postgres<PostgresContract>({
+    contractJson: postgresContractJson,
+    url: 'postgres://hyper:unused@127.0.0.1:1/hyper',
+  });
+  const postgresRecognition = postgresSqlStore(unconnectedPostgres).isUnavailable;
+  afterAll(async () => {
+    await unconnectedPostgres.close();
+  });
+
+  /**
+   * What `@prisma-next/driver-postgres`' `normalizePgError` makes of a
+   * statement PostgreSQL failed with a SQLSTATE: `@prisma-next/sql-errors`'
+   * `SqlQueryError`, the code on `sqlState`. Built by hand because that
+   * package is the driver's dependency, not this repository's; SQLite never
+   * raises one of these codes, which is why a SQLite file stands in for the
+   * database here and only the failure — and the PostgreSQL store's
+   * recognition of it, `postgresRecognition` — is PostgreSQL's.
+   */
+  const queryError = (sqlState: string): Error =>
+    Object.assign(new Error(`statement failed with ${sqlState}`), {
+      kind: 'sql_query',
+      sqlState,
+    });
+
+  // Ticket 31, amended. A deadlock victim is contention, not a defect: the
+  // database chose this transaction to abort so the other could proceed, and
+  // the same request is expected to succeed on a later attempt.
+  it('names a statement PostgreSQL aborted for contention unavailable', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const deadlock = queryError('40P01');
+    const deadlocked = withRepositoryState(
+      database,
+      (state) => ({ ...state, read: () => Promise.reject(deadlock) }),
+      postgresRecognition,
+    );
+
+    const error = await captureError(() => deadlocked.loadAggregate());
+
+    expect(error).toBeInstanceOf(PersistenceUnavailableError);
+    expect(error?.cause).toBe(deadlock);
+  });
+
+  it('leaves a statement failure that is a defect unclassified', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const duplicate = queryError('23505');
+    const failing = withRepositoryState(
+      database,
+      (state) => ({ ...state, read: () => Promise.reject(duplicate) }),
+      postgresRecognition,
+    );
+
+    expect(classifyStoredFailure(await captureError(() => failing.loadAggregate()))).toBe(
+      'unclassified',
+    );
+  });
+
+  // Before the amendment the deadlock was unclassified, and two in a row made
+  // start-up give up for good on what a third attempt cures.
+  it('keeps start-up trying through contention', async () => {
+    const { database } = await opened();
+    let reads = 0;
+    const contended = withRepositoryState(
+      database,
+      (state) => ({
+        ...state,
+        read: () => {
+          reads += 1;
+          return reads <= 3 ? Promise.reject(queryError('40001')) : state.read();
+        },
+      }),
+      postgresRecognition,
+    );
+    const ids = [SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(
+      contended,
+      () => {
+        const id = ids.shift();
+        if (id === undefined) throw new Error('Establishment minted more ids than it names');
+        return id;
+      },
+      { wait: () => Promise.resolve(), report: () => undefined },
+    );
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+  });
+
+  // A concurrent replacement deleting and rewriting the singleton row between
+  // the read and the relock, twice running, is a race that has passed by the
+  // next attempt -- not stored state that is broken, and not a defect.
+  it('names a Meta identity that keeps moving while it is locked unavailable', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const racing = withRepositoryState(database, (state) => ({
+      ...state,
+      relock: () => Promise.resolve(false),
+    }));
+
+    await expect(racing.loadAggregate()).rejects.toBeInstanceOf(PersistenceUnavailableError);
+  });
+
+  // Ticket 38. The store is asked only about a failure nothing has named. An
+  // already unavailable failure leaves as it is rather than wrapped again, and
+  // broken stored state keeps its name even when an outage is on its chain too.
+  it('does not wrap a failure that already carries a name', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const busy = Object.assign(new Error('database is locked'), {
+      kind: 'sql_connection',
+      transient: true,
+    });
+    const unavailable = new PersistenceUnavailableError('already named', { cause: busy });
+    const broken = new AggregateInvariantError('broken', { cause: busy });
+
+    for (const failure of [unavailable, broken]) {
+      const failing = withRepositoryState(database, (state) => ({
+        ...state,
+        read: () => Promise.reject(failure),
+      }));
+      await expect(failing.loadAggregate()).rejects.toBe(failure);
+    }
+    expect(classifyStoredFailure(broken)).toBe('broken-stored-state');
+  });
+
+  /**
+   * The harness's own store, with its tables rewritten by `rewrite`, told
+   * whether they are a transaction's own or the handle outside one -- so a
+   * stand-in can fail only the read a rolled-back transaction makes afterwards.
+   */
+  const withTables = (
+    database: SqliteDatabase,
+    rewrite: (
+      tables: ReturnType<SqliteStore['tables']>,
+      inTransaction: boolean,
+    ) => ReturnType<SqliteStore['tables']>,
+  ) => {
+    const store = sqliteSqlStore(database);
+    const tables: SqliteStore['tables'] = (handle) =>
+      rewrite(store.tables(handle), handle !== store.orm);
+    return new SqlSpaceRepository({ ...store, tables });
+  };
+
+  /**
+   * What the pinned `@prisma-next/sqlite` runtime raises for every operation
+   * on a closed client (`test/unit/sql-connection-failure.test.ts` raises it
+   * from the runtime itself).
+   */
+  const closedClient = () => new Error('SQLite client is closed');
+
+  // Ticket 38. A commit that loses its revision race rolls back and reads the
+  // Space it lost to afresh, outside the transaction and inside the one
+  // `serialise` call it already holds. An outage there is the database not
+  // answering like any other, so the commit is unavailable rather than a
+  // failure nobody named.
+  it('names an outage during the post-rollback conflict reload unavailable', async () => {
+    const { repository, database } = await opened();
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const outage = closedClient();
+    const racing = withTables(database, (tables, inTransaction) => ({
+      ...tables,
+      Space: inTransaction
+        ? // A rival commit moved the row between the read and the lock.
+          { ...tables.Space, writeDocumentUnderLock: () => Promise.resolve('7') }
+        : { ...tables.Space, loadWithResources: () => Promise.reject(outage) },
+    }));
+
+    const error = await captureError(() =>
+      racing.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: retitled(first, 'Never stored'),
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    );
+
+    expect(error).toBeInstanceOf(PersistenceUnavailableError);
+    expect(error?.cause).toBe(outage);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: first,
+      revision: 0n,
+    });
+  });
+
+  // The same for the Meta identity a replacement reads after a stored Space
+  // moved under its per-row relock.
+  it('names an outage reading the Meta identity after a replacement conflict unavailable', async () => {
+    const { repository, database } = await opened();
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const outage = closedClient();
+    const racing = withTables(database, (tables, inTransaction) =>
+      inTransaction
+        ? // A rival commit moved the row between the baseline read and its relock.
+          { ...tables, Space: { ...tables.Space, relock: () => Promise.resolve('7') } }
+        : {
+            ...tables,
+            RepositoryState: { ...tables.RepositoryState, read: () => Promise.reject(outage) },
+          },
+    );
+
+    const error = await captureError(() =>
+      racing.replaceAggregate(
+        { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'Other', [])] },
+        SPACE_ID,
+      ),
+    );
+
+    expect(error).toBeInstanceOf(PersistenceUnavailableError);
+    expect(error?.cause).toBe(outage);
+    await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
   });
 
   /*

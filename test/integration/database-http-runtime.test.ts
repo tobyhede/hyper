@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   AggregateInvariantError,
+  PersistenceUnavailableError,
   decodeLoadedSpace,
   decodeSpaceSummaries,
   type SpaceCommit,
@@ -135,7 +136,7 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
       opened.repository,
       async () => {
         reads += 1;
-        if (reads === 1) throw new Error('temporarily unavailable');
+        if (reads === 1) throw new PersistenceUnavailableError('temporarily unavailable');
         return opened.repository.loadAggregate();
       },
       async (input) => {

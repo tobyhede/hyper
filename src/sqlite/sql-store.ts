@@ -5,6 +5,8 @@ import {
   buildSpaceTable,
   buildResourceTable,
   defineSqlStore,
+  isDriverConnectionFailure,
+  someCause,
   type Orderable,
 } from '../persistence/sql-store';
 import type { SqliteDatabase } from './db';
@@ -50,6 +52,27 @@ const isUniqueViolation = (error: unknown, table: string): boolean => {
     candidate.constraint.startsWith(`${table}.`)
   );
 };
+
+/**
+ * The message `@prisma-next/sqlite`'s runtime (pinned at 0.16.0) raises for a
+ * query, a transaction or a `connect` on a client whose `close()` has run: a
+ * plain `Error`, built in its `getRuntime`, `connect` and `transaction` with
+ * nothing structured on it. A compatibility check against that one runtime,
+ * and the only failure either store recognises by message (ticket 38): a
+ * closed client is the database not answering, and no field says so. Nothing
+ * else observed after a close is read as unavailable. Exactly `Error` and exactly
+ * this text, so neither a subclass nor another message is read as it —
+ * `test/unit/sql-connection-failure.test.ts` raises it from the pinned runtime
+ * itself, so an upgrade that changes it fails there.
+ */
+const CLOSED_CLIENT_MESSAGE = 'SQLite client is closed';
+
+const isClosedClient = (error: unknown): boolean =>
+  someCause(
+    error,
+    (link) =>
+      Object.getPrototypeOf(link) === Error.prototype && link.message === CLOSED_CLIENT_MESSAGE,
+  );
 
 /**
  * SQLite stores Json as TEXT. A root-level read decodes it through the json
@@ -218,6 +241,9 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
     readDocument,
     isDuplicateKey(error: unknown, table: string): boolean {
       return isUniqueViolation(error, table);
+    },
+    isUnavailable(error: unknown): boolean {
+      return isDriverConnectionFailure(error) || isClosedClient(error);
     },
     serialise<T>(operation: () => Promise<T>): Promise<T> {
       return serialiseSqlite(database, operation);

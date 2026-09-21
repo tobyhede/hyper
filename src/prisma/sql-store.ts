@@ -5,6 +5,7 @@ import {
   buildSpaceTable,
   buildResourceTable,
   defineSqlStore,
+  someCause,
   type Orderable,
 } from '../persistence/sql-store';
 import type { PostgresDatabase } from './db';
@@ -44,6 +45,118 @@ const isPrimaryKeyConflict = (error: unknown, table: string): boolean => {
     candidate.constraint === `${table}_pkey`
   );
 };
+
+/**
+ * The SQLSTATEs that mean PostgreSQL is contended or not answering rather than
+ * that the request, the code or the configuration is wrong: a later attempt of
+ * the same request is the cure. The one place the set is kept; ticket 31's
+ * `## Answer` (amendment) records why each is in and why its neighbours are
+ * not.
+ *
+ * - `08000`, `08001`, `08003`, `08004`, `08006` — connection exceptions.
+ *   `08P01` (protocol violation) is left out: it is a client or server defect.
+ * - `40001` serialization failure and `40P01` deadlock detected — the database
+ *   aborted this transaction so another could proceed.
+ * - `53300` too many connections.
+ * - `55P03` lock not available.
+ * - `57P01` admin shutdown, `57P02` crash shutdown, `57P03` cannot connect now.
+ *   `57014` (query cancelled) is left out: a cancel can be deliberate.
+ *
+ * Read together with what is deliberately absent (ticket 38): `28P01` invalid
+ * password, `28000` invalid authorization, and `3D000` a database that does
+ * not exist are raised at connect exactly as `53300` and `57P03` are, but they
+ * are the configuration or the server refusing this client, which no wait
+ * cures — so they stay unclassified, and start-up counts them toward giving up.
+ */
+export const UNAVAILABLE_SQLSTATES = [
+  '08000',
+  '08001',
+  '08003',
+  '08004',
+  '08006',
+  '40001',
+  '40P01',
+  '53300',
+  '55P03',
+  '57P01',
+  '57P02',
+  '57P03',
+] as const;
+
+/**
+ * The socket failures Node raises under `pool.connect()` that mean the server
+ * is not answering for now, read off the errno name Node puts on `code`.
+ *
+ * - `ECONNREFUSED` — nothing is listening: the server is down or restarting.
+ * - `ECONNRESET` — the peer dropped the connection mid-conversation.
+ * - `ETIMEDOUT` — the peer did not answer in time.
+ * - `EHOSTUNREACH`, `ENETUNREACH` — no route to the server right now.
+ * - `EAI_AGAIN` — the resolver failed temporarily; the name may resolve next time.
+ *
+ * `ENOTFOUND` is left out: a host name that does not resolve is ordinarily a
+ * mistyped `DATABASE_URL`, which no wait cures. So is every other code — an
+ * allowlist, because a failure not named here is not evidence of an outage.
+ */
+const UNAVAILABLE_SOCKET_CODES = [
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EAI_AGAIN',
+] as const;
+
+const isUnavailableSqlState = (value: unknown): boolean =>
+  UNAVAILABLE_SQLSTATES.some((code) => code === value);
+
+const isUnavailableSocketCode = (value: unknown): boolean =>
+  UNAVAILABLE_SOCKET_CODES.some((code) => code === value);
+
+/** Whether `cause` is an error carrying an errno on `code` the allowlist does not name. */
+const carriesUnlistedSocketCode = (cause: unknown): boolean =>
+  cause instanceof Error &&
+  'code' in cause &&
+  typeof cause.code === 'string' &&
+  !isUnavailableSocketCode(cause.code);
+
+/**
+ * PostgreSQL's `SqlStore.isUnavailable` (ticket 38): whether any error on the
+ * failure's cause chain is one of three shapes, each read by a structured
+ * field and never by message.
+ *
+ * - The driver's `SqlConnectionError`, read by its `kind`, unless
+ *   the socket error on its `cause` carries a code outside
+ *   {@link UNAVAILABLE_SOCKET_CODES}: `normalizePgError` names `ENOTFOUND` a
+ *   connection failure too, and the allowlist decides a normalised socket
+ *   failure as it does a raw one. One with no code — matched by the driver on
+ *   its message — stays unavailable.
+ * - The driver's `SqlQueryError` with a SQLSTATE in {@link UNAVAILABLE_SQLSTATES}
+ *   on `sqlState`: `normalizePgError` turns every SQLSTATE failure on a
+ *   statement into one, so contention and shutdown arrive that way.
+ * - An error the driver never normalised, carrying on `code` an unavailable
+ *   SQLSTATE or one of {@link UNAVAILABLE_SOCKET_CODES}. `@prisma-next/driver-postgres`
+ *   acquires a connection with a bare `pool.connect()` and normalises nothing
+ *   it raises, so a server that is down arrives as Node's own socket error and
+ *   a server refusing the handshake as `pg`'s own `DatabaseError` — both with
+ *   the code on `code` (`test/unit/postgres-unreachable.test.ts`).
+ *
+ * The chain, because a deadlock or serialization failure at COMMIT, and the
+ * callback error behind a failed rollback, reach the repository wrapped.
+ * `test/unit/sql-connection-failure.test.ts` holds each of these.
+ */
+const isUnavailable = (failure: unknown): boolean =>
+  someCause(
+    failure,
+    (link) =>
+      ('kind' in link &&
+        link.kind === 'sql_connection' &&
+        !carriesUnlistedSocketCode(link.cause)) ||
+      ('kind' in link &&
+        link.kind === 'sql_query' &&
+        'sqlState' in link &&
+        isUnavailableSqlState(link.sqlState)) ||
+      ('code' in link && (isUnavailableSqlState(link.code) || isUnavailableSocketCode(link.code))),
+  );
 
 /**
  * `Space.where({ id }).include('resources', …).first()`, composed once here
@@ -117,6 +230,7 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
     isDuplicateKey(error: unknown, table: string): boolean {
       return isPrimaryKeyConflict(error, table);
     },
+    isUnavailable,
     serialise<T>(operation: () => Promise<T>): Promise<T> {
       return operation();
     },

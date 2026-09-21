@@ -10,7 +10,7 @@ import {
 import {
   encodeProblemDetails,
   problemCatalogue,
-  isAggregateInvariant,
+  classifyStoredFailure,
   type AggregateLoadResult,
   type HyperProblemCode,
 } from '@project/persistence';
@@ -66,10 +66,12 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
  * stand as the answer.
  *
  * One `AggregateInvariantError` is not proof of broken stored state. It is also
- * what a healthy repository shows for an instant: `loadAggregate` runs at READ
- * COMMITTED and reads in two statements, so a rival host committing between them
- * is reported as Spaces without Meta. Two hosts against one fresh database is
- * the ordinary way to see it — a dev server and `test:integration:postgres`.
+ * what a healthy repository shows for an instant: on PostgreSQL `loadAggregate`
+ * reads the Meta identity and the Spaces in two statements, and although both
+ * run inside one transaction, at READ COMMITTED each statement takes its own
+ * snapshot — so a rival host committing between them is reported as Spaces
+ * without Meta. Two hosts against one fresh database is the ordinary way to see
+ * it — a dev server and `test:integration:postgres`.
  *
  * Start-up's retry already required two consecutive failures for exactly this
  * reason (`src/startup/database-startup.ts`). Drawing a permanent 500 from the
@@ -82,7 +84,7 @@ const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoad
   try {
     return await repository.loadAggregate();
   } catch (error) {
-    if (!isAggregateInvariant(error)) throw error;
+    if (classifyStoredFailure(error) !== 'broken-stored-state') throw error;
     return await repository.loadAggregate();
   }
 };
@@ -102,7 +104,7 @@ const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoad
  * The root address mints nothing. It used to establish the Meta Space when the
  * repository had none, which made two safe methods create durable authored
  * state; establishment is start-up's alone now, and start-up retries it
- * (`src/http/postgres-http-runtime.ts`).
+ * (`src/http/database-http-runtime.ts`).
  */
 export const createSpaceHost = (
   repository: SpaceRepository,
@@ -130,27 +132,34 @@ export const createSpaceHost = (
         // detail is fixed prose like every other one here, so whatever a driver
         // put in its message is not served to an unauthenticated client.
         console.error('Failed to read the Meta Space', error);
-        // Two unrelated failures, told apart by type rather than by matching
-        // message prose (`isAggregateInvariant`, which walks the cause chain
-        // the driver wraps a failed rollback in). Contradictory stored state —
+        // Three failures, told apart by type rather than by matching message
+        // prose (`classifyStoredFailure`, which walks the cause chain the
+        // driver wraps a failed rollback in). Contradictory stored state —
         // Spaces without Meta, an aggregate that fails complete intake, or a
         // stored document that does not parse — is a defect this deployment
-        // carries and no retry cures, so it is a 500. Anything else is the
-        // database being unreachable, which is temporary, and 503 says so.
+        // carries and no retry cures, so it is a 500. An unreachable database
+        // is temporary, and 503 says so. A failure that is neither — a code
+        // defect, or a driver failure nobody anticipated — is a 500 under its
+        // own detail rather than a 503 by default: nothing says it will pass
+        // (ticket 31).
         //
-        // `GET /api/aggregate` (`packages/http/src/index.ts`) now does the same
+        // `GET /api/aggregate` (`packages/http/src/index.ts`) does the same
         // resource on the same rule, independently, because `@project/http` cannot
         // import this module: it re-reads once on an invariant failure — the
         // package boundary means it re-implements `readAggregate` above rather
         // than sharing it — answers 200 if the retry succeeds, and otherwise
-        // classifies whichever error it is left with exactly as this branch
-        // does. `space-http-app.test.ts`'s "re-reads once on an invariant
-        // failure and answers 200 when the retry succeeds" and the two
-        // `internal-error`/`persistence-unavailable` aggregate cases beside it
+        // answers whichever error it is left with by the same three arms.
+        // `space-http-app.test.ts`'s "re-reads once on an invariant failure and
+        // answers 200 when the retry succeeds" and the aggregate cases beside it
         // hold that half; this branch is held by `vite-hono-host.test.ts`.
-        return isAggregateInvariant(error)
-          ? problem('internal-error', 'Stored repository state is not usable.', accept)
-          : problem('persistence-unavailable', 'Try the request again later.', accept);
+        switch (classifyStoredFailure(error)) {
+          case 'broken-stored-state':
+            return problem('internal-error', 'Stored repository state is not usable.', accept);
+          case 'unavailable':
+            return problem('persistence-unavailable', 'Try the request again later.', accept);
+          case 'unclassified':
+            return problem('internal-error', 'The request failed unexpectedly.', accept);
+        }
       }
       if (loaded.kind === 'uninitialized') {
         // Healthy, and nothing to redirect to yet. 503 because it is the only
@@ -161,9 +170,13 @@ export const createSpaceHost = (
         // ticket 21 asked for one status each, and there is no second status in
         // `ProductResponse` that is true of this state.
         //
-        // The wait is literal rather than a hedge: a host reaches here only by
-        // failing to establish at start-up, and start-up retries without an
-        // attempt bound, so the condition ends without anything the client does.
+        // A host reaches here only by failing to establish at start-up. While
+        // the database is unreachable start-up retries without an attempt
+        // bound, so the wait is literal and ends without anything the client
+        // does. A failure no wait cures stops the retry instead (ticket 31),
+        // and start-up reports that it gave up and asks for a restart
+        // (`src/http/database-http-runtime.ts`) — the operator's signal, since
+        // this answer cannot carry it without serving a reason to the client.
         return problem(
           'persistence-unavailable',
           'No Meta Space has been established yet.',

@@ -1,10 +1,10 @@
-# 38 — `SqlTables` is nineteen members over one real difference
+# 41 — `SqlTables` is nineteen members over one real difference
 
 Status: needs-triage
 Tags: Cleanup, release/v1
 Blocked by: None.
 
-Recommended sequence: coordinate with tickets 31, 37 and 34 because they touch the same seam. These are not hard prerequisites; investigate the fixed ordering independently.
+Recommended sequence: coordinate with tickets 31, 40 and 34 because they touch the same seam. These are not hard prerequisites; investigate the fixed ordering independently.
 
 Audited: 2026-09-20 against `b1ac983d`. The 19 table members and the exposed ordering callback remain. The strongest bounded change is to hide fixed ascending-id ordering; the operation-merging choices below still need design review. This ticket joins the final release proof with its `needs-triage` status intact.
 

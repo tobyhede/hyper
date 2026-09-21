@@ -1,6 +1,6 @@
 # 33 — The memory backend's `loadAggregate` does not validate its aggregate
 
-Status: needs-triage
+Status: wontfix
 
 Tags: Defect
 
@@ -47,3 +47,12 @@ Ticket 30 (resolved) named exactly this and deliberately left it alone: "No aggr
 - [ ] If validation is added, `packages/persistence/test/backend-contract.ts`'s `spaceBackendContract` gains a case for it, or the harness gains a deliberate way to construct the invalid shape (the way `MemorySpaceRepository.withoutMetaIdentity` is named and deliberate rather than a second constructor argument meaning), so the shared contract — not just `SqlSpaceRepository` and `MemorySpaceRepository` individually — proves the doc comment's claim for both doubles.
 - [ ] If validation is not added, correct `packages/persistence/src/repository.ts`'s `AggregateInvariantError` doc comment: it currently says "the memory double" as if there were one, and asserts a behaviour this one does not have. Say which double it means, or that it means both and record why `MemorySpaceBackend` is the deliberate exception.
 - [ ] `pnpm verify` is green. `pnpm e2e`/`pnpm e2e:fixture` also, if `MemorySpaceBackend`'s observable behaviour changes for any seed the tracked fixture or `dev:new`/`dev:fixture` construct.
+
+## Comments
+
+**Audit, 2026-09-21 — closed `wontfix`: the premise does not hold.**
+
+- `MemorySpaceBackend` implements the browser-side `SpaceBackend` (`packages/persistence/src/backend.ts`), not `StoredSpaceRepository`. `AggregateInvariantError`'s doc comment speaks of "every implementation of the seam" — the stored seam — so it never covered this class.
+- It is not behind `dev:new`, `dev:fixture` or E2E. Those run `test/support/e2e-http-runtime.ts` over `E2eMemorySpaceRepository`, which extends `MemorySpaceRepository` and already validates. `MemorySpaceBackend` is constructed only in tests (`packages/app/test`, `packages/persistence/test`, `test/support/aggregate-commit-differential.ts`).
+- Its production counterpart is `HttpSpaceBackend`, whose `loadAggregate` throws a plain `Error` on a non-2xx response and never raises `AggregateInvariantError`. Making the memory double raise it would make it disagree with the backend it stands in for.
+- The one true part — "the memory double" did not say which of two — is fixed in the same change: the doc comment now names `MemorySpaceRepository`.

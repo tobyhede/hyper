@@ -264,6 +264,12 @@ export interface SqlTables<Order> {
  *   the ORM boundary for a root read, not a nested `include`.
  * - `isDuplicateKey(error, table)` — recognises a primary-key collision, the
  *   one error the two databases raise differently under a losing insert.
+ * - `isUnavailable(error)` — whether a failure carries evidence that the
+ *   database is not answering for now (ticket 38). Each database owns the
+ *   knowledge of what its driver raises; `SqlSpaceRepository` asks this for a
+ *   failure nothing else has named, and wraps a `true` answer in
+ *   `PersistenceUnavailableError`. `false` means no such evidence, not that
+ *   the failure is permanent, and `true` does not make retrying a write safe.
  * - `serialise` — PostgreSQL runs the operation directly; SQLite queues it
  *   per file handle (`src/sqlite/serialise.ts`), because the driver opens a
  *   connection per operation and the file has one writer.
@@ -280,6 +286,7 @@ export interface SqlStore<Handle, Order> {
   readonly transaction: <T>(fn: (orm: Handle) => Promise<T>) => Promise<T>;
   readonly readDocument: (value: unknown) => unknown;
   readonly isDuplicateKey: (error: unknown, table: string) => boolean;
+  readonly isUnavailable: (error: unknown) => boolean;
   readonly serialise: <T>(operation: () => Promise<T>) => Promise<T>;
   readonly close: () => Promise<void>;
 }
@@ -584,6 +591,49 @@ export interface Orderable<Order> {
     readonly all: () => PromiseLike<readonly SqlSpaceListRow[]>;
   };
 }
+
+/**
+ * Whether any error on a failure's cause chain satisfies `holds` — the one
+ * walk every store's `isUnavailable` reads a failure through (ticket 38).
+ *
+ * The chain, because `@prisma-next/sql-runtime` carries a failed COMMIT's own
+ * error, and the callback error behind a failed rollback, only on `.cause`;
+ * bounded by a seen set, because a chain is data a driver built and a cycle in
+ * one would otherwise hang the reader. `test/unit/sql-connection-failure.test.ts`
+ * holds both.
+ */
+export const someCause = (failure: unknown, holds: (link: Error) => boolean): boolean => {
+  const seen = new Set<unknown>();
+  let current = failure;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (holds(current)) return true;
+    current = current.cause;
+  }
+  return false;
+};
+
+/**
+ * Whether a failure carries the driver's own `SqlConnectionError` anywhere on
+ * its cause chain — what both `@prisma-next/driver-postgres` and
+ * `@prisma-next/driver-sqlite` normalise a statement's connection trouble to,
+ * SQLite BUSY and LOCKED included. SQLite's `isUnavailable` answers `true`
+ * for it (ticket 31, ticket 38); PostgreSQL's reads the same `kind` per link
+ * but first holds a socket errno on its `cause` to the store's allowlist,
+ * because its driver names `ENOTFOUND` a connection failure too.
+ *
+ * Read by the own `kind` field `SqlConnectionError.is` itself reads, because
+ * `@prisma-next/sql-errors` is the drivers' dependency rather than this
+ * repository's. Not by `transient`: that flag says whether an *immediate*
+ * retry might succeed, and the PostgreSQL driver marks a refused connection
+ * `false` — which is the database being down, the very case a reader answers
+ * "try again later" for. Not by message either, so ticket 18's two BUSY shapes
+ * (immediate and exhausted) are one answer without being told apart.
+ * `test/unit/sql-connection-failure.test.ts` holds each of these through both
+ * stores.
+ */
+export const isDriverConnectionFailure = (failure: unknown): boolean =>
+  someCause(failure, (link) => 'kind' in link && link.kind === 'sql_connection');
 
 export const asOrderable = <Order>(space: Orderable<Order>): Orderable<Order> => space;
 

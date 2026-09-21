@@ -9,7 +9,7 @@ import {
   encodeProblemDetails,
   encodeLoadedSpace,
   createWorkingSpaceLoader,
-  isAggregateInvariant,
+  classifyStoredFailure,
   problemCatalogue,
   type HyperProblemCode,
   type ProblemError,
@@ -95,6 +95,33 @@ const problem = (
   const response = context.json(body, body.status);
   response.headers.set('Content-Type', 'application/problem+json');
   return response;
+};
+
+/**
+ * The answer for a stored-seam failure a route has already logged, by what the
+ * failure is (`classifyStoredFailure`, which walks the cause chain the driver
+ * wraps a failed rollback or COMMIT in) rather than by its message.
+ *
+ * Broken stored state is a defect this deployment carries and no retry cures,
+ * so 500 `internal-error`. An unreachable database is temporary, so 503
+ * `persistence-unavailable`. A failure that is neither — a code defect, or a
+ * driver failure nobody anticipated — is 500 `internal-error` too, under its
+ * own detail: 503 would tell the client to wait out something this code has
+ * no evidence will pass (ticket 31). Every route that reads or writes the
+ * stored seam answers by it — the collection and single-Space reads included,
+ * which answered 503 for any failure until ticket 38, so a wrong password
+ * told a client to wait. `src/http/space-host.ts` answers `GET /` by the same
+ * three arms; it cannot share this helper across the package boundary.
+ */
+const storedFailureProblem = (context: Context, error: unknown) => {
+  switch (classifyStoredFailure(error)) {
+    case 'broken-stored-state':
+      return problem(context, 'internal-error', 'Stored repository state is not usable.');
+    case 'unavailable':
+      return problem(context, 'persistence-unavailable', 'Try the request again later.');
+    case 'unclassified':
+      return problem(context, 'internal-error', 'The request failed unexpectedly.');
+  }
 };
 
 const rejectOversizedBody = (context: Context) =>
@@ -356,7 +383,7 @@ export const createSpaceHttpApp = (
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to list spaces', error);
-        return problem(context, 'persistence-unavailable', 'Try the request again later.');
+        return storedFailureProblem(context, error);
       }
     })
     .post(
@@ -403,12 +430,10 @@ export const createSpaceHttpApp = (
           }
         } catch (error) {
           invokeLogError(logError, 'Failed to commit spaces', error);
-          // Broken stored state and an unreachable database are told apart by
-          // type (`isAggregateInvariant`), the same rule `GET /api/aggregate`
-          // applies below: a defect no retry cures answers 500
-          // `internal-error` rather than 503 `persistence-unavailable`. That
-          // is an operator-facing distinction only — status code and log
-          // signal — and not yet a client one: `commitFailureForProblem`
+          // The same three arms `GET /api/aggregate` answers by below
+          // (`storedFailureProblem`). The broken-stored-state arm is an
+          // operator-facing distinction only — status code and log signal —
+          // and not yet a client one: `commitFailureForProblem`
           // (`packages/http/src/backend.ts`) still maps both problem codes to
           // the same retryable `CommitResult`, pinned by
           // `http-backend.test.ts`'s `'maps %s to retryable %s'` cases, which
@@ -416,10 +441,10 @@ export const createSpaceHttpApp = (
           // commit should read differently to the author is tracked at
           // `.scratch/database-persistence/issues/35-internal-error-has-no-distinct-client-treatment.md`.
           // `commit` (`SqlSpaceRepository`,
-          // `src/persistence/sql-space-repository.ts`) now raises the same
+          // `src/persistence/sql-space-repository.ts`) raises the same
           // `AggregateInvariantError` the aggregate read does — reading the
-          // revision a write is about to replace, or writing its own new
-          // one, under `#writeUpdate`'s row lock, and reading every stored
+          // stored Space a write is about to replace, or writing its own new
+          // revision, under `#writeUpdate`'s row lock, and reading every stored
           // Space to judge a complete-aggregate commit against — so this
           // route can meet it too.
           //
@@ -438,20 +463,19 @@ export const createSpaceHttpApp = (
           // attempt would not answer differently. Retrying a write is also
           // not the free operation retrying a read is, so `repository.commit`
           // is not called a second time here.
-          if (isAggregateInvariant(error)) {
-            return problem(context, 'internal-error', 'Stored repository state is not usable.');
-          }
-          return problem(context, 'persistence-unavailable', 'Try the request again later.');
+          return storedFailureProblem(context, error);
         }
       },
     )
     .get(SPACE_AGGREGATE_PATH, async (context) => {
       try {
         // One `AggregateInvariantError` is not proof of broken stored state:
-        // on PostgreSQL `loadAggregate` runs at READ COMMITTED in two
-        // statements, so a rival host's commit landing between them can make
-        // a healthy store look like "Spaces without Meta" for an instant. So
-        // it is re-read once before letting an invariant failure stand — the
+        // on PostgreSQL `loadAggregate` reads the Meta identity and every
+        // stored Space in two statements, and although both run inside one
+        // transaction, at READ COMMITTED each statement takes its own
+        // snapshot — so a rival host's commit landing between them can make a
+        // healthy store look like "Spaces without Meta" for an instant. So it
+        // is re-read once before letting an invariant failure stand — the
         // same rule `src/http/space-host.ts`'s `readAggregate` applies for
         // `GET /`, mirrored here rather than shared, because `@project/http`
         // cannot import across the package boundary into `src/`.
@@ -459,21 +483,16 @@ export const createSpaceHttpApp = (
         try {
           loaded = await repository.loadAggregate();
         } catch (error) {
-          if (!isAggregateInvariant(error)) throw error;
+          if (classifyStoredFailure(error) !== 'broken-stored-state') throw error;
           loaded = await repository.loadAggregate();
         }
         return context.json(encodeLoadedAggregate(loaded), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to load the Space aggregate', error);
-        // Broken stored state and an unreachable database are told apart by
-        // type (`isAggregateInvariant`, which walks the cause chain the
-        // driver wraps a failed rollback in). An invariant failure that
-        // survives the re-read above is a permanent defect no further retry
-        // cures; everything else is temporary.
-        if (isAggregateInvariant(error)) {
-          return problem(context, 'internal-error', 'Stored repository state is not usable.');
-        }
-        return problem(context, 'persistence-unavailable', 'Try the request again later.');
+        // An invariant failure that survives the re-read above is a permanent
+        // defect no further retry cures; `storedFailureProblem` answers it and
+        // the other two arms.
+        return storedFailureProblem(context, error);
       }
     })
     .get(SPACE_RESOURCE_PATH, validateSpaceId, async (context) => {
@@ -486,7 +505,7 @@ export const createSpaceHttpApp = (
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         invokeLogError(logError, `Failed to load space ${id}`, error);
-        return problem(context, 'persistence-unavailable', 'Try the request again later.');
+        return storedFailureProblem(context, error);
       }
     });
   app.notFound(
