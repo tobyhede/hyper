@@ -7,8 +7,19 @@ import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 import { DatabaseTargetConfigurationError } from '../database/database-target';
 
+/*
+ * `verifyMarker: false` turns off `@prisma-next/sql-runtime`'s contract-marker
+ * check. In the installed 0.16.0 the check never refuses anything — a missing
+ * or mismatched marker only logs `CONTRACT.MARKER_MISSING` /
+ * `CONTRACT.MARKER_MISMATCH` — and a failed read is memoised for the life of
+ * the runtime: left on, a runtime whose first statement meets an unreachable
+ * database answers every later read with that same cached failure, without
+ * touching the network, until the process restarts (ticket 37).
+ */
 const optionsFor = (path: string | undefined): Parameters<typeof sqlite<Contract>>[0] =>
-  path === undefined ? { contractJson } : { contractJson, path };
+  path === undefined
+    ? { contractJson, verifyMarker: false }
+    : { contractJson, path, verifyMarker: false };
 
 /**
  * Fail before the driver opens a connection the parent cannot support.

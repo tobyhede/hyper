@@ -47,12 +47,28 @@ export const configuredDatabaseUrl = (): string | undefined => {
   return databaseUrl === '' ? undefined : databaseUrl;
 };
 
-export const createPostgresDatabase = () => {
-  const databaseUrl = configuredDatabaseUrl();
-  const options: Parameters<typeof postgres<Contract>>[0] = databaseUrl
-    ? { contractJson, url: databaseUrl }
-    : { contractJson };
-  return postgres<Contract>(options);
-};
+/**
+ * The options `createPostgresDatabase` passes to `postgres<Contract>` — factored
+ * out so a caller that needs the same runtime against a URL of its own (a test
+ * pointed at a stand-in server, for instance) builds it the way production does
+ * rather than restating `verifyMarker: false` and why.
+ *
+ * `verifyMarker: false` turns off `@prisma-next/sql-runtime`'s contract-marker
+ * check. In the installed 0.16.0 the check never refuses anything — a missing
+ * or mismatched marker only logs `CONTRACT.MARKER_MISSING` /
+ * `CONTRACT.MARKER_MISMATCH` — and a failed read is memoised for the life of
+ * the runtime: left on, a runtime whose first statement meets an unreachable
+ * database answers every later read with that same cached failure, without
+ * touching the network, until the process restarts (ticket 37).
+ */
+export const postgresOptionsFor = (
+  databaseUrl: string | undefined,
+): Parameters<typeof postgres<Contract>>[0] =>
+  databaseUrl
+    ? { contractJson, url: databaseUrl, verifyMarker: false }
+    : { contractJson, verifyMarker: false };
+
+export const createPostgresDatabase = () =>
+  postgres<Contract>(postgresOptionsFor(configuredDatabaseUrl()));
 
 export type PostgresDatabase = ReturnType<typeof createPostgresDatabase>;
