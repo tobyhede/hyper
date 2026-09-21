@@ -1,10 +1,12 @@
 # 34 — `nonTransactionalHandle.execute` is speculative generality
 
 Status: wontfix
-Tags: Cleanup
+Tags: Cleanup, release/v1
 Blocked by: None.
 
 Surfaced by: a second review pass of the one-SQL-repository branch (ADR 0095, tickets 22-24), M16-part (2026-09-20).
+
+Audited: 2026-09-20 against `b1ac983d`. The unused non-transactional capability still exists; this is a design/disposition ticket, not a demonstrated runtime defect. Release inclusion requires an explicit keep-or-remove decision, not mandatory removal. Coordinate with ticket 38 without creating a hard dependency.
 
 ## The claim, confirmed
 
@@ -12,12 +14,12 @@ In `src/sqlite/sql-store.ts`, `sqliteSqlStore`'s non-transactional `Handle` (`no
 
 Verified by reading every call site of `#loadEverySpace` (the sole caller of `tables.Space.loadEvery()`) in `src/persistence/sql-space-repository.ts`:
 
-- `#commitInTransaction` (line 398) — `tables` built at line 394 from `this.#store.tables(handle)`, `handle` from `this.#store.transaction(...)`.
-- `#authoritativeAggregate` (line 611) — always called with a `tables` built the same way, from its three callers: `#replaceAllSpaces` (transactional), `#loadAggregateUnserialised` (transactional), `#initializeUnserialised` (transactional).
-- `#loadAggregateUnserialised` (line 669) — `tables` from `this.#store.transaction(...)` (lines 665-666).
-- `#initializeUnserialised` (line 698) — `tables` from `this.#store.transaction(...)` (lines 689-690).
+- `#commitInTransaction` — `tables` comes from its transaction handle.
+- `#authoritativeAggregate` — all three callers (`#replaceAllSpaces`, `#loadAggregateUnserialised`, `#initializeUnserialised`) supply transactional tables.
+- `#loadAggregateUnserialised` — `tables` comes from `this.#store.transaction(...)`.
+- `#initializeUnserialised` — `tables` comes from `this.#store.transaction(...)`.
 
-None of the four non-transactional call sites of `tables()` (`listSpaces`, `loadSpace` → `#loadStoredSpaceRow`, `markExported`, `#loadMetaSpaceIdUnserialised`) ever calls `.loadEvery()`. So `nonTransactionalHandle.execute` is real, correct, working code for a capability the call graph never reaches — speculative generality, not a defect.
+None of the five non-transactional call sites of `tables()` calls `.loadEvery()`: `listSpaces`, `loadSpace`, `markExported`, the post-rollback conflict reload in `commit`, and `#loadMetaSpaceIdUnserialised`. The conflict reload was missing from the original count. The provided `execute` is therefore unreached by the current repository call graph, not a demonstrated defect.
 
 ## The fix considered, and why it is not a quick one
 
