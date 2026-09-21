@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema } from '@project/core';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
 import { runDatabaseCli } from '../../src/cli/database-entry';
@@ -11,12 +11,34 @@ import { postgresTestDatabase } from '../support/postgres-database';
 
 interface CliTargetCase {
   readonly name: string;
+  readonly target: 'postgres' | 'sqlite';
   arrange(): Promise<OpenedDatabaseTarget>;
 }
 
-const cases: readonly CliTargetCase[] = [
+/**
+ * One arm per database target, and each runs in the CI job that owns its
+ * database: `vitest.integration.config.ts` provides `postgres` against the
+ * migrated `DATABASE_URL`, `vitest.sqlite.config.ts` provides `sqlite` against
+ * the migrated `SQLITE_PATH`, and neither job has the other's database. An
+ * unrecognised value throws here rather than leaving a file that silently
+ * declares no test.
+ */
+const configuredTarget = process.env['HYPER_DATABASE_TARGET'];
+
+const targetCases = (all: readonly CliTargetCase[]): readonly CliTargetCase[] => {
+  const selected = all.filter((candidate) => candidate.target === configuredTarget);
+  if (selected.length === 0) {
+    throw new Error(
+      `HYPER_DATABASE_TARGET names no database target: ${configuredTarget ?? '<unset>'}`,
+    );
+  }
+  return selected;
+};
+
+const cases = targetCases([
   {
     name: 'PostgreSQL',
+    target: 'postgres',
     async arrange() {
       await clearHyperContent();
       return {
@@ -27,6 +49,7 @@ const cases: readonly CliTargetCase[] = [
   },
   {
     name: 'SQLite',
+    target: 'sqlite',
     async arrange() {
       const harness = await openSqliteRepository();
       return {
@@ -35,7 +58,18 @@ const cases: readonly CliTargetCase[] = [
       };
     },
   },
-];
+]);
+
+/**
+ * The shared PostgreSQL handle is a pool, and an open pool keeps this worker's
+ * event loop alive after the last case — the shape behind Vitest's "something
+ * prevents the main process from exiting". Every sibling that imports it closes
+ * it here; so does this file. Under the SQLite target the handle was never
+ * queried, so this closes a client that holds no connection.
+ */
+afterAll(async () => {
+  await postgresTestDatabase.close();
+});
 
 describe.each(cases)('database CLI target ($name)', (targetCase) => {
   it('initializes and reports the same complete Default Content aggregate', async () => {

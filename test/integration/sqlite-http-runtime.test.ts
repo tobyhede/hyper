@@ -293,9 +293,13 @@ describe('SQLite HTTP runtime', () => {
   // `isAggregateInvariant` calls (`src/http/space-host.ts:85` re-reads once
   // rather than rethrowing; `:149` classifies) are exercised for it: the read
   // fails identically every time this row is behind it, so `GET /` answers
-  // `internal-error` — a permanent defect. The target-parameterized runtime
-  // suite owns the retry/give-up policy; this case keeps the real SQLite codec
-  // and wire-classification proof only.
+  // `internal-error` — a permanent defect. The retry/give-up policy is held by
+  // `test/integration/database-http-runtime.test.ts`, in *database HTTP runtime
+  // ('SQLite') > gives up through the shared retry after two confirmed
+  // invariant failures* and its *recovers through the shared retry after a
+  // transient startup failure* sibling; `vitest.sqlite.config.ts` includes that
+  // file, so those cases run in this same job. What this case keeps is the real
+  // SQLite codec and wire-classification proof.
   it('answers internal-error for a non-JSON stored Meta document', async () => {
     const harness = await openSqliteRepository();
     close = harness.close;

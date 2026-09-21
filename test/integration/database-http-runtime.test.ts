@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   AggregateInvariantError,
   decodeLoadedSpace,
@@ -35,12 +35,34 @@ const repositoryWithAggregateReads = (
 
 interface HttpTargetCase {
   readonly name: string;
+  readonly target: 'postgres' | 'sqlite';
   arrange(): Promise<OpenedDatabaseTarget>;
 }
 
-const cases: readonly HttpTargetCase[] = [
+/**
+ * One arm per database target, and each runs in the CI job that owns its
+ * database: `vitest.integration.config.ts` provides `postgres` against the
+ * migrated `DATABASE_URL`, `vitest.sqlite.config.ts` provides `sqlite` against
+ * the migrated `SQLITE_PATH`, and neither job has the other's database. An
+ * unrecognised value throws here rather than leaving a file that silently
+ * declares no test.
+ */
+const configuredTarget = process.env['HYPER_DATABASE_TARGET'];
+
+const targetCases = (all: readonly HttpTargetCase[]): readonly HttpTargetCase[] => {
+  const selected = all.filter((candidate) => candidate.target === configuredTarget);
+  if (selected.length === 0) {
+    throw new Error(
+      `HYPER_DATABASE_TARGET names no database target: ${configuredTarget ?? '<unset>'}`,
+    );
+  }
+  return selected;
+};
+
+const cases = targetCases([
   {
     name: 'PostgreSQL',
+    target: 'postgres',
     async arrange() {
       await clearHyperContent();
       return {
@@ -51,6 +73,7 @@ const cases: readonly HttpTargetCase[] = [
   },
   {
     name: 'SQLite',
+    target: 'sqlite',
     async arrange() {
       const harness = await openSqliteRepository();
       return {
@@ -59,7 +82,18 @@ const cases: readonly HttpTargetCase[] = [
       };
     },
   },
-];
+]);
+
+/**
+ * The shared PostgreSQL handle is a pool, and an open pool keeps this worker's
+ * event loop alive after the last case — the shape behind Vitest's "something
+ * prevents the main process from exiting". Every sibling that imports it closes
+ * it here; so does this file. Under the SQLite target the handle was never
+ * queried, so this closes a client that holds no connection.
+ */
+afterAll(async () => {
+  await postgresTestDatabase.close();
+});
 
 describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
   it('establishes Default Content and serves the collection and Meta Space', async () => {

@@ -3,6 +3,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { toJsonValue } from '../../src/persistence/sql-store';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresTestDatabase as db } from '../support/postgres-database';
+import { createPostgresDatabase, type PostgresDatabase } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { spaceRepositoryContract } from '../support/repository-contract';
@@ -32,10 +33,38 @@ import { expectPersisted } from '../support/persistence-contract';
 // each covered separately.
 spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
   await clearHyperContent();
+  // Clients minted by `reopenRepository` below, closed with the harness.
+  const reopenedDatabases: PostgresDatabase[] = [];
   return {
     repository: new SqlSpaceRepository(postgresSqlStore(db)),
-    close: clearHyperContent,
-    reopenRepository: () => Promise.resolve(new SqlSpaceRepository(postgresSqlStore(db))),
+    close: async () => {
+      for (const database of reopenedDatabases) {
+        await database.close();
+      }
+      reopenedDatabases.length = 0;
+      await clearHyperContent();
+    },
+    /*
+     * A fresh host means a fresh client: `createPostgresDatabase()` returns a
+     * new connection pool, so the repository handed back reads through
+     * PostgreSQL sessions the seeding repository never used. This used to wrap
+     * the one live client twice, which reopened nothing: both repositories then
+     * read through the same connection, and the two contract cases that take
+     * this path are about what survives into a host that does not.
+     *
+     * Unlike `test/support/sqlite-harness.ts`, the original client is not
+     * closed first. It is the module-level handle this whole file shares —
+     * `clearHyperContent` and every raw-column write below go through it, and
+     * `afterAll` closes it — so closing it here would take the rest of the file
+     * down with it. That is also why the SQLite harness has to close: ticket 18
+     * found a second live writer against one SQLite file unsupported, while
+     * PostgreSQL serves both pools at once.
+     */
+    reopenRepository: () => {
+      const database = createPostgresDatabase();
+      reopenedDatabases.push(database);
+      return Promise.resolve(new SqlSpaceRepository(postgresSqlStore(database)));
+    },
     arrangeBrokenState: async (kind, ids) => {
       if (kind === 'invalid-space-document') {
         await db.orm.public.Space.create({

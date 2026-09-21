@@ -849,10 +849,12 @@ describe('Database HTTP runtime', () => {
     // establishment failing is reported and composition continues; the root
     // address answers the same failure per request.
     const url = process.env['DATABASE_URL'];
-    // Port 1 refuses immediately, and it is set before the runtime is imported
-    // because `src/prisma/db.ts` reads the variable once, at module scope.
-    // `dotenv` does not override an existing value, so a developer's `.env`
-    // cannot decide this test.
+    // Port 1 refuses immediately, and it is set before `createApp` is called
+    // because that is when the variable is read: `createDatabaseHttpApp` opens
+    // the target first thing, and `createPostgresDatabase` in
+    // `src/prisma/db.ts` reads `DATABASE_URL` on every such call. `dotenv` does
+    // not override an existing value, so a developer's `.env` cannot decide
+    // this test.
     process.env['DATABASE_URL'] = 'postgresql://hyper:hyper@127.0.0.1:1/hyper';
     let reported: unknown;
     vi.spyOn(console, 'error').mockImplementation((message: unknown, error: unknown) => {

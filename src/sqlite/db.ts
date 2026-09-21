@@ -1,6 +1,6 @@
-import { config as loadEnv } from 'dotenv';
-import { accessSync, constants, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { parse as parseEnv } from 'dotenv';
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sqlite from '@prisma-next/sqlite/runtime';
 import type { Contract } from './contract.d';
@@ -42,10 +42,34 @@ export interface SqlitePathOptions {
   readonly existing?: boolean;
 }
 
+/**
+ * The `SQLITE_PATH` a named environment file carries, read without writing to
+ * `process.env`.
+ *
+ * `dotenv`'s `config` loads into the process and then declines to overwrite a
+ * key the process already holds — including the one it wrote itself. So a
+ * second composition naming a different file kept the first file's path, and
+ * `envPath` meant nothing after the first call in a process. Reading the file
+ * per call keeps dotenv's precedence — a variable already in the environment
+ * still wins — without the process-wide memory.
+ */
+const environmentFilePath = (envPath: string): string | undefined => {
+  let contents: string;
+  try {
+    contents = readFileSync(envPath, 'utf8');
+  } catch {
+    // No environment file to read: the process environment and the caller's
+    // default are what is left.
+    return undefined;
+  }
+  return parseEnv(contents)['SQLITE_PATH'];
+};
+
 /** Resolve SQLite configuration from the named repository-root environment. */
 export const configuredSqlitePath = (options: SqlitePathOptions = {}): string | undefined => {
-  loadEnv({ path: options.envPath ?? SQLITE_ENV_PATH, quiet: true });
-  const configured = process.env['SQLITE_PATH']?.trim();
+  const configured = (
+    process.env['SQLITE_PATH'] ?? environmentFilePath(options.envPath ?? SQLITE_ENV_PATH)
+  )?.trim();
   const selected = configured === undefined || configured === '' ? options.defaultPath : configured;
   if (selected === undefined) {
     if (options.required === true) {
@@ -53,7 +77,11 @@ export const configuredSqlitePath = (options: SqlitePathOptions = {}): string | 
     }
     return undefined;
   }
-  if (!selected.startsWith('/'))
+  /*
+   * `node:path`, not a leading-separator test: a drive-letter or UNC path is
+   * absolute on Windows and `resolve` below already treats it as one.
+   */
+  if (!isAbsolute(selected))
     throw new DatabaseTargetConfigurationError(`SQLITE_PATH must be an absolute path: ${selected}`);
   const absolute = requireWritableParent(selected);
   if (options.existing === true && !existsSync(absolute)) {

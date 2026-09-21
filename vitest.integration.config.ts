@@ -18,6 +18,14 @@ export default defineConfig({
     environment: 'node',
     include: ['test/integration/**/*.test.ts'],
     exclude: ['test/integration/sqlite-*.test.ts'],
+    /**
+     * Which database this run can reach. `test:integration:postgres` migrates
+     * `DATABASE_URL` and performs no SQLite migration, so the `database-*`
+     * files — which declare one arm per database target — read this to run
+     * their PostgreSQL arm alone. Their SQLite arm runs under
+     * `vitest.sqlite.config.ts`, in the job that owns a migrated `SQLITE_PATH`.
+     */
+    env: { HYPER_DATABASE_TARGET: 'postgres' },
     testTimeout: 30_000,
     /**
      * One database, so one file at a time (issue `12`).

@@ -4,8 +4,8 @@ import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
-import { createPostgresDatabase } from '../../src/prisma/db';
 import { clearHyperContent } from '../support/clear-hyper-content';
+import { postgresTestDatabase } from '../support/postgres-database';
 import {
   dragResourceAndCapturePosition,
   expectRestartProofExport,
@@ -44,8 +44,12 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
 };
 
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
-  const database = createPostgresDatabase();
-  const repository = new SqlSpaceRepository(postgresSqlStore(database));
+  // The same handle `clearHyperContent` holds, not a second one beside it.
+  // That module opens its client at import, so a client of this spec's own
+  // would leave that one live after the `finally` below closed only its own —
+  // one pool per process is what the closing `finally` can actually account
+  // for.
+  const repository = new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase));
   const spaceId = newUuid();
   const resourceId = newUuid();
   const mapId = newUuid();
@@ -153,7 +157,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
       await clearHyperContent();
       spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
     } finally {
-      await database.close();
+      await postgresTestDatabase.close();
     }
   }
 
