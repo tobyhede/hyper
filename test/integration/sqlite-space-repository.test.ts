@@ -465,35 +465,57 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     });
   });
 
-  // Ticket 31: an unreachable database is named, not inferred from a failure
-  // being something other than broken stored state. A client closed underneath
-  // the repository refuses before any transaction opens, which is the position
-  // the repository names unavailable by — whatever the driver's error says. The
+  // Tickets 31 and 38: an unreachable database is named, not inferred from a
+  // failure being something else, and not from where it failed. A client
+  // closed underneath the repository raises the pinned runtime's plain
+  // closed-client `Error` from every operation, transactional or not, and the
+  // SQLite store recognises that one error (`src/sqlite/sql-store.ts`). The
   // driver's own error stays on `.cause`, where an operator's log finds it.
-  it('names a database that will not open a transaction unavailable', async () => {
+  it('names every operation on a closed database unavailable', async () => {
     const { repository, database } = await opened();
     const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
     await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
     await database.close();
 
-    await expect(repository.loadAggregate()).rejects.toBeInstanceOf(PersistenceUnavailableError);
-    await expect(
-      repository.commit({
-        changes: [
-          {
-            kind: 'update',
-            spaceId: SPACE_ID,
-            snapshot: { ...first, document: { ...first.document, title: 'Never stored' } },
-            expectedRevision: 0n,
-          },
-        ],
-      }),
-    ).rejects.toBeInstanceOf(PersistenceUnavailableError);
-    const initializing = await captureError(() =>
-      repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] }),
-    );
-    expect(initializing).toBeInstanceOf(PersistenceUnavailableError);
-    expect(initializing?.cause).toMatchObject({ message: 'SQLite client is closed' });
+    const operations: readonly (readonly [string, () => Promise<void>])[] = [
+      ['loadAggregate', async () => void (await repository.loadAggregate())],
+      [
+        'commit',
+        async () =>
+          void (await repository.commit({
+            changes: [
+              {
+                kind: 'update',
+                spaceId: SPACE_ID,
+                snapshot: retitled(first, 'Never stored'),
+                expectedRevision: 0n,
+              },
+            ],
+          })),
+      ],
+      [
+        'initializeAggregate',
+        async () =>
+          void (await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] })),
+      ],
+      [
+        'replaceAggregate',
+        async () =>
+          void (await repository.replaceAggregate(
+            { metaSpaceId: SPACE_ID, spaces: [first] },
+            SPACE_ID,
+          )),
+      ],
+      ['listSpaces', async () => void (await repository.listSpaces())],
+      ['loadSpace', async () => void (await repository.loadSpace(SPACE_ID))],
+      ['loadMetaSpaceId', async () => void (await repository.loadMetaSpaceId())],
+      ['markExported', () => repository.markExported(SPACE_ID, 1n)],
+    ];
+    for (const [name, operation] of operations) {
+      const error = await captureError(operation);
+      expect(error, name).toBeInstanceOf(PersistenceUnavailableError);
+      expect(error?.cause, name).toMatchObject({ message: 'SQLite client is closed' });
+    }
   });
 
   /**
