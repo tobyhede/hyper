@@ -1,13 +1,8 @@
 import postgres from '@prisma-next/postgres/runtime';
 import { afterAll, describe, expect, it } from 'vitest';
-import {
-  isDriverConnectionFailure,
-  isUnavailableStatementFailure,
-  UNAVAILABLE_SQLSTATES,
-} from '../../src/persistence/sql-store';
 import type { Contract } from '../../src/prisma/contract.d';
 import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
-import { postgresSqlStore } from '../../src/prisma/sql-store';
+import { postgresSqlStore, UNAVAILABLE_SQLSTATES } from '../../src/prisma/sql-store';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { captureError } from '../support/capture-error';
@@ -41,67 +36,51 @@ const rawPgError = (message: string, code: string): Error =>
 const socketError = (code: string): Error =>
   Object.assign(new Error(`connect ${code} 127.0.0.1:5432`), { code, syscall: 'connect' });
 
+/** A chain of two errors, each the other's cause. */
+const cyclicChain = (): Error => {
+  const first = new Error('first');
+  const second = new Error('second', { cause: first });
+  first.cause = second;
+  return first;
+};
+
 /*
- * Ticket 31. Both drivers normalise a failed statement's connection trouble to
- * `SqlConnectionError`, and the repository names it unavailable. The driver's
- * `transient` flag answers a different question — whether an *immediate*
- * retry might succeed — and `@prisma-next/driver-postgres` marks a refused
- * connection `transient: false`, which is the database being down: exactly
- * what a reader answers "try again later" for. So the flag is not read, and
- * neither is the message, which is how ticket 18's two SQLite BUSY shapes stay
- * one answer without being told apart.
+ * Tickets 31 and 38. Each database's store answers whether a failure is
+ * evidence the database is not answering for now, and `SqlSpaceRepository`
+ * asks it rather than reading driver fields itself. `postgresSqlStore` is
+ * built over a runtime that is never connected: answering touches no
+ * database.
  */
-describe('isDriverConnectionFailure', () => {
+describe('postgresSqlStore.isUnavailable', () => {
+  const store = postgresSqlStore(
+    postgres<Contract>({ contractJson, url: 'postgres://hyper:unused@127.0.0.1:1/hyper' }),
+  );
+
+  afterAll(async () => {
+    await store.close();
+  });
+
+  // The driver's `transient` flag answers a different question — whether an
+  // *immediate* retry might succeed — and `@prisma-next/driver-postgres` marks
+  // a refused connection `transient: false`, which is the database being down.
+  // So the flag is not read, and neither is the message.
   it.each([
-    ['SQLite BUSY, immediate or exhausted', connectionError('database is locked', true)],
     ['a connection the server dropped', connectionError('Connection terminated', false)],
+    ['a refused connection the driver normalised', connectionError('connect ECONNREFUSED', false)],
   ])('recognises %s whatever its transient flag says', (_label, error) => {
-    expect(isDriverConnectionFailure(error)).toBe(true);
+    expect(store.isUnavailable(error)).toBe(true);
   });
 
-  // `@prisma-next/sql-runtime` carries a failed COMMIT's own error, and the
-  // callback error behind a failed rollback, only on `.cause`.
-  it('walks the cause chain the runtime wraps a failed COMMIT in', () => {
-    const wrapped = new Error('Transaction commit failed', {
-      cause: connectionError('database is locked', true),
-    });
+  // Contention and shutdown reach the repository as `SqlQueryError`, because
+  // the driver turns every SQLSTATE failure on a statement into one.
+  it.each(UNAVAILABLE_SQLSTATES)(
+    'recognises SQLSTATE %s on a statement the driver normalised',
+    (sqlState) => {
+      expect(store.isUnavailable(queryError('failed', sqlState))).toBe(true);
+    },
+  );
 
-    expect(isDriverConnectionFailure(wrapped)).toBe(true);
-  });
-
-  it('refuses a statement failure and anything else', () => {
-    expect(
-      isDriverConnectionFailure(
-        Object.assign(new Error('duplicate key'), { kind: 'sql_query', sqlState: '23505' }),
-      ),
-    ).toBe(false);
-    expect(isDriverConnectionFailure(new Error('connect ECONNREFUSED 127.0.0.1:5432'))).toBe(false);
-    expect(isDriverConnectionFailure(undefined)).toBe(false);
-  });
-
-  it('terminates on a cyclic cause chain', () => {
-    const first = new Error('first');
-    const second = new Error('second', { cause: first });
-    first.cause = second;
-
-    expect(isDriverConnectionFailure(first)).toBe(false);
-  });
-});
-
-/*
- * Ticket 31, amended. A PostgreSQL statement that fails for contention or an
- * outage reaches the repository as `SqlQueryError`, not `SqlConnectionError`,
- * because the driver turns every SQLSTATE failure into the former. These are
- * the database choosing a victim, refusing to wait, or not being up yet —
- * conditions a later attempt is exactly the answer to — so they are named
- * unavailable by the structured `sqlState` field, never by message.
- */
-describe('isUnavailableStatementFailure', () => {
-  it.each(UNAVAILABLE_SQLSTATES)('recognises SQLSTATE %s', (sqlState) => {
-    expect(isUnavailableStatementFailure(queryError('failed', sqlState))).toBe(true);
-  });
-
-  it('names the set the amendment records', () => {
+  it('names the set ticket 31 records', () => {
     expect([...UNAVAILABLE_SQLSTATES].sort()).toEqual(
       [
         '08000',
@@ -120,74 +99,22 @@ describe('isUnavailableStatementFailure', () => {
     );
   });
 
-  // A deadlock or serialization failure at COMMIT reaches the repository
-  // wrapped, with the statement's own error only on `.cause`.
-  it('walks the cause chain the runtime wraps a failed COMMIT in', () => {
-    const wrapped = new Error('Transaction commit failed', {
-      cause: queryError('could not serialize access', '40001'),
-    });
-
-    expect(isUnavailableStatementFailure(wrapped)).toBe(true);
-  });
-
-  it('refuses a defect, a message that merely names a code, and a connection failure', () => {
-    // Unique violation, SQLite's catch-all, and a cancelled statement.
-    expect(isUnavailableStatementFailure(queryError('duplicate key', '23505'))).toBe(false);
-    expect(isUnavailableStatementFailure(queryError('no such table', 'HY000'))).toBe(false);
-    expect(isUnavailableStatementFailure(queryError('canceling statement', '57014'))).toBe(false);
-    // The code on something the driver did not normalise, and in prose.
-    expect(
-      isUnavailableStatementFailure(Object.assign(new Error('deadlock'), { sqlState: '40P01' })),
-    ).toBe(false);
-    expect(isUnavailableStatementFailure(new Error('deadlock detected (40P01)'))).toBe(false);
-    expect(isUnavailableStatementFailure(connectionError('database is locked', true))).toBe(false);
-    expect(isUnavailableStatementFailure(undefined)).toBe(false);
-  });
-
-  it('terminates on a cyclic cause chain', () => {
-    const first = new Error('first');
-    const second = new Error('second', { cause: first });
-    first.cause = second;
-
-    expect(isUnavailableStatementFailure(first)).toBe(false);
-  });
-});
-
-/*
- * Ticket 38. Each database's store answers whether a failure is evidence the
- * database is unavailable, and the repository asks it rather than reading
- * driver fields itself. `postgresSqlStore` is built over a runtime that is
- * never connected: answering the predicate touches no database.
- */
-describe('postgresSqlStore.isUnavailable', () => {
-  const store = postgresSqlStore(
-    postgres<Contract>({ contractJson, url: 'postgres://hyper:unused@127.0.0.1:1/hyper' }),
-  );
-
-  afterAll(async () => {
-    await store.close();
-  });
-
-  it.each([
-    ['a connection the server dropped', connectionError('Connection terminated', false)],
-    ['a refused connection the driver normalised', connectionError('connect ECONNREFUSED', false)],
-  ])('recognises %s whatever its transient flag says', (_label, error) => {
-    expect(store.isUnavailable(error)).toBe(true);
-  });
-
-  it.each(UNAVAILABLE_SQLSTATES)(
-    'recognises SQLSTATE %s on a statement the driver normalised',
-    (sqlState) => {
-      expect(store.isUnavailable(queryError('failed', sqlState))).toBe(true);
-    },
-  );
-
   // `pg` raises a failed startup handshake from `pool.connect()`, which the
   // driver does not normalise: the SQLSTATE is on `pg`'s own `code` field.
   it.each(['53300', '57P03'])('recognises SQLSTATE %s raised while connecting', (code) => {
     expect(store.isUnavailable(rawPgError('the server refused this client for now', code))).toBe(
       true,
     );
+  });
+
+  // Authentication and a missing database are the configuration or the
+  // server refusing this client, which no wait cures (ticket 36).
+  it.each([
+    ['28P01', 'password authentication failed for user "hyper"'],
+    ['28000', 'no pg_hba.conf entry for host'],
+    ['3D000', 'database "missing" does not exist'],
+  ])('leaves SQLSTATE %s raised while connecting unclassified', (code, message) => {
+    expect(store.isUnavailable(rawPgError(message, code))).toBe(false);
   });
 
   // What Node raises from the socket under `pool.connect()`, which the driver
@@ -208,22 +135,51 @@ describe('postgresSqlStore.isUnavailable', () => {
     },
   );
 
-  // Authentication and a missing database are the configuration or the
-  // server refusing this client, which no wait cures (ticket 36).
+  // `@prisma-next/sql-runtime` carries a failed COMMIT's own error, and the
+  // callback error behind a failed rollback, only on `.cause`.
   it.each([
-    ['28P01', 'password authentication failed for user "hyper"'],
-    ['28000', 'no pg_hba.conf entry for host'],
-    ['3D000', 'database "missing" does not exist'],
-  ])('leaves SQLSTATE %s raised while connecting unclassified', (code, message) => {
-    expect(store.isUnavailable(rawPgError(message, code))).toBe(false);
+    ['a connection failure', connectionError('Connection terminated', false)],
+    ['a serialization failure', queryError('could not serialize access', '40001')],
+    ['a refused socket', socketError('ECONNREFUSED')],
+    ['a server not accepting connections yet', rawPgError('the database is starting up', '57P03')],
+  ])('walks the cause chain to %s', (_label, cause) => {
+    const wrapped = new Error('Transaction commit failed', {
+      cause: new Error('rollback failed', { cause }),
+    });
+
+    expect(store.isUnavailable(wrapped)).toBe(true);
+  });
+
+  it('terminates on a cyclic cause chain', () => {
+    expect(store.isUnavailable(cyclicChain())).toBe(false);
+  });
+
+  it('leaves a defect, an unknown code and a code named only in prose unclassified', () => {
+    // Unique violation, SQLite's catch-all, a cancelled statement, and an
+    // unknown SQLSTATE, each on a statement the driver normalised.
+    expect(store.isUnavailable(queryError('duplicate key', '23505'))).toBe(false);
+    expect(store.isUnavailable(queryError('no such table', 'HY000'))).toBe(false);
+    expect(store.isUnavailable(queryError('canceling statement', '57014'))).toBe(false);
+    expect(store.isUnavailable(queryError('unknown', 'XX999'))).toBe(false);
+    // An unavailable code on a field no driver puts it on, and in prose.
+    expect(store.isUnavailable(Object.assign(new Error('deadlock'), { sqlState: '40P01' }))).toBe(
+      false,
+    );
+    expect(store.isUnavailable(new Error('deadlock detected (40P01)'))).toBe(false);
+    expect(store.isUnavailable(new Error('connect ECONNREFUSED 127.0.0.1:5432'))).toBe(false);
+    // Not an error at all.
+    expect(store.isUnavailable(undefined)).toBe(false);
+    expect(store.isUnavailable({ code: 'ECONNREFUSED' })).toBe(false);
   });
 });
 
 /*
  * Ticket 38. SQLite's store recognises what its driver normalises — BUSY and
- * LOCKED arrive as `SqlConnectionError` (ticket 18) — and, as a contained
- * compatibility check, the one failure the pinned runtime raises for a client
- * that has been closed, which carries nothing but its message.
+ * LOCKED arrive as `SqlConnectionError` (ticket 18), and ticket 18's two BUSY
+ * shapes (immediate and exhausted) stay one answer without being told apart —
+ * and, as a contained compatibility check, the one failure the pinned runtime
+ * raises for a client that has been closed, which carries nothing but its
+ * message.
  */
 describe('sqliteSqlStore.isUnavailable', () => {
   it.each([
@@ -233,6 +189,9 @@ describe('sqliteSqlStore.isUnavailable', () => {
     const store = sqliteSqlStore(createSqliteDatabase());
 
     expect(store.isUnavailable(error)).toBe(true);
+    expect(store.isUnavailable(new Error('Transaction commit failed', { cause: error }))).toBe(
+      true,
+    );
   });
 
   it('recognises the error the pinned runtime raises for a closed client', async () => {
@@ -247,6 +206,10 @@ describe('sqliteSqlStore.isUnavailable', () => {
     expect(store.isUnavailable(new Error('wrapped', { cause: closed }))).toBe(true);
   });
 
+  it('terminates on a cyclic cause chain', () => {
+    expect(sqliteSqlStore(createSqliteDatabase()).isUnavailable(cyclicChain())).toBe(false);
+  });
+
   it('leaves unrelated plain errors unclassified', () => {
     const store = sqliteSqlStore(createSqliteDatabase());
 
@@ -256,5 +219,6 @@ describe('sqliteSqlStore.isUnavailable', () => {
       false,
     );
     expect(store.isUnavailable(socketError('ECONNREFUSED'))).toBe(false);
+    expect(store.isUnavailable(undefined)).toBe(false);
   });
 });
