@@ -1993,6 +1993,379 @@ describe('a Resource is named once (ADR 0085)', () => {
 });
 
 /**
+ * ADR 0101 gives Map and Resource their final first-public names. These two
+ * scans retire the nouns they replaced, using every identifier shape the four
+ * earlier vocabulary guards accumulated. The migration trees are history and
+ * are excluded here only: their snapshots must continue to describe the schema
+ * that existed when each migration was generated.
+ */
+const PREVIOUS_MAP = ['D', 'iagram'].join('');
+const PREVIOUS_RESOURCE = ['T', 'hing'].join('');
+
+const retiredIdentifierPattern = (retired: string): RegExp => {
+  const lowercase = retired.toLowerCase();
+  const uppercase = retired.toUpperCase();
+
+  return new RegExp(
+    [
+      // PascalCase compounds, opening and closing. The opening arm carries the
+      // plural because a collection compound puts the `s` between the retired
+      // word and the segment after it: neither `<Retired>sById` — no capital to
+      // open on — nor `selected<Retired>sById` — no boundary between `s` and
+      // `B` for the closing arm to end on — is reachable without it.
+      `${retired}s?[A-Z]`,
+      `[A-Za-z]${retired}s?\\b`,
+      // camelCase compounds.
+      `\\b${lowercase}[A-Z]`,
+      // Screaming case: the bare constant and its plural, and the constant the
+      // retired word *opens*. Both need a boundary an underscore never yields,
+      // so neither can see the constant the retired word ends or sits inside —
+      // `DEFAULT_<retired>_ID` and `SELECTED_<retired>`. That is the third arm,
+      // written as the Space block below writes its own: the segment separator
+      // rather than `\\b`, and a letter after the word is a different word.
+      `\\b${uppercase}S?\\b`,
+      `\\b${uppercase}_[A-Z]`,
+      `_${uppercase}S?(?![A-Za-z])`,
+      // kebab-case, with the retired noun on either side. The closing arm ends
+      // on a lookahead rather than `\b`, because `_` is a word character and a
+      // BEM element suffix — `canvas-<retired>__rail` — therefore offers no
+      // boundary after the word. Written as the Map block above writes its own
+      // kebab arm, which closed this gap there for this reason. A following
+      // lowercase letter is a longer word and stays with the English-suffix arm
+      // below, which reads it.
+      `\\b${lowercase}-[a-z]`,
+      `\\b[a-z]+-${lowercase}s?(?![a-z])`,
+      // snake_case, with the retired noun on either side.
+      `\\b${lowercase}_[a-z]`,
+      `\\b[a-z]+_${lowercase}s?(?:_|\\b)`,
+      // A lowercase English suffix. The plural remains owned by the compound
+      // and collection arms rather than being reported twice.
+      `\\b${lowercase}(?!s?\\b)[a-z]`,
+      // A quoted storage or protocol identifier.
+      `["']${lowercase}s?["']`,
+      // Collection fields where a document or object declares one.
+      `\\b${lowercase}s["']?\\s*[:=]`,
+      // ...and where code reads it back from a value.
+      `\\.${lowercase}s\\b`,
+      // A path segment: a module specifier's last segment, a cited file, an
+      // HTTP collection route. The kebab arms see only a hyphenated segment,
+      // and a plural before a quote or a dot ends on a boundary the suffix arm
+      // requires to be absent, so `/<retired>s'` is reachable by neither.
+      `/${lowercase}s?(?![a-z])`,
+    ].join('|'),
+  );
+};
+
+const previousMapPattern = retiredIdentifierPattern(PREVIOUS_MAP);
+const previousResourcePattern = retiredIdentifierPattern(PREVIOUS_RESOURCE);
+const previousMapBare = new RegExp(`\\b${PREVIOUS_MAP}\\b`);
+const previousResourceBare = new RegExp(`\\b${PREVIOUS_RESOURCE}\\b`);
+
+const RETIRED_SCHEMA_TREES = ['migrations/', 'migrations-sqlite/'] as const;
+
+const currentVocabularyFiles = (): readonly string[] =>
+  scannableFiles().filter((file) => !RETIRED_SCHEMA_TREES.some((tree) => file.startsWith(tree)));
+
+/**
+ * A citation into a tree this rename does not rewrite — the historical records
+ * and the working notes — named under the spelling it has on disk. Renaming one
+ * breaks a link rather than updating a record, which is the same argument the
+ * Map and Resource blocks above make for their own cited paths.
+ *
+ * The three prefixes only, not `CITED_PATH`: that pattern forgives *any* token
+ * carrying a slash, which is most of a live relative import specifier, an HTTP
+ * route and a document's citation of a live module — and a module reintroducing
+ * the retired name is one of the shapes this guard exists to catch. This is the
+ * mask the ADR 0092 block below already chose, for that reason.
+ */
+const withoutHistoricalCitations = (source: string): string =>
+  source.replace(CITED_HISTORICAL_PATH, 'path');
+
+const expectNoRetiredIdentifier = (pattern: RegExp): void => {
+  const found = currentVocabularyFiles().flatMap((file) => {
+    const source = readTracked(file);
+    return source === null
+      ? []
+      : spanningHits(withoutHistoricalCitations(source), pattern).map((hit) => `${file}:${hit}`);
+  });
+
+  expect(found).toEqual([]);
+};
+
+/**
+ * The name of a tracked file is vocabulary too — a module, a fixture directory
+ * or a stylesheet carries the domain noun in its path, and every scan above
+ * reads only what is *inside* a file. A path holds no foreign sense of either
+ * word to protect: the only tracked paths that spell one are in the historical
+ * trees and the two migration trees, both already excluded from the list this
+ * reads, so the bare word is enough, in the two cases
+ * a kebab-case or PascalCase name writes it in. Spelled rather than read with
+ * the `i` flag, which would make `(?![a-z])` reject the capital that follows
+ * the word in a PascalCase name; and that lookahead is what keeps the English
+ * words ending in one of them out.
+ */
+const retiredFileNamePattern = (retired: string): RegExp =>
+  new RegExp(`\\b(?:${retired}|${retired.toLowerCase()})s?(?![a-z])`);
+
+const previousMapFileName = retiredFileNamePattern(PREVIOUS_MAP);
+const previousResourceFileName = retiredFileNamePattern(PREVIOUS_RESOURCE);
+
+const expectNoRetiredFileName = (pattern: RegExp): void => {
+  expect(currentVocabularyFiles().filter((file) => pattern.test(file))).toEqual([]);
+};
+
+const expectNoRetiredBareType = (pattern: RegExp): void => {
+  const found = currentVocabularyFiles()
+    .filter(isImplementationSource)
+    .flatMap((file) => {
+      const source = readTracked(file);
+      return source === null ? [] : hits(source, pattern).map((hit) => `${file}:${hit}`);
+    });
+
+  expect(found).toEqual([]);
+};
+
+const expectSchemaExclusionsEarned = (): void => {
+  for (const tree of RETIRED_SCHEMA_TREES) {
+    const files = trackedFiles().filter((file) => file.startsWith(tree));
+    expect(files, `${tree} is excluded but contains no tracked files`).not.toEqual([]);
+    const sources = files.map((file) => readTracked(file) ?? '').join('\n');
+    expect(
+      [previousMapPattern, previousResourcePattern].flatMap((pattern) =>
+        spanningHits(sources, pattern),
+      ),
+      `${tree} no longer records either retired schema name`,
+    ).not.toEqual([]);
+  }
+};
+
+describe('a Map has no retired identifier (ADR 0101)', () => {
+  it('reaches source, documents, and both live database contracts', () => {
+    const scanned = currentVocabularyFiles();
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('docs/agents/rendering.md');
+    expect(scanned).toContain('src/prisma/contract.prisma');
+    expect(scanned).toContain('src/sqlite/contract.prisma');
+  });
+
+  it('finds no retired identifier shape', () => {
+    expectNoRetiredIdentifier(previousMapPattern);
+  });
+
+  it('finds no retired bare type in implementation source', () => {
+    expectNoRetiredBareType(previousMapBare);
+  });
+
+  it('finds no retired name in a tracked file name', () => {
+    expectNoRetiredFileName(previousMapFileName);
+  });
+
+  it('keeps each migration-tree exclusion earned', () => {
+    expectSchemaExclusionsEarned();
+  });
+});
+
+describe('the retired Map noun guard reads every shape it governs', () => {
+  it('reports every identifier arm, including both collection-field shapes', () => {
+    const lowerName = PREVIOUS_MAP.toLowerCase();
+    const upperName = PREVIOUS_MAP.toUpperCase();
+    const retired = [
+      `type ${PREVIOUS_MAP}Id = string`,
+      `type ${PREVIOUS_MAP}sById = Record<string, Map>`,
+      `const selected${PREVIOUS_MAP} = value`,
+      `const selected${PREVIOUS_MAP}sById = value`,
+      `const ${lowerName}Id = value`,
+      `const mode = '${upperName}'`,
+      `const modes = '${upperName}S'`,
+      `const ${upperName}_ID = value`,
+      `const DEFAULT_${upperName}_ID = value`,
+      `const SELECTED_${upperName}_ID = value`,
+      `const SELECTED_${upperName} = value`,
+      `${lowerName}-not-found`,
+      `data-${lowerName}-selector`,
+      `<div className="canvas-${lowerName}__rail" />`,
+      `${lowerName}_id`,
+      `selected_${lowerName}_id`,
+      `const ${lowerName}less = true`,
+      `table: '${lowerName}s'`,
+      `{ ${lowerName}s: [] }`,
+      `space.${lowerName}s`,
+    ];
+
+    for (const line of retired) {
+      expect(previousMapPattern.test(line), line).toBe(true);
+    }
+    expect(previousMapBare.test(`type ${PREVIOUS_MAP} = Map`)).toBe(true);
+    expect(previousMapFileName.test(`packages/app/src/${lowerName}-resolution.ts`)).toBe(true);
+    expect(previousMapFileName.test(`packages/core/src/${PREVIOUS_MAP}Id.ts`)).toBe(true);
+  });
+
+  it('reads a live specifier, route and cited module, and forgives a historical citation', () => {
+    const lowerName = PREVIOUS_MAP.toLowerCase();
+    for (const line of [
+      `import { resolve } from './${lowerName}-resolution';`,
+      `app.get('/api/spaces/:spaceId/${lowerName}s', handler)`,
+      `  * see \`packages/app/src/${lowerName}-resolution.ts\``,
+    ]) {
+      expect(spanningHits(withoutHistoricalCitations(line), previousMapPattern), line).not.toEqual(
+        [],
+      );
+    }
+
+    for (const line of [
+      `  * see \`.scratch/${lowerName}-graph-orchestration/issues/01.md\``,
+      `  * ADR \`docs/adr/0085-name-a-${lowerName}-once.md\``,
+    ]) {
+      expect(spanningHits(withoutHistoricalCitations(line), previousMapPattern), line).toEqual([]);
+    }
+  });
+
+  it('stays silent on Map names belonging to JavaScript, React, Prisma, and the product', () => {
+    for (const line of [
+      'const miniMap = <MiniMap />',
+      'const flattened = values.flatMap(read)',
+      'const lookup: ReadonlyMap<string, string> = new Map()',
+      'const weak = new WeakMap<object, string>()',
+      'type TypeMaps = Record<string, string>',
+      '@@map("resources")',
+    ]) {
+      expect(previousMapPattern.test(line), line).toBe(false);
+      expect(previousMapBare.test(line), line).toBe(false);
+    }
+  });
+
+  // Mermaid's keyword for one of its chart kinds is the retired noun with a
+  // word in front of it, which is the closing compound arm exactly. Recorded
+  // as reported rather than masked: no tracked file writes one, so a mask for
+  // it would be an exemption earning nothing, and this file's exemptions are
+  // each asserted to still be earning themselves. The day a document needs a
+  // Mermaid sequence, the mask is written then, with this case to invert.
+  it('reports the foreign keyword it cannot tell from a compound', () => {
+    expect(previousMapPattern.test(`sequence${PREVIOUS_MAP}`)).toBe(true);
+  });
+});
+
+describe('a Resource has no retired identifier (ADR 0101)', () => {
+  it('reaches source, documents, and both live database contracts', () => {
+    const scanned = currentVocabularyFiles();
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
+    expect(scanned).toContain('src/prisma/contract.prisma');
+    expect(scanned).toContain('src/sqlite/contract.prisma');
+  });
+
+  it('finds no retired identifier shape', () => {
+    expectNoRetiredIdentifier(previousResourcePattern);
+  });
+
+  it('finds no retired bare type in implementation source', () => {
+    expectNoRetiredBareType(previousResourceBare);
+  });
+
+  it('finds no retired name in a tracked file name', () => {
+    expectNoRetiredFileName(previousResourceFileName);
+  });
+
+  it('keeps each migration-tree exclusion earned', () => {
+    expectSchemaExclusionsEarned();
+  });
+});
+
+describe('the retired Resource noun guard reads every shape it governs', () => {
+  it('reports every identifier arm, including both collection-field shapes', () => {
+    const lowerName = PREVIOUS_RESOURCE.toLowerCase();
+    const upperName = PREVIOUS_RESOURCE.toUpperCase();
+    const retired = [
+      `type ${PREVIOUS_RESOURCE}Id = string`,
+      `type ${PREVIOUS_RESOURCE}sById = Record<string, Resource>`,
+      `const selected${PREVIOUS_RESOURCE} = value`,
+      `const selected${PREVIOUS_RESOURCE}sById = value`,
+      `const ${lowerName}Id = value`,
+      `const mode = '${upperName}'`,
+      `const modes = '${upperName}S'`,
+      `const ${upperName}_ID = value`,
+      `const DEFAULT_${upperName}_ID = value`,
+      `const SELECTED_${upperName}_ID = value`,
+      `const SELECTED_${upperName} = value`,
+      `${lowerName}-not-found`,
+      `data-${lowerName}-selector`,
+      `<div className="canvas-${lowerName}__rail" />`,
+      `${lowerName}_id`,
+      `selected_${lowerName}_id`,
+      `const ${lowerName}like = true`,
+      `table: '${lowerName}s'`,
+      `{ ${lowerName}s: [] }`,
+      `space.${lowerName}s`,
+    ];
+
+    for (const line of retired) {
+      expect(previousResourcePattern.test(line), line).toBe(true);
+    }
+    expect(previousResourceBare.test(`type ${PREVIOUS_RESOURCE} = Resource`)).toBe(true);
+    expect(previousResourceFileName.test(`packages/ui/src/${lowerName}-card.tsx`)).toBe(true);
+    expect(previousResourceFileName.test(`packages/core/src/${PREVIOUS_RESOURCE}Id.ts`)).toBe(true);
+  });
+
+  it('reads a live specifier, route and cited module, and forgives a historical citation', () => {
+    const lowerName = PREVIOUS_RESOURCE.toLowerCase();
+    for (const line of [
+      `import { read } from './${lowerName}-lookup';`,
+      `app.get('/api/spaces/:spaceId/${lowerName}s', handler)`,
+      `  * see \`packages/app/src/${lowerName}-card.tsx\``,
+    ]) {
+      expect(
+        spanningHits(withoutHistoricalCitations(line), previousResourcePattern),
+        line,
+      ).not.toEqual([]);
+    }
+
+    for (const line of [
+      `  * see \`.scratch/reference-${lowerName}/issues/02.md\``,
+      `  * ADR \`docs/adr/0092-name-a-${lowerName}-once.md\``,
+    ]) {
+      expect(spanningHits(withoutHistoricalCitations(line), previousResourcePattern), line).toEqual(
+        [],
+      );
+    }
+  });
+
+  it('stays silent on the English words that contain it, and on the vocabulary that replaced it', () => {
+    const lowerName = PREVIOUS_RESOURCE.toLowerCase();
+    const upperName = PREVIOUS_RESOURCE.toUpperCase();
+    for (const line of [
+      // The English words the retired noun is the tail of, in each shape a
+      // name is written in. None of them offers the boundary the arms need.
+      `const Some${lowerName} = read()`,
+      `if (selected === no${lowerName}) return`,
+      `export type Any${lowerName} = unknown`,
+      `// every${lowerName} the author placed on the canvas`,
+      `const NO${upperName}_SELECTED = 'none'`,
+      // ...including after a hyphen, where the widened kebab arm ends on a
+      // lookahead: that arm needs the retired word itself directly after the
+      // hyphen, and an English word merely ending in it supplies none.
+      `<div className="canvas-no${lowerName}__rail" />`,
+      // The vocabulary this rename arrived at.
+      'const selected = space.resources.find((resource) => resource.id === id)',
+      '@@map("resources")',
+    ]) {
+      expect(previousResourcePattern.test(line), line).toBe(false);
+      expect(previousResourceBare.test(line), line).toBe(false);
+    }
+  });
+
+  // The retired noun's plural is an ordinary English word, and a colon after
+  // it is how a document introduces a clause as well as how one declares a
+  // collection field. The collection arm cannot tell the two apart, so a
+  // document that writes the clause is reported. Recorded as reported rather
+  // than narrowed: the arm is the one that reads a fixture and a schema, and
+  // the clause is rephrasable where the field is not.
+  it('reports the English clause it cannot tell from a collection field', () => {
+    const lowerName = PREVIOUS_RESOURCE.toLowerCase();
+    expect(previousResourcePattern.test(`A few ${lowerName}s: one`)).toBe(true);
+  });
+});
+
+/**
  * ADR 0010 makes Space the top-level domain value, minted only by `loadSpace`,
  * and retires the shipping-ledger word that named it before. `CONTEXT.md:9`
  * says so in as many words — "retired from the code, not merely avoided" — and
