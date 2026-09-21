@@ -21,7 +21,7 @@ import {
 import { defaultContentAggregate } from '../../src/startup/default-content';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { Contract } from '../../src/prisma/contract.d';
-import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
+import { postgresOptionsFor } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { startRefusingPostgresServer } from '../support/refusing-postgres-server';
@@ -462,7 +462,7 @@ describe('retryMetaSpaceEstablishment', () => {
 describe('retryMetaSpaceEstablishment over a PostgreSQL server that refuses this client', () => {
   const refusedBy = async (sqlState: string, message: string) => {
     const server = await startRefusingPostgresServer(sqlState, message);
-    const database = postgres<Contract>({ contractJson, url: server.url });
+    const database = postgres<Contract>(postgresOptionsFor(server.url));
     return {
       repository: new SqlSpaceRepository(postgresSqlStore(database)),
       close: async () => {

@@ -1,4 +1,4 @@
-import { createServer, type Server } from 'node:net';
+import { createServer } from 'node:net';
 import postgres from '@prisma-next/postgres/runtime';
 import { uuidSchema } from '@project/core';
 import { createSpaceHttpApp } from '@project/http';
@@ -15,7 +15,12 @@ import type { Contract } from '../../src/prisma/contract.d';
 import { postgresOptionsFor } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { captureError } from '../support/capture-error';
-import { startRefusingPostgresServer } from '../support/refusing-postgres-server';
+import {
+  closeServer,
+  listenOnLoopback,
+  loopbackPort,
+  startRefusingPostgresServer,
+} from '../support/refusing-postgres-server';
 
 /** Every error on a failure's cause chain, the failure first. */
 const causeChain = (failure: Error | undefined): readonly unknown[] => {
@@ -116,56 +121,39 @@ describe('SqlSpaceRepository (PostgreSQL) against a server that refuses connecti
  * later read with that same cached failure, without touching the network, for
  * the rest of the runtime's life. `postgresOptionsFor` builds this runtime the
  * way `createPostgresDatabase` does — `verifyMarker: false` included — so a
- * second read after the port comes up reaches it instead.
+ * second read against the same refusing server reaches the network again
+ * instead of repeating the first read's cached failure.
  */
 describe('SqlSpaceRepository (PostgreSQL) after a first read meets an outage', () => {
   it('reaches the database on the next read rather than repeating the first failure', async () => {
-    const finder = createServer();
-    await new Promise<void>((resolve, reject) => {
-      finder.once('error', reject);
-      finder.listen(0, '127.0.0.1', resolve);
+    // One server for the whole test, so there is no free-port handoff for
+    // another process to win in between: every connection this server ever
+    // accepts, first read and second alike, it counts and cuts.
+    let connections = 0;
+    const server = createServer((socket) => {
+      connections += 1;
+      socket.destroy();
     });
-    const finderAddress = finder.address();
-    if (finderAddress === null || typeof finderAddress === 'string') {
-      throw new Error('The port finder has no TCP address');
-    }
-    const port = finderAddress.port;
-    await new Promise<void>((resolve, reject) =>
-      finder.close((error) => (error === undefined ? resolve() : reject(error))),
-    );
+    await listenOnLoopback(server);
+    const port = loopbackPort(server);
 
     const outageDatabase = postgres<Contract>(
       postgresOptionsFor(`postgres://hyper:unused@127.0.0.1:${port}/hyper`),
     );
     const outageRepository = new SqlSpaceRepository(postgresSqlStore(outageDatabase));
-    let listener: Server | undefined;
     try {
       const first = await captureError(() => outageRepository.listSpaces());
       expect(first).toBeInstanceOf(Error);
-
-      let connections = 0;
-      listener = createServer((socket) => {
-        connections += 1;
-        socket.destroy();
-      });
-      await new Promise<void>((resolve, reject) => {
-        listener?.once('error', reject);
-        listener?.listen(port, '127.0.0.1', resolve);
-      });
+      const connectionsAfterFirst = connections;
 
       const second = await captureError(() => outageRepository.listSpaces());
 
       expect(second).toBeInstanceOf(Error);
       expect(second).not.toBe(first);
-      expect(connections).toBeGreaterThan(0);
+      expect(connections).toBeGreaterThan(connectionsAfterFirst);
     } finally {
       await outageDatabase.close();
-      if (listener !== undefined) {
-        const closing = listener;
-        await new Promise<void>((resolve, reject) =>
-          closing.close((error) => (error === undefined ? resolve() : reject(error))),
-        );
-      }
+      await closeServer(server);
     }
   });
 });

@@ -8,13 +8,11 @@ import contractJson from './contract.json' with { type: 'json' };
 import { DatabaseTargetConfigurationError } from '../database/database-target';
 
 /*
- * `verifyMarker: false` turns off `@prisma-next/sql-runtime`'s contract-marker
- * check. In the installed 0.16.0 the check never refuses anything — a missing
- * or mismatched marker only logs `CONTRACT.MARKER_MISSING` /
- * `CONTRACT.MARKER_MISMATCH` — and a failed read is memoised for the life of
- * the runtime: left on, a runtime whose first statement meets an unreachable
- * database answers every later read with that same cached failure, without
- * touching the network, until the process restarts (ticket 37).
+ * `verifyMarker: false` disables the contract-marker check for the reason and
+ * with the test coverage recorded on `postgresOptionsFor` (`src/prisma/db.ts`,
+ * ticket 37) — `@prisma-next/sqlite`'s runtime extends the same
+ * `@prisma-next/sql-runtime` `SqlRuntimeBase` and passes `verifyMarker`
+ * straight through, so the same reasoning applies here.
  */
 const optionsFor = (path: string | undefined): Parameters<typeof sqlite<Contract>>[0] =>
   path === undefined

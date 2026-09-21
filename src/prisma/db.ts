@@ -59,7 +59,11 @@ export const configuredDatabaseUrl = (): string | undefined => {
  * `CONTRACT.MARKER_MISMATCH` — and a failed read is memoised for the life of
  * the runtime: left on, a runtime whose first statement meets an unreachable
  * database answers every later read with that same cached failure, without
- * touching the network, until the process restarts (ticket 37).
+ * touching the network, until the process restarts (ticket 37). Held by
+ * `test/unit/postgres-unreachable.test.ts`'s "SqlSpaceRepository (PostgreSQL)
+ * after a first read meets an outage" — built with this function, a second
+ * read against a server that reset the first connection opens a new one
+ * rather than repeating the first failure.
  */
 export const postgresOptionsFor = (
   databaseUrl: string | undefined,
