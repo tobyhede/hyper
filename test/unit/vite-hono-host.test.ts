@@ -10,6 +10,7 @@ import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@pro
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
   AggregateInvariantError,
+  PersistenceUnavailableError,
   decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
@@ -368,10 +369,21 @@ describe('Vite Hono host', () => {
     },
     {
       failure: 'an unreachable database',
-      error: new Error('connect ECONNREFUSED 127.0.0.1:5432'),
+      error: new PersistenceUnavailableError('connect ECONNREFUSED 127.0.0.1:5432'),
       status: 503,
       title: 'Persistence unavailable',
       detail: 'Try the request again later.',
+    },
+    // Ticket 31's third case: a failure that is neither named arm — a code
+    // defect, or a driver failure nobody anticipated — is not an unreachable
+    // database by default. 503 would tell the browser to wait out something
+    // nothing says will pass.
+    {
+      failure: 'a failure that is neither',
+      error: new TypeError('Cannot read properties of undefined'),
+      status: 500,
+      title: 'Internal server error',
+      detail: 'The request failed unexpectedly.',
     },
   ])(
     'answers $failure with its own status and keeps the reason out of the response',
@@ -392,9 +404,9 @@ describe('Vite Hono host', () => {
         headers: { Accept: 'application/problem+json' },
       });
 
-      // The two are told apart by type rather than by message prose, so a
+      // The three are told apart by type rather than by message prose, so a
       // permanent defect and a database that is merely down get different
-      // answers — and neither serves the driver's own message to the client.
+      // answers — and none serves the driver's own message to the client.
       expect(response.status).toBe(status);
       expect(response.headers.get('location')).toBeNull();
       const body = await response.text();
@@ -873,12 +885,12 @@ describe('Database HTTP runtime', () => {
     try {
       const { createApp } = await import('../../src/http/postgres-http-runtime');
 
-      // A `wait` that never settles, so the bounded retry this failure schedules
-      // is parked rather than spending twelve real timers, twelve real
-      // connection attempts and twelve `console.error` lines minutes after this
-      // file has finished — into some other file's output, since the spy above
-      // is long restored by then. What the loop does once it runs is proved
-      // against a recording `wait` in `database-startup.test.ts`.
+      // A `wait` that never settles, so the retry this failure schedules is
+      // parked rather than spending real timers, real connection attempts and
+      // `console.error` lines after this file has finished — into some other
+      // file's output, since the spy above is long restored by then. What the
+      // loop does once it runs is proved against a recording `wait` in
+      // `database-startup.test.ts`.
       //
       // The reporter is left at its default on purpose: the first attempt's
       // failure goes through it, so this is also where the runtime's own stderr
@@ -887,8 +899,11 @@ describe('Database HTTP runtime', () => {
 
       expect(typeof application.resolveProductRequest).toBe('function');
       // The reason is not swallowed, only kept out of the way of composition.
-      expect(reported).toBeInstanceOf(Error);
-      expect(reported instanceof Error ? reported.message : '').toContain('ECONNREFUSED');
+      // It is named for what it is (ticket 31), with the driver's own error on
+      // `cause`, where the operator's log prints it.
+      expect(reported).toBeInstanceOf(PersistenceUnavailableError);
+      const cause = reported instanceof Error ? reported.cause : undefined;
+      expect(cause instanceof Error ? cause.message : '').toContain('ECONNREFUSED');
     } finally {
       if (url === undefined) delete process.env['DATABASE_URL'];
       else process.env['DATABASE_URL'] = url;

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AggregateInvariantError, isAggregateInvariant } from '../src/repository';
+import {
+  AggregateInvariantError,
+  classifyStoredFailure,
+  isAggregateInvariant,
+  PersistenceUnavailableError,
+} from '../src/repository';
 
 describe('isAggregateInvariant', () => {
   it('recognises the error itself', () => {
@@ -45,5 +50,73 @@ describe('isAggregateInvariant', () => {
     second.cause = first;
 
     expect(isAggregateInvariant(first)).toBe(false);
+  });
+});
+
+// Ticket 31. The two named failures a stored-seam reader tells apart, and the
+// third it meets that neither describes. Neither named arm is the other's
+// else-branch: a failure that is neither broken stored state nor an
+// unreachable database is classified as neither, and each reader decides its
+// own answer for it rather than inheriting one by default.
+describe('classifyStoredFailure', () => {
+  it('names broken stored state', () => {
+    expect(classifyStoredFailure(new AggregateInvariantError('broken'))).toBe(
+      'broken-stored-state',
+    );
+  });
+
+  it('names an unreachable database', () => {
+    expect(classifyStoredFailure(new PersistenceUnavailableError('refused'))).toBe('unavailable');
+  });
+
+  it('names neither for a failure that is neither', () => {
+    expect(classifyStoredFailure(new Error('connect ECONNREFUSED 127.0.0.1:5432'))).toBe(
+      'unclassified',
+    );
+    expect(classifyStoredFailure(new TypeError('undefined is not a function'))).toBe(
+      'unclassified',
+    );
+    expect(classifyStoredFailure(undefined)).toBe('unclassified');
+  });
+
+  // The driver wraps a failed COMMIT or a failed rollback and carries the
+  // original only on `.cause`, whichever of the two named failures it was.
+  it('walks the cause chain for either named failure', () => {
+    expect(
+      classifyStoredFailure(
+        new Error('Transaction commit failed', {
+          cause: new PersistenceUnavailableError('refused'),
+        }),
+      ),
+    ).toBe('unavailable');
+    expect(
+      classifyStoredFailure(
+        new Error('Transaction rollback failed after callback error', {
+          cause: new AggregateInvariantError('broken'),
+        }),
+      ),
+    ).toBe('broken-stored-state');
+  });
+
+  // Broken stored state is the stronger claim: a rollback that failed because
+  // the connection went away after the callback found broken state still
+  // found it.
+  it('prefers broken stored state when a chain carries both', () => {
+    expect(
+      classifyStoredFailure(
+        new PersistenceUnavailableError('refused', {
+          cause: new AggregateInvariantError('broken'),
+        }),
+      ),
+    ).toBe('broken-stored-state');
+  });
+
+  it('terminates on a cyclic cause chain', () => {
+    const first = new Error('first');
+    const second = new Error('second');
+    first.cause = second;
+    second.cause = first;
+
+    expect(classifyStoredFailure(first)).toBe('unclassified');
   });
 });

@@ -1,5 +1,5 @@
 import type { UUID } from '@project/core';
-import { isAggregateInvariant, type LoadedSpace } from '@project/persistence';
+import { classifyStoredFailure, type LoadedSpace } from '@project/persistence';
 import type { SpaceRepository } from '../persistence/space-repository';
 import { defaultContentAggregate } from './default-content';
 
@@ -55,38 +55,46 @@ export const establishMetaSpace = async (
  * for the life of the process; capping the growth keeps a database that comes
  * back late from waiting hours to be found.
  *
- * There is deliberately no attempt bound. A bounded retry left a host that
- * outlived it serving `503` at the root forever, because the root address no
- * longer establishes anything and nothing else was going to — the bound did not
- * surface the problem, it made it permanent. What tells an operator the
- * difference between waiting and giving up is the terminal report in
- * `src/http/postgres-http-runtime.ts`, not a silent stop.
+ * There is deliberately no attempt bound on an unreachable database. A bounded
+ * retry left a host that outlived it serving `503` at the root forever, because
+ * the root address no longer establishes anything and nothing else was going to
+ * — the bound did not surface the problem, it made it permanent. Every failed
+ * attempt is reported, so a long outage is visible while it lasts. What stops
+ * the retry is a failure no wait cures ({@link CONFIRMING_FAILURES}), and what
+ * tells an operator it stopped is the terminal report in
+ * `src/http/database-http-runtime.ts`, not a silent stop.
  */
 export const META_SPACE_RETRY_INITIAL_DELAY_MS = 5_000;
 export const META_SPACE_RETRY_MAX_DELAY_MS = 60_000;
 
 /**
- * Two consecutive invariant failures, not one.
+ * Two consecutive failures that no wait cures, not one.
  *
- * One is also what a healthy repository looks like for an instant.
- * `loadAggregate` runs at READ COMMITTED and reads in two statements:
- * `lockMetaIdentity` finds no Meta row, then `loadEverySpace` reads Spaces under
- * a fresh snapshot, so a rival host committing between the two is reported as
+ * Two kinds count: broken stored state, and a failure neither named arm
+ * describes — a code defect, or a driver failure nobody anticipated (ticket
+ * 31). Only an unreachable database is worth waiting out, and one of those
+ * between two others resets the count, since it says nothing about either.
+ *
+ * Not one, because one invariant failure is also what a healthy repository
+ * looks like for an instant. On PostgreSQL `loadAggregate` reads in two
+ * statements: `lockMetaIdentity` finds no Meta row, then `loadEverySpace` reads
+ * Spaces — inside one transaction, but at READ COMMITTED each statement takes
+ * its own snapshot — so a rival host committing between the two is reported as
  * Spaces without Meta. Two hosts against one fresh database is the ordinary way
  * to see it — a dev server and `test:integration:postgres`. The interleaving is
  * over by the next read, and stored state that is genuinely broken fails the
- * same way every time.
+ * same way every time. An unclassified failure gets the same second look: a
+ * one-off is not a verdict, and a defect repeats.
  */
-const CONFIRMING_INVARIANT_FAILURES = 2;
+const CONFIRMING_FAILURES = 2;
 
 /**
  * Default Content is not a valid aggregate.
  *
  * A defect in the code this process is running, not in what the database holds
  * and not in whether the database answers. No read and no wait can change it, so
- * the retry stops on it at once. Without its own type it read as "not an
- * invariant failure", which reset the consecutive count — harmless under an
- * attempt bound, and an endless loop without one.
+ * the retry stops on it at once rather than waiting for a second attempt to
+ * confirm what a second attempt cannot change.
  */
 export class DefaultContentInvalidError extends Error {}
 
@@ -127,7 +135,7 @@ export const retryMetaSpaceEstablishment = async (
       // There is nowhere left to report the failure of a reporter.
     }
   };
-  let consecutiveInvariantFailures = 0;
+  let consecutiveUncuredFailures = 0;
   let delay = META_SPACE_RETRY_INITIAL_DELAY_MS;
   for (;;) {
     await wait(delay);
@@ -137,13 +145,14 @@ export const retryMetaSpaceEstablishment = async (
     } catch (error) {
       reportSafely(error);
       if (error instanceof DefaultContentInvalidError) return undefined;
-      if (!isAggregateInvariant(error)) {
-        // A failure that says nothing about stored state cannot help confirm it.
-        consecutiveInvariantFailures = 0;
+      if (classifyStoredFailure(error) === 'unavailable') {
+        // An outage says nothing about whether the failures around it would
+        // recur once the database answers, so it cannot help confirm them.
+        consecutiveUncuredFailures = 0;
         continue;
       }
-      consecutiveInvariantFailures += 1;
-      if (consecutiveInvariantFailures === CONFIRMING_INVARIANT_FAILURES) return undefined;
+      consecutiveUncuredFailures += 1;
+      if (consecutiveUncuredFailures === CONFIRMING_FAILURES) return undefined;
     }
   }
 };

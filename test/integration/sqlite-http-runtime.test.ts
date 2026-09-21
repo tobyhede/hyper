@@ -290,10 +290,10 @@ describe('SQLite HTTP runtime', () => {
 
   // Ticket 27: a real, non-mocked case of the "not JSON" flavour, driven
   // through composition rather than a stubbed repository. Both of the host's
-  // `isAggregateInvariant` calls (`src/http/space-host.ts:85` re-reads once
-  // rather than rethrowing; `:149` classifies) are exercised for it: the read
-  // fails identically every time this row is behind it, so `GET /` answers
-  // `internal-error` — a permanent defect. The retry/give-up policy is held by
+  // `classifyStoredFailure` calls (`src/http/space-host.ts`'s `readAggregate`
+  // re-reads once rather than rethrowing; the root's catch classifies) are
+  // exercised for it: the read fails identically every time this row is behind
+  // it, so `GET /` answers `internal-error` — a permanent defect. The retry/give-up policy is held by
   // `test/integration/database-http-runtime.test.ts`, in *database HTTP runtime
   // ('SQLite') > gives up through the shared retry after two confirmed
   // invariant failures* and its *recovers through the shared retry after a

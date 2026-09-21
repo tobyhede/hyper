@@ -585,6 +585,37 @@ export interface Orderable<Order> {
   };
 }
 
+/**
+ * Whether a failure carries the driver's own `SqlConnectionError` anywhere on
+ * its cause chain — what both `@prisma-next/driver-postgres` and
+ * `@prisma-next/driver-sqlite` normalise a statement's connection trouble to,
+ * SQLite BUSY and LOCKED included. `SqlSpaceRepository` names it
+ * `PersistenceUnavailableError` (ticket 31).
+ *
+ * Read by the own `kind` field `SqlConnectionError.is` itself reads, because
+ * `@prisma-next/sql-errors` is the drivers' dependency rather than this
+ * repository's. Not by `transient`: that flag says whether an *immediate*
+ * retry might succeed, and the PostgreSQL driver marks a refused connection
+ * `false` — which is the database being down, the very case a reader answers
+ * "try again later" for. Not by message either, so ticket 18's two BUSY shapes
+ * (immediate and exhausted) are one answer without being told apart.
+ * `test/unit/sql-connection-failure.test.ts` holds each of these.
+ *
+ * The chain, because `@prisma-next/sql-runtime` carries a failed COMMIT's own
+ * error, and the callback error behind a failed rollback, only on `.cause`;
+ * bounded by a seen set, because a chain is data a driver built.
+ */
+export const isDriverConnectionFailure = (cause: unknown): boolean => {
+  const seen = new Set<unknown>();
+  let current = cause;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if ('kind' in current && current.kind === 'sql_connection') return true;
+    current = current.cause;
+  }
+  return false;
+};
+
 export const asOrderable = <Order>(space: Orderable<Order>): Orderable<Order> => space;
 
 /**

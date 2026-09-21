@@ -16,10 +16,10 @@ import type {
  * this one, and a database that is simply unreachable — and a bare `Error`
  * makes them one state. They are not one state: broken stored state is a defect
  * this deployment carries and no retry cures, while an unreachable database is
- * temporary and a later attempt is exactly the answer. `src/http/space-host.ts`
- * answers them with different statuses, and start-up stops retrying on this
- * one, both by asking {@link isAggregateInvariant} rather than by matching
- * message prose.
+ * temporary and a later attempt is exactly the answer. The unreachable half has
+ * its own name too, {@link PersistenceUnavailableError}, so neither is merely
+ * the absence of the other, and a failure that is neither stays neither
+ * ({@link classifyStoredFailure}).
  *
  * It lives here, beside `loadAggregate`, rather than on the server-only
  * superset that used to declare it. `loadAggregate` is `StoredSpaceRepository`'s,
@@ -36,28 +36,79 @@ import type {
 export class AggregateInvariantError extends Error {}
 
 /**
- * Whether a failure out of the stored seam is broken stored state.
+ * The database did not answer: it refused or dropped the connection, would not
+ * open a transaction, or reported contention it gave up waiting on. Temporary
+ * by nature, so a reader answers "try again later" and start-up keeps trying.
  *
- * The cause chain rather than the error itself, because the driver does not
- * always rethrow what the transaction callback threw: when the rollback after a
+ * A repository raises it, carrying the driver's own failure on `.cause`,
+ * rather than every reader asking a predicate over the driver's error shapes:
+ * `@project/http` is browser-safe and cannot name a driver, and what counts as
+ * unreachable is a fact about each database the repository already knows
+ * (`SqlSpaceRepository`, `src/persistence/sql-space-repository.ts`). Nothing
+ * is recognised by message prose.
+ */
+export class PersistenceUnavailableError extends Error {}
+
+/**
+ * Whether the cause chain holds an instance of `type`.
+ *
+ * The chain rather than the error itself, because the driver does not always
+ * rethrow what the transaction callback threw: when the rollback after a
  * callback error itself fails, `@prisma-next/sql-runtime` destroys the
  * connection and throws `RUNTIME.TRANSACTION_ROLLBACK_FAILED`, carrying the
- * original only on `.cause`. A bare `instanceof` reads that as an unreachable
- * database, answers `try again later` for a defect, and spends a retry budget
- * on something no retry cures.
+ * original only on `.cause`, and a failed COMMIT is wrapped the same way. A bare
+ * `instanceof` reads either as whatever the wrapper happens to be.
  *
  * The walk is bounded by a seen set. A chain is data a driver built, and a
  * cycle in one would otherwise hang whichever reader classifies the error.
  */
-export const isAggregateInvariant = (cause: unknown): boolean => {
+const causeChainHolds = (
+  cause: unknown,
+  type: typeof AggregateInvariantError | typeof PersistenceUnavailableError,
+): boolean => {
   const seen = new Set<unknown>();
   let current = cause;
   while (current instanceof Error && !seen.has(current)) {
-    if (current instanceof AggregateInvariantError) return true;
+    if (current instanceof type) return true;
     seen.add(current);
     current = current.cause;
   }
   return false;
+};
+
+/**
+ * Whether a failure out of the stored seam is broken stored state, anywhere on
+ * its cause chain. {@link classifyStoredFailure} is what a reader choosing an
+ * answer asks; this is the one question on its own, for a repository deciding
+ * whether a failure is already named.
+ */
+export const isAggregateInvariant = (cause: unknown): boolean =>
+  causeChainHolds(cause, AggregateInvariantError);
+
+/** Whether a failure out of the stored seam is an unreachable database, anywhere on its cause chain. */
+export const isPersistenceUnavailable = (cause: unknown): boolean =>
+  causeChainHolds(cause, PersistenceUnavailableError);
+
+/**
+ * What a failure out of the stored seam is, as a reader has to act on it:
+ * broken stored state, an unreachable database, or neither.
+ *
+ * `unclassified` is a real answer rather than a gap. It is a code defect, or a
+ * driver failure nobody anticipated, and it is deliberately not folded into
+ * either named arm: calling it unavailable tells a client to retry what no
+ * retry cures, and calling it broken stored state blames the data for a fault
+ * in the code. Each reader decides what it answers for it.
+ *
+ * Broken stored state wins when a chain carries both, because it is the claim
+ * about the data: a rollback that failed on a dropped connection after the
+ * callback found broken state still found it.
+ */
+export type StoredFailure = 'broken-stored-state' | 'unavailable' | 'unclassified';
+
+export const classifyStoredFailure = (cause: unknown): StoredFailure => {
+  if (isAggregateInvariant(cause)) return 'broken-stored-state';
+  if (isPersistenceUnavailable(cause)) return 'unavailable';
+  return 'unclassified';
 };
 
 /**

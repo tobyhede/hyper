@@ -1,6 +1,7 @@
 import { uuidSchema, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
+  PersistenceUnavailableError,
   type AggregateLoadResult,
   type LoadedSpace,
 } from '@project/persistence';
@@ -209,7 +210,10 @@ class ScriptedRepository extends MemorySpaceRepository {
   }
 }
 
-const unreachable = (): Error => new Error('connect ECONNREFUSED 127.0.0.1:5432');
+const unreachable = (): Error =>
+  new PersistenceUnavailableError('connect ECONNREFUSED 127.0.0.1:5432');
+/** Neither named arm: a code defect, or a driver failure nobody anticipated. */
+const unclassified = (): Error => new TypeError('Cannot read properties of undefined');
 const invariant = (): Error =>
   new AggregateInvariantError('Stored Spaces exist without a Meta Space');
 
@@ -323,6 +327,60 @@ describe('retryMetaSpaceEstablishment', () => {
 
     expect(metaSpaceId).toBe(SPACE_ID);
     expect(reported).toEqual([expect.any(AggregateInvariantError)]);
+  });
+
+  // Ticket 31, Part B. Only an unreachable database is worth waiting out. A
+  // failure neither named arm describes used to reset the count and continue,
+  // so a defect no retry cures was read once a minute, forever, at the 60s
+  // ceiling. It now counts toward giving up exactly as an invariant failure
+  // does: two running, so a one-off is not a verdict and a defect — which
+  // fails the same way every time — is.
+  it('stops at a failure it cannot classify once a second attempt confirms it', async () => {
+    const repository = new ScriptedRepository(Array.from({ length: 10 }, unclassified));
+    const waits: number[] = [];
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: recordingWait(waits),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBeUndefined();
+    expect(waits).toEqual([META_SPACE_RETRY_INITIAL_DELAY_MS, 10_000]);
+    expect(reported).toEqual([expect.any(TypeError), expect.any(TypeError)]);
+  });
+
+  it('keeps trying through one failure it cannot classify', async () => {
+    const repository = new ScriptedRepository([unclassified()]);
+    const reported: unknown[] = [];
+
+    const metaSpaceId = await retryMetaSpaceEstablishment(repository, establishmentIds(), {
+      wait: () => Promise.resolve(),
+      report: (error) => reported.push(error),
+    });
+
+    expect(metaSpaceId).toBe(SPACE_ID);
+    expect(reported).toEqual([expect.any(TypeError)]);
+  });
+
+  // Both are failures a wait does not cure, so they confirm each other; an
+  // outage between them says nothing about either and resets the count.
+  it('counts unclassified and invariant failures together, and an outage resets them', async () => {
+    const confirmed = new ScriptedRepository([unclassified(), invariant(), undefined]);
+    await expect(
+      retryMetaSpaceEstablishment(confirmed, establishmentIds(), {
+        wait: () => Promise.resolve(),
+        report: () => undefined,
+      }),
+    ).resolves.toBeUndefined();
+
+    const interrupted = new ScriptedRepository([unclassified(), unreachable(), invariant()]);
+    await expect(
+      retryMetaSpaceEstablishment(interrupted, establishmentIds(), {
+        wait: () => Promise.resolve(),
+        report: () => undefined,
+      }),
+    ).resolves.toBe(SPACE_ID);
   });
 
   it('counts invariant failures consecutively, so an outage between them resets', async () => {

@@ -1,6 +1,7 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import {
   AggregateInvariantError,
+  PersistenceUnavailableError,
   decodeProblemDetails,
   encodeCommitRequest,
   problemCatalogue,
@@ -435,7 +436,7 @@ describe('Space HTTP reads', () => {
   });
 
   it('hides and logs aggregate repository failures', async () => {
-    const failure = new Error('database credentials');
+    const failure = new PersistenceUnavailableError('database credentials');
     const logError = vi.fn();
     const response = await createSpaceHttpApp(
       repository({ loadAggregate: () => Promise.reject(failure) }),
@@ -500,24 +501,44 @@ describe('Space HTTP reads', () => {
   });
 
   // The negative half of the re-read above: only an invariant failure earns a
-  // second read. A failure that says nothing about stored state — an
-  // unreachable database is the case here — is answered from the first one, so
-  // the call count is what holds the guard in place. Without it every
-  // aggregate failure costs two full reads against a database that is already
-  // not answering.
-  it('answers 503 persistence-unavailable for an aggregate failure that is not an invariant, without re-reading', async () => {
+  // second read. A failure that says nothing about stored state is answered
+  // from the first one, so the call count is what holds the guard in place.
+  // Without it every aggregate failure costs two full reads against a database
+  // that is already not answering.
+  //
+  // Ticket 31: the unreachable arm is named (`PersistenceUnavailableError`)
+  // rather than being whatever is not an invariant, so a failure that is
+  // neither — a code defect, a driver failure nobody anticipated — is the third
+  // case, and answers 500 `internal-error` rather than inheriting 503 by
+  // default. 503 says "try again later", which is not something this code
+  // knows about a failure it cannot name.
+  it.each([
+    {
+      failure: 'an unreachable database',
+      error: new PersistenceUnavailableError('connect ECONNREFUSED'),
+      code: 'persistence-unavailable' as const,
+    },
+    {
+      failure: 'a failure that is neither',
+      error: new TypeError('Cannot read properties of undefined'),
+      code: 'internal-error' as const,
+    },
+  ])('answers $failure as $code without re-reading', async ({ error, code }) => {
     let calls = 0;
+    const logError = vi.fn();
     const response = await createSpaceHttpApp(
       repository({
         loadAggregate: () => {
           calls += 1;
-          return Promise.reject(new Error('connect ECONNREFUSED'));
+          return Promise.reject(error);
         },
       }),
+      { logError },
     ).request('/api/aggregate');
 
-    await expectProblem(response, 'persistence-unavailable');
+    await expectProblem(response, code);
     expect(calls).toBe(1);
+    expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', error);
   });
 
   it('hides and logs collection and lazy-resource repository failures', async () => {
@@ -567,7 +588,7 @@ describe('Space HTTP reads', () => {
   // the unhandled rejection. Every route that logs is driven, because the
   // containment is one helper and a route that stopped calling it would lose it.
   it('returns service unavailable when failure logging itself throws a non-Error', async () => {
-    const failure = new Error('repository failure');
+    const failure = new PersistenceUnavailableError('repository failure');
     const options = {
       logError: () => {
         // JavaScript callers can violate the TypeScript convention; that is the regression case.
@@ -682,13 +703,27 @@ describe('Space HTTP aggregate commit', () => {
   });
 
   it('hides and logs repository failures', async () => {
-    const failure = new Error('database host');
+    const failure = new PersistenceUnavailableError('database host');
     const logError = vi.fn();
     const response = await postCommit(
       createSpaceHttpApp(repository({ commit: () => Promise.reject(failure) }), { logError }),
     );
 
     await expectProblem(response, 'persistence-unavailable');
+    expect(logError).toHaveBeenCalledWith('Failed to commit spaces', failure);
+  });
+
+  // Ticket 31's third case at the commit route: a failure that is neither
+  // broken stored state nor an unreachable database is not answered 503 by
+  // default. It is logged, and answers 500 `internal-error`.
+  it('answers a commit failure that is neither named arm as 500 internal-error', async () => {
+    const failure = new TypeError('Cannot read properties of undefined');
+    const logError = vi.fn();
+    const response = await postCommit(
+      createSpaceHttpApp(repository({ commit: () => Promise.reject(failure) }), { logError }),
+    );
+
+    await expectProblem(response, 'internal-error');
     expect(logError).toHaveBeenCalledWith('Failed to commit spaces', failure);
   });
 

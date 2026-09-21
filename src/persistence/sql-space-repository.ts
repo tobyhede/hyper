@@ -8,7 +8,9 @@ import {
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
+  classifyStoredFailure,
   commitRequestRefusal,
+  PersistenceUnavailableError,
   committedRevision,
   decideCommit,
   decodeStoredRevision,
@@ -29,7 +31,12 @@ import type {
   ReplaceAggregateResult,
   SpaceRepository,
 } from './space-repository';
-import type { SqlStore, SqlTables } from './sql-store';
+import {
+  isDriverConnectionFailure,
+  type SqlLoadedSpaceRow,
+  type SqlStore,
+  type SqlTables,
+} from './sql-store';
 
 class SnapshotValidationError extends Error {}
 
@@ -73,17 +80,17 @@ type UpdateChange = Extract<SpaceChange, { kind: 'update' }>;
  * path: a revision the codec refuses -- stored text that is not canonical
  * decimal, or a value past the 2^63-1 ceiling on either side of the round
  * trip -- is broken stored state (ADR 0095), the same identity
- * `#loadEverySpace`'s own decode step already raises it as. Three places
- * outside `#loadEverySpace`'s complete read decode or encode a Space's
- * revision during a commit -- `#writeUpdate`'s row-lock write and its prior-
- * revision comparison, and `#loadStoredSpaceRowForCommit`'s two callers, the
- * fast path's candidate read and the post-rollback conflict reload -- and all
- * three need the same reclassification rather than letting `RevisionCodecError`
- * escape a commit unclassified as a defect no retry cures answered
- * `persistence-unavailable`. Decode and encode are named separately below
- * because they are not the same claim: a decode failure is about a revision
- * the database already holds, an encode failure is about the next revision
- * the commit itself just computed and has not written anywhere yet.
+ * `#loadEverySpace`'s own decode step already raises it as. `#writeUpdate`
+ * decodes and encodes a Space's revision outside any complete read -- its
+ * row-lock write's prior-revision comparison, and the next revision it
+ * writes -- and both need the reclassification rather than letting
+ * `RevisionCodecError` escape a commit unclassified. (The other commit-path
+ * reader of one stored Space, `#loadStoredSpaceRowForCommit`, names its whole
+ * decode step broken stored state by position, revision included.) Decode and
+ * encode are named separately below because they are not the same claim: a
+ * decode failure is about a revision the database already holds, an encode
+ * failure is about the next revision the commit itself just computed and has
+ * not written anywhere yet.
  */
 const storedRevisionInvariant = (spaceId: UUID, error: unknown): AggregateInvariantError =>
   new AggregateInvariantError(`Stored Space ${spaceId}'s revision is not usable`, { cause: error });
@@ -91,8 +98,7 @@ const storedRevisionInvariant = (spaceId: UUID, error: unknown): AggregateInvari
 /**
  * `decodeStoredRevision`, reclassifying a `RevisionCodecError` it raises as
  * `storedRevisionInvariant` -- used for a value already sitting in the
- * `revision` column: `#writeUpdate`'s prior-revision comparison, and (through
- * `#loadStoredSpaceRow`) `#loadStoredSpaceRowForCommit`'s two callers.
+ * `revision` column: `#writeUpdate`'s prior-revision comparison.
  */
 const decodeRevisionReclassified = (spaceId: UUID, value: string): bigint => {
   try {
@@ -224,7 +230,65 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     this.#store = store;
   }
 
+  /**
+   * Every public operation, naming the driver's own connection failure
+   * (`isDriverConnectionFailure`) `PersistenceUnavailableError` on its way
+   * out (ticket 31), so a reader asks one predicate rather than re-deriving
+   * "unreachable" from a failure being something else. A failure already
+   * named -- broken stored state, or a transaction `#transaction` saw never
+   * open -- keeps its name; broken stored state wins, as
+   * `classifyStoredFailure` says. Anything else leaves unclassified, which is
+   * a real answer: each reader decides what it says for a failure neither
+   * arm describes.
+   */
+  async #naming<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (classifyStoredFailure(error) === 'unclassified' && isDriverConnectionFailure(error)) {
+        throw new PersistenceUnavailableError('The database connection failed', { cause: error });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * `#store.transaction`, naming a transaction the database never opened
+   * `PersistenceUnavailableError` -- by position, whatever the driver threw
+   * (ticket 31).
+   *
+   * By position because the canonical outage never reaches here as the
+   * driver's own type. A PostgreSQL server that is down refuses the pool's
+   * connection, and `@prisma-next/driver-postgres` does not normalise an error
+   * from acquiring a connection, only from a statement run on one: what
+   * escapes is Node's own `ECONNREFUSED` (`test/unit/postgres-unreachable.test.ts`).
+   * A SQLite client closed underneath the repository refuses before any
+   * connection with a plain `Error` (`test/integration/sqlite-space-repository.test.ts`,
+   * "names a database that will not open a transaction unavailable"). Neither
+   * carries anything but prose to recognise it by, and both are the database
+   * not answering. Once the callback has run, a failure is the callback's or a
+   * statement's, and `#naming` classifies it by what it carries instead.
+   */
+  async #transaction<T>(fn: (handle: Handle) => Promise<T>): Promise<T> {
+    const progress = { opened: false };
+    try {
+      return await this.#store.transaction((handle) => {
+        progress.opened = true;
+        return fn(handle);
+      });
+    } catch (error) {
+      if (progress.opened) throw error;
+      throw new PersistenceUnavailableError('The database did not open a transaction', {
+        cause: error,
+      });
+    }
+  }
+
   listSpaces(): Promise<readonly SpaceSummary[]> {
+    return this.#naming(() => this.#listSpacesSerialised());
+  }
+
+  #listSpacesSerialised(): Promise<readonly SpaceSummary[]> {
     return this.#store.serialise(async () => {
       const tables = this.#store.tables(this.#store.orm);
       const spaces = await tables.Space.orderBy((space) => space.id.asc()).all();
@@ -237,8 +301,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   loadSpace(id: UUID): Promise<LoadedSpace | undefined> {
-    return this.#store.serialise(() =>
-      this.#loadStoredSpaceRow(this.#store.tables(this.#store.orm), id),
+    return this.#naming(() =>
+      this.#store.serialise(() =>
+        this.#loadStoredSpaceRow(this.#store.tables(this.#store.orm), id),
+      ),
     );
   }
 
@@ -256,16 +322,17 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * `AggregateInvariantError`: `loadSpace` above answers for one Space, not the
    * aggregate, and keeps the narrower error deliberately (ticket 27, "one
    * Space failing intake is that resource's answer to give, not evidence the
-   * aggregate cannot be read"). The fast path's candidate read and the
-   * post-conflict reload call `#loadStoredSpaceRowForCommit` below instead,
-   * which reclassifies a revision decode failure only -- a commit's own
-   * correctness depends on reading the revision it is about to compare or
-   * conflict on, where it does not equally depend on that Space's document.
+   * aggregate cannot be read"). The commit path calls
+   * `#loadStoredSpaceRowForCommit` below instead, which names the whole decode
+   * step broken stored state.
    */
   async #loadStoredSpaceRow(tables: SqlTables<Order>, id: UUID): Promise<LoadedSpace | undefined> {
     const stored = await tables.Space.loadWithResources(id);
-    if (stored === null) return undefined;
+    return stored === null ? undefined : this.#decodeStoredSpaceRow(stored);
+  }
 
+  /** One stored row, parsed. No I/O: `tables.Space.loadWithResources` has already read it. */
+  #decodeStoredSpaceRow(stored: SqlLoadedSpaceRow): LoadedSpace {
     const snapshot = parseSnapshot({
       id: stored.id,
       document: spaceDocumentSchema.parse(this.#store.readDocument(stored.document)),
@@ -284,45 +351,55 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * `#loadStoredSpaceRow`, reclassifying a `RevisionCodecError` it raises as
-   * `AggregateInvariantError` (`storedRevisionInvariant`) rather than letting
-   * it escape a commit unclassified. Used by the two commit-path readers of
-   * one stored Space's row that are not `loadSpace` itself: the fast path's
-   * candidate read (`#commitTopologyPreservingUpdate`) and the post-rollback
-   * conflict reload (`#commitUnserialised`). `#loadStoredSpaceRow` is left as
-   * it is -- `loadSpace`/`listSpaces` share it and keep the narrower,
-   * unclassified error deliberately -- so this wraps the call rather than
-   * changing what it answers.
+   * `#loadStoredSpaceRow` for the commit path -- the fast path's candidate read
+   * (`#commitTopologyPreservingUpdate`) and the post-rollback conflict reload
+   * (`#commitUnserialised`) -- naming every failure of the decode step
+   * `AggregateInvariantError`, exactly as `#loadEverySpace` names the same
+   * row on the complete-aggregate path (ticket 31). A commit's correctness
+   * rests on reading the Space it is about to replace or conflict on, so a
+   * stored row it cannot decode is stored state that commit cannot be judged
+   * against, whichever of the two paths met it -- and left unclassified, it
+   * reached the commit route as a failure neither arm names.
+   *
+   * The catch is unconditional, by position rather than by type, for the
+   * reason `#loadEverySpace`'s is: it wraps only the decode, which performs no
+   * I/O, so a connection failure cannot reach it, and naming today's causes
+   * (a schema's `ZodError`, intake's `SnapshotValidationError`, the codec's
+   * `RevisionCodecError`, SQLite's `SyntaxError`) would let a future one --
+   * or a change in which of them the decode raises -- escape unclassified.
    */
   async #loadStoredSpaceRowForCommit(
     tables: SqlTables<Order>,
     id: UUID,
   ): Promise<LoadedSpace | undefined> {
+    const stored = await tables.Space.loadWithResources(id);
+    if (stored === null) return undefined;
     try {
-      return await this.#loadStoredSpaceRow(tables, id);
+      return this.#decodeStoredSpaceRow(stored);
     } catch (error) {
-      if (!(error instanceof RevisionCodecError)) throw error;
-      throw storedRevisionInvariant(id, error);
+      throw new AggregateInvariantError(`Stored Space ${id} does not parse`, { cause: error });
     }
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {
-    return this.#store.serialise(() => this.#loadAggregateUnserialised());
+    return this.#naming(() => this.#store.serialise(() => this.#loadAggregateUnserialised()));
   }
 
   async initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult> {
-    return this.#store.serialise(() => this.#initializeUnserialised(input));
+    return this.#naming(() => this.#store.serialise(() => this.#initializeUnserialised(input)));
   }
 
   loadMetaSpaceId(): Promise<UUID | undefined> {
-    return this.#store.serialise(() => this.#loadMetaSpaceIdUnserialised());
+    return this.#naming(() => this.#store.serialise(() => this.#loadMetaSpaceIdUnserialised()));
   }
 
   async replaceAggregate(
     input: AggregateInput,
     expectedMetaSpaceId: UUID | undefined,
   ): Promise<ReplaceAggregateResult> {
-    return this.#store.serialise(() => this.#replaceUnserialised(input, expectedMetaSpaceId));
+    return this.#naming(() =>
+      this.#store.serialise(() => this.#replaceUnserialised(input, expectedMetaSpaceId)),
+    );
   }
 
   /**
@@ -344,15 +421,17 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * an identity nothing downstream asks for.
    */
   markExported(id: UUID, revision: bigint): Promise<void> {
-    return this.#store.serialise(async () => {
-      const tables = this.#store.tables(this.#store.orm);
-      const updated = await tables.Space.setExportedRevision(id, encodeStoredRevision(revision));
-      if (!updated) throw new Error(`Space ${id} does not exist`);
-    });
+    return this.#naming(() =>
+      this.#store.serialise(async () => {
+        const tables = this.#store.tables(this.#store.orm);
+        const updated = await tables.Space.setExportedRevision(id, encodeStoredRevision(revision));
+        if (!updated) throw new Error(`Space ${id} does not exist`);
+      }),
+    );
   }
 
   commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
-    return this.#store.serialise(() => this.#commitUnserialised(request));
+    return this.#naming(() => this.#store.serialise(() => this.#commitUnserialised(request)));
   }
 
   /**
@@ -372,8 +451,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       // did not release. Complete intake cannot see it -- the candidate
       // aggregate is consistent and the collision only exists in the stored
       // rows the write loop meets in request order. It is permanent, so it
-      // has to leave here as a rejection: escaping instead becomes 503
-      // `persistence-unavailable`, which the client retries forever.
+      // has to leave here as a rejection: escaping instead reaches the commit
+      // route as a failure neither named arm describes, answered 500
+      // `internal-error` -- which the browser client still maps to a
+      // retryable failure (ticket 35), so it would retry forever.
       if (error instanceof ResourceOwnershipError) {
         return { kind: 'rejected', code: 'invalid-commit', message: error.message };
       }
@@ -404,7 +485,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
-    return this.#store.transaction(async (handle) => {
+    return this.#transaction(async (handle) => {
       const tables = this.#store.tables(handle);
       const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
@@ -593,11 +674,11 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * already has, on both databases -- so the catch below is unconditional, by
    * position rather than by type: a connection failure cannot reach it, and
    * narrowing to today's three known causes would answer a fourth, future
-   * decode failure as *unclassified* instead -- exactly the "unavailable,
-   * retry forever" misclassification this error class exists to prevent,
-   * just failing quietly rather than loudly (ticket 27, "The per-row catch
-   * is unconditional, by position rather than by type", declined narrowing
-   * this same shape on this same reasoning).
+   * decode failure as *unclassified* instead -- a failure neither named arm
+   * describes, where broken stored state has a name of its own (ticket 27,
+   * "The per-row catch is unconditional, by position rather than by type",
+   * declined narrowing this same shape on this same reasoning;
+   * `#loadStoredSpaceRowForCommit` takes the same shape for one row).
    *
    * `loadSpace`/`listSpaces` keep the narrower, unclassified error
    * deliberately: one Space failing intake is that resource's answer to give,
@@ -693,7 +774,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   async #loadAggregateUnserialised(): Promise<AggregateLoadResult> {
-    return this.#store.transaction(async (handle) => {
+    return this.#transaction(async (handle) => {
       const tables = this.#store.tables(handle);
       const metaSpaceId = await this.#lockMetaIdentity(tables);
       if (metaSpaceId === undefined) {
@@ -717,7 +798,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     try {
-      return await this.#store.transaction(async (handle) => {
+      return await this.#transaction(async (handle) => {
         const tables = this.#store.tables(handle);
         const metaSpaceId = await this.#lockMetaIdentity(tables);
         if (metaSpaceId !== undefined) {
@@ -759,7 +840,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     });
     if (!intake.ok) return { kind: 'aggregate-refused', errors: intake.errors };
     try {
-      return await this.#store.transaction(async (handle) => {
+      return await this.#transaction(async (handle) => {
         const tables = this.#store.tables(handle);
         const metaSpaceId = await this.#lockMetaIdentity(tables);
         // Rows are read raw rather than through `#loadEverySpace`: truncation

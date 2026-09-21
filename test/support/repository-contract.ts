@@ -434,7 +434,14 @@ export const spaceRepositoryContract = (
     });
   }
 
-  it(`${name} leaves a broken stored document unclassified on the single-Space fast path`, async (context) => {
+  // Ticket 31. A stored document that fails its schema is broken stored state
+  // whichever commit path meets it: the complete-aggregate path always named
+  // it so (`#loadEverySpace`), and the single-Space fast path now does too,
+  // rather than letting the parse error escape unclassified and reach the
+  // commit route as whatever the route did by default. `loadSpace` keeps the
+  // narrower answer deliberately (ticket 27): one Space failing intake is
+  // that resource's answer to give, not evidence the aggregate cannot be read.
+  it(`${name} names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower`, async (context) => {
     await withBrokenStateHarness(context, async (repository, arrange) => {
       await arrange('invalid-space-document', {
         spaceId: SPACE_ID,
@@ -445,9 +452,7 @@ export const spaceRepositoryContract = (
       await expect(repository.loadSpace(SPACE_ID)).rejects.not.toBeInstanceOf(
         AggregateInvariantError,
       );
-      await expect(commitUpdate(repository, repaired, 0n)).rejects.not.toBeInstanceOf(
-        AggregateInvariantError,
-      );
+      await expect(commitUpdate(repository, repaired, 0n)).rejects.toThrow(AggregateInvariantError);
     });
   });
 
