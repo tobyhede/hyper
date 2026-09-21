@@ -1,6 +1,12 @@
 import postgres from '@prisma-next/postgres/runtime';
 import { uuidSchema } from '@project/core';
-import { classifyStoredFailure, PersistenceUnavailableError } from '@project/persistence';
+import { createSpaceHttpApp } from '@project/http';
+import {
+  classifyStoredFailure,
+  decodeProblemDetails,
+  PersistenceUnavailableError,
+  problemCatalogue,
+} from '@project/persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
@@ -174,6 +180,53 @@ describe('SqlSpaceRepository (PostgreSQL) against a server that refuses this cli
       }
     } finally {
       await close();
+    }
+  });
+});
+
+/*
+ * Ticket 38. The HTTP answer for a direct read follows the classification the
+ * repository gives it: an outage is 503 `persistence-unavailable`, which tells
+ * a client to try again, and a configuration failure is 500 `internal-error`,
+ * which does not.
+ */
+describe('The Space API over a PostgreSQL server that will not serve it', () => {
+  const problemType = async (response: Response) => {
+    expect(response.headers.get('content-type')).toBe('application/problem+json');
+    return decodeProblemDetails(await response.json()).type;
+  };
+
+  it('answers a refused connection on a direct read 503 persistence-unavailable', async () => {
+    const app = createSpaceHttpApp(unverified, { logError: () => undefined });
+
+    for (const path of ['/api/spaces', `/api/spaces/${SPACE_ID}`]) {
+      const response = await app.request(path);
+      expect(response.status, path).toBe(503);
+      expect(await problemType(response), path).toBe(
+        problemCatalogue['persistence-unavailable'].type,
+      );
+    }
+  });
+
+  it('answers a wrong password on a direct read 500 internal-error', async () => {
+    const server = await startRefusingPostgresServer(
+      '28P01',
+      'password authentication failed for user "hyper"',
+    );
+    const refusing = postgres<Contract>({ contractJson, url: server.url, verifyMarker: false });
+    try {
+      const app = createSpaceHttpApp(new SqlSpaceRepository(postgresSqlStore(refusing)), {
+        logError: () => undefined,
+      });
+
+      for (const path of ['/api/spaces', `/api/spaces/${SPACE_ID}`]) {
+        const response = await app.request(path);
+        expect(response.status, path).toBe(500);
+        expect(await problemType(response), path).toBe(problemCatalogue['internal-error'].type);
+      }
+    } finally {
+      await refusing.close();
+      await server.close();
     }
   });
 });

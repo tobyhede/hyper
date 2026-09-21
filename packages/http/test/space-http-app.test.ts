@@ -541,22 +541,44 @@ describe('Space HTTP reads', () => {
     expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', error);
   });
 
-  it('hides and logs collection and lazy-resource repository failures', async () => {
-    const failure = new Error('database credentials');
-    const logError = vi.fn();
-    const app = createSpaceHttpApp(
-      repository({
-        listSpaces: () => Promise.reject(failure),
-        loadSpace: () => Promise.reject(failure),
-      }),
-      { logError },
-    );
+  // Ticket 38. The collection and single-Space reads answer by the same three
+  // arms every other stored-seam route does: an outage is 503, and a failure
+  // nothing has named is 500 rather than a 503 telling a client to wait out a
+  // wrong password.
+  it.each([
+    {
+      failure: new PersistenceUnavailableError('database down'),
+      code: 'persistence-unavailable' as const,
+      detail: 'Try the request again later.',
+    },
+    {
+      failure: new AggregateInvariantError('broken'),
+      code: 'internal-error' as const,
+      detail: 'Stored repository state is not usable.',
+    },
+    {
+      failure: new Error('database credentials'),
+      code: 'internal-error' as const,
+      detail: 'The request failed unexpectedly.',
+    },
+  ])(
+    'hides and logs a collection or single-Space read failure as $code',
+    async ({ failure, code, detail }) => {
+      const logError = vi.fn();
+      const app = createSpaceHttpApp(
+        repository({
+          listSpaces: () => Promise.reject(failure),
+          loadSpace: () => Promise.reject(failure),
+        }),
+        { logError },
+      );
 
-    await expectProblem(await app.request('/api/spaces'), 'persistence-unavailable');
-    await expectProblem(await app.request(`/api/spaces/${SPACE_ID}`), 'persistence-unavailable');
-    expect(logError).toHaveBeenCalledWith('Failed to list spaces', failure);
-    expect(logError).toHaveBeenCalledWith(`Failed to load space ${SPACE_ID}`, failure);
-  });
+      await expectProblem(await app.request('/api/spaces'), code, detail);
+      await expectProblem(await app.request(`/api/spaces/${SPACE_ID}`), code, detail);
+      expect(logError).toHaveBeenCalledWith('Failed to list spaces', failure);
+      expect(logError).toHaveBeenCalledWith(`Failed to load space ${SPACE_ID}`, failure);
+    },
+  );
 
   it('contains a failing repository log sink as an internal error', async () => {
     const response = await createSpaceHttpApp(
@@ -573,7 +595,7 @@ describe('Space HTTP reads', () => {
 
   it('reports repository failures through the default error sink', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const failure = new Error('database');
+    const failure = new PersistenceUnavailableError('database');
 
     const response = await createSpaceHttpApp(
       repository({ listSpaces: () => Promise.reject(failure) }),
@@ -1128,9 +1150,12 @@ describe('Space HTTP response media', () => {
         status: 503,
         contentType: PROBLEM_MEDIA,
         request: () =>
-          createSpaceHttpApp(repository({ listSpaces: () => Promise.reject(new Error('down')) }), {
-            logError: (message) => swallowed.push(message),
-          }).request('/api/spaces'),
+          createSpaceHttpApp(
+            repository({
+              listSpaces: () => Promise.reject(new PersistenceUnavailableError('down')),
+            }),
+            { logError: (message) => swallowed.push(message) },
+          ).request('/api/spaces'),
       },
     ];
 

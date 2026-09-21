@@ -107,9 +107,11 @@ const problem = (
  * `persistence-unavailable`. A failure that is neither — a code defect, or a
  * driver failure nobody anticipated — is 500 `internal-error` too, under its
  * own detail: 503 would tell the client to wait out something this code has
- * no evidence will pass (ticket 31). `src/http/space-host.ts` answers `GET /`
- * by the same three arms; it cannot share this helper across the package
- * boundary.
+ * no evidence will pass (ticket 31). Every route that reads or writes the
+ * stored seam answers by it — the collection and single-Space reads included,
+ * which answered 503 for any failure until ticket 38, so a wrong password
+ * told a client to wait. `src/http/space-host.ts` answers `GET /` by the same
+ * three arms; it cannot share this helper across the package boundary.
  */
 const storedFailureProblem = (context: Context, error: unknown) => {
   switch (classifyStoredFailure(error)) {
@@ -381,7 +383,7 @@ export const createSpaceHttpApp = (
         return context.json(await repository.listSpaces(), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to list spaces', error);
-        return problem(context, 'persistence-unavailable', 'Try the request again later.');
+        return storedFailureProblem(context, error);
       }
     })
     .post(
@@ -503,7 +505,7 @@ export const createSpaceHttpApp = (
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         invokeLogError(logError, `Failed to load space ${id}`, error);
-        return problem(context, 'persistence-unavailable', 'Try the request again later.');
+        return storedFailureProblem(context, error);
       }
     });
   app.notFound(
