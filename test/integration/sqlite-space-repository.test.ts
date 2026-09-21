@@ -127,6 +127,8 @@ const retitled = (snapshot: SpaceSnapshot, title: string): SpaceSnapshot => ({
 
 type RepositoryStateTable = SqlTables<unknown>['RepositoryState'];
 
+type SqliteStore = ReturnType<typeof sqliteSqlStore>;
+
 const stored = (snapshot: SpaceSnapshot, revision: bigint, exportedRevision: bigint | null) => ({
   snapshot,
   revision,
@@ -607,6 +609,99 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     }));
 
     await expect(racing.loadAggregate()).rejects.toBeInstanceOf(PersistenceUnavailableError);
+  });
+
+  /**
+   * The harness's own store, with its tables rewritten by `rewrite`, told
+   * whether they are a transaction's own or the handle outside one -- so a
+   * stand-in can fail only the read a rolled-back transaction makes afterwards.
+   */
+  const withTables = (
+    database: SqliteDatabase,
+    rewrite: (
+      tables: ReturnType<SqliteStore['tables']>,
+      inTransaction: boolean,
+    ) => ReturnType<SqliteStore['tables']>,
+  ) => {
+    const store = sqliteSqlStore(database);
+    const tables: SqliteStore['tables'] = (handle) =>
+      rewrite(store.tables(handle), handle !== store.orm);
+    return new SqlSpaceRepository({ ...store, tables });
+  };
+
+  /**
+   * What the pinned `@prisma-next/sqlite` runtime raises for every operation
+   * on a closed client (`test/unit/sql-connection-failure.test.ts` raises it
+   * from the runtime itself).
+   */
+  const closedClient = () => new Error('SQLite client is closed');
+
+  // Ticket 38. A commit that loses its revision race rolls back and reads the
+  // Space it lost to afresh, outside the transaction and inside the one
+  // `serialise` call it already holds. An outage there is the database not
+  // answering like any other, so the commit is unavailable rather than a
+  // failure nobody named.
+  it('names an outage during the post-rollback conflict reload unavailable', async () => {
+    const { repository, database } = await opened();
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const outage = closedClient();
+    const racing = withTables(database, (tables, inTransaction) => ({
+      ...tables,
+      Space: inTransaction
+        ? // A rival commit moved the row between the read and the lock.
+          { ...tables.Space, writeDocumentUnderLock: () => Promise.resolve('7') }
+        : { ...tables.Space, loadWithResources: () => Promise.reject(outage) },
+    }));
+
+    const error = await captureError(() =>
+      racing.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: SPACE_ID,
+            snapshot: retitled(first, 'Never stored'),
+            expectedRevision: 0n,
+          },
+        ],
+      }),
+    );
+
+    expect(error).toBeInstanceOf(PersistenceUnavailableError);
+    expect(error?.cause).toBe(outage);
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      snapshot: first,
+      revision: 0n,
+    });
+  });
+
+  // The same for the Meta identity a replacement reads after a stored Space
+  // moved under its per-row relock.
+  it('names an outage reading the Meta identity after a replacement conflict unavailable', async () => {
+    const { repository, database } = await opened();
+    const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+    await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+    const outage = closedClient();
+    const racing = withTables(database, (tables, inTransaction) =>
+      inTransaction
+        ? // A rival commit moved the row between the baseline read and its relock.
+          { ...tables, Space: { ...tables.Space, relock: () => Promise.resolve('7') } }
+        : {
+            ...tables,
+            RepositoryState: { ...tables.RepositoryState, read: () => Promise.reject(outage) },
+          },
+    );
+
+    const error = await captureError(() =>
+      racing.replaceAggregate(
+        { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'Other', [])] },
+        SPACE_ID,
+      ),
+    );
+
+    expect(error).toBeInstanceOf(PersistenceUnavailableError);
+    expect(error?.cause).toBe(outage);
+    await expect(repository.loadMetaSpaceId()).resolves.toBe(SPACE_ID);
   });
 
   /*
