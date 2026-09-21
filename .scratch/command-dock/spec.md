@@ -60,7 +60,7 @@ keep Card and Layout as provenance, which is what ADR 0085 asks for.
 | [19](issues/19-space-thing-creation-answers-the-thing-it-created.md) | Space Thing creation answers the Thing it created | resolved |
 | [20](issues/20-the-create-dispatch-names-every-thing-kind.md) | The Create dispatch names every Thing kind | resolved |
 | [21](issues/21-the-postgres-suite-fails-at-the-compiler.md) | Removing a persistence field fails at the compiler, not only in CI | resolved |
-| [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the registry Drawer and the strip the shell yields to it | needs-triage |
+| [22](issues/22-retire-the-registry-drawer-and-the-yielded-strip.md) | Retire the Drawer and the strip the shell yields to it | resolved |
 | [23](issues/23-a-creation-in-flight-does-not-hold-the-command.md) | A creation in flight does not hold the command it was pressed on | resolved |
 | [24](issues/24-new-diagram-is-available-where-its-continuation-cannot-land.md) | New Diagram is available where its continuation cannot land | resolved |
 | [25](issues/25-an-alias-of-an-open-thing-is-carried-by-the-close.md) | An Alias of an Open Thing is carried off by that Thing’s Close | needs-triage |
@@ -89,9 +89,10 @@ none of them blocking each other:
   lands and "caret moved" means landed, not requested (PR #209). **26** makes
   Space, Diagram and Graph one disclosure: name and chevron open the list,
   Rename is a row in it.
-- **17** resolved delete: `Button`'s unused `label` variant is gone. **22**
-  is the same shape still open — the registry `Drawer`, `needs-triage`.
-  **25** is also `needs-triage`.
+- **17** resolved delete: `Button`'s unused `label` variant is gone. **22** is
+  the same shape and resolved the same way — the `Drawer` (a Base UI wrapper,
+  not a registry copy, which `22` checked), its `DRAWER_WIDTH` and `AppShell`'s
+  `insetEnd` are gone. **25** is `needs-triage`.
 - **18** closed as `wontfix`. Clicking a Space, Diagram or Graph name cannot
   reach a Thing's Open — the canvas keyboard guards decline a key that came
   from the Dock — and that is a claim on `dock-interactions.spec.ts`. **26**

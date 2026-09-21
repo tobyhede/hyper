@@ -33,7 +33,7 @@ Documentation only. No browser suite can observe it, and running one is pure cos
 
 **The four spellings the scripts left alone were checked, not assumed.** All were settled by ticket 02 taking main's text. The domain-initial callback bindings survive only as the vocabulary guard's own fixture strings; the `CardContent as CardSection` prose survives only in ADR 0085's record of it; the product URL segment is `/diagrams/`; the guard block passes. **`AGENTS.md` carries no ADR 0085 entry because main carries none** — the sweep's own entry is not in main's Decided section, and inventing one here would be this branch deciding something for main.
 
-**Nothing named in the three paragraphs is absent from the tree.** `CommandSurface`, `CommandToolbar`, `command-surface.css`, `ChoiceMenu`, `ThingRailActions`, `ThingsPopover`, `command-surface-sharing.test.ts`, the registry `Drawer` and `AppShell`'s `insetEnd` all exist; the last two are named as still standing, with the reason `08` did not take them.
+**Nothing named in the three paragraphs is absent from the tree.** `CommandSurface`, `CommandToolbar`, `command-surface.css`, `ChoiceMenu`, `ThingRailActions`, `ThingsPopover`, `command-surface-sharing.test.ts`, the registry `Drawer` and `AppShell`'s `insetEnd` all exist; the last two are named as still standing, with the reason `08` did not take them. **The last two no longer exist**: `.scratch/command-dock/issues/22-retire-the-registry-drawer-and-the-yielded-strip.md` deleted the wrapper (not a registry component, which `22` checked) and the prop, and edited the `AGENTS.md` sentence this paragraph is checking. The check was true when it was made.
 
 ### Verification
 

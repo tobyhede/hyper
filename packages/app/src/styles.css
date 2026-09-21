@@ -37,29 +37,24 @@ body {
   overflow: hidden;
 }
 
-/* `padding-inline-end` is the strip yielded to a surface overlaying the end
-   edge. Nothing asks for one now — the Resources drawer it was written for is gone
-   and the Resources list is an anchored Popover — so this is dead with
-   `AppShell.insetEnd`. Issue 08 retired the Sidebar-era primitives while
-   this one still had a consumer, so it did not take the pair; taking them is a
-   decision of its own, and `.scratch/command-dock/issues/16-retire-the-registry-drawer-and-the-yielded-strip.md`
-   owns it. This declaration goes with `insetEnd` when it is taken.
+/* Everything left of the viewport once the shell has it, and the containing
+   block everything positioned inside the main area resolves against — the
+   notice below, and the Command Dock over the canvas.
 
-   Deliberately not animated, although the panel beside it slides. React Flow
-   re-measures this container continuously, so an animated width moves the
-   canvas under a pointer that is already dragging a Resource out of the drawer, and
-   the Resource lands somewhere other than where it was dropped. The strip is taken
-   in one step, which is also what the flex layout this replaced did. */
+   `position: relative` sat on a `.shell__area` child of this element until
+   ticket 22, and only because `AppShell` set `padding-inline-end` here for the
+   strip a drawer overlaid: an absolutely positioned box resolves against its
+   containing block's *padding* box, so the notice would have ignored that
+   padding and sat under the drawer, and the child was the box the strip had
+   already been taken out of. Nothing yields a strip now, so this element's
+   padding box and its content box are the same box and the child had no job
+   left. The child's `height: 100%` went with it — `flex: 1` is what gives this
+   element its height, and the canvas inside resolves its own `100%` against
+   that exactly as the child did. */
 .shell__main {
+  position: relative;
   flex: 1;
   min-height: 0;
-}
-
-/* What is left of the main area once the strip is yielded, and the containing
-   block everything positioned inside it resolves against. */
-.shell__area {
-  position: relative;
-  height: 100%;
 }
 
 /*
@@ -70,11 +65,13 @@ body {
  * It sat at `5` while the Space's command surface was a gutter beside the
  * canvas and could not overlap it. The Command Dock floats *over* the canvas at
  * `20` (`components/command-dock.css`) and moves between twelve slots, so at
- * every top slot the two occupy the same corner — and `.shell__area` is
+ * every top slot the two occupy the same corner — and `.shell__main` is
  * `position: relative` with no `z-index`, so it opens no stacking context to
- * separate them and the higher value simply won. A report drawn behind the
- * furniture it reports for is not a report, so this sits above the Dock's whole
- * frame, its own notice at `21` included. Under every modal surface still.
+ * separate them and the higher value simply won. (A flex item opens one at a
+ * `z-index` other than `auto` even while static, so the absent `z-index` there
+ * is the load-bearing half rather than the `position`.) A report drawn behind
+ * the furniture it reports for is not a report, so this sits above the Dock's
+ * whole frame, its own notice at `21` included. Under every modal surface still.
  *
  * What being above the bar owes is a way out from under it: every report drawn
  * here carries its own dismissal (`components/ShellNotice.tsx`), because one that

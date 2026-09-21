@@ -113,6 +113,12 @@ won, and in this file. Losing both takes two deliberate deletions.
   **This line named `08` and that was wrong**: `08` is resolved and it ran while
   this drawer was still mounted, so it could not and did not take it. `08`
   records the handoff; `22` is the decision.
+  **`22` has since taken it, and found two of the words above false.**
+  `drawer.tsx` is not a registry primitive — it is a hand-composed Base UI
+  wrapper — and it carries no inventory entry any more: the module, its test,
+  its exports, that entry and `AppShell`'s `insetEnd` are all deleted. The
+  paragraph stands as the state of the question when this ticket ran; `22`'s
+  Answer is the outcome.
 - The seven `cards-drawer-*` parity claims are ten `cards-popover-*` claims,
   with their Ladle and application halves moved across. The seven cover the
   same behaviours; the three new ones are what this change added and had to

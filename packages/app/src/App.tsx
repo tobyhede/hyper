@@ -329,10 +329,10 @@ export const createApp = (
     /**
      * The box the Command Dock docks to.
      *
-     * The canvas's own element, so the twelve slots are the slots of the paper
-     * rather than of the window: a drawer opening at the end edge narrows the
-     * area and the Dock's right-edge stops move with it, which is what a reader
-     * would expect of furniture sitting on the canvas.
+     * The canvas's own element, so the twelve slots are measured against the
+     * surface the Dock sits on. Nothing narrows that element now that the shell
+     * yields no strip, so it coincides with the viewport; the ref is what keeps
+     * the measurement the canvas's rather than the window's.
      */
     const graphArea = useRef<HTMLDivElement | null>(null);
     const reportVisibleCentre = useCallback((centre: VisibleCentre | null) => {
@@ -1232,11 +1232,11 @@ export const createApp = (
      * Both `added-resource-to-map` outcomes this can produce
      * (`resource-already-in-map`, `resource-not-found`) mean the Resource just left
      * `resourcesOutsideSelectedMap`, so the row the reader activated is already
-     * gone. The drawer is still on screen though, and it is the surface that
-     * asked — so it keeps the sentence, in the `Alert` above its list.
+     * gone. The Resources list is still on screen though, and it is the surface
+     * that asked — so it keeps the sentence, in the `Alert` above its list.
      *
      * `dropExistingResource` below discards the same string on purpose: a drop
-     * ends on the canvas, and by then the drawer that named the Resource may be
+     * ends on the canvas, and by then the list that named the Resource may be
      * dismissed, leaving nowhere the sentence belongs.
      */
     const addExistingResource = useCallback(
@@ -1765,10 +1765,13 @@ export const createApp = (
 
     return (
       <AppShell
-        // No inset. The Resources list is a Popover anchored to its trigger and
-        // floats over the canvas, so it yields no width — which is the
-        // occlusion the surface comparison held against the drawer it replaced
-        // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+        // The shell yields nothing at its end edge, and there is no prop left
+        // that could ask it to. The Resources list is a Popover anchored to its
+        // trigger and floats over the canvas, so it yields no width — which is
+        // the occlusion the surface comparison held against the drawer it replaced
+        // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`), and
+        // why `22-retire-the-registry-drawer-and-the-yielded-strip.md` deleted
+        // `AppShell`'s `insetEnd` rather than leaving it unset here.
         notice={
           <>
             {clipboardFailure === null ? null : (
