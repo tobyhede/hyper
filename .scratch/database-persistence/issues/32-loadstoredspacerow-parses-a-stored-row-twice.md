@@ -64,7 +64,7 @@ Implemented 2026-09-21, on top of ticket 31 (`afd61774`), which had already move
 
 **Oracle.** No new test: the contract row "names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower" (`test/support/repository-contract.ts`) arranges exactly a schema-invalid stored Space document (`{ version: 1 }`, no title) and pins both observable answers — `loadSpace` rejects, and not as `AggregateInvariantError`; the fast-path commit rejects with `AggregateInvariantError`.
 
-**Run:** `pnpm exec vitest run --config vitest.sqlite.config.ts test/integration/sqlite-space-repository.test.ts` against a freshly migrated scratch `SQLITE_PATH` — 65/65 passed, that row included. `pnpm typecheck`, `pnpm lint` and `pnpm format:check` passed. **Not run here:** `pnpm verify`, the full `pnpm test:integration:sqlite`, and `pnpm test:integration:postgres` (no PostgreSQL was started); those are left to CI, which is why the second acceptance box stays open and the Status is unchanged until CI is green.
+**Run:** `pnpm exec vitest run --config vitest.sqlite.config.ts test/integration/sqlite-space-repository.test.ts` against a freshly migrated scratch `SQLITE_PATH` — 65/65 passed, that row included. `pnpm typecheck`, `pnpm lint` and `pnpm format:check` passed. `pnpm verify`, the full `pnpm test:integration:sqlite` and `pnpm test:integration:postgres` were not run locally; CI ran them on PR #259 (run 35562558942, head `a77bc662`) green, which closed the second acceptance box and resolved the ticket.
 
 ## Comments
 
