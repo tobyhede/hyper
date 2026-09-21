@@ -1,4 +1,4 @@
-# 36 — `#replaceAllSpaces` has no stated error interface
+# 39 — `#replaceAllSpaces` has no stated error interface
 
 Status: needs-triage
 Tags: Cleanup, release/v1
