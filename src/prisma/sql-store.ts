@@ -50,13 +50,41 @@ const isPrimaryKeyConflict = (error: unknown, table: string): boolean => {
 };
 
 /**
- * `pg`'s own `DatabaseError` from a failed startup handshake, carrying an
- * unavailable SQLSTATE on its `code` field.
+ * The socket failures Node raises under `pool.connect()` that mean the server
+ * is not answering for now, read off the errno name Node puts on `code`.
+ *
+ * - `ECONNREFUSED` — nothing is listening: the server is down or restarting.
+ * - `ECONNRESET` — the peer dropped the connection mid-conversation.
+ * - `ETIMEDOUT` — the peer did not answer in time.
+ * - `EHOSTUNREACH`, `ENETUNREACH` — no route to the server right now.
+ * - `EAI_AGAIN` — the resolver failed temporarily; the name may resolve next time.
+ *
+ * `ENOTFOUND` is left out: a host name that does not resolve is ordinarily a
+ * mistyped `DATABASE_URL`, which no wait cures. So is every other code — an
+ * allowlist, because a failure not named here is not evidence of an outage.
  */
-const isRawUnavailableSqlState = (error: unknown): boolean =>
+const UNAVAILABLE_SOCKET_CODES = [
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EAI_AGAIN',
+] as const;
+
+/**
+ * An un-normalised failure from acquiring a connection: `pg`'s own
+ * `DatabaseError` from a failed startup handshake carrying an unavailable
+ * SQLSTATE, or Node's socket error carrying an unavailable errno name — both on
+ * `code`, the one field `pg` and `net` share.
+ */
+const isRawUnavailableFailure = (error: unknown): boolean =>
   someCause(
     error,
-    (link) => 'code' in link && UNAVAILABLE_SQLSTATES.some((code) => code === link.code),
+    (link) =>
+      'code' in link &&
+      (UNAVAILABLE_SQLSTATES.some((code) => code === link.code) ||
+        UNAVAILABLE_SOCKET_CODES.some((code) => code === link.code)),
   );
 
 /**
@@ -135,7 +163,7 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
       return (
         isDriverConnectionFailure(error) ||
         isUnavailableStatementFailure(error) ||
-        isRawUnavailableSqlState(error)
+        isRawUnavailableFailure(error)
       );
     },
     serialise<T>(operation: () => Promise<T>): Promise<T> {

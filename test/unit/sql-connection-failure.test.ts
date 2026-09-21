@@ -34,6 +34,10 @@ const queryError = (message: string, sqlState: string): Error =>
 const rawPgError = (message: string, code: string): Error =>
   Object.assign(new Error(message), { code, severity: 'FATAL' });
 
+/** What Node's `net` raises for a failed socket: the errno name on `code`. */
+const socketError = (code: string): Error =>
+  Object.assign(new Error(`connect ${code} 127.0.0.1:5432`), { code, syscall: 'connect' });
+
 /*
  * Ticket 31. Both drivers normalise a failed statement's connection trouble to
  * `SqlConnectionError`, and the repository names it unavailable. The driver's
@@ -182,6 +186,24 @@ describe('postgresSqlStore.isUnavailable', () => {
       true,
     );
   });
+
+  // What Node raises from the socket under `pool.connect()`, which the driver
+  // does not normalise either: the errno name on `code`.
+  it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN'])(
+    'recognises the socket failure %s',
+    (code) => {
+      expect(store.isUnavailable(socketError(code))).toBe(true);
+    },
+  );
+
+  // A host name that does not resolve is ordinarily a mistyped `DATABASE_URL`,
+  // and the rest are not the network at all.
+  it.each(['ENOTFOUND', 'EACCES', 'EPROTO', 'ERR_INVALID_ARG_TYPE'])(
+    'leaves the error code %s unclassified',
+    (code) => {
+      expect(store.isUnavailable(socketError(code))).toBe(false);
+    },
+  );
 
   // Authentication and a missing database are the configuration or the
   // server refusing this client, which no wait cures (ticket 36).
