@@ -71,6 +71,25 @@ describe('postgresSqlStore.isUnavailable', () => {
     expect(store.isUnavailable(error)).toBe(true);
   });
 
+  // `normalizePgError` also names `ENOTFOUND` a `SqlConnectionError`, with the
+  // socket error on `cause`. The socket allowlist decides a normalised failure
+  // that carries an errno, as it does a raw one.
+  it.each(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH'])(
+    'recognises the socket failure %s the driver normalised',
+    (code) => {
+      const error = connectionError(`connect ${code}`, false);
+      error.cause = socketError(code);
+      expect(store.isUnavailable(error)).toBe(true);
+    },
+  );
+
+  it('leaves a host name that does not resolve unclassified when the driver normalised it', () => {
+    const error = connectionError('getaddrinfo ENOTFOUND db.invalid', false);
+    error.cause = socketError('ENOTFOUND');
+    expect(store.isUnavailable(error)).toBe(false);
+    expect(store.isUnavailable(new Error('wrapped', { cause: error }))).toBe(false);
+  });
+
   // Contention and shutdown reach the repository as `SqlQueryError`, because
   // the driver turns every SQLSTATE failure on a statement into one.
   it.each(UNAVAILABLE_SQLSTATES)(

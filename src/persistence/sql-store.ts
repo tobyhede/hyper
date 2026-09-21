@@ -617,8 +617,10 @@ export const someCause = (failure: unknown, holds: (link: Error) => boolean): bo
  * Whether a failure carries the driver's own `SqlConnectionError` anywhere on
  * its cause chain — what both `@prisma-next/driver-postgres` and
  * `@prisma-next/driver-sqlite` normalise a statement's connection trouble to,
- * SQLite BUSY and LOCKED included. Both stores' `isUnavailable` answer `true`
- * for it (ticket 31, ticket 38).
+ * SQLite BUSY and LOCKED included. SQLite's `isUnavailable` answers `true`
+ * for it (ticket 31, ticket 38); PostgreSQL's reads the same `kind` per link
+ * but first holds a socket errno on its `cause` to the store's allowlist,
+ * because its driver names `ENOTFOUND` a connection failure too.
  *
  * Read by the own `kind` field `SqlConnectionError.is` itself reads, because
  * `@prisma-next/sql-errors` is the drivers' dependency rather than this

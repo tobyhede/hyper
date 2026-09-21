@@ -5,7 +5,6 @@ import {
   buildSpaceTable,
   buildResourceTable,
   defineSqlStore,
-  isDriverConnectionFailure,
   someCause,
   type Orderable,
 } from '../persistence/sql-store';
@@ -110,12 +109,27 @@ const UNAVAILABLE_SOCKET_CODES = [
 const isUnavailableSqlState = (value: unknown): boolean =>
   UNAVAILABLE_SQLSTATES.some((code) => code === value);
 
+const isUnavailableSocketCode = (value: unknown): boolean =>
+  UNAVAILABLE_SOCKET_CODES.some((code) => code === value);
+
+/** Whether `cause` is an error carrying an errno on `code` the allowlist does not name. */
+const carriesUnlistedSocketCode = (cause: unknown): boolean =>
+  cause instanceof Error &&
+  'code' in cause &&
+  typeof cause.code === 'string' &&
+  !isUnavailableSocketCode(cause.code);
+
 /**
  * PostgreSQL's `SqlStore.isUnavailable` (ticket 38): whether any error on the
  * failure's cause chain is one of three shapes, each read by a structured
  * field and never by message.
  *
- * - The driver's `SqlConnectionError` (`isDriverConnectionFailure`).
+ * - The driver's `SqlConnectionError`, read by its `kind`, unless
+ *   the socket error on its `cause` carries a code outside
+ *   {@link UNAVAILABLE_SOCKET_CODES}: `normalizePgError` names `ENOTFOUND` a
+ *   connection failure too, and the allowlist decides a normalised socket
+ *   failure as it does a raw one. One with no code — matched by the driver on
+ *   its message — stays unavailable.
  * - The driver's `SqlQueryError` with a SQLSTATE in {@link UNAVAILABLE_SQLSTATES}
  *   on `sqlState`: `normalizePgError` turns every SQLSTATE failure on a
  *   statement into one, so contention and shutdown arrive that way.
@@ -131,17 +145,17 @@ const isUnavailableSqlState = (value: unknown): boolean =>
  * `test/unit/sql-connection-failure.test.ts` holds each of these.
  */
 const isUnavailable = (failure: unknown): boolean =>
-  isDriverConnectionFailure(failure) ||
   someCause(
     failure,
     (link) =>
       ('kind' in link &&
+        link.kind === 'sql_connection' &&
+        !carriesUnlistedSocketCode(link.cause)) ||
+      ('kind' in link &&
         link.kind === 'sql_query' &&
         'sqlState' in link &&
         isUnavailableSqlState(link.sqlState)) ||
-      ('code' in link &&
-        (isUnavailableSqlState(link.code) ||
-          UNAVAILABLE_SOCKET_CODES.some((code) => code === link.code))),
+      ('code' in link && (isUnavailableSqlState(link.code) || isUnavailableSocketCode(link.code))),
   );
 
 /**
