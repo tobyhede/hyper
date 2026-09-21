@@ -12,7 +12,7 @@ Audited: 2026-09-20 against `b1ac983d`. The missing replacement contract case re
 
 `#replaceAllSpaces` (`src/persistence/sql-space-repository.ts`) is one private method with two callers, and each encodes a different belief about what it can throw. Neither is written down; neither is checked.
 
-`#initializeUnserialised` handles `ThingOwnershipError` and duplicate keys on `spaces`/`repository_state` by re-reading and classifying. `#replaceUnserialised` handles `StaleSpaceRevisionError` and propagates other failures. These filters identify recoverable cases; neither says all other errors are impossible. In particular, the stale-revision error is raised by replacement's relock loop before `#replaceAllSpaces`, not by the shared method itself.
+`#initializeUnserialised` handles `ResourceOwnershipError` and duplicate keys on `spaces`/`repository_state` by re-reading and classifying. `#replaceUnserialised` handles `StaleSpaceRevisionError` and propagates other failures. These filters identify recoverable cases; neither says all other errors are impossible. In particular, the stale-revision error is raised by replacement's relock loop before `#replaceAllSpaces`, not by the shared method itself.
 
 Both beliefs are correct today. The second is correct for reasons outside this module: `loadSpaceAggregate`'s aggregate-wide `duplicate-thing-id` check (`packages/graph/src/space-aggregate.ts:105-115`, a different package) runs before the transaction opens and refuses the only input that could collide once `#truncateHyperContent` has emptied the store; and the Meta lock plus per-row `relock` loop (`:751`, `:775-781`) make a concurrent replacement lose before any Thing is written. Nothing ties either fact to that catch.
 

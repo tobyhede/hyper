@@ -22,7 +22,7 @@ Of those 19, **one** of the three adapter-authored table operations has a differ
 
 Ticket 24's own addendum calls `deleteExcept` "the one genuine per-database difference beyond `loadWithThings`/`loadEvery`/…". Both of those are identical text, so that claim overstates the variation by two.
 
-**Two members are strict specialisations of two others.** `relockSpace` (`:386-389`) *is* `writeDocumentUnderLock(space, id, {})` — same statement, same return shape, one constant document apart, with roughly 40 lines of doc comment across the pair explaining that they differ. `deleteThingsForSpace` (`:485-490`) *is* `deleteExcept(spaceId, [])`, and both adapters' `deleteExcept` opens with exactly that branch.
+**Two members are strict specialisations of two others.** `relockSpace` (`:386-389`) *is* `writeDocumentUnderLock(space, id, {})` — same statement, same return shape, one constant document apart, with roughly 40 lines of doc comment across the pair explaining that they differ. `Resource.deleteAllForSpace` (`:485-490`) *is* `deleteExcept(spaceId, [])`, and both adapters' `deleteExcept` opens with exactly that branch.
 
 **Holding the shared implementation costs additional structural descriptions.** Ten internal interfaces (`SpaceByIdQuery`, `SpaceWithId`, `SpaceCreatable`, `SpaceIdListable`, `SpaceRevisionListable`, `ThingCreatable`, `ThingUpsertable`, `ThingDeletableForSpace`, `RepositoryStateQuery`, `RepositoryStateWithSingleton`) describe narrower ORM capabilities alongside the table interface and helpers. Evaluate which declarations the reduced interface makes unnecessary; the shared module's line count alone does not establish shallowness, especially because much of it documents assignability and storage obligations.
 
