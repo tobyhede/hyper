@@ -37,19 +37,23 @@ export class AggregateInvariantError extends Error {}
 
 /**
  * The database did not answer, or answered "not now": it refused or dropped
- * the connection, would not open a transaction, was shutting down or out of
- * connections, or aborted the work for contention — a lock it would not wait
- * for, a deadlock or serialization failure it resolved against this
- * transaction, or a concurrent replacement that moved the Meta identity while
- * the repository was locking it. Temporary by nature, so a reader answers
+ * the connection, had been closed underneath the repository, was starting
+ * up, shutting down or out of connections, or aborted the work for
+ * contention — a lock it would not wait for, a deadlock or serialization
+ * failure it resolved against this transaction, or a concurrent replacement
+ * that moved the Meta identity while the repository was locking it. Temporary by nature, so a reader answers
  * "try again later" and start-up keeps trying.
  *
  * A repository raises it, carrying the driver's own failure on `.cause` where
  * there is one, rather than every reader asking a predicate over the driver's
- * error shapes: `@project/http` is browser-safe and cannot name a driver, and what counts as
- * unreachable is a fact about each database the repository already knows
- * (`SqlSpaceRepository`, `src/persistence/sql-space-repository.ts`). Nothing
- * is recognised by message prose.
+ * error shapes: `@project/http` is browser-safe and cannot name a driver,
+ * and what counts as unreachable is a fact about each database, which its
+ * store answers
+ * (`SqlStore.isUnavailable`, `src/persistence/sql-store.ts`) and
+ * `SqlSpaceRepository` asks. It is decided by what a failure carries, never by
+ * where it was raised, and by structured fields rather than message prose —
+ * save the one compatibility check `src/sqlite/sql-store.ts` documents for its
+ * pinned runtime's closed-client error.
  */
 export class PersistenceUnavailableError extends Error {}
 

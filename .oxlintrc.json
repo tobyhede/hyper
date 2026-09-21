@@ -60,13 +60,15 @@
     {
       // ADR 0095's `SqlStore` contract (`src/persistence/sql-store.ts`) and its
       // two per-database implementations. `SqlStore.readDocument`/
-      // `isDuplicateKey` are declared over `unknown` on purpose: each database
-      // answers a different representation for "the stored document" and "the
-      // error a losing insert raised" — `unknown` in and a schema-parsed value
+      // `isDuplicateKey`/`isUnavailable` are declared over `unknown` on
+      // purpose: each database answers a different representation for "the
+      // stored document", "the error a losing insert raised" and "the error an
+      // unreachable database raised" — `unknown` in and a schema-parsed value
       // or a `boolean` out is the honest contract for a boundary the interface
       // exists to abstract over, not a narrowing skipped. The two
       // implementations below carry the concrete boundary code this contract
-      // describes: `isDuplicateKey`'s caught-error classification is the
+      // describes: `isDuplicateKey`'s and `isUnavailable`'s caught-error
+      // classification is the
       // `error: unknown`/`cause`-shaped case a caught driver error is —
       // structurally the same as the rule's own exempted `cause` parameter,
       // where `typeof` discriminates an already-closed union rather than
