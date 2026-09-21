@@ -46,9 +46,25 @@ Left unfixed on the one-SQL-repository branch's review pass: it predates the bra
 
 ## Acceptance (draft, for whoever picks this up)
 
-- [ ] Decide whether `#loadStoredSpaceRow` should stop pre-parsing with `spaceDocumentSchema`/`resourceDocumentSchema` and rely on `parseSnapshot`/`loadSpaceSnapshot` alone.
+- [x] Decide whether `#loadStoredSpaceRow` should stop pre-parsing with `spaceDocumentSchema`/`resourceDocumentSchema` and rely on `parseSnapshot`/`loadSpaceSnapshot` alone.
 - [ ] If so, remove the pre-parse, confirm no caller depended on the narrower failure mode the direct `.parse()` calls produced, and run `pnpm verify`, `pnpm test:integration:sqlite`, `pnpm test:integration:postgres`.
-- [ ] If not (e.g. the pre-parse is found to serve a purpose beyond validation, such as narrowing `unknown` for a type downstream needs), record why here instead.
+- [x] ~~If not~~ — not applicable: the pre-parse is removed (see Answer). (e.g. the pre-parse is found to serve a purpose beyond validation, such as narrowing `unknown` for a type downstream needs), record why here instead.
+
+## Answer
+
+Implemented 2026-09-21, on top of ticket 31 (`afd61774`), which had already moved the pre-parse into the pure `#decodeStoredSpaceRow`.
+
+**Decision: the pre-parse goes.** `#decodeStoredSpaceRow` (`src/persistence/sql-space-repository.ts`) now hands `readDocument`'s raw values straight to `parseSnapshot`, the shape `#loadEverySpace` already had, so `loadSpaceSnapshot`'s `spaceSnapshotSchema.safeParse` is the one schema intake for a stored row on every read. It served no purpose beyond validation: `parseSnapshot` takes `unknown`, so nothing downstream needed the narrowed type. `resourceDocumentSchema` became unused in that module and its import is gone; `spaceDocumentSchema` stays for `listSpaces`'s title-only read, which parses once and is not part of this defect. The `#loadStoredSpaceRowForCommit` comment no longer lists a schema's `ZodError` among the decode's causes.
+
+**What a schema-invalid stored document now raises:** the private `SnapshotValidationError` in place of `ZodError`. Checked, not assumed, that nothing depended on the old shape:
+
+- `grep -rln ZodError test packages/*/src packages/*/test src` finds only the comment edited above — no test or caller names `ZodError`.
+- `loadSpace`'s callers are `resolveProductDestination` (`packages/http/src/product-destination.ts`) and `openDatabaseSelection` (`src/startup/database-startup.ts`); neither inspects the error's type. `classifyStoredFailure` and `#naming` read `AggregateInvariantError`, `PersistenceUnavailableError` and the driver's `SqlConnectionError` only, so both errors are `unclassified` from `loadSpace`.
+- On the commit path, `#loadStoredSpaceRowForCommit` wraps every decode failure in `AggregateInvariantError` by position, so the classification is the same whichever error the decode raises.
+
+**Oracle.** No new test: the contract row "names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower" (`test/support/repository-contract.ts`) arranges exactly a schema-invalid stored Space document (`{ version: 1 }`, no title) and pins both observable answers — `loadSpace` rejects, and not as `AggregateInvariantError`; the fast-path commit rejects with `AggregateInvariantError`.
+
+**Run:** `pnpm exec vitest run --config vitest.sqlite.config.ts test/integration/sqlite-space-repository.test.ts` against a freshly migrated scratch `SQLITE_PATH` — 65/65 passed, that row included. `pnpm typecheck`, `pnpm lint` and `pnpm format:check` passed. **Not run here:** `pnpm verify`, the full `pnpm test:integration:sqlite`, and `pnpm test:integration:postgres` (no PostgreSQL was started); those are left to CI, which is why the second acceptance box stays open and the Status is unchanged until CI is green.
 
 ## Comments
 

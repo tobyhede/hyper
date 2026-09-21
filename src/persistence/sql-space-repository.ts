@@ -1,10 +1,4 @@
-import {
-  spaceDocumentSchema,
-  resourceDocumentSchema,
-  uuidSchema,
-  type SpaceSnapshot,
-  type UUID,
-} from '@project/core';
+import { spaceDocumentSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
@@ -331,14 +325,18 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     return stored === null ? undefined : this.#decodeStoredSpaceRow(stored);
   }
 
-  /** One stored row, parsed. No I/O: `tables.Space.loadWithResources` has already read it. */
+  /**
+   * One stored row, parsed. No I/O: `tables.Space.loadWithResources` has already read it.
+   * The raw documents go straight to `parseSnapshot`, as `#loadEverySpace`'s do, so
+   * `loadSpaceSnapshot` is their one schema intake (ticket 32).
+   */
   #decodeStoredSpaceRow(stored: SqlLoadedSpaceRow): LoadedSpace {
     const snapshot = parseSnapshot({
       id: stored.id,
-      document: spaceDocumentSchema.parse(this.#store.readDocument(stored.document)),
+      document: this.#store.readDocument(stored.document),
       resources: stored.resources.map((resource) => ({
         id: resource.id,
-        document: resourceDocumentSchema.parse(this.#store.readDocument(resource.document)),
+        document: this.#store.readDocument(resource.document),
       })),
     });
 
@@ -364,8 +362,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * The catch is unconditional, by position rather than by type, for the
    * reason `#loadEverySpace`'s is: it wraps only the decode, which performs no
    * I/O, so a connection failure cannot reach it, and naming today's causes
-   * (a schema's `ZodError`, intake's `SnapshotValidationError`, the codec's
-   * `RevisionCodecError`, SQLite's `SyntaxError`) would let a future one --
+   * (intake's `SnapshotValidationError`, the codec's `RevisionCodecError`,
+   * SQLite's `SyntaxError`) would let a future one --
    * or a change in which of them the decode raises -- escape unclassified.
    */
   async #loadStoredSpaceRowForCommit(
