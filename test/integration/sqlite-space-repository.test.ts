@@ -661,6 +661,32 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expect(racing.loadAggregate()).rejects.toBeInstanceOf(PersistenceUnavailableError);
   });
 
+  // Ticket 38. The store is asked only about a failure nothing has named. An
+  // already unavailable failure leaves as it is rather than wrapped again, and
+  // broken stored state keeps its name even when an outage is on its chain too.
+  it('does not wrap a failure that already carries a name', async () => {
+    const { repository, database } = await opened();
+    await repository.initializeAggregate({
+      metaSpaceId: SPACE_ID,
+      spaces: [space(SPACE_ID, 'One', [RESOURCE_ID])],
+    });
+    const busy = Object.assign(new Error('database is locked'), {
+      kind: 'sql_connection',
+      transient: true,
+    });
+    const unavailable = new PersistenceUnavailableError('already named', { cause: busy });
+    const broken = new AggregateInvariantError('broken', { cause: busy });
+
+    for (const failure of [unavailable, broken]) {
+      const failing = withRepositoryState(database, (state) => ({
+        ...state,
+        read: () => Promise.reject(failure),
+      }));
+      await expect(failing.loadAggregate()).rejects.toBe(failure);
+    }
+    expect(classifyStoredFailure(broken)).toBe('broken-stored-state');
+  });
+
   /**
    * The harness's own store, with its tables rewritten by `rewrite`, told
    * whether they are a transaction's own or the handle outside one -- so a
