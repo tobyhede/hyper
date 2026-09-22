@@ -3569,22 +3569,24 @@ test('the Resource menu groups Create Reference, both copy links, then Remove an
  * (`EntityActionItems`), so a right click on the Resource itself offers the same
  * ordered menu the actions control does.
  */
-test('a right click on a Resource opens the same ordered menu as its actions control', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
+test(
+  'a right click on a Resource opens the same ordered menu as its actions control',
+  { tag: '@parity:canvas-resource-actions-menu' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
 
-  await nodeByTitle(page, 'B').first().click({ button: 'right' });
-  const menu = page.getByRole('menu');
-  await expectMenuGroups(menu, [
-    ['Create Reference'],
-    ['Copy link to Resource in Map', 'Copy link to Resource'],
-    ['Remove from Map', 'Delete from Space'],
-  ]);
-});
+    await nodeByTitle(page, 'B').first().click({ button: 'right' });
+    const menu = page.getByRole('menu');
+    await expectMenuGroups(menu, [
+      ['Create Reference'],
+      ['Copy link to Resource in Map', 'Copy link to Resource'],
+      ['Remove from Map', 'Delete from Space'],
+    ]);
+  },
+);
 
 /**
  * **Present and unavailable on a Reference Resource, not absent.**

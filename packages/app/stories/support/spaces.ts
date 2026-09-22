@@ -85,7 +85,7 @@ const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const RESOURCE_D = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 
-/** Five Resources in a row. The sidebar draws none of them; the geometry only has to be legal. */
+/** Five Resources in a row. The geometry only has to be legal. */
 const SPINE = [RESOURCE_A, RESOURCE_B, RESOURCE_C, RESOURCE_D, RESOURCE_E] as const;
 
 const positions = (count: number): Record<string, ResourcePlacement> =>
@@ -301,7 +301,7 @@ export const storyGraphIds = (): (() => GraphId) => {
 /**
  * The Spaces the presenting stories traverse.
  *
- * Purpose-built, and deliberately not the sidebar's `authoredSpace`: that one
+ * Purpose-built, and deliberately not `authoredSpace`: that one
  * exists to draw four Graphs in a list and every one of them is a line, so it
  * can show a one-member choice and nothing else. A fork needs a Resource with
  * several outgoing Edges, and there is no such Resource anywhere in the tracked

@@ -23,6 +23,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Pointer Open and Close allow the rail to hide on departure; keyboard activation keeps the focused command visible across both transitions.',
   },
   {
+    id: 'canvas-resource-actions-menu',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'RailActions',
+    claim:
+      "A Resource's actions menu opens from its rail control and from a right click on the Resource itself, offering the same commands both ways.",
+  },
+  {
     id: 'command-dock-creates-each-kind-in-one-press',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
@@ -317,10 +324,10 @@ export const parityClaims: readonly ParityClaim[] = [
    * rail (ADR 0073) and not to this surface — the Dock's organising rule is
    * that a Resource's own commands are absent — so
    * `space-sidebar-copies-resource-destinations` and
-   * `space-sidebar-entity-actions-menu` have no successor here. They keep their
-   * browser evidence in `space-routing.spec.ts` and `link-actions.spec.ts`
-   * untagged, and they gain a claim of their own when the rail's story sheet
-   * leaves `stories/review`.
+   * `space-sidebar-entity-actions-menu` have no successor here. The menu's own
+   * successor is `canvas-resource-actions-menu`, claimed against the rail's
+   * stable `Components/Resource` story; the copied destinations keep their
+   * browser evidence in `space-routing.spec.ts` untagged.
    *
    * **And one was retired rather than restated.** `space-sidebar-shows-pending-
    * persistence` claimed a pending commit is exposed as saving. Ticket `01`

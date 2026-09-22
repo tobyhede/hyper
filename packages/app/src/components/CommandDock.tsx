@@ -1276,7 +1276,7 @@ function SetTrigger({
   );
 }
 
-export function ResourcesTrigger() {
+function ResourcesTrigger() {
   return (
     /* The Resource glyph the rows in its own list carry, not `OpenResourceIcon`'s
        expand arrows: beside a Space, a Map and a Graph's colour, the icon

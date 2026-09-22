@@ -42,7 +42,7 @@ export const RESOURCE_HEIGHT = COLLAPSED_RESOURCE_SIZE.height;
 export const RESOURCE_SIZE = { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT } as const;
 
 /** Application-owned magnetic range for resizing an Open Resource to Close. */
-export const RESOURCE_CLOSE_SNAP_DISTANCE = 24;
+const RESOURCE_CLOSE_SNAP_DISTANCE = 24;
 
 /** Snap a complete near-Closed proposal to the one exact Closed rect. */
 export const snapResourceSizeToClose = (size: {
