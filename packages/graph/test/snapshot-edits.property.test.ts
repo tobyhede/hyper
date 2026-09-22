@@ -801,7 +801,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   });
 });
 
-describe('SnapshotEdit.addToMap and removeFromMap properties', () => {
+describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSpace', () => {
   const OTHER_MAP_ID = uuid('00000000-0000-4000-8000-000000000004');
   const OTHER_GRAPH_ID = uuid('00000000-0000-4000-8000-000000000005');
 
@@ -938,6 +938,36 @@ describe('SnapshotEdit.addToMap and removeFromMap properties', () => {
         const fromOpened = completed(SnapshotEdit.removeFromMap(opened, MAP_ID, subject));
 
         expect(mapIn(fromOpened, MAP_ID)?.positions).toEqual(mapIn(fromClosed, MAP_ID)?.positions);
+      }),
+    );
+  });
+
+  it('deletes a Resource from every Map, reclaiming its room in each, and keeps every Graph', () => {
+    // Delete from Space is Remove from Map in every Map at once, plus the
+    // Resource's own entry (ADR 0040). Opened in the Map the Edit is not
+    // drawing too, so a room stranded there is caught (ADR 0084).
+    fc.assert(
+      fc.property(idsArb, coordsArb, fc.nat({ max: 8 }), (ids, coords, subjectSeed) => {
+        const subject = ids[subjectSeed % ids.length];
+        if (subject === undefined) return;
+        const closed = twoMaps(ids, coords, false);
+        const opened = completed(
+          SnapshotEdit.open(
+            completed(SnapshotEdit.open(closed, MAP_ID, subject)),
+            OTHER_MAP_ID,
+            subject,
+          ),
+        );
+
+        const deleted = completed(SnapshotEdit.deleteFromSpace(opened, subject));
+
+        expect(deleted.resources.some((resource) => resource.id === subject)).toBe(false);
+        for (const mapId of [MAP_ID, OTHER_MAP_ID]) {
+          const removedClosed = completed(SnapshotEdit.removeFromMap(closed, mapId, subject));
+          expect(mapIn(deleted, mapId)?.positions).toEqual(mapIn(removedClosed, mapId)?.positions);
+          expect(mapIn(deleted, mapId)?.graphs).toEqual(mapIn(removedClosed, mapId)?.graphs);
+        }
+        expect(deleted.document.defaultMap).toBe(opened.document.defaultMap);
       }),
     );
   });

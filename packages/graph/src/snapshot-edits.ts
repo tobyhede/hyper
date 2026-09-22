@@ -33,10 +33,10 @@ import { Placement } from './placement';
  * small refusal union carrying codes and typed context only — wording stays in
  * `app`, which maps a code into `AuthoringRefusal` or `SpaceResourceRefusal`.
  *
- * Operations arrive with their first real caller rather than ahead of one:
- * `createInMap` and `deleteFromSpace` are what the session registry needs;
+ * Operations arrive with their first real caller rather than ahead of one.
+ * Both callers create and delete through `createInMap` and `deleteFromSpace`;
  * `open`, `close`, `resize`, `addToMap` and `removeFromMap` are Space
- * Authoring's.
+ * Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */

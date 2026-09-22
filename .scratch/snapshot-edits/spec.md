@@ -47,7 +47,7 @@ Rules move to property tests over snapshots in `packages/graph/test/snapshot-edi
 | [08 — Open, Close and Resize through `SnapshotEdit`](issues/08-open-close-resize-through-snapshot-edit.md) | 03 | done |
 | [09 — Add to Map and Remove from Map through `SnapshotEdit`](issues/09-map-membership-through-snapshot-edit.md) | 03 | done |
 | [10 — Creation through `createInMap`](issues/10-creation-through-create-in-map.md) | 03 | done |
-| [11 — Delete from Space through `SnapshotEdit`](issues/11-delete-from-space-through-snapshot-edit.md) | 03, 08, 09 | ready-for-agent |
+| [11 — Delete from Space through `SnapshotEdit`](issues/11-delete-from-space-through-snapshot-edit.md) | 03, 08, 09 | done |
 
 ## Out of scope
 

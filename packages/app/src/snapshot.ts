@@ -1,13 +1,11 @@
 import {
   SPACE_FILE_VERSION,
-  type ResourceId,
-  type Graph,
   type GraphId,
   type Map,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement, type Space } from '@project/graph';
+import { loadSpaceSnapshot, type Space } from '@project/graph';
 
 /**
  * Read a working snapshot as the validated aggregate, revalidating only when
@@ -63,78 +61,6 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
       id,
       document: rest,
     })),
-  };
-};
-
-/**
- * The graphs a Resource has left, with every Edge incident to it gone.
- *
- * A Resource that is not a member of a Map cannot be an endpoint of a Graph that
- * Map owns (ADR 0040), so this is what both removals owe: Remove from
- * Map, which applies it to the one Map the Edit writes, and Delete Resource
- * from Space, which applies it to every Map through
- * {@link withResourceRemovedFromMaps}. One rule, in one place, so the two
- * scopes of the same deletion cannot come to disagree about what an incident
- * Edge is. The graphs themselves stay, empty ones included: deleting a graph is
- * its own action.
- */
-export const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: ResourceId): Graph[] =>
-  graphs.map((graph) => ({
-    ...graph,
-    edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
-  }));
-
-/**
- * The snapshot with one Resource gone from every Map: its membership, its
- * position and every Edge incident to it, in every Graph every Map owns.
- *
- * The cascade half of Delete Resource from Space, and the one write in this module
- * that is not about a single Map — which is exactly why it is here rather
- * than folded into {@link updatePositionedMap}. The Resource itself stays in
- * `resources`: this answers what the Maps hold, and removing the Resource is the
- * caller's own statement in the same Edit. Empty Graphs and empty Maps
- * remain, because deleting a Resource is not an instruction to delete either
- * (ADR 0040).
- *
- * Every Map that held the Resource **Open** also gets the room it was holding
- * back, through the same `Placement.reclaim` the single-Map removal uses.
- * Under the derivation ADR 0084 removed, dropping the entry dropped its
- * displacement with it and this could be a filter; now the room lives in the
- * neighbours' own stored coordinates, so a Map the Edit is not drawing would
- * otherwise keep it forever — with no Resource left on that canvas to Close and no
- * Edit that could give it back. Open/Closed is Map-owned (ADR 0064), so
- * whether there is any room to reclaim is asked of each Map separately and
- * is not what the drawing one answered.
- *
- * Answers the snapshot it was given when no Map held the Resource, so a deletion
- * that only ever affected the current Map — which the caller writes
- * separately — does not rebuild every other Map to say nothing about them.
- */
-export const withResourceRemovedFromMaps = (
-  base: SpaceSnapshot,
-  resourceId: ResourceId,
-): SpaceSnapshot => {
-  const maps = base.document.maps ?? [];
-  const affected = maps.some(
-    (map) =>
-      Object.hasOwn(map.positions, resourceId) ||
-      map.graphs.some((graph) =>
-        graph.edges.some((edge) => edge.from === resourceId || edge.to === resourceId),
-      ),
-  );
-  if (!affected) return base;
-  return {
-    ...base,
-    document: {
-      ...base.document,
-      maps: maps.map((map) => ({
-        ...map,
-        positions: Placement.toPositions(
-          Placement.remove(Placement.reclaim(Placement.fromMap(map), resourceId), resourceId),
-        ),
-        graphs: withoutIncidentEdges(map.graphs, resourceId),
-      })),
-    },
   };
 };
 

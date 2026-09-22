@@ -8,7 +8,6 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
@@ -31,8 +30,6 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const RESOURCE_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -304,52 +301,6 @@ describe('Edit Resource', () => {
 });
 
 describe('Expanded Resource geometry', () => {
-  /**
-   * Five Resources at every relation to RESOURCE_A that deciding a Resource's one room
-   * axis distinguishes (ADR 0093): clear of its collapsed rect on `x` alone, on
-   * `y` alone, on both, and before it on both.
-   */
-  const displacementSnapshot: SpaceSnapshot = {
-    ...positionedSnapshot,
-    resources: [
-      ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      { id: RESOURCE_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
-      { id: RESOURCE_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
-    ],
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        {
-          id: MAP_ID,
-          title: 'Map 1',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_A]: { x: 100, y: 100, open: false },
-            [RESOURCE_B]: { x: 400, y: 100, open: false },
-            [RESOURCE_C]: { x: 100, y: 300, open: false },
-            [RESOURCE_D]: { x: 500, y: 500, open: false },
-            [RESOURCE_E]: { x: 40, y: 40, open: false },
-          },
-          graphs: [MAIN_GRAPH],
-        },
-      ],
-      defaultMap: MAP_ID,
-    },
-  };
-
-  const openDisplacement = () => open(displacementSnapshot);
-
-  /** Every origin the Map authors, so a whole Map can be compared at once. */
-  const originsOf = (session: ReturnType<typeof open>['session']) => {
-    const origins = new Map<string, readonly [number, number]>();
-    const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
-    for (const [resourceId, at] of Object.entries(positions)) {
-      if (at !== undefined) origins.set(resourceId, [at.x, at.y]);
-    }
-    return Object.fromEntries(origins);
-  };
-
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
@@ -428,7 +379,7 @@ describe('Expanded Resource geometry', () => {
   });
 
   it('refuses a subject the Map does not hold and moves nobody', () => {
-    const { authoring, session } = openDisplacement();
+    const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
@@ -443,7 +394,7 @@ describe('Expanded Resource geometry', () => {
   });
 
   it('is unchanged and moves nobody when the proposal is the size the Resource already has', () => {
-    const { authoring, session } = openDisplacement();
+    const { authoring, session } = openPositioned();
     authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
     const before = session.getState().working;
 
@@ -455,20 +406,6 @@ describe('Expanded Resource geometry', () => {
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
-  });
-
-  it('reclaims the room an Open Resource held when it is deleted', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    const { [RESOURCE_A]: deleted, ...remaining } = before;
-    expect(deleted).toBeDefined();
-    expect(originsOf(session)).toEqual(remaining);
   });
 });
 
@@ -1377,59 +1314,6 @@ describe('Map membership', () => {
 });
 
 describe('Delete Resource from Space', () => {
-  const twoMaps: SpaceSnapshot = {
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        positionedSnapshot.document.maps![0]!,
-        {
-          id: OTHER_MAP_ID,
-          title: 'Map 2',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_A]: { x: 0, y: 400, open: false },
-            [RESOURCE_B]: { x: 0, y: 600, open: false },
-          },
-          graphs: [
-            {
-              id: OTHER_GRAPH_ID,
-              title: 'Elsewhere',
-              edges: [
-                { from: RESOURCE_A, to: RESOURCE_B },
-                { from: RESOURCE_B, to: RESOURCE_A },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  };
-
-  it('deletes the Resource and cascades it out of every Map at once', () => {
-    const { authoring, session } = open(twoMaps);
-
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
-      kind: 'completed',
-    });
-
-    const working = session.getState().working;
-    expect(working.resources).toEqual([positionedSnapshot.resources[0]]);
-    expect(mapOf(working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-    });
-    expect(mapOf(working, MAP_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
-    expect(mapOf(working, OTHER_MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 0, y: 400, open: false },
-    });
-    // Empty Graphs and Maps remain: deleting a Resource is not an instruction to
-    // delete either.
-    expect(mapOf(working, OTHER_MAP_ID)?.graphs).toEqual([
-      { id: OTHER_GRAPH_ID, title: 'Elsewhere', edges: [] },
-    ]);
-    expect(loadSpaceSnapshot(working).ok).toBe(true);
-  });
-
   it('refuses a Resource its Reference Resources still point at, naming them', () => {
     const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -1480,6 +1364,35 @@ describe('Delete Resource from Space', () => {
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-resource-deletion-unsupported' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses deleting a Space Resource a Reference Resource targets as a Space Resource deletion', () => {
+    // Decided before the Reference Resource rule: the cascade a Space Resource
+    // owes is the session registry's whether or not anything targets it.
+    const referencedSpace: SpaceSnapshot = {
+      ...positionedSnapshot,
+      resources: [
+        {
+          id: RESOURCE_A,
+          document: {
+            title: 'Nested Space',
+            kind: 'space',
+            spaceId: UNKNOWN_RESOURCE,
+            map: UNLOADED_MAP,
+            graph: UNLOADED_GRAPH,
+          },
+        },
+        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+      ],
+    };
+    const { authoring, session } = open(referencedSpace);
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'refused',
       refusal: { code: 'space-resource-deletion-unsupported' },
     });

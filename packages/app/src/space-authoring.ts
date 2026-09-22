@@ -10,7 +10,6 @@ import {
   RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
-  titleName,
   type UUID,
 } from '@project/core';
 import {
@@ -33,7 +32,7 @@ import {
 import { nextGraphColor } from './colors';
 import { mapShowsGraph } from './navigation';
 import type { Navigation, NavigationState } from './navigation';
-import { updatePositionedMap, withResourceRemovedFromMaps } from './snapshot';
+import { updatePositionedMap } from './snapshot';
 import { nextResourceTitle, nextGraphTitle, nextMapTitle } from './titles';
 import { requireDefaultMap, resolveMap } from './map-resolution';
 
@@ -500,9 +499,6 @@ interface SpaceAuthoringDependencies {
   readonly newId: () => UUID;
 }
 
-/** The Resources a snapshot carries, in the shape a snapshot carries them. */
-type SnapshotResources = SpaceSnapshot['resources'];
-
 /**
  * Every `SnapshotEdit` refusal, in Authoring's vocabulary.
  *
@@ -589,15 +585,6 @@ const reconnectOutcome = (
   }
   return { kind: 'edge', edge: reconnected };
 };
-
-/** The Reference Resources pointing at a Resource, which are what block deleting it from the Space. */
-const incomingReferences = (
-  resources: SnapshotResources,
-  resourceId: ResourceId,
-): SnapshotResources =>
-  resources.filter(
-    (resource) => resource.document.kind === 'reference' && resource.document.target === resourceId,
-  );
 
 /**
  * A single-line title normalized for authorship, or `null` when it has no name.
@@ -1273,31 +1260,17 @@ export function createSpaceAuthoring({
       // a single-Space update this seam can make. Completing it here would store
       // a Space whose target is unreachable, and aggregate intake refuses that
       // commit permanently with the Resource already gone from the working state.
+      // Decided before the module, so a Space Resource a Reference Resource
+      // targets still answers this rather than `resource-has-references`.
       if (deleted.kind === 'space') {
         return refuse({ code: 'space-resource-deletion-unsupported' });
       }
-      // A Reference Resource whose Target vanished is not a Resource intake accepts, so the Space
-      // cannot lose one out from under its Reference Resources. Removing that Resource from a
-      // single Map is never blocked this way — only deleting it outright.
-      const incoming = incomingReferences(snapshot.resources, completion.resourceId);
-      if (incoming.length > 0) {
-        return refuse({
-          code: 'resource-has-references',
-          // Named, not Titled: the wording joins these into one sentence, and
-          // a Title's later lines would break the list across it (ADR 0083).
-          referenceTitles: incoming.map((reference) => titleName(reference.document.title)),
-        });
-      }
-      // One Edit over every Map (ADR 0040), the one this Edit is drawing
-      // included: the cascade reclaims, unplaces and disconnects the Resource
-      // wherever it was placed.
-      snapshot = withResourceRemovedFromMaps(
-        {
-          ...snapshot,
-          resources: snapshot.resources.filter((resource) => resource.id !== completion.resourceId),
-        },
-        completion.resourceId,
-      );
+      // Everything else — a Reference Resource still targeting it, and the
+      // cascade through every Map, the one this Edit is drawing included — is
+      // the module's (ADR 0040, ADR 0070, ADR 0084).
+      const outcome = SnapshotEdit.deleteFromSpace(snapshot, completion.resourceId);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
     } else if (completion.kind === 'create-and-connect') {
       const refusal = connectRefusal(completion.from, null, placement);
       if (refusal !== null) return refuse(refusal);
