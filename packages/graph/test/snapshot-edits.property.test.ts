@@ -188,6 +188,154 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 });
 
 describe('SnapshotEdit.createInMap properties', () => {
+  const referenceTo = (target: UUID): ResourceDocument => ({
+    title: 'Reference',
+    kind: 'reference',
+    target,
+  });
+
+  it('refuses a Reference Resource whose Target is missing or is itself a Reference Resource', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.nat({ max: 8 }),
+        fc.uuid().map(uuid),
+        fc.uuid().map(uuid),
+        fc.constantFrom<'exact' | 'avoidingOverlap'>('exact', 'avoidingOverlap'),
+        (ids, coords, targetSeed, newResourceId, missing, mode) => {
+          fc.pre(!ids.includes(newResourceId) && !ids.includes(missing));
+          fc.pre(newResourceId !== missing);
+          const target = ids[targetSeed % ids.length];
+          if (target === undefined) return;
+          const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
+          // One existing Resource turned into a Reference Resource, so it is a
+          // Target that owns no content of its own.
+          const referencing: SpaceSnapshot = {
+            ...base,
+            resources: base.resources.map((resource) =>
+              resource.id === target
+                ? { id: target, document: referenceTo(ids.find((id) => id !== target) ?? target) }
+                : resource,
+            ),
+          };
+          const at = { x: 0, y: 0 };
+
+          expect(
+            SnapshotEdit.createInMap(base, MAP_ID, newResourceId, referenceTo(missing), at, mode),
+          ).toEqual({
+            kind: 'refused',
+            refusal: { code: 'reference-target-not-found', targetId: missing },
+          });
+          expect(
+            SnapshotEdit.createInMap(
+              referencing,
+              MAP_ID,
+              newResourceId,
+              referenceTo(target),
+              at,
+              mode,
+            ),
+          ).toEqual({
+            kind: 'refused',
+            refusal: { code: 'reference-target-must-own-content', targetId: target },
+          });
+        },
+      ),
+    );
+  });
+
+  it('creates a Reference Resource to a Target that owns content, which intake accepts', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.nat({ max: 8 }),
+        fc.uuid().map(uuid),
+        fc.boolean(),
+        (ids, coords, targetSeed, newResourceId, targetIsSpace) => {
+          fc.pre(!ids.includes(newResourceId));
+          const target = ids[targetSeed % ids.length];
+          if (target === undefined) return;
+          const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
+          // A Space Resource owns content too: it draws its target's Map (ADR 0070).
+          const snapshot: SpaceSnapshot = targetIsSpace
+            ? {
+                ...base,
+                resources: base.resources.map((resource) =>
+                  resource.id === target
+                    ? {
+                        id: target,
+                        document: {
+                          title: 'Nested',
+                          kind: 'space',
+                          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+                          map: MAP_ID,
+                          graph: GRAPH_ID,
+                        },
+                      }
+                    : resource,
+                ),
+              }
+            : base;
+
+          const outcome = SnapshotEdit.createInMap(
+            snapshot,
+            MAP_ID,
+            newResourceId,
+            referenceTo(target),
+            { x: 0, y: 0 },
+            'avoidingOverlap',
+          );
+
+          expect(outcome.kind).toBe('completed');
+          if (outcome.kind !== 'completed') return;
+          expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
+          expect(outcome.snapshot.resources.at(-1)).toEqual({
+            id: newResourceId,
+            document: referenceTo(target),
+          });
+        },
+      ),
+    );
+  });
+
+  it('keeps an exact point as aimed, even one another Resource occupies', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.nat({ max: 8 }),
+        fc.uuid().map(uuid),
+        (ids, coords, anchorSeed, newResourceId) => {
+          fc.pre(!ids.includes(newResourceId));
+          const positions = Placement.toPositions(closedPlacement(ids, coords));
+          const neighbour = ids[anchorSeed % ids.length];
+          const anchor = neighbour === undefined ? undefined : positions[neighbour];
+          if (anchor === undefined) return;
+
+          const outcome = SnapshotEdit.createInMap(
+            baseSnapshot(ids, positions),
+            MAP_ID,
+            newResourceId,
+            markdownDocument('New'),
+            anchor,
+            'exact',
+          );
+
+          expect(outcome.kind).toBe('completed');
+          if (outcome.kind !== 'completed') return;
+          expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
+          expect(outcome.snapshot.document.maps?.[0]?.positions[newResourceId]).toEqual({
+            x: anchor.x,
+            y: anchor.y,
+            open: false,
+          });
+        },
+      ),
+    );
+  });
+
   it('refuses creation into a Map the snapshot does not name, and changes nothing', () => {
     // A coordinated create or link must not silently add an unpositioned
     // Resource when its containing Map is gone by the time the Edit lands.

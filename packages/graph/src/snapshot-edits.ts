@@ -45,6 +45,10 @@ export type SnapshotEditRefusal =
   | { readonly code: 'map-not-found' }
   | { readonly code: 'resource-not-in-map' }
   | { readonly code: 'resource-already-in-map' }
+  /** A Reference Resource created with a Target the Space does not hold. */
+  | { readonly code: 'reference-target-not-found'; readonly targetId: UUID }
+  /** A Reference Resource created with a Target that is itself a Reference Resource. */
+  | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
   /** A Resize of a Resource that is not Open: there is no Open Size to change. */
   | { readonly code: 'resource-not-expanded' }
   | {
@@ -68,8 +72,7 @@ export type SnapshotEditOutcome =
  * menu-created Space Resource exactly as a menu-created Markdown Resource lands
  * (ADR 0089) and a rule with two owners had none — the registry wrote the
  * anchor it was given exactly, so a repeated centre-add stacked Space Resources
- * on top of each other. Authoring keeps its own copy until ticket 03 routes it
- * through this module too.
+ * on top of each other.
  *
  * A visible stack rather than collision avoidance: existing Resources never move,
  * and partial overlap of the Front is deliberate. Only an *exact* anchor
@@ -103,8 +106,15 @@ const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
  * `avoidingOverlap` steps diagonally off a point another Resource in the named
  * Map already occupies exactly, exactly as a menu-created Markdown Resource
  * lands (ADR 0089, {@link freeAnchor}). `exact` keeps the aimed point, for a
- * caller with one to aim — create-and-connect's drop point, which does not
- * reach this module yet (ticket 03).
+ * caller with one to aim — create-and-connect's drop point.
+ *
+ * A Reference Resource is refused `reference-target-not-found` for a Target
+ * the snapshot does not hold, and `reference-target-must-own-content` for a
+ * Target that is itself a Reference Resource: resolution ends after one hop
+ * (ADR 0070). The same rule intake enforces, asked here so an author choosing
+ * the wrong Target meets a refusal rather than an unloadable Space, and the
+ * creation half of the rule {@link deleteFromSpace}'s `resource-has-references`
+ * enforces from the other side.
  */
 function createInMap(
   snapshot: SpaceSnapshot,
@@ -118,6 +128,14 @@ function createInMap(
   const target = maps.find((map) => map.id === mapId);
   if (target === undefined) {
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
+  }
+  if (document.kind === 'reference') {
+    const targetId = document.target;
+    const resolved = snapshot.resources.find((resource) => resource.id === targetId);
+    if (resolved === undefined) return refused({ code: 'reference-target-not-found', targetId });
+    if (resolved.document.kind === 'reference') {
+      return refused({ code: 'reference-target-must-own-content', targetId });
+    }
   }
   const at =
     mode === 'avoidingOverlap' ? freeAnchor(Placement.fromMap(target), position) : position;

@@ -538,34 +538,6 @@ describe('Add Reference Resource', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('creates a Reference Resource whose Target is a Space Resource', () => {
-    const withSpaceResource: SpaceSnapshot = {
-      ...positionedSnapshot,
-      resources: [
-        positionedSnapshot.resources[0]!,
-        {
-          id: RESOURCE_B,
-          document: {
-            title: 'Nested Space',
-            kind: 'space',
-            spaceId: UNKNOWN_RESOURCE,
-            map: UNLOADED_MAP,
-            graph: UNLOADED_GRAPH,
-          },
-        },
-      ],
-    };
-    const { authoring, session } = open(withSpaceResource);
-
-    expect(
-      authoring.complete({ kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }).kind,
-    ).toBe('completed');
-    expect(session.getState().working.resources.at(-1)?.document).toMatchObject({
-      kind: 'reference',
-      target: RESOURCE_B,
-    });
-  });
-
   it('refuses a Target the Space no longer holds', () => {
     const { authoring } = openPositioned();
 

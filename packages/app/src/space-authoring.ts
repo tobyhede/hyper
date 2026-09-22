@@ -504,28 +504,6 @@ interface SpaceAuthoringDependencies {
 type SnapshotResources = SpaceSnapshot['resources'];
 
 /**
- * How far a Resource creation steps when the anchor it was given is taken, and in
- * which direction.
- *
- * A visible stack rather than collision avoidance: existing Resources never move,
- * and partial overlap of the 260×146 Front is deliberate. Only an *exact*
- * anchor collision steps, which is what a repeated centre-add produces and a
- * pointer drop essentially never does.
- */
-const STACK_STEP = 24;
-
-const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
-  const taken = new Set([...placement.values()].map(({ x, y }) => `${x},${y}`));
-  let at = anchor;
-  // Terminates: each step is a distinct point on one diagonal, and the taken
-  // set is finite, so at most one step per placed Resource can be occupied.
-  for (let step = 1; taken.has(`${at.x},${at.y}`); step += 1) {
-    at = { x: anchor.x + STACK_STEP * step, y: anchor.y + STACK_STEP * step };
-  }
-  return at;
-};
-
-/**
  * Every `SnapshotEdit` refusal, in Authoring's vocabulary.
  *
  * The identity, and deliberately so: each code `SnapshotEdit` raises is one
@@ -610,32 +588,6 @@ const reconnectOutcome = (
     return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
   }
   return { kind: 'edge', edge: reconnected };
-};
-
-/**
- * Why a Resource document's Reference Resource Target may not be authored, or `null`.
- *
- * This is the creation-time rule for choosing a Reference Resource Target. Existing Reference Resource
- * Targets are immutable and are refused before this validation is reached. It
- * duplicates what `validateReferences` already enforces, and deliberately:
- * intake reports by failing the whole snapshot, which this derivation answers
- * by throwing, and an author choosing the wrong Target has made a mistake that
- * deserves a sentence rather than an exception. A markdown document has no
- * Target and nothing to refuse.
- */
-const referenceTargetRefusal = (
-  space: Space,
-  document: ResourceDocument,
-): AuthoringRefusal | null => {
-  if (document.kind !== 'reference') return null;
-  const target = space.lookup.resource(document.target);
-  if (target === undefined)
-    return { code: 'reference-target-not-found', targetId: document.target };
-  // Reference Resource resolution ends after one Resource reference, including a Space Resource.
-  if (target.kind === 'reference') {
-    return { code: 'reference-target-must-own-content', targetId: document.target };
-  }
-  return null;
 };
 
 /** The Reference Resources pointing at a Resource, which are what block deleting it from the Space. */
@@ -1189,29 +1141,26 @@ export function createSpaceAuthoring({
     const writeGraphs = (graphs: readonly Graph[]): void => {
       writeMap((map) => ({ ...map, graphs: [...graphs] }));
     };
-    // The one way a Resource is added: mint it, append it, place it. Add Resource
-    // and Add Reference Resource differ in the document they carry and in nothing
-    // else — neither creates an Edge, and neither adds a Graph to a Map that
-    // already has one.
-    // Returns rather than assigns: `createdResourceId` is read further down, and
-    // a `let` written only from inside a closure keeps its initial narrowing.
+    // The one way a Resource is added: mint it, and let `SnapshotEdit` add and
+    // place it. Add Resource and Add Reference Resource differ in the document
+    // they carry and in nothing else — neither creates an Edge, and neither adds
+    // a Graph to a Map that already has one. Answers the new id, or the
+    // derivation's answer when the module refused.
     const createResource = (
       document: ResourceDocument,
       at: MapPosition,
       /**
-       * Step off a position another Resource already occupies exactly. A gesture
-       * that dropped on empty canvas aimed at its point and keeps it; a Resource
-       * created from a menu has no aimed-at point and would otherwise stack.
+       * A gesture that dropped on empty canvas aimed at its point and keeps it
+       * (`exact`); a Resource created from a menu has no aimed-at point and
+       * would otherwise stack (`avoidingOverlap`).
        */
-      avoidingOverlap = true,
-    ): ResourceId => {
+      mode: 'exact' | 'avoidingOverlap',
+    ): { readonly id: ResourceId } | DerivedCompletion => {
       const id = newId();
-      snapshot = { ...snapshot, resources: [...snapshot.resources, { id, document }] };
-      // The drop point is authorship, not a coordinate to convert (ADR 0084).
-      writePlacement(
-        Placement.place(placement, id, avoidingOverlap ? freeAnchor(placement, at) : at),
-      );
-      return id;
+      const outcome = SnapshotEdit.createInMap(snapshot, mapId, id, document, at, mode);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
+      return { id };
     };
     if (completion.kind === 'edited-resource') {
       const resourceIndex = snapshot.resources.findIndex(
@@ -1250,8 +1199,6 @@ export function createSpaceAuthoring({
       if (title === null) return refuse({ code: RESOURCE_TITLE_REQUIRED });
       const document: ResourceDocument = { ...completion.document, title };
       if (sameValue(resource.document, document)) return UNCHANGED;
-      const refusal = referenceTargetRefusal(space, document);
-      if (refusal !== null) return refuse(refusal);
       const resources = [...snapshot.resources];
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
@@ -1270,10 +1217,13 @@ export function createSpaceAuthoring({
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'created-resource') {
-      createdResourceId = createResource(
+      const created = createResource(
         { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
         completion.anchor,
+        'avoidingOverlap',
       );
+      if ('kind' in created) return created;
+      createdResourceId = created.id;
     } else if (completion.kind === 'created-reference') {
       // An empty title mints the same neutral `Resource N` every other created Resource
       // gets; text the author already entered is never overwritten. `??` cannot
@@ -1295,9 +1245,9 @@ export function createSpaceAuthoring({
         kind: 'reference',
         target: completion.target,
       };
-      const refusal = referenceTargetRefusal(space, document);
-      if (refusal !== null) return refuse(refusal);
-      createdResourceId = createResource(document, completion.anchor);
+      const created = createResource(document, completion.anchor, 'avoidingOverlap');
+      if ('kind' in created) return created;
+      createdResourceId = created.id;
     } else if (completion.kind === 'added-resource-to-map') {
       const outcome = SnapshotEdit.addToMap(
         snapshot,
@@ -1354,12 +1304,14 @@ export function createSpaceAuthoring({
       // The drop point is aimed at, so it is kept exactly: the gesture only
       // offers an empty-canvas release, and stepping off it would move the Resource
       // away from where the author watched the preview sit.
-      createdResourceId = createResource(
+      const created = createResource(
         { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
         completion.position,
-        false,
+        'exact',
       );
-      connection = { from: completion.from, to: createdResourceId };
+      if ('kind' in created) return created;
+      createdResourceId = created.id;
+      connection = { from: completion.from, to: created.id };
     } else if (completion.kind === 'connected-resources') {
       const named =
         completion.graphId === undefined

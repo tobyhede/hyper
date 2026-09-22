@@ -396,6 +396,12 @@ const planSpaceResourceCreation = (
     'avoidingOverlap',
   );
   if (created.kind === 'refused') {
+    // `map-not-found` is the one refusal a Space Resource creation can meet.
+    // The Reference Resource Target codes (`reference-target-not-found`,
+    // `reference-target-must-own-content`) are unreachable: this document is a
+    // Space Resource, never a Reference Resource, so it has no Target to check.
+    // They are not mapped into `SpaceResourceRefusal` for that reason, and
+    // reaching one here is a defect rather than an author's state.
     if (created.refusal.code !== 'map-not-found') {
       throw new Error(`Space Resource creation refused unexpectedly: ${created.refusal.code}`);
     }
