@@ -1,6 +1,12 @@
 import {
+  COLLAPSED_RESOURCE_SIZE,
+  DEFAULT_OPEN_SIZE,
+  DEFAULT_SPACE_RESOURCE_OPEN_SIZE,
   titleName,
+  type Graph,
+  type Map,
   type MapPosition,
+  type ResourcePlacement,
   type SpaceSnapshot,
   type ResourceDocument,
   type UUID,
@@ -27,16 +33,24 @@ import { Placement } from './placement';
  * small refusal union carrying codes and typed context only — wording stays in
  * `app`, which maps a code into `AuthoringRefusal` or `SpaceResourceRefusal`.
  *
- * Operations arrive with their first real caller rather than ahead of one:
- * `createInMap` and `deleteFromSpace` are what the session registry needs
- * (ticket 01); Space Authoring's own Open, Close, Resize and Remove from
- * Map stay where they are until ticket 03 routes them through here too.
+ * Operations arrive with their first real caller rather than ahead of one.
+ * Both callers create and delete through `createInMap` and `deleteFromSpace`;
+ * `open`, `close`, `resize`, `addToMap` and `removeFromMap` are Space
+ * Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
 export type SnapshotEditRefusal =
   | { readonly code: 'resource-not-found' }
   | { readonly code: 'map-not-found' }
+  | { readonly code: 'resource-not-in-map' }
+  | { readonly code: 'resource-already-in-map' }
+  /** A Reference Resource created with a Target the Space does not hold. */
+  | { readonly code: 'reference-target-not-found'; readonly targetId: UUID }
+  /** A Reference Resource created with a Target that is itself a Reference Resource. */
+  | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
+  /** A Resize of a Resource that is not Open: there is no Open Size to change. */
+  | { readonly code: 'resource-not-expanded' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -58,8 +72,7 @@ export type SnapshotEditOutcome =
  * menu-created Space Resource exactly as a menu-created Markdown Resource lands
  * (ADR 0089) and a rule with two owners had none — the registry wrote the
  * anchor it was given exactly, so a repeated centre-add stacked Space Resources
- * on top of each other. Authoring keeps its own copy until ticket 03 routes it
- * through this module too.
+ * on top of each other.
  *
  * A visible stack rather than collision avoidance: existing Resources never move,
  * and partial overlap of the Front is deliberate. Only an *exact* anchor
@@ -93,8 +106,15 @@ const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
  * `avoidingOverlap` steps diagonally off a point another Resource in the named
  * Map already occupies exactly, exactly as a menu-created Markdown Resource
  * lands (ADR 0089, {@link freeAnchor}). `exact` keeps the aimed point, for a
- * caller with one to aim — create-and-connect's drop point, which does not
- * reach this module yet (ticket 03).
+ * caller with one to aim — create-and-connect's drop point.
+ *
+ * A Reference Resource is refused `reference-target-not-found` for a Target
+ * the snapshot does not hold, and `reference-target-must-own-content` for a
+ * Target that is itself a Reference Resource: resolution ends after one hop
+ * (ADR 0070). The same rule intake enforces, asked here so an author choosing
+ * the wrong Target meets a refusal rather than an unloadable Space, and the
+ * creation half of the rule {@link deleteFromSpace}'s `resource-has-references`
+ * enforces from the other side.
  */
 function createInMap(
   snapshot: SpaceSnapshot,
@@ -108,6 +128,14 @@ function createInMap(
   const target = maps.find((map) => map.id === mapId);
   if (target === undefined) {
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
+  }
+  if (document.kind === 'reference') {
+    const targetId = document.target;
+    const resolved = snapshot.resources.find((resource) => resource.id === targetId);
+    if (resolved === undefined) return refused({ code: 'reference-target-not-found', targetId });
+    if (resolved.document.kind === 'reference') {
+      return refused({ code: 'reference-target-must-own-content', targetId });
+    }
   }
   const at =
     mode === 'avoidingOverlap' ? freeAnchor(Placement.fromMap(target), position) : position;
@@ -130,6 +158,33 @@ function createInMap(
     },
   };
 }
+
+/**
+ * The Graphs a Resource has left, with every Edge incident to it gone.
+ *
+ * A Resource that is not a member of a Map cannot be an endpoint of a Graph
+ * that Map owns (ADR 0040), so this is what both removals owe: Remove from Map
+ * applies it to the one Map, and Delete from Space to every Map. The Graphs
+ * themselves stay, empty ones included: deleting a Graph is its own action.
+ */
+const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: UUID): Graph[] =>
+  graphs.map((graph) => ({
+    ...graph,
+    edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
+  }));
+
+/**
+ * The placement with a Resource gone and the room it held given back.
+ *
+ * Leaving a Map is a Close the Resource does not come back from, so it
+ * reclaims as a Close does (ADR 0084) — the room is written into the
+ * neighbours' own coordinates, so a removal that only dropped the entry would
+ * leave a hole nothing on the canvas explains and no Edit can give back. The
+ * reclaim runs **before** the removal, because `Placement.reclaim` reads the
+ * Resource's own entry.
+ */
+const removedFrom = (placement: Placement, resourceId: UUID): Placement =>
+  Placement.remove(Placement.reclaim(placement, resourceId), resourceId);
 
 /**
  * Remove a Resource from a Space entirely: its own entry, its position and every
@@ -175,14 +230,263 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
         ...snapshot.document,
         maps: maps.map((map) => ({
           ...map,
-          positions: Placement.toPositions(
-            Placement.remove(Placement.reclaim(Placement.fromMap(map), resourceId), resourceId),
-          ),
-          graphs: map.graphs.map((graph) => ({
-            ...graph,
-            edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
-          })),
+          positions: Placement.toPositions(removedFrom(Placement.fromMap(map), resourceId)),
+          graphs: withoutIncidentEdges(map.graphs, resourceId),
         })),
+      },
+    },
+  };
+}
+
+/** A width and a height together: an Open Size, or the room between two. */
+type Extent = { readonly width: number; readonly height: number };
+
+/** An entry for a Resource that is Open, which is the only kind that holds room. */
+type OpenPlacement = Extract<ResourcePlacement, { readonly open: true }>;
+
+/** The named Map, and the placement it holds, or the refusal for a Map that is gone. */
+const placedIn = (
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+): { readonly map: Map; readonly placement: Placement } | SnapshotEditRefusal => {
+  const map = (snapshot.document.maps ?? []).find((candidate) => candidate.id === mapId);
+  if (map === undefined) return { code: 'map-not-found' };
+  return { map, placement: Placement.fromMap(map) };
+};
+
+/** The snapshot with one Map's positions replaced, and nothing else changed. */
+const withPlacement = (
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  placement: Placement,
+): SnapshotEditOutcome => ({
+  kind: 'completed',
+  snapshot: {
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      maps: (snapshot.document.maps ?? []).map((map) =>
+        map.id === mapId ? { ...map, positions: Placement.toPositions(placement) } : map,
+      ),
+    },
+  },
+});
+
+const refused = (refusal: SnapshotEditRefusal): SnapshotEditOutcome => ({
+  kind: 'refused',
+  refusal,
+});
+
+const UNCHANGED: SnapshotEditOutcome = { kind: 'unchanged' };
+
+/**
+ * The placement after a Resource's own entry changes and the room it holds
+ * changes with it: one Edit, and the whole of displacement at the Edit
+ * (ADR 0084).
+ *
+ * The entry is written first and the displacement runs over the result. The
+ * coordinates are the same either way, because `displace` compares every
+ * neighbour against the *subject's* `x`/`y` and neither step moves the subject.
+ * But `displace` answers the placement unchanged for a subject the map does not
+ * hold, and after `place` the subject is certainly held.
+ */
+const withRoomFor = (
+  placement: Placement,
+  resourceId: UUID,
+  at: ResourcePlacement,
+  room: Extent,
+): Placement => Placement.displace(Placement.place(placement, resourceId, at), resourceId, room);
+
+/**
+ * The placement after a Resource Closes: Closed on its own entry, and the room
+ * it held given back by `Placement.reclaim`.
+ *
+ * Both ways a Resource closes end here — {@link close}, and a {@link resize} to
+ * exactly the Closed Size (ADR 0066) — so the magnetic Close reclaims the
+ * growth of the size the Resource was actually Open at rather than the zero
+ * growth of the collapsed rect being proposed.
+ *
+ * The reclaim runs first and the Closed entry is written over the result,
+ * because `Placement.reclaim` reads the Open Size off the entry it is given and
+ * a Closed entry no longer holds any room. The remembered Open Size rides
+ * through untouched (ADR 0066), which is what makes the next Open apply exactly
+ * what this gives back.
+ */
+const closedResource = (placement: Placement, resourceId: UUID, at: OpenPlacement): Placement =>
+  Placement.place(Placement.reclaim(placement, resourceId), resourceId, { ...at, open: false });
+
+/**
+ * The room a Resource's neighbours gain when it goes from one Open Size to
+ * another: the difference between the two growths, per axis (ADR 0084).
+ *
+ * Negative on an axis the Resource shrank on, which is the whole of a
+ * shrinking Resize. It is **not** the involution the Open/Close pair is: a
+ * negative room reverses a growth only for the Resources that growth was
+ * applied to, and a Resource the author placed clear of the subject *after* the
+ * Open was never one of them. Such a Resource can be carried back inside the
+ * subject — subject Open at `x = 0`, a Resource dropped at `x = 260`, a shrink
+ * of 200 — and growing back skips it as no longer clear, so it keeps the 200.
+ * That is the memorylessness ADR 0084 chose for Close, which reclaims from
+ * every Resource currently clear of the closing Resource; remembering which
+ * Resources a growth actually pushed is the per-Resource history it rejected.
+ */
+const roomBetween = (from: Extent, to: Extent): Extent => {
+  const before = Placement.growth(from);
+  const after = Placement.growth(to);
+  return { width: after.width - before.width, height: after.height - before.height };
+};
+
+/**
+ * Open a Resource in one Map, moving the Resources clear of it by the room it
+ * now takes (ADR 0084, ADR 0093).
+ *
+ * It Opens at the Open Size it remembers (ADR 0066), or at the default for its
+ * kind — a Space Resource draws a whole Map and opens larger. The room it
+ * takes is that size's growth, so the Close that reverses this reads the same
+ * number back off the entry. `unchanged` for a Resource already Open.
+ */
+function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (at.open) return UNCHANGED;
+  const kind = snapshot.resources.find((resource) => resource.id === resourceId)?.document.kind;
+  const openSize =
+    at.openSize ?? (kind === 'space' ? DEFAULT_SPACE_RESOURCE_OPEN_SIZE : DEFAULT_OPEN_SIZE);
+  return withPlacement(
+    snapshot,
+    mapId,
+    withRoomFor(
+      placed.placement,
+      resourceId,
+      { ...at, open: true, openSize },
+      Placement.growth(openSize),
+    ),
+  );
+}
+
+/**
+ * Close a Resource in one Map, giving back the room it held and keeping its
+ * Open Size for the next Open (ADR 0066).
+ *
+ * Read as the Map stands, with no record of who this Resource's Open pushed:
+ * everything currently clear of it moves back, the Resources the author dragged
+ * there while it was open included (ADR 0084). `unchanged` for a Resource
+ * already Closed.
+ */
+function close(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (!at.open) return UNCHANGED;
+  return withPlacement(snapshot, mapId, closedResource(placed.placement, resourceId, at));
+}
+
+/**
+ * Resize an Open Resource in one Map, moving its neighbours by the difference
+ * between the room it held and the room it now takes.
+ *
+ * A size of exactly `COLLAPSED_RESOURCE_SIZE` is a Close, and closes as
+ * {@link close} does — reclaiming the growth of the size it was Open at, not
+ * the proposal's. Which near misses count as that size is the application's
+ * magnetic range (ADR 0066), decided before this is reached; only the exact
+ * size arrives here as a Close. `unchanged` at the size it already has, and
+ * `resource-not-expanded` for a Resource that is not Open, which has no Open
+ * Size to change.
+ */
+function resize(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  size: Extent,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (!at.open) return refused({ code: 'resource-not-expanded' });
+  if (
+    size.width === COLLAPSED_RESOURCE_SIZE.width &&
+    size.height === COLLAPSED_RESOURCE_SIZE.height
+  ) {
+    return withPlacement(snapshot, mapId, closedResource(placed.placement, resourceId, at));
+  }
+  if (at.openSize.width === size.width && at.openSize.height === size.height) return UNCHANGED;
+  return withPlacement(
+    snapshot,
+    mapId,
+    withRoomFor(
+      placed.placement,
+      resourceId,
+      { ...at, openSize: { width: size.width, height: size.height } },
+      roomBetween(at.openSize, size),
+    ),
+  );
+}
+
+/**
+ * Add a Resource the Space already holds to one Map, Closed, with no Edge.
+ *
+ * Membership and a position and nothing else: a Resource added back to a Map
+ * is detached, and the Edges it once had there are never inferred back. The
+ * position is an authored one (ADR 0084); `avoidingOverlap` steps off a point
+ * another Resource already occupies exactly, as a creation from a menu does
+ * ({@link freeAnchor}), and `exact` keeps it.
+ */
+function addToMap(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  position: MapPosition,
+  mode: 'exact' | 'avoidingOverlap',
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
+    return refused({ code: 'resource-not-found' });
+  }
+  if (placed.placement.has(resourceId)) return refused({ code: 'resource-already-in-map' });
+  const at = mode === 'avoidingOverlap' ? freeAnchor(placed.placement, position) : position;
+  return withPlacement(
+    snapshot,
+    mapId,
+    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y, open: false }),
+  );
+}
+
+/**
+ * Remove a Resource from one Map: the room it held given back, its position
+ * gone, and every Edge incident to it gone from **this Map's** Graphs.
+ *
+ * The Resource stays in the Space and in every other Map. Never blocked by a
+ * Reference Resource targeting it: a Target that has left one Map is still a
+ * Resource of the Space, which is all a Reference Resource needs (ADR 0070).
+ */
+function removeFromMap(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  if (!placed.placement.has(resourceId)) return refused({ code: 'resource-not-in-map' });
+  return {
+    kind: 'completed',
+    snapshot: {
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: (snapshot.document.maps ?? []).map((map) =>
+          map.id === mapId
+            ? {
+                ...map,
+                positions: Placement.toPositions(removedFrom(placed.placement, resourceId)),
+                graphs: withoutIncidentEdges(map.graphs, resourceId),
+              }
+            : map,
+        ),
       },
     },
   };
@@ -191,4 +495,9 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
 export const SnapshotEdit = {
   createInMap,
   deleteFromSpace,
+  open,
+  close,
+  resize,
+  addToMap,
+  removeFromMap,
 } as const;

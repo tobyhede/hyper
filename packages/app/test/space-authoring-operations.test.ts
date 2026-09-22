@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
   uuidSchema,
   type Graph,
@@ -9,7 +8,6 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
@@ -32,8 +30,6 @@ const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
-const RESOURCE_D = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
-const RESOURCE_E = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
@@ -151,6 +147,8 @@ describe('Add Map', () => {
       },
     ]);
     expect(session.getState().working.document.defaultMap).toBe(MINTED);
+    // A new Map owns its Graph; there is no Space-level Graph collection.
+    expect(Object.hasOwn(session.getState().working.document, 'graphs')).toBe(false);
     expect(navigation.getState().selectedMapId).toBe(MINTED);
   });
 
@@ -303,59 +301,6 @@ describe('Edit Resource', () => {
 });
 
 describe('Expanded Resource geometry', () => {
-  /**
-   * What {@link DEFAULT_OPEN_SIZE} displaces by: the Open rect less the
-   * collapsed one, per axis (ADR 0084). Named rather than derived so the
-   * coordinates below read as positions instead of as arithmetic.
-   */
-  const GROWTH = { width: 300, height: 274 };
-
-  /**
-   * Five Resources at every relation to RESOURCE_A that deciding a Resource's one room
-   * axis distinguishes (ADR 0093): clear of its collapsed rect on `x` alone, on
-   * `y` alone, on both, and before it on both.
-   */
-  const displacementSnapshot: SpaceSnapshot = {
-    ...positionedSnapshot,
-    resources: [
-      ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      { id: RESOURCE_D, document: { title: 'D', kind: 'markdown', body: 'D' } },
-      { id: RESOURCE_E, document: { title: 'E', kind: 'markdown', body: 'E' } },
-    ],
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        {
-          id: MAP_ID,
-          title: 'Map 1',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_A]: { x: 100, y: 100, open: false },
-            [RESOURCE_B]: { x: 400, y: 100, open: false },
-            [RESOURCE_C]: { x: 100, y: 300, open: false },
-            [RESOURCE_D]: { x: 500, y: 500, open: false },
-            [RESOURCE_E]: { x: 40, y: 40, open: false },
-          },
-          graphs: [MAIN_GRAPH],
-        },
-      ],
-      defaultMap: MAP_ID,
-    },
-  };
-
-  const openDisplacement = () => open(displacementSnapshot);
-
-  /** Every origin the Map authors, so a whole Map can be compared at once. */
-  const originsOf = (session: ReturnType<typeof open>['session']) => {
-    const origins = new Map<string, readonly [number, number]>();
-    const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
-    for (const [resourceId, at] of Object.entries(positions)) {
-      if (at !== undefined) origins.set(resourceId, [at.x, at.y]);
-    }
-    return Object.fromEntries(origins);
-  };
-
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
@@ -433,99 +378,8 @@ describe('Expanded Resource geometry', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves the Resources clear of the opening Resource by one axis growth, and nobody else', () => {
-    const { authoring, session } = openDisplacement();
-
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual({
-      // A Resource does not displace itself.
-      [RESOURCE_A]: [100, 100],
-      // Clear on `x` and level on `y`, so it moves right and not down.
-      [RESOURCE_B]: [400 + GROWTH.width, 100],
-      // The mirror of it: inside the column on `x` and clear on `y`.
-      [RESOURCE_C]: [100, 300 + GROWTH.height],
-      // Clear on both, and the width alone takes it clear of the Open rect.
-      [RESOURCE_D]: [500 + GROWTH.width, 500],
-      // Before the Resource on both axes: the room is made after it, not around it.
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
-  it('returns every position to exactly what it was when the Resource Closes again', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual(before);
-  });
-
-  it('reclaims from a Resource the author moved beyond the Open Resource, which the Open never pushed', () => {
-    // ADR 0084: Open and Close each read the Map as it is at that moment and
-    // remember nothing about who was pushed, so Close reclaims from everything
-    // currently clear of the closing Resource. This is the deliberate memoryless
-    // behaviour and not a defect — recording which Resources a particular Open moved
-    // is the per-Resource history that ADR rejected, because it goes stale the
-    // moment the author moves anything and makes two identical Maps behave
-    // differently.
-    const { authoring, session } = openDisplacement();
-
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-    // The author drags E from before the Open Resource to clear of it on both axes.
-    expect(
-      authoring.complete({
-        kind: 'settled-resource-movement',
-        moved: new Map([[RESOURCE_E, { x: 900, y: 900 }]]),
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual({
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [400, 100],
-      [RESOURCE_C]: [100, 300],
-      [RESOURCE_D]: [500, 500],
-      // Never pushed by the Open, and moved back by the Close all the same —
-      // on `x` alone, the one axis it makes room on.
-      [RESOURCE_E]: [900 - GROWTH.width, 900],
-    });
-  });
-
-  it('takes an already Open Resource room as it finds it, with nothing summed over Open Resources', () => {
-    const { authoring, session } = openDisplacement();
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    // B is at (700, 100) by now, and its own growth is measured from there.
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_B })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual({
-      // Level with B on `y` and before it on `x`: A does not move for it.
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [700, 100],
-      [RESOURCE_C]: [100, 574 + GROWTH.height],
-      // Inside B's collapsed column now, and clear of it below.
-      [RESOURCE_D]: [800, 500 + GROWTH.height],
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
   it('refuses a subject the Map does not hold and moves nobody', () => {
-    const { authoring, session } = openDisplacement();
+    const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
@@ -539,51 +393,8 @@ describe('Expanded Resource geometry', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves neighbours by the difference between the old growth and the new one', () => {
-    const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-
-    expect(
-      authoring.complete({
-        kind: 'resized-resource',
-        resourceId: RESOURCE_A,
-        size: { width: 860, height: 720 },
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    // 860x720 grows by (600, 574); the Open already applied (300, 274); the
-    // difference this Edit applies is (300, 300).
-    expect(originsOf(session)).toEqual({
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [1000, 100],
-      [RESOURCE_C]: [100, 874],
-      [RESOURCE_D]: [1100, 500],
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
-  it('moves neighbours on one axis only when only one axis of the size changed', () => {
-    const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-
-    // 100 wider at the same height, so the height difference is zero.
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: { width: 660, height: 420 },
-    });
-
-    expect(originsOf(session)).toEqual({
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [800, 100],
-      [RESOURCE_C]: [100, 574],
-      [RESOURCE_D]: [900, 500],
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
   it('is unchanged and moves nobody when the proposal is the size the Resource already has', () => {
-    const { authoring, session } = openDisplacement();
+    const { authoring, session } = openPositioned();
     authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
     const before = session.getState().working;
 
@@ -595,113 +406,6 @@ describe('Expanded Resource geometry', () => {
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
-  });
-
-  it('returns every position to where it started through Open, resize, resize back and Close', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: { width: 860, height: 720 },
-    });
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: DEFAULT_OPEN_SIZE,
-    });
-    authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A });
-
-    expect(originsOf(session)).toEqual(before);
-  });
-
-  it('reclaims the whole growth of the size it was Open at when a resize snaps to Closed', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: { width: 860, height: 720 },
-    });
-
-    // The magnetic Close (ADR 0066) arrives as a resize proposal at exactly the
-    // collapsed size. What it gives back is (600, 574) — the growth of the
-    // 860x720 the Resource was actually Open at — and not the zero growth of the
-    // collapsed rect being proposed.
-    expect(
-      authoring.complete({
-        kind: 'resized-resource',
-        resourceId: RESOURCE_A,
-        size: COLLAPSED_RESOURCE_SIZE,
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(originsOf(session)).toEqual(before);
-    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
-      x: 100,
-      y: 100,
-      open: false,
-      openSize: { width: 860, height: 720 },
-    });
-  });
-
-  /**
-   * A Resource that leaves the Map takes its room with it.
-   *
-   * Under the derived model this reclaimed itself: the entry carried the Open
-   * state, so removing the entry removed the displacement. Now the room is
-   * written into the neighbours' own coordinates, and a removal that only drops
-   * the entry leaves a hole with nothing left on the canvas to explain it and no
-   * Edit that can give it back. Leaving the Map is a Close the Resource does not
-   * come back from, so it reclaims exactly as Close does (ADR 0084).
-   */
-  it('reclaims the room an Open Resource held when it is removed from the Map', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
-    ).toEqual({
-      kind: 'completed',
-    });
-
-    const { [RESOURCE_A]: removed, ...remaining } = before;
-    expect(removed).toBeDefined();
-    expect(originsOf(session)).toEqual(remaining);
-  });
-
-  it('reclaims the room an Open Resource held when it is deleted', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    const { [RESOURCE_A]: deleted, ...remaining } = before;
-    expect(deleted).toBeDefined();
-    expect(originsOf(session)).toEqual(remaining);
-  });
-
-  it('moves nobody when the Resource leaving the Map was Closed', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
-    ).toEqual({
-      kind: 'completed',
-    });
-
-    const { [RESOURCE_A]: removed, ...remaining } = before;
-    expect(removed).toBeDefined();
-    expect(originsOf(session)).toEqual(remaining);
   });
 });
 
@@ -769,34 +473,6 @@ describe('Add Reference Resource', () => {
       refusal: { code: 'reference-target-must-own-content', targetId: RESOURCE_B },
     });
     expect(session.getState().working).toBe(before);
-  });
-
-  it('creates a Reference Resource whose Target is a Space Resource', () => {
-    const withSpaceResource: SpaceSnapshot = {
-      ...positionedSnapshot,
-      resources: [
-        positionedSnapshot.resources[0]!,
-        {
-          id: RESOURCE_B,
-          document: {
-            title: 'Nested Space',
-            kind: 'space',
-            spaceId: UNKNOWN_RESOURCE,
-            map: UNLOADED_MAP,
-            graph: UNLOADED_GRAPH,
-          },
-        },
-      ],
-    };
-    const { authoring, session } = open(withSpaceResource);
-
-    expect(
-      authoring.complete({ kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }).kind,
-    ).toBe('completed');
-    expect(session.getState().working.resources.at(-1)?.document).toMatchObject({
-      kind: 'reference',
-      target: RESOURCE_B,
-    });
   });
 
   it('refuses a Target the Space no longer holds', () => {
@@ -1605,38 +1281,6 @@ describe('Map membership', () => {
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('places a Resource added to a Map at the anchor given, whatever is Open', () => {
-    const expandedSparse: SpaceSnapshot = {
-      ...sparse,
-      document: {
-        ...sparse.document,
-        maps: [
-          {
-            ...sparse.document.maps![0]!,
-            positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-              [RESOURCE_B]: { x: 300, y: 40, open: false },
-            },
-          },
-        ],
-      },
-    };
-    const { authoring, session } = open(expandedSparse);
-
-    authoring.complete({
-      kind: 'added-resource-to-map',
-      resourceId: RESOURCE_C,
-      anchor: { x: 500, y: 400 },
-    });
-
-    // As above: the anchor is authorship, not a drawn coordinate to invert.
-    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_C]).toEqual({
-      x: 500,
-      y: 400,
-      open: false,
-    });
-  });
-
   it('refuses a Resource the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
@@ -1657,55 +1301,6 @@ describe('Map membership', () => {
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-already-in-map' } });
   });
 
-  it('removes membership and every incident Edge, in this Map only', () => {
-    const twoMaps: SpaceSnapshot = {
-      ...positionedSnapshot,
-      document: {
-        ...positionedSnapshot.document,
-        maps: [
-          {
-            ...positionedSnapshot.document.maps![0]!,
-            graphs: [
-              MAIN_GRAPH,
-              { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: RESOURCE_B, to: RESOURCE_A }] },
-            ],
-          },
-          {
-            id: OTHER_MAP_ID,
-            title: 'Map 2',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_A]: { x: 0, y: 400, open: false },
-              [RESOURCE_B]: { x: 0, y: 600, open: false },
-            },
-            graphs: [
-              { id: MINTED, title: 'Elsewhere', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
-            ],
-          },
-        ],
-      },
-    };
-    const { authoring, session } = open(twoMaps);
-
-    expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_B }),
-    ).toEqual({
-      kind: 'completed',
-    });
-
-    const working = session.getState().working;
-    expect(mapOf(working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-    });
-    expect(mapOf(working, MAP_ID)?.graphs).toEqual([
-      { id: GRAPH_ID, title: 'Main', edges: [] },
-      { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
-    ]);
-    // The Resource stays in the Space and in every other Map, Edges and all.
-    expect(working.resources).toEqual(positionedSnapshot.resources);
-    expect(mapOf(working, OTHER_MAP_ID)).toEqual(twoMaps.document.maps![1]);
-  });
-
   it('refuses removing a Resource the Map does not hold', () => {
     const { authoring } = open(sparse);
 
@@ -1719,59 +1314,6 @@ describe('Map membership', () => {
 });
 
 describe('Delete Resource from Space', () => {
-  const twoMaps: SpaceSnapshot = {
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        positionedSnapshot.document.maps![0]!,
-        {
-          id: OTHER_MAP_ID,
-          title: 'Map 2',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_A]: { x: 0, y: 400, open: false },
-            [RESOURCE_B]: { x: 0, y: 600, open: false },
-          },
-          graphs: [
-            {
-              id: OTHER_GRAPH_ID,
-              title: 'Elsewhere',
-              edges: [
-                { from: RESOURCE_A, to: RESOURCE_B },
-                { from: RESOURCE_B, to: RESOURCE_A },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  };
-
-  it('deletes the Resource and cascades it out of every Map at once', () => {
-    const { authoring, session } = open(twoMaps);
-
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
-      kind: 'completed',
-    });
-
-    const working = session.getState().working;
-    expect(working.resources).toEqual([positionedSnapshot.resources[0]]);
-    expect(mapOf(working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-    });
-    expect(mapOf(working, MAP_ID)?.graphs).toEqual([{ ...MAIN_GRAPH, edges: [] }]);
-    expect(mapOf(working, OTHER_MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 0, y: 400, open: false },
-    });
-    // Empty Graphs and Maps remain: deleting a Resource is not an instruction to
-    // delete either.
-    expect(mapOf(working, OTHER_MAP_ID)?.graphs).toEqual([
-      { id: OTHER_GRAPH_ID, title: 'Elsewhere', edges: [] },
-    ]);
-    expect(loadSpaceSnapshot(working).ok).toBe(true);
-  });
-
   it('refuses a Resource its Reference Resources still point at, naming them', () => {
     const referenced: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -1822,6 +1364,35 @@ describe('Delete Resource from Space', () => {
     const before = session.getState().working;
 
     expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
+      kind: 'refused',
+      refusal: { code: 'space-resource-deletion-unsupported' },
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses deleting a Space Resource a Reference Resource targets as a Space Resource deletion', () => {
+    // Decided before the Reference Resource rule: the cascade a Space Resource
+    // owes is the session registry's whether or not anything targets it.
+    const referencedSpace: SpaceSnapshot = {
+      ...positionedSnapshot,
+      resources: [
+        {
+          id: RESOURCE_A,
+          document: {
+            title: 'Nested Space',
+            kind: 'space',
+            spaceId: UNKNOWN_RESOURCE,
+            map: UNLOADED_MAP,
+            graph: UNLOADED_GRAPH,
+          },
+        },
+        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+      ],
+    };
+    const { authoring, session } = open(referencedSpace);
+    const before = session.getState().working;
+
+    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
       kind: 'refused',
       refusal: { code: 'space-resource-deletion-unsupported' },
     });

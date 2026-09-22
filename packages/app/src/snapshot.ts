@@ -1,12 +1,11 @@
 import {
   SPACE_FILE_VERSION,
-  type ResourceId,
-  type Graph,
   type GraphId,
+  type Map,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement, type Space } from '@project/graph';
+import { loadSpaceSnapshot, type Space } from '@project/graph';
 
 /**
  * Read a working snapshot as the validated aggregate, revalidating only when
@@ -66,124 +65,50 @@ export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
 };
 
 /**
- * The graphs a Resource has left, with every Edge incident to it gone.
+ * What a completed Edit says about the Map it continues in: the Map's
+ * identity, as distinct from its content.
  *
- * A Resource that is not a member of a Map cannot be an endpoint of a Graph that
- * Map owns (ADR 0040), so this is what both removals owe: Remove from
- * Map, which applies it to the one Map the Edit writes, and Delete Resource
- * from Space, which applies it to every Map through
- * {@link withResourceRemovedFromMaps}. One rule, in one place, so the two
- * scopes of the same deletion cannot come to disagree about what an incident
- * Edge is. The graphs themselves stay, empty ones included: deleting a graph is
- * its own action.
+ * Positions and Graphs are deliberately absent. The Edit that changes them
+ * writes them into the working snapshot itself — through `SnapshotEdit` or its
+ * own arm — before this is folded over the result, so a whole-snapshot answer
+ * from one of those operations is never overwritten here by a copy of the Map
+ * taken before it ran.
  */
-export const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: ResourceId): Graph[] =>
-  graphs.map((graph) => ({
-    ...graph,
-    edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
-  }));
-
-/**
- * The snapshot with one Resource gone from every Map: its membership, its
- * position and every Edge incident to it, in every Graph every Map owns.
- *
- * The cascade half of Delete Resource from Space, and the one write in this module
- * that is not about a single Map — which is exactly why it is here rather
- * than folded into {@link updatePositionedMap}. The Resource itself stays in
- * `resources`: this answers what the Maps hold, and removing the Resource is the
- * caller's own statement in the same Edit. Empty Graphs and empty Maps
- * remain, because deleting a Resource is not an instruction to delete either
- * (ADR 0040).
- *
- * Every Map that held the Resource **Open** also gets the room it was holding
- * back, through the same `Placement.reclaim` the single-Map removal uses.
- * Under the derivation ADR 0084 removed, dropping the entry dropped its
- * displacement with it and this could be a filter; now the room lives in the
- * neighbours' own stored coordinates, so a Map the Edit is not drawing would
- * otherwise keep it forever — with no Resource left on that canvas to Close and no
- * Edit that could give it back. Open/Closed is Map-owned (ADR 0064), so
- * whether there is any room to reclaim is asked of each Map separately and
- * is not what the drawing one answered.
- *
- * Answers the snapshot it was given when no Map held the Resource, so a deletion
- * that only ever affected the current Map — which the caller writes
- * separately — does not rebuild every other Map to say nothing about them.
- */
-export const withResourceRemovedFromMaps = (
-  base: SpaceSnapshot,
-  resourceId: ResourceId,
-): SpaceSnapshot => {
-  const maps = base.document.maps ?? [];
-  const affected = maps.some(
-    (map) =>
-      Object.hasOwn(map.positions, resourceId) ||
-      map.graphs.some((graph) =>
-        graph.edges.some((edge) => edge.from === resourceId || edge.to === resourceId),
-      ),
-  );
-  if (!affected) return base;
-  return {
-    ...base,
-    document: {
-      ...base.document,
-      maps: maps.map((map) => ({
-        ...map,
-        positions: Placement.toPositions(
-          Placement.remove(Placement.reclaim(Placement.fromMap(map), resourceId), resourceId),
-        ),
-        graphs: withoutIncidentEdges(map.graphs, resourceId),
-      })),
-    },
-  };
-};
-
-/** Everything a completed Edit writes into one Map. */
 export interface PositionedMapEdit {
   readonly mapId: UUID;
   readonly title: string;
-  readonly positions: Placement;
-  /**
-   * The graphs this Map owns after the Edit, in author order (ADR 0040).
-   *
-   * Replaced whole rather than merged, for the same reason the positions are:
-   * the editor holds the whole truth of them. A graph is a nested owned value
-   * of exactly one Map, so there is nowhere else for this Edit's graphs to
-   * be written and nothing at the space level left to reconcile them with.
-   */
-  readonly graphs: readonly Graph[];
   /** The Graph the Map opens on. */
   readonly activeGraphId: GraphId | null;
 }
 
-/** Fold a completed placement edit into a complete authoritative snapshot. */
+/**
+ * Fold a completed Edit's Map identity — title, kind and Active Graph — into
+ * the snapshot, and make that Map the Space's opening one.
+ *
+ * Writes into a Map the snapshot already holds, and throws for one it does not:
+ * creating a Map is the `created-map` Edit's own statement, not a side effect
+ * of naming an id here.
+ */
 export const updatePositionedMap = (
   base: SpaceSnapshot,
-  { mapId, title, positions, graphs, activeGraphId }: PositionedMapEdit,
+  { mapId, title, activeGraphId }: PositionedMapEdit,
 ): SpaceSnapshot => {
-  const existing = (base.document.maps ?? []).find((map) => map.id === mapId);
-  const map = {
-    id: mapId,
-    title,
-    kind: 'positioned' as const,
-    positions: Placement.toPositions(positions),
-    graphs: [...graphs],
-    // An Edit with no active Graph says nothing about the authored one, so the
-    // existing value carries through. Only a named Graph replaces it.
-    ...(activeGraphId !== null
-      ? { activeGraph: activeGraphId }
-      : existing?.activeGraph !== undefined
-        ? { activeGraph: existing.activeGraph }
-        : {}),
-  };
-  const maps = [...(base.document.maps ?? [])];
-  const existingIndex = maps.findIndex((candidate) => candidate.id === mapId);
-  if (existingIndex === -1) maps.push(map);
-  else maps[existingIndex] = map;
+  const maps = base.document.maps ?? [];
+  if (!maps.some((map) => map.id === mapId)) {
+    throw new Error(`Cannot write Map ${mapId}: the snapshot holds no such Map.`);
+  }
   return {
     ...base,
     document: {
       ...base.document,
-      maps,
+      maps: maps.map((existing) => {
+        if (existing.id !== mapId) return existing;
+        const written: Map = { ...existing, title, kind: 'positioned' };
+        // An Edit with no active Graph says nothing about the authored one, so
+        // the existing value carries through. Only a named Graph replaces it.
+        if (activeGraphId !== null) written.activeGraph = activeGraphId;
+        return written;
+      }),
       defaultMap: mapId,
     },
   };
