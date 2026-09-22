@@ -250,14 +250,18 @@ export interface SqlTables<Order> {
  *   the repository's one namespace (`db.orm.public` on PostgreSQL, the
  *   already-unbound `database.orm` on SQLite) so `tables(orm)` takes the same
  *   shape whichever database supplied it. `Handle` is opaque to this
- *   repository beyond that: PostgreSQL's is the bare ORM namespace, and
- *   SQLite's additionally carries what `Space.loadEvery` needs to
- *   read a document that may not even be JSON without the driver's codec
+ *   repository beyond that: both carry the ORM and transaction-bound execute.
+ *   PostgreSQL uses execute for its aggregate advisory lock; SQLite uses it
+ *   to read documents that may not even be JSON without the driver's codec
  *   throwing (`src/sqlite/sql-store.ts`'s doc comment).
  * - `tables(orm)` — the structural view over `orm` (or a transaction's own
  *   handle, which shares `Handle`'s type) this repository calls through.
  * - `transaction` — runs a unit of work under the database's own
  *   transaction, handing the callback the same `Handle` shape `orm` is.
+ * - `lockAggregate` — protects aggregate decisions from mixing an absent
+ *   Meta identity with another transaction's newly committed Spaces.
+ *   PostgreSQL needs an advisory lock even when no row exists; SQLite's
+ *   transaction snapshot and refusal of stale write upgrades already suffice.
  * - `readDocument` — decodes a stored `document`/`document` cell into a plain
  *   value a schema can parse: identity on PostgreSQL, whose `jsonb` codec
  *   already decoded it; `JSON.parse` on SQLite's TEXT, which only decodes at
@@ -284,6 +288,8 @@ export interface SqlStore<Handle, Order> {
   readonly orm: Handle;
   readonly tables: (orm: Handle) => SqlTables<Order>;
   readonly transaction: <T>(fn: (orm: Handle) => Promise<T>) => Promise<T>;
+  /** Protect aggregate decisions for this transaction, including when no Meta row exists. */
+  readonly lockAggregate: (orm: Handle) => Promise<void>;
   readonly readDocument: (value: unknown) => unknown;
   readonly isDuplicateKey: (error: unknown, table: string) => boolean;
   readonly isUnavailable: (error: unknown) => boolean;

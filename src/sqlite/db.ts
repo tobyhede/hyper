@@ -7,8 +7,17 @@ import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 import { DatabaseTargetConfigurationError } from '../database/database-target';
 
+/*
+ * `verifyMarker: false` disables the contract-marker check for the reason and
+ * with the test coverage recorded on `postgresOptionsFor` (`src/prisma/db.ts`,
+ * ticket 37) — `@prisma-next/sqlite`'s runtime extends the same
+ * `@prisma-next/sql-runtime` `SqlRuntimeBase` and passes `verifyMarker`
+ * straight through, so the same reasoning applies here.
+ */
 const optionsFor = (path: string | undefined): Parameters<typeof sqlite<Contract>>[0] =>
-  path === undefined ? { contractJson } : { contractJson, path };
+  path === undefined
+    ? { contractJson, verifyMarker: false }
+    : { contractJson, path, verifyMarker: false };
 
 /**
  * Fail before the driver opens a connection the parent cannot support.

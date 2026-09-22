@@ -6,6 +6,37 @@ export interface RefusingPostgresServer {
 }
 
 /**
+ * Binds `server` to `port` (0 for an OS-assigned free port) on loopback,
+ * resolving once it is listening and rejecting on a listen error. Shared so a
+ * caller minting its own loopback server (a port finder, a connection-counting
+ * listener) gets the same promise/error-handling shape this module uses.
+ */
+export const listenOnLoopback = (server: Server, port = 0): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+
+/**
+ * The TCP port a `server` listening on loopback is bound to. Node types
+ * `Server.address()` as `AddressInfo | string | null` for the pipe/Unix-socket
+ * cases neither this module nor its callers ever hit on loopback.
+ */
+export const loopbackPort = (server: Server): number => {
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('The server has no TCP address');
+  }
+  return address.port;
+};
+
+/** `server.close` as a Promise, rejecting with whatever error `close` passes. */
+export const closeServer = (server: Server): Promise<void> =>
+  new Promise<void>((resolve, reject) =>
+    server.close((error) => (error === undefined ? resolve() : reject(error))),
+  );
+
+/**
  * One PostgreSQL wire-protocol `ErrorResponse` message: a type byte, a length
  * counting itself, each field as a type byte and a NUL-terminated string, and a
  * final NUL.
@@ -43,16 +74,9 @@ export const startRefusingPostgresServer = async (
     });
     socket.on('error', () => undefined);
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  if (address === null || typeof address === 'string') {
-    throw new Error('The refusing server has no TCP address');
-  }
+  await listenOnLoopback(server);
   return {
-    url: `postgres://hyper:wrong@127.0.0.1:${address.port}/hyper`,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((error) => (error === undefined ? resolve() : reject(error))),
-      ),
+    url: `postgres://hyper:wrong@127.0.0.1:${loopbackPort(server)}/hyper`,
+    close: () => closeServer(server),
   };
 };

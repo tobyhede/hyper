@@ -11,6 +11,12 @@ import {
 import type { PostgresDatabase } from './db';
 
 type Orm = PostgresDatabase['orm']['public'];
+type Tx = Parameters<Parameters<PostgresDatabase['transaction']>[0]>[0];
+
+interface Handle {
+  readonly orm: Orm;
+  readonly execute: Tx['execute'];
+}
 
 /**
  * `Order`, named once from a real, harmless reference to the live `orm` —
@@ -207,8 +213,8 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
   const _orderProbe = asOrderable(orm.Space);
   type InferredOrder = typeof _orderProbe extends Orderable<infer O> ? O : never;
   return defineSqlStore({
-    orm,
-    tables(orm: Orm): SqlTables<InferredOrder> {
+    orm: { orm, execute: (plan, options) => database.runtime().execute(plan, options) },
+    tables({ orm }: Handle): SqlTables<InferredOrder> {
       return {
         Space: buildSpaceTable(
           orm.Space,
@@ -221,8 +227,22 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
         RepositoryState: buildRepositoryStateTable(orm.RepositoryState),
       };
     },
-    transaction<T>(fn: (orm: Orm) => Promise<T>): Promise<T> {
-      return database.transaction(({ orm }) => fn(orm.public));
+    transaction<T>(fn: (handle: Handle) => Promise<T>): Promise<T> {
+      return database.transaction((tx) => fn({ orm: tx.orm.public, execute: tx.execute }));
+    },
+    async lockAggregate(handle: Handle): Promise<void> {
+      // The fixed database-local pair is Hyper's aggregate lock namespace and
+      // singleton identity, independent of which (if any) Meta Space exists.
+      // Prisma Next 0.16.0's facade exposes raw expressions, not standalone
+      // statements. count(*) guarantees one projection even on the empty
+      // singleton table, so the volatile lock call always runs exactly once.
+      const plan = database.sql.public.repository_state
+        .select(() => ({
+          count: database.raw`count(*)::integer`.returns('pg/int4@1'),
+          lock: database.raw`pg_advisory_xact_lock(1213812818, 1)::text`.returns('pg/text@1'),
+        }))
+        .build();
+      await handle.execute(plan);
     },
     readDocument(value: unknown): unknown {
       return value;

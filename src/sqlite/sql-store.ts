@@ -238,6 +238,13 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
     transaction<T>(fn: (handle: Handle) => Promise<T>): Promise<T> {
       return database.transaction((tx) => fn(tx));
     },
+    lockAggregate(): Promise<void> {
+      // SQLite keeps one transaction snapshot even before Meta exists. Its
+      // file locks refuse a stale reader's write upgrade (BUSY/LOCKED), rather
+      // than letting later statements mix that snapshot with a new aggregate.
+      // serialise queues same-handle work; other handles retain that refusal.
+      return Promise.resolve();
+    },
     readDocument,
     isDuplicateKey(error: unknown, table: string): boolean {
       return isUniqueViolation(error, table);

@@ -77,7 +77,7 @@ What stays unclassified: a PostgreSQL non-transactional read (`listSpaces`, `loa
 
 **Sorting `#commitInTransaction`'s updates by id was considered and not done.** The review's concrete trigger was two concurrent commits updating A,B and B,A deadlocking. Read, not reproduced: a complete-aggregate commit takes the singleton row's write lock (`RepositoryState.relock`, an `UPDATE`) in `#lockMetaIdentity` before it writes any Space, so two such commits queue on that row rather than interleaving; with no Meta row there is nothing to lock, but `decideCommit` then rejects the write ("The repository has no Meta Space") before any row is touched; and the fast path writes exactly one Space. So that interleaving cannot form between two commits as the code stands, and reordering the write loop would change the order `ResourceOwnershipError` is met in for no demonstrated cure. A deadlock that does occur is now `unavailable` either way.
 
-The misconfiguration that `#transaction`'s by-position rule also names unavailable is ticket 36; the cached contract-marker failure under "Found on the way" is ticket 37.
+The misconfiguration that `#transaction`'s by-position rule also names unavailable is ticket 36; the cached contract-marker failure under "Found on the way" is ticket 37, resolved by constructing both runtimes with `verifyMarker: false`.
 
 ## Comments
 
