@@ -3,6 +3,7 @@ import {
   type ResourceId,
   type Graph,
   type GraphId,
+  type Map,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -137,53 +138,51 @@ export const withResourceRemovedFromMaps = (
   };
 };
 
-/** Everything a completed Edit writes into one Map. */
+/**
+ * What a completed Edit says about the Map it continues in: the Map's
+ * identity, as distinct from its content.
+ *
+ * Positions and Graphs are deliberately absent. The Edit that changes them
+ * writes them into the working snapshot itself — through `SnapshotEdit` or its
+ * own arm — before this is folded over the result, so a whole-snapshot answer
+ * from one of those operations is never overwritten here by a copy of the Map
+ * taken before it ran.
+ */
 export interface PositionedMapEdit {
   readonly mapId: UUID;
   readonly title: string;
-  readonly positions: Placement;
-  /**
-   * The graphs this Map owns after the Edit, in author order (ADR 0040).
-   *
-   * Replaced whole rather than merged, for the same reason the positions are:
-   * the editor holds the whole truth of them. A graph is a nested owned value
-   * of exactly one Map, so there is nowhere else for this Edit's graphs to
-   * be written and nothing at the space level left to reconcile them with.
-   */
-  readonly graphs: readonly Graph[];
   /** The Graph the Map opens on. */
   readonly activeGraphId: GraphId | null;
 }
 
-/** Fold a completed placement edit into a complete authoritative snapshot. */
+/**
+ * Fold a completed Edit's Map identity — title, kind and Active Graph — into
+ * the snapshot, and make that Map the Space's opening one.
+ *
+ * Writes into a Map the snapshot already holds, and throws for one it does not:
+ * creating a Map is the `created-map` Edit's own statement, not a side effect
+ * of naming an id here.
+ */
 export const updatePositionedMap = (
   base: SpaceSnapshot,
-  { mapId, title, positions, graphs, activeGraphId }: PositionedMapEdit,
+  { mapId, title, activeGraphId }: PositionedMapEdit,
 ): SpaceSnapshot => {
-  const existing = (base.document.maps ?? []).find((map) => map.id === mapId);
-  const map = {
-    id: mapId,
-    title,
-    kind: 'positioned' as const,
-    positions: Placement.toPositions(positions),
-    graphs: [...graphs],
-    // An Edit with no active Graph says nothing about the authored one, so the
-    // existing value carries through. Only a named Graph replaces it.
-    ...(activeGraphId !== null
-      ? { activeGraph: activeGraphId }
-      : existing?.activeGraph !== undefined
-        ? { activeGraph: existing.activeGraph }
-        : {}),
-  };
-  const maps = [...(base.document.maps ?? [])];
-  const existingIndex = maps.findIndex((candidate) => candidate.id === mapId);
-  if (existingIndex === -1) maps.push(map);
-  else maps[existingIndex] = map;
+  const maps = base.document.maps ?? [];
+  if (!maps.some((map) => map.id === mapId)) {
+    throw new Error(`Cannot write Map ${mapId}: the snapshot holds no such Map.`);
+  }
   return {
     ...base,
     document: {
       ...base.document,
-      maps,
+      maps: maps.map((existing) => {
+        if (existing.id !== mapId) return existing;
+        const written: Map = { ...existing, title, kind: 'positioned' };
+        // An Edit with no active Graph says nothing about the authored one, so
+        // the existing value carries through. Only a named Graph replaces it.
+        if (activeGraphId !== null) written.activeGraph = activeGraphId;
+        return written;
+      }),
       defaultMap: mapId,
     },
   };

@@ -151,6 +151,8 @@ describe('Add Map', () => {
       },
     ]);
     expect(session.getState().working.document.defaultMap).toBe(MINTED);
+    // A new Map owns its Graph; there is no Space-level Graph collection.
+    expect(Object.hasOwn(session.getState().working.document, 'graphs')).toBe(false);
     expect(navigation.getState().selectedMapId).toBe(MINTED);
   });
 

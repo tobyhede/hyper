@@ -8,6 +8,7 @@ import {
   type Graph,
   type GraphEdge,
   type GraphId,
+  type Map,
   type MapId,
   type MapPosition,
   RESOURCE_TITLE_REQUIRED,
@@ -729,22 +730,6 @@ const referenceTargetRefusal = (
   return null;
 };
 
-/**
- * A Resource an Edit is creating, held rather than placed.
- *
- * Its position waits here until the complete next Map is assembled.
- */
-interface CreatedResource {
-  readonly id: ResourceId;
-  readonly position: MapPosition;
-  /**
-   * Step off a position another Resource already occupies exactly. A gesture that
-   * dropped on empty canvas aimed at its point and keeps it; a Resource created from
-   * a menu has no aimed-at point and would otherwise stack.
-   */
-  readonly avoidingOverlap: boolean;
-}
-
 /** The Reference Resources pointing at a Resource, which are what block deleting it from the Space. */
 const incomingReferences = (
   resources: SnapshotResources,
@@ -1041,8 +1026,7 @@ export function createSpaceAuthoring({
    *
    * `members` and `graph` are the Map and Graph this Edit writes, and every
    * caller supplies `members` explicitly — the selected Map's own placement
-   * for a preview, the in-progress `completedPlacement` for an Edit already
-   * assembling one. `graph` alone keeps a default, the Active Graph through
+   * for a preview, and the placement a completed Edit derives from for an Edit. `graph` alone keeps a default, the Active Graph through
    * `targetGraph()`, because the host canvas is the one caller that never names
    * a Graph of its own; a Space Resource names the Graph it is showing.
    */
@@ -1118,21 +1102,34 @@ export function createSpaceAuthoring({
       const snapshot = session.getState().working;
       const mapId = newId();
       const graphId = newId();
-      const emptyPlacement = Placement.fromEntries([]);
-      const next = updatePositionedMap(snapshot, {
-        mapId,
-        title: nextMapTitle(snapshot),
-        positions: emptyPlacement,
-        graphs: [
-          {
-            id: graphId,
-            title: 'Graph 1',
-            color: nextGraphColor(0),
-            edges: [],
-          },
-        ],
-        activeGraphId: graphId,
-      });
+      // The one Edit that makes a Map rather than writing into one, so it
+      // builds the whole Map here: empty, owning one empty Graph that it opens
+      // on, and the Space's opening Map from now on (ADR 0079).
+      const next: SpaceSnapshot = {
+        ...snapshot,
+        document: {
+          ...snapshot.document,
+          maps: [
+            ...(snapshot.document.maps ?? []),
+            {
+              id: mapId,
+              title: nextMapTitle(snapshot),
+              kind: 'positioned',
+              positions: {},
+              graphs: [
+                {
+                  id: graphId,
+                  title: 'Graph 1',
+                  color: nextGraphColor(0),
+                  edges: [],
+                },
+              ],
+              activeGraph: graphId,
+            },
+          ],
+          defaultMap: mapId,
+        },
+      };
       assertValidAuthoredSnapshot(next);
       return {
         kind: 'completed',
@@ -1255,36 +1252,58 @@ export function createSpaceAuthoring({
       return refuse({ code: 'map-not-found' });
     }
     const resolved = resolveMap(space, selection);
-    /**
-     * What this Edit does to the placement, held rather than applied.
-     *
-     * Resource additions and removals wait here until the complete next Map is
-     * assembled.
-     */
-    let createdResource: CreatedResource | null = null;
-    let unplacedResourceId: ResourceId | undefined;
-    let deletedResourceId: ResourceId | undefined;
+    // Which Map this Edit writes. Every arm below that changes its positions
+    // or its Graphs writes them into `snapshot` itself, and the tail folds only
+    // the Map's identity over the result — so an arm answered by a
+    // whole-snapshot operation is never overwritten by a copy of the Map taken
+    // before that operation ran.
+    const mapId: UUID = resolved.map.id;
+    let createdResourceId: ResourceId | undefined;
     let connection: GraphEdge | null = null;
     // The Map's own placement, read fresh at derivation — the one source of
     // geometry this Edit starts from. A queued completion derives against this
     // too, at drain time rather than at the moment it was requested, which is
     // what keeps a settled drag from landing against a Map that has since
     // moved on.
-    let completedPlacement = Placement.fromMap(resolved.map);
-    // The one way a Resource is added: mint it, place it at a free anchor, append it.
-    // Add Resource and Add Reference Resource differ in the document they carry and in nothing
+    const placement = Placement.fromMap(resolved.map);
+    const writeMap = (write: (map: Map) => Map): void => {
+      snapshot = {
+        ...snapshot,
+        document: {
+          ...snapshot.document,
+          maps: (snapshot.document.maps ?? []).map((map) => (map.id === mapId ? write(map) : map)),
+        },
+      };
+    };
+    const writePlacement = (next: Placement): void => {
+      writeMap((map) => ({ ...map, positions: Placement.toPositions(next) }));
+    };
+    const writeGraphs = (graphs: readonly Graph[]): void => {
+      writeMap((map) => ({ ...map, graphs: [...graphs] }));
+    };
+    // The one way a Resource is added: mint it, append it, place it. Add Resource
+    // and Add Reference Resource differ in the document they carry and in nothing
     // else — neither creates an Edge, and neither adds a Graph to a Map that
     // already has one.
-    // Returns rather than assigns: `createdResource` is read further down, and a
-    // `let` written only from inside a closure keeps its initial narrowing.
+    // Returns rather than assigns: `createdResourceId` is read further down, and
+    // a `let` written only from inside a closure keeps its initial narrowing.
     const createResource = (
       document: ResourceDocument,
       at: MapPosition,
+      /**
+       * Step off a position another Resource already occupies exactly. A gesture
+       * that dropped on empty canvas aimed at its point and keeps it; a Resource
+       * created from a menu has no aimed-at point and would otherwise stack.
+       */
       avoidingOverlap = true,
-    ): CreatedResource => {
+    ): ResourceId => {
       const id = newId();
       snapshot = { ...snapshot, resources: [...snapshot.resources, { id, document }] };
-      return { id, position: at, avoidingOverlap };
+      // The drop point is authorship, not a coordinate to convert (ADR 0084).
+      writePlacement(
+        Placement.place(placement, id, avoidingOverlap ? freeAnchor(placement, at) : at),
+      );
+      return id;
     };
     if (completion.kind === 'edited-resource') {
       const resourceIndex = snapshot.resources.findIndex(
@@ -1329,7 +1348,7 @@ export function createSpaceAuthoring({
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
     } else if (completion.kind === 'opened-resource') {
-      const at = completedPlacement.get(completion.resourceId);
+      const at = placement.get(completion.resourceId);
       if (at === undefined) return refuse({ code: 'resource-not-in-map' });
       if (at.open) return UNCHANGED;
       // The size the Resource is actually opening at: the one it remembers, or the
@@ -1340,22 +1359,24 @@ export function createSpaceAuthoring({
         (space.lookup.resource(completion.resourceId)?.kind === 'space'
           ? DEFAULT_SPACE_RESOURCE_OPEN_SIZE
           : DEFAULT_OPEN_SIZE);
-      completedPlacement = withRoomFor(
-        completedPlacement,
-        completion.resourceId,
-        { ...at, open: true, openSize },
-        Placement.growth(openSize),
+      writePlacement(
+        withRoomFor(
+          placement,
+          completion.resourceId,
+          { ...at, open: true, openSize },
+          Placement.growth(openSize),
+        ),
       );
     } else if (completion.kind === 'closed-resource') {
-      const at = completedPlacement.get(completion.resourceId);
+      const at = placement.get(completion.resourceId);
       if (at === undefined) return refuse({ code: 'resource-not-in-map' });
       if (!at.open) return UNCHANGED;
       // Read as the Map stands, with no record of who this Resource's Open
       // pushed: everything currently clear of it moves back, the Resources the author
       // dragged there while it was open included (ADR 0084).
-      completedPlacement = closedResource(completedPlacement, completion.resourceId, at);
+      writePlacement(closedResource(placement, completion.resourceId, at));
     } else if (completion.kind === 'resized-resource') {
-      const at = completedPlacement.get(completion.resourceId);
+      const at = placement.get(completion.resourceId);
       if (at === undefined) return refuse({ code: 'resource-not-in-map' });
       if (!at.open) return refuse({ code: 'resource-not-expanded' });
       if (
@@ -1365,22 +1386,24 @@ export function createSpaceAuthoring({
         // The magnetic Close (ADR 0066). It is a Close, so it takes the Close
         // path rather than restating it — reclaiming the growth of the size the
         // Resource was Open at, not the zero growth of the rect being proposed.
-        completedPlacement = closedResource(completedPlacement, completion.resourceId, at);
+        writePlacement(closedResource(placement, completion.resourceId, at));
       } else if (
         at.openSize.width === completion.size.width &&
         at.openSize.height === completion.size.height
       ) {
         return UNCHANGED;
       } else {
-        completedPlacement = withRoomFor(
-          completedPlacement,
-          completion.resourceId,
-          { ...at, openSize: completion.size },
-          roomBetween(at.openSize, completion.size),
+        writePlacement(
+          withRoomFor(
+            placement,
+            completion.resourceId,
+            { ...at, openSize: completion.size },
+            roomBetween(at.openSize, completion.size),
+          ),
         );
       }
     } else if (completion.kind === 'created-resource') {
-      createdResource = createResource(
+      createdResourceId = createResource(
         { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
         completion.anchor,
       );
@@ -1407,29 +1430,30 @@ export function createSpaceAuthoring({
       };
       const refusal = referenceTargetRefusal(space, document);
       if (refusal !== null) return refuse(refusal);
-      createdResource = createResource(document, completion.anchor);
+      createdResourceId = createResource(document, completion.anchor);
     } else if (completion.kind === 'added-resource-to-map') {
       if (space.lookup.resource(completion.resourceId) === undefined) {
         return refuse({ code: 'resource-not-found' });
       }
-      if (completedPlacement.has(completion.resourceId)) {
+      if (placement.has(completion.resourceId)) {
         return refuse({ code: 'resource-already-in-map' });
       }
       // Membership and a position, and nothing else: a re-added Resource is detached,
       // and the Edges it once had are never inferred back.
       // The anchor is taken as given: a canvas coordinate is an authored one
       // (ADR 0084).
-      completedPlacement = Placement.place(
-        completedPlacement,
-        completion.resourceId,
-        freeAnchor(completedPlacement, completion.anchor),
+      writePlacement(
+        Placement.place(placement, completion.resourceId, freeAnchor(placement, completion.anchor)),
       );
     } else if (completion.kind === 'removed-resource-from-map') {
-      if (!completedPlacement.has(completion.resourceId)) {
+      if (!placement.has(completion.resourceId)) {
         return refuse({ code: 'resource-not-in-map' });
       }
-      unplacedResourceId = completion.resourceId;
-      completedPlacement = removedResource(completedPlacement, completion.resourceId);
+      writePlacement(removedResource(placement, completion.resourceId));
+      // A Resource that has left this Map cannot be an endpoint of a Graph this
+      // Map owns (ADR 0040), so its incident Edges leave with it. The Graphs
+      // themselves stay, empty ones included: deletion is their own action.
+      writeGraphs(withoutIncidentEdges(resolved.map.graphs, completion.resourceId));
     } else if (completion.kind === 'deleted-resource') {
       const deleted = space.lookup.resource(completion.resourceId);
       if (deleted === undefined) {
@@ -1456,25 +1480,28 @@ export function createSpaceAuthoring({
           referenceTitles: incoming.map((reference) => titleName(reference.document.title)),
         });
       }
-      // Deferred like a creation so the complete Map changes atomically.
-      unplacedResourceId = completion.resourceId;
-      deletedResourceId = completion.resourceId;
-      snapshot = {
-        ...snapshot,
-        resources: snapshot.resources.filter((resource) => resource.id !== completion.resourceId),
-      };
+      // One Edit over every Map (ADR 0040), the one this Edit is drawing
+      // included: the cascade reclaims, unplaces and disconnects the Resource
+      // wherever it was placed.
+      snapshot = withResourceRemovedFromMaps(
+        {
+          ...snapshot,
+          resources: snapshot.resources.filter((resource) => resource.id !== completion.resourceId),
+        },
+        completion.resourceId,
+      );
     } else if (completion.kind === 'create-and-connect') {
-      const refusal = connectRefusal(completion.from, null, completedPlacement);
+      const refusal = connectRefusal(completion.from, null, placement);
       if (refusal !== null) return refuse(refusal);
       // The drop point is aimed at, so it is kept exactly: the gesture only
       // offers an empty-canvas release, and stepping off it would move the Resource
       // away from where the author watched the preview sit.
-      createdResource = createResource(
+      createdResourceId = createResource(
         { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
         completion.position,
         false,
       );
-      connection = { from: completion.from, to: createdResource.id };
+      connection = { from: completion.from, to: createdResourceId };
     } else if (completion.kind === 'connected-resources') {
       const named =
         completion.graphId === undefined
@@ -1491,28 +1518,28 @@ export function createSpaceAuthoring({
           : fallbackId === undefined
             ? null
             : (resolved.map.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
-      const refusal = connectRefusal(completion.from, completion.to, completedPlacement, graph);
+      const refusal = connectRefusal(completion.from, completion.to, placement, graph);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
     } else if (completion.kind === 'settled-resource-movement') {
       // The moved Resources' drop points, merged over the Map's own positions
       // this Edit already started from — `Placement.next` is what keeps each
       // Resource's Open/Closed state and Open Size while overwriting `x`/`y`.
-      completedPlacement = Placement.next(
-        completedPlacement,
-        Placement.fromEntries(completion.moved),
-        [...completion.moved.keys()],
+      writePlacement(
+        Placement.next(placement, Placement.fromEntries(completion.moved), [
+          ...completion.moved.keys(),
+        ]),
       );
     }
-    // Which Map this Edit writes, and what it owns afterwards.
-    const mapId: UUID = resolved.map.id;
+    // What the tail writes as the Map's identity.
     let mapTitle: string;
-    let ownedGraphs: readonly Graph[];
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
     const { map } = resolved;
     mapTitle = map.title;
-    ownedGraphs = map.graphs;
+    // The Graphs as they stand after the arm above: the arms that write Graphs
+    // below are never the ones that wrote them above, so this is the Map's own.
+    const ownedGraphs = map.graphs;
     activeGraphId =
       embeddedMapId === undefined
         ? navigationState.activeGraphId
@@ -1542,21 +1569,6 @@ export function createSpaceAuthoring({
       if (title === mapTitle) return UNCHANGED;
       mapTitle = title;
     }
-    // Apply membership changes together to the completed Map.
-    if (createdResource !== null) {
-      // As above: the drop point is authorship, not a coordinate to convert
-      // (ADR 0084).
-      completedPlacement = Placement.place(
-        completedPlacement,
-        createdResource.id,
-        createdResource.avoidingOverlap
-          ? freeAnchor(completedPlacement, createdResource.position)
-          : createdResource.position,
-      );
-    }
-    if (deletedResourceId !== undefined) {
-      completedPlacement = removedResource(completedPlacement, deletedResourceId);
-    }
     if (connection !== null) {
       const writeGraphId =
         completion.kind === 'connected-resources' && completion.graphId !== undefined
@@ -1569,12 +1581,7 @@ export function createSpaceAuthoring({
       }
       const graphs = [...ownedGraphs];
       graphs[graphIndex] = { ...graph, edges: [...graph.edges, connection] };
-      ownedGraphs = graphs;
-    } else if (unplacedResourceId !== undefined) {
-      // A Resource that has left this Map cannot be an endpoint of a Graph this
-      // Map owns (ADR 0040), so its incident Edges leave with it. The Graphs
-      // themselves stay, empty ones included: deletion is their own action.
-      ownedGraphs = withoutIncidentEdges(ownedGraphs, unplacedResourceId);
+      writeGraphs(graphs);
     } else if (completion.kind === 'added-graph') {
       const graph: Graph = {
         id: newId(),
@@ -1582,7 +1589,7 @@ export function createSpaceAuthoring({
         color: nextGraphColor(ownedGraphs.length),
         edges: [],
       };
-      ownedGraphs = [...ownedGraphs, graph];
+      writeGraphs([...ownedGraphs, graph]);
       activeGraphId = graph.id;
       createdGraphId = graph.id;
     } else if (
@@ -1609,65 +1616,56 @@ export function createSpaceAuthoring({
           return refuse({ code: 'graph-title-required' });
         }
         if (title === graph.title) return UNCHANGED;
-        ownedGraphs = replacing({ ...graph, title });
+        writeGraphs(replacing({ ...graph, title }));
       } else if (completion.kind === 'recolored-graph') {
         if (completion.color === graph.color) return UNCHANGED;
-        ownedGraphs = replacing({ ...graph, color: completion.color });
+        writeGraphs(replacing({ ...graph, color: completion.color }));
       } else if (completion.kind === 'deleted-graph') {
         // Every Map resolves an Active Graph, so the last one cannot go
         // (ADR 0040). Removing its Edges is the author's way to empty it.
         if (ownedGraphs.length === 1) {
           return refuse({ code: 'map-must-keep-graph' });
         }
-        ownedGraphs = ownedGraphs.filter((_, index) => index !== graphIndex);
+        const survivors = ownedGraphs.filter((_, index) => index !== graphIndex);
+        writeGraphs(survivors);
         // Order among the survivors is untouched, and the first of them becomes
         // active when the deleted Graph was the one being emphasised.
-        if (activeGraphId === graph.id) activeGraphId = ownedGraphs[0]?.id ?? null;
+        if (activeGraphId === graph.id) activeGraphId = survivors[0]?.id ?? null;
       } else if (completion.kind === 'deleted-edge') {
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
         if (edgeIndex === -1) {
           return refuse({ code: 'edge-not-found' });
         }
-        ownedGraphs = replacing({
-          ...graph,
-          edges: graph.edges.filter((_, index) => index !== edgeIndex),
-        });
+        writeGraphs(
+          replacing({
+            ...graph,
+            edges: graph.edges.filter((_, index) => index !== edgeIndex),
+          }),
+        );
       } else {
         // The same rule `edgeEligibility` offered the gesture under, asked again
         // because the Space can have changed since — and answering with the
         // resulting Edge rather than a boolean, so there is nothing to rederive.
-        const outcome = reconnectOutcome(graph, completion, completedPlacement, (resourceId) =>
+        const outcome = reconnectOutcome(graph, completion, placement, (resourceId) =>
           snapshot.resources.some((resource) => resource.id === resourceId),
         );
         if (outcome.kind !== 'edge') return outcome;
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
         // In place, so reconnecting does not reorder a Graph's Edges — that order
         // is what a branching Resource's moves are offered in (ADR 0024).
-        ownedGraphs = replacing({
-          ...graph,
-          edges: graph.edges.map((edge, index) => (index === edgeIndex ? outcome.edge : edge)),
-        });
+        writeGraphs(
+          replacing({
+            ...graph,
+            edges: graph.edges.map((edge, index) => (index === edgeIndex ? outcome.edge : edge)),
+          }),
+        );
       }
     }
-    const next = updatePositionedMap(
-      // The cascade first, then this Map written whole over the top of it.
-      // Delete Resource from Space is one Edit over every Map (ADR 0040), and the
-      // current one is simply the Map this Edit was also going to write.
-      deletedResourceId === undefined
-        ? snapshot
-        : withResourceRemovedFromMaps(snapshot, deletedResourceId),
-      {
-        mapId,
-        title: mapTitle,
-        positions: completedPlacement,
-        graphs: ownedGraphs,
-        activeGraphId,
-      },
-    );
+    const next = updatePositionedMap(snapshot, { mapId, title: mapTitle, activeGraphId });
     if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
     assertValidAuthoredSnapshot(next);
     const created: { createdResourceId?: ResourceId; createdGraphId?: GraphId } = {};
-    if (createdResource !== null) created.createdResourceId = createdResource.id;
+    if (createdResourceId !== undefined) created.createdResourceId = createdResourceId;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
     return {
       kind: 'completed',

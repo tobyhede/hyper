@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type Graph } from '@project/core';
-import { loadSpaceSnapshot, Placement } from '@project/graph';
+import { loadSpaceSnapshot } from '@project/graph';
 import {
   snapshotFromSpace,
   updatePositionedMap,
@@ -46,15 +46,15 @@ const snapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-it('writes a Map that owns its Graphs as a complete valid persistence snapshot', () => {
+/**
+ * The helper writes a Map's identity, not its content: the Edit that changes
+ * positions or Graphs has already written them into the snapshot, and this
+ * must not put an older copy back over them.
+ */
+it("writes a Map's identity and opening selection, preserving its positions and Graphs", () => {
   const changed = updatePositionedMap(snapshot, {
     mapId: MAP_ID,
-    title: 'Map',
-    positions: Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: false }],
-      [RESOURCE_B, { x: 300, y: 40, open: false }],
-    ]),
-    graphs: [MAIN],
+    title: 'Renamed',
     activeGraphId: GRAPH_ID,
   });
 
@@ -63,11 +63,11 @@ it('writes a Map that owns its Graphs as a complete valid persistence snapshot',
   expect(changed.document.maps).toEqual([
     {
       id: MAP_ID,
-      title: 'Map',
+      title: 'Renamed',
       kind: 'positioned',
       positions: {
-        [RESOURCE_A]: { x: 10, y: 20, open: false },
-        [RESOURCE_B]: { x: 300, y: 40, open: false },
+        [RESOURCE_A]: { x: 0, y: 0, open: false },
+        [RESOURCE_B]: { x: 200, y: 0, open: false },
       },
       graphs: [MAIN],
       activeGraph: GRAPH_ID,
@@ -76,22 +76,15 @@ it('writes a Map that owns its Graphs as a complete valid persistence snapshot',
   expect(loadSpaceSnapshot(changed).ok).toBe(true);
 });
 
-/** A new Map owns its Graph; there is no Space-level Graph collection. */
-it('appends a Map owning its own Graph without touching the other Maps', () => {
-  const minted: Graph = { id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] };
-  const changed = updatePositionedMap(snapshot, {
-    mapId: OTHER_MAP_ID,
-    title: 'Map 2',
-    positions: Placement.fromEntries([[RESOURCE_A, { x: 1, y: 2, open: false }]]),
-    graphs: [minted],
-    activeGraphId: OTHER_GRAPH_ID,
-  });
-
-  expect(changed.document.maps).toHaveLength(2);
-  expect(changed.document.maps?.[1]?.graphs).toEqual([minted]);
-  expect(changed.document.maps?.[1]?.activeGraph).toBe(OTHER_GRAPH_ID);
-  expect(Object.hasOwn(changed.document, 'graphs')).toBe(false);
-  expect(loadSpaceSnapshot(changed).ok).toBe(true);
+/** Creating a Map is the `created-map` Edit's own statement, not a side effect of an id. */
+it('refuses to write a Map the snapshot does not hold', () => {
+  expect(() =>
+    updatePositionedMap(snapshot, {
+      mapId: OTHER_MAP_ID,
+      title: 'Map 2',
+      activeGraphId: OTHER_GRAPH_ID,
+    }),
+  ).toThrow(OTHER_MAP_ID);
 });
 
 it('converts the validated runtime aggregate back to the persistence seam', () => {
@@ -103,7 +96,7 @@ it('converts the validated runtime aggregate back to the persistence seam', () =
   expect(snapshotFromSpace(loaded.space).document.version).toBe(1);
 });
 
-it('leaves unrelated maps standing while replacing placement', () => {
+it('leaves unrelated maps standing while writing one', () => {
   const withMaps = spaceSnapshotSchema.parse({
     ...snapshot,
     document: {
@@ -126,11 +119,6 @@ it('leaves unrelated maps standing while replacing placement', () => {
   const changed = updatePositionedMap(withMaps, {
     mapId: MAP_ID,
     title: 'Map',
-    positions: Placement.fromEntries([
-      [RESOURCE_A, { x: 5, y: 6, open: false }],
-      [RESOURCE_B, { x: 7, y: 8, open: false }],
-    ]),
-    graphs: [MAIN],
     activeGraphId: GRAPH_ID,
   });
 
@@ -151,37 +139,14 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
   const changed = updatePositionedMap(snapshot, {
     mapId: MAP_ID,
     title: 'Map',
-    positions: Placement.fromEntries([
-      [RESOURCE_A, { x: 5, y: 6, open: false }],
-      [RESOURCE_B, { x: 7, y: 8, open: false }],
-    ]),
-    graphs: [MAIN],
     activeGraphId: null,
   });
 
   expect(changed.document.maps?.[0]?.activeGraph).toBeUndefined();
 
   const authored = updatePositionedMap(
-    updatePositionedMap(snapshot, {
-      mapId: MAP_ID,
-      title: 'Map',
-      positions: Placement.fromEntries([
-        [RESOURCE_A, { x: 5, y: 6, open: false }],
-        [RESOURCE_B, { x: 7, y: 8, open: false }],
-      ]),
-      graphs: [MAIN],
-      activeGraphId: GRAPH_ID,
-    }),
-    {
-      mapId: MAP_ID,
-      title: 'Map',
-      positions: Placement.fromEntries([
-        [RESOURCE_A, { x: 9, y: 9, open: false }],
-        [RESOURCE_B, { x: 7, y: 8, open: false }],
-      ]),
-      graphs: [MAIN],
-      activeGraphId: null,
-    },
+    updatePositionedMap(snapshot, { mapId: MAP_ID, title: 'Map', activeGraphId: GRAPH_ID }),
+    { mapId: MAP_ID, title: 'Map', activeGraphId: null },
   );
 
   expect(authored.document.maps?.[0]?.activeGraph).toBe(GRAPH_ID);
