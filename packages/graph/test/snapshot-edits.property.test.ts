@@ -652,3 +652,207 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 });
+
+describe('SnapshotEdit.addToMap and removeFromMap properties', () => {
+  const OTHER_MAP_ID = uuid('00000000-0000-4000-8000-000000000004');
+  const OTHER_GRAPH_ID = uuid('00000000-0000-4000-8000-000000000005');
+
+  /**
+   * Two Maps over the same Resources, each owning a Graph chained through all
+   * of them, so a Resource removed from one has incident Edges in both.
+   * `absent` is left out of the first Map, for Add to Map to add back.
+   */
+  const twoMaps = (
+    ids: readonly UUID[],
+    coords: readonly number[],
+    open: boolean,
+    absent?: UUID,
+  ): SpaceSnapshot => {
+    const placement = closedPlacement(ids, coords);
+    const members = ids.filter((id) => id !== absent);
+    const first = Placement.toPositions(
+      Placement.fromEntries(
+        members.map((id): [UUID, ResourcePlacement] => {
+          const at = placement.get(id) ?? { x: 0, y: 0, open: false };
+          return [id, open ? { x: at.x, y: at.y, open: true, openSize: DEFAULT_OPEN_SIZE } : at];
+        }),
+      ),
+    );
+    const base = baseSnapshot(ids, first, chainEdges(members));
+    return {
+      ...base,
+      document: {
+        ...base.document,
+        maps: [
+          ...(base.document.maps ?? []),
+          {
+            id: OTHER_MAP_ID,
+            title: 'Map 2',
+            kind: 'positioned',
+            positions: Placement.toPositions(placement),
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 2', edges: chainEdges(ids) }],
+          },
+        ],
+      },
+    };
+  };
+
+  const completed = (outcome: SnapshotEditOutcome): SpaceSnapshot => {
+    if (outcome.kind !== 'completed') throw new Error(`Expected completed, got ${outcome.kind}`);
+    expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
+    return outcome.snapshot;
+  };
+
+  const mapIn = (snapshot: SpaceSnapshot, mapId: UUID) =>
+    snapshot.document.maps?.find((map) => map.id === mapId);
+
+  it('removes a Resource from the one Map only, with every Edge incident to it there', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.nat({ max: 8 }),
+        fc.boolean(),
+        (ids, coords, subjectSeed, open) => {
+          const subject = ids[subjectSeed % ids.length];
+          if (subject === undefined) return;
+          const snapshot = twoMaps(ids, coords, open);
+
+          const removed = completed(SnapshotEdit.removeFromMap(snapshot, MAP_ID, subject));
+
+          const map = mapIn(removed, MAP_ID);
+          expect(map?.positions[subject]).toBeUndefined();
+          expect(
+            map?.graphs
+              .flatMap((graph) => graph.edges)
+              .some((edge) => edge.from === subject || edge.to === subject),
+          ).toBe(false);
+          // Graphs stay, empty ones included: deleting a Graph is its own action.
+          expect(map?.graphs.map((graph) => graph.id)).toEqual([GRAPH_ID]);
+          expect(mapIn(removed, OTHER_MAP_ID)).toEqual(mapIn(snapshot, OTHER_MAP_ID));
+          expect(removed.resources).toEqual(snapshot.resources);
+        },
+      ),
+    );
+  });
+
+  it('never lands avoidingOverlap on an occupied point, and keeps an exact point as aimed', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.nat({ max: 8 }),
+        fc.nat({ max: 8 }),
+        (ids, coords, subjectSeed, anchorSeed) => {
+          const subject = ids[subjectSeed % ids.length];
+          const others = ids.filter((id) => id !== subject);
+          const neighbour = others[anchorSeed % others.length];
+          if (subject === undefined || neighbour === undefined) return;
+          const snapshot = twoMaps(ids, coords, false, subject);
+          const positions = mapIn(snapshot, MAP_ID)?.positions ?? {};
+          const anchor = positions[neighbour];
+          if (anchor === undefined) return;
+
+          const avoiding = completed(
+            SnapshotEdit.addToMap(snapshot, MAP_ID, subject, anchor, 'avoidingOverlap'),
+          );
+          const landed = mapIn(avoiding, MAP_ID)?.positions[subject];
+          expect(landed?.open).toBe(false);
+          expect(
+            others.some((id) => positions[id]?.x === landed?.x && positions[id]?.y === landed?.y),
+          ).toBe(false);
+          // No Edge is inferred back for a Resource added to a Map.
+          expect(mapIn(avoiding, MAP_ID)?.graphs).toEqual(mapIn(snapshot, MAP_ID)?.graphs);
+
+          const exact = completed(
+            SnapshotEdit.addToMap(snapshot, MAP_ID, subject, anchor, 'exact'),
+          );
+          expect(mapIn(exact, MAP_ID)?.positions[subject]).toEqual({
+            x: anchor.x,
+            y: anchor.y,
+            open: false,
+          });
+        },
+      ),
+    );
+  });
+
+  it('gives back the room an Open Resource held, leaving everyone where removing it Closed would', () => {
+    // Leaving a Map is a Close the Resource does not come back from (ADR 0084).
+    fc.assert(
+      fc.property(idsArb, coordsArb, fc.nat({ max: 8 }), (ids, coords, subjectSeed) => {
+        const subject = ids[subjectSeed % ids.length];
+        if (subject === undefined) return;
+        const closed = twoMaps(ids, coords, false);
+        const opened = completed(SnapshotEdit.open(closed, MAP_ID, subject));
+
+        const fromClosed = completed(SnapshotEdit.removeFromMap(closed, MAP_ID, subject));
+        const fromOpened = completed(SnapshotEdit.removeFromMap(opened, MAP_ID, subject));
+
+        expect(mapIn(fromOpened, MAP_ID)?.positions).toEqual(mapIn(fromClosed, MAP_ID)?.positions);
+      }),
+    );
+  });
+
+  it('refuses a Map, a Resource or a membership it cannot add, changing nothing', () => {
+    fc.assert(
+      fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, stranger) => {
+        fc.pre(!ids.includes(stranger) && stranger !== MAP_ID && stranger !== OTHER_MAP_ID);
+        const member = ids[0];
+        if (member === undefined) return;
+        const snapshot = twoMaps(ids, coords, false);
+        const at = { x: 0, y: 0 };
+
+        expect(SnapshotEdit.addToMap(snapshot, stranger, member, at, 'exact')).toEqual({
+          kind: 'refused',
+          refusal: { code: 'map-not-found' },
+        });
+        expect(SnapshotEdit.addToMap(snapshot, MAP_ID, stranger, at, 'exact')).toEqual({
+          kind: 'refused',
+          refusal: { code: 'resource-not-found' },
+        });
+        expect(SnapshotEdit.addToMap(snapshot, MAP_ID, member, at, 'exact')).toEqual({
+          kind: 'refused',
+          refusal: { code: 'resource-already-in-map' },
+        });
+        expect(SnapshotEdit.removeFromMap(snapshot, stranger, member)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'map-not-found' },
+        });
+        expect(SnapshotEdit.removeFromMap(snapshot, MAP_ID, stranger)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'resource-not-in-map' },
+        });
+      }),
+    );
+  });
+
+  it('removes a Resource that a Reference Resource targets, which only deletion refuses', () => {
+    fc.assert(
+      fc.property(
+        idsArb,
+        coordsArb,
+        fc.nat({ max: 8 }),
+        fc.uuid().map(uuid),
+        (ids, coords, subjectSeed, referenceId) => {
+          fc.pre(!ids.includes(referenceId));
+          const subject = ids[subjectSeed % ids.length];
+          if (subject === undefined) return;
+          const base = twoMaps(ids, coords, false);
+          const snapshot: SpaceSnapshot = {
+            ...base,
+            resources: [
+              ...base.resources,
+              {
+                id: referenceId,
+                document: { title: 'Reference', kind: 'reference', target: subject },
+              },
+            ],
+          };
+
+          expect(SnapshotEdit.removeFromMap(snapshot, MAP_ID, subject).kind).toBe('completed');
+        },
+      ),
+    );
+  });
+});

@@ -3,6 +3,7 @@ import {
   DEFAULT_OPEN_SIZE,
   DEFAULT_SPACE_RESOURCE_OPEN_SIZE,
   titleName,
+  type Graph,
   type Map,
   type MapPosition,
   type ResourcePlacement,
@@ -34,7 +35,8 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one:
  * `createInMap` and `deleteFromSpace` are what the session registry needs;
- * `open`, `close` and `resize` are Space Authoring's.
+ * `open`, `close`, `resize`, `addToMap` and `removeFromMap` are Space
+ * Authoring's.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
@@ -42,6 +44,7 @@ export type SnapshotEditRefusal =
   | { readonly code: 'resource-not-found' }
   | { readonly code: 'map-not-found' }
   | { readonly code: 'resource-not-in-map' }
+  | { readonly code: 'resource-already-in-map' }
   /** A Resize of a Resource that is not Open: there is no Open Size to change. */
   | { readonly code: 'resource-not-expanded' }
   | {
@@ -139,6 +142,33 @@ function createInMap(
 }
 
 /**
+ * The Graphs a Resource has left, with every Edge incident to it gone.
+ *
+ * A Resource that is not a member of a Map cannot be an endpoint of a Graph
+ * that Map owns (ADR 0040), so this is what both removals owe: Remove from Map
+ * applies it to the one Map, and Delete from Space to every Map. The Graphs
+ * themselves stay, empty ones included: deleting a Graph is its own action.
+ */
+const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: UUID): Graph[] =>
+  graphs.map((graph) => ({
+    ...graph,
+    edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
+  }));
+
+/**
+ * The placement with a Resource gone and the room it held given back.
+ *
+ * Leaving a Map is a Close the Resource does not come back from, so it
+ * reclaims as a Close does (ADR 0084) — the room is written into the
+ * neighbours' own coordinates, so a removal that only dropped the entry would
+ * leave a hole nothing on the canvas explains and no Edit can give back. The
+ * reclaim runs **before** the removal, because `Placement.reclaim` reads the
+ * Resource's own entry.
+ */
+const removedFrom = (placement: Placement, resourceId: UUID): Placement =>
+  Placement.remove(Placement.reclaim(placement, resourceId), resourceId);
+
+/**
  * Remove a Resource from a Space entirely: its own entry, its position and every
  * Edge incident to it in **every** Map, with the room it held given back
  * wherever it was Open (ADR 0084).
@@ -182,13 +212,8 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
         ...snapshot.document,
         maps: maps.map((map) => ({
           ...map,
-          positions: Placement.toPositions(
-            Placement.remove(Placement.reclaim(Placement.fromMap(map), resourceId), resourceId),
-          ),
-          graphs: map.graphs.map((graph) => ({
-            ...graph,
-            edges: graph.edges.filter((edge) => edge.from !== resourceId && edge.to !== resourceId),
-          })),
+          positions: Placement.toPositions(removedFrom(Placement.fromMap(map), resourceId)),
+          graphs: withoutIncidentEdges(map.graphs, resourceId),
         })),
       },
     },
@@ -383,10 +408,78 @@ function resize(
   );
 }
 
+/**
+ * Add a Resource the Space already holds to one Map, Closed, with no Edge.
+ *
+ * Membership and a position and nothing else: a Resource added back to a Map
+ * is detached, and the Edges it once had there are never inferred back. The
+ * position is an authored one (ADR 0084); `avoidingOverlap` steps off a point
+ * another Resource already occupies exactly, as a creation from a menu does
+ * ({@link freeAnchor}), and `exact` keeps it.
+ */
+function addToMap(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  position: MapPosition,
+  mode: 'exact' | 'avoidingOverlap',
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
+    return refused({ code: 'resource-not-found' });
+  }
+  if (placed.placement.has(resourceId)) return refused({ code: 'resource-already-in-map' });
+  const at = mode === 'avoidingOverlap' ? freeAnchor(placed.placement, position) : position;
+  return withPlacement(
+    snapshot,
+    mapId,
+    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y, open: false }),
+  );
+}
+
+/**
+ * Remove a Resource from one Map: the room it held given back, its position
+ * gone, and every Edge incident to it gone from **this Map's** Graphs.
+ *
+ * The Resource stays in the Space and in every other Map. Never blocked by a
+ * Reference Resource targeting it: a Target that has left one Map is still a
+ * Resource of the Space, which is all a Reference Resource needs (ADR 0070).
+ */
+function removeFromMap(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  if (!placed.placement.has(resourceId)) return refused({ code: 'resource-not-in-map' });
+  return {
+    kind: 'completed',
+    snapshot: {
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: (snapshot.document.maps ?? []).map((map) =>
+          map.id === mapId
+            ? {
+                ...map,
+                positions: Placement.toPositions(removedFrom(placed.placement, resourceId)),
+                graphs: withoutIncidentEdges(map.graphs, resourceId),
+              }
+            : map,
+        ),
+      },
+    },
+  };
+}
+
 export const SnapshotEdit = {
   createInMap,
   deleteFromSpace,
   open,
   close,
   resize,
+  addToMap,
+  removeFromMap,
 } as const;

@@ -457,32 +457,6 @@ describe('Expanded Resource geometry', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  /**
-   * A Resource that leaves the Map takes its room with it.
-   *
-   * Under the derived model this reclaimed itself: the entry carried the Open
-   * state, so removing the entry removed the displacement. Now the room is
-   * written into the neighbours' own coordinates, and a removal that only drops
-   * the entry leaves a hole with nothing left on the canvas to explain it and no
-   * Edit that can give it back. Leaving the Map is a Close the Resource does not
-   * come back from, so it reclaims exactly as Close does (ADR 0084).
-   */
-  it('reclaims the room an Open Resource held when it is removed from the Map', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
-    ).toEqual({
-      kind: 'completed',
-    });
-
-    const { [RESOURCE_A]: removed, ...remaining } = before;
-    expect(removed).toBeDefined();
-    expect(originsOf(session)).toEqual(remaining);
-  });
-
   it('reclaims the room an Open Resource held when it is deleted', () => {
     const { authoring, session } = openDisplacement();
     const before = originsOf(session);
@@ -494,21 +468,6 @@ describe('Expanded Resource geometry', () => {
 
     const { [RESOURCE_A]: deleted, ...remaining } = before;
     expect(deleted).toBeDefined();
-    expect(originsOf(session)).toEqual(remaining);
-  });
-
-  it('moves nobody when the Resource leaving the Map was Closed', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
-    ).toEqual({
-      kind: 'completed',
-    });
-
-    const { [RESOURCE_A]: removed, ...remaining } = before;
-    expect(removed).toBeDefined();
     expect(originsOf(session)).toEqual(remaining);
   });
 });
@@ -1413,38 +1372,6 @@ describe('Map membership', () => {
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
   });
 
-  it('places a Resource added to a Map at the anchor given, whatever is Open', () => {
-    const expandedSparse: SpaceSnapshot = {
-      ...sparse,
-      document: {
-        ...sparse.document,
-        maps: [
-          {
-            ...sparse.document.maps![0]!,
-            positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-              [RESOURCE_B]: { x: 300, y: 40, open: false },
-            },
-          },
-        ],
-      },
-    };
-    const { authoring, session } = open(expandedSparse);
-
-    authoring.complete({
-      kind: 'added-resource-to-map',
-      resourceId: RESOURCE_C,
-      anchor: { x: 500, y: 400 },
-    });
-
-    // As above: the anchor is authorship, not a drawn coordinate to invert.
-    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_C]).toEqual({
-      x: 500,
-      y: 400,
-      open: false,
-    });
-  });
-
   it('refuses a Resource the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
@@ -1463,55 +1390,6 @@ describe('Map membership', () => {
     expect(
       authoring.complete({ kind: 'added-resource-to-map', resourceId: RESOURCE_A, anchor: CENTRE }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-already-in-map' } });
-  });
-
-  it('removes membership and every incident Edge, in this Map only', () => {
-    const twoMaps: SpaceSnapshot = {
-      ...positionedSnapshot,
-      document: {
-        ...positionedSnapshot.document,
-        maps: [
-          {
-            ...positionedSnapshot.document.maps![0]!,
-            graphs: [
-              MAIN_GRAPH,
-              { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: RESOURCE_B, to: RESOURCE_A }] },
-            ],
-          },
-          {
-            id: OTHER_MAP_ID,
-            title: 'Map 2',
-            kind: 'positioned',
-            positions: {
-              [RESOURCE_A]: { x: 0, y: 400, open: false },
-              [RESOURCE_B]: { x: 0, y: 600, open: false },
-            },
-            graphs: [
-              { id: MINTED, title: 'Elsewhere', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
-            ],
-          },
-        ],
-      },
-    };
-    const { authoring, session } = open(twoMaps);
-
-    expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_B }),
-    ).toEqual({
-      kind: 'completed',
-    });
-
-    const working = session.getState().working;
-    expect(mapOf(working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-    });
-    expect(mapOf(working, MAP_ID)?.graphs).toEqual([
-      { id: GRAPH_ID, title: 'Main', edges: [] },
-      { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] },
-    ]);
-    // The Resource stays in the Space and in every other Map, Edges and all.
-    expect(working.resources).toEqual(positionedSnapshot.resources);
-    expect(mapOf(working, OTHER_MAP_ID)).toEqual(twoMaps.document.maps![1]);
   });
 
   it('refuses removing a Resource the Map does not hold', () => {

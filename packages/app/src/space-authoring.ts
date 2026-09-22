@@ -33,7 +33,7 @@ import {
 import { nextGraphColor } from './colors';
 import { mapShowsGraph } from './navigation';
 import type { Navigation, NavigationState } from './navigation';
-import { updatePositionedMap, withResourceRemovedFromMaps, withoutIncidentEdges } from './snapshot';
+import { updatePositionedMap, withResourceRemovedFromMaps } from './snapshot';
 import { nextResourceTitle, nextGraphTitle, nextMapTitle } from './titles';
 import { requireDefaultMap, resolveMap } from './map-resolution';
 
@@ -540,32 +540,6 @@ const notCompleted = (
   outcome: Exclude<SnapshotEditOutcome, { readonly kind: 'completed' }>,
 ): DerivedCompletion =>
   outcome.kind === 'unchanged' ? UNCHANGED : refuse(authoringRefusal(outcome.refusal));
-
-/**
- * The placement after a Resource leaves this Map, with the room it held given
- * back.
- *
- * Leaving is a Close the Resource does not come back from, so it reclaims exactly
- * as a Close does — and it has to, because the room is no longer
- * derived from the Resource's own entry. Under the derivation ADR 0084 removed,
- * dropping the entry dropped the displacement with it; now the room is written
- * into the neighbours' own coordinates, and a removal that only drops the entry
- * leaves a hole with nothing on the canvas left to explain it and no Edit that
- * can give it back.
- *
- * The reclaim runs **before** the removal, because `Placement.reclaim` reads
- * the Resource's own entry — after `Placement.remove` there is neither an Open Size
- * to read nor a subject to compare the neighbours against.
- *
- * Two of the three ways a Resource leaves end here — `removed-resource-from-map`,
- * and the deletion applied with the other membership changes below — and both
- * of those write *this* Map. The third is the same deletion cascading into
- * every other Map, which no single-Map write can reach;
- * `withResourceRemovedFromMaps` performs it, and reaches the same rule through
- * `Placement.reclaim` rather than through this function.
- */
-const removedResource = (placement: Placement, resourceId: ResourceId): Placement =>
-  Placement.remove(Placement.reclaim(placement, resourceId), resourceId);
 
 /** Two Edges are the same Edge when they join the same Resources the same way (ADR 0032). */
 const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
@@ -1325,28 +1299,19 @@ export function createSpaceAuthoring({
       if (refusal !== null) return refuse(refusal);
       createdResourceId = createResource(document, completion.anchor);
     } else if (completion.kind === 'added-resource-to-map') {
-      if (space.lookup.resource(completion.resourceId) === undefined) {
-        return refuse({ code: 'resource-not-found' });
-      }
-      if (placement.has(completion.resourceId)) {
-        return refuse({ code: 'resource-already-in-map' });
-      }
-      // Membership and a position, and nothing else: a re-added Resource is detached,
-      // and the Edges it once had are never inferred back.
-      // The anchor is taken as given: a canvas coordinate is an authored one
-      // (ADR 0084).
-      writePlacement(
-        Placement.place(placement, completion.resourceId, freeAnchor(placement, completion.anchor)),
+      const outcome = SnapshotEdit.addToMap(
+        snapshot,
+        mapId,
+        completion.resourceId,
+        completion.anchor,
+        'avoidingOverlap',
       );
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
     } else if (completion.kind === 'removed-resource-from-map') {
-      if (!placement.has(completion.resourceId)) {
-        return refuse({ code: 'resource-not-in-map' });
-      }
-      writePlacement(removedResource(placement, completion.resourceId));
-      // A Resource that has left this Map cannot be an endpoint of a Graph this
-      // Map owns (ADR 0040), so its incident Edges leave with it. The Graphs
-      // themselves stay, empty ones included: deletion is their own action.
-      writeGraphs(withoutIncidentEdges(resolved.map.graphs, completion.resourceId));
+      const outcome = SnapshotEdit.removeFromMap(snapshot, mapId, completion.resourceId);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
     } else if (completion.kind === 'deleted-resource') {
       const deleted = space.lookup.resource(completion.resourceId);
       if (deleted === undefined) {

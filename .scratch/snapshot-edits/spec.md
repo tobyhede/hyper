@@ -45,7 +45,7 @@ Rules move to property tests over snapshots in `packages/graph/test/snapshot-edi
 | [06 — Map and Graph deletion decide their successor after their last wait](issues/06-context-deletion-decides-after-its-last-wait.md) | 04 | done |
 | [07 — The coordination has one shape](issues/07-one-coordination-shape.md) | 05, 06 | done |
 | [08 — Open, Close and Resize through `SnapshotEdit`](issues/08-open-close-resize-through-snapshot-edit.md) | 03 | done |
-| [09 — Add to Map and Remove from Map through `SnapshotEdit`](issues/09-map-membership-through-snapshot-edit.md) | 03 | ready-for-agent |
+| [09 — Add to Map and Remove from Map through `SnapshotEdit`](issues/09-map-membership-through-snapshot-edit.md) | 03 | done |
 | [10 — Creation through `createInMap`](issues/10-creation-through-create-in-map.md) | 03 | ready-for-agent |
 | [11 — Delete from Space through `SnapshotEdit`](issues/11-delete-from-space-through-snapshot-edit.md) | 03, 08, 09 | ready-for-agent |
 
