@@ -9,6 +9,9 @@ import {
 } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/http/sqlite-http-runtime';
+import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
+import { createSqliteDatabase } from '../../src/sqlite/db';
+import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { openSqliteRepository } from '../support/sqlite-harness';
 import {
   holdLockInSecondProcess,
@@ -201,6 +204,28 @@ describe('SQLite contention', () => {
     ).resolves.toMatchObject({ kind: 'initialized' });
     return harness;
   };
+
+  it('recovers on the same runtime when its first read meets an exclusive lock', async () => {
+    const harness = await initialized();
+    const expected = await harness.repository.listSpaces();
+    const database = createSqliteDatabase(harness.path);
+    const repository = new SqlSpaceRepository(sqliteSqlStore(database));
+    try {
+      held = await holdLockInSecondProcess(harness.path, 'exclusive');
+
+      // This runtime has made no statement before the lock, so enabling the
+      // first-use marker check would cache this failed read (ticket 37).
+      const { settled } = await timed(() => repository.listSpaces());
+      expect(settled.status).toBe('rejected');
+      expect(settled.status === 'rejected' && isBusyOrLocked(settled.reason)).toBe(true);
+
+      await held.release();
+      held = undefined;
+      await expect(repository.listSpaces()).resolves.toEqual(expected);
+    } finally {
+      await database.close();
+    }
+  });
 
   describe('inside one process', () => {
     // The different-Space case is `serialises overlapping in-process commits at

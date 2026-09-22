@@ -56,7 +56,7 @@ Both the PostgreSQL and the SQLite runtime this repository composes are construc
 - [x] Tests that turned the marker off to observe the connection rather than this defect no longer need a separately-configured runtime for that reason; their comments no longer cite ticket 37 as a live defect.
 - [x] `test:integration:postgres`'s misconfiguration cases that assert the `'onFirstUse'` shape (`CliStructuredError` `3006` on a direct read) no longer describe the runtime production opens with. Either drop the `'onFirstUse'` arms or keep them explicitly labelled as the library default this repository does not use — the start-up give-up case there (wrong password, unclassified, two attempts) must still pass with production's options.
 - [x] Every document that names ticket 37 as open — the ADR 0095 entry in `AGENTS.md`/`CLAUDE.md`, and tickets 31 and 38 — says it is resolved and how.
-- [x] `pnpm verify` green (see `## Answer`). `pnpm test:integration:postgres` and `pnpm test:integration:sqlite` were **not** run by this agent — no database was available and starting one was out of scope for this task — so this half is left for CI, which runs both.
+- [x] `pnpm verify`, `pnpm test:integration:postgres` and `pnpm test:integration:sqlite` green in the subsequent 2026-09-22 verification (see `## Answer`). The original implementation agent did not run the integration suites because no database was available and starting one was out of scope.
 
 **Out of scope:**
 - Patching, forking or reporting to `@prisma-next`.
@@ -81,9 +81,51 @@ Both the PostgreSQL and the SQLite runtime this repository composes are construc
 
 **Docs updated:** the ADR 0095 entry in `AGENTS.md` (`CLAUDE.md` is a symlink to it) no longer lists ticket 37 among what remains open, and states it is resolved and how. Ticket 31's "Found on the way, not fixed here" cross-reference now says ticket 37 is resolved and how. Ticket 38's Resolution gained a dated amendment doing the same for its several mentions of ticket 37 (the historical narrative itself is left as written, since it is an accurate record of what ticket 38's implementer observed at the time).
 
-**Verification:**
+**Original implementation verification:**
 
 - `pnpm typecheck` — clean, both before and after the cleanup edits.
 - `pnpm exec vitest run test/unit/postgres-unreachable.test.ts` — 15 passed (red confirmed first, per above).
-- `pnpm verify` — reported in the handoff; see there for the exact command outputs.
+- `pnpm verify` — the original ticket referred to a handoff without retaining its output. That original run's stage results cannot be reconstructed from this ticket; the inspected subsequent run is recorded below.
 - `pnpm test:integration:postgres` and `pnpm test:integration:sqlite` were **not run** — no PostgreSQL or migrated SQLite file is available to this agent, and the task explicitly forbade starting one. `test/integration/postgres-misconfiguration.test.ts` was typechecked and read through carefully instead; CI's `postgres` job runs it.
+
+**Subsequent verification (2026-09-22, implementation tree committed as `7b93b498`):** The following records the successful run for ticket 42, with this ticket's marker fix retained. It is evidence for that later tree, not a reconstruction of the original run. The output was inspected in `/tmp/hyper-init-fix-verify.txt`; the relevant results are retained here so no external handoff is needed.
+
+| `pnpm verify` stage | Status and observed output |
+| --- | --- |
+| `typecheck:toolchain` | Passed: `TypeScript toolchain is the one ADR 0061 describes:`; root and all seven packages report `tsc Version 7.0.2`, with `typescript (library): 6.0.3`. |
+| `typecheck` | Passed: `tsc -p tsconfig.json --noEmit`, no diagnostics. |
+| `typecheck:packages` | Passed: `Scope: 7 of 8 workspace projects`; every package reports `typecheck: Done`. |
+| `ui:catalog:check` | Passed: `UI catalogue is valid.` |
+| `lint` | Passed: `eslint . --max-warnings=0 --prune-suppressions`, no diagnostics. |
+| `lint:anti-slop` | Passed: `oxlint -c .oxlintrc.json .`, no diagnostics. |
+| `format:check` | Passed: `All matched files use Prettier code style!` |
+| `test:coverage` | Passed: `vitest run --coverage`; summary below. |
+
+```text
+> pnpm verify:static && pnpm test:coverage
+> pnpm typecheck:toolchain && pnpm typecheck && pnpm typecheck:packages && pnpm ui:catalog:check && pnpm lint && pnpm lint:anti-slop && pnpm format:check
+
+ Test Files  237 passed (237)
+      Tests  3011 passed | 13 skipped (3024)
+   Duration  69.76s (transform 5.63s, setup 16.59s, collect 125.65s, tests 228.86s, environment 26.50s, prepare 17.97s)
+```
+
+No verification stage was skipped. The 13 skipped tests belong to `test/unit/memory-space-repository.test.ts`: the shared repository contract skips cases requiring stored-state corruption or repository-reopening hooks that the memory harness does not provide. The toolchain and catalog stages emitted Node's `DEP0205` deprecation warning for `module.register()`; neither failed.
+
+The separately run database suites also passed, superseding the original implementation's integration gap:
+
+- `pnpm test:integration:postgres` — `Test Files 8 passed (8)`, `Tests 90 passed (90)`, `Duration 21.13s`; includes `postgres-misconfiguration.test.ts` (5 tests). Inspected output: `/tmp/hyper-init-full-postgres.txt`.
+- `pnpm test:integration:sqlite` — `Test Files 7 passed (7)`, `Tests 107 passed (107)`, `Duration 154.59s`. Inspected output: `/tmp/hyper-init-full-sqlite.txt`.
+- Browser E2E and Ladle were not run: these persistence changes touch no UI, rendering, graph logic or stories.
+
+**Review follow-up (2026-09-22):** The missing SQLite recovery regression is now `test/integration/sqlite-contention.test.ts`, "recovers on the same runtime when its first read meets an exclusive lock". It creates a fresh client through `createSqliteDatabase`/`optionsFor`, fails its first read against a real exclusive file lock, releases the lock, and successfully reads through that same client. Temporarily restoring `verifyMarker: 'onFirstUse'` made the second read reject with cached `CliStructuredError` code `3006`, `Database error while reading contract marker`, after the lock was released. Production options were restored unchanged; existing reopen and closed-client tests were not edited.
+
+Final `pnpm verify` for this test/documentation follow-up exited 0; all eight stages in the table above passed, none skipped. Its actual summary (`/tmp/hyper-review37-verify.txt`) was:
+
+```text
+ Test Files  237 passed (237)
+      Tests  3011 passed | 13 skipped (3024)
+   Duration  72.37s (transform 5.71s, setup 15.19s, collect 125.41s, tests 250.23s, environment 28.89s, prepare 15.80s)
+```
+
+The 13 test skips have the same memory-harness reasons stated above. `pnpm test:integration:sqlite` also passed: 7 files, 108 tests, 170.23s; its temporary database was removed. PostgreSQL integration was not rerun for this follow-up because only a SQLite test and this document changed. Browser E2E and Ladle were likewise inapplicable.
