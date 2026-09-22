@@ -20,8 +20,16 @@ Either way the decision is written down, which is the part that does not exist n
 
 **Blocked by:** None (can start immediately). Touches one declaration in one stylesheet.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The Dock's dragging elevation is a named step or a recorded exception, and the reasoning is written down
-- [ ] If a second step is added, `things-popover.css`'s and `command-dock.css`'s other elevations are checked against it rather than left behind
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass and the output is reported
+- [x] The Dock's dragging elevation is a named step or a recorded exception, and the reasoning is written down
+- [x] If a second step is added, `things-popover.css`'s and `command-dock.css`'s other elevations are checked against it rather than left behind
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass and the output is reported
+
+## Resolution
+
+The scale gains a second step. `tailwind.css` states `--shadow-chrome-lifted` beside `--shadow-chrome-elevated`: the same unblurred offset in the same ink, cast further (`calc(var(--shadow-chrome-elevated-offset) + 4px)`, so 10px against the resting 6px). The dragged Dock spends it.
+
+The exception was the other reasonable answer and was not taken because of ticket 14: once the resting elevation became a hard offset, the dragged Dock's soft 34px blur differed in character, not just degree, which made it the one place the chrome cast a shadow of its own making. The Resource already draws its resting and handled states as one character at two distances, so the chrome now does the same. Stating the lifted offset from the elevated one means a theme block that moves the one moves both, which the inert experiment blocks rely on.
+
+Checked against the new step, per the second criterion: `resources-popover.css`'s only other shadow is the toggle's 1px hairline (ticket 10), and `command-dock.css`'s is the `inset 0 0 0 2px var(--destructive)` refusal ring. Neither is an elevation, so neither moves.
