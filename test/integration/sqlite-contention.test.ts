@@ -215,7 +215,9 @@ describe('SQLite contention', () => {
 
       // This runtime has made no statement before the lock, so enabling the
       // first-use marker check would cache this failed read (ticket 37).
-      await expect(repository.listSpaces()).rejects.toThrow();
+      const { settled } = await timed(() => repository.listSpaces());
+      expect(settled.status).toBe('rejected');
+      expect(settled.status === 'rejected' && isBusyOrLocked(settled.reason)).toBe(true);
 
       await held.release();
       held = undefined;
