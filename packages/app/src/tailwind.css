@@ -62,6 +62,26 @@
   --text-chrome-2xs: 10px;
   --text-chrome-xs: 0.75rem;
   --text-chrome-sm: 0.85rem;
+  /* Tailwind's named shadow steps, restated with the theme's ink in place of
+     the black its own `theme.css` writes. Each keeps Tailwind's offsets, blur
+     and opacity, so a menu, popover or dialog still lifts on a soft shadow; only
+     the colour now follows `--foreground`. `inline` is what lets that
+     `var()` resolve where the class is used rather than on `:root`. */
+  --shadow-2xs: 0 1px color-mix(in oklab, var(--foreground) 5%, transparent);
+  --shadow-xs: 0 1px 2px 0 color-mix(in oklab, var(--foreground) 5%, transparent);
+  --shadow-sm:
+    0 1px 3px 0 color-mix(in oklab, var(--foreground) 10%, transparent),
+    0 1px 2px -1px color-mix(in oklab, var(--foreground) 10%, transparent);
+  --shadow-md:
+    0 4px 6px -1px color-mix(in oklab, var(--foreground) 10%, transparent),
+    0 2px 4px -2px color-mix(in oklab, var(--foreground) 10%, transparent);
+  --shadow-lg:
+    0 10px 15px -3px color-mix(in oklab, var(--foreground) 10%, transparent),
+    0 4px 6px -4px color-mix(in oklab, var(--foreground) 10%, transparent);
+  --shadow-xl:
+    0 20px 25px -5px color-mix(in oklab, var(--foreground) 10%, transparent),
+    0 8px 10px -6px color-mix(in oklab, var(--foreground) 10%, transparent);
+  --shadow-2xl: 0 25px 50px -12px color-mix(in oklab, var(--foreground) 25%, transparent);
 }
 
 /*
@@ -176,9 +196,9 @@
      only Tailwind's `--tw-shadow-color` hook for a `shadow-<color>` modifier,
      which nothing here uses.
 
-     **Tailwind's own `shadow-md` and `shadow-lg` are untouched**, so a menu,
-     popover and dialog still cast a blurred shadow while the Dock casts a hard
-     one. Reconciling those is a decision of its own. */
+     A menu, popover and dialog still cast Tailwind's blurred `shadow-md` and
+     `shadow-lg` while the Dock casts a hard one: those steps are restated in the
+     theme's ink in `@theme` above, and kept blurred on purpose. */
   --shadow-chrome-elevated-offset: 6px;
   --shadow-chrome-elevated: var(--shadow-chrome-elevated-offset)
     var(--shadow-chrome-elevated-offset) 0 var(--foreground);

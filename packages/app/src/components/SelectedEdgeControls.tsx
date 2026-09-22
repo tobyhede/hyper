@@ -33,9 +33,14 @@ import type { EdgeEndpoint } from '../space-authoring';
 const FROM_ERROR = 'edge-from-error';
 const TO_ERROR = 'edge-to-error';
 
-/** The raised resource these controls and their refusal are both drawn on. */
-const RAISED_SURFACE =
-  'rounded-chrome-md border border-border bg-card shadow-[0_6px_20px_rgb(0_0_0/45%)]';
+/**
+ * The raised resource these controls and their refusal are both drawn on. Its
+ * shadow is the theme's `shadow-lg`, the one `Popover` and `Select` spend: this
+ * is a floating control over the canvas as they are, so it lifts the way they
+ * do rather than the way the Command Dock does
+ * (`.scratch/structural-tokens/issues/10-...`).
+ */
+const RAISED_SURFACE = 'rounded-chrome-md border border-border bg-card shadow-lg';
 
 /** Two commands in one group: square edges, and the group's border around them. */
 const GROUPED_COMMAND = 'rounded-none border-0 text-chrome-xs text-foreground';
