@@ -154,7 +154,9 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: HOST_ID,
-      meta: () => ({ spaceId: HOST_ID, title: snapshot.document.title }),
+      listing: unused,
+      opener: unused,
+      select: unused,
       getState: () => state,
       subscribe: (listener) => {
         listeners.add(listener);
@@ -297,7 +299,9 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: TARGET_ID,
-      meta: () => ({ spaceId: TARGET_ID, title: snapshot.document.title }),
+      listing: unused,
+      opener: unused,
+      select: unused,
       getState: () => state,
       subscribe: () => () => undefined,
       entry: (spaceId) => (spaceId === TARGET_ID ? targetEntry : undefined),

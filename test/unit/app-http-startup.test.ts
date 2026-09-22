@@ -164,7 +164,12 @@ describe('HTTP space startup composition', () => {
     );
 
     expect(result.spaces.entry(SPACE_ID)).toBeUndefined();
-    expect(result.spaces.meta()).toEqual({ spaceId: SPACE_ID, title: 'Stored space' });
+    expect(result.spaces.listing()[0]).toEqual({
+      spaceId: SPACE_ID,
+      title: 'Stored space',
+      depth: 0,
+      open: false,
+    });
   });
 
   it('retries a startup whose first aggregate load failed', async () => {

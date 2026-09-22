@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
@@ -224,85 +224,4 @@ describe('the Spaces a Resources list offers', () => {
     );
     expect(screen.getByRole('button', { name: 'Add Space 1 to Map' })).toBeInTheDocument();
   }, 15_000);
-});
-
-/** A backend whose Space list read always fails, as a dropped request would. */
-class UnlistableBackend extends MemorySpaceBackend {
-  override listSpaces(): Promise<never> {
-    return Promise.reject(new Error('The Space list is unavailable.'));
-  }
-}
-
-describe("Meta's row in the Open Spaces menu", () => {
-  /**
-   * Meta's row is not read from the Space list: a Space opened by its own
-   * address, with Meta closed, still lists Meta first when that read fails.
-   */
-  it('lists a closed Meta by its title when the Space list read fails', async () => {
-    const backend = new UnlistableBackend(
-      META_ID,
-      [meta, home, other].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
-    );
-    const reported: unknown[] = [];
-    const spaces = createOpenSpaces({
-      backend,
-      metaSpaceId: META_ID,
-      metaSpaceTitle: meta.document.title,
-      newId: newUuid,
-      history: recordingHistory(),
-      reportObserverError: (error) => reported.push(error),
-    });
-    const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-    await readyToAuthor();
-    await waitFor(() =>
-      expect(reported).toContainEqual(new Error('The Space list is unavailable.')),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Spaces. 1 open.' }));
-    const rows = within(await screen.findByRole('menu')).getAllByRole('menuitemradio');
-    expect(rows.map((row) => row.textContent)).toEqual(['Meta', 'Home']);
-  });
-});
-
-/** A backend that cannot load the Meta Space, as a dropped request would. */
-class MetaUnloadableBackend extends MemorySpaceBackend {
-  override loadSpace(id: Parameters<MemorySpaceBackend['loadSpace']>[0]) {
-    return id === META_ID
-      ? Promise.reject(new Error('The Meta Space is unavailable.'))
-      : super.loadSpace(id);
-  }
-}
-
-describe('choosing a closed Meta from the Open Spaces menu', () => {
-  /**
-   * The row the reader chose is named by Meta's title, so a failure to open it
-   * names Meta too rather than an anonymous Space.
-   */
-  it('names Meta by its title when it cannot be opened', async () => {
-    const backend = new MetaUnloadableBackend(
-      META_ID,
-      [meta, home, other].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
-    );
-    const reported: unknown[] = [];
-    const spaces = createOpenSpaces({
-      backend,
-      metaSpaceId: META_ID,
-      metaSpaceTitle: meta.document.title,
-      newId: newUuid,
-      history: recordingHistory(),
-      reportObserverError: (error) => reported.push(error),
-    });
-    const initial = await spaces.open(HOME_ID);
-    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-    await readyToAuthor();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Spaces. 1 open.' }));
-    fireEvent.click(
-      within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Meta' }),
-    );
-
-    expect(await screen.findByText('Meta could not be opened.')).toBeInTheDocument();
-    expect(screen.queryByText('That Space could not be opened.')).not.toBeInTheDocument();
-  });
 });

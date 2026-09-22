@@ -9,6 +9,7 @@ import {
   type ObserverErrorReporter,
   type SpaceBackend,
   type SpaceSession,
+  type SpaceSessionState,
 } from '@project/persistence';
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
@@ -82,17 +83,84 @@ export interface RejectedExitConfirmation {
   readonly warning: 'persistence-rejected';
 }
 
+/** A Space the Open Spaces menu names: the Opener, and every row of the listing. */
+export interface NamedSpace {
+  readonly spaceId: UUID;
+  readonly title: string;
+}
+
+/**
+ * One row of the Open Spaces menu, and how deep it hangs in the tree crossing makes.
+ *
+ * The set of open Spaces is a **tree**, not a path: each entry remembers the
+ * Space it was entered from, so `Meta ▸ Platform ▸ Design system` and a second
+ * Space opened straight off Meta are both in it at once. `depth` is what the
+ * menu indents by, and it is derived from the crossing rather than stored, so a
+ * row cannot claim a depth its opener does not give it.
+ */
+export interface OpenListingRow extends NamedSpace {
+  readonly depth: number;
+  readonly open: true;
+  readonly persistence: SpaceSessionState['persistence'];
+}
+
+/**
+ * The one row that is not backed by an open entry: a closed Meta.
+ *
+ * `CONTEXT.md`'s rule — "The Meta Space is always listed first, whether or not
+ * it is open" — is what makes this arm possible at all, and the only Space it
+ * is ever drawn for: every other Space that is not open is not in the listing,
+ * having nowhere to hang.
+ */
+export interface ClosedListingRow extends NamedSpace {
+  readonly depth: 0;
+  readonly open: false;
+}
+
+/** Every row the Open Spaces menu draws, Meta first whether or not it is open. */
+export type ListingRow = OpenListingRow | ClosedListingRow;
+
+/**
+ * What choosing a row from the Open Spaces menu does, named for `CONTEXT.md`'s
+ * "Selecting an entry switches to that Space".
+ *
+ * `switched` and `opened` carry the Space's title, read off the entry `select`
+ * itself just produced. `refused` carries none: the only way to reach it is a
+ * non-Meta Space that closed between the listing being drawn and the row being
+ * chosen, and `OpenSpaces` no longer holds a title for a Space that is not
+ * open — the reader who drew the row is the one still holding it.
+ */
+export type SelectSpaceResult =
+  | { readonly kind: 'switched'; readonly title: string }
+  | { readonly kind: 'opened'; readonly title: string }
+  | { readonly kind: 'refused'; readonly code: 'space-not-open' };
+
 export interface OpenSpaces {
   readonly metaSpaceId: UUID;
   /**
-   * The Meta Space, named whether or not it is open.
+   * Every row the Open Spaces menu draws, Meta first whether or not it is open,
+   * then the tree the rest of the open set makes below it.
    *
-   * The title is Meta's live session's when there is one, and otherwise the
-   * one startup read from the aggregate it loaded — so naming Meta never waits
-   * on, or fails with, a Space list read. `packages/app/test/open-spaces.test.ts`
-   * holds both halves.
+   * **Derived, not stored** — computed from {@link getState} and memoized on
+   * that state's identity, so a caller reading it once per render does no more
+   * work than the state actually changing. Meta's title is its live session's
+   * while it is open, and otherwise the one startup read from the aggregate it
+   * loaded — so naming Meta never waits on, or fails with, a Space list read.
+   * `packages/app/test/open-spaces.test.tsx` holds both halves.
    */
-  readonly meta: () => { readonly spaceId: UUID; readonly title: string };
+  readonly listing: () => readonly ListingRow[];
+  /** The Space `spaceId` was entered from, or `null` at the root or with nothing open. */
+  readonly opener: (spaceId: UUID) => NamedSpace | null;
+  /**
+   * Choose a row from the Open Spaces menu: switch to an open Space, open a
+   * closed Meta with no Opener, or refuse anything else.
+   *
+   * Load failures still throw rather than answering `refused` — a refusal is
+   * only ever the race decision 5 of `.scratch/command-dock/issues/28` names,
+   * never a failed load. Selecting the Space already on the canvas answers
+   * `switched`.
+   */
+  readonly select: (spaceId: UUID) => Promise<SelectSpaceResult>;
   readonly getState: () => OpenSpacesState;
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
@@ -114,7 +182,7 @@ export interface OpenSpaces {
   /**
    * The camera Enter asked the first canvas showing to take, or `undefined`.
    *
-   * Peeked, not consumed: `packages/app/test/open-spaces.test.ts` holds that a
+   * Peeked, not consumed: `packages/app/test/open-spaces.test.tsx` holds that a
    * second read still answers the same seed, and that a later Enter of a Space
    * already shown does not write one.
    */
@@ -173,6 +241,93 @@ const validateLoadedSpace = (loaded: LoadedSpace): ValidatedLoadedSpace => {
     );
   }
   return { loaded, space: runtime.space };
+};
+
+/** What one open entry contributes to the tree, before depth is derived. */
+interface OpenSpaceTreeRow extends NamedSpace {
+  /** The Space this one was entered from — the Opener — or `null` at the root. */
+  readonly from: UUID | null;
+  readonly persistence: SpaceSessionState['persistence'];
+}
+
+/**
+ * Every open Space, depth-first from the root, in the order they were opened.
+ *
+ * A tree because `from` makes one — and drawing it as a tree rather than as a
+ * flat list is what lets the Open Spaces menu say *where* a Space is as well as
+ * that it is open. A flat list would put a Space three crossings down beside
+ * the root with nothing to tell them apart but their names, which is exactly
+ * the confusion the bar's Opener control exists to remove.
+ *
+ * Siblings keep the order the caller lists them in, which is the order the
+ * reader opened them. Nothing sorts them here: an Open Spaces menu that
+ * reordered itself as the reader moved would move the row they were aiming at.
+ *
+ * **Every `from` names a Space that is open**, which is what makes the walk
+ * total: entries begin that way and `retireOpenSpace` re-homes the rows below
+ * the Space it closes. Without that invariant this drops a Space whose opener
+ * exited — still open, and not in the list that is the only way back to it.
+ *
+ * **Meta is the one exception to both rules**: it draws first at the root
+ * whatever opened it, with what was Entered from it beneath. A Space Resource
+ * may target Meta, so Meta can have an Opener, and hung by it Meta drew under
+ * that Space where the menu promises it on top (`open-spaces.test.tsx`).
+ */
+const openTree = (
+  rows: readonly OpenSpaceTreeRow[],
+  metaSpaceId: UUID,
+): readonly OpenListingRow[] => {
+  const parent = (row: OpenSpaceTreeRow): UUID | null =>
+    row.spaceId === metaSpaceId ? null : row.from;
+  const below = (from: UUID | null, depth: number): readonly OpenListingRow[] =>
+    rows
+      .filter((row) => parent(row) === from)
+      .sort(
+        (left, right) =>
+          Number(right.spaceId === metaSpaceId) - Number(left.spaceId === metaSpaceId),
+      )
+      .flatMap((row) => [
+        {
+          spaceId: row.spaceId,
+          title: row.title,
+          depth,
+          open: true as const,
+          persistence: row.persistence,
+        },
+        ...below(row.spaceId, depth + 1),
+      ]);
+  return below(null, 0);
+};
+
+/**
+ * Every row the Open Spaces menu draws, Meta first whether or not it is open.
+ *
+ * Meta's own row folds the two facts CONTEXT.md's rule is about into one
+ * derivation: closed, it is a synthetic root row named from startup; open, it
+ * is wherever `openTree` puts it — which is always first, by that same rule.
+ */
+const buildListing = (
+  state: OpenSpacesState,
+  metaSpaceId: UUID,
+  metaSpaceTitle: string,
+): readonly ListingRow[] => {
+  const openRows = openTree(
+    state.entries.map((entry) => ({
+      spaceId: entry.id,
+      title: entry.session.getState().working.document.title,
+      from: state.openedFrom.get(entry.id) ?? null,
+      persistence: entry.session.getState().persistence,
+    })),
+    metaSpaceId,
+  );
+  if (state.entries.some((entry) => entry.id === metaSpaceId)) return openRows;
+  const closedMeta: ClosedListingRow = {
+    spaceId: metaSpaceId,
+    title: metaSpaceTitle,
+    depth: 0,
+    open: false,
+  };
+  return [closedMeta, ...openRows];
 };
 
 /** Own every live Space composition and the one registry they all share. */
@@ -660,12 +815,52 @@ export function createOpenSpaces({
     }
   };
 
+  /**
+   * `listing()`'s memo: recomputed only when {@link observable}'s state is a
+   * new object, which is exactly when publication last ran (`getState`
+   * answers the same reference between publications — `observable-state.ts`).
+   */
+  let listingCache: {
+    readonly state: OpenSpacesState;
+    readonly rows: readonly ListingRow[];
+  } | null = null;
+
+  const listing = (): readonly ListingRow[] => {
+    const state = observable.getState();
+    if (listingCache !== null && listingCache.state === state) return listingCache.rows;
+    const rows = buildListing(state, metaSpaceId, metaSpaceTitle);
+    listingCache = { state, rows };
+    return rows;
+  };
+
+  const opener = (spaceId: UUID): NamedSpace | null => {
+    const state = observable.getState();
+    const openerId = state.openedFrom.get(spaceId) ?? null;
+    if (openerId === null) return null;
+    const entry = state.entries.find((candidate) => candidate.id === openerId);
+    return entry === undefined
+      ? null
+      : { spaceId: openerId, title: entry.session.getState().working.document.title };
+  };
+
+  const select = async (spaceId: UUID): Promise<SelectSpaceResult> => {
+    if (observable.getState().entries.some((entry) => entry.id === spaceId)) {
+      const switched = await switchTo(spaceId);
+      return { kind: 'switched', title: switched.session.getState().working.document.title };
+    }
+    if (spaceId !== metaSpaceId) return { kind: 'refused', code: 'space-not-open' };
+    // The Open Spaces menu lists Meta whether or not it is open. Choosing it
+    // from the menu is not a crossing, so a Meta that is not open yet is
+    // opened directly, with no Opener.
+    const opened = await open(spaceId);
+    return { kind: 'opened', title: opened.session.getState().working.document.title };
+  };
+
   return {
     metaSpaceId,
-    meta: () => ({
-      spaceId: metaSpaceId,
-      title: registry.session(metaSpaceId)?.getState().working.document.title ?? metaSpaceTitle,
-    }),
+    listing,
+    opener,
+    select,
     getState: observable.getState,
     subscribe: observable.subscribe,
     entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),
