@@ -39,9 +39,9 @@ export const SET_TRIGGER = {
  * The treatment the Resources cluster's trigger takes, for whoever supplies the
  * surface.
  *
- * Exported with {@link ResourcesTrigger} because {@link DockResources.surface} is the
- * caller's whole component — trigger and panel together — and the trigger still
- * has to be one of the Dock's four names: the same size, the same classes and
+ * Exported because {@link DockResources.surface} is the caller's whole component —
+ * trigger and panel together — and the trigger, which `CommandDock`'s own
+ * `ResourcesTrigger` labels, still has to be one of the Dock's four names: the same size, the same classes and
  * the same parts in the same order, so the word lands in the column the other
  * three land in and the vertical dock's grid can place its chevron.
  *

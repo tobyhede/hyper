@@ -17,7 +17,8 @@ const RESOURCE_COPY_LINK = /^Copy link to Resource(?! in Map)/;
  * `space-sidebar-entity-actions-menu` — described a menu "reached two ways from
  * a Sidebar row". The Command Dock has clusters rather than rows and no
  * `onContextMenu` anywhere, so that behaviour did not move: it belongs to the
- * Resource rail (ADR 0073), which is what the last two tests in this file press.
+ * Resource rail (ADR 0073), which is what the last three tests in this file
+ * press, on the stable `Components/Resource` rail story.
  * What is left of the Sidebar's half is the one choice the Dock still decides
  * about the Space's own menu — which address it offers, and that Rename is a
  * command in it — restated below in the Dock's own words and untagged, the claim
@@ -81,7 +82,7 @@ test('the Space cluster discloses from the name and offers one address plus Rena
  * instead; the rail keeps the swap, being a menu on the canvas itself.
  */
 test('a copy command confirms in the rail menu it was pressed in', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--resource-rail&mode=preview');
+  await page.goto('/?story=components--resource--rail-actions&mode=preview');
 
   await page.getByRole('button', { name: 'Actions for Resource Resource 2' }).click({ delay: 120 });
   const menu = page.getByRole('menu');
@@ -92,27 +93,33 @@ test('a copy command confirms in the rail menu it was pressed in', async ({ page
 });
 
 test('a Resource rail opens its actions menu from the actions control', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--resource-rail&mode=preview');
+  await page.goto('/?story=components--resource--rail-actions&mode=preview');
 
   await page.getByRole('button', { name: 'Actions for Resource Resource 2' }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
   await menu.getByRole('menuitem', { name: 'Copy link to Resource in Map' }).click();
-  await expect(
-    page.getByText(/Copied → .*\/maps\/AAAAAAAAQACAAAAAAAAAIA\/resources\//),
-  ).toBeVisible();
+  await expect(page.getByTestId('copy-report')).toHaveText(
+    /^Copied .*\/maps\/AAAAAAAAQACAAAAAAAAAIA\/resources\//,
+  );
 });
 
-test('a Resource opens the same actions menu from a right click', async ({ page }) => {
-  await page.goto('/?story=review--link-actions--resource-rail&mode=preview');
+test(
+  'a Resource opens the same actions menu from a right click',
+  { tag: '@parity:canvas-resource-actions-menu' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--rail-actions&mode=preview');
 
-  await page.getByRole('article', { name: 'Resource 2' }).click({ button: 'right' });
+    await page.getByRole('article', { name: 'Resource 2' }).click({ button: 'right' });
 
-  const menu = page.getByRole('menu');
-  // No Rename: a Resource's title is renamed in place on its Front, so the menu
-  // production would supply here holds its two addresses and nothing else.
-  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
-  await expect(menu.getByRole('menuitem', { name: 'Copy link to Resource in Map' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: RESOURCE_COPY_LINK })).toBeVisible();
-});
+    const menu = page.getByRole('menu');
+    // No Rename: a Resource's title is renamed in place on its Front, so the menu
+    // production would supply here holds its two addresses and nothing else.
+    await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
+    await expect(
+      menu.getByRole('menuitem', { name: 'Copy link to Resource in Map' }),
+    ).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: RESOURCE_COPY_LINK })).toBeVisible();
+  },
+);

@@ -24,16 +24,14 @@
  *   real, un-replaceable framework or library machinery — a live React Flow
  *   canvas, for instance — but not the whole running app.
  * - `stories/space/`, title `'Space/…'` — needs the real app-level machinery:
- *   Space Authoring, a persistence session, the Sidebar. Despite the name,
+ *   Space Authoring, a persistence session, the Command Dock. Despite the name,
  *   this means "the whole app for a given Space", not the domain Space.
  * - `stories/review/`, title `'Review/…'` or `'Space/…'` — staged and
  *   non-production. No ADR 0052 parity claim attaches here, ever. Use it for
  *   a surface the application cannot reach yet, or a prototype you want
  *   visible without promising it. Choosing `'Space/…'` here deliberately
  *   places the story in the same Ladle nav group as the stable `Space/…`
- *   stories, with nothing in the sidebar to tell the two apart —
- *   `stories/review/multiple-spaces.stories.tsx` does this today, alongside
- *   `stories/space/space.stories.tsx`'s own `'Space/Space'`. Default to
+ *   stories, with nothing in Ladle's navigation to tell the two apart. Default to
  *   `'Review/…'` and reach for `'Space/…'` only when sitting beside the
  *   stable Space stories is actually what you want.
  *
@@ -82,7 +80,7 @@ export const SurfacesExample: Story = () => (
     </StoryCanvas>
   </StoryCanvasFrame>
 );
-// A story that owns its own viewport — a canvas, a full-screen Sidebar, a
+// A story that owns its own viewport — a canvas, the full application, a
 // dialog — sets `iframed: true` so it draws in its own frame rather than the
 // catalogue's. Leave this off for anything that isn't full-viewport.
 SurfacesExample.meta = { iframed: true };

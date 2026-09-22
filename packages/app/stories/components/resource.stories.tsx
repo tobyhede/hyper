@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema, type Map, type Resource } from '@project/core';
-import type { ProductDestination } from '@project/http';
+import { productDestinationPath, type ProductDestination } from '@project/http';
 import { CanvasResource, type CanvasResourceFront, type CanvasResourceState } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars, snapResourceSizeToClose } from '#src/resource';
@@ -9,6 +9,7 @@ import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
+import { authoredSpace } from '../support/spaces';
 import '../support/inventory.css';
 
 export default { title: 'Components/Resource' };
@@ -530,3 +531,48 @@ export const OpenIndependently: Story = () => {
 };
 OpenIndependently.storyName = 'Open independently';
 OpenIndependently.meta = { iframed: true };
+
+/**
+ * A Resource's actions menu, reached from its rail control or a right click on
+ * the Resource itself. The commands are production's own `spaceEntityActions`
+ * over the fixture Space's real ids; the copy is recorded rather than written to
+ * the clipboard, and the pressed item confirms as it does over a clipboard that
+ * accepted the link. The application proof is `editing.spec.ts`.
+ */
+export const RailActions: Story = () => {
+  const [copied, setCopied] = useState<string | null>(null);
+  const map = authoredSpace.maps[0];
+  if (map === undefined) throw new Error('RailActions fixture requires an authored Map');
+  const actions = spaceEntityActions({
+    spaceId: authoredSpace.id,
+    spaceTitle: authoredSpace.title,
+    onCopy: (destination) => {
+      setCopied(productDestinationPath(destination));
+      return true;
+    },
+    onOpenIndependently: null,
+    onRename: null,
+    onDeleteMap: null,
+  });
+  return (
+    <div className="p-8" style={resourceSizeVars}>
+      <div className="flex flex-wrap items-start gap-6">
+        {authoredSpace.resources.slice(0, 2).map((resource, index) => (
+          <CanvasResource
+            key={resource.id}
+            front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => 'retained' }}
+            title={resource.title}
+            state={index === 1 ? 'selected' : 'rest'}
+            graphColor="#ffc53d"
+            entityActions={actions({ kind: 'resource', resource, map })}
+          />
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground" data-testid="copy-report">
+        {copied === null ? 'Nothing copied.' : `Copied ${copied}`}
+      </p>
+    </div>
+  );
+};
+RailActions.storyName = 'Rail actions';
+RailActions.meta = { iframed: true };

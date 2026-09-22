@@ -1308,8 +1308,8 @@ const withoutHistoricalQuotations = (source: string): string =>
  *    as having already happened twice. Masked by shape, as any run of
  *    non-whitespace carrying a `/`, plus the `NNNN-` filename form an ADR row
  *    and the roadmap generator both write bare.
- *  - **A foreign glyph arrives with a dependency.** Lucide spells its two grid
- *    icons with the retired word, and they are names in someone else's
+ *  - **A foreign glyph arrives with a dependency.** Lucide spells its grid
+ *    icon with the retired word, and they are names in someone else's
  *    catalogue rather than ours to sweep.
  *  - **The verb keeps the word** (ADR 0014, ADR 0085), in the hyphenated shapes
  *    the strategy contract and the prose about arranging a screen are written
@@ -1319,9 +1319,8 @@ const withoutHistoricalQuotations = (source: string): string =>
  * tree takes its mask with it rather than leaving a hole.
  */
 const QUALIFIED_SPELLINGS: readonly string[] = [
-  // Lucide's two grid glyphs.
+  // Lucide's grid glyph.
   `${retiredMapLower}-grid`,
-  `${retiredMapLower}-dashboard`,
   // The verb: the contract, the engine, the caller's own arranging, and the
   // prose about re-running one.
   `${retiredMapLower}-strategy`,
