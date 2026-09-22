@@ -3566,11 +3566,11 @@ test('the Resource menu groups Create Reference, both copy links, then Remove an
 
 /**
  * The dropdown and the context menu draw the identical list
- * (`EntityActionItems`), so a right click on the Resource itself offers the same
- * ordered menu the actions control does.
+ * (`EntityActionItems`), so the actions control and a right click on the
+ * Resource itself offer the same ordered menu — asserted here by opening both.
  */
 test(
-  'a right click on a Resource opens the same ordered menu as its actions control',
+  'a Resource opens the same ordered menu from its actions control and a right click',
   { tag: '@parity:canvas-resource-actions-menu' },
   async ({ page }) => {
     await page.goto('/');
@@ -3578,13 +3578,18 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
-    await nodeByTitle(page, 'B').first().click({ button: 'right' });
-    const menu = page.getByRole('menu');
-    await expectMenuGroups(menu, [
+    const groups = [
       ['Create Reference'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
-    ]);
+    ];
+
+    await expectMenuGroups(await resourceActions(page, 'B'), groups);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    await nodeByTitle(page, 'B').first().click({ button: 'right' });
+    await expectMenuGroups(page.getByRole('menu'), groups);
   },
 );
 
