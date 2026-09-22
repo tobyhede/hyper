@@ -87,10 +87,10 @@ const copyCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
  * confirmation lands on is the whole subject of the ordering test, and two
  * commands both reporting "Copied" would leave that unreadable.
  */
-const permanentCopyCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
-  id: 'copy-permanent-link',
-  label: 'Copy permanent link',
-  report: { done: 'Permanent link copied', failed: 'Permanent link not copied' },
+const titleCopyCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
+  id: 'copy-title',
+  label: 'Copy title',
+  report: { done: 'Title copied', failed: 'Title not copied' },
   onSelect,
 });
 
@@ -249,19 +249,19 @@ describe('the entity actions menu', () => {
    */
   it('leaves the confirmation on the command that was pressed last', async () => {
     const slow = deferredOutcome();
-    openMenu([copyCommand(() => slow.promise), permanentCopyCommand(() => 'done')]);
+    openMenu([copyCommand(() => slow.promise), titleCopyCommand(() => 'done')]);
     await press(/Copy link/);
-    await press(/Copy permanent link/);
-    await screen.findByRole('menuitem', { name: 'Permanent link copied' });
+    await press(/Copy title/);
+    await screen.findByRole('menuitem', { name: 'Title copied' });
 
     await act(async () => {
       slow.settle('done');
       await settled();
     });
 
-    expect(screen.getByRole('menuitem', { name: 'Permanent link copied' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Title copied' })).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Copy link' })).toBeVisible();
-    expect(announcement()).toHaveTextContent('Permanent link copied');
+    expect(announcement()).toHaveTextContent('Title copied');
   });
 
   /**
