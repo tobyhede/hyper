@@ -53,6 +53,12 @@
   --canvas-resource-title-underline-hover: inset 0 -2px 0 var(--canvas-resource-graph);
   --canvas-resource-title-underline-editing: inset 0 -3px 0 var(--canvas-resource-graph);
 
+  /* The content area's own bottom divider, separating it from the Title
+     footer below. A singleton like the three above it, and deliberately not
+     the Resource's `--canvas-resource-border-width`: this is an interior
+     rule, not the Resource's paper edge. */
+  --canvas-resource-content-divider-width: 2px;
+
   position: relative;
   box-sizing: border-box;
   width: var(--resource-width);
@@ -365,7 +371,7 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  border-bottom: 2px solid var(--canvas-resource-ink);
+  border-bottom: var(--canvas-resource-content-divider-width) solid var(--canvas-resource-ink);
   /* The Resource's ink, not the ambient `--foreground`. A Resource's face is its own
      paper and a body drawn in the surrounding theme's text colour is the one
      part of an Expanded Resource that would not look like the Resource. */
