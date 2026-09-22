@@ -1320,8 +1320,9 @@ export function createSpaceAuthoring({
     let createdGraphId: GraphId | undefined;
     const { map } = resolved;
     mapTitle = map.title;
-    // The Graphs as they stand after the arm above: the arms that write Graphs
-    // below are never the ones that wrote them above, so this is the Map's own.
+    // The Graphs as the Map held them before this Edit. The arms above that
+    // change Graphs through the snapshot (Remove from Map, Delete from Space)
+    // never reach the Graph-writing arms below, so the two cannot disagree.
     const ownedGraphs = map.graphs;
     activeGraphId =
       embeddedMapId === undefined
