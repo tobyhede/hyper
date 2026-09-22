@@ -1,10 +1,6 @@
 import {
   type ResourceDocument,
   type ResourceId,
-  type ResourcePlacement,
-  COLLAPSED_RESOURCE_SIZE,
-  DEFAULT_OPEN_SIZE,
-  DEFAULT_SPACE_RESOURCE_OPEN_SIZE,
   type Graph,
   type GraphEdge,
   type GraphId,
@@ -20,6 +16,9 @@ import {
 import {
   loadSpaceSnapshot,
   Placement,
+  SnapshotEdit,
+  type SnapshotEditOutcome,
+  type SnapshotEditRefusal,
   type ResolvedMap,
   type Space,
   type SpaceError,
@@ -527,92 +526,27 @@ const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
 };
 
 /**
- * A width and a height together: an Open Size, the collapsed constant, or the
- * difference between two growths. Local, and shaped as `Placement.growth`'s own
- * parameter is, because none of the three is a domain entity.
+ * Every `SnapshotEdit` refusal, in Authoring's vocabulary.
+ *
+ * The identity, and deliberately so: each code `SnapshotEdit` raises is one
+ * Authoring already names, with the same typed context, so the compiler is
+ * what holds the mapping — a new module code that Authoring does not name
+ * fails to typecheck here rather than reaching the author unworded.
  */
-type Extent = { readonly width: number; readonly height: number };
+const authoringRefusal = (refusal: SnapshotEditRefusal): AuthoringRefusal => refusal;
 
-/**
- * The room a Resource's neighbours gain when its rect goes from one Open Size to
- * another: the difference between the two growths, per axis (ADR 0084).
- *
- * Resize's alone. Close hands its whole growth back rather than a difference,
- * and says so in one place — `Placement.reclaim` — which is where a Resource that
- * leaves a Map and a Resource deleted from the Space say it too.
- *
- * Negative on an axis the Resource shrank on, which is legitimate and is the whole
- * of a shrinking Resize. It is **not** the involution the Open/Close pair is,
- * and the bound `Placement.growth` documents does not extend to it: a negative
- * room reverses a growth only for the Resources that growth was applied to, and a
- * Resource the author placed clear of the subject *after* the Open was never one of
- * them. Such a Resource can be carried back inside the subject — subject Open at
- * `x = 0`, a Resource dropped at `x = 260`, a shrink of 200 — and growing back skips
- * it as no longer clear, so it keeps the 200. That is the same memorylessness
- * ADR 0084 chose for Close, which reclaims from every Resource currently clear of the
- * closing Resource including the ones the author moved there; remembering which
- * Resources a growth actually pushed is the per-Resource history the ADR rejected.
- */
-const roomBetween = (from: Extent, to: Extent): Extent => {
-  const before = Placement.growth(from);
-  const after = Placement.growth(to);
-  return { width: after.width - before.width, height: after.height - before.height };
-};
-
-/**
- * The placement after a Resource's own entry changes and the room it holds changes
- * with it: one Edit, and the whole of displacement at the Edit (ADR 0084).
- *
- * **Order.** The entry is written first and the displacement runs over the
- * result. The coordinates are the same either way, because `displace` compares
- * every neighbour against the *subject's* `x`/`y` and neither writing the entry
- * nor displacing moves the subject. But `place` and `displace` each answer a
- * new map, so one of them has to be second, and it must be the one that has to
- * see the whole map — the displacement. Writing the entry first also settles
- * what `displace` needs in order to do anything at all: it answers the
- * placement unchanged for a subject the map does not hold, and after `place`
- * the subject is certainly held.
- */
-const withRoomFor = (
-  placement: Placement,
-  resourceId: ResourceId,
-  at: ResourcePlacement,
-  room: Extent,
-): Placement => Placement.displace(Placement.place(placement, resourceId, at), resourceId, room);
-
-/**
- * The placement after a Resource Closes: Closed on its own entry, and the room it
- * held given back by `Placement.reclaim`.
- *
- * Both ways a Resource closes end here — the Close completion, and a resize
- * proposal the magnet has taken to the collapsed size (ADR 0066) — so this
- * Map's two Close gestures reach the shared rule through one line rather
- * than each restating it. That matters most for the magnetic one, which is
- * where a restatement would reclaim the collapsed proposal's zero growth
- * instead of the growth of the size the Resource was actually Open at.
- *
- * The reclaim runs first and the Closed entry is written over the result,
- * because `Placement.reclaim` reads the Open Size off the entry it is given and
- * a Closed entry no longer holds any room. The coordinates do not depend on the
- * order — `displace` moves every Resource against the subject's own `x`/`y`, and
- * neither step moves the subject — so this is about what each step can still
- * see, not about where anything lands. The remembered Open Size rides through
- * untouched (ADR 0066), which is what makes the next Open apply exactly what
- * this gives back.
- */
-const closedResource = (
-  placement: Placement,
-  resourceId: ResourceId,
-  at: Extract<ResourcePlacement, { readonly open: true }>,
-): Placement =>
-  Placement.place(Placement.reclaim(placement, resourceId), resourceId, { ...at, open: false });
+/** A `SnapshotEdit` answer that is not an Edit, as the derivation answers it. */
+const notCompleted = (
+  outcome: Exclude<SnapshotEditOutcome, { readonly kind: 'completed' }>,
+): DerivedCompletion =>
+  outcome.kind === 'unchanged' ? UNCHANGED : refuse(authoringRefusal(outcome.refusal));
 
 /**
  * The placement after a Resource leaves this Map, with the room it held given
  * back.
  *
  * Leaving is a Close the Resource does not come back from, so it reclaims exactly
- * as {@link closedResource} does — and it has to, because the room is no longer
+ * as a Close does — and it has to, because the room is no longer
  * derived from the Resource's own entry. Under the derivation ADR 0084 removed,
  * dropping the entry dropped the displacement with it; now the room is written
  * into the neighbours' own coordinates, and a removal that only drops the entry
@@ -1348,60 +1282,19 @@ export function createSpaceAuthoring({
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
     } else if (completion.kind === 'opened-resource') {
-      const at = placement.get(completion.resourceId);
-      if (at === undefined) return refuse({ code: 'resource-not-in-map' });
-      if (at.open) return UNCHANGED;
-      // The size the Resource is actually opening at: the one it remembers, or the
-      // default for its kind. The room it takes is that size's growth, so the
-      // Close that reverses this reads the same number back off the entry.
-      const openSize =
-        at.openSize ??
-        (space.lookup.resource(completion.resourceId)?.kind === 'space'
-          ? DEFAULT_SPACE_RESOURCE_OPEN_SIZE
-          : DEFAULT_OPEN_SIZE);
-      writePlacement(
-        withRoomFor(
-          placement,
-          completion.resourceId,
-          { ...at, open: true, openSize },
-          Placement.growth(openSize),
-        ),
-      );
+      const outcome = SnapshotEdit.open(snapshot, mapId, completion.resourceId);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
     } else if (completion.kind === 'closed-resource') {
-      const at = placement.get(completion.resourceId);
-      if (at === undefined) return refuse({ code: 'resource-not-in-map' });
-      if (!at.open) return UNCHANGED;
-      // Read as the Map stands, with no record of who this Resource's Open
-      // pushed: everything currently clear of it moves back, the Resources the author
-      // dragged there while it was open included (ADR 0084).
-      writePlacement(closedResource(placement, completion.resourceId, at));
+      const outcome = SnapshotEdit.close(snapshot, mapId, completion.resourceId);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
     } else if (completion.kind === 'resized-resource') {
-      const at = placement.get(completion.resourceId);
-      if (at === undefined) return refuse({ code: 'resource-not-in-map' });
-      if (!at.open) return refuse({ code: 'resource-not-expanded' });
-      if (
-        completion.size.width === COLLAPSED_RESOURCE_SIZE.width &&
-        completion.size.height === COLLAPSED_RESOURCE_SIZE.height
-      ) {
-        // The magnetic Close (ADR 0066). It is a Close, so it takes the Close
-        // path rather than restating it — reclaiming the growth of the size the
-        // Resource was Open at, not the zero growth of the rect being proposed.
-        writePlacement(closedResource(placement, completion.resourceId, at));
-      } else if (
-        at.openSize.width === completion.size.width &&
-        at.openSize.height === completion.size.height
-      ) {
-        return UNCHANGED;
-      } else {
-        writePlacement(
-          withRoomFor(
-            placement,
-            completion.resourceId,
-            { ...at, openSize: completion.size },
-            roomBetween(at.openSize, completion.size),
-          ),
-        );
-      }
+      // Only an exact Closed Size reaches here as a Close: the magnetic range
+      // that snaps a near miss to it is the canvas's (ADR 0066).
+      const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
     } else if (completion.kind === 'created-resource') {
       createdResourceId = createResource(
         { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },

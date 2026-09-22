@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
   uuidSchema,
   type Graph,
@@ -306,13 +305,6 @@ describe('Edit Resource', () => {
 
 describe('Expanded Resource geometry', () => {
   /**
-   * What {@link DEFAULT_OPEN_SIZE} displaces by: the Open rect less the
-   * collapsed one, per axis (ADR 0084). Named rather than derived so the
-   * coordinates below read as positions instead of as arithmetic.
-   */
-  const GROWTH = { width: 300, height: 274 };
-
-  /**
    * Five Resources at every relation to RESOURCE_A that deciding a Resource's one room
    * axis distinguishes (ADR 0093): clear of its collapsed rect on `x` alone, on
    * `y` alone, on both, and before it on both.
@@ -435,97 +427,6 @@ describe('Expanded Resource geometry', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves the Resources clear of the opening Resource by one axis growth, and nobody else', () => {
-    const { authoring, session } = openDisplacement();
-
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual({
-      // A Resource does not displace itself.
-      [RESOURCE_A]: [100, 100],
-      // Clear on `x` and level on `y`, so it moves right and not down.
-      [RESOURCE_B]: [400 + GROWTH.width, 100],
-      // The mirror of it: inside the column on `x` and clear on `y`.
-      [RESOURCE_C]: [100, 300 + GROWTH.height],
-      // Clear on both, and the width alone takes it clear of the Open rect.
-      [RESOURCE_D]: [500 + GROWTH.width, 500],
-      // Before the Resource on both axes: the room is made after it, not around it.
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
-  it('returns every position to exactly what it was when the Resource Closes again', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual(before);
-  });
-
-  it('reclaims from a Resource the author moved beyond the Open Resource, which the Open never pushed', () => {
-    // ADR 0084: Open and Close each read the Map as it is at that moment and
-    // remember nothing about who was pushed, so Close reclaims from everything
-    // currently clear of the closing Resource. This is the deliberate memoryless
-    // behaviour and not a defect — recording which Resources a particular Open moved
-    // is the per-Resource history that ADR rejected, because it goes stale the
-    // moment the author moves anything and makes two identical Maps behave
-    // differently.
-    const { authoring, session } = openDisplacement();
-
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-    // The author drags E from before the Open Resource to clear of it on both axes.
-    expect(
-      authoring.complete({
-        kind: 'settled-resource-movement',
-        moved: new Map([[RESOURCE_E, { x: 900, y: 900 }]]),
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual({
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [400, 100],
-      [RESOURCE_C]: [100, 300],
-      [RESOURCE_D]: [500, 500],
-      // Never pushed by the Open, and moved back by the Close all the same —
-      // on `x` alone, the one axis it makes room on.
-      [RESOURCE_E]: [900 - GROWTH.width, 900],
-    });
-  });
-
-  it('takes an already Open Resource room as it finds it, with nothing summed over Open Resources', () => {
-    const { authoring, session } = openDisplacement();
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    // B is at (700, 100) by now, and its own growth is measured from there.
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_B })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(originsOf(session)).toEqual({
-      // Level with B on `y` and before it on `x`: A does not move for it.
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [700, 100],
-      [RESOURCE_C]: [100, 574 + GROWTH.height],
-      // Inside B's collapsed column now, and clear of it below.
-      [RESOURCE_D]: [800, 500 + GROWTH.height],
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
   it('refuses a subject the Map does not hold and moves nobody', () => {
     const { authoring, session } = openDisplacement();
     const before = session.getState().working;
@@ -541,49 +442,6 @@ describe('Expanded Resource geometry', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('moves neighbours by the difference between the old growth and the new one', () => {
-    const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-
-    expect(
-      authoring.complete({
-        kind: 'resized-resource',
-        resourceId: RESOURCE_A,
-        size: { width: 860, height: 720 },
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    // 860x720 grows by (600, 574); the Open already applied (300, 274); the
-    // difference this Edit applies is (300, 300).
-    expect(originsOf(session)).toEqual({
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [1000, 100],
-      [RESOURCE_C]: [100, 874],
-      [RESOURCE_D]: [1100, 500],
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
-  it('moves neighbours on one axis only when only one axis of the size changed', () => {
-    const { authoring, session } = openDisplacement();
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-
-    // 100 wider at the same height, so the height difference is zero.
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: { width: 660, height: 420 },
-    });
-
-    expect(originsOf(session)).toEqual({
-      [RESOURCE_A]: [100, 100],
-      [RESOURCE_B]: [800, 100],
-      [RESOURCE_C]: [100, 574],
-      [RESOURCE_D]: [900, 500],
-      [RESOURCE_E]: [40, 40],
-    });
-  });
-
   it('is unchanged and moves nobody when the proposal is the size the Resource already has', () => {
     const { authoring, session } = openDisplacement();
     authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
@@ -597,58 +455,6 @@ describe('Expanded Resource geometry', () => {
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
-  });
-
-  it('returns every position to where it started through Open, resize, resize back and Close', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: { width: 860, height: 720 },
-    });
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: DEFAULT_OPEN_SIZE,
-    });
-    authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A });
-
-    expect(originsOf(session)).toEqual(before);
-  });
-
-  it('reclaims the whole growth of the size it was Open at when a resize snaps to Closed', () => {
-    const { authoring, session } = openDisplacement();
-    const before = originsOf(session);
-
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
-    authoring.complete({
-      kind: 'resized-resource',
-      resourceId: RESOURCE_A,
-      size: { width: 860, height: 720 },
-    });
-
-    // The magnetic Close (ADR 0066) arrives as a resize proposal at exactly the
-    // collapsed size. What it gives back is (600, 574) — the growth of the
-    // 860x720 the Resource was actually Open at — and not the zero growth of the
-    // collapsed rect being proposed.
-    expect(
-      authoring.complete({
-        kind: 'resized-resource',
-        resourceId: RESOURCE_A,
-        size: COLLAPSED_RESOURCE_SIZE,
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(originsOf(session)).toEqual(before);
-    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
-      x: 100,
-      y: 100,
-      open: false,
-      openSize: { width: 860, height: 720 },
-    });
   });
 
   /**

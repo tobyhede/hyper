@@ -113,7 +113,7 @@ const anchor = fc.record({
  * `settled-resource-movement` is absent because it carries the moved Resources' own
  * drop points, which only a real pointer gesture produces; its eligibility and
  * derivation are pinned in `space-authoring-operations.test.ts` and
- * `displacement.property.test.ts` against real geometry. The two connect
+ * `authoring-placement-copy.test.ts` against real geometry. The two connect
  * gestures are covered there too, over the Edge-specific fixtures their
  * eligibility rules need.
  */
