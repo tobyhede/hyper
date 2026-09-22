@@ -7,7 +7,6 @@ import {
   Ellipsis,
   ExternalLink,
   LayoutGrid,
-  Link,
   LogIn,
   Maximize,
   Maximize2,
@@ -324,22 +323,6 @@ export const AlertIcon = () => <CircleAlert />;
 
 /** Close the surface that contains the control. */
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
-
-/**
- * Open an entity's actions menu, on a **Resource rail**.
- *
- * A link glyph rather than the conventional kebab, and that argument is the
- * rail's alone: every other control there names its command (`EditIcon`,
- * `OpenResourceIcon`, `CloseResourceIcon`), so a generic "more" glyph beside them would
- * be the one control saying nothing about what it does.
- *
- * It is no longer the glyph the menu wears everywhere. The menu grew a rename
- * and a delete beside its addresses, so a Sidebar row — which has no cluster of
- * self-naming commands to sit in — draws `EntityActionsIcon` instead. Whether
- * the rail follows is a rail decision, taken when `ResourceNode` first supplies the
- * actions; until then this stays exactly what it draws today.
- */
-export const LinkActionsIcon = (props: ResourceActionIconProps) => <Link size={14} {...props} />;
 
 /**
  * Open an entity's actions menu, where the menu does not primarily serve one action.

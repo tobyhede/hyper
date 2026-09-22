@@ -1,18 +1,17 @@
 /**
- * The entity-actions menu on a **Resource rail** — the one surface the application
- * still cannot reach. See `.scratch/link-ux/issues/01-choose-the-link-action-pattern.md`.
+ * The entity-actions menu on a **Resource rail**, several Resources side by
+ * side. See `.scratch/link-ux/issues/01-choose-the-link-action-pattern.md`
+ * (obsolete) for where the menu came from.
  *
- * **Review, not stable**, and only this half of it is. The Sidebar half moved
- * out: production supplies `entityActions` now, so the real menu is drawn by
- * the real Sidebar in the stable `Space/Space` stories, and it carries the ADR
- * 0052 parity claims a production-reachable surface owes. A second Sidebar
- * story here would have been a copy of that one, free to disagree with it.
- *
- * The rail stays a review surface because `ResourceNode` still does not pass
- * `entityActions` through, so no Resource on a canvas opens this menu. What the
- * commands *are*, however, is no longer invented here: they come from
- * production's own `spaceEntityActions`, so the rail cannot advertise a command
- * the application does not have. Copying is replaced by a line in the
+ * **Review, not stable.** The menu is production-reachable: `ResourceNode`
+ * passes `entityActions` through, fed by `canvas-resource-decoration.ts` from
+ * `spaceEntityActions`, so every Resource on the canvas opens it. What this
+ * sheet lacks is an ADR 0052 parity claim — the rail's Copy link commands were
+ * left unclaimed when the Sidebar's claims were retired (`parity-claims.ts`,
+ * the Command Dock block), so this stays in `stories/review` until the sheet
+ * earns one or `components/resource.stories.tsx` takes it over. The commands
+ * are production's own `spaceEntityActions`, so the rail cannot advertise a
+ * command the application does not have; copying is replaced by a line in the
  * on-screen log so the interaction can be judged without side effects.
  */
 import type { Story } from '@ladle/react';
@@ -82,19 +81,13 @@ function PrototypeBanner({ children }: { readonly children: string }) {
 }
 
 /**
- * The Resource's own rail carrying the menu, at four of the states a Resource is drawn
- * in.
+ * Four Resources' own rails carrying the menu, the second one selected and the
+ * rest at rest.
  *
- * The rail is `CanvasResource`'s, not a replica: the icon sits in the shared
- * command group ahead of Open/Close, so what a reviewer is looking at is the
- * order `[link][open-or-close]` on the real control cluster, with the real
- * roving-tabindex keyboard contract (ADR 0073) over it. Hover a Resource, or Tab to
- * it and press ArrowRight, to reach the icon.
- *
- * The rail keeps the **link** glyph while a Sidebar row now draws the general
- * one: every other control here names its own command, so a generic glyph would
- * be the one saying nothing. Whether that survives is a rail decision, taken
- * when `ResourceNode` first supplies the actions.
+ * The rail is `CanvasResource`'s, not a replica: the trigger sits in the shared
+ * command group ahead of Open/Close, drawing the general `EntityActionsIcon`,
+ * with the real roving-tabindex keyboard contract (ADR 0073) over it. Hover a
+ * Resource, or Tab to it and press ArrowRight, to reach the trigger.
  *
  * There is no Rename in this menu, because production has none to offer: a Resource
  * title is renamed in place on its Front. "Open in new tab" is a Space Resource

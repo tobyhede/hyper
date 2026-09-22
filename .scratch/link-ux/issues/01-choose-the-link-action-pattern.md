@@ -2,7 +2,19 @@
 
 **What to build:** Replace the Sidebar's persistent "Copy link to X" / "Copy link in this Layout" buttons with one entity-actions menu — Rename, Copy link, Copy permanent link, Open in new tab — reachable two ways: a trailing icon on the entity's own row or rail, and a right click anywhere on it. For Cards, Graphs, Layouts and Spaces alike. This ticket does not change addressing, routing, or the product-destination table (ADR 0069, ADR 0072) — only where and how a person reaches the two link forms those ADRs already define, plus one existing capability (rename) it now also surfaces.
 
-**Status:** interaction direction chosen; production wiring remains open
+**Status:** obsolete
+
+**Obsolete (2026-09-21).** Every surface this ticket was written against is gone, and each open follow-up was either built or overtaken. ADR 0082 retired `SpaceSidebar` for the Command Dock (`CommandDock.tsx`), taking the Sidebar rows, the "Copy link to …" footer buttons and `SelectedLayoutName` with it; Layout and Card are Map and Resource. Where each follow-up below ended up:
+
+- **Wire Copy link / Copy permanent link:** built by issue 02. `packages/app/src/entity-actions.tsx` (`spaceEntityActions`) is the one command set, spent by `App.tsx`.
+- **The canvas header menu:** overtaken. The Dock's Space, Map and Graph clusters carry those commands.
+- **Actions on a Resource on the canvas:** built. `ResourceNode` passes `entityActions` through, fed by `canvas-resource-decoration.ts`, and the rail draws the general `EntityActionsIcon`; `LinkActionsIcon`, the link glyph this ticket chose for the rail, had no production caller left and is deleted.
+- **Click-to-rename vs. menu Rename:** settled. A Resource's menu has no Rename, its Title being edited in place; the Dock's clusters offer Rename in their lists.
+- **ADR 0052 parity claims:** the Dock's claims are in `parity-claims.ts`. The rail's Copy link commands still have none — `stories/review/link-actions-prototype.stories.tsx` stays a review story for that reason, with `ladle-e2e/link-actions.spec.ts` and `e2e/space-routing.spec.ts` as untagged evidence.
+- **Long-press on touch for the Resource right-click menu:** never evaluated. File it on its own if it matters.
+
+The body below is kept as the record of the decision and is not current.
+
 
 **ADR 0079 reconciliation:** the retired `space-view` `SpaceEntity` kind is gone —
 `layout-only-v1/03` removed it, and `SpaceSidebar` now asks one entity at a time as

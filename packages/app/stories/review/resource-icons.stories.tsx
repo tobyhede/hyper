@@ -725,7 +725,7 @@ const REFERENCE_OPTIONS: readonly ReferenceOption[] = [
   },
   {
     title: 'Corner badge — link',
-    note: 'Unambiguous about reference, and it collides with LinkActionsIcon, which is already the link-actions control.',
+    note: 'Unambiguous about reference. It was ruled out while `link` was the Resource rail’s actions glyph; the rail now draws the general `EntityActionsIcon`, so the collision is gone and the arrow was chosen on its own merits.',
     mark: 'link',
   },
   {
@@ -840,7 +840,6 @@ const SPENT: readonly {
     means: 'Copy link, including a Resource’s within-Map and permanent forms',
     rulesOut: 'any two-overlapping-sheets Reference Resource — copy itself, and files is close',
   },
-  { name: 'link', icon: 'LinkActionsIcon', means: 'the link actions control', rulesOut: 'link-2' },
   {
     name: 'play',
     icon: 'PresentIcon',
