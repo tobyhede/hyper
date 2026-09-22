@@ -1,35 +1,23 @@
-# 03 — Space Authoring edits snapshots through `SnapshotEdit`
+# 03 — Space Authoring writes a Map's identity, not its content
 
-Status: needs-triage
-Blocked by: 01, 02, 05
+Status: ready-for-agent
+Blocked by: none (01, 02 and 05 are done)
 
-**What to build:** Add `addToDiagram`, `open`, `close`, `resize` and `removeFromDiagram` to `SnapshotEdit`, move Space Authoring's Thing membership completions onto the module — including `created-thing`, `created-alias`, `create-and-connect` and `deleted-thing` through the operations ticket 01 built — and delete the helpers and rule tests they replace. See `../spec.md`.
+**What to build:** A prefactor with no behaviour change. `updatePositionedMap` narrows to the fields that are a Map's identity rather than its content — title, `kind`, `activeGraph` and the Space's `defaultMap` — and `deriveCompletedEdit` stops handing it the Map's positions and Graphs whole. Each arm that changes positions or Graphs writes them into the working snapshot itself; the tail folds only the Map's identity over the result. See `../spec.md`.
 
-**Why:** After 01 the registry uses the module, and after 02 Authoring has no second placement to reconcile, so Authoring can call the operations with the working snapshot directly. What remains in `app` is completion routing, outcomes, epochs and queueing — the deep part of Authoring — not the Diagram rules.
+**Why:** Today the tail writes `completedPlacement` and `ownedGraphs` over the Map whatever the arm did. Once an arm calls a `SnapshotEdit` operation, which answers a whole snapshot, that tail would overwrite what the module wrote — for Delete from Space, putting the deleted Resource's position back in the Map the Edit is drawing. Removing that write first makes each of 08–11 a local change to one arm.
 
-**Triage before starting:** re-read `deriveCompletedEdit` as 02 left it and confirm the arms still reduce to "call the operation, map the refusal, write the Diagram"; update this ticket's line references.
+This replaces the original single ticket 03, which an audit on 2026-09-22 found stale in vocabulary (Thing/Diagram/Alias), wrong about what `updatePositionedMap` writes, and without a decision on how the module's snapshot composes with the tail. The work is now split across 03 and 08–11.
 
 ## Build
 
-- [ ] `SnapshotEdit` gains:
-  - `addToDiagram` — existing Thing, `exact` or `avoidingOverlap`; refuses `thing-not-found`, `thing-already-in-diagram`.
-  - `open` — refuses `thing-not-in-diagram`; unchanged if already Open; default Open Size by kind (`DEFAULT_SPACE_THING_OPEN_SIZE` / `DEFAULT_OPEN_SIZE`); displaces by growth.
-  - `close` — refuses `thing-not-in-diagram`; unchanged if Closed; reclaims and keeps the Open Size.
-  - `resize` — refuses `thing-not-in-diagram`, `thing-not-open`; unchanged at the same size; exactly `COLLAPSED_THING_SIZE` is a Close; otherwise displaces by the difference in growth.
-  - `removeFromDiagram` — refuses `thing-not-in-diagram`; reclaims, removes the position and this Diagram's incident Edges only.
-- [ ] The magnetic 24-unit range (ADR 0066) stays in `app`; only an exact Closed Size reaches `resize` as a Close.
-- [ ] Authoring's `opened-thing`, `closed-thing`, `resized-thing`, `added-thing-to-diagram`, `removed-thing-from-diagram`, `deleted-thing`, `created-thing`, `created-alias` and `create-and-connect` arms call the module and map its refusal codes into `AuthoringRefusal`. `space-thing-deletion-unsupported` stays in Authoring; the Alias Target check on creation moves into `createInDiagram` and `aliasTargetRefusal` is deleted.
-- [ ] `updatePositionedDiagram` remains Authoring's write of `defaultDiagram`, `activeGraph`, title and `kind`; the module never writes those.
-- [ ] Deleted: `freeAnchor`, `roomBetween`, `withRoomFor`, `closedThing`, `removedThing`, `incomingAliases` from `space-authoring.ts`, and `withThingRemovedFromDiagrams` and `withoutIncidentEdges` from `snapshot.ts` (moving any Edge-only use they still have into the module).
-
-## Tests
-
-- [ ] Property tests for each new operation in `packages/graph/test/snapshot-edits.property.test.ts`: Open then Close restores every position for nonnegative growth; resize A→B→A restores positions; resize to Closed Size equals close; `removeFromDiagram` touches no other Diagram; every operation's completed snapshot passes `loadSpaceSnapshot`.
-- [ ] Delete the tests in `space-authoring-operations.test.ts` that only restate those rules through full composition (Open Thing geometry :326-733, Diagram membership ~:1700, the Delete Thing from Space cascade ~:1860-2000), and the pure `snapshot.test.ts` cases for the moved functions. Keep every test of completion outcome, epoch invalidation, queueing and ordering, and keep `displacement.property.test.ts` cases that assert Authoring-level behaviour rather than the rule.
+- [ ] `updatePositionedMap` takes a Map id, title, and Active Graph, and writes the Map's title, `kind: 'positioned'`, `activeGraph` (carrying the stored one through when the Edit names none, as today) and the Space's `defaultMap`. It no longer takes or writes `positions` or `graphs`, and a Map it does not find is not appended — the module or the arm that creates a Map owns that.
+- [ ] Every arm of `deriveCompletedEdit` that changes the Map's positions or Graphs writes them into `snapshot` before the tail, in the Map being edited (the resolved Map, which is the embedded Map when `embeddedMapId` is given). The membership arms still use their current helpers; only where the write happens moves.
+- [ ] `sameSnapshot(previousSnapshot, next)` still answers `unchanged` for an Edit that changed nothing, including a settled drag that landed where it started.
+- [ ] No test in `space-authoring-operations.test.ts`, `snapshot.test.ts`, `displacement.property.test.ts` or `authoring-placement-copy.test.ts` changes its assertions. `snapshot.test.ts`'s `updatePositionedMap` cases change only their inputs.
 
 ## Done when
 
-- [ ] `rg "Placement\.(reclaim|displace|growth)" packages/app/src` is empty.
-- [ ] `pnpm verify` and `pnpm e2e` are green; `pnpm e2e:ladle` run or named inapplicable with reason.
+- [ ] `pnpm verify` and `pnpm e2e` are green. `pnpm e2e:ladle` is not applicable: no component or story changes.
 
 ## Comments
