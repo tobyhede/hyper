@@ -458,7 +458,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       const tables = this.#store.tables(handle);
       const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
-      const metaSpaceId = await this.#lockMetaIdentity(tables);
+      const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
       const decision = decideCommit(request, metaSpaceId, await this.#loadEverySpace(tables));
       if (decision.kind === 'answer') return decision.result;
 
@@ -590,12 +590,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * Take the singleton row's write lock, and answer `undefined` when there is
-   * no row to take.
+   * Protect the aggregate transaction before reading its Meta identity, then
+   * take the singleton row's write lock when one exists.
    *
    * A repository that has only been migrated has no Meta Space, and there is
-   * then nothing to serialize integrity-affecting transactions on and no
-   * aggregate to validate. That is not a reason to fail a commit outright:
+   * no aggregate to validate. The store's protection covers that absence too:
+   * PostgreSQL takes a transaction advisory lock; SQLite keeps its snapshot
+   * and refuses stale write upgrades. Absence does not fail a commit outright:
    * identity and revision conflicts are answerable without Meta, and
    * `MemorySpaceRepository` answers them first.
    *
@@ -624,7 +625,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * defect (`sqlite-space-repository.test.ts`, "names a Meta identity that
    * keeps moving while it is locked unavailable").
    */
-  async #lockMetaIdentity(tables: SqlTables<Order>): Promise<UUID | undefined> {
+  async #lockMetaIdentity(handle: Handle, tables: SqlTables<Order>): Promise<UUID | undefined> {
+    await this.#store.lockAggregate(handle);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const state = await tables.RepositoryState.read();
       if (state === null) return undefined;
@@ -751,7 +753,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   async #loadAggregateUnserialised(): Promise<AggregateLoadResult> {
     return this.#store.transaction(async (handle) => {
       const tables = this.#store.tables(handle);
-      const metaSpaceId = await this.#lockMetaIdentity(tables);
+      const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
       if (metaSpaceId === undefined) {
         if ((await this.#loadEverySpace(tables)).length === 0) return { kind: 'uninitialized' };
         throw new AggregateInvariantError('Stored Spaces exist without a Meta Space');
@@ -775,7 +777,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     try {
       return await this.#store.transaction(async (handle) => {
         const tables = this.#store.tables(handle);
-        const metaSpaceId = await this.#lockMetaIdentity(tables);
+        const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
         if (metaSpaceId !== undefined) {
           return classifyInitializedAggregate(
             input,
@@ -817,13 +819,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     try {
       return await this.#store.transaction(async (handle) => {
         const tables = this.#store.tables(handle);
-        const metaSpaceId = await this.#lockMetaIdentity(tables);
+        const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
         // Rows are read raw rather than through `#loadEverySpace`: truncation
         // replaces stored state whether or not it parses (ADR 0094). In id
         // order, so two overlapping replacements take the row locks below in
         // the same order: the later waits on the earlier rather than
-        // deadlocking with it. Where no Meta row exists to lock, those row
-        // locks are all that serialises them.
+        // deadlocking with it. The store also protects the empty case before
+        // the Meta read, when no row lock can serialize these decisions.
         const storedRows = await tables.Space.loadAllForReplacement();
         if (metaSpaceId === undefined && storedRows.length === 0) {
           return { kind: 'uninitialized' };
