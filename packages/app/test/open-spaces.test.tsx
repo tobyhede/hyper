@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   MemorySpaceBackend,
@@ -6,6 +7,8 @@ import {
   type CommitResult,
 } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
+import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
+import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
@@ -166,15 +169,42 @@ const edit = (space: SpaceSnapshot): SpaceSnapshot => ({
 });
 
 describe('Open Spaces', () => {
-  it('names Meta from startup while it is closed, and from its session once open', async () => {
+  it('lists Meta from startup while it is closed, and from its own session once open', async () => {
     const { openSpaces } = setup();
     await openSpaces.open(OTHER_ID);
     expect(openSpaces.entry(META_ID)).toBeUndefined();
-    expect(openSpaces.meta()).toEqual({ spaceId: META_ID, title: 'Meta' });
+    expect(openSpaces.listing()[0]).toEqual({
+      spaceId: META_ID,
+      title: 'Meta',
+      depth: 0,
+      open: false,
+    });
 
     const meta = await openSpaces.open(META_ID);
     meta.session.submit(edit(meta.session.getState().working));
-    expect(openSpaces.meta()).toEqual({ spaceId: META_ID, title: 'Meta edited' });
+    expect(openSpaces.listing()[0]).toMatchObject({
+      spaceId: META_ID,
+      title: 'Meta edited',
+      depth: 0,
+      open: true,
+    });
+  });
+
+  it('memoizes the listing on the open set’s state identity', async () => {
+    const { openSpaces } = setup();
+    await openSpaces.open(OTHER_ID);
+
+    const first = openSpaces.listing();
+    expect(openSpaces.listing()).toBe(first);
+
+    const meta = await openSpaces.open(META_ID);
+    const afterOpen = openSpaces.listing();
+    expect(afterOpen).not.toBe(first);
+
+    meta.session.submit(edit(meta.session.getState().working));
+    const afterEdit = openSpaces.listing();
+    expect(afterEdit).not.toBe(afterOpen);
+    expect(openSpaces.listing()).toBe(afterEdit);
   });
 
   it('authors the embedded Map while preserving the full canvas selection', async () => {
@@ -1004,6 +1034,231 @@ describe('Open Spaces', () => {
     // ADR 0068: closing one Space never closes another. The record is a history
     // and never a containment, so nothing cascades down it.
     expect(openSpaces.getState().entries.map(({ id }) => id)).toEqual([META_ID, THIRD_ID]);
+  });
+
+  describe('choosing a row from the Open Spaces menu', () => {
+    it('refuses to select a closed non-Meta Space', async () => {
+      const { openSpaces } = setup();
+
+      await expect(openSpaces.select(OTHER_ID)).resolves.toEqual({
+        kind: 'refused',
+        code: 'space-not-open',
+      });
+    });
+
+    it('switches to an open Space', async () => {
+      const { openSpaces } = setup();
+      await openSpaces.open(META_ID);
+      await openSpaces.open(OTHER_ID);
+      await openSpaces.switchTo(META_ID);
+
+      await expect(openSpaces.select(OTHER_ID)).resolves.toEqual({
+        kind: 'switched',
+        title: 'Other',
+      });
+      expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+    });
+
+    it('answers switched for the Space already on the canvas', async () => {
+      const { openSpaces } = setup();
+      await openSpaces.open(OTHER_ID);
+
+      await expect(openSpaces.select(OTHER_ID)).resolves.toEqual({
+        kind: 'switched',
+        title: 'Other',
+      });
+      expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+    });
+
+    it('opens a closed Meta with no Opener', async () => {
+      const { openSpaces } = setup();
+      await openSpaces.open(OTHER_ID);
+
+      await expect(openSpaces.select(META_ID)).resolves.toEqual({
+        kind: 'opened',
+        title: 'Meta',
+      });
+      expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+      expect(openSpaces.getState().openedFrom.get(META_ID)).toBe(null);
+    });
+
+    it('still throws a load failure rather than answering refused', async () => {
+      const { backend, openSpaces } = setup();
+      vi.spyOn(backend, 'loadSpace').mockRejectedValueOnce(new Error('The space is unavailable.'));
+
+      await expect(openSpaces.select(META_ID)).rejects.toThrow('The space is unavailable.');
+    });
+  });
+
+  describe('the Opener', () => {
+    it('names the Space a crossing was made from', async () => {
+      const { openSpaces } = setup();
+      await openSpaces.open(META_ID);
+      const other = await openSpaces.enter(OTHER_ID);
+
+      expect(openSpaces.opener(other.id)).toEqual({ spaceId: META_ID, title: 'Meta' });
+    });
+
+    it('answers null for a Space opened directly, and for one with nothing open', () => {
+      const { openSpaces } = setup();
+
+      expect(openSpaces.opener(META_ID)).toBeNull();
+    });
+  });
+
+  /**
+   * What the tree the Open Spaces menu draws is a picture of, ported from the
+   * deleted `dock-open-tree.test.ts` through `listing()` rather than through the
+   * private `openTree` helper it used to test directly.
+   *
+   * The one case that file held and this does not is a row whose opener is
+   * absent: `listing()`'s only producer, `openedFrom`, cannot produce one — every
+   * entry begins with a real opener and `retireOpenSpace` re-homes what an exit
+   * would otherwise strand — so there is no way to reach it through the public
+   * seam.
+   */
+  describe('the tree the listing draws (ADR 0082)', () => {
+    it('derives each row’s depth from the crossing that opened it', async () => {
+      const { openSpaces } = crossing();
+      await openSpaces.open(META_ID);
+      await openSpaces.enter(OTHER_ID);
+      await openSpaces.enter(THIRD_ID);
+
+      expect(openSpaces.listing().map((row) => [row.title, row.depth])).toEqual([
+        ['Meta', 0],
+        ['Other', 1],
+        ['Third', 2],
+      ]);
+    });
+
+    it('keeps siblings in the order they were opened', async () => {
+      const { openSpaces } = crossing();
+      await openSpaces.open(META_ID);
+      await openSpaces.enter(THIRD_ID);
+      await openSpaces.switchTo(META_ID);
+      await openSpaces.enter(OTHER_ID);
+
+      expect(openSpaces.listing().map((row) => row.title)).toEqual(['Meta', 'Third', 'Other']);
+    });
+
+    it('draws Meta first even when it was entered from another Space', async () => {
+      const { openSpaces } = crossing();
+      await openSpaces.open(OTHER_ID);
+      await openSpaces.enter(META_ID);
+      await openSpaces.enter(THIRD_ID);
+
+      expect(openSpaces.listing().map((row) => [row.title, row.depth])).toEqual([
+        ['Meta', 0],
+        ['Third', 1],
+        ['Other', 0],
+      ]);
+    });
+
+    it('draws Meta first when it was opened directly after another Space', async () => {
+      const { openSpaces } = setup();
+      await openSpaces.open(OTHER_ID);
+      await openSpaces.open(META_ID);
+
+      expect(openSpaces.listing().map((row) => row.title)).toEqual(['Meta', 'Other']);
+    });
+  });
+
+  /**
+   * The Meta-row rule cases moved from `space-set-freshness.test.tsx`
+   * (`.scratch/command-dock/issues/28`, decision 11): Meta's row does not
+   * depend on the Space list read, and a failure to open it names Meta by the
+   * title the menu drew rather than by a placeholder.
+   */
+  describe('Meta’s row in the Open Spaces menu', () => {
+    it('lists a closed Meta by its title independently of the Space list read', async () => {
+      const control = new MemorySpaceBackendTestControl();
+      const { backend, openSpaces } = setup(control);
+      const failingList = vi.spyOn(backend, 'listSpaces');
+      failingList.mockRejectedValue(new Error('The Space list is unavailable.'));
+      await openSpaces.open(OTHER_ID);
+
+      // `listing()` never calls `listSpaces` at all, which is the whole of the
+      // independence this proves: naming Meta cannot wait on, or fail with, a
+      // read this derivation does not make.
+      expect(failingList).not.toHaveBeenCalled();
+      expect(openSpaces.listing()[0]).toEqual({
+        spaceId: META_ID,
+        title: 'Meta',
+        depth: 0,
+        open: false,
+      });
+    });
+  });
+
+  /**
+   * The one rendered case decision 11 keeps: the Dock draws whatever
+   * `listing()` computes, and a refusal to open the row it drew names the
+   * Space by the title that row carried (decision 10) rather than by a
+   * placeholder — ported from `space-set-freshness.test.tsx`'s "names Meta by
+   * its title when it cannot be opened".
+   */
+  describe('choosing a closed Meta that cannot be opened, rendered', () => {
+    beforeAll(() => {
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          observe(): void {
+            return undefined;
+          }
+          unobserve(): void {
+            return undefined;
+          }
+          disconnect(): void {
+            return undefined;
+          }
+        },
+      );
+      // Base UI's positioner measures, and jsdom ships neither pointer capture
+      // nor `scrollIntoView`; both are reached before a menu can open.
+      HTMLElement.prototype.hasPointerCapture = () => false;
+      HTMLElement.prototype.setPointerCapture = () => undefined;
+      HTMLElement.prototype.releasePointerCapture = () => undefined;
+      HTMLElement.prototype.scrollIntoView = () => undefined;
+    });
+
+    afterAll(() => vi.unstubAllGlobals());
+
+    /** A backend that cannot load the Meta Space, as a dropped request would. */
+    class MetaUnloadableBackend extends MemorySpaceBackend {
+      override loadSpace(id: Parameters<MemorySpaceBackend['loadSpace']>[0]) {
+        return id === META_ID
+          ? Promise.reject(new Error('The Meta Space is unavailable.'))
+          : super.loadSpace(id);
+      }
+    }
+
+    it('names Meta by the title the menu drew when it cannot be opened', async () => {
+      const backend = new MetaUnloadableBackend(META_ID, [
+        loaded(META_ID, 'Meta'),
+        loaded(OTHER_ID, 'Other'),
+      ]);
+      const reported: unknown[] = [];
+      const spaces = createOpenSpaces({
+        backend,
+        metaSpaceId: META_ID,
+        metaSpaceTitle: 'Meta',
+        newId: () => RESOURCE_ID,
+        history: recordingHistory(),
+        reportObserverError: (error) => reported.push(error),
+      });
+      const initial = await spaces.open(OTHER_ID);
+      render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+      const create = await screen.findByRole('button', { name: 'Create Markdown Resource' });
+      await waitFor(() => expect(unavailable(create)).toBe(false));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Spaces. 1 open.' }));
+      fireEvent.click(
+        within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Meta' }),
+      );
+
+      expect(await screen.findByText('Meta could not be opened.')).toBeInTheDocument();
+      expect(screen.queryByText('That Space could not be opened.')).not.toBeInTheDocument();
+    });
   });
 
   it('never exits the permanent Meta Space', async () => {

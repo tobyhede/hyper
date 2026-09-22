@@ -107,7 +107,7 @@ import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
-import type { RejectedExitConfirmation } from '../open-spaces';
+import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import { GRAPH_PALETTE_ENTRIES } from '../colors';
 import {
   DOCK_ALONGS,
@@ -116,6 +116,7 @@ import {
   exitReportSentence,
   nearestAlong,
   nearestEdge,
+  openCount,
   orientationOf,
   slotValue,
   unwellElsewhere,
@@ -126,8 +127,6 @@ import {
   type DockOrientation,
   type DockPosition,
   type ExitOutcome,
-  type OpenRow,
-  type NamedSpace,
   openSpacesName,
   SPACES_LABEL,
 } from '../dock-model';
@@ -302,16 +301,14 @@ export interface DockSpace {
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
   readonly currentSpaceId: UUID;
-  /**
-   * The Meta Space, which the Open Spaces menu lists first whether or not it is
-   * open. `null` only where the App is drawn outside Open Spaces, which is
-   * what knows Meta; inside it Meta always has a title (`OpenSpaces.meta`).
-   */
-  readonly meta: NamedSpace | null;
   /** The Space this one was entered from, and the only Space the bar names. Null at the root. */
   readonly opener: NamedSpace | null;
-  /** Every open Space, depth-first from the root — what the Open Spaces menu lists. */
-  readonly openSpaces: readonly OpenRow[];
+  /**
+   * Every row the Open Spaces menu draws, Meta first whether or not it is
+   * open (`OpenSpaces.listing`) — `[]` only where the App is drawn outside
+   * Open Spaces, which is what knows Meta.
+   */
+  readonly listing: readonly ListingRow[];
   /**
    * Rename this Space, or `null` while no chrome rename may run.
    *
@@ -336,11 +333,20 @@ export interface DockSpace {
   /** Copy this Space's own address — the one link a Space offers (`entity-actions.tsx`). */
   readonly onCopyLink: () => void;
   /**
-   * Move to an open Space, closing nothing — or to the Meta Space, which is
-   * opened if it is not open yet. The Opener control and the Open Spaces menu both
-   * spend this.
+   * Choose a row of the listing: move to an open Space, closing nothing, or to
+   * the Meta Space, which is opened if it is not open yet. The Opener control
+   * and the Open Spaces menu both spend this.
+   *
+   * `title` travels with the choice rather than being looked up again once the
+   * command answers — `OpenSpaces.select`'s own refusal carries none, being
+   * only ever a race the reader cannot see coming, and by the time a thrown
+   * failure is caught the row that was chosen may no longer be in
+   * {@link listing} at all. The Dock already holds the title of the row it
+   * drew and the reader chose, so it hands it over rather than making the
+   * caller keep a last-known one (`.scratch/command-dock/issues/28`, decision
+   * 10).
    */
-  readonly onSwitchTo: (spaceId: UUID) => void;
+  readonly onSelect: (spaceId: UUID, title: string) => void;
   /**
    * Exit this Space — one Space, never a second (ADR 0068). Never the root.
    *
@@ -1803,11 +1809,18 @@ function OpenerAndOpenSpaces({
    * (`openSpacesName`) reads the same number, and a count taken twice could
    * have the dot and the name disagree.
    */
-  const unwell = unwellElsewhere(space.openSpaces, space.currentSpaceId);
-  const meta = space.meta;
-  // Listed by its own row while it is open; otherwise the menu lists it first.
-  const closedMeta =
-    meta !== null && !space.openSpaces.some((row) => row.spaceId === meta.spaceId) ? meta : null;
+  const unwell = unwellElsewhere(space.listing, space.currentSpaceId);
+  /**
+   * Meta's own row, whichever arm of {@link ListingRow} it is — `listing`
+   * draws it first whether or not it is open (`open-spaces.ts`), so the first
+   * row is always Meta's and nothing here has to ask which Space it names.
+   * `null` only for the empty listing `SpaceApp`'s isolated mount draws.
+   */
+  const metaId = space.listing[0]?.spaceId ?? null;
+  const selectRow = (spaceId: UUID): void => {
+    const row = space.listing.find((candidate) => candidate.spaceId === spaceId);
+    if (row !== undefined) space.onSelect(row.spaceId, row.title);
+  };
 
   return (
     // Named for the surface it draws: the primitive's own default is a word
@@ -1841,7 +1854,7 @@ function OpenerAndOpenSpaces({
                   className="command-dock__crumb nokey"
                   aria-label={`Go to ${opener.title}`}
                   title={`Go to ${opener.title}`}
-                  onClick={() => space.onSwitchTo(opener.spaceId)}
+                  onClick={() => space.onSelect(opener.spaceId, opener.title)}
                 />
               }
             >
@@ -1872,7 +1885,7 @@ function OpenerAndOpenSpaces({
               // The Dock's words, and {@link openSpacesName} is where they
               // and the reason for them live — the visible word and the
               // accessible name are one token, so the pair cannot drift.
-              aria-label={openSpacesName(space.openSpaces.length, unwell)}
+              aria-label={openSpacesName(openCount(space.listing), unwell)}
               title="Switch Space"
               // A `ToolbarButton` like every other control in the bar. It sits
               // in a breadcrumb rather than in a cluster, which used to mean a
@@ -1919,22 +1932,21 @@ function OpenerAndOpenSpaces({
                     the same question those ask: which of a set is the one you
                     are looking at. What differs is only that the set is nested,
                     and the indent is the whole of that difference. */}
-              <DropdownMenuRadioGroup
-                value={space.currentSpaceId}
-                onValueChange={(next) => space.onSwitchTo(next)}
-              >
+              <DropdownMenuRadioGroup value={space.currentSpaceId} onValueChange={selectRow}>
                 <DropdownMenuLabel>Open Spaces</DropdownMenuLabel>
-                {/* Meta tops the list whether or not it is open, so where
-                      navigation starts is one choice away from every Space —
-                      including one reached by its own address, which has no
-                      Opener. Open, it is the tree's own first row below. */}
-                {closedMeta === null ? null : (
-                  <SpaceItem value={closedMeta.spaceId} closeOnClick>
-                    <ParentIcon />
-                    {closedMeta.title}
-                  </SpaceItem>
-                )}
-                {space.openSpaces.map((row) => {
+                {/* Meta tops the list whether or not it is open (`listing`'s
+                      own rule), so where navigation starts is one choice away
+                      from every Space — including one reached by its own
+                      address, which has no Opener. */}
+                {space.listing.map((row) => {
+                  if (!row.open) {
+                    return (
+                      <SpaceItem key={row.spaceId} value={row.spaceId} closeOnClick>
+                        <ParentIcon />
+                        {row.title}
+                      </SpaceItem>
+                    );
+                  }
                   const report = unwellReport(row.persistence);
                   return (
                     <SpaceItem key={row.spaceId} value={row.spaceId} closeOnClick>
@@ -1952,7 +1964,7 @@ function OpenerAndOpenSpaces({
                           ))}
                         </span>
                       )}
-                      {row.spaceId === meta?.spaceId ? (
+                      {row.spaceId === metaId ? (
                         <ParentIcon />
                       ) : (
                         <ResourceKindIcon kind="space" decorative />

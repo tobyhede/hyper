@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { newUuid } from '@project/core';
-import { unwellElsewhere, type OpenRow, type NamedSpace } from '../src/dock-model';
+import { openCount, unwellElsewhere } from '../src/dock-model';
+import type { ListingRow, NamedSpace, OpenListingRow } from '../src/open-spaces';
 
 const named = (title: string): NamedSpace => ({ spaceId: newUuid(), title });
 
 /** A commit that failed on one of the open Spaces, which is the least of the three unwell states. */
-const failedOn = (open: readonly OpenRow[], spaceId: string): readonly OpenRow[] =>
-  open.map((row) =>
+const failedOn = (listing: readonly OpenListingRow[], spaceId: string): readonly OpenListingRow[] =>
+  listing.map((row) =>
     row.spaceId === spaceId
       ? {
           ...row,
@@ -32,20 +33,27 @@ describe('the unwell Spaces the Open Spaces trigger reports', () => {
   it('counts a Space the bar is not naming that needs attention', () => {
     const current = newUuid();
     const opener = named('Design system');
-    const open: readonly OpenRow[] = failedOn(
+    const listing: readonly OpenListingRow[] = failedOn(
       [
         {
           spaceId: opener.spaceId,
           title: opener.title,
           depth: 0,
+          open: true,
           persistence: { kind: 'settled' },
         },
-        { spaceId: current, title: 'Rendering', depth: 1, persistence: { kind: 'settled' } },
+        {
+          spaceId: current,
+          title: 'Rendering',
+          depth: 1,
+          open: true,
+          persistence: { kind: 'settled' },
+        },
       ],
       opener.spaceId,
     );
 
-    expect(unwellElsewhere(open, current)).toBe(1);
+    expect(unwellElsewhere(listing, current)).toBe(1);
   });
 
   /**
@@ -57,19 +65,82 @@ describe('the unwell Spaces the Open Spaces trigger reports', () => {
   it('does not count the unwell Space that is the one being read', () => {
     const current = newUuid();
     const opener = named('Design system');
-    const open: readonly OpenRow[] = failedOn(
+    const listing: readonly OpenListingRow[] = failedOn(
       [
         {
           spaceId: opener.spaceId,
           title: opener.title,
           depth: 0,
+          open: true,
           persistence: { kind: 'settled' },
         },
-        { spaceId: current, title: 'Rendering', depth: 1, persistence: { kind: 'settled' } },
+        {
+          spaceId: current,
+          title: 'Rendering',
+          depth: 1,
+          open: true,
+          persistence: { kind: 'settled' },
+        },
       ],
       current,
     );
 
-    expect(unwellElsewhere(open, current)).toBe(0);
+    expect(unwellElsewhere(listing, current)).toBe(0);
+  });
+
+  /**
+   * The closed Meta row carries no `persistence` to be unwell about, and it
+   * cannot be the Space being read either — so it is excluded by construction
+   * rather than by a check either function has to make
+   * (`.scratch/command-dock/issues/28`, decision 3).
+   */
+  it('does not count a closed Meta row', () => {
+    const current = newUuid();
+    const meta = named('Meta');
+    const listing: readonly ListingRow[] = [
+      { spaceId: meta.spaceId, title: meta.title, depth: 0, open: false },
+      {
+        spaceId: current,
+        title: 'Rendering',
+        depth: 0,
+        open: true,
+        persistence: { kind: 'settled' },
+      },
+    ];
+
+    expect(unwellElsewhere(listing, current)).toBe(0);
+  });
+});
+
+describe('how many rows of the listing are open', () => {
+  it('excludes the closed Meta row from the count', () => {
+    const meta = named('Meta');
+    const listing: readonly ListingRow[] = [
+      { spaceId: meta.spaceId, title: meta.title, depth: 0, open: false },
+      {
+        spaceId: newUuid(),
+        title: 'New space',
+        depth: 0,
+        open: true,
+        persistence: { kind: 'settled' },
+      },
+    ];
+
+    expect(openCount(listing)).toBe(1);
+  });
+
+  it('counts every row once Meta is open too', () => {
+    const listing: readonly ListingRow[] = [
+      { spaceId: newUuid(), title: 'Meta', depth: 0, open: true, persistence: { kind: 'settled' } },
+      {
+        spaceId: newUuid(),
+        title: 'Platform',
+        depth: 1,
+        open: true,
+        persistence: { kind: 'settled' },
+      },
+    ];
+
+    expect(openCount(listing)).toBe(2);
   });
 });

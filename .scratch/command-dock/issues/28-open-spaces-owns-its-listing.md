@@ -1,6 +1,6 @@
 # 28 — Open Spaces owns its listing and the select operation
 
-Status: ready-for-agent
+Status: resolved
 Tags: release/v1
 Blocked by: None.
 
@@ -42,8 +42,8 @@ Open Spaces already republishes on every session change (`open-spaces.ts`, the `
 
 ## Acceptance
 
-- [ ] `OpenSpaces` exposes `listing()`, `opener(spaceId)` and `select(spaceId)`; `meta()` is gone.
-- [ ] `openTree` and `closedMeta` are gone; App builds no rows and reads no session title for the Dock.
-- [ ] `select` refuses a closed non-Meta Space with `space-not-open`, proven red first in `open-spaces.test.ts`.
-- [ ] The listing's rule cases live in `open-spaces.test.ts`; `dock-open-tree.test.ts` is deleted.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` green.
+- [x] `OpenSpaces` exposes `listing()`, `opener(spaceId)` and `select(spaceId)`; `meta()` is gone.
+- [x] `openTree` and `closedMeta` are gone; App builds no rows and reads no session title for the Dock.
+- [x] `select` refuses a closed non-Meta Space with `space-not-open`, proven red first in `open-spaces.test.ts`.
+- [x] The listing's rule cases live in `open-spaces.test.ts`; `dock-open-tree.test.ts` is deleted.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` green.

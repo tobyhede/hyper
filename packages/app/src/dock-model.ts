@@ -1,17 +1,19 @@
 import { openSpaceStatusLabel, type OpenSpaceStatus } from '@project/ui';
 import type { SpaceSessionState } from '@project/persistence';
 import type { UUID } from '@project/core';
-import type { ExitSpaceResult } from './open-spaces';
+import type { ExitSpaceResult, ListingRow } from './open-spaces';
 
 /**
  * The Command Dock's model: what it derives, with no React and no DOM.
  *
  * A module beside the component rather than inside it, because everything here
  * is arithmetic and mapping — which edge a released box is nearest, which of
- * twelve slots a menu value names, what the open set looks like as a tree, what
- * a refused Exit has to say — and every one of those is held to an answer by a
- * node-environment test (`packages/app/test/dock-*.test.ts`). `CommandDock.tsx`
- * imports from here; nothing here imports it.
+ * twelve slots a menu value names, how many rows of the listing are open and
+ * unwell, what a refused Exit has to say — and every one of those is held to an
+ * answer by a node-environment test (`packages/app/test/dock-*.test.ts`).
+ * `CommandDock.tsx` imports from here; nothing here imports it. The listing
+ * itself — the tree the open set makes, and Meta's row in it — is
+ * `open-spaces.ts`'s (`.scratch/command-dock/issues/28`).
  */
 
 /**
@@ -64,6 +66,17 @@ export const unwellReport = (persistence: SpaceSessionState['persistence']): str
 };
 
 /**
+ * How many rows of the listing are open.
+ *
+ * The closed Meta row is excluded by construction rather than by a check here:
+ * it carries no `persistence` and reports nothing, so "N open" and
+ * {@link unwellElsewhere} both read this rather than the listing's own length
+ * (`.scratch/command-dock/issues/28`, decision 3).
+ */
+export const openCount = (listing: readonly ListingRow[]): number =>
+  listing.filter((row) => row.open).length;
+
+/**
  * How many open Spaces are unwell *other than the one being read*.
  *
  * The Space the reader is in is excluded because it reports for itself: its own
@@ -76,9 +89,9 @@ export const unwellReport = (persistence: SpaceSessionState['persistence']): str
  * they must not disagree: {@link openSpacesName} and the dot on the trigger both
  * say *that* something needs attention.
  */
-export const unwellElsewhere = (openSpaces: readonly OpenRow[], currentSpaceId: UUID): number =>
-  openSpaces.filter(
-    (row) => row.spaceId !== currentSpaceId && unwellReport(row.persistence) !== null,
+export const unwellElsewhere = (listing: readonly ListingRow[], currentSpaceId: UUID): number =>
+  listing.filter(
+    (row) => row.open && row.spaceId !== currentSpaceId && unwellReport(row.persistence) !== null,
   ).length;
 
 /** The word on the Open Spaces trigger's face, which its name has to contain. */
@@ -328,79 +341,6 @@ export const nearestAlong = (bounds: DockBox, box: DockBox, edge: DockEdge): Doc
 };
 
 /* ------------------------------------------------------------ open Spaces */
-
-/** A Space the Dock names: the Opener, and every row of the Open Spaces menu. */
-export interface NamedSpace {
-  readonly spaceId: UUID;
-  readonly title: string;
-}
-
-/**
- * One row of the open-Spaces tree, and how deep it hangs in it.
- *
- * The set of open Spaces is a **tree**, not a path: each entry remembers the
- * Space it was entered from, so `Meta ▸ Platform ▸ Design system` and a second
- * Space opened straight off Meta are both in it at once. `depth` is what the
- * Open Spaces menu indents by, and it is derived from `from` rather than stored, so a
- * row cannot claim a depth its opener does not give it.
- */
-export interface OpenRow extends NamedSpace {
-  /** What this Space's row has to say about it, which is nothing unless it is unwell. */
-  readonly depth: number;
-  readonly persistence: SpaceSessionState['persistence'];
-}
-
-/** The presentation fields Open Spaces supplies for each row. */
-export interface OpenSpaceRow {
-  readonly spaceId: UUID;
-  readonly title: string;
-  /** The Space this one was entered from — the Opener — or `null` at the root. */
-  readonly from: UUID | null;
-  readonly persistence: SpaceSessionState['persistence'];
-}
-
-/**
- * Every open Space, depth-first from the root, in the order they were opened.
- *
- * A tree because `from` makes one — and drawing it as a tree rather than as a
- * flat list is what lets the Open Spaces menu say *where* a Space is as well as that it
- * is open. A flat list would put a Space three crossings down beside the root
- * with nothing to tell them apart but their names, which is exactly the
- * confusion the bar's Opener control exists to remove.
- *
- * Siblings keep the order the caller lists them in, which is the order the
- * reader opened them. Nothing sorts them here: a Open Spaces menu that reordered itself as
- * the reader moved would move the row they were aiming at.
- *
- * **Every `from` names a Space that is open**, which is what makes the walk
- * total: entries begin that way and Open Spaces re-homes the rows below
- * the Space it closes. Without that invariant this drops a Space whose opener
- * exited — still open, and not in the list that is the only way back to it.
- *
- * **Meta is the one exception to both rules**: it draws first at the root
- * whatever opened it, with what was Entered from it beneath. A Space Resource may
- * target Meta, so Meta can have an Opener, and hung by it Meta drew under that
- * Space where the menu promises it on top (`dock-open-tree.test.ts`).
- */
-export const openTree = (
-  rows: readonly OpenSpaceRow[],
-  metaSpaceId: UUID | null,
-): readonly OpenRow[] => {
-  const parent = (row: OpenSpaceRow): UUID | null =>
-    row.spaceId === metaSpaceId ? null : row.from;
-  const below = (from: UUID | null, depth: number): readonly OpenRow[] =>
-    rows
-      .filter((row) => parent(row) === from)
-      .sort(
-        (left, right) =>
-          Number(right.spaceId === metaSpaceId) - Number(left.spaceId === metaSpaceId),
-      )
-      .flatMap((row) => [
-        { spaceId: row.spaceId, title: row.title, depth, persistence: row.persistence },
-        ...below(row.spaceId, depth + 1),
-      ]);
-  return below(null, 0);
-};
 
 /**
  * An exit that did not happen, which is the only kind the surface draws.

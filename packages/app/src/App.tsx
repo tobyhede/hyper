@@ -78,7 +78,6 @@ import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
 import { useOpenSpaces } from './open-spaces-context';
-import { openTree } from './dock-model';
 
 /**
  * What an isolated single-Space mount reads in place of the session's open set.
@@ -1365,45 +1364,19 @@ export const createApp = (
     });
 
     /**
-     * The Space the canvas draws, its open set, and the exit that leaves one.
+     * Every row the Open Spaces menu draws, and the Space this one was entered
+     * from — both `OpenSpaces`'s own derivations (`open-spaces.ts`), which is
+     * what lets App build no rows and read no session title for the Dock
+     * (`.scratch/command-dock/issues/28`). Read after the `openSpacesState`
+     * subscription above, so a publication that changes either re-renders this
+     * component; `listing` is memoized inside `OpenSpaces` on that same state's
+     * identity, so reading it here does no extra work.
      *
-     * `openTree` derives presentation from the production Open Spaces state,
-     * also used by the catalogue through the same application composition.
-     *
-     * Each row's persistence is read off that Space's **own** session, which is
-     * the whole of ADR 0082's clause about naming which open Space is unwell: a
-     * commit belongs to the Space it was made in (ADR 0076), and the reader is
-     * only ever standing in one of the set.
+     * `spaces === null` only under `SpaceApp`'s isolated mount, which draws an
+     * empty listing and no Opener.
      */
-    const openSpaceRows = useMemo(
-      () =>
-        openTree(
-          openSpacesState.entries.map((entry) => ({
-            spaceId: entry.id,
-            title: entry.session.getState().working.document.title,
-            from: openSpacesState.openedFrom.get(entry.id) ?? null,
-            persistence: entry.session.getState().persistence,
-          })),
-          spaces?.metaSpaceId ?? null,
-        ),
-      [openSpacesState, spaces],
-    );
-    const openerId = openSpacesState.openedFrom.get(renderedSpace.id) ?? null;
-    const opener = useMemo(() => {
-      if (openerId === null) return null;
-      const entry = openSpacesState.entries.find((candidate) => candidate.id === openerId);
-      return entry === undefined
-        ? null
-        : { spaceId: openerId, title: entry.session.getState().working.document.title };
-    }, [openerId, openSpacesState]);
-    /**
-     * The Meta Space, named by its own title whether or not it is open, from
-     * Open Spaces rather than from `metaSpaces`: that list is a repository read
-     * that may not have answered, or may have failed, and Meta's row must not
-     * wait on it. Read on every render rather than memoized, because the title
-     * is the live session's while Meta is open and nothing here is keyed on it.
-     */
-    const meta = spaces === null ? null : spaces.meta();
+    const listing = spaces?.listing() ?? [];
+    const opener = spaces?.opener(renderedSpace.id) ?? null;
 
     /**
      * The one Map refusal there is anywhere to put, now that Add Map and
@@ -1542,9 +1515,8 @@ export const createApp = (
             space: {
               title: renderedSpace.title,
               currentSpaceId: renderedSpace.id,
-              meta,
               opener,
-              openSpaces: openSpaceRows,
+              listing,
               // Behind `chromeTitleEdit` exactly as the Map and Graph names
               // are below, and for the one reason the guard exists: all three
               // names are withdrawn together while something else owns the caret
@@ -1556,22 +1528,24 @@ export const createApp = (
                 ? (title) => renameChromeTitle({ kind: 'space' }, title)
                 : null,
               onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
-              onSwitchTo: (spaceId) => {
+              /**
+               * Choose a row from the Open Spaces menu, named by the title the
+               * Dock drew for it — `select`'s own refusal carries none, being
+               * only ever the race of a Space that closed between the listing
+               * being drawn and the row being chosen, and a thrown load failure
+               * carries none either. Both read the same, by the title the reader
+               * chose rather than a placeholder (`.scratch/command-dock/issues/28`,
+               * decision 10).
+               */
+              onSelect: (spaceId, title) => {
                 if (spaces === null) return;
-                const entry = spaces.entry(spaceId);
-                // A closed Meta is the one row not backed by an open entry, and
-                // the menu named it by `meta()`'s title, so its failure does too.
-                const title =
-                  spaceId === spaces.metaSpaceId
-                    ? spaces.meta().title
-                    : (entry?.session.getState().working.document.title ?? 'That Space');
                 setSpaceCommandBreak(null);
                 void (async () => {
                   try {
-                    // The Open Spaces menu lists Meta whether or not it is open.
-                    // Choosing it from the menu is not a crossing, so a Meta
-                    // that is not open yet is opened directly, with no Opener.
-                    await (entry === undefined ? spaces.open(spaceId) : spaces.switchTo(spaceId));
+                    const result = await spaces.select(spaceId);
+                    if (result.kind === 'refused') {
+                      setSpaceCommandBreak(`${title} could not be opened.`);
+                    }
                   } catch (failure) {
                     reportBreak(failure);
                     setSpaceCommandBreak(`${title} could not be opened.`);
