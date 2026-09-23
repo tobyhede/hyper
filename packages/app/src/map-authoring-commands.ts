@@ -56,6 +56,21 @@ export interface MapCapability<Invocation> {
   readonly invoke: Invocation;
 }
 
+/**
+ * A capability as a surface draws it: the press built from its own
+ * invocation, or `null` where it is unavailable.
+ *
+ * The one way a surface spends a capability, so its unavailable treatment and
+ * what it invokes are read off one answer and cannot disagree
+ * (`.scratch/command-outcomes/issues/09`). The press is the surface's — it
+ * decides where the outcome goes and where the caret continues — and the
+ * invocation still asks again when it is pressed.
+ */
+export const offered = <Invocation, Press>(
+  capability: MapCapability<Invocation>,
+  press: (invoke: Invocation) => Press,
+): Press | null => (capability.available ? press(capability.invoke) : null);
+
 /** Rename one Map: synchronous, so an inline editor can hold a refused draft open. */
 export type MapRename = MapCapability<(title: string) => MapEditOutcome>;
 

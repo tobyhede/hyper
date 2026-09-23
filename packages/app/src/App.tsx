@@ -72,7 +72,7 @@ import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
 import { COMMAND_BROKE, COMMAND_CHANNELS } from './command-outcomes';
 import { useOpenSpaces } from './open-spaces-context';
-import { renameDraftAnswer, topLevelMapAuthoringCommands } from './map-authoring-commands';
+import { offered, renameDraftAnswer, topLevelMapAuthoringCommands } from './map-authoring-commands';
 
 /**
  * What an isolated single-Space mount reads in place of the session's open set.
@@ -771,18 +771,15 @@ export const createApp = (
         ),
       [chromeTitleEdit, createMapAvailable, entityEdits],
     );
+    /**
+     * A Space or Graph rename from the Dock. A Map's is not here: the Dock
+     * renames its Map through Map authoring's capability, below.
+     */
     const renameChromeTitle = useCallback(
-      (subject: SpaceChromeTitleSubject, title: string): string | null => {
-        if (subject.kind === 'map') {
-          // Map authoring decides availability and the report; command
-          // outcomes holds the report as "Map unchanged", and the editor
-          // holds a refused draft open on its sentence.
-          return renameDraftAnswer(
-            commandOutcomes.run('map-manage', () =>
-              mapAuthoring.map(subject.id).rename.invoke(title),
-            ),
-          );
-        }
+      (
+        subject: Exclude<SpaceChromeTitleSubject, { kind: 'map' }>,
+        title: string,
+      ): string | null => {
         const result =
           subject.kind === 'space'
             ? // No id: the Edit writes `document.title` on the session this
@@ -791,7 +788,7 @@ export const createApp = (
             : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
-      [mapAuthoring],
+      [],
     );
 
     /**
@@ -853,10 +850,6 @@ export const createApp = (
           // a Resource has no rename here either — its title is renamed in place
           // on the canvas.
           onRename: null,
-          // No Delete Map item either: the Dock deletes its Map through Map
-          // authoring (`mapAuthoring` above), which owns the last-Map rule,
-          // the cross-Space coordination and the survivor the canvas lands on.
-          onDeleteMap: null,
         }),
       // `authoring` is the composition's, closed over rather than rendered, so it
       // is not a dependency a render can move. `resourceDeletion` says the same of
@@ -1474,13 +1467,18 @@ export const createApp = (
               maps: renderedSpace.maps,
               selected: selectedMap.map,
               onSelect: selectMap,
-              onRename: mapAuthoring.map(selectedMap.map.id).rename.available
-                ? (mapId, title) => renameChromeTitle({ kind: 'map', id: mapId }, title)
-                : null,
-              createDisabled: !mapAuthoring.create.available,
-              // The capability the row invokes, so the unavailable treatment
-              // and the press read one answer — the last Map included.
-              deleteDisabled: !mapAuthoring.map(selectedMap.map.id).delete.available,
+              // Each Map command is the press built from the capability that
+              // answers its availability (`offered`), so the Dock draws a row
+              // unavailable exactly when invoking it would answer so — the last
+              // Map included. The Dock names only the drawing Map, which is the
+              // one the top-level capabilities address. Map authoring decides
+              // availability and the report; command outcomes holds the report,
+              // and the editor holds a refused draft open on its sentence.
+              onRename: offered(
+                mapAuthoring.map(selectedMap.map.id).rename,
+                (rename) => (title: string) =>
+                  renameDraftAnswer(commandOutcomes.run('map-manage', () => rename(title))),
+              ),
               /**
                * **It opens nothing, and the author continues in the name.**
                *
@@ -1492,32 +1490,27 @@ export const createApp = (
                * self-announcing in a product with no undo
                * (`.scratch/command-dock/issues/13`).
                */
-              onCreate: () => {
+              onCreate: offered(mapAuthoring.create, (create) => () => {
                 createMapMovedCaret.current = false;
                 // Map authoring creates and selects the Map, and command
                 // outcomes holds a refusal as "Map not created"; the caret's
                 // continuation is the Dock's, and follows only a completion.
-                void commandOutcomes
-                  .run('map-create', () => mapAuthoring.create.invoke())
-                  .then((outcome) => {
-                    if (outcome.kind !== 'completed') return;
-                    continuation.request({
-                      target: { kind: 'control', name: 'map-name' },
-                      select: false,
-                      then: 'rename',
-                    });
+                void commandOutcomes.run('map-create', create).then((outcome) => {
+                  if (outcome.kind !== 'completed') return;
+                  continuation.request({
+                    target: { kind: 'control', name: 'map-name' },
+                    select: false,
+                    then: 'rename',
                   });
-              },
+                });
+              }),
               didCreateMoveCaret: () => createMapMovedCaret.current,
-              // The Dock's Delete names the Map its cluster is showing, which is
-              // the drawing one. Map authoring deletes it, repoints every Space
+              // Map authoring deletes the drawing Map, repoints every Space
               // Resource that selected it and leaves the canvas on the survivor;
               // command outcomes holds a refusal as "Map not deleted".
-              onDelete: (mapId) => {
-                void commandOutcomes.run('map-delete', () =>
-                  mapAuthoring.map(mapId).delete.invoke(),
-                );
-              },
+              onDelete: offered(mapAuthoring.map(selectedMap.map.id).delete, (remove) => () => {
+                void commandOutcomes.run('map-delete', remove);
+              }),
               onCopyLink: runEntityCommand(
                 { kind: 'map', map: selectedMap.map },
                 COPY_LINK_ACTION_ID,

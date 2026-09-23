@@ -1078,10 +1078,9 @@ describe('CanvasResource Space front', () => {
             selection: selection({
               mapCommands: {
                 onRename,
-                onCreate: () => Promise.resolve(null),
-                onDelete: () => Promise.resolve(null),
+                onCreate: () => Promise.resolve(false),
+                onDelete: () => Promise.resolve(),
                 onCopyLink: () => Promise.resolve(null),
-                deleteDisabled: false,
               },
             }),
           }}
@@ -1118,14 +1117,13 @@ describe('CanvasResource Space front', () => {
             mapCommands: {
               onRename: () => null,
               onCreate: () =>
-                new Promise<string | null>((_, reject) => {
+                new Promise<boolean>((_, reject) => {
                   rejectCreate = () => {
                     reject(new Error('persist failed'));
                   };
                 }),
-              onDelete: () => Promise.resolve(null),
+              onDelete: () => Promise.resolve(),
               onCopyLink: () => Promise.resolve(null),
-              deleteDisabled: false,
             },
           }),
         }}
@@ -1157,15 +1155,14 @@ describe('CanvasResource Space front', () => {
           selection: selection({
             mapCommands: {
               onRename: () => null,
-              onCreate: () => Promise.resolve(null),
+              onCreate: () => Promise.resolve(false),
               onDelete: () =>
-                new Promise<string | null>((_, reject) => {
+                new Promise<void>((_, reject) => {
                   rejectDelete = () => {
                     reject(new Error('persist failed'));
                   };
                 }),
               onCopyLink: () => Promise.resolve(null),
-              deleteDisabled: false,
             },
           }),
         }}

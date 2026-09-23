@@ -1,15 +1,7 @@
-import {
-  type Resource,
-  type Graph,
-  type GraphId,
-  type Map,
-  type MapId,
-  type UUID,
-} from '@project/core';
+import { type Resource, type Graph, type GraphId, type Map, type UUID } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import {
   CopyIcon,
-  DeleteIcon,
   EditIcon,
   OpenIndependentlyIcon,
   type EntityAction,
@@ -40,22 +32,10 @@ import {
  */
 
 /**
- * The id of the one entity command whose *outcome* a caller reads rather than
- * assumes.
- *
- * Exported so a consumer spells it from here instead of from a second literal
- * that happens to agree. It outlived the Sidebar that first needed it — that
- * surface read the outcome to decide whether to dismiss its mobile Sheet — and
- * it stays because the answer is still the only way to tell a Delete that ran
- * from one the domain refused.
- */
-export const DELETE_MAP_ACTION_ID = 'delete-map';
-
-/**
  * The two addresses, spelled once.
  *
- * Same reason as the constant above, arrived at the other way round: the Dock's
- * clusters draw their own menus and cannot render an `EntityActionGroup[]`
+ * Exported so a consumer spells each from here instead of from a second
+ * literal that happens to agree: the Dock's clusters draw their own menus and cannot render an `EntityActionGroup[]`
  * whole, so they reach into this list by id — and they did it with bare
  * literals at four call sites. `runEntityCommand` looks an id up and spends
  * `?.onSelect()` on the miss, so a rename here left the copy commands silently
@@ -69,8 +49,7 @@ export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';
 export const OPEN_INDEPENDENTLY_ACTION_ID = 'open-independently';
 
 /** The commands a surface may ask this list for by id. */
-export type EntityCommandId =
-  typeof DELETE_MAP_ACTION_ID | typeof COPY_LINK_ACTION_ID | typeof COPY_RESOURCE_LINK_ACTION_ID;
+export type EntityCommandId = typeof COPY_LINK_ACTION_ID | typeof COPY_RESOURCE_LINK_ACTION_ID;
 
 /**
  * An entity a surface offers commands for, named the way that surface knows it.
@@ -132,16 +111,6 @@ export interface SpaceEntityActionsOptions {
    * cannot run there is nothing to offer.
    */
   readonly onRename: ((subject: SpaceChromeTitleSubject, title: string) => void) | null;
-  /**
-   * Deletes the Map, answering whether it went, or `null` while no Map
-   * Edit may run.
-   *
-   * The answer is not decoration: it is the only way a caller can tell a Delete
-   * that ran from one the domain refused, and a callback that swallowed its
-   * outcome left the item answering `done` either way. Same shape and same
-   * reason as `onCopy` above.
-   */
-  readonly onDeleteMap: ((mapId: MapId) => boolean | Promise<boolean>) | null;
 }
 
 /**
@@ -210,7 +179,6 @@ export function spaceEntityActions({
   onCopy,
   onOpenIndependently,
   onRename,
-  onDeleteMap,
 }: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityActionGroup[] {
   const renameAction = (subject: SpaceChromeTitleSubject, title: string): EntityActionGroup =>
     onRename === null
@@ -258,25 +226,7 @@ export function spaceEntityActions({
       return [
         renameAction({ kind: 'map', id: mapId }, title),
         [copy(COPY_LINK_ACTION_ID, COPY_LINK, { kind: 'map', spaceId, mapId }, onCopy)],
-        onDeleteMap === null
-          ? []
-          : [
-              {
-                // Named from the constant above rather than written out, so a
-                // caller that recognises this one command spells it the same
-                // way this does.
-                id: DELETE_MAP_ACTION_ID,
-                label: 'Delete Map',
-                icon: <DeleteIcon />,
-                variant: 'destructive',
-                // The Edit's prose report is the application's own refusal
-                // alert, and this item carries no words of its own to swap — so
-                // what the outcome is read for is not the label. It is what
-                // tells a caller whether the Delete had a canvas result at all.
-                onSelect: async (): Promise<EntityActionOutcome> =>
-                  (await onDeleteMap(mapId)) ? 'done' : 'failed',
-              },
-            ],
+        [],
       ];
     }
 

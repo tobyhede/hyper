@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Resource, type Graph, type Map } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
-import { DELETE_MAP_ACTION_ID, spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
+import { spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -59,7 +59,6 @@ const build = (
     onCopy: vi.fn(),
     onOpenIndependently: vi.fn(),
     onRename: vi.fn(),
-    onDeleteMap: vi.fn(),
     ...overrides,
   });
 
@@ -129,14 +128,16 @@ describe('spaceEntityActions', () => {
     expect(copied({ kind: 'space' }, 'Copy link')).toEqual({ kind: 'space', spaceId: SPACE_ID });
   });
 
-  it('offers a Map its rename, its address and a destructive delete', () => {
+  /**
+   * No Delete: a Map is deleted through Map authoring
+   * (`map-authoring-commands.ts`), which owns the last-Map rule and the
+   * survivor, and the Dock and the rail each draw it from that capability.
+   */
+  it('offers a Map its rename and its address', () => {
     const entity: SpaceEntity = { kind: 'map', map: MAP };
     const groups = build()(entity);
 
-    expect(labels(groups)).toEqual(['Rename', 'Copy link', 'Delete Map']);
-    expect(commands(groups).find((action) => action.id === DELETE_MAP_ACTION_ID)?.variant).toBe(
-      'destructive',
-    );
+    expect(labels(groups)).toEqual(['Rename', 'Copy link']);
     expect(copied(entity, 'Copy link')).toEqual({
       kind: 'map',
       spaceId: SPACE_ID,
@@ -148,33 +149,13 @@ describe('spaceEntityActions', () => {
    * A withheld command is absent, never present and disabled — the rule the
    * Sidebar's link buttons already followed, applied to the Edits as well.
    */
-  it('withholds the Map Edits rather than offering them refused', () => {
-    const groups = build({ onRename: null, onDeleteMap: null })({
+  it('withholds the Map rename rather than offering it refused', () => {
+    const groups = build({ onRename: null })({
       kind: 'map',
       map: MAP,
     });
 
     expect(labels(groups)).toEqual(['Copy link']);
-  });
-
-  /**
-   * What the Delete answers, which is not a nicety: the Sidebar dismisses its
-   * mobile Sheet on a command that did what its label said, and the refusal a
-   * refused deletion produces renders *on that Sheet*. An item that answered
-   * `done` either way took the surface its own refusal was about to be printed
-   * on away with it, and the reader was told nothing.
-   */
-  it.each([
-    { outcome: 'done', deleted: true, name: 'the Map was deleted' },
-    { outcome: 'failed', deleted: false, name: 'the Edit was refused' },
-  ])('answers $outcome when $name', async ({ outcome, deleted }) => {
-    const groups = build({ onDeleteMap: () => Promise.resolve(deleted) })({
-      kind: 'map',
-      map: MAP,
-    });
-    const action = commands(groups).find((candidate) => candidate.id === DELETE_MAP_ACTION_ID);
-
-    expect(await action?.onSelect()).toBe(outcome);
   });
 
   /**

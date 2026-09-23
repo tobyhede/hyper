@@ -74,7 +74,7 @@ const target: SpaceSnapshot = {
   resources: [],
 };
 
-async function setup() {
+async function setup(available = true) {
   const control = new MemorySpaceBackendTestControl();
   const backend = new MemorySpaceBackend(
     META,
@@ -109,15 +109,44 @@ async function setup() {
       });
       return result.kind === 'refused' ? result.refusal.code : null;
     },
-    () => true,
+    () => available,
   );
   return { backend, spaces, commands, source, control };
 }
 
+/** A press the rail offers, which the test needs to be offered. */
+const offeredPress = <Press>(press: Press | null): Press => {
+  if (press === null) throw new Error('The rail offered no such command.');
+  return press;
+};
+
+/**
+ * Each Map command is one field — its press, or `null` — built from the Map
+ * authoring capability that answers it, so the rail cannot draw a command
+ * available that invoking would answer unavailable.
+ */
+describe('the rail’s Map commands', () => {
+  it('offers each Map command its capability answers available', async () => {
+    const { commands } = await setup();
+
+    expect(commands.mapCommands.onRename).not.toBeNull();
+    expect(commands.mapCommands.onCreate).not.toBeNull();
+    expect(commands.mapCommands.onDelete).not.toBeNull();
+  });
+
+  it('offers none of them while the rail is withdrawn', async () => {
+    const { commands } = await setup(false);
+
+    expect(commands.mapCommands.onRename).toBeNull();
+    expect(commands.mapCommands.onCreate).toBeNull();
+    expect(commands.mapCommands.onDelete).toBeNull();
+  });
+});
+
 describe('persisting a Space Resource context command', () => {
   it('persists Map deletion after moving the stored referring Resource', async () => {
     const { backend, spaces, commands } = await setup();
-    expect(await commands.mapCommands.onDelete()).toBeNull();
+    await offeredPress(commands.mapCommands.onDelete)();
     await spaces.waitForPersistence(META);
     await spaces.waitForPersistence(TARGET);
     const loaded = await backend.loadSpace(TARGET);
@@ -144,16 +173,21 @@ it.each(['map', 'graph'] as const)(
   async (kind) => {
     const { backend, spaces, commands, source, control } = await setup();
     const release = control.deferNextCommit();
-    const action = kind === 'map' ? commands.mapCommands : commands.graphCommands;
-    if (action === undefined) throw new Error('Commands missing');
-    const creating = action.onCreate('test-rail');
+    const graphCommands = commands.graphCommands;
+    if (graphCommands === undefined) throw new Error('Commands missing');
+    // A Map creation answers whether the caret continues in its name; a
+    // Graph creation answers the sentence the rail reports.
+    const creating =
+      kind === 'map'
+        ? offeredPress(commands.mapCommands.onCreate)('test-rail')
+        : graphCommands.onCreate('test-rail');
     try {
       await vi.waitFor(() => expect(control.requests).toHaveLength(1));
       expect(source.session.getState().working.resources[0]?.document).toEqual(document);
     } finally {
       release();
     }
-    expect(await creating).toBeNull();
+    expect(await creating).toBe(kind === 'map' ? true : null);
     expect(await spaces.waitForPersistence(META)).toBe(true);
     expect(await spaces.waitForPersistence(TARGET)).toBe(true);
     const stored = await backend.loadSpace(META);

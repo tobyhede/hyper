@@ -433,7 +433,6 @@ export function CanvasResourceNodeSpecimen({
       onCopy: () => true,
       onOpenIndependently: null,
       onRename: null,
-      onDeleteMap: null,
     })({ kind: 'resource', resource, map }),
     readOnly,
     onBeginTitleEditing: () => undefined,

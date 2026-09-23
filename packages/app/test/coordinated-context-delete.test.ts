@@ -93,9 +93,8 @@ describe('Dock delete wiring', () => {
   const app = readFileSync(new URL('../src/App.tsx', import.meta.url), { encoding: 'utf8' });
 
   it('sends Map delete through Map authoring rather than the lifecycle', () => {
-    expect(app).toMatch(
-      /commandOutcomes\.run\('map-delete',\s*\(\)\s*=>\s*mapAuthoring\.map\(mapId\)\.delete\.invoke\(\)/u,
-    );
+    expect(app).toMatch(/offered\(\s*mapAuthoring\.map\(selectedMap\.map\.id\)\.delete,/u);
+    expect(app).toMatch(/commandOutcomes\.run\('map-delete',\s*remove\)/u);
     expect(app).not.toMatch(/spaceResources\.deleteMap\b/u);
   });
 

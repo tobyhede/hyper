@@ -1,5 +1,5 @@
 import type { ResourceDocument, GraphId, UUID } from '@project/core';
-import type { CanvasSpaceResourceCommands, CanvasSpaceResourceGraphCommands } from '@project/ui';
+import type { CanvasSpaceResourceGraphCommands, CanvasSpaceResourceMapCommands } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
@@ -7,7 +7,7 @@ import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { coordinatedGraphDelete, PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import { coordinatedContextCreate } from './coordinated-context-create';
-import { embeddedMapAuthoringCommands, renameDraftAnswer } from './map-authoring-commands';
+import { embeddedMapAuthoringCommands, offered, renameDraftAnswer } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
@@ -16,7 +16,7 @@ const refusalOf = (result: AuthoringResult): string | null =>
   result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 
 interface SpaceResourceContextCommands {
-  readonly mapCommands: CanvasSpaceResourceCommands;
+  readonly mapCommands: CanvasSpaceResourceMapCommands;
   readonly graphCommands?: CanvasSpaceResourceGraphCommands;
 }
 
@@ -68,41 +68,41 @@ export function spaceResourceContextCommands(
   const space = entry.app.currentSpace();
   const map = space.maps.find((each) => each.id === mapId);
   const graph = map?.graphs.find((each) => each.id === graphId);
-  const mapCommands: CanvasSpaceResourceCommands = {
-    // Map authoring's answer, the last Map and a Map that has gone included.
-    deleteDisabled: !mapAuthoring.map(mapId).delete.available,
+  const addressed = mapAuthoring.map(mapId);
+  // Each press is built from the capability that answers its availability,
+  // so the rail draws a command unavailable exactly when invoking it would be.
+  const mapCommands: CanvasSpaceResourceMapCommands = {
     // The containing canvas's command outcomes hold the report: the notice
-    // is drawn by the Space the author is looking at, not by the target.
-    onRename: (title) =>
-      renameDraftAnswer(
-        commandOutcomes.run('map-manage', () => mapAuthoring.map(mapId).rename.invoke(title)),
-      ),
+    // is drawn by the Space the author is looking at, not by the target. The
+    // editor holds a refused draft open on the report's sentence.
+    onRename: offered(
+      addressed.rename,
+      (rename) => (title: string) =>
+        renameDraftAnswer(commandOutcomes.run('map-manage', () => rename(title))),
+    ),
     // Map authoring orders the creation and the selection write, and the
-    // containing canvas holds its report; where the caret goes is this rail's.
-    onCreate: async (scope) => {
-      const outcome = await commandOutcomes.run('map-create', () => mapAuthoring.create.invoke());
-      if (outcome.kind === 'completed') {
-        continuation.request({
-          target: {
-            kind: 'control',
-            name: 'map-name',
-            scope: { id: scope, subject: outcome.mapId },
-          },
-          select: false,
-          then: 'rename',
-        });
-      }
-      return outcome.kind === 'refused' ? outcome.report.message : null;
-    },
+    // containing canvas holds its report; where the caret goes is this rail's,
+    // and the rail learns only whether it went there.
+    onCreate: offered(mapAuthoring.create, (create) => async (scope: string) => {
+      const outcome = await commandOutcomes.run('map-create', create);
+      if (outcome.kind !== 'completed') return false;
+      continuation.request({
+        target: {
+          kind: 'control',
+          name: 'map-name',
+          scope: { id: scope, subject: outcome.mapId },
+        },
+        select: false,
+        then: 'rename',
+      });
+      return true;
+    }),
     // Map authoring waits for both Spaces, repoints every Space Resource that
     // selected the Map — this one included — and leaves the target's canvas
     // on the survivor; the containing canvas holds a refusal.
-    onDelete: async () => {
-      const outcome = await commandOutcomes.run('map-delete', () =>
-        mapAuthoring.map(mapId).delete.invoke(),
-      );
-      return outcome.kind === 'refused' ? outcome.report.message : null;
-    },
+    onDelete: offered(addressed.delete, (remove) => async () => {
+      await commandOutcomes.run('map-delete', remove);
+    }),
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };
   if (map === undefined || graph === undefined) return { mapCommands };

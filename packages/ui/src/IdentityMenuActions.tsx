@@ -14,14 +14,20 @@ import {
 } from './components/dropdown-menu';
 import { CopyIcon, DeleteIcon, GraphIcon, PlusIcon } from './icons';
 
+/**
+ * The Map commands a surface offers.
+ *
+ * New Map and Delete are each one field — the press, or `null` where the
+ * command is unavailable — so the row's unavailable treatment and what it
+ * invokes cannot disagree: both surfaces hand over what Map authoring's
+ * capability answered (`.scratch/command-outcomes/issues/09`).
+ */
 export interface MapMenuActionsProps {
   readonly title: string;
   readonly renameItem: ReactNode;
-  readonly createDisabled: boolean;
-  readonly deleteDisabled: boolean;
-  readonly onCreate: () => void;
+  readonly onCreate: (() => void) | null;
   readonly onCopyLink: () => void;
-  readonly onDelete: () => void;
+  readonly onDelete: (() => void) | null;
 }
 
 /**
@@ -35,8 +41,6 @@ export interface MapMenuActionsProps {
 export function MapMenuActions({
   title,
   renameItem,
-  createDisabled,
-  deleteDisabled,
   onCreate,
   onCopyLink,
   onDelete,
@@ -44,7 +48,11 @@ export function MapMenuActions({
   return (
     <>
       <DropdownMenuGroup>
-        <DropdownMenuItem className="gap-2" disabled={createDisabled} onClick={onCreate}>
+        <DropdownMenuItem
+          className="gap-2"
+          disabled={onCreate === null}
+          onClick={() => onCreate?.()}
+        >
           <PlusIcon />
           New Map
         </DropdownMenuItem>
@@ -62,8 +70,8 @@ export function MapMenuActions({
         <DropdownMenuItem
           variant="destructive"
           className="gap-2"
-          disabled={deleteDisabled}
-          onClick={onDelete}
+          disabled={onDelete === null}
+          onClick={() => onDelete?.()}
         >
           <DeleteIcon />
           Delete {title}
@@ -73,7 +81,13 @@ export function MapMenuActions({
   );
 }
 
-export interface GraphMenuActionsProps extends Omit<MapMenuActionsProps, 'createDisabled'> {
+export interface GraphMenuActionsProps {
+  readonly title: string;
+  readonly renameItem: ReactNode;
+  readonly deleteDisabled: boolean;
+  readonly onCreate: () => void;
+  readonly onCopyLink: () => void;
+  readonly onDelete: () => void;
   readonly editsDisabled: boolean;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];

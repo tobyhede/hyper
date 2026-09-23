@@ -14,24 +14,95 @@ export interface CanvasSpaceResourceChoice {
 }
 
 /**
- * Kind commands for one Map or Graph on an Open Space Resource rail.
+ * The Map commands on an Open Space Resource rail, addressed to the Map this
+ * Resource selects — the verbs the Dock spends on its Map, over the target
+ * Space.
  *
- * Rename, create, delete and copy — the same verbs the Dock spends on that
- * entity, addressed here to the context this Resource stores.
+ * Rename, New Map and Delete are each one field: the press, or `null` where the
+ * command is unavailable. The application answers each from one Map authoring
+ * capability, so the row's unavailable treatment and what it invokes cannot
+ * disagree (`.scratch/command-outcomes/issues/09`).
+ *
+ * **What the rail says, and what it does not.** A refused rename answers the
+ * sentence that holds the draft open, which is the editor's own treatment. A
+ * refused creation or deletion answers nothing here: the containing canvas's
+ * command outcomes say it as a notice, and a second sentence on the rail
+ * would outlive the notice's dismissal.
  */
-export interface CanvasSpaceResourceCommands {
+export interface CanvasSpaceResourceMapCommands {
+  readonly onRename: ((title: string) => string | null) | null;
+  /**
+   * Create an empty Map, resolving whether the caret continues in its name —
+   * which is what keeps this menu from taking the caret back on close.
+   */
+  readonly onCreate: ((renameScope: string) => Promise<boolean>) | null;
+  readonly onDelete: (() => Promise<void>) | null;
+  readonly onCopyLink: () => Promise<string | null>;
+}
+
+/**
+ * The Graph commands on an Open Space Resource rail, addressed to the Graph
+ * this Resource selects. Each answers the sentence the rail reports, or `null`.
+ */
+export interface CanvasSpaceResourceGraphCommands {
   readonly onRename: (title: string) => string | null;
   readonly onCreate: (renameScope: string) => Promise<string | null>;
   readonly onDelete: () => Promise<string | null>;
   readonly onCopyLink: () => Promise<string | null>;
   readonly deleteDisabled: boolean;
-}
-
-export interface CanvasSpaceResourceGraphCommands extends CanvasSpaceResourceCommands {
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
 }
+
+/**
+ * One selector's commands as it spends them: each press, or `null` where it is
+ * unavailable, and for creation whether the caret continued apart from the
+ * sentence to report — so a creation that moved nothing and said nothing
+ * cannot be read as one that moved the caret.
+ */
+interface SelectorCommands {
+  readonly rename: ((title: string) => string | null) | null;
+  readonly create:
+    | ((
+        renameScope: string,
+      ) => Promise<{ readonly continued: boolean; readonly report: string | null }>)
+    | null;
+  readonly delete: (() => Promise<string | null>) | null;
+  readonly copyLink: () => Promise<string | null>;
+  /** A Graph's colour, the one command a Graph carries that a Map does not. */
+  readonly palette?: Pick<CanvasSpaceResourceGraphCommands, 'color' | 'colors' | 'onRecolor'>;
+}
+
+const mapSelectorCommands = (commands: CanvasSpaceResourceMapCommands): SelectorCommands => {
+  const { onCreate, onDelete } = commands;
+  return {
+    rename: commands.onRename,
+    create:
+      onCreate === null
+        ? null
+        : async (renameScope) => ({ continued: await onCreate(renameScope), report: null }),
+    delete:
+      onDelete === null
+        ? null
+        : async () => {
+            await onDelete();
+            return null;
+          },
+    copyLink: commands.onCopyLink,
+  };
+};
+
+const graphSelectorCommands = (commands: CanvasSpaceResourceGraphCommands): SelectorCommands => ({
+  rename: commands.onRename,
+  create: async (renameScope) => ({
+    continued: false,
+    report: await commands.onCreate(renameScope),
+  }),
+  delete: commands.deleteDisabled ? null : commands.onDelete,
+  copyLink: commands.onCopyLink,
+  palette: commands,
+});
 
 /**
  * The two choices an Open Space Resource publishes, and what is available to make
@@ -45,7 +116,7 @@ export interface CanvasSpaceResourceGraphCommands extends CanvasSpaceResourceCom
  */
 export interface CanvasSpaceResourceSelection {
   readonly onEditingChange?: (editing: boolean) => void;
-  readonly mapCommands?: CanvasSpaceResourceCommands;
+  readonly mapCommands?: CanvasSpaceResourceMapCommands;
   readonly graphCommands?: CanvasSpaceResourceGraphCommands;
   readonly maps: readonly CanvasSpaceResourceChoice[];
   readonly graphs: readonly CanvasSpaceResourceChoice[];
@@ -106,7 +177,7 @@ export function SpaceResourceSelectors({
     <>
       <SpaceResourceSelector
         label="Map"
-        commands={mapCommands}
+        commands={mapCommands === undefined ? undefined : mapSelectorCommands(mapCommands)}
         onBusy={setBusy}
         renaming={renaming === 'Map'}
         onRenaming={(editing) => setRenaming(editing ? 'Map' : null)}
@@ -120,7 +191,7 @@ export function SpaceResourceSelectors({
       />
       <SpaceResourceSelector
         label="Graph"
-        commands={graphCommands}
+        commands={graphCommands === undefined ? undefined : graphSelectorCommands(graphCommands)}
         onBusy={setBusy}
         renaming={renaming === 'Graph'}
         onRenaming={(editing) => setRenaming(editing ? 'Graph' : null)}
@@ -138,7 +209,7 @@ export function SpaceResourceSelectors({
 
 interface SpaceResourceSelectorProps {
   readonly onBusy: (busy: boolean) => void;
-  readonly commands: CanvasSpaceResourceCommands | CanvasSpaceResourceGraphCommands | undefined;
+  readonly commands: SelectorCommands | undefined;
   readonly renaming: boolean;
   readonly onRenaming: (editing: boolean) => void;
   readonly onReport: (message: string | null) => void;
@@ -219,10 +290,16 @@ function SpaceResourceSelector({
     returningFocus.current = true;
     endRename();
   };
+  // One answer per command: a withdrawn rail, or a command the application
+  // answered unavailable, offers nothing to press.
+  const rename = disabled || selected === undefined ? null : (commands?.rename ?? null);
+  const create = disabled ? null : (commands?.create ?? null);
+  const remove = disabled ? null : (commands?.delete ?? null);
+  const palette = commands?.palette;
   const renameItem = (
     <DropdownMenuItem
       className="gap-2"
-      disabled={disabled || selected === undefined}
+      disabled={rename === null}
       onClick={() => {
         movedCaret.current = true;
         onRenaming(true);
@@ -232,45 +309,46 @@ function SpaceResourceSelector({
       Rename
     </DropdownMenuItem>
   );
+  const onCreate =
+    create === null
+      ? null
+      : () => {
+          // The application requests creation's continuation; keep the menu
+          // from restoring focus while its adapter waits for the new name.
+          movedCaret.current = label === 'Map';
+          onBusy(true);
+          void create(renameScope)
+            .then(({ continued, report }) => {
+              onReport(report);
+              movedCaret.current = continued;
+            })
+            .catch(() => {
+              movedCaret.current = false;
+            })
+            .finally(() => {
+              onBusy(false);
+            });
+        };
+  const onDelete =
+    remove === null
+      ? null
+      : () => {
+          onBusy(true);
+          void remove()
+            .then((refusal) => {
+              onReport(refusal);
+            })
+            .catch(() => undefined)
+            .finally(() => {
+              onBusy(false);
+            });
+        };
   const commonCommands = {
     title: selected?.title ?? `No ${label}`,
     renameItem,
-    deleteDisabled: disabled || commands?.deleteDisabled === true,
-    onCreate: () => {
-      if (commands === undefined) return;
-      // The application requests creation's continuation; keep the menu
-      // from restoring focus while its adapter waits for the new name.
-      movedCaret.current = label === 'Map';
-      onBusy(true);
-      void commands
-        .onCreate(renameScope)
-        .then((refusal) => {
-          onReport(refusal);
-          if (refusal !== null) movedCaret.current = false;
-        })
-        .catch(() => {
-          movedCaret.current = false;
-        })
-        .finally(() => {
-          onBusy(false);
-        });
-    },
-    onDelete: () => {
-      if (commands === undefined) return;
-      onBusy(true);
-      void commands
-        .onDelete()
-        .then((refusal) => {
-          onReport(refusal);
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          onBusy(false);
-        });
-    },
     onCopyLink: () => {
       if (commands === undefined) return;
-      void commands.onCopyLink().then((refusal) => onReport(refusal ?? 'Link copied.'));
+      void commands.copyLink().then((refusal) => onReport(refusal ?? 'Link copied.'));
     },
   };
   return (
@@ -284,7 +362,7 @@ function SpaceResourceSelector({
           data-continuation-control="map-name"
           data-continuation-scope={renameScope}
           data-continuation-subject={chosen}
-          disabled={disabled || selected === undefined}
+          disabled={rename === null}
           onClick={() => onRenaming(true)}
         />
       )}
@@ -295,7 +373,9 @@ function SpaceResourceSelector({
           variant="header"
           className="nokey nodrag nopan"
           onComplete={(title) => {
-            const refusal = commands.onRename(title);
+            // A rename withdrawn while its editor was open closes it, as an
+            // unavailable rename does wherever it is invoked.
+            const refusal = commands.rename === null ? null : commands.rename(title);
             if (refusal === null) endRename();
             return refusal;
           }}
@@ -332,19 +412,22 @@ function SpaceResourceSelector({
         }
       >
         {commands !== undefined &&
-          ('onRecolor' in commands ? (
+          (palette !== undefined ? (
             <GraphMenuActions
               {...commonCommands}
               editsDisabled={disabled}
-              color={commands.color}
-              colors={commands.colors}
+              deleteDisabled={onDelete === null}
+              onCreate={() => onCreate?.()}
+              onDelete={() => onDelete?.()}
+              color={palette.color}
+              colors={palette.colors}
               onRecolor={(color) => {
-                onReport(commands.onRecolor(color));
+                onReport(palette.onRecolor(color));
                 setMenuOpen(false);
               }}
             />
           ) : (
-            <MapMenuActions {...commonCommands} createDisabled={disabled} />
+            <MapMenuActions {...commonCommands} onCreate={onCreate} onDelete={onDelete} />
           ))}
       </ChoiceMenu>
     </ToolbarGroup>

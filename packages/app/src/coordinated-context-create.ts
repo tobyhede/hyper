@@ -10,6 +10,9 @@ export interface CreatedContext {
 }
 
 /**
+ * Graph creation on an Open Space Resource rail — the one caller since Map
+ * creation moved behind `map-authoring-commands.ts`.
+ *
  * Settled → create → persist → hook. Call sites own selection writes and
  * rename continuation; this module does not import continuation targets
  * (`coordinated-context-create.test.ts` — "does not import continuation targets").

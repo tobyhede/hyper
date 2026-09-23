@@ -12,6 +12,7 @@ import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/pers
 import type { CommandOutcomes } from '../src/command-outcomes';
 import {
   embeddedMapAuthoringCommands,
+  offered,
   renameDraftAnswer,
   topLevelMapAuthoringCommands,
   type MapAuthoringCommands,
@@ -776,6 +777,28 @@ describe('what each context deletes', () => {
     await spaces.exit(TARGET);
     expect(await deleting).toEqual({ kind: 'unavailable' });
     expect(deleteMap).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * How a surface spends a capability: one field, the press or `null`, so
+ * what it draws unavailable and what it invokes are one answer.
+ */
+describe('offered', () => {
+  it('builds the press from the capability’s own invocation while it is available', () => {
+    const invoke = vi.fn(() => 'invoked');
+
+    const press = offered({ available: true, invoke }, (own) => () => own());
+
+    expect(press?.()).toBe('invoked');
+    expect(invoke).toHaveBeenCalledOnce();
+  });
+
+  it('offers nothing, and builds no press, while the capability is unavailable', () => {
+    const build = vi.fn(() => () => undefined);
+
+    expect(offered({ available: false, invoke: () => undefined }, build)).toBeNull();
+    expect(build).not.toHaveBeenCalled();
   });
 });
 
