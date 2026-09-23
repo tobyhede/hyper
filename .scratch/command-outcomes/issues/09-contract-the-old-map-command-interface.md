@@ -37,3 +37,5 @@ Blocked by: 07, 08
 
 
 **2026-09-23, branch review.** The coordinator ran the owed commands on the branch after the review fixes: `pnpm verify` green, `test:coverage` 237 files, 3115 passed and 13 skipped with no timeout; `pnpm e2e` 227 passed. The e2e half of the last box was unproven when it was ticked and is proven by this run.
+
+**2026-09-23, CI evidence (F5).** The last box is proven by CI, not by a local run by this ticket's agent: PR #269's CI run 35811376031 (`gh run view 35811376031`), on this ticket's commit `5578e2ca`, passed every job — `static-checks`, `coverage`, `postgres`, `sqlite`, `e2e` shards 1–3 and `ladle`. That run is the e2e evidence for the box as ticked here.

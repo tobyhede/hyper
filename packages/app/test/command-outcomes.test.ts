@@ -10,7 +10,7 @@ import {
 import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
 import type { CoordinatedContextDeleteResult } from '../src/coordinated-context-delete';
-import type { CreatedMap } from '../src/map-authoring-commands';
+import type { CompletedMapEdit } from '../src/map-authoring-commands';
 import type { AuthoringResult } from '../src/space-authoring';
 import type {
   SpaceResourceCreationResult,
@@ -115,7 +115,7 @@ const mapReport: CommandNotice = { title: 'Map not created', message: 'Try a dif
 const refusedMap = { kind: 'refused', report: mapReport } as const;
 const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
 /** New Map's continuation, in the name of the Map the creation made. */
-const inTheName = ({ mapId }: CreatedMap): PendingContinuation => ({
+const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
   target: { kind: 'control', name: 'map-name', scope: { id: 'rail', subject: mapId } },
   select: false,
   then: 'rename',

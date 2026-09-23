@@ -13,7 +13,7 @@ import {
 import type { CoordinatedContextDeleteResult } from './coordinated-context-delete';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
-import type { CreatedMap, MapEditOutcome } from './map-authoring-commands';
+import type { CompletedMapEdit, MapEditOutcome } from './map-authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -27,10 +27,10 @@ import type {
  *
  * A command runs an Edit or a lifecycle operation, and what it leaves behind is
  * a **notice** on one channel: which words, whether a Map change clears them,
- * and where the caret goes after a creation. Every command handler in `App`
- * used to write its own copy of narrow → describe → set, with a try/catch to
- * the reporter for the asynchronous ones; this is that pattern once, and `App`
- * draws what it publishes (`.scratch/command-outcomes/spec.md`).
+ * and where the caret goes after a creation. `run` narrows a command's result,
+ * describes it and publishes it, and reports a throw, so a caller names its
+ * command and its operation and nothing else; `App` draws what this module
+ * publishes (`.scratch/command-outcomes/spec.md`).
  *
  * **Channels and commands are two tables.** A channel is one notice slot — the
  * thing drawn and dismissed. A command is one operation that reports on a
@@ -136,9 +136,8 @@ const CHANNELS = {
   },
   // Enter, Exit and Open reach *another* Space's session, and each can fail
   // for a reason that is not a refusal — a Space that cannot be re-composed, a
-  // backend that will not answer. The surfaces that used to report them went
-  // with the Sidebar, which left the reader pressing a row that did nothing;
-  // this notice is what says so, and the reporter still hears the defect.
+  // backend that will not answer. This notice is what tells the author the
+  // press did nothing, and the reporter still hears the defect.
   'space-command': {
     resetsOnMapChange: false,
     completionMovesMap: false,
@@ -176,18 +175,6 @@ const described =
   (channel: DescribedChannel) =>
   (message: string): CommandNotice => ({ title: CHANNELS[channel].title, message });
 
-/**
- * What a Map command answers, as far as this module reads it.
- *
- * Map authoring's own outcomes extend this — a completed creation carries the
- * identities it made — and `run` hands the caller's precise result back.
- * `unavailable` is distinct from `refused`: nothing was attempted, so there is
- * no report.
- */
-export type MapCommandResult =
-  | { readonly kind: 'refused'; readonly report: CommandNotice }
-  | { readonly kind: 'completed' | 'unchanged' | 'unavailable' };
-
 /** The one runtime value a channel's sentences may name. */
 export interface CommandSubject {
   /** The title of the Space or entity the press was about. */
@@ -215,7 +202,7 @@ type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
  * so a `completed` answer from `run` means the continuation was requested.
  */
 export interface MapCreateContinuation {
-  readonly continueAt: (created: CreatedMap) => PendingContinuation;
+  readonly continueAt: (created: CompletedMapEdit) => PendingContinuation;
 }
 
 /**
@@ -226,11 +213,11 @@ export interface MapCreateContinuation {
  */
 interface CommandSignatures {
   readonly 'map-create': {
-    readonly result: MapEditOutcome<CreatedMap>;
+    readonly result: MapEditOutcome<CompletedMapEdit>;
     readonly options: [options: MapCreateContinuation];
   };
-  readonly 'map-manage': { readonly result: MapCommandResult; readonly options: [] };
-  readonly 'map-delete': { readonly result: MapCommandResult; readonly options: [] };
+  readonly 'map-manage': { readonly result: MapEditOutcome; readonly options: [] };
+  readonly 'map-delete': { readonly result: MapEditOutcome; readonly options: [] };
   readonly 'graph-edit': { readonly result: AuthoringResult; readonly options: [] };
   readonly 'graph-delete': {
     readonly result: CoordinatedContextDeleteResult;
@@ -313,9 +300,9 @@ const CLEAR: Settlement = { kind: 'clear', continuation: null };
 
 const notice = (value: CommandNotice): Settlement => ({ kind: 'notice', notice: value });
 
-const mapCompleted = (result: MapCommandResult): boolean => result.kind === 'completed';
+const mapCompleted = (result: MapEditOutcome): boolean => result.kind === 'completed';
 
-const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<MapCommandResult, []> => ({
+const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<MapEditOutcome, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
   broke: null,

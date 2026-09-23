@@ -12,10 +12,10 @@ import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
  *
  * A Map is authored from two places: the Command Dock, over the Space on the
  * canvas, and an Open Space Resource's rail, over the target Space it embeds.
- * Each used to decide for itself whether the command was available, which Edit
- * to complete and how to say a refusal. This module decides those once, behind
- * two private adapters — one per context — and answers both callers in the same
- * outcome vocabulary (`.scratch/command-outcomes/issues/06`).
+ * This module decides once whether a command is available, which Edit to
+ * complete and how to say a refusal, behind two private adapters — one per
+ * context — and answers both callers in the same outcome vocabulary
+ * (`.scratch/command-outcomes/issues/06`).
  *
  * **What stays outside.** Which Map is selected, Copy link, where the caret
  * goes and how a report is drawn are the surfaces'. The report's *lifetime* —
@@ -75,12 +75,16 @@ export const offered = <Invocation, Press>(
 export type MapRename = MapCapability<(title: string) => MapEditOutcome>;
 
 /**
- * The Map and Active Graph a deletion leaves its Space continuing on.
+ * A completed Map Edit that leaves its context on a Map: that Map and its
+ * Active Graph.
  *
- * Every Space Resource that selected the deleted Map now selects this pair,
- * and so does a canvas that was showing it.
+ * A creation answers the Map it made, and the surface continues in its name
+ * with these — which is why they are answered rather than read back off
+ * whatever is selected afterwards. A deletion answers the survivor: every
+ * Space Resource that selected the deleted Map now selects this pair, and so
+ * does a canvas that was showing it.
  */
-export interface SurvivingMap {
+export interface CompletedMapEdit {
   readonly kind: 'completed';
   readonly mapId: MapId;
   readonly graphId: GraphId;
@@ -93,7 +97,7 @@ export interface SurvivingMap {
  * A Space's last Map is never available (ADR 0079), and neither is a Map
  * that has gone; both are asked again when invoked.
  */
-export type MapDelete = MapCapability<() => Promise<MapEditOutcome<SurvivingMap>>>;
+export type MapDelete = MapCapability<() => Promise<MapEditOutcome<CompletedMapEdit>>>;
 
 /** The commands addressed to one Map. */
 export interface MapCommands {
@@ -102,22 +106,10 @@ export interface MapCommands {
 }
 
 /**
- * A completed creation: the Map it made and that Map's Active Graph.
- *
- * The surface continues in the new Map's name with these, which is why they
- * are answered rather than read back off whatever is selected afterwards.
- */
-export interface CreatedMap {
-  readonly kind: 'completed';
-  readonly mapId: MapId;
-  readonly graphId: GraphId;
-}
-
-/**
  * Create one empty Map: asynchronous, because an embedded creation waits for
  * the Spaces it writes to save before and after it.
  */
-export type MapCreate = MapCapability<() => Promise<MapEditOutcome<CreatedMap>>>;
+export type MapCreate = MapCapability<() => Promise<MapEditOutcome<CompletedMapEdit>>>;
 
 /**
  * Every Map Edit one context offers.
@@ -173,13 +165,11 @@ export interface AuthoredSpace {
  * report that stops the creation, or `null` to go on.
  */
 interface MapCreation {
-  /** Whether a creation may run as the Space stands now, beyond general availability. */
-  readonly live: () => boolean;
   readonly app: AuthoringApp;
   /** Asked before the Edit; absent where there is nothing to wait for. */
   readonly before?: () => Promise<CommandNotice | null>;
   /** Asked once the Edit has completed, with what it made. */
-  readonly after?: (created: CreatedMap) => Promise<CommandNotice | null>;
+  readonly after?: (created: CompletedMapEdit) => Promise<CommandNotice | null>;
 }
 
 /**
@@ -195,7 +185,7 @@ interface MapDeletion {
 
 /** What differs between the two contexts, and nothing else. */
 interface MapAuthoringContext {
-  /** General availability of each command, asked at read and again at invocation. */
+  /** Whether each command may run, asked at read and again at invocation. */
   readonly available: MapAuthoringAvailability;
   /** Whether this context can author `mapId` as the Space stands now. */
   readonly addresses: (mapId: MapId) => boolean;
@@ -230,7 +220,7 @@ const notCreated = (message: string): CommandNotice => ({ title: 'Map not create
  * Authoring breaking its own contract, and it throws rather than answering a
  * Map the author did not make.
  */
-const recoverCreatedMap = (app: AuthoringApp): CreatedMap => {
+const recoverCreatedMap = (app: AuthoringApp): CompletedMapEdit => {
   const created = app.currentSpace().lookup.map(app.navigation.getState().selectedMapId)?.map;
   const graphId = created?.activeGraph ?? created?.graphs[0]?.id;
   if (created === undefined || graphId === undefined) {
@@ -242,7 +232,7 @@ const recoverCreatedMap = (app: AuthoringApp): CreatedMap => {
 const createMap = async (
   creation: MapCreation,
   live: () => boolean,
-): Promise<MapEditOutcome<CreatedMap>> => {
+): Promise<MapEditOutcome<CompletedMapEdit>> => {
   if (!live()) return UNAVAILABLE;
   if (creation.before !== undefined) {
     const stopped = await creation.before();
@@ -302,7 +292,7 @@ const deleteMap = async (
   deletion: MapDeletion,
   mapId: MapId,
   live: () => boolean,
-): Promise<MapEditOutcome<SurvivingMap>> => {
+): Promise<MapEditOutcome<CompletedMapEdit>> => {
   if (!live()) return UNAVAILABLE;
   const { app, spaceResources } = deletion.space;
   if (deletion.before !== undefined) {
@@ -331,8 +321,8 @@ const deleteMap = async (
  * A Space Authoring answer as a Map Edit outcome.
  *
  * `queued` is an Edit accepted behind the one completing, which lands when that
- * one drains; the surface answers it as it answers a completed one, which is
- * what the editor did before this module existed.
+ * one drains; it answers `completed`, so the editor closes on it as on a
+ * completed rename (`renameDraftAnswer`).
  */
 const renameOutcome = (result: AuthoringResult): MapEditOutcome => {
   switch (result.kind) {
@@ -350,7 +340,7 @@ const renameOutcome = (result: AuthoringResult): MapEditOutcome => {
 };
 
 const mapAuthoringCommands = (context: MapAuthoringContext): MapAuthoringCommands => {
-  const creates = (): boolean => context.available.create() && context.creation.live();
+  const creates = context.available.create;
   return {
     // Read as a getter so `available` is the answer when the capability is
     // read, as `map(mapId)`'s are, rather than when the commands were built.
@@ -408,7 +398,7 @@ export function topLevelMapAuthoringCommands(
       app.navigation.getState().selectedMapId === mapId &&
       app.currentSpace().lookup.map(mapId) !== undefined,
     complete: (_mapId, completion) => app.authoring.complete(completion),
-    creation: { live: () => true, app },
+    creation: { app },
     deletion: { space },
   });
 }
@@ -461,11 +451,12 @@ export function embeddedMapAuthoringCommands({
   const settled = async (): Promise<boolean> =>
     (await saved(target.id)) && (await saved(containingSpaceId));
   return mapAuthoringCommands({
-    available: { rename: available, create: available, delete: available },
+    // Creation is Space-scoped, so no Map address carries the entry check:
+    // it joins creation's own availability instead.
+    available: { rename: available, create: () => available() && current(), delete: available },
     addresses: (mapId) => current() && target.app.currentSpace().lookup.map(mapId) !== undefined,
     complete: (mapId, completion) => target.app.authoring.completeInMap(mapId, completion),
     creation: {
-      live: current,
       app: target.app,
       before: async () => ((await settled()) ? null : notCreated(PERSISTENCE_UNSETTLED)),
       after: async ({ mapId, graphId }) => {
