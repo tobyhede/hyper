@@ -1,11 +1,15 @@
-import type { Edge } from '@xyflow/react';
+import type { Edge, EdgeTypes } from '@xyflow/react';
 import {
   SPACE_RESOURCE_EMBED_INSET,
   uuidSchema,
   type MapPosition,
   type ResourceId,
 } from '@project/core';
-import { AUTHORING_HANDLE_DIAMETER, type ResourceFlowNode } from '@project/react-flow-adapter';
+import {
+  AUTHORING_HANDLE_DIAMETER,
+  RoutedEdge,
+  type ResourceFlowNode,
+} from '@project/react-flow-adapter';
 
 import type { CanvasNodesAndEdges } from './canvas-projection';
 import { DRAG_TILT_RADIANS, rotateAbout, tiltResourcePosition } from './drag-tilt';
@@ -14,6 +18,28 @@ import { DRAG_TILT_RADIANS, rotateAbout, tiltResourcePosition } from './drag-til
 export const embeddedNodeId = (parentId: string, resourceId: string): string =>
   `embedded:${parentId}:${resourceId}`;
 export const embeddedClipId = (parentId: string): string => `embedded-clip-${parentId}`;
+
+/**
+ * The React Flow Edge type an embedded Map's Edges are minted with.
+ *
+ * An embedded Edge copies an Edge of another Space's Map — Space Resource
+ * references never cycle, so a Space never embeds itself (ADR 0068) — and its
+ * endpoints are placement ids rather than Resource ids. Minting it under its own
+ * type is what keeps it from ever reading as an Edge of the Map on the canvas:
+ * `edgeSelectionOf` answers only for the routed type the canvas projection writes.
+ */
+export const EMBEDDED_EDGE_TYPE = 'embedded';
+
+/**
+ * The canvas's Edge type table with the embedded type added, drawn by the plain
+ * routed Edge — the same curve, lane offset, trim and attachment, without the
+ * authoring controls. The embedding owns this registration so Edge Authoring
+ * learns nothing about embedded Maps.
+ */
+export const withEmbeddedEdgeTypes = (edgeTypes: EdgeTypes): EdgeTypes => ({
+  ...edgeTypes,
+  [EMBEDDED_EDGE_TYPE]: RoutedEdge,
+});
 
 const EMBEDDED_PREFIX = 'embedded:';
 
@@ -330,6 +356,7 @@ export function embeddedMap({
           {
             ...edge,
             id: `${parent.id}:${edge.id}`,
+            type: EMBEDDED_EDGE_TYPE,
             source,
             target,
             selectable: false,

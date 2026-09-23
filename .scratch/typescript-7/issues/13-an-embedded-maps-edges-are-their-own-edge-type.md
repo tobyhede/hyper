@@ -4,7 +4,7 @@
 
 **Blocked by:** 07 — Prove Resource identity across the React Flow boundary (the node half, on the same branch and in the same module).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Tags:** Cleanup
 
@@ -34,12 +34,26 @@ The `edge.data` narrowing stays: an Edge's `type` is a plain `string` on React F
 
 ## Acceptance
 
-- [ ] An Edge minted by the embedding yields no Edge selection, and an Edge selection change naming one changes nothing.
-- [ ] Every Edge type the embedding mints is registered in the canvas's Edge type table — a test that fails if a new embedded type is added without a registration.
-- [ ] The embedding's own tests assert the minted type.
-- [ ] The render adapter's Edge fixture carries the routed type.
-- [ ] The unreachable missing-Graph-id branch goes, and one `SAFETY:` comment states the cross-Space fact.
-- [ ] Non-vacuity: with the type gate removed, the new cases fail.
-- [ ] The embedding bullet in `docs/agents/rendering.md` says embedded Edges are their own type and why.
-- [ ] Embedded Edges render unchanged (same curve, lane offset, trim, attachment).
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+- [x] An Edge minted by the embedding yields no Edge selection, and an Edge selection change naming one changes nothing.
+- [x] Every Edge type the embedding mints is registered in the canvas's Edge type table — a test that fails if a new embedded type is added without a registration.
+- [x] The embedding's own tests assert the minted type.
+- [x] The render adapter's Edge fixture carries the routed type.
+- [x] The unreachable missing-Graph-id branch goes, and one `SAFETY:` comment states the cross-Space fact.
+- [x] Non-vacuity: with the type gate removed, the new cases fail.
+- [x] The embedding bullet in `docs/agents/rendering.md` says embedded Edges are their own type and why.
+- [x] Embedded Edges render unchanged (same curve, lane offset, trim, attachment).
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+
+## Resolved — 2026-09-23
+
+Built on `resource-identity-07`, test-first.
+
+- `embedded-map.ts` exports `EMBEDDED_EDGE_TYPE` (`'embedded'`) and `withEmbeddedEdgeTypes`, which adds that type to a given table, drawn by the plain `RoutedEdge`. `embeddedMap` mints every Edge with that type.
+- `SpaceCanvas` hands React Flow `withEmbeddedEdgeTypes(edgeSurface.edgeTypes)` under a `useMemo` keyed on Edge Authoring's module-level table, so the identity is stable (#002) and Edge Authoring's `EDGE_TYPES` is untouched.
+- `edgeSelectionOf` returns `null` for any type other than `routed`. The missing-Graph-id branch is gone, and one `SAFETY:` comment over the `return` covers the `data`, `source` and `target` narrowings, stating the cross-Space fact (ADR 0068). The suppressions count for `render-adapter.ts` stays at 5.
+- Tests: `embedded-map.test.ts` asserts the minted type, that the projection's own Edges convert while every minted Edge answers `null`, and that `withEmbeddedEdgeTypes` keeps the given table and draws every minted type with `RoutedEdge`. The last of these is the one that fails if a new type is minted without being registered. `render-adapter.test.ts`'s `EDGE` fixture carries `type: 'routed'`, and a new case sends a selection change naming an embedded Edge id and checks it changes nothing.
+- Non-vacuity: with the type gate removed, *mints its Edges as its own type, which never converts to an Edge selection* fails. The registration test failed before `withEmbeddedEdgeTypes` existed. The render-adapter selection-change case passes without the gate too, because `changeEdges` already resolves a change against the projection's own Edges. It guards that path and does not test the gate.
+- Rendering unchanged: the embedded type is drawn by the same `RoutedEdge` that `AuthorableEdge` draws when it shows no controls. The e2e fixture gate fails a test on any React Flow warning, including #011 (unregistered type) and #002 (unstable `edgeTypes`), and both suites passed.
+- `docs/agents/rendering.md`: the embedding bullet now says embedded Edges are their own type, why, and where the registration lives.
+
+Verification on the finished state: `pnpm verify` exit 0 (240 files, 3106 passed, 13 skipped); `pnpm e2e` 227 passed; `pnpm e2e:ladle` 115 passed.

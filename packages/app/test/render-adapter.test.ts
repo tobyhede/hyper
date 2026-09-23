@@ -37,6 +37,7 @@ const PROJECTED = [node(RESOURCE_A, 10, 20), node(RESOURCE_B, 300, 20)];
  */
 const EDGE: Edge = {
   id: graphRenderEdgeId(GRAPH_ID, { from: RESOURCE_A, to: RESOURCE_B }),
+  type: 'routed',
   source: RESOURCE_A,
   target: RESOURCE_B,
   data: { graphId: GRAPH_ID },
@@ -839,6 +840,19 @@ describe('render adapter', () => {
         moved: new Map([[RESOURCE_A, { x: 500, y: 400 }]]),
       },
     ]);
+  });
+
+  it('takes no Edge selection from an Edge of an embedded Map', () => {
+    // The embedding draws its Edges into the same React Flow instance under
+    // their own ids, so a selection change can name one the projection never drew.
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    store
+      .getState()
+      .changeEdges([{ type: 'select', id: `${RESOURCE_C}:${EDGE.id}`, selected: true }]);
+
+    expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
   it('completes a settled-resource-movement Edit for a drag that lands somewhere new', () => {

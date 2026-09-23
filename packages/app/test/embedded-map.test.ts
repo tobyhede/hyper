@@ -1,20 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { SPACE_RESOURCE_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
-import { AUTHORING_HANDLE_DIAMETER, type ResourceFlowNode } from '@project/react-flow-adapter';
+import {
+  AUTHORING_HANDLE_DIAMETER,
+  RoutedEdge,
+  type ResourceFlowNode,
+} from '@project/react-flow-adapter';
 import { CANVAS_RESOURCE_DRAG_TILT_DEGREES } from '@project/ui';
 import { canvasProjection } from '../src/canvas-projection';
 import {
   canvasNodeConnection,
   clipEmbeddedNode,
   constrainEmbeddedPosition,
+  EMBEDDED_EDGE_TYPE,
   embeddedMap,
   embeddedNodeId,
   parseEmbeddedNodeId,
+  withEmbeddedEdgeTypes,
   type EmbeddedParentProjection,
   type EmbeddedTilt,
 } from '../src/embedded-map';
 import { resolveMap } from '../src/map-resolution';
+import { edgeSelectionOf } from '../src/render-adapter';
 
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
@@ -515,6 +522,30 @@ describe('an embedded production projection', () => {
       data: { connectionAuthoringEnabled: false },
     });
     expect(inert.nodes[0]?.style?.pointerEvents).toBe('none');
+  });
+
+  // An embedded Edge is a copy of an Edge of another Space's Map — a Space never
+  // embeds itself (ADR 0068) — so it must never read as an Edge of the Map on the
+  // canvas, whose endpoints are Resource ids rather than placement ids.
+  it('mints its Edges as its own type, which never converts to an Edge selection', async () => {
+    const { drawn, projected } = await draw();
+    expect(projected.edges.length).toBeGreaterThan(0);
+    for (const edge of projected.edges) expect(edgeSelectionOf(edge)).not.toBeNull();
+    expect(drawn.edges).toHaveLength(projected.edges.length);
+    for (const edge of drawn.edges) {
+      expect(edge.type).toBe(EMBEDDED_EDGE_TYPE);
+      expect(edgeSelectionOf(edge)).toBeNull();
+    }
+  });
+
+  // An unregistered type falls back to React Flow's default curve (its error 011)
+  // and loses the lane offset, end trim and anchor attachment the routed Edge draws.
+  it('registers every Edge type it mints in the canvas table, drawn as the routed Edge', async () => {
+    const { drawn } = await draw();
+    const canvasEdge = () => null;
+    const table = withEmbeddedEdgeTypes({ routed: canvasEdge });
+    expect(table['routed']).toBe(canvasEdge);
+    for (const edge of drawn.edges) expect(table[edge.type ?? '']).toBe(RoutedEdge);
   });
 
   it('gives two embeddings of the same Space distinct node and Edge identities', async () => {

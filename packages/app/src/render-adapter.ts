@@ -124,27 +124,25 @@ export const selectedResourceOf = (selection: CanvasSelection): ResourceId | nul
 export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
 
 /**
- * The domain Edge behind a projected React Flow Edge, or `null` for one carrying
- * no Graph — which is any Edge this projection did not draw.
+ * The domain Edge behind a projected React Flow Edge, or `null` for any Edge
+ * that is not of the routed type — the one type only the canvas projection
+ * writes, from Resource ids. An embedded Map's Edges are minted under their own
+ * type (`EMBEDDED_EDGE_TYPE`), so they never convert.
  *
  * The **one** place that translation happens. Every surface that acts on an Edge
  * needs it — the selection mirror here, the decoration and callbacks in Edge
  * Authoring, the toolbar inside the Edge itself — and three hand-rolled copies
  * would be three chances to widen `source` and `target` differently.
- *
- * They are `ResourceId`s widened to `string` by React Flow's `Edge` type.
  */
 export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
-  // SAFETY: `edge.data` is React Flow's generic bag, but every Edge this
-  // adapter projects has its `data` written by this same module's own
-  // edge-projection as `RoutedEdgeData` — there is no other producer.
-  const graphId = (edge.data as RoutedEdgeData | undefined)?.graphId;
-  if (graphId === undefined) return null;
-  // SAFETY: `source`/`target` are `ResourceId`s widened to `string` by React
-  // Flow's `Edge` type.
+  if (edge.type !== 'routed') return null;
+  // SAFETY: a routed Edge is one the canvas projection drew for the Map on the
+  // canvas, with `RoutedEdgeData` and Resource-id endpoints. An embedded Map's
+  // Edges are always another Space's — Space Resource references never cycle
+  // (ADR 0068) — and are minted under their own type, so none reaches here.
   return {
     kind: 'edge',
-    graphId,
+    graphId: (edge.data as RoutedEdgeData).graphId,
     edge: { from: edge.source as ResourceId, to: edge.target as ResourceId },
   };
 }

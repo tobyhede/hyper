@@ -2,7 +2,7 @@
 
 **What to build:** Derive a node change's `ResourceId` from the ownership lookup `changeNodes` already performs, and read a node's from its typed `data`, so the three node assertions in `render-adapter.ts` go with the comments that misstate why they hold. The Edge question below is decided in 13, which builds it.
 
-**Status:** needs-triage
+**Status:** resolved
 
 **Tags:** Cleanup
 
@@ -66,3 +66,7 @@ So the third option's rewritten comment ("embedded Edges are neither reconnectab
 Decided after three parallel designs were compared: an embedded Map's Edges become their own React Flow Edge type, minted by the embedding, and the Edge conversion answers only for the routed type. The build, the rejected alternatives (including the fourth option above in its original form) and the reasons are in 13 — An embedded Map's Edges are their own Edge type. This ticket closes on the node work once `pnpm verify` is seen green in one run.
 
 A side finding from that review, unrelated to identity, is `embedded-open-space-thing/04`: the embedding's zero interaction width on its Edges has no effect.
+
+## Resolved — 2026-09-23
+
+`pnpm verify` was seen green in one run on the finished branch, with 13 built on top (load average 7 at the start, 28 by the end): every static step passed, and `test:coverage` passed 240 files, 3106 tests, 13 skipped. The 5000ms timeouts recorded above did not recur, which fits the earlier reading that they came from machine load, not from this change. `pnpm e2e` passed 227 and `pnpm e2e:ladle` passed 115 on the same tree. The Edge half is built in 13.
