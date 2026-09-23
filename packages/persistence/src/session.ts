@@ -199,16 +199,19 @@ export const openManagedSpaceSession = (
             )?.revision;
             if (revision === undefined || result.deletedSpaceIds.length > 0) {
               waiting = undefined;
-              const message =
-                revision === undefined
-                  ? `Commit result omitted the revision for Space ${snapshot.id}`
-                  : 'Commit result unexpectedly deleted Spaces';
               publishPersistence({
                 kind: 'rejected',
                 failure: {
                   kind: 'permanent-failure',
                   code: 'protocol',
-                  message,
+                  fault:
+                    revision === undefined
+                      ? { kind: 'revision-omitted', spaceId: snapshot.id }
+                      : {
+                          kind: 'unexpected-deletion',
+                          spaceId: snapshot.id,
+                          deletedSpaceIds: result.deletedSpaceIds,
+                        },
                 },
               });
               publishIdle();
@@ -254,7 +257,7 @@ export const openManagedSpaceSession = (
                 failure: {
                   kind: 'permanent-failure',
                   code: 'protocol',
-                  message: `Conflict result omitted the current Space ${snapshot.id}`,
+                  fault: { kind: 'conflict-omitted-space', spaceId: snapshot.id },
                 },
               });
               publishIdle();
@@ -291,7 +294,7 @@ export const openManagedSpaceSession = (
        * Reported as retryable because a throw says nothing about the snapshot,
        * only that the attempt did not produce an answer.
        */
-      .catch((error: unknown) => {
+      .catch(() => {
         inFlight = false;
         waiting = undefined;
         publishPersistence({
@@ -299,7 +302,6 @@ export const openManagedSpaceSession = (
           failure: {
             kind: 'retryable-failure',
             code: 'unavailable',
-            message: error instanceof Error ? error.message : String(error),
           },
         });
         publishIdle();

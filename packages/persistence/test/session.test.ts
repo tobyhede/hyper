@@ -101,10 +101,10 @@ const openSessionIn = async (kind: UnconflictedKind): Promise<DrivenSession> => 
       release = control.deferNextCommit();
       break;
     case 'failed':
-      control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
+      control.queueResult({ kind: 'retryable-failure', code: 'unavailable' });
       break;
     case 'rejected':
-      control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'No access' });
+      control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
       break;
     case 'refused':
       control.queueResult({
@@ -330,7 +330,7 @@ describe('openSpaceSession', () => {
    */
   it('queues an Edit submitted from a pending notification raised inside an optimistic one', async () => {
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'retryable-failure', code: 'unavailable', message: 'Try later' });
+    control.queueResult({ kind: 'retryable-failure', code: 'unavailable' });
     const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
 
@@ -526,7 +526,6 @@ describe('openSpaceSession', () => {
     control.queueResult({
       kind: 'retryable-failure',
       code: 'unavailable',
-      message: 'Try later',
     });
     const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
@@ -559,7 +558,6 @@ describe('openSpaceSession', () => {
     control.queueResult({
       kind: 'permanent-failure',
       code: 'forbidden',
-      message: 'No access',
     });
     const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
     const session = openSpaceSession(backend, loaded);
@@ -899,7 +897,6 @@ describe('openSpaceSession', () => {
       failure: {
         kind: 'retryable-failure',
         code: 'unavailable',
-        message: 'backend exploded',
       },
     });
 
@@ -921,18 +918,29 @@ describe('openSpaceSession', () => {
 
   it.each([
     {
+      name: 'revision-omitted',
       result: { kind: 'committed' as const, revisions: [], deletedSpaceIds: [] },
-      message: `Commit result omitted the revision for Space ${SPACE_ID}`,
+      fault: { kind: 'revision-omitted' as const, spaceId: SPACE_ID },
     },
     {
+      name: 'unexpected-deletion',
       result: {
         kind: 'committed' as const,
         revisions: [{ spaceId: SPACE_ID, revision: 4n }],
         deletedSpaceIds: [SPACE_ID],
       },
-      message: 'Commit result unexpectedly deleted Spaces',
+      fault: {
+        kind: 'unexpected-deletion' as const,
+        spaceId: SPACE_ID,
+        deletedSpaceIds: [SPACE_ID],
+      },
     },
-  ])('describes the $message protocol fault precisely', async ({ result, message }) => {
+    {
+      name: 'conflict-omitted-space',
+      result: { kind: 'conflict' as const, conflicts: [] },
+      fault: { kind: 'conflict-omitted-space' as const, spaceId: SPACE_ID },
+    },
+  ])('names the $name protocol fault as typed context', async ({ result, fault }) => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult(result);
     const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
@@ -946,7 +954,7 @@ describe('openSpaceSession', () => {
 
     expect(state.persistence).toEqual({
       kind: 'rejected',
-      failure: { kind: 'permanent-failure', code: 'protocol', message },
+      failure: { kind: 'permanent-failure', code: 'protocol', fault },
     });
   });
 

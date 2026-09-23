@@ -13,9 +13,6 @@ import type { AuthoringRefusal } from '../src/space-authoring';
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 
-/** One transport sentence, so any copy that leaked it is visible as a collision. */
-const WIRE = 'the transport said this';
-
 /** One sample of every AuthoringRefusal, keyed by code for exhaustive iteration. */
 const EVERY_REFUSAL = {
   'map-not-found': { code: 'map-not-found' },
@@ -109,19 +106,16 @@ describe('presentEdgeDeletionRefusal', () => {
 
 /**
  * Persistence failures are refusals like any other (ADR 0057): the code is the
- * identity, and the sentence is the application's. The `message` each one
- * carries is the transport's — `problem.detail` off the wire, or a thrown
- * `Error`'s own text — and it is deliberately not what the author reads.
+ * identity, and the sentence is the application's. A failure carries no prose
+ * of the transport's to show instead — `problem.detail` stops at the wire.
  */
 describe('describePersistenceFailure', () => {
-  it('writes its own sentence for a forbidden rejection rather than the wire’s', () => {
+  it('writes its own sentence for a forbidden rejection', () => {
     const description = describePersistenceFailure({
       kind: 'permanent-failure',
       code: 'forbidden',
-      message: 'Permission denied',
     });
 
-    expect(description).not.toBe('Permission denied');
     expect(description).toBe('You do not have permission to save this space.');
   });
 
@@ -129,27 +123,26 @@ describe('describePersistenceFailure', () => {
    * One sample of every persistence failure, keyed by code, on the same
    * precedent as `EVERY_REFUSAL` above: `satisfies` proves a sentence exists
    * for each code, not that it is reachable, distinct, or the right one.
-   *
-   * Every `message` here is deliberately the same string, so a sentence that
-   * leaked the transport's prose would collapse the distinctness assertion
-   * rather than passing quietly.
    */
   const EVERY_FAILURE = {
-    network: { kind: 'retryable-failure', code: 'network', message: WIRE },
-    timeout: { kind: 'retryable-failure', code: 'timeout', message: WIRE },
-    unavailable: { kind: 'retryable-failure', code: 'unavailable', message: WIRE },
-    'rate-limited': { kind: 'retryable-failure', code: 'rate-limited', message: WIRE },
-    'invalid-commit': { kind: 'permanent-failure', code: 'invalid-commit', message: WIRE },
-    forbidden: { kind: 'permanent-failure', code: 'forbidden', message: WIRE },
-    'payload-too-large': { kind: 'permanent-failure', code: 'payload-too-large', message: WIRE },
-    protocol: { kind: 'permanent-failure', code: 'protocol', message: WIRE },
+    network: { kind: 'retryable-failure', code: 'network' },
+    timeout: { kind: 'retryable-failure', code: 'timeout' },
+    unavailable: { kind: 'retryable-failure', code: 'unavailable' },
+    'rate-limited': { kind: 'retryable-failure', code: 'rate-limited' },
+    'invalid-commit': { kind: 'permanent-failure', code: 'invalid-commit' },
+    forbidden: { kind: 'permanent-failure', code: 'forbidden' },
+    'payload-too-large': { kind: 'permanent-failure', code: 'payload-too-large' },
+    protocol: {
+      kind: 'permanent-failure',
+      code: 'protocol',
+      fault: { kind: 'revision-omitted', spaceId: TARGET_ID },
+    },
   } as const satisfies Readonly<Record<PersistenceFailure['code'], PersistenceFailure>>;
 
-  it('gives every code a sentence of its own, and none of them the wire’s', () => {
+  it('gives every code a sentence of its own', () => {
     const descriptions = Object.values(EVERY_FAILURE).map(describePersistenceFailure);
 
     for (const description of descriptions) {
-      expect(description).not.toBe(WIRE);
       expect(description.length).toBeGreaterThan(0);
     }
     expect(new Set(descriptions).size).toBe(descriptions.length);
@@ -171,7 +164,6 @@ describe('describePersistenceFailure', () => {
     const description = describePersistenceFailure({
       kind: 'permanent-failure',
       code: 'payload-too-large',
-      message: 'Send a request body no larger than 1048576 bytes.',
     });
 
     expect(description).toMatch(/large|size|limit/i);

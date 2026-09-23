@@ -463,7 +463,6 @@ describe('Space app permanent save refusal', () => {
     control.queueResult({
       kind: 'permanent-failure',
       code: 'invalid-commit',
-      message: 'Graph names an absent resource',
     });
     const { spaceSession: session, spaceResources } = openTestSpace(
       new MemorySpaceBackend(SPACE_ID, [], control),
@@ -491,10 +490,8 @@ describe('Space app permanent save refusal', () => {
     );
 
     expect(screen.getByRole('alertdialog', { name: 'Changes couldn’t be saved' })).toBeVisible();
-    // The code's sentence, not the server's. `message` here is `problem.detail`
-    // off the wire, and ADR 0057 leaves the wording to the application.
+    // The code's sentence: ADR 0057 leaves the wording to the application.
     expect(screen.getByText('These changes are not in a form the server can store.')).toBeVisible();
-    expect(screen.queryByText('Graph names an absent resource')).toBeNull();
 
     fireEvent.click(screen.getByTestId('persistence-rejection-continue'));
 

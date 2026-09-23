@@ -47,13 +47,11 @@ describe('the Command Dock reports an unwell Space', () => {
 const retryable = {
   kind: 'retryable-failure',
   code: 'network',
-  message: 'The space could not be reached.',
 } as const;
 
 const permanent = {
   kind: 'permanent-failure',
   code: 'forbidden',
-  message: 'Permission denied',
 } as const;
 
 const refused = {

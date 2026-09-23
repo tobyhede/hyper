@@ -11,6 +11,7 @@ import {
   type CommitResult,
   type LoadedSpace,
   type ProblemDetails,
+  type ProtocolFault,
   type SpaceBackend,
   type SpaceSummary,
 } from '@project/persistence';
@@ -21,10 +22,10 @@ import { hasValidUniqueMediaTypeParameters } from './media-type';
 
 type SpaceHttpClient = ReturnType<typeof hc<SpaceHttpApp>>;
 
-const protocolFailure = (message: string): CommitResult => ({
+const protocolFailure = (fault: ProtocolFault): CommitResult => ({
   kind: 'permanent-failure',
   code: 'protocol',
-  message,
+  fault,
 });
 
 /** Media-type essence match, so a charset or other parameter doesn't fail an otherwise-valid response. */
@@ -119,30 +120,29 @@ export class HttpSpaceBackend implements SpaceBackend {
               return decodeOutcome(await response.json());
             }
             if (!hasProblemDetailsMediaType(response)) {
-              return protocolFailure('Error response must use application/problem+json');
+              return protocolFailure({
+                kind: 'problem-media-type',
+                contentType: response.headers.get('Content-Type'),
+              });
             }
             const problem = decodeProblemDetails(await response.json());
             if (problem.status !== response.status) {
-              return protocolFailure('Problem status does not match the HTTP status');
+              return protocolFailure({
+                kind: 'problem-status-mismatch',
+                httpStatus: response.status,
+                problemStatus: problem.status,
+              });
             }
             return commitFailureForProblem(problem, response);
           } catch (error) {
             if (signal.aborted) throw error;
-            return protocolFailure(error instanceof Error ? error.message : 'Malformed response');
+            return protocolFailure({ kind: 'malformed-response', cause: error });
           }
         },
       );
     } catch (error) {
-      if (error instanceof HttpTimeoutError) {
-        return { kind: 'retryable-failure', code: 'timeout', message: 'Request timed out' };
-      }
-      return {
-        kind: 'retryable-failure',
-        code: 'network',
-        // Inline: the sentence the author reads comes from the code, so this
-        // field is a diagnostic and there is no display constant to name.
-        message: error instanceof Error ? error.message : 'Network request failed',
-      };
+      if (error instanceof HttpTimeoutError) return { kind: 'retryable-failure', code: 'timeout' };
+      return { kind: 'retryable-failure', code: 'network' };
     }
   }
 }
@@ -165,42 +165,34 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
   const code = problemCodeForType(problem.type);
   switch (code) {
     case 'request-timeout':
-      return { kind: 'retryable-failure', code: 'timeout', message: problem.detail };
+      return { kind: 'retryable-failure', code: 'timeout' };
     case 'rate-limited': {
       const retryAfterMs = retryAfterMilliseconds(response);
-      const result: CommitResult = {
-        kind: 'retryable-failure',
-        code: 'rate-limited',
-        message: problem.detail,
-      };
+      const result: CommitResult = { kind: 'retryable-failure', code: 'rate-limited' };
       if (retryAfterMs !== undefined) result.retryAfterMs = retryAfterMs;
       return result;
     }
     case 'persistence-unavailable':
     case 'internal-error': {
       const retryAfterMs = retryAfterMilliseconds(response);
-      const result: CommitResult = {
-        kind: 'retryable-failure',
-        code: 'unavailable',
-        message: problem.detail,
-      };
+      const result: CommitResult = { kind: 'retryable-failure', code: 'unavailable' };
       if (retryAfterMs !== undefined) result.retryAfterMs = retryAfterMs;
       return result;
     }
     case 'unauthorized':
     case 'forbidden':
-      return { kind: 'permanent-failure', code: 'forbidden', message: problem.detail };
+      return { kind: 'permanent-failure', code: 'forbidden' };
     case 'invalid-request':
     case 'invalid-snapshot':
       // A 422 carrying `invalid-snapshot` cannot reach this exhaustive mapping:
       // commit's outcome decoder rejects a problem whose code mismatches its status.
-      return { kind: 'permanent-failure', code: 'invalid-commit', message: problem.detail };
+      return { kind: 'permanent-failure', code: 'invalid-commit' };
     case 'payload-too-large':
-      return { kind: 'permanent-failure', code: 'payload-too-large', message: problem.detail };
+      return { kind: 'permanent-failure', code: 'payload-too-large' };
     case 'not-found':
     case 'invalid-space-id':
     case 'unsupported-media-type':
     case 'method-not-allowed':
-      return protocolFailure(problem.detail);
+      return protocolFailure({ kind: 'unexpected-problem', problemCode: code });
   }
 };

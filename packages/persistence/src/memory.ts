@@ -62,11 +62,13 @@ export class MemorySpaceBackendTestControl {
   }
 }
 
-/** A repository's permanent rejection is what the browser's transport calls a permanent failure. */
+/**
+ * A repository's permanent rejection is what the browser's transport calls a
+ * permanent failure. Its `message` is the stored seam's, which the HTTP host
+ * sends as `problem.detail`; the browser's failure carries the code alone.
+ */
 const backendResult = (result: RepositoryCommitResult): CommitResult =>
-  result.kind === 'rejected'
-    ? { kind: 'permanent-failure', code: result.code, message: result.message }
-    : result;
+  result.kind === 'rejected' ? { kind: 'permanent-failure', code: result.code } : result;
 
 /** Browser-safe asynchronous adapter used for development and behavioral tests. */
 export class MemorySpaceBackend implements SpaceBackend {

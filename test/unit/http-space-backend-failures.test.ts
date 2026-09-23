@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { HttpSpaceBackend } from '@project/http';
-import { encodeProblemDetails, type HyperProblemCode } from '@project/persistence';
+import {
+  encodeProblemDetails,
+  type CommitResult,
+  type HyperProblemCode,
+} from '@project/persistence';
 import { RESOURCE_ID, SPACE_ID, oneResourceSnapshot as snapshot } from '../support/space-fixtures';
 
 const backendFor = (response: Response): HttpSpaceBackend =>
@@ -24,18 +28,38 @@ const problemResponse = (
 
 describe('typed Hono HttpSpaceBackend failure classification', () => {
   const permanent = [
-    ['invalid-request', 'invalid-commit', 'Denied'],
-    ['unauthorized', 'forbidden', 'Denied'],
-    ['forbidden', 'forbidden', 'Denied'],
-    ['not-found', 'protocol', 'Denied'],
-    ['invalid-snapshot', 'protocol', 'commit refusal has unexpected fields'],
-  ] as const;
+    ['invalid-request', { kind: 'permanent-failure', code: 'invalid-commit' }],
+    ['unauthorized', { kind: 'permanent-failure', code: 'forbidden' }],
+    ['forbidden', { kind: 'permanent-failure', code: 'forbidden' }],
+    // Well-formed, but a code a commit never answers: the fault names which.
+    [
+      'not-found',
+      {
+        kind: 'permanent-failure',
+        code: 'protocol',
+        fault: { kind: 'unexpected-problem', problemCode: 'not-found' },
+      },
+    ],
+    // A 422 is the commit refusal's status, so its body is decoded as one and
+    // fails there; the fault carries the decoder's own error.
+    [
+      'invalid-snapshot',
+      {
+        kind: 'permanent-failure',
+        code: 'protocol',
+        fault: {
+          kind: 'malformed-response',
+          cause: new Error('commit refusal has unexpected fields'),
+        },
+      },
+    ],
+  ] as const satisfies readonly (readonly [HyperProblemCode, CommitResult])[];
 
-  for (const [problemCode, code, message] of permanent) {
-    it(`maps ${problemCode} to permanent ${code}`, async () => {
+  for (const [problemCode, result] of permanent) {
+    it(`maps ${problemCode} to permanent ${result.code}`, async () => {
       await expect(
         commitUpdate(backendFor(problemResponse(problemCode, 'Denied'))),
-      ).resolves.toEqual({ kind: 'permanent-failure', code, message });
+      ).resolves.toEqual(result);
     });
   }
 
@@ -55,7 +79,11 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
             }),
           ),
         ),
-      ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
+      ).resolves.toMatchObject({
+        kind: 'permanent-failure',
+        code: 'protocol',
+        fault: { kind: 'malformed-response' },
+      });
     });
   }
 
@@ -66,11 +94,11 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     ).resolves.toEqual({
       kind: 'permanent-failure',
       code: 'protocol',
-      message: 'Error response must use application/problem+json',
+      fault: { kind: 'problem-media-type', contentType: 'text/plain;charset=UTF-8' },
     });
   });
 
-  it('uses a valid retryable error message and Retry-After seconds', async () => {
+  it('uses a valid Retry-After in seconds', async () => {
     await expect(
       commitUpdate(
         backendFor(problemResponse('rate-limited', 'Try later', { 'Retry-After': '2' })),
@@ -78,7 +106,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     ).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'rate-limited',
-      message: 'Try later',
       retryAfterMs: 2000,
     });
   });
@@ -92,7 +119,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
       ).resolves.toEqual({
         kind: 'retryable-failure',
         code: 'unavailable',
-        message: 'Down for maintenance',
         retryAfterMs: 30_000,
       });
     }
@@ -104,7 +130,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     ).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'unavailable',
-      message: 'Down',
     });
   });
 
@@ -118,7 +143,7 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
         commitUpdate(
           backendFor(problemResponse('persistence-unavailable', 'Down', { 'Retry-After': value })),
         ),
-      ).resolves.toEqual({ kind: 'retryable-failure', code: 'unavailable', message: 'Down' });
+      ).resolves.toEqual({ kind: 'retryable-failure', code: 'unavailable' });
     }
   });
 
@@ -126,7 +151,11 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     for (const status of [200, 409]) {
       await expect(
         commitUpdate(backendFor(new Response(JSON.stringify({ revision: 4 }), { status }))),
-      ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
+      ).resolves.toMatchObject({
+        kind: 'permanent-failure',
+        code: 'protocol',
+        fault: { kind: 'malformed-response' },
+      });
     }
   });
 
@@ -145,7 +174,11 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
       commitUpdate(
         backendFor(new Response(JSON.stringify({ message: 'Teapot' }), { status: 418 })),
       ),
-    ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
+    ).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      fault: { kind: 'problem-media-type', contentType: 'text/plain;charset=UTF-8' },
+    });
   });
 
   it('maps Fetch rejection to a retryable network failure', async () => {
@@ -155,7 +188,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(commitUpdate(backend)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'network',
-      message: 'offline',
     });
   });
 
@@ -224,7 +256,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(commitUpdate(backend)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'timeout',
-      message: 'Request timed out',
     });
   });
 
@@ -239,7 +270,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(commitUpdate(backend)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'timeout',
-      message: 'Request timed out',
     });
   });
 
@@ -291,7 +321,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(commitUpdate(backend)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'timeout',
-      message: 'Request timed out',
     });
   }, 1000);
 
@@ -306,7 +335,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(commitUpdate(backend)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'timeout',
-      message: 'Request timed out',
     });
   }, 1000);
 
@@ -318,7 +346,6 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
     await expect(commitUpdate(backend)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'timeout',
-      message: 'Request timed out',
     });
   }, 1000);
 });

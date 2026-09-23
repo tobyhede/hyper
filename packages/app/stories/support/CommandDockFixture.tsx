@@ -151,7 +151,6 @@ export async function openDockStory(scenario: DockScenario) {
       control.queueResult({
         kind: 'permanent-failure',
         code: 'forbidden',
-        message: 'Permission denied',
       });
     } else if (scenario === 'save-refused') {
       control.queueResult({
@@ -162,7 +161,6 @@ export async function openDockStory(scenario: DockScenario) {
       control.queueResult({
         kind: 'retryable-failure',
         code: 'network',
-        message: 'Network unavailable',
       });
     }
     // A real Edit creates the failed commit; the same Map and title remain

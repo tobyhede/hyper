@@ -20,6 +20,7 @@ import type {
   CommitResult,
   LoadedAggregate,
   LoadedSpace,
+  ProtocolFault,
   SpaceBackend,
   SpaceChange,
 } from './backend';
@@ -101,7 +102,7 @@ interface SpaceResourceCoordinatedOperation<P = undefined> {
 
 type SpaceResourceCoordinationResult =
   | CommitResult
-  | { readonly kind: 'persistence-read-failed' }
+  | { readonly kind: 'persistence-read-failed'; readonly cause: unknown }
   /** A refusal `plan` answered, installed the same way as the other two. */
   | SpaceResourceRefused;
 
@@ -221,7 +222,13 @@ export type SpaceResourceRefusal =
       readonly recovery: 'retry' | 'resolve-conflict';
     }
   | { readonly code: 'aggregate-refused'; readonly errors: readonly SpaceAggregateError[] }
-  | { readonly code: 'persistence-read-failed' }
+  /**
+   * The aggregate read this Edit validates against failed, or answered
+   * without a Space the Edit needs. `cause` is what the read threw, carried as
+   * typed context for a diagnostic (ADR 0057); it is absent when the read
+   * answered but lacked the Space, because nothing was thrown.
+   */
+  | { readonly code: 'persistence-read-failed'; readonly cause?: unknown }
   /**
    * The target could not be made working, so it supplies no Map and
    * Graph for the Resource to select (ADR 0079).
@@ -355,7 +362,7 @@ const asSpaceResourceRefusal = (
   result: SpaceResourceCoordinationResult,
 ): SpaceResourceRefused | undefined => {
   if (result.kind === 'persistence-read-failed') {
-    return { kind: 'refused', refusal: { code: 'persistence-read-failed' } };
+    return { kind: 'refused', refusal: { code: 'persistence-read-failed', cause: result.cause } };
   }
   if (result.kind === 'aggregate-refused') {
     return { kind: 'refused', refusal: { code: 'aggregate-refused', errors: result.errors } };
@@ -480,11 +487,11 @@ const replaceSpaceResourceSelection = (
 });
 
 const protocolFailure = (
-  message: string,
+  fault: ProtocolFault,
 ): Extract<CommitResult, { kind: 'permanent-failure' }> => ({
   kind: 'permanent-failure',
   code: 'protocol',
-  message,
+  fault,
 });
 
 export function createSpaceSessionRegistry(
@@ -533,17 +540,14 @@ export function createSpaceSessionRegistry(
    */
   const loadCoordinationAggregate = async (): Promise<
     | { readonly kind: 'loaded'; readonly aggregate: LoadedAggregate }
-    | { readonly kind: 'read-failed'; readonly message: string }
+    | { readonly kind: 'read-failed'; readonly cause: unknown }
   > => {
     try {
       const result = await backend.loadAggregate();
       if (result.kind === 'uninitialized') throw new Error('The repository is uninitialized');
       return { kind: 'loaded', aggregate: result.aggregate };
     } catch (error) {
-      return {
-        kind: 'read-failed',
-        message: error instanceof Error ? error.message : String(error),
-      };
+      return { kind: 'read-failed', cause: error };
     }
   };
 
@@ -599,8 +603,9 @@ export function createSpaceSessionRegistry(
       }
       const loaded = await loadCoordinationAggregate();
       if (loaded.kind === 'read-failed') {
-        installed({ kind: 'persistence-read-failed' });
-        return protocolFailure(`The coordinated persistence read threw: ${loaded.message}`);
+        const readFailed = { kind: 'persistence-read-failed', cause: loaded.cause } as const;
+        installed(readFailed);
+        return readFailed;
       }
       const aggregate = loaded.aggregate;
       const candidate = new Map(
@@ -844,9 +849,9 @@ export function createSpaceSessionRegistry(
         }
       };
       /* A throw carries no `CommitResult`, and participants still need one. */
-      const unwind = (message: string): void => {
+      const unwind = (cause: unknown): void => {
         dropProvisionalCreates();
-        const failure = protocolFailure(`The coordinated commit threw: ${message}`);
+        const failure = protocolFailure({ kind: 'coordinated-commit-threw', cause });
         for (const managed of begun) {
           managed.setCoordinatedRecovery(recovery);
           managed.failCoordinatedCommit(failure);
@@ -892,7 +897,7 @@ export function createSpaceSessionRegistry(
         for (const managed of begun) managed.publishCoordinatedCommit();
         installed();
       } catch (error) {
-        unwind(error instanceof Error ? error.message : String(error));
+        unwind(error);
         throw error;
       }
 
@@ -905,7 +910,7 @@ export function createSpaceSessionRegistry(
       try {
         result = await backend.commit({ changes: backendChanges });
       } catch (error) {
-        unwind(error instanceof Error ? error.message : String(error));
+        unwind(error);
         throw error;
       }
       if (result.kind === 'committed') {
@@ -930,7 +935,13 @@ export function createSpaceSessionRegistry(
           expectedDeleted.some((id) => !deleted.has(id));
         if (malformed) {
           dropProvisionalCreates();
-          const failure = protocolFailure('Commit result omitted a coordinated Space result');
+          const failure = protocolFailure({
+            kind: 'coordinated-result-malformed',
+            omittedSpaceIds: [
+              ...expectedRevisions.filter((id) => !revisions.has(id)),
+              ...expectedDeleted.filter((id) => !deleted.has(id)),
+            ],
+          });
           for (const managed of participants.values()) {
             managed.setCoordinatedRecovery(recovery);
             managed.failCoordinatedCommit(failure);

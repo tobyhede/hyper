@@ -168,7 +168,6 @@ test(
     await page.goto(story('persistence-failure'));
     const notice = page.getByTestId('persistence-failure');
     await expect(notice).toContainText('Your device could not reach the server.');
-    await expect(notice).not.toContainText('Failed to fetch');
     await page.getByRole('button', { name: 'Resources' }).click();
     await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
   },

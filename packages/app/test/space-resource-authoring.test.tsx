@@ -844,7 +844,6 @@ describe('referencing an existing Space', () => {
     control.queueResult({
       kind: 'permanent-failure',
       code: 'invalid-commit',
-      message: 'the target could not be written',
     });
     await act(async () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Add Other Space to Map' }));

@@ -299,12 +299,13 @@ const fixtureFor = ({
   return { metaSpaceId, snapshots, commit };
 };
 
-const comparableResult = (
-  result: CommitResult | RepositoryCommitResult,
-): CommitResult | RepositoryCommitResult =>
-  result.kind === 'permanent-failure' && result.code === 'invalid-commit'
-    ? { kind: 'rejected', code: result.code, message: result.message }
-    : result;
+/**
+ * Both sides' answers in the browser's vocabulary. A repository's rejection
+ * carries the stored seam's `message`, which the memory backend's permanent
+ * failure does not (ADR 0057), so a rejection is compared by its code.
+ */
+const comparableResult = (result: CommitResult | RepositoryCommitResult): CommitResult =>
+  result.kind === 'rejected' ? { kind: 'permanent-failure', code: result.code } : result;
 
 const comparableAggregate = ({ metaSpaceId, spaces }: LoadedAggregate): LoadedAggregate => ({
   metaSpaceId,
