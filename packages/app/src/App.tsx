@@ -77,7 +77,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
-import { COMMAND_CHANNELS } from './command-outcomes';
+import { COMMAND_BROKE, COMMAND_CHANNELS } from './command-outcomes';
 import { useOpenSpaces } from './open-spaces-context';
 
 /**
@@ -240,8 +240,6 @@ export const createApp = (
      * a broken command is a diagnostic as well as a report.
      */
     const [spaceCommandBreak, setSpaceCommandBreak] = useState<string | null>(null);
-    /** Why the last Graph Edit did not run, or `null` — see `reportGraphEdit`. */
-    const [graphRefusal, setGraphRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
       resourceDeletion.subscribe,
@@ -477,18 +475,6 @@ export const createApp = (
      * author may be typing into the Resource when it goes.
      */
     const [spaceResourceRefusal, setSpaceResourceRefusal] = useState<string | null>(null);
-
-    /**
-     * The Reference Resource creation that refused, said in one sentence.
-     *
-     * **Beside `spaceResourceRefusal`, for the reason that one exists.** Create
-     * Reference Resource completes on activation and closes the menu it was pressed in
-     * (ADR 0089), so it has no field and no row of its own to hold a failure
-     * against — the surface that owns the command is the Space chrome, and this
-     * is its channel. The rows that can refuse by kind are drawn unavailable, so
-     * what lands here is a Target that went between the draw and the press.
-     */
-    const [referenceRefusal, setReferenceRefusal] = useState<string | null>(null);
 
     const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
 
@@ -753,15 +739,15 @@ export const createApp = (
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Resource deletion and removal notices are command outcomes' channels,
-    // and that module clears them on the same move (`command-outcomes.ts`).
+    // The Graph Edit and the Resource deletion and removal notices are command
+    // outcomes' channels, and that module clears them on the same move
+    // (`command-outcomes.ts`).
     const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
     if (refusedUnder !== selectedMapId) {
       setRefusedUnder(selectedMapId);
       setCreateMapRefusal(null);
       setMapManagementRefusal(null);
       setMapDeleteMessage(null);
-      setGraphRefusal(null);
       setGraphDeleteMessage(null);
     }
     /**
@@ -985,35 +971,33 @@ export const createApp = (
                 x: at.x + (at.open ? Math.max(RESOURCE_WIDTH, across) : across),
                 y: at.y + (at.open ? Math.max(RESOURCE_HEIGHT, down) : down),
               };
-        const created = authoring.complete({
-          kind: 'created-reference',
-          target: resource.id,
-          title: resource.title,
-          anchor,
-        });
-        // Each arm named rather than narrowed in one comparison, so the compiler
-        // asks again the day a fifth joins the union.
-        //
         // A refusal takes the standing notice rather than the menu it was
         // pressed in: this command closes its menu, because it moves the caret
         // onto the canvas, so by the time an answer exists there is no row left
         // to swap a word on. The rows that *can* refuse are drawn unavailable
         // above, so what reaches here is a Target that went between the draw and
         // the press — which is why it is worth a sentence rather than silence.
-        if (created.kind === 'refused') {
-          setReferenceRefusal(describeAuthoringRefusal(created.refusal));
-          return 'failed';
-        }
-        setReferenceRefusal(null);
-        if (created.kind === 'queued') return 'done';
-        if (created.kind === 'unchanged') return 'done';
-        if (created.createdResourceId === undefined) return 'done';
-        continuation.request({
-          target: { kind: 'resource', resourceId: created.createdResourceId },
-          select: true,
-          then: 'rename',
-        });
-        return 'done';
+        const created = commandOutcomes.run(
+          'reference-create',
+          () =>
+            authoring.complete({
+              kind: 'created-reference',
+              target: resource.id,
+              title: resource.title,
+              anchor,
+            }),
+          {
+            continueAt: ({ createdResourceId }) =>
+              createdResourceId === undefined
+                ? null
+                : {
+                    target: { kind: 'resource', resourceId: createdResourceId },
+                    select: true,
+                    then: 'rename',
+                  },
+          },
+        );
+        return created === COMMAND_BROKE || created.kind === 'refused' ? 'failed' : 'done';
       },
       [selectedMap.map, centreAnchor],
     );
@@ -1391,16 +1375,14 @@ export const createApp = (
     const mapRefusal = createMapRefusal ?? mapManagementRefusal;
 
     /**
-     * Where a refused Graph Edit is drawn, which is the notice every other
-     * refused chrome command is drawn in.
+     * A Graph Edit from the cluster, reported on `graph-edit`.
      *
-     * One reporter for the cluster's three commands rather than three call
-     * sites setting the same state: what the reader needs to know is which
-     * Graph Edit did not happen and why, and all three answer that in the same
-     * words.
+     * One reporter for the cluster's commands rather than call sites each
+     * naming the channel: what the reader needs to know is which Graph Edit
+     * did not happen and why, and each answers that in the same words.
      */
-    const reportGraphEdit = (result: AuthoringResult): void => {
-      setGraphRefusal(result.kind === 'refused' ? result.refusal : null);
+    const runGraphEdit = (operation: () => AuthoringResult): void => {
+      commandOutcomes.run('graph-edit', operation);
     };
 
     const [exitReport, setExitReport] = useState<SpaceExitReport | null>(null);
@@ -1639,10 +1621,10 @@ export const createApp = (
               // that answer closes its menu having changed nothing, said nothing
               // and logged nothing.
               onRecolor: (graphId, color) => {
-                reportGraphEdit(authoring.complete({ kind: 'recolored-graph', graphId, color }));
+                runGraphEdit(() => authoring.complete({ kind: 'recolored-graph', graphId, color }));
               },
               onCreate: () => {
-                reportGraphEdit(authoring.complete({ kind: 'added-graph' }));
+                runGraphEdit(() => authoring.complete({ kind: 'added-graph' }));
               },
               onDelete: (graphId) => {
                 void (async () => {
@@ -1801,28 +1783,12 @@ export const createApp = (
                 {spaceResourceRefusal}
               </ShellNotice>
             )}
-            {referenceRefusal === null ? null : (
-              <ShellNotice
-                /* It names what was not made. The menu the command was pressed
-                   in has closed by the time this can be shown, so this is the
-                   only place the author learns the press did nothing. */
-                title="Reference Resource not created"
-                onDismiss={() => setReferenceRefusal(null)}
-              >
-                {referenceRefusal}
-              </ShellNotice>
-            )}
             {spaceCommandBreak === null ? null : (
               <ShellNotice
                 title="Space command failed"
                 onDismiss={() => setSpaceCommandBreak(null)}
               >
                 {spaceCommandBreak}
-              </ShellNotice>
-            )}
-            {graphRefusal === null ? null : (
-              <ShellNotice title="Graph unchanged" onDismiss={() => setGraphRefusal(null)}>
-                {describeAuthoringRefusal(graphRefusal)}
               </ShellNotice>
             )}
             {graphDeleteMessage === null ? null : (

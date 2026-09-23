@@ -169,6 +169,28 @@ describe('titles and sentences', () => {
     });
   });
 
+  it('publishes a refused Graph Edit under "Graph unchanged"', () => {
+    const { outcomes } = open();
+
+    expect(outcomes.run('graph-edit', () => refusedAuthoring)).toBe(refusedAuthoring);
+
+    expect(notice(outcomes, 'graph-edit')).toEqual({
+      title: 'Graph unchanged',
+      message: MAP_GONE,
+    });
+  });
+
+  it('publishes a refused Reference Resource creation under its own title', () => {
+    const { outcomes } = open();
+
+    outcomes.run('reference-create', () => refusedAuthoring);
+
+    expect(notice(outcomes, 'reference-create')).toEqual({
+      title: 'Reference Resource not created',
+      message: MAP_GONE,
+    });
+  });
+
   it('publishes a Map report whole, without describing it', () => {
     const { outcomes } = open();
 
@@ -256,6 +278,49 @@ describe('continueAt', () => {
     });
   });
 
+  it('continues a created Reference Resource at the id Space Authoring minted', () => {
+    const { outcomes, continuation } = open();
+
+    outcomes.run('reference-create', () => ({ kind: 'completed', createdResourceId: CREATED }), {
+      continueAt: ({ createdResourceId }) =>
+        createdResourceId === undefined
+          ? null
+          : {
+              target: { kind: 'resource', resourceId: createdResourceId },
+              select: true,
+              then: 'rename',
+            },
+    });
+
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: CREATED },
+      select: true,
+      then: 'rename',
+    });
+  });
+
+  it('requests nothing where the completion names nothing to continue at', () => {
+    const { outcomes, continuation } = open();
+
+    outcomes.run('reference-create', () => completedAuthoring, { continueAt: () => null });
+
+    expect(continuation.getState().pending).toBeNull();
+  });
+
+  it('requests nothing for a Reference Resource creation that did not complete', () => {
+    const { outcomes, continuation } = open();
+    const continueAt = vi.fn(
+      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
+    );
+
+    outcomes.run('reference-create', () => refusedAuthoring, { continueAt });
+    outcomes.run('reference-create', () => queuedAuthoring, { continueAt });
+    outcomes.run('reference-create', () => unchangedAuthoring, { continueAt });
+
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+  });
+
   it('requests nothing on a refusal', async () => {
     const { outcomes, continuation } = open();
     const continueAt = vi.fn(
@@ -304,6 +369,29 @@ describe('a thrown operation', () => {
     expect(notice(outcomes, 'space-resource-create')).toEqual({
       title: 'Space not created',
       message: 'This Resource was not created: coordination broke',
+    });
+  });
+
+  it('says a thrown Graph Edit and Reference Resource creation in the words the failure carries', () => {
+    const { outcomes, reported } = open();
+    const graphFailure = new Error('recolour broke');
+    const referenceFailure = new Error('reference broke');
+
+    outcomes.run('graph-edit', () => {
+      throw graphFailure;
+    });
+    outcomes.run('reference-create', () => {
+      throw referenceFailure;
+    });
+
+    expect(reported).toEqual([graphFailure, referenceFailure]);
+    expect(notice(outcomes, 'graph-edit')).toEqual({
+      title: 'Graph unchanged',
+      message: 'recolour broke',
+    });
+    expect(notice(outcomes, 'reference-create')).toEqual({
+      title: 'Reference Resource not created',
+      message: 'reference broke',
     });
   });
 

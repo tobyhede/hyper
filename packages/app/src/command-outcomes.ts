@@ -155,10 +155,12 @@ export interface CommandSubject {
  * Where the author continues after a completed result.
  *
  * A function of the result because the continuation names what the operation
- * minted — the id the lifecycle made, not the Resource that appeared.
+ * minted — the id the lifecycle made, not the Resource that appeared. It
+ * answers `null` where the completion names nothing to continue at: Space
+ * Authoring's completed result carries `createdResourceId` optionally.
  */
 export interface CommandContinuation<Completed> {
-  readonly continueAt?: (completed: Completed) => PendingContinuation;
+  readonly continueAt?: (completed: Completed) => PendingContinuation | null;
 }
 
 type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;

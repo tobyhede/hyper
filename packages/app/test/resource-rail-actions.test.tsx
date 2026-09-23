@@ -16,6 +16,7 @@ import type { HistoryApi } from '../src/browser-location';
 import { composeApp, type ComposedApp } from '../src/compose-app';
 import type { DestinationOpening } from '../src/destination-opening';
 import { recordingHistory } from './browser-history';
+import { newGraphItem } from './command-dock';
 import { expectMenuGroups } from './menu-assertions';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
@@ -345,6 +346,52 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Resource not removed' }));
     await waitFor(() => expect(screen.queryByText('Resource not removed')).not.toBeInTheDocument());
+    await settled(session);
+  });
+
+  /**
+   * A refused Graph Edit and a refused Reference Resource creation are drawn
+   * from command outcomes' `graph-edit` and `reference-create` channels, each
+   * under its own title, and each dismissal puts away only its own notice.
+   */
+  it('shows a refused Graph Edit and Reference Resource creation, and dismisses each', async () => {
+    const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
+      const complete = authoring.complete;
+      vi.spyOn(authoring, 'complete').mockImplementation((completion) => {
+        if (completion.kind === 'added-graph') {
+          return { kind: 'refused', refusal: { code: 'map-not-found' } };
+        }
+        if (completion.kind === 'created-reference') {
+          return { kind: 'refused', refusal: { code: 'resource-not-found' } };
+        }
+        return complete(completion);
+      });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
+    await waitFor(() => expect(newGraphItem('Graph')).not.toHaveAttribute('aria-disabled', 'true'));
+    fireEvent.click(newGraphItem('Graph'));
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.map((alert) => alert.textContent)).toEqual([
+      expect.stringContaining('Reference Resource not created'),
+      expect.stringContaining('Graph unchanged'),
+    ]);
+    expect(alerts[0]).toHaveTextContent('This Resource is no longer part of the Space.');
+    expect(alerts[1]).toHaveTextContent('This Map is no longer part of the Space.');
+    expect(resourceIds(session)).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Graph unchanged' }));
+    await waitFor(() => expect(screen.queryByText('Graph unchanged')).not.toBeInTheDocument());
+    expect(screen.getByText('Reference Resource not created')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss: Reference Resource not created' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('Reference Resource not created')).not.toBeInTheDocument(),
+    );
     await settled(session);
   });
 
