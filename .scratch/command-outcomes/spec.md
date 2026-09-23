@@ -1,6 +1,6 @@
 # Command outcomes have one home, and App only draws them
 
-What the author is told after a chrome command — which notice, which sentence, whether a Map change clears it, and where the caret goes after a creation — moves out of `App.tsx` into one per-Space module, `createCommandOutcomes` (`packages/app/src/command-outcomes.ts`). App keeps preparing each command's arguments and drawing `ShellNotice`s; it stops narrowing results, choosing describers, holding refusal slots and wrapping async commands in try/catch.
+What the author is told after a chrome command — which notice, whether a Map change clears it, and where the caret goes after a creation — moves out of `App.tsx` into one per-Space module, `createCommandOutcomes` (`packages/app/src/command-outcomes.ts`). App keeps drawing `ShellNotice`s; it stops holding refusal slots and wrapping async commands in try/catch. Most channels keep their describer here. Map Edit reports are the deliberate exception: tickets 06–09 put the complete title and message beside the Map authoring decision, and command outcomes owns their lifetime and dismissal without interpreting the refusal.
 
 Grilled out of the 2026-09-22 architecture review (candidate 1, "Deepen a per-Space command outcome module out of App"). No ADR: `CONTEXT.md`'s **Completion outcome** already says application composition owns the wording and where it is shown; this names the module that owns it. `CONTEXT.md` is unchanged — "command outcomes" is an application construct, not a domain term.
 
@@ -35,14 +35,14 @@ No test file contains "Map not deleted", "Reference Resource not created", "Spac
   - On `refused` it publishes the channel's describer applied to the refusal. On `completed` it clears the channel, and if `options.continueAt` is given, requests that continuation from the completed result (e.g. the minted `resourceId`). On `unchanged`/`queued` it clears the channel and does nothing else.
   - On a throw it reports through `reportBreak` and publishes the channel's **break** sentence. A throw is never dressed as a refusal (`CONTEXT.md`, Completion outcome).
   - `options.subject` carries the one runtime value a channel's sentences may name — the title of the Space or entity the press was about. A channel declares its describers as functions of `(refusal | failure, subject)`, so `space-command`'s three sentences ("… could not be entered/exited/opened.") are one channel with three operations rather than three channels or an invented second option. A channel whose sentences name nothing ignores it, and the type makes `subject` required exactly for the channels whose describers read it.
-  - It returns the result to the caller, so a caller that must act on completion (Delete Map's `navigation.selectMap`, the Dock's `onDelete` boolean) still can. That follow-up stays in the caller until candidate 2 of the review ("one Map/Graph context lifecycle") moves it.
+  - It returns the result to the caller, so a caller that must act on completion still can. Tickets 06–09 move Map creation, rename and deletion behind `MapAuthoringCommands`; that module owns Map coordination and recovery while command outcomes continues to own report lifetime.
 - **Staleness is the module's, not the caller's** — the rule `resource-deletion.ts` already carries (`interactionEpoch`, and a `disposed` guard on the `.then`), generalised to the table. Each `run` takes, at the press: a per-channel run epoch, the `selectedMapId` for a Map-scoped channel, and the composition's `replacementEpoch`. A settlement publishes only if all three still hold, and is otherwise dropped in silence — it is not a refusal the author asked for (`CONTEXT.md`, Replacement epoch). So an operation begun on Map A cannot draw its notice under Map B, and two runs on one channel cannot land out of order. A dropped settlement still reaches `reportBreak` if it threw: the defect happened whether or not anyone is left to be told.
 - **`dispose()`** unsubscribes from Navigation, drops every in-flight run and calls `observable.clearSubscribers()`. It joins the ordered block in `open-spaces.ts:783-788`, before `continuation.dispose()`, since this module publishes into the continuation.
 - **Not in the interface:** argument preparation. Minting titles (`titles.ts`), `resolveMap`, `centreAnchor`, the Reference Resource offset (`Placement.growth`, ADR 0093) stay with the command that needs them.
 
 ### The channel table
 
-One entry per shell notice, declared once in the module: fixed **title**, **describer**, a **break describer** where the channel's operation can throw (both functions of `subject` where they name one), and whether **a Map change clears it**. Reset membership keeps today's behaviour exactly.
+One entry per shell notice, declared once in the module: whether **a Map change clears it**, plus a fixed **title**, **describer** and **break describer** where that channel owns the words. Map channels instead accept the complete structured report from `MapAuthoringCommands`; the channel still owns staleness, lifetime and dismissal. Reset membership keeps today's behaviour exactly.
 
 | Channel | Title | Clears on Map change |
 |---|---|---|
@@ -57,7 +57,7 @@ One entry per shell notice, declared once in the module: fixed **title**, **desc
 | `reference-create` | Reference Resource not created | no |
 | `space-command` | Space command failed | no |
 
-`map-create`/`map-manage` split the shared slot; `resource-remove` is new, for Remove from Map. The reset is the module subscribing to Navigation's `selectedMapId` and clearing every channel marked "yes" — `refusedUnder` goes.
+`map-create`/`map-manage` split the shared slot; their complete reports arrive from `MapAuthoringCommands` rather than a channel describer. `resource-remove` is new, for Remove from Map. The reset is the module subscribing to Navigation's `selectedMapId` and clearing every channel marked "yes" — `refusedUnder` goes once ticket 09 contracts the old Map paths.
 
 ### `resourceDeletion` keeps its interaction, not its notice
 
@@ -72,7 +72,7 @@ It keeps arm → confirm → deleting (`pending`, `deleting`) and runs the delet
 - **"Link not copied"** — a clipboard failure, not a Completion outcome.
 - **The destination-not-found report** — undismissable by design and owned by `browser-location.ts` (ADR 0081).
 - **`exitReport`** (`SpaceExitReport`, drawn by the Dock through `dock-model.ts`'s `EXIT_REPORT`) — a Dock report about the exit's persistence state, not a shell notice. Exit's *throw* moves (`space-command`); its report does not.
-- **The coordinated create/delete helpers** (`coordinated-context-*.ts`) and the navigation that follows them — candidate 2. Only their outcome message moves here.
+- **Graph coordination and its navigation follow-up.** Tickets 06–09 absorb the Map arms of the coordinated helpers into `MapAuthoringCommands`; Graph coordination remains separate.
 
 ### Sequencing
 
@@ -89,7 +89,11 @@ Independent of `.scratch/snapshot-edits`: those tickets change Space Authoring i
 ## Tickets
 
 1. `01-the-module-and-resource-deletion.md` — the module, the table, the reset; `resource-delete` and `resource-remove`.
-2. `02-authoring-refusal-channels.md` — `map-create`, `map-manage`, `graph-edit`, `reference-create`.
+2. `02-authoring-refusal-channels.md` — `graph-edit`, `reference-create`.
 3. `03-space-resource-creation.md` — `space-resource-create` with its continuation and break.
 4. `04-open-spaces-breaks.md` — Enter, Exit, Open through `space-command`.
-5. `05-coordinated-delete-messages.md` — `map-delete`, `graph-delete`; `refusedUnder` is deleted.
+5. `05-coordinated-delete-messages.md` — `graph-delete`.
+6. `06-map-rename-through-one-authoring-command-interface.md` — establish `MapAuthoringCommands` and both adapters through synchronous rename.
+7. `07-map-creation-through-both-context-adapters.md` — asynchronous creation, identity recovery and surface-owned continuation.
+8. `08-map-deletion-through-both-context-adapters.md` — coordinated deletion, persistence gates and surviving Navigation.
+9. `09-contract-the-old-map-command-interface.md` — remove the expanded old form, duplicated paths and `refusedUnder`.
