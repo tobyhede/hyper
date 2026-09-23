@@ -26,9 +26,18 @@ It is the same class of value — a shadow whose colour is written as black rath
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `SelectedEdgeControls`'s raised surface draws an elevation the light theme states, and the choice is recorded
-- [ ] No surface in the repository draws an elevation shadow whose colour is written as black or `rgba(0,0,0,…)` — a contrast outline on a glyph is not an elevation and is out of scope
-- [ ] `things-popover.css`'s hairline shadow takes its colour from the theme
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass and the output is reported
+- [x] `SelectedEdgeControls`'s raised surface draws an elevation the light theme states, and the choice is recorded
+- [x] No surface in the repository draws an elevation shadow whose colour is written as black or `rgba(0,0,0,…)` — a contrast outline on a glyph is not an elevation and is out of scope
+- [x] `things-popover.css`'s hairline shadow takes its colour from the theme
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass and the output is reported
+
+## Resolution
+
+- `SelectedEdgeControls`'s raised surface draws `shadow-lg`, the step `Popover` and `Select` spend. It is a floating control over the canvas as they are, so it lifts as they do; the Command Dock's hard offset belongs to the command surface, and reconciling Tailwind's blurred steps with it is the separate decision `tailwind.css` already names. The choice is recorded on `RAISED_SURFACE`.
+- `resources-popover.css` (the file this ticket called `things-popover.css` before the rename) draws its toggle hairline as `color-mix(in oklab, var(--foreground) 4%, transparent)`.
+- `PaletteColorPicker.tsx`'s `drop-shadow-[0_0_1px_rgba(0,0,0,0.85)]` stays, as this ticket decided: it is a contrast outline on a glyph, not an elevation. Ticket 08's scan records it as a carve-out with that reason.
+- Ticket 08's scan holds the second criterion: an elevation shadow written in black fails it.
+- **The second criterion was ticked early, and is now held.** Tailwind's own `theme.css` writes every named shadow step (`--shadow-2xs` to `--shadow-2xl`) in `rgb(0 0 0 / …)`, and the theme restated none of them, so `shadow-lg` above, and every `shadow-sm`/`-md`/`-lg` in `Popover`, `Select`, the registry menus, `alert-dialog`, `GraphHud` and `ZoomSlider`, still drew black. The scan read only literals written in source and never resolved a named class to its value. The steps are now restated in `tailwind.css`'s `@theme inline` block with Tailwind's own offsets, blur and opacity in `color-mix(in oklab, var(--foreground) N%, transparent)` — kept blurred rather than moved to the Dock's hard offset, by decision — and the scan fails a named step the theme leaves at black.
+- **The named-step check covers every shadow family, by decision.** Tailwind's named `inset-shadow-*`, `text-shadow-*` and `drop-shadow-*` steps are black by default too. None is an elevation, and none is used in `packages/*/src`, but the scan holds them to the same rule: a named step in any of the four families fails unless the theme restates it off black. A glyph's arbitrary `drop-shadow-[…]` contrast outline stays excused, as above.

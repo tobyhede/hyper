@@ -168,7 +168,7 @@
 }
 
 .command-dock[data-dragging='true'] .command-dock__surface {
-  box-shadow: 0 14px 34px color-mix(in oklab, var(--foreground) 20%, transparent);
+  box-shadow: var(--shadow-chrome-lifted);
 }
 
 /* The snap is the only motion this surface has, and a reader who has asked for

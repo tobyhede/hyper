@@ -121,7 +121,9 @@
   padding: 5px 8px;
   border-color: var(--border);
   background: var(--card);
-  box-shadow: 0 1px 0 rgb(0 0 0 / 4%);
+  /* A hairline in the theme's ink, as every other hairline is, rather than
+     black (`.scratch/structural-tokens/issues/10-...`). */
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent);
 }
 
 .resources-popover__toggle:hover {
