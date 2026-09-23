@@ -180,9 +180,9 @@ describe('PersistenceControl', () => {
    * Dismissing the dialog is an acknowledgement of the failure in front of the
    * author, not a standing preference, so the next failure has to draw it
    * again. Nothing in the failure's *value* can tell the two apart — both are
-   * `invalid-commit` and nothing else — so what separates them is that they are different publications, and the
-   * control follows the failure it was handed rather than a key derived from
-   * what that failure says.
+   * `invalid-commit` and nothing else — so what separates them is that they
+   * are different publications, and the control follows the failure it was
+   * handed rather than a key derived from what that failure says.
    *
    * The coordinated path is why this matters rather than being theoretical:
    * `prepareCoordinatedCommit` installs `pending` without notifying, so the

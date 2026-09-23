@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
-import { createSpaceSessionRegistry } from '../src/session-registry';
+import type { SpaceSessionState } from '../src/session';
+import { createSpaceSessionRegistry, type SpaceResourceRefusal } from '../src/session-registry';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -23,11 +24,12 @@ const DANGLING_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000001
 
 class ThrowingAggregateBackend extends MemorySpaceBackend {
   throwNextLoad = true;
+  readonly thrown = new Error('aggregate transport exploded');
 
   override loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
     if (this.throwNextLoad) {
       this.throwNextLoad = false;
-      return Promise.reject(new Error('aggregate transport exploded'));
+      return Promise.reject(this.thrown);
     }
     return super.loadAggregate();
   }
@@ -57,6 +59,18 @@ const metaSnapshot: SpaceSnapshot = {
     },
   ],
 };
+
+// `toEqual` compares an Error by its message, so identity is read out separately.
+const refusalCarries = (
+  result: { kind: string; refusal?: SpaceResourceRefusal },
+  thrown: Error,
+): boolean => result.refusal?.code === 'persistence-read-failed' && result.refusal.cause === thrown;
+
+const faultCarries = (persistence: SpaceSessionState['persistence'], thrown: Error): boolean =>
+  persistence.kind === 'rejected' &&
+  persistence.failure.code === 'protocol' &&
+  persistence.failure.fault.kind === 'coordinated-commit-threw' &&
+  persistence.failure.fault.cause === thrown;
 
 const idSource = (ids: readonly UUID[]) => {
   const remaining = [...ids];
@@ -157,11 +171,9 @@ describe('Space Resource lifecycle', () => {
 
       expect(result).toEqual({
         kind: 'refused',
-        refusal: {
-          code: 'persistence-read-failed',
-          cause: new Error('aggregate transport exploded'),
-        },
+        refusal: { code: 'persistence-read-failed', cause: backend.thrown },
       });
+      expect(refusalCarries(result, backend.thrown)).toBe(true);
       expect(meta.getState()).toEqual(before);
       if (operation === 'create') {
         expect(registry.session(TARGET_ID)).toBeUndefined();
@@ -226,15 +238,15 @@ describe('Space Resource lifecycle', () => {
     const before = structuredClone(meta.getState());
     const lifecycle = registry.spaceResources(idSource([]));
 
-    await expect(
-      lifecycle.delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID }),
-    ).resolves.toEqual({
-      kind: 'refused',
-      refusal: {
-        code: 'persistence-read-failed',
-        cause: new Error('aggregate transport exploded'),
-      },
+    const result = await lifecycle.delete({
+      containingSpaceId: META_ID,
+      resourceId: SPACE_RESOURCE_ID,
     });
+    expect(result).toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-read-failed', cause: backend.thrown },
+    });
+    expect(refusalCarries(result, backend.thrown)).toBe(true);
     expect(meta.getState()).toEqual(before);
     meta.submit({
       ...meta.getState().working,
@@ -687,6 +699,7 @@ describe('Space Resource lifecycle', () => {
     };
     expect(meta.getState().persistence).toEqual(rejected);
     expect(registry.session(TARGET_ID)?.getState().persistence).toEqual(rejected);
+    expect(faultCarries(meta.getState().persistence, thrown)).toBe(true);
   });
 
   it('names the participant a malformed coordinated result omitted', async () => {

@@ -147,10 +147,10 @@ describe('HTTP Space backend failure mapping', () => {
    * `PersistenceControl` acknowledges a rejection by the identity of the failure
    * the session published, because nothing in the value separates two — a
    * failure carries its code and no prose (ADR 0057), so two `forbidden`
-   * rejections are equal field for field. That makes "a fresh result per commit" load-bearing rather than
-   * incidental: a backend that answered a memoised `CommitResult` would leave
-   * the second rejection acknowledged by the author's dismissal of the first,
-   * and the dialog would never draw. Pinned here, at the one production backend
+   * rejections are equal field for field. That makes "a fresh result per
+   * commit" load-bearing rather than incidental: a backend that answered a
+   * memoised `CommitResult` would leave the second rejection acknowledged by
+   * the author's dismissal of the first, and the dialog would never draw. Pinned here, at the one production backend
    * that mints them, rather than left to the component to defend.
    */
   it('mints a distinct failure for each rejected commit', async () => {
