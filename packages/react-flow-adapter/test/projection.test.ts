@@ -3,7 +3,12 @@ import { buildGraphRenderEdges, loadSpace, type Space } from '@project/graph';
 import type { SpaceFile } from '@project/core';
 import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
-import { projectResourceNodes, projectGraphEdges, OTHER_GRAPH_OPACITY } from '../src/index';
+import {
+  projectResourceNodes,
+  projectGraphEdges,
+  OTHER_GRAPH_OPACITY,
+  ROUTED_EDGE_TYPE,
+} from '../src/index';
 import { referenceFile, resourceFile } from './resource-files';
 import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
@@ -281,7 +286,7 @@ describe('projectGraphEdges', () => {
     expect(edges).toHaveLength(2);
     const mainEdge = edges.find((e) => e.id === MAIN_EDGE_ID)!;
     expect(mainEdge).toMatchObject({
-      type: 'routed',
+      type: ROUTED_EDGE_TYPE,
       source: '00000000-0000-4000-8000-000000000002',
       target: '00000000-0000-4000-8000-000000000003',
     });

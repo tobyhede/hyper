@@ -4,10 +4,12 @@ import { Position, type Edge } from '@xyflow/react';
 import { uuidSchema, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
 import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { ROUTED_EDGE_TYPE } from '@project/react-flow-adapter';
 import { mintingIds } from './minting';
 import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
+import { embeddedNodeId } from '../src/embedded-map';
 import type {
   AuthoringResult,
   EdgeEligibility,
@@ -36,6 +38,7 @@ const PROJECTED = [node(RESOURCE_A, 10, 20), node(RESOURCE_B, 300, 20)];
  */
 const EDGE: Edge = {
   id: graphRenderEdgeId(GRAPH_ID, { from: RESOURCE_A, to: RESOURCE_B }),
+  type: ROUTED_EDGE_TYPE,
   source: RESOURCE_A,
   target: RESOURCE_B,
   data: { graphId: GRAPH_ID },
@@ -806,6 +809,54 @@ describe('render adapter', () => {
     // it again, forever. Holding the published value's identity is what breaks
     // that loop, so identity — not equality — is the assertion.
     expect(store.getState().projection).toBe(published);
+  });
+
+  it('takes neither a selection nor a settled move from an embedded node in a mixed batch', () => {
+    // One React Flow instance draws the Map on the canvas and every embedded Map,
+    // so a batch carries embedded placement ids beside the canvas Map's Resource
+    // ids. Only a canvas Map node's own identity may reach the selection or a
+    // movement Edit.
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    store.getState().syncProjection([node(RESOURCE_A, 10, 20)], []);
+    const embedded = embeddedNodeId(RESOURCE_B, RESOURCE_C);
+
+    store
+      .getState()
+      .changeNodes([
+        ...moving(RESOURCE_A, 500, 400),
+        { type: 'position', id: embedded, position: { x: 0, y: 0 }, dragging: true },
+      ]);
+    store
+      .getState()
+      .changeNodes([
+        { type: 'select', id: embedded, selected: true },
+        ...settled(RESOURCE_A, 500, 400),
+        { type: 'position', id: embedded, position: { x: 90, y: 90 }, dragging: false },
+      ]);
+
+    expect(store.getState().selection).toEqual({ kind: 'none' });
+    expect(spy.completions).toEqual([
+      {
+        kind: 'settled-resource-movement',
+        moved: new Map([[RESOURCE_A, { x: 500, y: 400 }]]),
+      },
+    ]);
+  });
+
+  it('takes no Edge selection from a selection change naming an Edge the projection never drew', () => {
+    // React Flow reports selection changes for every Edge it renders, not only
+    // the ones this projection synced, so a change naming any other id must
+    // change nothing. What keeps an embedded Map's Edges out is their type, held
+    // in embedded-map.test.ts; this covers only the lookup of the drawn Edge.
+    const store = adapter();
+    store.getState().syncProjection(PROJECTED, [EDGE]);
+
+    store
+      .getState()
+      .changeEdges([{ type: 'select', id: `${RESOURCE_C}:${EDGE.id}`, selected: true }]);
+
+    expect(store.getState().selection).toEqual({ kind: 'none' });
   });
 
   it('completes a settled-resource-movement Edit for a drag that lands somewhere new', () => {

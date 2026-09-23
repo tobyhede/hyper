@@ -4,7 +4,7 @@ Status: ready-for-agent
 Tags: release/v1
 Blocked by: 03, 05, 06, 08, 16, 17, 19; `entity-url-addressability/08`; `interaction-draft-invalidation/04`; `space-cards/10`;
   `command-dock/28`; `database-persistence/26`; `database-persistence/31`;
-  `database-persistence/34`; `database-persistence/36`; `database-persistence/37`; `database-persistence/38`
+  `database-persistence/34`; `database-persistence/39`; `database-persistence/40`; `database-persistence/41`
 
 ## Release-candidate architecture prerequisites — 2026-09-20
 

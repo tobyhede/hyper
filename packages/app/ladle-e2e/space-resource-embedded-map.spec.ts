@@ -73,6 +73,31 @@ test(
   },
 );
 
+/**
+ * An embedded Edge is drawn and nothing else: a press on it reaches whatever lies
+ * beneath. That holds because it is minted not selectable and the canvas has no
+ * Edge click handler, so React Flow marks its group `inactive`
+ * (`.scratch/embedded-open-space-thing/issues/04`).
+ */
+test('an embedded Edge takes no pointer events, even on its own curve', async ({ page }) => {
+  await open(page);
+  const edge = page.locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]');
+  await expect(edge).toHaveCount(1);
+  await expect(edge).toHaveClass(/\binactive\b/);
+
+  // The topmost element at the midpoint of the drawn curve, in page coordinates.
+  const passesThrough = await edge.locator('path.react-flow__edge-path').evaluate((path) => {
+    if (!(path instanceof SVGGeometryElement)) throw new Error('The Edge drew no path');
+    const middle = path.getPointAtLength(path.getTotalLength() / 2);
+    const matrix = path.getScreenCTM();
+    if (matrix === null) throw new Error('The Edge path is not rendered');
+    const point = middle.matrixTransform(matrix);
+    const target = document.elementFromPoint(point.x, point.y);
+    return target?.closest('.react-flow__edge') === null;
+  });
+  expect(passesThrough).toBe(true);
+});
+
 test(
   'an Open Space Resource keeps its embedded Map aligned throughout a drag',
   { tag: '@parity:open-space-resource-drag-keeps-embedded-map-aligned' },

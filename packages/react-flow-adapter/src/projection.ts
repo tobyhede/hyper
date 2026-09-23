@@ -14,7 +14,7 @@ import type {
   LayoutStrategyGraph,
   Space,
 } from '@project/graph';
-import type { RoutedEdgeData, RoutedFlowEdge } from './RoutedEdge';
+import { ROUTED_EDGE_TYPE, type RoutedEdgeData, type RoutedFlowEdge } from './RoutedEdge';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
 
@@ -420,7 +420,7 @@ export function projectGraphEdges(
     const flowEdge: RoutedFlowEdge = {
       id: edge.id,
       // A custom edge, drawing a bezier between the handles React Flow resolved.
-      type: 'routed',
+      type: ROUTED_EDGE_TYPE,
       source: edge.source,
       target: edge.target,
       className: `rf-graph-edge rf-graph-edge--${edge.graphId}${isActiveGraph ? ' rf-graph-edge--active' : ''}`,

@@ -25,6 +25,7 @@ import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   ConnectionEndEligibilityContext,
   ConnectionTargetProximityProvider,
+  ROUTED_EDGE_TYPE,
 } from '@project/react-flow-adapter';
 import type { ResourceChoice } from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
@@ -135,7 +136,7 @@ export interface EdgeAuthoringInput {
   readonly mayOfferAlso?: (resourceId: ResourceId) => boolean;
 }
 
-const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
+const EDGE_TYPES: EdgeTypes = { [ROUTED_EDGE_TYPE]: AuthorableEdge };
 
 /**
  * Which `ElementDropTarget` the element under the pointer is. Both class names

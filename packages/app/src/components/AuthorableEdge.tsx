@@ -68,7 +68,9 @@ export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
   const { path, labelX, labelY } = useRoutedEdgeGeometry(props);
   const pathProps = routedEdgePathProps(props, path);
   // The same translation the selection mirror and the callbacks use, so this
-  // Edge cannot disagree with them about which Edge it is.
+  // Edge cannot disagree with them about which Edge it is. It gates on `type`,
+  // which React Flow passes into Edge props — held by edge-authoring-react.test.tsx,
+  // 'appears only on the selected Edge'.
   const subject = edgeSelectionOf({ ...props, id: props.id });
 
   // `selected` is the whole gate. The decoration conjoins it with the Active

@@ -58,6 +58,7 @@ import {
   clipEmbeddedNode,
   embeddedClipId,
   parseEmbeddedNodeId,
+  withEmbeddedEdgeTypes,
 } from '../embedded-map';
 import {
   embeddedAuthoringEnabled,
@@ -682,6 +683,11 @@ export function SpaceCanvas({
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
     [edgeSurface.edges, liveEmbeddings],
   );
+  // A stable identity, or React Flow warns of a fresh `edgeTypes` object (#002).
+  const canvasEdgeTypes = useMemo(
+    () => withEmbeddedEdgeTypes(edgeSurface.edgeTypes),
+    [edgeSurface.edgeTypes],
+  );
   const changeCanvasNodes: OnNodesChange<ResourceFlowNode> = useCallback(
     (changes) => {
       onNodesChange(changes);
@@ -1137,7 +1143,7 @@ export function SpaceCanvas({
       nodes={canvasNodes}
       edges={canvasEdges}
       nodeTypes={nodeTypes}
-      edgeTypes={edgeSurface.edgeTypes}
+      edgeTypes={canvasEdgeTypes}
       onNodesChange={changeCanvasNodes}
       {...embeddedEvents}
       onEdgesChange={onEdgesChange}
