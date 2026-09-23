@@ -46,6 +46,10 @@ test-results/
 # rename landed replays one instead of hand-merging it, which only works if
 # every branch can reach the same script. They go when the second rename lands.
 !.scratch/thing-and-diagram/rename-*.mjs
+# Ticket 04's impact calibration is tracked for the same kind of reason: the
+# decision it backs names the conditions that reopen it, and whoever reopens
+# it re-runs this script rather than rebuilding a parser from the ticket's prose.
+!.scratch/impact-gate/calibration.py
 # ADR 0092's rename codemod, tracked for the same reason.
 !.scratch/reference-thing/rename-*.mjs
 # ADR 0101's, likewise — one script for both words this time, so there is one
