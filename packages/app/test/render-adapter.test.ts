@@ -812,9 +812,10 @@ describe('render adapter', () => {
   });
 
   it('takes neither a selection nor a settled move from an embedded node in a mixed batch', () => {
-    // One React Flow instance draws the host Map and every embedded Map, so a
-    // batch carries embedded placement ids beside host Resource ids. Only the
-    // host node's own identity may reach the selection or a movement Edit.
+    // One React Flow instance draws the Map on the canvas and every embedded Map,
+    // so a batch carries embedded placement ids beside the canvas Map's Resource
+    // ids. Only a canvas Map node's own identity may reach the selection or a
+    // movement Edit.
     const spy = authoringSpy();
     const store = createRenderAdapter(spy.authoring);
     store.getState().syncProjection([node(RESOURCE_A, 10, 20)], []);

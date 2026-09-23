@@ -305,8 +305,8 @@ function trackDragOrigins(
  * The moved Resources' own drop points, exactly: which settled changes actually
  * ended somewhere other than where the drag began, and where.
  *
- * Each change is keyed through `owned`, the host nodes' own identities, so a
- * change for a node this store does not draw contributes nothing.
+ * Each change is keyed through `owned`, the identities of the canvas Map's own
+ * nodes, so a change for a node this store does not draw contributes nothing.
  *
  * Answers the drop points directly rather than a list of ids — Authoring now
  * merges these over the Map's own positions at derivation, so there is no

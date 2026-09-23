@@ -1299,11 +1299,11 @@ describe('the Map an Open Space Resource draws', () => {
       }),
     );
 
-    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
-    const edges = [
+    const embeddedEdges = () => [
       ...document.querySelectorAll(`.react-flow__edge[data-id^="${SPACE_RESOURCE_ID}:"]`),
     ];
-    expect(edges).toHaveLength(1);
+    await waitFor(() => expect(embeddedEdges()).toHaveLength(1));
+    const edges = embeddedEdges();
     expect(edges[0]).toHaveClass(`react-flow__edge-${EMBEDDED_EDGE_TYPE}`);
     expect(edges[0]).not.toHaveClass('react-flow__edge-default');
   });
