@@ -321,6 +321,23 @@ describe('continueAt', () => {
     expect(continuation.getState().pending).toBeNull();
   });
 
+  it('requests nothing for a Space Resource creation that changed nothing', async () => {
+    const { outcomes, continuation } = open();
+    const continueAt = vi.fn(
+      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
+    );
+
+    await outcomes.run(
+      'space-resource-create',
+      () => Promise.resolve({ kind: 'unchanged' } as const),
+      { continueAt },
+    );
+
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+    expect(notice(outcomes, 'space-resource-create')).toBeNull();
+  });
+
   it('requests nothing on a refusal', async () => {
     const { outcomes, continuation } = open();
     const continueAt = vi.fn(
@@ -369,6 +386,39 @@ describe('a thrown operation', () => {
     expect(notice(outcomes, 'space-resource-create')).toEqual({
       title: 'Space not created',
       message: 'This Resource was not created: coordination broke',
+    });
+  });
+
+  it('says a Space Resource creation that broke before its await as a break, not a refusal', async () => {
+    const { outcomes, reported, continuation } = open();
+    const failure = new Error('map resolution broke');
+    const continueAt = vi.fn(
+      () => ({ target: { kind: 'canvas' }, select: false, then: 'focus' }) as const,
+    );
+
+    const resolveMap = (): never => {
+      throw failure;
+    };
+
+    // An `async` thunk, as `App`'s creation is: title minting and `resolveMap`
+    // run before it hands back the lifecycle's promise, and their throw must
+    // arrive as a rejection rather than escape `run` synchronously.
+    const answered = await outcomes.run(
+      'space-resource-create',
+      async () => {
+        resolveMap();
+        return Promise.resolve(refusedCreation);
+      },
+      { continueAt },
+    );
+
+    expect(answered).toBe(COMMAND_BROKE);
+    expect(reported).toEqual([failure]);
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+    expect(notice(outcomes, 'space-resource-create')).toEqual({
+      title: 'Space not created',
+      message: 'This Resource was not created: map resolution broke',
     });
   });
 

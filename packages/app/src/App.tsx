@@ -35,7 +35,6 @@ import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
   describeSpaceResourceBreak,
-  describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
 import {
@@ -465,17 +464,6 @@ export const createApp = (
       [centreAnchor],
     );
 
-    /**
-     * The Space Resource creation that has not settled, said in one sentence.
-     *
-     * **The Dock's refusal channel, beside `createMapRefusal`.** A creation
-     * that completes on activation has no pane to hold its own failure against
-     * the field that caused it (ADR 0089), so it reports through the surface
-     * that owns the command. The sentence has to name the Space, because the
-     * author may be typing into the Resource when it goes.
-     */
-    const [spaceResourceRefusal, setSpaceResourceRefusal] = useState<string | null>(null);
-
     const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
 
     /**
@@ -489,7 +477,8 @@ export const createApp = (
      * from out here. A refusal is delivered on that same resolution, before any
      * Resource is installed, so there is no half-made Resource to take away: what the
      * ticket calls removing a refused creation is the lifecycle leaving none
-     * standing, and the sentence below is the half the author can see.
+     * standing, and the "Space not created" notice command outcomes publishes
+     * is the half the author can see.
      *
      * `Space N` is minted from this Space's own Resource titles and handed to both
      * the Space and the Resource that names it, so the two agree at creation
@@ -498,51 +487,46 @@ export const createApp = (
      */
     const createSpaceResource = useCallback((): void => {
       setCreatingSpaceResource(true);
-      setSpaceResourceRefusal(null);
-      void (async () => {
-        try {
-          const title = nextSpaceTitle(spaceSession.getState().working);
-          // Resolved at the press rather than closed over, which is the rule the
-          // pane needed for a surface open across renders and this keeps for a
-          // gesture whose Edit lands one await later. `create` still refuses
-          // `map-not-found` on its own account, against the Map the
-          // coordinated Edit actually sees.
-          const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
-          const result = await spaceResources.create({
-            containingSpaceId: currentSpace().id,
-            mapId: resolved.map.id,
-            title,
-            position: centreAnchor(),
-          });
-          if (result.kind === 'refused') {
-            setSpaceResourceRefusal(describeSpaceResourceRefusal(result.refusal));
-            return;
-          }
-          // Named rather than narrowed to "not refused": a lifecycle that
-          // changed nothing made no Resource, and continuing at one would name an
-          // id nothing draws. Not reachable from `create` today.
-          if (result.kind === 'unchanged') return;
-          // The id the lifecycle minted, not the Resource that appeared. Nothing
-          // prevents a Markdown creation between this press and the installed
-          // Edit — that creation lands synchronously — so "which Resource is new"
-          // answers a different question from "which Resource did this press make",
-          // and the two disagree exactly when it matters.
-          //
-          // Nothing bumps the Spaces epoch here: a created Space joins the Meta
-          // Space for *every* open Space, so the lifecycle that made it is what
-          // announces it (`space-resource-lifecycle.ts`).
-          continuation.request({
-            target: { kind: 'resource', resourceId: result.resourceId },
-            select: true,
-            then: 'rename',
-          });
-        } catch (failure) {
-          reportBreak(failure);
-          setSpaceResourceRefusal(describeSpaceResourceCreationBreak(failure));
-        } finally {
-          setCreatingSpaceResource(false);
-        }
-      })();
+      // An `async` thunk so a throw from the title minting or `resolveMap`
+      // arrives at `run` as a rejection, as the lifecycle's own does.
+      void commandOutcomes
+        .run(
+          'space-resource-create',
+          async () => {
+            const title = nextSpaceTitle(spaceSession.getState().working);
+            // Resolved at the press rather than closed over, which is the rule
+            // the pane needed for a surface open across renders and this keeps
+            // for a gesture whose Edit lands one await later. `create` still
+            // refuses `map-not-found` on its own account, against the Map the
+            // coordinated Edit actually sees.
+            const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
+            return spaceResources.create({
+              containingSpaceId: currentSpace().id,
+              mapId: resolved.map.id,
+              title,
+              position: centreAnchor(),
+            });
+          },
+          {
+            // The id the lifecycle minted, not the Resource that appeared.
+            // Nothing prevents a Markdown creation between this press and the
+            // installed Edit — that creation lands synchronously — so "which
+            // Resource is new" answers a different question from "which
+            // Resource did this press make", and the two disagree exactly when
+            // it matters. A refusal or an `unchanged` made no Resource, so
+            // command outcomes requests nothing for either.
+            //
+            // Nothing bumps the Spaces epoch here: a created Space joins the
+            // Meta Space for *every* open Space, so the lifecycle that made it
+            // is what announces it (`space-resource-lifecycle.ts`).
+            continueAt: ({ resourceId }) => ({
+              target: { kind: 'resource', resourceId },
+              select: true,
+              then: 'rename',
+            }),
+          },
+        )
+        .finally(() => setCreatingSpaceResource(false));
     }, [centreAnchor]);
 
     const selectedMap = useMemo(
@@ -1769,18 +1753,6 @@ export const createApp = (
             {mapDeleteMessage === null ? null : (
               <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
                 {mapDeleteMessage}
-              </ShellNotice>
-            )}
-            {spaceResourceRefusal === null ? null : (
-              <ShellNotice
-                /* It names what died. A Space Resource's placement is optimistic
-                   (ADR 0089), so the author may be typing into the Resource when
-                   the lifecycle answers — "Space not created" is the sentence
-                   that makes a Resource vanishing from under the caret legible. */
-                title="Space not created"
-                onDismiss={() => setSpaceResourceRefusal(null)}
-              >
-                {spaceResourceRefusal}
               </ShellNotice>
             )}
             {spaceCommandBreak === null ? null : (

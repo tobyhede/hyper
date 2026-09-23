@@ -91,6 +91,10 @@ const CHANNELS = {
     words: 'described',
     title: 'Resource not removed',
   },
+  // It names what died. A Space Resource's placement is optimistic (ADR
+  // 0089), so the author may be typing into the Resource when the lifecycle
+  // answers, and this title makes a Resource vanishing from under the caret
+  // legible.
   'space-resource-create': {
     resetsOnMapChange: false,
     words: 'described',
