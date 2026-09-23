@@ -9,7 +9,8 @@ import {
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import type { EntityActionGroup } from '@project/ui';
-import { buildSpaceResourceRail, type SpaceResourceRailContext } from './build-space-resource-rail';
+import { buildSpaceResourceRail } from './build-space-resource-rail';
+import type { SpaceResourceRailContext } from './space-resource-context-commands';
 import type { CommandOutcomes } from './command-outcomes';
 import type { Continuation } from './continuation';
 import type { OpenSpace, OpenSpaces } from './open-spaces';

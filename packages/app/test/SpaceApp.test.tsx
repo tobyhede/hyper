@@ -880,9 +880,11 @@ describe('Space app Resources list', () => {
     expect(session.getState().working.document.maps?.[1]?.graphs).toHaveLength(1);
     expect(screen.queryByRole('dialog', { name: 'Resources' })).not.toBeInTheDocument();
 
-    const editor = screen.getByRole('textbox', { name: 'Map name' });
+    // The Edit lands on the press; the Dock continues in the name once Map
+    // authoring answers the completion, which is a promise.
+    const editor = await screen.findByRole('textbox', { name: 'Map name' });
     expect(editor).toHaveValue('Map 1');
-    expect(editor).toHaveFocus();
+    await waitFor(() => expect(editor).toHaveFocus());
   });
 
   /**
@@ -1002,7 +1004,9 @@ describe('Space app Resources list', () => {
 
     await waitUntilMapContinuationReady();
     newMap('Map');
-    const created = screen.getByRole('textbox', { name: 'Map name' }).getAttribute('value');
+    const created = (await screen.findByRole('textbox', { name: 'Map name' })).getAttribute(
+      'value',
+    );
     if (created === null || created === '') {
       throw new Error('New Map left no name');
     }
@@ -1175,6 +1179,41 @@ describe('Space app Resources list', () => {
   });
 
   /**
+   * A refused Dock New Map is reported as "Map not created" by command
+   * outcomes, and the caret stays where it was: the Dock continues in a name
+   * only after a completed creation.
+   *
+   * Refused through a spy on Space Authoring, because `created-map` has no
+   * refusal a mount can stage.
+   */
+  it('reports a refused Dock New Map as Map not created and opens no name', async () => {
+    const base = snapshot('Space', 'Resource', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceResources } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    const app = composeApp({ spaceSession: session });
+    const complete = app.authoring.complete;
+    vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
+      completion.kind === 'created-map'
+        ? { kind: 'refused', refusal: { code: 'map-not-found' } }
+        : complete(completion),
+    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
+    await waitUntilMapContinuationReady();
+
+    newMap('Map');
+
+    const notice = await screen.findByRole('button', { name: 'Dismiss: Map not created' });
+    expect(screen.getByText('This Map is no longer part of the Space.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Map name' })).toBeNull();
+    expect(session.getState().working.document.maps).toHaveLength(1);
+    fireEvent.click(notice);
+    await waitFor(() => expect(screen.queryByText('Map not created')).not.toBeInTheDocument());
+  });
+
+  /**
    * **What the bar reports and what the bar draws are one answer.**
    *
    * A live chrome rename withdraws Create Resource, Present, Delete Resource and the
@@ -1284,7 +1323,8 @@ describe('Space app Resources list', () => {
     // Add Map continues in the new Map's name, so the editor is already
     // open and there is no second gesture to begin the rename with.
     newMap('Map');
-    const editor = screen.getByRole('textbox', { name: 'Map name' });
+    const editor = await screen.findByRole('textbox', { name: 'Map name' });
+    await waitFor(() => expect(editor).toHaveFocus());
     fireEvent.change(editor, { target: { value: 'Workshop' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Workshop');

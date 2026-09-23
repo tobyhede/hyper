@@ -10,8 +10,8 @@ import {
   coordinatedGraphDelete,
   PERSISTENCE_UNSETTLED,
 } from './coordinated-context-delete';
-import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
-import { renameDraftAnswer, type MapAuthoringCommands } from './map-authoring-commands';
+import { coordinatedContextCreate } from './coordinated-context-create';
+import { embeddedMapAuthoringCommands, renameDraftAnswer } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
@@ -24,20 +24,41 @@ interface SpaceResourceContextCommands {
   readonly graphCommands?: CanvasSpaceResourceGraphCommands;
 }
 
+/** The target an Open Space Resource embeds, and what its rail's commands report into. */
+export interface SpaceResourceRailContext {
+  readonly entry: OpenSpace;
+  readonly spaces: OpenSpaces;
+  readonly containingSpaceId: UUID;
+  readonly continuation: Continuation;
+  /** The containing canvas's, where a Map report from this rail is held. */
+  readonly commandOutcomes: CommandOutcomes;
+  readonly complete: (
+    completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
+  ) => AuthoringResult;
+}
+
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
-  entry: OpenSpace,
-  spaces: OpenSpaces,
-  containingSpaceId: UUID,
+  {
+    entry,
+    spaces,
+    containingSpaceId,
+    continuation,
+    complete,
+    commandOutcomes,
+  }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
   select: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
-  continuation: Continuation,
-  complete: (
-    completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
-  ) => AuthoringResult,
-  mapAuthoring: MapAuthoringCommands,
-  commandOutcomes: CommandOutcomes,
+  available: () => boolean,
 ): SpaceResourceContextCommands {
+  // The rail's own answer, asked again when a command is pressed.
+  const mapAuthoring = embeddedMapAuthoringCommands({
+    target: entry,
+    spaces,
+    containingSpaceId,
+    select: (mapId, graphId) => select({ id: mapId }, graphId),
+    available,
+  });
   const location = spaces.browserLocation;
   const settled = async () =>
     (await spaces.waitForPersistence(entry.id)) &&
@@ -59,31 +80,23 @@ export function spaceResourceContextCommands(
       renameDraftAnswer(
         commandOutcomes.run('map-manage', () => mapAuthoring.map(mapId).rename.invoke(title)),
       ),
-    onCreate: async (scope) =>
-      coordinatedContextCreate({
-        waitBefore: settled,
-        create: () => entry.app.authoring.complete({ kind: 'created-map' }),
-        waitUntilPersisted: () => spaces.waitForPersistence(entry.id),
-        createdOf: () =>
-          createdMapContext(
-            entry.app.currentSpace().maps,
-            entry.app.navigation.getState().selectedMapId,
-          ),
-        afterCreated: async (created, active) => {
-          const refusal = await selectAndSave(created, active);
-          if (refusal !== null) return refusal;
-          continuation.request({
-            target: {
-              kind: 'control',
-              name: 'map-name',
-              scope: { id: scope, subject: created.id },
-            },
-            select: false,
-            then: 'rename',
-          });
-          return null;
-        },
-      }),
+    // Map authoring orders the creation and the selection write, and the
+    // containing canvas holds its report; where the caret goes is this rail's.
+    onCreate: async (scope) => {
+      const outcome = await commandOutcomes.run('map-create', () => mapAuthoring.create.invoke());
+      if (outcome.kind === 'completed') {
+        continuation.request({
+          target: {
+            kind: 'control',
+            name: 'map-name',
+            scope: { id: scope, subject: outcome.mapId },
+          },
+          select: false,
+          then: 'rename',
+        });
+      }
+      return outcome.kind === 'refused' ? outcome.report.message : null;
+    },
     onDelete: async () => {
       const selected = entry.app.navigation.getState().selectedMapId;
       const result = await coordinatedMapDelete(

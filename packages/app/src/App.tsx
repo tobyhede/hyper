@@ -27,7 +27,7 @@ import { createNonThrowingReporter, type SpaceSummary } from '@project/persisten
 import { Placement } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
-import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
+import type { AuthoringResult } from './space-authoring';
 import { authoringAvailability } from './authoring-availability';
 import { selectedResourceOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
@@ -42,7 +42,6 @@ import {
   coordinatedMapDelete,
   coordinatedGraphDelete,
 } from './coordinated-context-delete';
-import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
 import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
@@ -223,7 +222,6 @@ export const createApp = (
      */
     const [editingResourceBody, setEditingResourceBody] = useState(false);
     const [editingResourceTitle, setEditingResourceTitle] = useState(false);
-    const [createMapRefusal, setCreateMapRefusal] = useState<AuthoringRefusal | null>(null);
     const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
@@ -709,13 +707,13 @@ export const createApp = (
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Map rename notice, the Graph Edit and deletion notices and the
-    // Resource deletion and removal notices are command outcomes' channels, and
-    // that module clears them on the same move (`command-outcomes.ts`).
+    // The Map creation and rename notices, the Graph Edit and deletion notices
+    // and the Resource deletion and removal notices are command outcomes'
+    // channels, and that module clears them on the same move
+    // (`command-outcomes.ts`).
     const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
     if (refusedUnder !== selectedMapId) {
       setRefusedUnder(selectedMapId);
-      setCreateMapRefusal(null);
       setMapDeleteMessage(null);
     }
     /**
@@ -774,14 +772,21 @@ export const createApp = (
      * that there is one of these.
      */
     /**
-     * Map Edits on the Space the canvas draws, available while a chrome
-     * command may run. Rebuilt when that answer moves, so the capability the
-     * Dock is drawn from and the one it invokes read the same render.
+     * Map Edits on the Space the canvas draws: rename while a chrome command
+     * may run, and creation while Add Map may. Rebuilt when either answer
+     * moves, so the capability the Dock is drawn from and the one it invokes
+     * read the same render — both answers are React state, and nothing
+     * outside the render holds a later one.
      */
     const chromeTitleEdit = availability.chromeTitleEdit;
+    const createMapAvailable = availability.createMap;
     const mapAuthoring = useMemo(
-      () => topLevelMapAuthoringCommands(composition, () => chromeTitleEdit),
-      [chromeTitleEdit],
+      () =>
+        topLevelMapAuthoringCommands(composition, {
+          rename: () => chromeTitleEdit,
+          create: () => createMapAvailable,
+        }),
+      [chromeTitleEdit, createMapAvailable],
     );
     const renameChromeTitle = useCallback(
       (subject: SpaceChromeTitleSubject, title: string): string | null => {
@@ -1510,7 +1515,7 @@ export const createApp = (
               onRename: mapAuthoring.map(selectedMap.map.id).rename.available
                 ? (mapId, title) => renameChromeTitle({ kind: 'map', id: mapId }, title)
                 : null,
-              createDisabled: !availability.createMap,
+              createDisabled: !mapAuthoring.create.available,
               // The same answer `onDeleteMap` above is built from, said on
               // the row as well: when entity Edits are withdrawn the
               // `delete-map` action is not built at all, and a row that did
@@ -1528,24 +1533,20 @@ export const createApp = (
                * (`.scratch/command-dock/issues/13`).
                */
               onCreate: () => {
-                void coordinatedContextCreate({
-                  create: () => {
-                    const result = authoring.complete({ kind: 'created-map' });
-                    setCreateMapRefusal(result.kind === 'refused' ? result.refusal : null);
-                    createMapMovedCaret.current = false;
-                    return result;
-                  },
-                  createdOf: () =>
-                    createdMapContext(currentSpace().maps, navigation.getState().selectedMapId),
-                  afterCreated: () => {
+                createMapMovedCaret.current = false;
+                // Map authoring creates and selects the Map, and command
+                // outcomes holds a refusal as "Map not created"; the caret's
+                // continuation is the Dock's, and follows only a completion.
+                void commandOutcomes
+                  .run('map-create', () => mapAuthoring.create.invoke())
+                  .then((outcome) => {
+                    if (outcome.kind !== 'completed') return;
                     continuation.request({
                       target: { kind: 'control', name: 'map-name' },
                       select: false,
                       then: 'rename',
                     });
-                    return null;
-                  },
-                });
+                  });
               },
               didCreateMoveCaret: () => createMapMovedCaret.current,
               // The Dock's Delete names the Map its cluster is showing, which is
@@ -1705,11 +1706,6 @@ export const createApp = (
                 </ShellNotice>
               );
             })}
-            {createMapRefusal === null ? null : (
-              <ShellNotice title="Map not created" onDismiss={() => setCreateMapRefusal(null)}>
-                {describeAuthoringRefusal(createMapRefusal)}
-              </ShellNotice>
-            )}
             {mapDeleteMessage === null ? null : (
               <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
                 {mapDeleteMessage}

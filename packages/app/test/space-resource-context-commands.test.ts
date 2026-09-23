@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot, type ResourceDocument } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
-import { embeddedMapAuthoringCommands } from '../src/map-authoring-commands';
 import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
@@ -92,9 +91,15 @@ async function setup() {
   const source = await spaces.open(META);
   const entry = await spaces.embed(TARGET);
   const commands = spaceResourceContextCommands(
-    entry,
-    spaces,
-    META,
+    {
+      entry,
+      spaces,
+      containingSpaceId: META,
+      continuation: source.app.continuation,
+      commandOutcomes: source.app.commandOutcomes,
+      complete: (completion) =>
+        completeEmbeddedAuthoring(entry, document.map, completion, entry.app.reportObserverError),
+    },
     document,
     (map, graph) => {
       const result = source.app.authoring.complete({
@@ -104,11 +109,7 @@ async function setup() {
       });
       return result.kind === 'refused' ? result.refusal.code : null;
     },
-    source.app.continuation,
-    (completion) =>
-      completeEmbeddedAuthoring(entry, document.map, completion, entry.app.reportObserverError),
-    embeddedMapAuthoringCommands(entry, spaces, () => true),
-    source.app.commandOutcomes,
+    () => true,
   );
   return { backend, spaces, commands, source, control };
 }
