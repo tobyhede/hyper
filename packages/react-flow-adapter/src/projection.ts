@@ -424,7 +424,10 @@ export function projectGraphEdges(
       source: edge.source,
       target: edge.target,
       className: `rf-graph-edge rf-graph-edge--${edge.graphId}${isActiveGraph ? ' rf-graph-edge--active' : ''}`,
-      animated: emphasized,
+      // Never `animated`: React Flow's marching dash drew the emphasised Graph in
+      // constant motion, which competed with every Resource on the canvas for
+      // attention. Emphasis is the stroke's width, opacity and paint order.
+      animated: false,
       style: {
         stroke: color,
         strokeWidth: isActiveGraph ? 3 : 2,

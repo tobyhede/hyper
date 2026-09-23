@@ -323,7 +323,7 @@ describe('projectGraphEdges', () => {
   it('draws every graph the same when nothing is emphasised', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {});
     expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
-    expect(edges.every((e) => e.animated)).toBe(true);
+    expect(edges.some((e) => e.animated)).toBe(false);
   });
 
   it('recedes the other graphs while one is active, never hiding them', () => {
@@ -335,7 +335,8 @@ describe('projectGraphEdges', () => {
 
     // The Active Graph is untouched.
     expect(main.style?.opacity).toBe(1);
-    expect(main.animated).toBe(true);
+    // Emphasis is never motion: the Active Graph's line is still.
+    expect(main.animated).toBe(false);
 
     // The others recede but are still drawn, and none are dropped.
     expect(alt.style?.opacity).toBe(OTHER_GRAPH_OPACITY);
