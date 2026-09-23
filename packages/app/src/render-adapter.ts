@@ -8,7 +8,11 @@ import {
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import type { ResourceId, GraphEdge, GraphId, MapPosition } from '@project/core';
 import { Placement } from '@project/graph';
-import type { ResourceFlowNode, RoutedEdgeData } from '@project/react-flow-adapter';
+import {
+  ROUTED_EDGE_TYPE,
+  type ResourceFlowNode,
+  type RoutedEdgeData,
+} from '@project/react-flow-adapter';
 import { snapResourceSizeToClose } from './resource';
 import type { SpaceAuthoring } from './space-authoring';
 
@@ -135,11 +139,13 @@ export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
  * would be three chances to widen `source` and `target` differently.
  */
 export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
-  if (edge.type !== 'routed') return null;
-  // SAFETY: a routed Edge is one the canvas projection drew for the Map on the
-  // canvas, with `RoutedEdgeData` and Resource-id endpoints. An embedded Map's
-  // Edges are always another Space's — Space Resource references never cycle
-  // (ADR 0068) — and are minted under their own type, so none reaches here.
+  if (edge.type !== ROUTED_EDGE_TYPE) return null;
+  // SAFETY: only the canvas projection writes `ROUTED_EDGE_TYPE`, and it always
+  // writes it with `RoutedEdgeData` and Resource-id endpoints, so a routed Edge's
+  // `data` and endpoints are those. An embedded Map's Edges, whose endpoints are
+  // another Space's (ADR 0068), are minted under `EMBEDDED_EDGE_TYPE` instead —
+  // held by embedded-map.test.ts, 'mints its Edges as its own type, which never
+  // converts to an Edge selection'.
   return {
     kind: 'edge',
     graphId: (edge.data as RoutedEdgeData).graphId,

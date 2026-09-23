@@ -26,7 +26,9 @@ export const embeddedClipId = (parentId: string): string => `embedded-clip-${par
  * references never cycle, so a Space never embeds itself (ADR 0068) — and its
  * endpoints are placement ids rather than Resource ids. Minting it under its own
  * type is what keeps it from ever reading as an Edge of the Map on the canvas:
- * `edgeSelectionOf` answers only for the routed type the canvas projection writes.
+ * `edgeSelectionOf` answers only for the routed type the canvas projection writes
+ * (`embedded-map.test.ts`, 'mints its Edges as its own type, which never converts
+ * to an Edge selection').
  */
 export const EMBEDDED_EDGE_TYPE = 'embedded';
 

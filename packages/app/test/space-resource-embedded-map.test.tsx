@@ -13,7 +13,7 @@ import {
   MemorySpaceBackendTestControl,
   type SpaceSession,
 } from '@project/persistence';
-import { embeddedNodeId } from '../src/embedded-map';
+import { EMBEDDED_EDGE_TYPE, embeddedNodeId } from '../src/embedded-map';
 import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
@@ -1277,6 +1277,35 @@ describe('the Map an Open Space Resource draws', () => {
     expect(queryEmbeddedNode(UNPLACED)).toBeNull();
     expect(screen.getByText('Intake')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Elsewhere entirely' })).toBeNull();
+  });
+
+  /**
+   * The canvas hands React Flow the table with the embedded Edge type in it.
+   *
+   * React Flow draws a type its table lacks with its default curve and names the
+   * fallback in the Edge's class, so the class is what tells the routed Edge from
+   * the fallback here. `embedded-map.test.ts` ('registers every Edge type it mints
+   * in the canvas table, drawn as the routed Edge') holds that the registration
+   * draws that type with `RoutedEdge`; this holds that `SpaceCanvas` spends it.
+   */
+  it('draws an embedded Edge with the type the embedding registers', async () => {
+    await mount(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        map: SELECTED_MAP_ID,
+        graph: SELECTED_GRAPH_ID,
+      }),
+    );
+
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    const edges = [
+      ...document.querySelectorAll(`.react-flow__edge[data-id^="${SPACE_RESOURCE_ID}:"]`),
+    ];
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toHaveClass(`react-flow__edge-${EMBEDDED_EDGE_TYPE}`);
+    expect(edges[0]).not.toHaveClass('react-flow__edge-default');
   });
 
   /**

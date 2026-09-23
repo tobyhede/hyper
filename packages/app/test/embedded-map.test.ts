@@ -3,6 +3,7 @@ import { SPACE_RESOURCE_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@pr
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
 import {
   AUTHORING_HANDLE_DIAMETER,
+  ROUTED_EDGE_TYPE,
   RoutedEdge,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
@@ -543,8 +544,8 @@ describe('an embedded production projection', () => {
   it('registers every Edge type it mints in the canvas table, drawn as the routed Edge', async () => {
     const { drawn } = await draw();
     const canvasEdge = () => null;
-    const table = withEmbeddedEdgeTypes({ routed: canvasEdge });
-    expect(table['routed']).toBe(canvasEdge);
+    const table = withEmbeddedEdgeTypes({ [ROUTED_EDGE_TYPE]: canvasEdge });
+    expect(table[ROUTED_EDGE_TYPE]).toBe(canvasEdge);
     for (const edge of drawn.edges) expect(table[edge.type ?? '']).toBe(RoutedEdge);
   });
 

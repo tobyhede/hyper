@@ -3,7 +3,7 @@ import type { EdgeTypes } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { GraphEdge, GraphId } from '@project/core';
 import { Placement, positionedStrategy, type LayoutStrategyGraph } from '@project/graph';
-import { nodeTypes } from '@project/react-flow-adapter';
+import { nodeTypes, ROUTED_EDGE_TYPE } from '@project/react-flow-adapter';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
@@ -44,7 +44,7 @@ import { StoryCanvas, StoryCanvasFrame } from './ReactFlowCanvas';
 const SPACE = authoredSpace;
 
 /** The production Edge type, keyed as the projection keys it. */
-const EDGE_TYPES: EdgeTypes = { routed: AuthorableEdge };
+const EDGE_TYPES: EdgeTypes = { [ROUTED_EDGE_TYPE]: AuthorableEdge };
 
 /**
  * The Map the story opens on: the Space's declared default, which is its

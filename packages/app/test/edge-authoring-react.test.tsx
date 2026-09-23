@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
@@ -156,7 +156,7 @@ const flowEdge = (graphId: string, from: string, to: string): Edge => ({
     from: uuidSchema.parse(from),
     to: uuidSchema.parse(to),
   }),
-  type: 'routed',
+  type: ROUTED_EDGE_TYPE,
   source: from,
   target: to,
   data: { graphId },

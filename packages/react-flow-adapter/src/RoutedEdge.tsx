@@ -48,10 +48,18 @@ export type RoutedEdgeData = {
 };
 
 /**
+ * The React Flow Edge type the canvas projection writes, and the key it is
+ * registered under. One constant, because what reads an Edge back into a domain
+ * subject gates on this type: a second spelling that drifted from the projection's
+ * would quietly turn every Edge's controls off.
+ */
+export const ROUTED_EDGE_TYPE = 'routed';
+
+/**
  * The edge as React Flow knows it. Naming the data and the type discriminant is
  * what lets `EdgeProps` hand back a typed `data` instead of an `unknown` to cast.
  */
-export type RoutedFlowEdge = Edge<RoutedEdgeData, 'routed'>;
+export type RoutedFlowEdge = Edge<RoutedEdgeData, typeof ROUTED_EDGE_TYPE>;
 
 /** An Edge's drawn path and the point a label or toolbar sits at. */
 export interface RoutedEdgeGeometry {

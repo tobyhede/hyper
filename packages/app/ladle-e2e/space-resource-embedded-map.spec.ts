@@ -76,8 +76,7 @@ test(
 /**
  * An embedded Edge is drawn and nothing else: a press on it reaches whatever lies
  * beneath. That holds because it is minted not selectable and the canvas has no
- * Edge click handler, so React Flow marks its group `inactive` — not because of
- * any hit width, which the routed Edge path never forwards
+ * Edge click handler, so React Flow marks its group `inactive`
  * (`.scratch/embedded-open-space-thing/issues/04`).
  */
 test('an embedded Edge takes no pointer events, even on its own curve', async ({ page }) => {

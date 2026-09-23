@@ -4,6 +4,7 @@ import { Position, type Edge } from '@xyflow/react';
 import { uuidSchema, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
 import { graphRenderEdgeId, Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { ROUTED_EDGE_TYPE } from '@project/react-flow-adapter';
 import { mintingIds } from './minting';
 import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
@@ -37,7 +38,7 @@ const PROJECTED = [node(RESOURCE_A, 10, 20), node(RESOURCE_B, 300, 20)];
  */
 const EDGE: Edge = {
   id: graphRenderEdgeId(GRAPH_ID, { from: RESOURCE_A, to: RESOURCE_B }),
-  type: 'routed',
+  type: ROUTED_EDGE_TYPE,
   source: RESOURCE_A,
   target: RESOURCE_B,
   data: { graphId: GRAPH_ID },
@@ -842,9 +843,11 @@ describe('render adapter', () => {
     ]);
   });
 
-  it('takes no Edge selection from an Edge of an embedded Map', () => {
-    // The embedding draws its Edges into the same React Flow instance under
-    // their own ids, so a selection change can name one the projection never drew.
+  it('takes no Edge selection from a selection change naming an Edge the projection never drew', () => {
+    // React Flow reports selection changes for every Edge it renders, not only
+    // the ones this projection synced, so a change naming any other id must
+    // change nothing. What keeps an embedded Map's Edges out is their type, held
+    // in embedded-map.test.ts; this covers only the lookup of the drawn Edge.
     const store = adapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
 

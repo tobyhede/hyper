@@ -1,6 +1,6 @@
 import type { EdgeTypes, NodeTypes } from '@xyflow/react';
 import { ResourceNode } from './ResourceNode';
-import { RoutedEdge } from './RoutedEdge';
+import { ROUTED_EDGE_TYPE, RoutedEdge } from './RoutedEdge';
 
 export * from './projection';
 export { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
@@ -20,6 +20,7 @@ export {
 } from './connection-end-eligibility';
 export { ConnectionTargetProximityProvider } from './connection-target-proximity';
 export {
+  ROUTED_EDGE_TYPE,
   RoutedEdge,
   RoutedEdgePath,
   routedEdgePathProps,
@@ -47,5 +48,5 @@ export const nodeTypes: NodeTypes = {
 
 /** Register the custom edge type(s) with React Flow. */
 export const edgeTypes: EdgeTypes = {
-  routed: RoutedEdge,
+  [ROUTED_EDGE_TYPE]: RoutedEdge,
 };
