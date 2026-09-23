@@ -10,7 +10,7 @@ Why not the published GitHub Action: it runs one score per step and does not tak
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Scoring runs on `pull_request` only, with full history so the merge-base with the base branch resolves. (Ticket 02 adds a push-to-main run that builds baselines and scores nothing.)
 - [x] The job summary carries two clearly labelled reports: with tests, and without tests.
@@ -19,7 +19,7 @@ Why not the published GitHub Action: it runs one score per step and does not tak
 - [x] The workflow's permissions are `contents: read` only, and `ci.yml` and its `ci` gate are unchanged.
 - [x] The ImpactGate version is pinned.
 - [x] `prettier --check` and `actionlint` pass on the new files.
-- [ ] One real PR run is linked in this ticket's Comments, showing both reports.
+- [x] One real PR run is linked in this ticket's Comments, showing both reports.
 
 ## Comments
 
@@ -46,3 +46,12 @@ Review finding, fixed. The score steps pipe into `tee`, and a step with no `shel
 First real run: PR #231, https://github.com/tobyhede/hyper/actions/runs/35303231917. Green. Both score steps ran under `bash --noprofile --norc -e -o pipefail`, and each wrote its labelled heading to the summary followed by `**impact-gate:** no source changes to score.` That is correct: the PR changes only YAML and Markdown, which ImpactGate does not score.
 
 Remaining: a run on a PR that changes source, to show both reports with content. The workflow runs only where it exists, so that is the first source-changing PR opened or updated after this merges.
+
+Source-changing run, 2026-09-23: PR #268 at `cab27d23`, https://github.com/tobyhede/hyper/actions/runs/35809090542. Green, and both score steps green. The summary carries both labelled reports with content, each graded against the project baseline:
+
+| report | score | grade | files |
+|---|---|---|---|
+| with tests | 498,852 | p74.14 (blended n=432, w=0.68) | 9 |
+| without tests | 381,192 | p79.99 (blended n=392, w=0.66) | 7 |
+
+The without-tests report names no path under a test home; the two files it lists are `App.tsx` and `CommandDock.tsx`. Read from the run's log with `gh run view --log`.

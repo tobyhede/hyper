@@ -13,7 +13,7 @@ Choose on measured cost, and record the measurement and method in this ticket, n
 
 **Blocked by:** 01: Land the Impact workflow, scored with and without tests, warn only
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Both reports grade against a project baseline, and the report says so (not "seed only").
 - [x] The without-tests grade uses a baseline built with the same measure config as its score.
