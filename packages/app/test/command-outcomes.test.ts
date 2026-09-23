@@ -667,6 +667,21 @@ describe('staleness', () => {
     expect(notice(outcomes, 'resource-delete')).toBeNull();
   });
 
+  it('clears every standing notice when the Space is replaced', async () => {
+    const { outcomes, authoring, session } = open(1n);
+    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
+    outcomes.run('resource-delete', () => refusedAuthoring);
+    await outcomes.run('space-resource-create', () => Promise.resolve(refusedCreation));
+    expect(notice(outcomes, 'resource-delete')).not.toBeNull();
+    expect(notice(outcomes, 'space-resource-create')).not.toBeNull();
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+
+    expect(notice(outcomes, 'resource-delete')).toBeNull();
+    expect(notice(outcomes, 'space-resource-create')).toBeNull();
+  });
+
   it('still reports a dropped settlement that threw', async () => {
     const { outcomes, navigation, reported } = open();
     const pending = deferred<AuthoringResult>();

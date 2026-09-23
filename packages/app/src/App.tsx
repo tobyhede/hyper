@@ -731,30 +731,11 @@ export const createApp = (
     }
 
     /**
-     * One chrome rename, answered rather than performed twice.
-     *
-     * The editor is `InlineTitleEditor`, mounted by the Dock's own name control,
-     * and it holds a refused draft open and editable — so this returns the
-     * refusal's sentence rather than swallowing it, and `null` for an Edit that
-     * landed. `unchanged` is `null` too: renaming a Map to the title it
-     * already has is the value the author already authored, and closing the
-     * editor is the right answer to it (`space-authoring.ts`).
-     *
-     * **Three subjects through one seam, not three seams.** The Space joined the
-     * Map and the Graph here rather than beside them, because every part of
-     * this that is worth writing down is the same for all three: which Edit the
-     * name completes is the only difference, and the answer — a sentence or
-     * `null` — is what the editor spends. A second callback for the Space would
-     * have been a second place for the refusal-versus-`unchanged` reading to
-     * drift, and the Dock has one rename slot under the whole bar precisely so
-     * that there is one of these.
-     */
-    /**
      * Map Edits on the Space the canvas draws: rename while a chrome command
      * may run, creation while Add Map may, and deletion while entity Edits
-     * may. Rebuilt when any answer moves, so the capability the Dock is drawn from and the one it invokes
-     * read the same render — both answers are React state, and nothing
-     * outside the render holds a later one.
+     * may. Rebuilt when any answer moves, so the capability the Dock is drawn
+     * from and the one it invokes read the same render — both answers are React
+     * state, and nothing outside the render holds a later one.
      */
     const chromeTitleEdit = availability.chromeTitleEdit;
     const createMapAvailable = availability.createMap;
@@ -773,7 +754,13 @@ export const createApp = (
     );
     /**
      * A Space or Graph rename from the Dock. A Map's is not here: the Dock
-     * renames its Map through Map authoring's capability, below.
+     * renames its Map through `mapAuthoring`, above.
+     *
+     * The editor is `InlineTitleEditor`, which holds a refused draft open and
+     * editable, so this answers the refusal's sentence rather than swallowing
+     * it, and `null` for an Edit that landed. `unchanged` is `null` too: a
+     * title the subject already has is the value the author already authored,
+     * and closing the editor is the right answer to it (`space-authoring.ts`).
      */
     const renameChromeTitle = useCallback(
       (

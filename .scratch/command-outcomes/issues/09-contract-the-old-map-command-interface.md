@@ -35,3 +35,5 @@ Blocked by: 07, 08
   
   Both callers now hold only the press: where the outcome is published, and where the caret goes.
 
+
+**2026-09-23, branch review.** The coordinator ran the owed commands on the branch after the review fixes: `pnpm verify` green, `test:coverage` 237 files, 3115 passed and 13 skipped with no timeout; `pnpm e2e` 227 passed. The e2e half of the last box was unproven when it was ticked and is proven by this run.

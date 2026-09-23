@@ -462,6 +462,16 @@ export function createCommandOutcomes({
     if (kept.size !== notices.size) observable.publish({ notices: kept });
   });
 
+  // A replacement clears every standing notice: each was about the Space that
+  // was replaced. A run still in flight is dropped by `current` instead.
+  let replacementEpoch = authoring.getState().replacementEpoch;
+  const unsubscribeAuthoring = authoring.subscribe(() => {
+    const next = authoring.getState().replacementEpoch;
+    if (next === replacementEpoch) return;
+    replacementEpoch = next;
+    if (observable.getState().notices.size > 0) observable.publish(NONE);
+  });
+
   const press = (channel: CommandChannel): Press => {
     const epoch = (epochs.get(channel) ?? 0) + 1;
     epochs.set(channel, epoch);
@@ -553,6 +563,7 @@ export function createCommandOutcomes({
     dispose: () => {
       disposed = true;
       unsubscribeNavigation();
+      unsubscribeAuthoring();
       observable.clearSubscribers();
     },
   };
