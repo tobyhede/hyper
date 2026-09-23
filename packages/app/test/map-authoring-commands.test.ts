@@ -9,7 +9,7 @@ import {
   type SpaceSnapshot,
 } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
-import type { CommandOutcomes } from '../src/command-outcomes';
+import type { CommandOutcomes, MapCreateContinuation } from '../src/command-outcomes';
 import {
   embeddedMapAuthoringCommands,
   offered,
@@ -19,6 +19,15 @@ import {
 } from '../src/map-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
+
+/** Where these tests' Map creations continue; what it names is not under test here. */
+const CONTINUE_IN_NAME: MapCreateContinuation = {
+  continueAt: () => ({
+    target: { kind: 'control', name: 'map-name' },
+    select: false,
+    then: 'rename',
+  }),
+};
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -338,7 +347,7 @@ describe.each(contexts)('Map creation through $name', ({ setup }) => {
     const working = authored.session.getState().working;
     const publications = publicationsOf(authored);
     withdraw();
-    expect(await outcomes.run('map-create', () => create.invoke())).toEqual({
+    expect(await outcomes.run('map-create', () => create.invoke(), CONTINUE_IN_NAME)).toEqual({
       kind: 'unavailable',
     });
     expect(publications.count()).toBe(0);
@@ -358,7 +367,9 @@ describe.each(contexts)('Map creation through $name', ({ setup }) => {
       title: 'Map not created',
       message: 'This Map is no longer part of the Space.',
     };
-    expect(await outcomes.run('map-create', () => commands.create.invoke())).toEqual({
+    expect(
+      await outcomes.run('map-create', () => commands.create.invoke(), CONTINUE_IN_NAME),
+    ).toEqual({
       kind: 'refused',
       report,
     });

@@ -3,12 +3,14 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import {
   COMMAND_BROKE,
+  COMMAND_DISCARDED,
   type CommandChannel,
   type CommandNotice,
-  type MapCommandResult,
 } from '../src/command-outcomes';
+import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
 import type { CoordinatedContextDeleteResult } from '../src/coordinated-context-delete';
+import type { CreatedMap } from '../src/map-authoring-commands';
 import type { AuthoringResult } from '../src/space-authoring';
 import type {
   SpaceResourceCreationResult,
@@ -110,7 +112,14 @@ const refusedCreation: SpaceResourceCreationResult = {
 };
 const MAP_GONE = 'This Map is no longer part of the Space.';
 const mapReport: CommandNotice = { title: 'Map not created', message: 'Try a different name.' };
-const refusedMap: MapCommandResult = { kind: 'refused', report: mapReport };
+const refusedMap = { kind: 'refused', report: mapReport } as const;
+const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
+/** New Map's continuation, in the name of the Map the creation made. */
+const inTheName = ({ mapId }: CreatedMap): PendingContinuation => ({
+  target: { kind: 'control', name: 'map-name', scope: { id: 'rail', subject: mapId } },
+  select: false,
+  then: 'rename',
+});
 const refusedGraphDelete: CoordinatedContextDeleteResult = {
   kind: 'error',
   message: 'Graph refused.',
@@ -124,7 +133,7 @@ const notice = (outcomes: ReturnType<typeof open>['outcomes'], channel: CommandC
 
 /** Leave a refusal standing on every channel the table declares. */
 async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes']): Promise<void> {
-  outcomes.run('map-create', () => refusedMap);
+  outcomes.run('map-create', () => refusedMap, { continueAt: inTheName });
   outcomes.run('map-manage', () => refusedMap);
   outcomes.run('map-delete', () => refusedMap);
   outcomes.run('graph-edit', () => refusedAuthoring);
@@ -194,7 +203,7 @@ describe('titles and sentences', () => {
   it('publishes a Map report whole, without describing it', () => {
     const { outcomes } = open();
 
-    outcomes.run('map-create', () => refusedMap);
+    outcomes.run('map-create', () => refusedMap, { continueAt: inTheName });
 
     expect(notice(outcomes, 'map-create')).toBe(mapReport);
   });
@@ -585,7 +594,7 @@ describe('graph-delete', () => {
     expect(notice(outcomes, 'graph-delete')).toBeNull();
   });
 
-  it('drops a delete pressed on one Map that settles under another', async () => {
+  it('discards a delete pressed on one Map that settles under another', async () => {
     const { outcomes, navigation } = open();
     const pending = deferred<CoordinatedContextDeleteResult>();
     const running = outcomes.run('graph-delete', () => pending.promise);
@@ -593,7 +602,7 @@ describe('graph-delete', () => {
     navigation.selectMap(MAP_B);
     pending.resolve(refusedGraphDelete);
 
-    await expect(running).resolves.toBe(refusedGraphDelete);
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
     expect(notice(outcomes, 'graph-delete')).toBeNull();
   });
 
@@ -614,7 +623,7 @@ describe('graph-delete', () => {
 });
 
 describe('staleness', () => {
-  it('drops a Map-scoped run that settles after the Map changed', async () => {
+  it('discards a Map-scoped run that settles after the Map changed', async () => {
     const { outcomes, navigation } = open();
     const pending = deferred<AuthoringResult>();
     const running = outcomes.run('resource-delete', () => pending.promise);
@@ -622,8 +631,19 @@ describe('staleness', () => {
     navigation.selectMap(MAP_B);
     pending.resolve(refusedAuthoring);
 
-    await expect(running).resolves.toBe(refusedAuthoring);
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
     expect(notice(outcomes, 'resource-delete')).toBeNull();
+  });
+
+  it('discards a completion too, on a channel whose completion does not move the Map', async () => {
+    const { outcomes, navigation } = open();
+    const pending = deferred<AuthoringResult>();
+    const running = outcomes.run('resource-delete', () => pending.promise);
+
+    navigation.selectMap(MAP_B);
+    pending.resolve(completedAuthoring);
+
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
   });
 
   it('keeps a run on a channel the Map change does not reset', async () => {
@@ -646,14 +666,14 @@ describe('staleness', () => {
     const second = outcomes.run('resource-delete', () => newer.promise);
 
     newer.resolve(refusedAuthoring);
-    await second;
+    await expect(second).resolves.toBe(refusedAuthoring);
     older.resolve(refusedDeletion);
-    await first;
+    await expect(first).resolves.toBe(COMMAND_DISCARDED);
 
     expect(notice(outcomes, 'resource-delete')?.message).toBe(MAP_GONE);
   });
 
-  it('drops a run that settles after the Space was replaced', async () => {
+  it('discards a run that settles after the Space was replaced', async () => {
     const { outcomes, authoring, session } = open(1n);
     authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
@@ -662,7 +682,7 @@ describe('staleness', () => {
 
     expect(authoring.acceptStoredSpace()).toBeNull();
     pending.resolve(refusedAuthoring);
-    await running;
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
 
     expect(notice(outcomes, 'resource-delete')).toBeNull();
   });
@@ -682,7 +702,7 @@ describe('staleness', () => {
     expect(notice(outcomes, 'space-resource-create')).toBeNull();
   });
 
-  it('still reports a dropped settlement that threw', async () => {
+  it('still reports a discarded settlement that threw, and answers it discarded', async () => {
     const { outcomes, navigation, reported } = open();
     const pending = deferred<AuthoringResult>();
     const running = outcomes.run('resource-delete', () => pending.promise);
@@ -691,9 +711,84 @@ describe('staleness', () => {
     navigation.selectMap(MAP_B);
     pending.reject(failure);
 
-    await expect(running).resolves.toBe(COMMAND_BROKE);
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
     expect(reported).toEqual([failure]);
     expect(notice(outcomes, 'resource-delete')).toBeNull();
+  });
+});
+
+describe('a command whose completion moves the Map', () => {
+  it("requests New Map's continuation after the creation's own selection move", async () => {
+    const { outcomes, navigation, continuation } = open();
+
+    const answered = await outcomes.run(
+      'map-create',
+      () => {
+        navigation.selectMap(MAP_B);
+        return Promise.resolve(createdMap);
+      },
+      { continueAt: inTheName },
+    );
+
+    expect(answered).toBe(createdMap);
+    expect(continuation.getState().pending).toEqual(inTheName(createdMap));
+  });
+
+  it('answers a completed Map deletion that moved the selection', async () => {
+    const { outcomes, navigation } = open();
+
+    const answered = await outcomes.run('map-delete', () => {
+      navigation.selectMap(MAP_B);
+      return Promise.resolve({ kind: 'completed' } as const);
+    });
+
+    expect(answered).toEqual({ kind: 'completed' });
+  });
+
+  it('discards a refused creation that settles after the author changed Map', async () => {
+    const { outcomes, navigation, continuation } = open();
+    const pending = deferred<typeof refusedMap>();
+    const running = outcomes.run('map-create', () => pending.promise, { continueAt: inTheName });
+    const listener = vi.fn();
+    outcomes.subscribe(listener);
+
+    navigation.selectMap(MAP_B);
+    pending.resolve(refusedMap);
+
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
+    expect(listener).not.toHaveBeenCalled();
+    expect(notice(outcomes, 'map-create')).toBeNull();
+    expect(continuation.getState().pending).toBeNull();
+  });
+
+  it('requests no continuation for a creation that completes after the Space was replaced', async () => {
+    const { outcomes, authoring, session, continuation } = open(1n);
+    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
+    const pending = deferred<typeof createdMap>();
+    const continueAt = vi.fn(inTheName);
+    const running = outcomes.run('map-create', () => pending.promise, { continueAt });
+
+    expect(authoring.acceptStoredSpace()).toBeNull();
+    pending.resolve(createdMap);
+
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+  });
+
+  it('requests no continuation for a creation a newer one overtook', async () => {
+    const { outcomes, continuation } = open();
+    const older = deferred<typeof createdMap>();
+    const continueAt = vi.fn(inTheName);
+    const first = outcomes.run('map-create', () => older.promise, { continueAt });
+    outcomes.run('map-create', () => refusedMap, { continueAt });
+
+    older.resolve(createdMap);
+
+    await expect(first).resolves.toBe(COMMAND_DISCARDED);
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
   });
 });
 
@@ -710,7 +805,7 @@ describe('disposal', () => {
     outcomes.dispose();
     navigation.selectMap(MAP_B);
     pending.resolve(refusedAuthoring);
-    await running;
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
 
     expect(outcomes.getState()).toBe(frozen);
     expect(listener).not.toHaveBeenCalled();

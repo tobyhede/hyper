@@ -35,8 +35,8 @@ No test file contains "Map not deleted", "Reference Resource not created", "Spac
   - On `refused` it publishes the channel's describer applied to the refusal. On `completed` it clears the channel, and if `options.continueAt` is given, requests that continuation from the completed result (e.g. the minted `resourceId`). On `unchanged`/`queued` it clears the channel and does nothing else.
   - On a throw it reports through `reportBreak` and publishes the channel's **break** sentence. A throw is never dressed as a refusal (`CONTEXT.md`, Completion outcome).
   - `options.subject` carries the one runtime value a channel's sentences may name — the title of the Space or entity the press was about. A channel declares its describers as functions of `(refusal | failure, subject)`, so `space-command`'s three sentences ("… could not be entered/exited/opened.") are one channel with three operations rather than three channels or an invented second option. A channel whose sentences name nothing ignores it, and the type makes `subject` required exactly for the channels whose describers read it.
-  - It returns the result to the caller, so a caller that must act on completion still can. Tickets 06–09 move Map creation, rename and deletion behind `MapAuthoringCommands`; that module owns Map coordination and recovery while command outcomes continues to own report lifetime.
-- **Staleness is the module's, not the caller's** — the rule `resource-deletion.ts` already carries (`interactionEpoch`, and a `disposed` guard on the `.then`), generalised to the table. Each `run` takes, at the press: a per-channel run epoch, the `selectedMapId` for a Map-scoped channel, and the composition's `replacementEpoch`. A settlement publishes only if all three still hold, and is otherwise dropped in silence — it is not a refusal the author asked for (`CONTEXT.md`, Replacement epoch). So an operation begun on Map A cannot draw its notice under Map B, and two runs on one channel cannot land out of order. A dropped settlement still reaches `reportBreak` if it threw: the defect happened whether or not anyone is left to be told.
+  - It returns the result to the caller when the settlement is current, so a caller that must act on completion still can. A stale settlement returns `COMMAND_DISCARDED` (`{ kind: 'discarded' }`) in place of the **whole** result — never a `completed`, `unchanged` or `refused` — so a caller that narrows on `completed` cannot act on discarded work (ticket 10). Tickets 06–09 move Map creation, rename and deletion behind `MapAuthoringCommands`; that module owns Map coordination and recovery while command outcomes continues to own report lifetime.
+- **Staleness is the module's, not the caller's** — the rule `resource-deletion.ts` already carries (`interactionEpoch`, and a `disposed` guard on the `.then`), generalised to the table. Each `run` takes, at the press: a per-channel run epoch, the `selectedMapId` for a Map-scoped channel, and the composition's `replacementEpoch`. A settlement publishes only if all three still hold, and is otherwise discarded in silence — `run` answers `COMMAND_DISCARDED`. One exception to the Map check: on a channel whose **completion moves the Map** (`map-create`, `map-delete`), a `completed` outcome passes it, because that command's own completion is what moved the selection; its other outcomes are still held to it. A discarded settlement is not a refusal the author asked for (`CONTEXT.md`, Replacement epoch). So an operation begun on Map A cannot draw its notice under Map B, and two runs on one channel cannot land out of order. A discarded settlement still reaches `reportBreak` if it threw: the defect happened whether or not anyone is left to be told.
 - **`dispose()`** unsubscribes from Navigation, drops every in-flight run and calls `observable.clearSubscribers()`. It joins the ordered block in `open-spaces.ts:783-788`, before `continuation.dispose()`, since this module publishes into the continuation.
 - **Not in the interface:** argument preparation. Minting titles (`titles.ts`), `resolveMap`, `centreAnchor`, the Reference Resource offset (`Placement.growth`, ADR 0093) stay with the command that needs them.
 
@@ -44,18 +44,18 @@ No test file contains "Map not deleted", "Reference Resource not created", "Spac
 
 One entry per shell notice, declared once in the module: whether **a Map change clears it**, plus a fixed **title**, **describer** and **break describer** where that channel owns the words. Map channels instead accept the complete structured report from `MapAuthoringCommands`; the channel still owns staleness, lifetime and dismissal. Reset membership keeps today's behaviour exactly.
 
-| Channel | Title | Clears on Map change |
-|---|---|---|
-| `map-create` | Map not created | yes |
-| `map-manage` | Map unchanged | yes |
-| `map-delete` | Map not deleted | yes |
-| `graph-edit` | Graph unchanged | yes |
-| `graph-delete` | Graph not deleted | yes |
-| `resource-delete` | Resource not deleted | yes |
-| `resource-remove` | Resource not removed | yes |
-| `space-resource-create` | Space not created | no |
-| `reference-create` | Reference Resource not created | no |
-| `space-command` | Space command failed | no |
+| Channel | Title | Clears on Map change | Completion moves the Map |
+|---|---|---|---|
+| `map-create` | Map not created | yes | yes |
+| `map-manage` | Map unchanged | yes | no |
+| `map-delete` | Map not deleted | yes | yes |
+| `graph-edit` | Graph unchanged | yes | no |
+| `graph-delete` | Graph not deleted | yes | no |
+| `resource-delete` | Resource not deleted | yes | no |
+| `resource-remove` | Resource not removed | yes | no |
+| `space-resource-create` | Space not created | no | no |
+| `reference-create` | Reference Resource not created | no | no |
+| `space-command` | Space command failed | no | no |
 
 `map-create`/`map-manage` split the shared slot; their complete reports arrive from `MapAuthoringCommands` rather than a channel describer. `resource-remove` is new, for Remove from Map. The reset is the module subscribing to Navigation's `selectedMapId` and clearing every channel marked "yes" — `refusedUnder` goes once ticket 09 contracts the old Map paths.
 
@@ -97,3 +97,4 @@ Independent of `.scratch/snapshot-edits`: those tickets change Space Authoring i
 7. `07-map-creation-through-both-context-adapters.md` — asynchronous creation, identity recovery and surface-owned continuation.
 8. `08-map-deletion-through-both-context-adapters.md` — coordinated deletion, persistence gates and surviving Navigation.
 9. `09-contract-the-old-map-command-interface.md` — remove the expanded old form, duplicated paths and `refusedUnder`.
+10. `10-discarded-settlements-follow-nothing.md` — `COMMAND_DISCARDED`, `completionMovesMap`, and New Map's continuation through `continueAt`.

@@ -13,6 +13,7 @@ import {
 import type { CoordinatedContextDeleteResult } from './coordinated-context-delete';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
+import type { CreatedMap, MapEditOutcome } from './map-authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -49,12 +50,22 @@ import type {
  * **A throw is never dressed as a refusal** (`CONTEXT.md`, Completion outcome).
  * It reaches the reporter and publishes the command's break sentence, and
  * `run` answers {@link COMMAND_BROKE} in place of a result.
+ *
+ * **Discarded work answers nothing a caller can act on.** A settlement that is
+ * no longer current answers {@link COMMAND_DISCARDED} in place of the whole
+ * result, so a caller that narrows on `completed` cannot follow work its
+ * epoch has moved past (`CONTEXT.md`, Replacement epoch).
  */
 
 /** One standing notice: the title the shell draws it under, and its sentence. */
 export interface CommandNotice {
   readonly title: string;
   readonly message: string;
+}
+
+interface ChannelLifetime {
+  readonly resetsOnMapChange: boolean;
+  readonly completionMovesMap: boolean;
 }
 
 /**
@@ -65,29 +76,45 @@ export interface CommandNotice {
  * result.
  */
 type ChannelEntry =
-  | { readonly resetsOnMapChange: boolean; readonly words: 'described'; readonly title: string }
-  | { readonly resetsOnMapChange: boolean; readonly words: 'reported' };
+  | (ChannelLifetime & { readonly words: 'described'; readonly title: string })
+  | (ChannelLifetime & { readonly words: 'reported' });
 
 /**
  * One entry per shell notice.
  *
- * `resetsOnMapChange` is two rules at once: a Map change clears the channel's
- * standing notice, and a run pressed on one Map does not publish once another
- * is selected. Membership is what `App`'s `refusedUnder` cleared by name.
+ * `resetsOnMapChange` makes a notice live only as long as the Map it was
+ * pressed on: a Map change clears it where it stands, and a run pressed on one
+ * Map settles under that Map or not at all.
+ *
+ * `completionMovesMap` marks a command whose own completion is what moves the
+ * selection, so a `completed` outcome on it is not held to the Map it was
+ * pressed on. Its other outcomes still are.
  */
 const CHANNELS = {
-  'map-create': { resetsOnMapChange: true, words: 'reported' },
-  'map-manage': { resetsOnMapChange: true, words: 'reported' },
-  'map-delete': { resetsOnMapChange: true, words: 'reported' },
-  'graph-edit': { resetsOnMapChange: true, words: 'described', title: 'Graph unchanged' },
-  'graph-delete': { resetsOnMapChange: true, words: 'described', title: 'Graph not deleted' },
+  'map-create': { resetsOnMapChange: true, completionMovesMap: true, words: 'reported' },
+  'map-manage': { resetsOnMapChange: true, completionMovesMap: false, words: 'reported' },
+  'map-delete': { resetsOnMapChange: true, completionMovesMap: true, words: 'reported' },
+  'graph-edit': {
+    resetsOnMapChange: true,
+    completionMovesMap: false,
+    words: 'described',
+    title: 'Graph unchanged',
+  },
+  'graph-delete': {
+    resetsOnMapChange: true,
+    completionMovesMap: false,
+    words: 'described',
+    title: 'Graph not deleted',
+  },
   'resource-delete': {
     resetsOnMapChange: true,
+    completionMovesMap: false,
     words: 'described',
     title: 'Resource not deleted',
   },
   'resource-remove': {
     resetsOnMapChange: true,
+    completionMovesMap: false,
     words: 'described',
     title: 'Resource not removed',
   },
@@ -97,11 +124,13 @@ const CHANNELS = {
   // legible.
   'space-resource-create': {
     resetsOnMapChange: false,
+    completionMovesMap: false,
     words: 'described',
     title: 'Space not created',
   },
   'reference-create': {
     resetsOnMapChange: false,
+    completionMovesMap: false,
     words: 'described',
     title: 'Reference Resource not created',
   },
@@ -110,7 +139,12 @@ const CHANNELS = {
   // backend that will not answer. The surfaces that used to report them went
   // with the Sidebar, which left the reader pressing a row that did nothing;
   // this notice is what says so, and the reporter still hears the defect.
-  'space-command': { resetsOnMapChange: false, words: 'described', title: 'Space command failed' },
+  'space-command': {
+    resetsOnMapChange: false,
+    completionMovesMap: false,
+    words: 'described',
+    title: 'Space command failed',
+  },
 } as const satisfies Record<string, ChannelEntry>;
 
 export type CommandChannel = keyof typeof CHANNELS;
@@ -175,13 +209,26 @@ export interface CommandContinuation<Completed> {
 type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
 
 /**
+ * Where the author continues after a completed Map creation.
+ *
+ * Required, and never `null`: a created Map always has a name to continue in,
+ * so a `completed` answer from `run` means the continuation was requested.
+ */
+export interface MapCreateContinuation {
+  readonly continueAt: (created: CreatedMap) => PendingContinuation;
+}
+
+/**
  * What each command's operation answers, and what `run` must be given with it.
  *
  * `options` is a tuple so a command whose sentences name a `subject` makes the
  * argument required and every other command leaves it out.
  */
 interface CommandSignatures {
-  readonly 'map-create': { readonly result: MapCommandResult; readonly options: [] };
+  readonly 'map-create': {
+    readonly result: MapEditOutcome<CreatedMap>;
+    readonly options: [options: MapCreateContinuation];
+  };
   readonly 'map-manage': { readonly result: MapCommandResult; readonly options: [] };
   readonly 'map-delete': { readonly result: MapCommandResult; readonly options: [] };
   readonly 'graph-edit': { readonly result: AuthoringResult; readonly options: [] };
@@ -248,6 +295,11 @@ interface CommandDefinition<Result, Options extends readonly unknown[]> {
    * reaches the reporter and leaves the channel clear.
    */
   readonly broke: CommandBreak<Options> | null;
+  /**
+   * Whether a result is a completion, where the channel's completion moves the
+   * Map — the one case staleness reads a result's kind.
+   */
+  readonly completed?: (result: Result) => boolean;
 }
 
 type CommandDefinitions = {
@@ -261,10 +313,13 @@ const CLEAR: Settlement = { kind: 'clear', continuation: null };
 
 const notice = (value: CommandNotice): Settlement => ({ kind: 'notice', notice: value });
 
+const mapCompleted = (result: MapCommandResult): boolean => result.kind === 'completed';
+
 const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<MapCommandResult, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
   broke: null,
+  completed: mapCompleted,
 });
 
 const authoringCommand = (channel: DescribedChannel): CommandDefinition<AuthoringResult, []> => ({
@@ -277,7 +332,16 @@ const authoringCommand = (channel: DescribedChannel): CommandDefinition<Authorin
 });
 
 const COMMANDS: CommandDefinitions = {
-  'map-create': reportedMapCommand('map-create'),
+  'map-create': {
+    channel: 'map-create',
+    settle: (result, { continueAt }) => {
+      if (result.kind === 'refused') return notice(result.report);
+      if (result.kind !== 'completed') return CLEAR;
+      return { kind: 'clear', continuation: continueAt(result) };
+    },
+    broke: null,
+    completed: mapCompleted,
+  },
   'map-manage': reportedMapCommand('map-manage'),
   'map-delete': reportedMapCommand('map-delete'),
   'graph-edit': authoringCommand('graph-edit'),
@@ -351,6 +415,16 @@ const COMMANDS: CommandDefinitions = {
 export const COMMAND_BROKE = { kind: 'broke' } as const;
 export type CommandBroke = typeof COMMAND_BROKE;
 
+/**
+ * What `run` answers in place of a result when the settlement is stale.
+ *
+ * It replaces the whole result — never a `completed`, `unchanged` or
+ * `refused` — so a caller cannot act on work its run epoch, its Map or its
+ * Space has moved past. It is not a refusal: there is nothing to say.
+ */
+export const COMMAND_DISCARDED = { kind: 'discarded' } as const;
+export type CommandDiscarded = typeof COMMAND_DISCARDED;
+
 export interface CommandOutcomesState {
   /** The standing notice on each channel that has one. */
   readonly notices: ReadonlyMap<CommandChannel, CommandNotice>;
@@ -362,19 +436,20 @@ export interface CommandOutcomesState {
  * Synchronous in, synchronous out; a promise in, a promise out. An operation
  * that throws before it returns answers {@link COMMAND_BROKE} synchronously
  * whichever it was, so an asynchronous operation is written as one whose
- * throws are rejections.
+ * throws are rejections. A stale settlement answers {@link COMMAND_DISCARDED}
+ * whether it returned or threw.
  */
 export interface CommandRun {
   <Command extends CommandName, Result extends CommandResult<Command>>(
     command: Command,
     operation: () => Result,
     ...options: CommandOptions<Command>
-  ): Result | CommandBroke;
+  ): Result | CommandBroke | CommandDiscarded;
   <Command extends CommandName, Result extends CommandResult<Command>>(
     command: Command,
     operation: () => Promise<Result>,
     ...options: CommandOptions<Command>
-  ): Promise<Result | CommandBroke>;
+  ): Promise<Result | CommandBroke | CommandDiscarded>;
 }
 
 export interface CommandOutcomes {
@@ -382,7 +457,8 @@ export interface CommandOutcomes {
   readonly subscribe: (listener: () => void) => () => void;
   /**
    * Run `operation` for `command`, publish what it leaves on the command's
-   * channel, and answer its result — or {@link COMMAND_BROKE} if it threw.
+   * channel, and answer its result — {@link COMMAND_BROKE} if it threw, or
+   * {@link COMMAND_DISCARDED} if it settled stale.
    *
    * The channel is cleared at the press. A refusal publishes the command's
    * words; a completion requests `continueAt`'s continuation where one is
@@ -423,11 +499,13 @@ const NONE: CommandOutcomesState = { notices: new Map() };
  * while three things captured at its press still hold: the channel's run epoch,
  * so two runs on one channel cannot land out of order; the selected Map, for a
  * channel a Map change resets, so an outcome pressed on one Map is never drawn
- * under another; and Space Authoring's replacement epoch, so an outcome about a
- * replaced Space is never drawn over its replacement (`CONTEXT.md`,
- * Replacement epoch). A stale settlement is dropped in silence — it is not an
- * outcome the author asked for — but one that threw still reaches the
- * reporter: the defect happened whether or not anyone is left to be told.
+ * under another — except a completion that is itself what moved the Map; and
+ * Space Authoring's replacement epoch, so an outcome about a replaced Space is
+ * never drawn over its replacement (`CONTEXT.md`, Replacement epoch). A stale
+ * settlement is discarded in silence and `run` answers
+ * {@link COMMAND_DISCARDED} — it is not an outcome the author asked for — but
+ * one that threw still reaches the reporter: the defect happened whether or
+ * not anyone is left to be told.
  */
 export function createCommandOutcomes({
   authoring,
@@ -484,26 +562,37 @@ export function createCommandOutcomes({
     };
   };
 
-  const current = ({ channel, epoch, mapId, replacementEpoch }: Press): boolean =>
+  /**
+   * Whether a settlement pressed at `at` may still publish. `completed` is
+   * whether it is a completion, which a channel whose completion moves the Map
+   * exempts from the Map check.
+   */
+  const current = (
+    { channel, epoch, mapId, replacementEpoch }: Press,
+    completed: boolean,
+  ): boolean =>
     !disposed &&
     epochs.get(channel) === epoch &&
     authoring.getState().replacementEpoch === replacementEpoch &&
-    (mapId === null || navigation.getState().selectedMapId === mapId);
+    (mapId === null ||
+      (completed && CHANNELS[channel].completionMovesMap) ||
+      navigation.getState().selectedMapId === mapId);
 
   const settle = <Result, Options extends readonly unknown[]>(
     at: Press,
     definition: CommandDefinition<Result, Options>,
     result: Result,
     options: Options,
-  ): void => {
-    if (!current(at)) return;
+  ): Result | CommandDiscarded => {
+    if (!current(at, definition.completed?.(result) ?? false)) return COMMAND_DISCARDED;
     const settlement = definition.settle(result, ...options);
     if (settlement.kind === 'notice') {
       write(at.channel, settlement.notice);
-      return;
+      return result;
     }
     write(at.channel, null);
     if (settlement.continuation !== null) continuation.request(settlement.continuation);
+    return result;
   };
 
   const broke = <Result, Options extends readonly unknown[]>(
@@ -511,9 +600,10 @@ export function createCommandOutcomes({
     definition: CommandDefinition<Result, Options>,
     failure: unknown,
     options: Options,
-  ): CommandBroke => {
+  ): CommandBroke | CommandDiscarded => {
     reportBreak(failure);
-    if (current(at)) write(at.channel, definition.broke?.(failure, ...options) ?? null);
+    if (!current(at, false)) return COMMAND_DISCARDED;
+    write(at.channel, definition.broke?.(failure, ...options) ?? null);
     return COMMAND_BROKE;
   };
 
@@ -521,17 +611,17 @@ export function createCommandOutcomes({
     command: Command,
     operation: () => Result,
     ...options: CommandOptions<Command>
-  ): Result | CommandBroke;
+  ): Result | CommandBroke | CommandDiscarded;
   function run<Command extends CommandName, Result extends CommandResult<Command>>(
     command: Command,
     operation: () => Promise<Result>,
     ...options: CommandOptions<Command>
-  ): Promise<Result | CommandBroke>;
+  ): Promise<Result | CommandBroke | CommandDiscarded>;
   function run<Command extends CommandName, Result extends CommandResult<Command>>(
     command: Command,
     operation: () => Result | Promise<Result>,
     ...options: CommandOptions<Command>
-  ): Result | CommandBroke | Promise<Result | CommandBroke> {
+  ): Result | CommandBroke | CommandDiscarded | Promise<Result | CommandBroke | CommandDiscarded> {
     const definition: CommandDefinition<CommandResult<Command>, CommandOptions<Command>> = COMMANDS[
       command
     ];
@@ -544,15 +634,11 @@ export function createCommandOutcomes({
     }
     if (returned instanceof Promise) {
       return returned.then(
-        (result: Result) => {
-          settle(at, definition, result, options);
-          return result;
-        },
+        (result: Result) => settle(at, definition, result, options),
         (failure: unknown) => broke(at, definition, failure, options),
       );
     }
-    settle(at, definition, returned, options);
-    return returned;
+    return settle(at, definition, returned, options);
   }
 
   return {

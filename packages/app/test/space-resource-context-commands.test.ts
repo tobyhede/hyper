@@ -95,7 +95,6 @@ async function setup(available = true) {
       entry,
       spaces,
       containingSpaceId: META,
-      continuation: source.app.continuation,
       commandOutcomes: source.app.commandOutcomes,
       complete: (completion) =>
         completeEmbeddedAuthoring(entry, document.map, completion, entry.app.reportObserverError),

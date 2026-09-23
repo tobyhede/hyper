@@ -1,7 +1,6 @@
 import type { ResourceDocument, GraphId, UUID } from '@project/core';
 import type { CanvasSpaceResourceGraphCommands, CanvasSpaceResourceMapCommands } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
-import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
 import { describeAuthoringRefusal } from './authoring-refusal';
@@ -25,7 +24,6 @@ export interface SpaceResourceRailContext {
   readonly entry: OpenSpace;
   readonly spaces: OpenSpaces;
   readonly containingSpaceId: UUID;
-  readonly continuation: Continuation;
   /** The containing canvas's, where a Map report from this rail is held. */
   readonly commandOutcomes: CommandOutcomes;
   readonly complete: (
@@ -35,14 +33,7 @@ export interface SpaceResourceRailContext {
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
-  {
-    entry,
-    spaces,
-    containingSpaceId,
-    continuation,
-    complete,
-    commandOutcomes,
-  }: SpaceResourceRailContext,
+  { entry, spaces, containingSpaceId, complete, commandOutcomes }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
   select: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
@@ -81,21 +72,27 @@ export function spaceResourceContextCommands(
         renameDraftAnswer(commandOutcomes.run('map-manage', () => rename(title))),
     ),
     // Map authoring orders the creation and the selection write, and the
-    // containing canvas holds its report; where the caret goes is this rail's,
-    // and the rail learns only whether it went there.
+    // containing canvas holds its report. Where the caret goes is this rail's:
+    // command outcomes requests it only for a current completion, so the rail
+    // answers whether it went there from the outcome alone.
     onCreate: offered(mapAuthoring.create, (create) => async (scope: string) => {
-      const outcome = await commandOutcomes.run('map-create', create);
-      if (outcome.kind !== 'completed') return false;
-      continuation.request({
-        target: {
-          kind: 'control',
-          name: 'map-name',
-          scope: { id: scope, subject: outcome.mapId },
-        },
-        select: false,
-        then: 'rename',
+      const outcome = await commandOutcomes.run('map-create', create, {
+        continueAt: ({ mapId: created }) => ({
+          target: { kind: 'control', name: 'map-name', scope: { id: scope, subject: created } },
+          select: false,
+          then: 'rename',
+        }),
       });
-      return true;
+      switch (outcome.kind) {
+        case 'completed':
+          return true;
+        case 'refused':
+        case 'unchanged':
+        case 'unavailable':
+        case 'broke':
+        case 'discarded':
+          return false;
+      }
     }),
     // Map authoring waits for both Spaces, repoints every Space Resource that
     // selected the Map — this one included — and leaves the target's canvas

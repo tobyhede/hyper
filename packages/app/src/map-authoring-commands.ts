@@ -1,6 +1,6 @@
 import type { GraphId, MapId, UUID } from '@project/core';
 import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
-import type { CommandBroke, CommandNotice } from './command-outcomes';
+import type { CommandBroke, CommandDiscarded, CommandNotice } from './command-outcomes';
 import type { ComposedApp } from './compose-app';
 import { PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
@@ -136,10 +136,23 @@ export interface MapAuthoringCommands {
  *
  * `unavailable` and a broken invocation close it too — neither is the author's
  * draft being wrong, and the surface ends a withdrawn editor on its next
- * render in any case. A break has already reached the reporter.
+ * render in any case. A break has already reached the reporter. A discarded
+ * settlement has nothing to say.
  */
-export const renameDraftAnswer = (outcome: MapEditOutcome | CommandBroke): string | null =>
-  outcome.kind === 'refused' ? outcome.report.message : null;
+export const renameDraftAnswer = (
+  outcome: MapEditOutcome | CommandBroke | CommandDiscarded,
+): string | null => {
+  switch (outcome.kind) {
+    case 'refused':
+      return outcome.report.message;
+    case 'completed':
+    case 'unchanged':
+    case 'unavailable':
+    case 'broke':
+    case 'discarded':
+      return null;
+  }
+};
 
 type RenamedMap = Extract<AuthoringCompletion, { readonly kind: 'renamed-map' }>;
 

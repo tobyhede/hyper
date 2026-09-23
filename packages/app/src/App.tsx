@@ -70,7 +70,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
-import { COMMAND_BROKE, COMMAND_CHANNELS } from './command-outcomes';
+import { COMMAND_CHANNELS } from './command-outcomes';
 import { useOpenSpaces } from './open-spaces-context';
 import { offered, renameDraftAnswer, topLevelMapAuthoringCommands } from './map-authoring-commands';
 
@@ -929,7 +929,17 @@ export const createApp = (
                   },
           },
         );
-        return created === COMMAND_BROKE || created.kind === 'refused' ? 'failed' : 'done';
+        switch (created.kind) {
+          case 'refused':
+          case 'broke':
+            return 'failed';
+          // A discarded creation has nothing to say.
+          case 'completed':
+          case 'unchanged':
+          case 'queued':
+          case 'discarded':
+            return 'done';
+        }
       },
       [selectedMap.map, centreAnchor],
     );
@@ -1339,8 +1349,18 @@ export const createApp = (
         void commandOutcomes
           .run('space-exit', async () => spaces.exit(spaceId, confirmation), { subject: title })
           .then((result) => {
-            if (result.kind === 'broke' || result.kind === 'exited') return;
-            setExitReport({ spaceId, title, outcome: result });
+            switch (result.kind) {
+              case 'warning':
+              case 'refused':
+                setExitReport({ spaceId, title, outcome: result });
+                return;
+              // A discarded exit has nothing to say, and a broken one is the
+              // standing notice's.
+              case 'exited':
+              case 'broke':
+              case 'discarded':
+                return;
+            }
           })
           .finally(() => setExiting(null));
       },
@@ -1480,15 +1500,15 @@ export const createApp = (
               onCreate: offered(mapAuthoring.create, (create) => () => {
                 createMapMovedCaret.current = false;
                 // Map authoring creates and selects the Map, and command
-                // outcomes holds a refusal as "Map not created"; the caret's
-                // continuation is the Dock's, and follows only a completion.
-                void commandOutcomes.run('map-create', create).then((outcome) => {
-                  if (outcome.kind !== 'completed') return;
-                  continuation.request({
+                // outcomes holds a refusal as "Map not created". Where the
+                // caret continues is the Dock's; command outcomes requests it
+                // only for a current completion.
+                void commandOutcomes.run('map-create', create, {
+                  continueAt: () => ({
                     target: { kind: 'control', name: 'map-name' },
                     select: false,
                     then: 'rename',
-                  });
+                  }),
                 });
               }),
               didCreateMoveCaret: () => createMapMovedCaret.current,
@@ -1537,7 +1557,7 @@ export const createApp = (
                     }),
                   )
                   .then((result) => {
-                    if (result !== COMMAND_BROKE && result.kind === 'completed') {
+                    if (result.kind === 'completed') {
                       navigation.activateGraph(result.graphId);
                     }
                   });
@@ -1737,7 +1757,6 @@ export const createApp = (
                 onSelectEdge={selectEdge}
               />
               <SpaceCanvas
-                continuation={continuation}
                 commandOutcomes={commandOutcomes}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render

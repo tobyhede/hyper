@@ -343,7 +343,6 @@ function CanvasHarness({
         onSelectEdge={adapter.getState().selectEdge}
       />
       <SpaceCanvas
-        continuation={continuation}
         commandOutcomes={commandOutcomes}
         nodes={projection?.nodes ?? []}
         edges={projection?.edges ?? []}
