@@ -8,12 +8,22 @@ If the answer is yes, ImpactGate's `comment` subcommand posts the markdown repor
 
 **Blocked by:** 01: Land the Impact workflow, scored with and without tests, warn only
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] The decision and its reason are recorded in this ticket.
-- [ ] If yes: the write permission is scoped to the impact job alone, and `ci.yml`'s stance is untouched.
-- [ ] If yes: one comment per PR, updated in place and not duplicated per push.
-- [ ] If yes: a missing permission or token degrades to a warning and never fails the job.
+- [x] The decision and its reason are recorded in this ticket.
+- [x] If yes: the write permission is scoped to the impact job alone, and `ci.yml`'s stance is untouched. (No; see the Answer.)
+- [x] If yes: one comment per PR, updated in place and not duplicated per push. (No.)
+- [x] If yes: a missing permission or token degrades to a warning and never fails the job. (No.)
+
+## Answer
+
+**No. The report stays in the job summary, with no PR comment and no `::notice` annotation.** Decided 2026-09-23 by Toby Hede. Nothing about the workflow changes.
+
+- **The table a reader would act on is wrong routinely, not rarely.** Ticket 05 reduces the lizard defect to two causes, and both come from ordinary code. The worse one, a callable type in a parameter list, cuts 120 functions in this repo down to their first few lines at CC 1, among them `createNavigation`, `createBrowserLocation` and `spaceResources`. So a posted table would mostly understate the code most worth watching, and state it by default to every author.
+- **It would spend a stated principle on a report nothing acts on.** `ci.yml` says nothing in CI comments on a PR, and ticket 04 keeps the report warn-only and out of the `ci` gate.
+- **The lighter `::notice` annotation was considered and not taken.** It needs no permission and leaves the table out, but the grades alone do not tell anyone what to refactor, and they rest on the same spans.
+
+What reopens this: the conditions that reopen ticket 04. A report worth gating on is worth putting in front of authors.
 
 ## Comments
 
