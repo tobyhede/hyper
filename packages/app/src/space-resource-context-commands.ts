@@ -74,9 +74,12 @@ export function spaceResourceContextCommands(
     // Map authoring orders the creation and the selection write, and the
     // containing canvas holds its report. Where the caret goes is this rail's:
     // command outcomes requests it only for a current completion, so the rail
-    // answers whether it went there from the outcome alone.
+    // answers whether it went there from the outcome alone. The creation
+    // authors in the target and never moves the containing canvas, so its
+    // completion is held to the Map it was pressed on like any other outcome.
     onCreate: offered(mapAuthoring.create, (create) => async (scope: string) => {
       const outcome = await commandOutcomes.run('map-create', create, {
+        completionMovesMap: false,
         continueAt: ({ mapId: created }) => ({
           target: { kind: 'control', name: 'map-name', scope: { id: scope, subject: created } },
           select: false,
@@ -96,9 +99,10 @@ export function spaceResourceContextCommands(
     }),
     // Map authoring waits for both Spaces, repoints every Space Resource that
     // selected the Map — this one included — and leaves the target's canvas
-    // on the survivor; the containing canvas holds a refusal.
+    // on the survivor; the containing canvas holds a refusal. The canvas it
+    // leaves is the target's, not the containing one, so it claims no move.
     onDelete: offered(addressed.delete, (remove) => async () => {
-      await commandOutcomes.run('map-delete', remove);
+      await commandOutcomes.run('map-delete', remove, { completionMovesMap: false });
     }),
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };

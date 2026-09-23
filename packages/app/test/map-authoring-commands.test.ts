@@ -9,7 +9,11 @@ import {
   type SpaceSnapshot,
 } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
-import type { CommandOutcomes, MapCreateContinuation } from '../src/command-outcomes';
+import type {
+  CommandOutcomes,
+  MapCompletionClaim,
+  MapCreateContinuation,
+} from '../src/command-outcomes';
 import {
   embeddedMapAuthoringCommands,
   offered,
@@ -135,6 +139,8 @@ interface ContractContext {
   readonly outcomes: CommandOutcomes;
   /** The Map the surface addresses. */
   readonly mapId: MapId;
+  /** Whether the surface's Map completions move the Map `outcomes` reads. */
+  readonly claim: MapCompletionClaim;
   readonly commands: MapAuthoringCommands;
   readonly withdraw: () => void;
   readonly spaces: ReturnType<typeof openSpaces>;
@@ -168,6 +174,7 @@ const contexts: readonly {
         authored,
         outcomes: authored.app.commandOutcomes,
         mapId: FIRST_MAP,
+        claim: { completionMovesMap: true },
         commands: topLevelMapAuthoringCommands(authored, {
           rename: () => available,
           create: () => available,
@@ -195,6 +202,7 @@ const contexts: readonly {
         authored,
         outcomes: source.app.commandOutcomes,
         mapId: document.map,
+        claim: { completionMovesMap: false },
         commands: embeddedMapAuthoringCommands({
           target: authored,
           spaces,
@@ -342,12 +350,14 @@ describe.each(contexts)('Map creation through $name', ({ setup }) => {
   });
 
   it('answers a stale invocation as unavailable without authoring anything', async () => {
-    const { authored, commands, outcomes, withdraw } = await setup();
+    const { authored, commands, outcomes, withdraw, claim } = await setup();
     const create = commands.create;
     const working = authored.session.getState().working;
     const publications = publicationsOf(authored);
     withdraw();
-    expect(await outcomes.run('map-create', () => create.invoke(), CONTINUE_IN_NAME)).toEqual({
+    expect(
+      await outcomes.run('map-create', () => create.invoke(), { ...CONTINUE_IN_NAME, ...claim }),
+    ).toEqual({
       kind: 'unavailable',
     });
     expect(publications.count()).toBe(0);
@@ -357,7 +367,7 @@ describe.each(contexts)('Map creation through $name', ({ setup }) => {
   });
 
   it('answers a refused creation with the complete Map report, which command outcomes holds', async () => {
-    const { authored, commands, outcomes } = await setup();
+    const { authored, commands, outcomes, claim } = await setup();
     const before = mapsOf(authored);
     vi.spyOn(authored.app.authoring, 'complete').mockReturnValueOnce({
       kind: 'refused',
@@ -368,7 +378,10 @@ describe.each(contexts)('Map creation through $name', ({ setup }) => {
       message: 'This Map is no longer part of the Space.',
     };
     expect(
-      await outcomes.run('map-create', () => commands.create.invoke(), CONTINUE_IN_NAME),
+      await outcomes.run('map-create', () => commands.create.invoke(), {
+        ...CONTINUE_IN_NAME,
+        ...claim,
+      }),
     ).toEqual({
       kind: 'refused',
       report,
@@ -612,10 +625,10 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
   });
 
   it('answers a stale invocation as unavailable without deleting anything', async () => {
-    const { authored, commands, outcomes, withdraw } = await setup();
+    const { authored, commands, outcomes, withdraw, claim } = await setup();
     const remove = commands.map(showSecond(authored)).delete;
     withdraw();
-    expect(await outcomes.run('map-delete', () => remove.invoke())).toEqual({
+    expect(await outcomes.run('map-delete', () => remove.invoke(), claim)).toEqual({
       kind: 'unavailable',
     });
     expect(mapsOf(authored)).toEqual([FIRST_MAP, SECOND_MAP]);
@@ -654,14 +667,18 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
   });
 
   it('deletes nothing while the target has not saved, and reports a Map not deleted', async () => {
-    const { authored, commands, control, spaces, outcomes } = await setup();
+    const { authored, commands, control, spaces, outcomes, claim } = await setup();
     const mapId = showSecond(authored);
     control.throwNext(new Error('offline'));
     expect(
       authored.app.authoring.complete({ kind: 'renamed-map', mapId, title: 'Renamed' }).kind,
     ).toBe('completed');
     expect(await spaces.waitForPersistence(TARGET)).toBe(false);
-    const outcome = await outcomes.run('map-delete', () => commands.map(mapId).delete.invoke());
+    const outcome = await outcomes.run(
+      'map-delete',
+      () => commands.map(mapId).delete.invoke(),
+      claim,
+    );
     if (outcome.kind !== 'refused') throw new Error(`Map deletion answered ${outcome.kind}`);
     expect(outcome.report.title).toBe('Map not deleted');
     expect(outcomes.getState().notices.get('map-delete')).toEqual(outcome.report);
@@ -669,7 +686,7 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
   });
 
   it('answers a refused deletion with the complete Map report, which command outcomes holds', async () => {
-    const { authored, commands, outcomes } = await setup();
+    const { authored, commands, outcomes, claim } = await setup();
     const mapId = showSecond(authored);
     vi.spyOn(authored.spaceResources, 'deleteMap').mockResolvedValueOnce({
       kind: 'refused',
@@ -679,7 +696,9 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
       title: 'Map not deleted',
       message: 'This Map is no longer part of the Space.',
     };
-    expect(await outcomes.run('map-delete', () => commands.map(mapId).delete.invoke())).toEqual({
+    expect(
+      await outcomes.run('map-delete', () => commands.map(mapId).delete.invoke(), claim),
+    ).toEqual({
       kind: 'refused',
       report,
     });

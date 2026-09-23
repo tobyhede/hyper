@@ -120,6 +120,11 @@ const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
   select: false,
   then: 'rename',
 });
+/**
+ * How the Dock runs a Map deletion: leaving its own canvas on the survivor is
+ * the completion's move.
+ */
+const DOCK = { completionMovesMap: true } as const;
 const refusedGraphDelete: CoordinatedContextDeleteResult = {
   kind: 'error',
   message: 'Graph refused.',
@@ -133,9 +138,9 @@ const notice = (outcomes: ReturnType<typeof open>['outcomes'], channel: CommandC
 
 /** Leave a refusal standing on every channel the table declares. */
 async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes']): Promise<void> {
-  outcomes.run('map-create', () => refusedMap, { continueAt: inTheName });
+  outcomes.run('map-create', () => refusedMap, { continueAt: inTheName, completionMovesMap: true });
   outcomes.run('map-manage', () => refusedMap);
-  outcomes.run('map-delete', () => refusedMap);
+  outcomes.run('map-delete', () => refusedMap, DOCK);
   outcomes.run('graph-edit', () => refusedAuthoring);
   outcomes.run('graph-delete', () => refusedGraphDelete);
   outcomes.run('resource-delete', () => refusedAuthoring);
@@ -203,7 +208,10 @@ describe('titles and sentences', () => {
   it('publishes a Map report whole, without describing it', () => {
     const { outcomes } = open();
 
-    outcomes.run('map-create', () => refusedMap, { continueAt: inTheName });
+    outcomes.run('map-create', () => refusedMap, {
+      continueAt: inTheName,
+      completionMovesMap: true,
+    });
 
     expect(notice(outcomes, 'map-create')).toBe(mapReport);
   });
@@ -458,9 +466,13 @@ describe('a thrown operation', () => {
     const { outcomes, reported } = open();
     const failure = new Error('map broke');
 
-    outcomes.run('map-delete', () => {
-      throw failure;
-    });
+    outcomes.run(
+      'map-delete',
+      () => {
+        throw failure;
+      },
+      DOCK,
+    );
 
     expect(reported).toEqual([failure]);
     expect(notice(outcomes, 'map-delete')).toBeNull();
@@ -717,7 +729,7 @@ describe('staleness', () => {
   });
 });
 
-describe('a command whose completion moves the Map', () => {
+describe('a Map command whose run claims its completion moves the Map', () => {
   it("requests New Map's continuation after the creation's own selection move", async () => {
     const { outcomes, navigation, continuation } = open();
 
@@ -727,7 +739,7 @@ describe('a command whose completion moves the Map', () => {
         navigation.selectMap(MAP_B);
         return Promise.resolve(createdMap);
       },
-      { continueAt: inTheName },
+      { continueAt: inTheName, completionMovesMap: true },
     );
 
     expect(answered).toBe(createdMap);
@@ -737,18 +749,58 @@ describe('a command whose completion moves the Map', () => {
   it('answers a completed Map deletion that moved the selection', async () => {
     const { outcomes, navigation } = open();
 
-    const answered = await outcomes.run('map-delete', () => {
-      navigation.selectMap(MAP_B);
-      return Promise.resolve({ kind: 'completed' } as const);
-    });
+    const answered = await outcomes.run(
+      'map-delete',
+      () => {
+        navigation.selectMap(MAP_B);
+        return Promise.resolve({ kind: 'completed' } as const);
+      },
+      DOCK,
+    );
 
     expect(answered).toEqual({ kind: 'completed' });
+  });
+
+  it('discards a creation that does not move this Map and completes after the author changed Map', async () => {
+    const { outcomes, navigation, continuation } = open();
+    const pending = deferred<typeof createdMap>();
+    const continueAt = vi.fn(inTheName);
+    const running = outcomes.run('map-create', () => pending.promise, {
+      continueAt,
+      completionMovesMap: false,
+    });
+    const listener = vi.fn();
+    outcomes.subscribe(listener);
+
+    navigation.selectMap(MAP_B);
+    pending.resolve(createdMap);
+
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('discards a deletion that does not move this Map and completes after the author changed Map', async () => {
+    const { outcomes, navigation } = open();
+    const pending = deferred<{ readonly kind: 'completed' }>();
+    const running = outcomes.run('map-delete', () => pending.promise, {
+      completionMovesMap: false,
+    });
+
+    navigation.selectMap(MAP_B);
+    pending.resolve({ kind: 'completed' });
+
+    await expect(running).resolves.toBe(COMMAND_DISCARDED);
   });
 
   it('discards a refused creation that settles after the author changed Map', async () => {
     const { outcomes, navigation, continuation } = open();
     const pending = deferred<typeof refusedMap>();
-    const running = outcomes.run('map-create', () => pending.promise, { continueAt: inTheName });
+    const running = outcomes.run('map-create', () => pending.promise, {
+      continueAt: inTheName,
+      completionMovesMap: true,
+    });
     const listener = vi.fn();
     outcomes.subscribe(listener);
 
@@ -767,7 +819,10 @@ describe('a command whose completion moves the Map', () => {
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     const pending = deferred<typeof createdMap>();
     const continueAt = vi.fn(inTheName);
-    const running = outcomes.run('map-create', () => pending.promise, { continueAt });
+    const running = outcomes.run('map-create', () => pending.promise, {
+      continueAt,
+      completionMovesMap: true,
+    });
 
     expect(authoring.acceptStoredSpace()).toBeNull();
     pending.resolve(createdMap);
@@ -781,8 +836,11 @@ describe('a command whose completion moves the Map', () => {
     const { outcomes, continuation } = open();
     const older = deferred<typeof createdMap>();
     const continueAt = vi.fn(inTheName);
-    const first = outcomes.run('map-create', () => older.promise, { continueAt });
-    outcomes.run('map-create', () => refusedMap, { continueAt });
+    const first = outcomes.run('map-create', () => older.promise, {
+      continueAt,
+      completionMovesMap: true,
+    });
+    outcomes.run('map-create', () => refusedMap, { continueAt, completionMovesMap: true });
 
     older.resolve(createdMap);
 

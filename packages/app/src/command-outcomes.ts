@@ -65,7 +65,6 @@ export interface CommandNotice {
 
 interface ChannelLifetime {
   readonly resetsOnMapChange: boolean;
-  readonly completionMovesMap: boolean;
 }
 
 /**
@@ -84,37 +83,30 @@ type ChannelEntry =
  *
  * `resetsOnMapChange` makes a notice live only as long as the Map it was
  * pressed on: a Map change clears it where it stands, and a run pressed on one
- * Map settles under that Map or not at all.
- *
- * `completionMovesMap` marks a command whose own completion is what moves the
- * selection, so a `completed` outcome on it is not held to the Map it was
- * pressed on. Its other outcomes still are.
+ * Map settles under that Map or not at all — except a completion whose run
+ * claimed it moves that Map ({@link MapCompletionClaim}).
  */
 const CHANNELS = {
-  'map-create': { resetsOnMapChange: true, completionMovesMap: true, words: 'reported' },
-  'map-manage': { resetsOnMapChange: true, completionMovesMap: false, words: 'reported' },
-  'map-delete': { resetsOnMapChange: true, completionMovesMap: true, words: 'reported' },
+  'map-create': { resetsOnMapChange: true, words: 'reported' },
+  'map-manage': { resetsOnMapChange: true, words: 'reported' },
+  'map-delete': { resetsOnMapChange: true, words: 'reported' },
   'graph-edit': {
     resetsOnMapChange: true,
-    completionMovesMap: false,
     words: 'described',
     title: 'Graph unchanged',
   },
   'graph-delete': {
     resetsOnMapChange: true,
-    completionMovesMap: false,
     words: 'described',
     title: 'Graph not deleted',
   },
   'resource-delete': {
     resetsOnMapChange: true,
-    completionMovesMap: false,
     words: 'described',
     title: 'Resource not deleted',
   },
   'resource-remove': {
     resetsOnMapChange: true,
-    completionMovesMap: false,
     words: 'described',
     title: 'Resource not removed',
   },
@@ -124,13 +116,11 @@ const CHANNELS = {
   // legible.
   'space-resource-create': {
     resetsOnMapChange: false,
-    completionMovesMap: false,
     words: 'described',
     title: 'Space not created',
   },
   'reference-create': {
     resetsOnMapChange: false,
-    completionMovesMap: false,
     words: 'described',
     title: 'Reference Resource not created',
   },
@@ -140,7 +130,6 @@ const CHANNELS = {
   // press did nothing, and the reporter still hears the defect.
   'space-command': {
     resetsOnMapChange: false,
-    completionMovesMap: false,
     words: 'described',
     title: 'Space command failed',
   },
@@ -206,6 +195,22 @@ export interface MapCreateContinuation {
 }
 
 /**
+ * Whether this run's completion is what moves the Map these command outcomes
+ * read.
+ *
+ * Required on every Map creation and deletion, because only the caller knows:
+ * the Dock's creation selects the new Map on the canvas it stands on, and its
+ * deletion leaves that canvas on the survivor, so both claim it. A Space
+ * Resource's rail authors in the target Space and is held by the containing
+ * canvas's command outcomes, whose Map it never moves, so it claims neither.
+ * A claimed completion is not held to the Map the run was pressed on; every
+ * other outcome, and every unclaimed completion, still is.
+ */
+export interface MapCompletionClaim {
+  readonly completionMovesMap: boolean;
+}
+
+/**
  * What each command's operation answers, and what `run` must be given with it.
  *
  * `options` is a tuple so a command whose sentences name a `subject` makes the
@@ -214,10 +219,13 @@ export interface MapCreateContinuation {
 interface CommandSignatures {
   readonly 'map-create': {
     readonly result: MapEditOutcome<CompletedMapEdit>;
-    readonly options: [options: MapCreateContinuation];
+    readonly options: [options: MapCreateContinuation & MapCompletionClaim];
   };
   readonly 'map-manage': { readonly result: MapEditOutcome; readonly options: [] };
-  readonly 'map-delete': { readonly result: MapEditOutcome; readonly options: [] };
+  readonly 'map-delete': {
+    readonly result: MapEditOutcome;
+    readonly options: [options: MapCompletionClaim];
+  };
   readonly 'graph-edit': { readonly result: AuthoringResult; readonly options: [] };
   readonly 'graph-delete': {
     readonly result: CoordinatedContextDeleteResult;
@@ -283,10 +291,10 @@ interface CommandDefinition<Result, Options extends readonly unknown[]> {
    */
   readonly broke: CommandBreak<Options> | null;
   /**
-   * Whether a result is a completion, where the channel's completion moves the
-   * Map — the one case staleness reads a result's kind.
+   * Whether this result is a completion its run claimed moves the Map, which
+   * exempts it from the Map check — the one case staleness reads a result.
    */
-  readonly completed?: (result: Result) => boolean;
+  readonly movedMap?: (result: Result, ...options: Options) => boolean;
 }
 
 type CommandDefinitions = {
@@ -300,13 +308,13 @@ const CLEAR: Settlement = { kind: 'clear', continuation: null };
 
 const notice = (value: CommandNotice): Settlement => ({ kind: 'notice', notice: value });
 
-const mapCompleted = (result: MapEditOutcome): boolean => result.kind === 'completed';
+const claimedMove = (result: MapEditOutcome, { completionMovesMap }: MapCompletionClaim): boolean =>
+  completionMovesMap && result.kind === 'completed';
 
 const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<MapEditOutcome, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
   broke: null,
-  completed: mapCompleted,
 });
 
 const authoringCommand = (channel: DescribedChannel): CommandDefinition<AuthoringResult, []> => ({
@@ -327,10 +335,15 @@ const COMMANDS: CommandDefinitions = {
       return { kind: 'clear', continuation: continueAt(result) };
     },
     broke: null,
-    completed: mapCompleted,
+    movedMap: claimedMove,
   },
   'map-manage': reportedMapCommand('map-manage'),
-  'map-delete': reportedMapCommand('map-delete'),
+  'map-delete': {
+    channel: 'map-delete',
+    settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
+    broke: null,
+    movedMap: claimedMove,
+  },
   'graph-edit': authoringCommand('graph-edit'),
   // `coordinatedGraphDelete` has already said its gate and its lifecycle
   // refusal in a sentence, so the describer is that sentence.
@@ -550,20 +563,18 @@ export function createCommandOutcomes({
   };
 
   /**
-   * Whether a settlement pressed at `at` may still publish. `completed` is
-   * whether it is a completion, which a channel whose completion moves the Map
-   * exempts from the Map check.
+   * Whether a settlement pressed at `at` may still publish. `movedMap` is
+   * whether it is a completion its run claimed moved the Map, which the Map
+   * check exempts.
    */
   const current = (
     { channel, epoch, mapId, replacementEpoch }: Press,
-    completed: boolean,
+    movedMap: boolean,
   ): boolean =>
     !disposed &&
     epochs.get(channel) === epoch &&
     authoring.getState().replacementEpoch === replacementEpoch &&
-    (mapId === null ||
-      (completed && CHANNELS[channel].completionMovesMap) ||
-      navigation.getState().selectedMapId === mapId);
+    (mapId === null || movedMap || navigation.getState().selectedMapId === mapId);
 
   const settle = <Result, Options extends readonly unknown[]>(
     at: Press,
@@ -571,7 +582,7 @@ export function createCommandOutcomes({
     result: Result,
     options: Options,
   ): Result | CommandDiscarded => {
-    if (!current(at, definition.completed?.(result) ?? false)) return COMMAND_DISCARDED;
+    if (!current(at, definition.movedMap?.(result, ...options) ?? false)) return COMMAND_DISCARDED;
     const settlement = definition.settle(result, ...options);
     if (settlement.kind === 'notice') {
       write(at.channel, settlement.notice);

@@ -1502,8 +1502,10 @@ export const createApp = (
                 // Map authoring creates and selects the Map, and command
                 // outcomes holds a refusal as "Map not created". Where the
                 // caret continues is the Dock's; command outcomes requests it
-                // only for a current completion.
+                // only for a current completion. The creation selects the new
+                // Map on this canvas, so its completion claims that move.
                 void commandOutcomes.run('map-create', create, {
+                  completionMovesMap: true,
                   continueAt: () => ({
                     target: { kind: 'control', name: 'map-name' },
                     select: false,
@@ -1514,9 +1516,10 @@ export const createApp = (
               didCreateMoveCaret: () => createMapMovedCaret.current,
               // Map authoring deletes the drawing Map, repoints every Space
               // Resource that selected it and leaves the canvas on the survivor;
-              // command outcomes holds a refusal as "Map not deleted".
+              // command outcomes holds a refusal as "Map not deleted". Leaving
+              // this canvas on the survivor is its completion's move.
               onDelete: offered(mapAuthoring.map(selectedMap.map.id).delete, (remove) => () => {
-                void commandOutcomes.run('map-delete', remove);
+                void commandOutcomes.run('map-delete', remove, { completionMovesMap: true });
               }),
               onCopyLink: runEntityCommand(
                 { kind: 'map', map: selectedMap.map },

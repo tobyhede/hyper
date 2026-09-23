@@ -18,6 +18,8 @@ const META_GRAPH = id('7');
 const FIRST_GRAPH = id('8');
 const SECOND_GRAPH = id('9');
 const SURVIVOR_GRAPH = id('10');
+const OTHER_META_MAP = id('11');
+const OTHER_META_GRAPH = id('12');
 
 const document: Extract<ResourceDocument, { kind: 'space' }> = {
   kind: 'space',
@@ -39,6 +41,13 @@ const meta: SpaceSnapshot = {
         kind: 'positioned',
         positions: { [RESOURCE]: { x: 0, y: 0, open: false } },
         graphs: [{ id: META_GRAPH, title: 'Meta Graph', edges: [] }],
+      },
+      {
+        id: OTHER_META_MAP,
+        title: 'Other Meta Map',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: OTHER_META_GRAPH, title: 'Other Meta Graph', edges: [] }],
       },
     ],
   },
@@ -193,3 +202,24 @@ it.each(['map', 'graph'] as const)(
     expect(stored?.snapshot.resources[0]?.document).not.toEqual(document);
   },
 );
+
+/**
+ * The rail's New Map authors in the target and never moves the containing
+ * canvas, so its completion is held to the containing Map it was pressed on:
+ * once the author has moved that canvas to another Map, the completion is
+ * discarded and the caret is sent nowhere.
+ */
+it('discards a rail New Map that completes after the containing canvas moved Map', async () => {
+  const { commands, source, control } = await setup();
+  const release = control.deferNextCommit();
+  const creating = offeredPress(commands.mapCommands.onCreate)('test-rail');
+  try {
+    await vi.waitFor(() => expect(control.requests).toHaveLength(1));
+    source.app.navigation.selectMap(OTHER_META_MAP);
+  } finally {
+    release();
+  }
+
+  expect(await creating).toBe(false);
+  expect(source.app.continuation.getState().pending).toBeNull();
+});

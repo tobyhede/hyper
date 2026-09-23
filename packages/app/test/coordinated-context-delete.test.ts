@@ -94,7 +94,9 @@ describe('Dock delete wiring', () => {
 
   it('sends Map delete through Map authoring rather than the lifecycle', () => {
     expect(app).toMatch(/offered\(\s*mapAuthoring\.map\(selectedMap\.map\.id\)\.delete,/u);
-    expect(app).toMatch(/commandOutcomes\.run\('map-delete',\s*remove\)/u);
+    expect(app).toMatch(
+      /commandOutcomes\.run\('map-delete',\s*remove,\s*\{\s*completionMovesMap:\s*true\s*\}\)/u,
+    );
     expect(app).not.toMatch(/spaceResources\.deleteMap\b/u);
   });
 
