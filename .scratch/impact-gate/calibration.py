@@ -55,9 +55,12 @@ def gh(*args: str) -> str:
 
 
 def pr_runs(limit: int) -> list[dict]:
+    # Only finished, green runs carry both reports: the workflow cancels a
+    # superseded run, and one still in progress has no summary yet.
     out = gh("run", "list", "--repo", REPO, "--workflow=impact.yml", "--limit", str(limit),
-             "--json", "databaseId,event,headBranch,createdAt,conclusion")
-    return [r for r in json.loads(out) if r["event"] == "pull_request"]
+             "--json", "databaseId,event,headBranch,createdAt,status,conclusion")
+    return [r for r in json.loads(out)
+            if r["event"] == "pull_request" and r["status"] == "completed" and r["conclusion"] == "success"]
 
 
 def run_log(run_id: int, cache: pathlib.Path | None) -> str:

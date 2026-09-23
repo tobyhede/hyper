@@ -42,7 +42,7 @@ Until both hold, a gate would rest on numbers already shown wrong. Ticket 05 red
 
 ## Comments
 
-Calibration. It covers the Impact workflow's pull-request runs from PR #231's merge to 2026-09-23: one row per branch, taken from that branch's most recent run. Each row is `score / grade / files changed`. Codemod branches are shown but excluded from the distribution figures, because breadth-squared inflates them while they carry little risk: `map-resource-01` (PR #249, the prose sweep before the rename) and `map-resource-02` (PR #250, the rename itself). Produced by `.scratch/impact-gate/calibration.py --limit 100`, which reads each run's log through `gh run view --log` and parses ImpactGate's markdown out of it. That parser breaks if ImpactGate changes its output.
+Calibration. It covers the Impact workflow's pull-request runs from PR #231's merge to 2026-09-23: one row per branch, taken from that branch's most recent completed, successful run. Every pull-request run in the window succeeded, so each is simply the branch's latest. Each row is `score / grade / files changed`. Codemod branches are shown but excluded from the distribution figures, because breadth-squared inflates them while they carry little risk: `map-resource-01` (PR #249, the prose sweep before the rename) and `map-resource-02` (PR #250, the rename itself). Produced by `.scratch/impact-gate/calibration.py --limit 100`, which reads each run's log through `gh run view --log` and parses ImpactGate's markdown out of it. That parser breaks if ImpactGate changes its output.
 
 | date | branch | with tests (score / grade / files) | without tests | job |
 |---|---|---|---|---|
