@@ -363,7 +363,6 @@ export function embeddedMap({
             focusable: false,
             reconnectable: false,
             deletable: false,
-            interactionWidth: 0,
             zIndex: (parent.zIndex ?? 10) + 1,
             style: { ...edge.style, clipPath: `url("#${embeddedClipId(parent.id)}")` },
           },

@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Tags:** Defect
 
@@ -50,12 +50,21 @@ Embedded Edges are also minted not selectable, not focusable, not reconnectable 
 - `RoutedEdgePath` / `routedEdgePathProps`: unchanged. Do not start forwarding interaction width.
 
 **Acceptance criteria:**
-- [ ] No embedded Edge carries `interactionWidth`, and nothing else in the tree sets it.
-- [ ] A rendering test asserts an embedded Edge's group is `inactive`, and fails when that group is made selectable (non-vacuity checked by flipping `selectable` temporarily).
-- [ ] The embedding bullet in `docs/agents/rendering.md` says what makes an embedded Edge inert to the pointer, if it does not already.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
+- [x] No embedded Edge carries `interactionWidth`, and nothing else in the tree sets it.
+- [x] A rendering test asserts an embedded Edge's group is `inactive`, and fails when that group is made selectable (non-vacuity checked by flipping `selectable` temporarily).
+- [x] The embedding bullet in `docs/agents/rendering.md` says what makes an embedded Edge inert to the pointer, if it does not already.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass.
 
 **Out of scope:**
 - Forwarding interaction width (or any other new prop) through `RoutedEdgePath`.
 - Changing the canvas's own Edges' hit area or selection behavior.
 - Anything about embedded Edge types or conversion to Edge selections (typescript-7/13, resolved).
+
+## Resolved — 2026-09-23
+
+- `embeddedMap` no longer sets `interactionWidth`, and nothing else in `packages/` does. `RoutedEdgePath` is unchanged.
+- New Ladle test *an embedded Edge takes no pointer events, even on its own curve*, in the embed spec against the `SelectedMap` story, which renders the real `Application`. It asserts the embedded Edge's group has React Flow's `inactive` class, and that the element topmost at the midpoint of the drawn curve (`getPointAtLength` / `elementFromPoint`) is not inside any `.react-flow__edge`. It carries no parity tag: the application proof for the matching claim draws only one embedded Resource, so there is no embedded Edge there to observe.
+- Non-vacuity: with embedded Edges minted `selectable: true`, the class assertion fails, because the group becomes `selectable` rather than `inactive`. With the class assertion removed as well, the hit-test assertion fails too (the press lands on the Edge). So each half bites on its own.
+- `docs/agents/rendering.md`'s embedding bullet now says what makes an embedded Edge inert to the pointer, and names the test.
+
+Verification: `pnpm verify` exit 0 (240 files, 3106 passed, 13 skipped); `pnpm e2e` 227 passed; `pnpm e2e:ladle` 116 passed. The first `verify` failed `current-domain-vocabulary` on a bare citation of this ticket's directory in the rendering doc. That citation now uses the full `.scratch/` path, which the scan forgives as a cited path. The final `verify` ran after that doc-only fix; neither Playwright suite can observe the doc, so they were not rerun.
