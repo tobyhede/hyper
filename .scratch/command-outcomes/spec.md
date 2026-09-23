@@ -67,7 +67,7 @@ It keeps arm → confirm → deleting (`pending`, `deleting`) and runs the delet
 
 ### Out of scope
 
-- **Inline refusals** returned to the surface that asked: chrome rename (:829) and add-existing-Resource (:1244) return a sentence to their editor or picker. That is already local.
+- **Inline refusals** returned to the surface that asked: Space and Graph chrome rename (:829) and add-existing-Resource (:1244) return a sentence to their editor or picker. That is already local. Map rename is the exception (ticket 06): `MapAuthoringCommands` returns its complete report, which `map-manage` holds, and the editor still holds the refused draft open on the report's sentence.
 - **Pending flags** (`creatingSpaceResource` and the like) stay with whoever draws the busy state.
 - **"Link not copied"** — a clipboard failure, not a Completion outcome.
 - **The destination-not-found report** — undismissable by design and owned by `browser-location.ts` (ADR 0081).

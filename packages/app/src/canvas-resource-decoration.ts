@@ -10,6 +10,7 @@ import type { ObserverErrorReporter } from '@project/persistence';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import type { EntityActionGroup } from '@project/ui';
 import { buildSpaceResourceRail, type SpaceResourceRailContext } from './build-space-resource-rail';
+import type { CommandOutcomes } from './command-outcomes';
 import type { Continuation } from './continuation';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { ResourceResize } from './render-adapter';
@@ -62,6 +63,7 @@ export interface CanvasResourceDecorationContext {
   readonly spaceResourceTargets: SpaceResourceTargets;
   readonly spaces: OpenSpaces | null;
   readonly continuation: Continuation | undefined;
+  readonly commandOutcomes: CommandOutcomes | undefined;
   readonly completeSpaceResourceSelection: (
     resourceId: ResourceId,
     map: Pick<SpaceResourceTargetMap, 'id'>,
@@ -124,6 +126,7 @@ type SpaceResourceDecorationContext = Pick<
   | 'spaceResourceTargets'
   | 'spaces'
   | 'continuation'
+  | 'commandOutcomes'
   | 'completeSpaceResourceSelection'
   | 'completeEmbedded'
   | 'portalEditing'
@@ -254,6 +257,7 @@ export function decorateSpaceResourceNode(
     if (
       context.spaces !== null &&
       context.continuation !== undefined &&
+      context.commandOutcomes !== undefined &&
       spaceDocument !== undefined
     ) {
       const entry = context.spaces.entry(spaceDocument.spaceId);
@@ -263,6 +267,7 @@ export function decorateSpaceResourceNode(
           spaces: context.spaces,
           containingSpaceId: context.containingSpaceId,
           continuation: context.continuation,
+          commandOutcomes: context.commandOutcomes,
           complete: (completion) =>
             context.completeEmbedded(
               entry,

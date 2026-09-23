@@ -67,6 +67,7 @@ import {
 import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
+import type { CommandOutcomes } from '../command-outcomes';
 import type { Continuation } from '../continuation';
 import {
   framingFromFit,
@@ -169,6 +170,8 @@ const focusedResource = (
 
 export interface SpaceCanvasProps {
   readonly continuation: Continuation;
+  /** Where a Space Resource rail's Map report is held. */
+  readonly commandOutcomes: CommandOutcomes;
   nodes: ResourceFlowNode[];
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
@@ -298,6 +301,7 @@ export interface SpaceCanvasProps {
 
 export function SpaceCanvas({
   continuation,
+  commandOutcomes,
   nodes,
   edges,
   projectedNodes,
@@ -413,6 +417,7 @@ export function SpaceCanvas({
   }, [embeddedEditing, reportEmbeddedMapEditing]);
   const resourceAuthoring = useCanvasResourceAuthoring({
     continuation,
+    commandOutcomes,
     nodes,
     availability,
     nameOnCreation,
@@ -1234,6 +1239,7 @@ export function SpaceCanvas({
         request.entry === undefined ? null : (
           <EmbeddedMapAuthoring
             continuation={continuation}
+            commandOutcomes={commandOutcomes}
             key={`${request.parent.id}:${request.mapId}`}
             parent={request.parent}
             entry={request.entry}

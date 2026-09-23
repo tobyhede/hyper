@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot, type ResourceDocument } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
+import { embeddedMapAuthoringCommands } from '../src/map-authoring-commands';
 import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
@@ -106,6 +107,8 @@ async function setup() {
     source.app.continuation,
     (completion) =>
       completeEmbeddedAuthoring(entry, document.map, completion, entry.app.reportObserverError),
+    embeddedMapAuthoringCommands(entry, spaces, () => true),
+    source.app.commandOutcomes,
   );
   return { backend, spaces, commands, source, control };
 }

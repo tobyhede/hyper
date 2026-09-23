@@ -93,6 +93,7 @@ const context = (
   spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
   spaces: null,
   continuation: undefined,
+  commandOutcomes: undefined,
   completeSpaceResourceSelection: () => null,
   completeEmbedded: completeEmbeddedAuthoring,
   portalEditing: undefined,

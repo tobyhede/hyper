@@ -78,6 +78,7 @@ import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
 import { COMMAND_BROKE, COMMAND_CHANNELS } from './command-outcomes';
 import { useOpenSpaces } from './open-spaces-context';
+import { renameDraftAnswer, topLevelMapAuthoringCommands } from './map-authoring-commands';
 
 /**
  * What an isolated single-Space mount reads in place of the session's open set.
@@ -223,7 +224,6 @@ export const createApp = (
     const [editingResourceBody, setEditingResourceBody] = useState(false);
     const [editingResourceTitle, setEditingResourceTitle] = useState(false);
     const [createMapRefusal, setCreateMapRefusal] = useState<AuthoringRefusal | null>(null);
-    const [mapManagementRefusal, setMapManagementRefusal] = useState<AuthoringRefusal | null>(null);
     const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
@@ -709,14 +709,13 @@ export const createApp = (
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Graph Edit and deletion notices and the Resource deletion and removal
-    // notices are command outcomes' channels, and that module clears them on
-    // the same move (`command-outcomes.ts`).
+    // The Map rename notice, the Graph Edit and deletion notices and the
+    // Resource deletion and removal notices are command outcomes' channels, and
+    // that module clears them on the same move (`command-outcomes.ts`).
     const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
     if (refusedUnder !== selectedMapId) {
       setRefusedUnder(selectedMapId);
       setCreateMapRefusal(null);
-      setMapManagementRefusal(null);
       setMapDeleteMessage(null);
     }
     /**
@@ -774,19 +773,37 @@ export const createApp = (
      * drift, and the Dock has one rename slot under the whole bar precisely so
      * that there is one of these.
      */
+    /**
+     * Map Edits on the Space the canvas draws, available while a chrome
+     * command may run. Rebuilt when that answer moves, so the capability the
+     * Dock is drawn from and the one it invokes read the same render.
+     */
+    const chromeTitleEdit = availability.chromeTitleEdit;
+    const mapAuthoring = useMemo(
+      () => topLevelMapAuthoringCommands(composition, () => chromeTitleEdit),
+      [chromeTitleEdit],
+    );
     const renameChromeTitle = useCallback(
       (subject: SpaceChromeTitleSubject, title: string): string | null => {
+        if (subject.kind === 'map') {
+          // Map authoring decides availability and the report; command
+          // outcomes holds the report as "Map unchanged", and the editor
+          // holds a refused draft open on its sentence.
+          return renameDraftAnswer(
+            commandOutcomes.run('map-manage', () =>
+              mapAuthoring.map(subject.id).rename.invoke(title),
+            ),
+          );
+        }
         const result =
           subject.kind === 'space'
             ? // No id: the Edit writes `document.title` on the session this
               // composition is closed over, which is the Space the Dock draws.
               authoring.complete({ kind: 'renamed-space', title })
-            : subject.kind === 'map'
-              ? authoring.complete({ kind: 'renamed-map', mapId: subject.id, title })
-              : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
+            : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
-      [],
+      [mapAuthoring],
     );
 
     /**
@@ -855,7 +872,6 @@ export const createApp = (
                   mapId,
                   preferredMapId: null,
                 });
-                setMapManagementRefusal(null);
                 setMapDeleteMessage(null);
                 if (result.kind === 'error') {
                   setMapDeleteMessage(result.message);
@@ -1330,16 +1346,6 @@ export const createApp = (
     const opener = spaces?.opener(renderedSpace.id) ?? null;
 
     /**
-     * The one Map refusal there is anywhere to put, now that Add Map and
-     * Delete Map report in the same place.
-     *
-     * Both were drawn under Add Map in the Sidebar and both are about the
-     * Map that was selected when they were refused, which is why moving
-     * between Maps already clears them together.
-     */
-    const mapRefusal = createMapRefusal ?? mapManagementRefusal;
-
-    /**
      * A Graph Edit from the cluster, reported on `graph-edit`.
      *
      * One reporter for the cluster's commands rather than call sites each
@@ -1501,7 +1507,7 @@ export const createApp = (
               maps: renderedSpace.maps,
               selected: selectedMap.map,
               onSelect: selectMap,
-              onRename: availability.chromeTitleEdit
+              onRename: mapAuthoring.map(selectedMap.map.id).rename.available
                 ? (mapId, title) => renameChromeTitle({ kind: 'map', id: mapId }, title)
                 : null,
               createDisabled: !availability.createMap,
@@ -1526,7 +1532,6 @@ export const createApp = (
                   create: () => {
                     const result = authoring.complete({ kind: 'created-map' });
                     setCreateMapRefusal(result.kind === 'refused' ? result.refusal : null);
-                    setMapManagementRefusal(null);
                     createMapMovedCaret.current = false;
                     return result;
                   },
@@ -1700,21 +1705,9 @@ export const createApp = (
                 </ShellNotice>
               );
             })}
-            {mapRefusal === null ? null : (
-              <ShellNotice
-                /* Named for the command that was refused rather than for the
-                   Map, because a refused *creation* left no Map to be
-                   unchanged — "Map unchanged" told the author an existing
-                   Map had been left alone when none had been made. */
-                title={createMapRefusal === null ? 'Map unchanged' : 'Map not created'}
-                // Both, because the one that is standing is whichever was
-                // written last and the reader is dismissing what they can see.
-                onDismiss={() => {
-                  setCreateMapRefusal(null);
-                  setMapManagementRefusal(null);
-                }}
-              >
-                {describeAuthoringRefusal(mapRefusal)}
+            {createMapRefusal === null ? null : (
+              <ShellNotice title="Map not created" onDismiss={() => setCreateMapRefusal(null)}>
+                {describeAuthoringRefusal(createMapRefusal)}
               </ShellNotice>
             )}
             {mapDeleteMessage === null ? null : (
@@ -1813,6 +1806,7 @@ export const createApp = (
               />
               <SpaceCanvas
                 continuation={continuation}
+                commandOutcomes={commandOutcomes}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but

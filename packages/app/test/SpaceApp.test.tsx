@@ -1133,6 +1133,48 @@ describe('Space app Resources list', () => {
   });
 
   /**
+   * A refused Dock Map rename is answered twice, each by its owner: the
+   * editor holds the draft open on the sentence, and command outcomes hold the
+   * report as "Map unchanged" until it is dismissed.
+   *
+   * Refused through a spy on Space Authoring, because the Dock answers a
+   * blank name itself and every other refusal of `renamed-map` is a race no
+   * mount can stage.
+   */
+  it('holds a refused Dock Map rename open and reports it as Map unchanged', async () => {
+    const base = snapshot('Space', 'Resource', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceResources } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    const app = composeApp({ spaceSession: session });
+    const complete = app.authoring.complete;
+    vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
+      completion.kind === 'renamed-map'
+        ? { kind: 'refused', refusal: { code: 'map-not-found' } }
+        : complete(completion),
+    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
+
+    await beginRename('selected-canvas');
+    const mapEditor = await screen.findByRole('textbox', { name: 'Map name' });
+    fireEvent.change(mapEditor, { target: { value: 'Renamed' } });
+    fireEvent.keyDown(mapEditor, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveValue('Renamed');
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveAccessibleDescription(
+      'This Map is no longer part of the Space.',
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss: Map unchanged' }));
+    await waitFor(() => expect(screen.queryByText('Map unchanged')).not.toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveValue('Renamed');
+    expect(session.getState().working.document.maps?.[0]?.title).toBe(
+      base.document.maps?.[0]?.title,
+    );
+  });
+
+  /**
    * **What the bar reports and what the bar draws are one answer.**
    *
    * A live chrome rename withdraws Create Resource, Present, Delete Resource and the

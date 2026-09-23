@@ -201,6 +201,7 @@ describe('opening framing on a mounted canvas', () => {
           <ReactFlowProvider>
             <SpaceCanvas
               continuation={app.continuation}
+              commandOutcomes={app.commandOutcomes}
               nodes={[resourceNode()]}
               edges={[]}
               projectedNodes={null}
@@ -334,6 +335,7 @@ describe('opening framing on a mounted canvas', () => {
         <ReactFlowProvider>
           <SpaceCanvas
             continuation={app.continuation}
+            commandOutcomes={app.commandOutcomes}
             nodes={[resourceNode()]}
             edges={[]}
             projectedNodes={null}

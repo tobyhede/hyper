@@ -366,6 +366,41 @@ describe('the Map an Open Space Resource draws', () => {
     },
   );
 
+  /**
+   * A refused rail rename is answered twice, each by its owner: the editor
+   * holds the draft open on the sentence, and the containing canvas's command
+   * outcomes hold the report as "Map unchanged" until it is dismissed.
+   */
+  it('holds a refused rail Map rename open and reports it on the containing Space', async () => {
+    const session = await mount(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        map: SELECTED_MAP_ID,
+        graph: SELECTED_GRAPH_ID,
+      }),
+    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    fireEvent.click(
+      within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const editor = await screen.findByRole('textbox', { name: 'Map name' });
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveAccessibleDescription(
+      'A Map title is required.',
+    );
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Map unchanged' });
+    fireEvent.click(dismiss);
+    await waitFor(() => expect(screen.queryByText('Map unchanged')).not.toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toBeInTheDocument();
+    expect(session.getState().working.resources).toHaveLength(2);
+  });
+
   it('keeps the embedded Map inert until Edit, and Done returns it to Read', async () => {
     const value = home({
       title: 'Elsewhere',

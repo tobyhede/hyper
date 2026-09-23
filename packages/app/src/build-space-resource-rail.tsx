@@ -1,6 +1,8 @@
 import type { GraphId, ResourceDocument, UUID } from '@project/core';
 import { SpaceResourceSelectors, type SpaceResourceSelectorsProps } from '@project/ui';
+import type { CommandOutcomes } from './command-outcomes';
 import type { Continuation } from './continuation';
+import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import { spaceResourceContextCommands } from './space-resource-context-commands';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
@@ -13,6 +15,8 @@ export interface SpaceResourceRailContext {
   readonly spaces: OpenSpaces;
   readonly containingSpaceId: UUID;
   readonly continuation: Continuation;
+  /** The containing canvas's, where a Map report from this rail is held. */
+  readonly commandOutcomes: CommandOutcomes;
   readonly complete: (
     completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
   ) => AuthoringResult;
@@ -61,6 +65,9 @@ export function buildSpaceResourceRail({
           complete,
           context.continuation,
           context.complete,
+          // The rail's own answer, asked again when a command is pressed.
+          embeddedMapAuthoringCommands(context.entry, context.spaces, () => !disabled),
+          context.commandOutcomes,
         );
   const optional: Mutable<
     Pick<SpaceResourceSelectorsProps, 'onEditingChange' | 'mapCommands' | 'graphCommands'>

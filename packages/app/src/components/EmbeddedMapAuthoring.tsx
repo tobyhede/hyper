@@ -18,6 +18,7 @@ import type { OpenSpace } from '../open-spaces';
 import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceResourceTargets } from '../space-resource-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
+import type { CommandOutcomes } from '../command-outcomes';
 import type { Continuation } from '../continuation';
 import type { EmbeddedPublication } from '../embedded-publication';
 import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
@@ -30,6 +31,7 @@ const EMPTY_NODES: readonly ResourceFlowNode[] = [];
 /** Reuse production projection and Resource controls over an explicitly addressed target Map. */
 export function EmbeddedMapAuthoring({
   continuation,
+  commandOutcomes,
   parent,
   entry,
   mapId,
@@ -43,6 +45,7 @@ export function EmbeddedMapAuthoring({
   publish,
 }: {
   readonly continuation: Continuation;
+  readonly commandOutcomes: CommandOutcomes;
   readonly parent: ResourceFlowNode;
   readonly entry: OpenSpace;
   readonly mapId: MapId;
@@ -146,6 +149,7 @@ export function EmbeddedMapAuthoring({
   );
   const authoring = useCanvasResourceAuthoring({
     continuation,
+    commandOutcomes,
     nodes: state.projection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation: null,

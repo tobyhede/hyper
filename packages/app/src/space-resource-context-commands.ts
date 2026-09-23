@@ -1,5 +1,6 @@
 import type { ResourceDocument, GraphId, UUID } from '@project/core';
 import type { CanvasSpaceResourceCommands, CanvasSpaceResourceGraphCommands } from '@project/ui';
+import type { CommandOutcomes } from './command-outcomes';
 import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
@@ -10,6 +11,7 @@ import {
   PERSISTENCE_UNSETTLED,
 } from './coordinated-context-delete';
 import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
+import { renameDraftAnswer, type MapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
@@ -33,6 +35,8 @@ export function spaceResourceContextCommands(
   complete: (
     completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
   ) => AuthoringResult,
+  mapAuthoring: MapAuthoringCommands,
+  commandOutcomes: CommandOutcomes,
 ): SpaceResourceContextCommands {
   const location = spaces.browserLocation;
   const settled = async () =>
@@ -49,7 +53,12 @@ export function spaceResourceContextCommands(
   const graph = map?.graphs.find((each) => each.id === graphId);
   const mapCommands: CanvasSpaceResourceCommands = {
     deleteDisabled: space.maps.length <= 1 || map === undefined,
-    onRename: (title) => refusalOf(complete({ kind: 'renamed-map', mapId, title })),
+    // The containing canvas's command outcomes hold the report: the notice
+    // is drawn by the Space the author is looking at, not by the target.
+    onRename: (title) =>
+      renameDraftAnswer(
+        commandOutcomes.run('map-manage', () => mapAuthoring.map(mapId).rename.invoke(title)),
+      ),
     onCreate: async (scope) =>
       coordinatedContextCreate({
         waitBefore: settled,
