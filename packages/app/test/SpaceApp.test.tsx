@@ -1214,6 +1214,43 @@ describe('Space app Resources list', () => {
   });
 
   /**
+   * A refused Dock Delete Map is reported as "Map not deleted" by command
+   * outcomes, and the canvas stays on the Map it showed.
+   *
+   * Refused through a spy on the Space Resource lifecycle, because its
+   * refusals are races or recovery states no mount can stage.
+   */
+  it('reports a refused Dock Delete Map as Map not deleted and keeps the Map', async () => {
+    const base = snapshot('Space', 'Resource', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceResources } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    const app = composeApp({ spaceSession: session });
+    // A second Map, selected, so Delete is available on it.
+    expect(app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+    const selected = app.navigation.getState().selectedMapId;
+    const title = app.currentSpace().lookup.map(selected)?.map.title ?? '';
+    vi.spyOn(spaceResources, 'deleteMap').mockResolvedValue({
+      kind: 'refused',
+      refusal: { code: 'map-not-found', mapId: selected },
+    });
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
+    await waitUntilMapContinuationReady();
+
+    openMapMenu(title);
+    fireEvent.click(await screen.findByRole('menuitem', { name: `Delete ${title}` }));
+
+    const notice = await screen.findByRole('button', { name: 'Dismiss: Map not deleted' });
+    expect(screen.getByText('This Map is no longer part of the Space.')).toBeInTheDocument();
+    expect(session.getState().working.document.maps).toHaveLength(2);
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent(title);
+    fireEvent.click(notice);
+    await waitFor(() => expect(screen.queryByText('Map not deleted')).not.toBeInTheDocument());
+  });
+
+  /**
    * **What the bar reports and what the bar draws are one answer.**
    *
    * A live chrome rename withdraws Create Resource, Present, Delete Resource and the

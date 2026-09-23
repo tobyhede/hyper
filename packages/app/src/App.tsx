@@ -37,11 +37,7 @@ import {
   describeSpaceResourceBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
-import {
-  coordinatedDeleteOk,
-  coordinatedMapDelete,
-  coordinatedGraphDelete,
-} from './coordinated-context-delete';
+import { coordinatedGraphDelete } from './coordinated-context-delete';
 import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
@@ -50,7 +46,6 @@ import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
   COPY_LINK_ACTION_ID,
-  DELETE_MAP_ACTION_ID,
   spaceEntityActions,
   type EntityCommandId,
   type SpaceChromeTitleSubject,
@@ -222,7 +217,6 @@ export const createApp = (
      */
     const [editingResourceBody, setEditingResourceBody] = useState(false);
     const [editingResourceTitle, setEditingResourceTitle] = useState(false);
-    const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
       resourceDeletion.subscribe,
@@ -700,22 +694,6 @@ export const createApp = (
     const resourceResize = useRenderAdapter((s) => s.resourceResize);
     const reportEmbeddedMapEditing = useRenderAdapter((s) => s.reportEmbeddedMapEditing);
     const canvas = canvasContent(placement, hasResourcesOnCanvas);
-    // Every standing refusal is about the Map that was selected when it was
-    // refused — the Edit New Map would have made, the Rename or Delete on
-    // the one it named, the Graph Edit inside it, the Resource it would not remove
-    // from it. None of them says anything about the Map the reader has moved
-    // to, so the move clears them together, during the render that moves rather
-    // than one frame after it.
-    //
-    // The Map creation and rename notices, the Graph Edit and deletion notices
-    // and the Resource deletion and removal notices are command outcomes'
-    // channels, and that module clears them on the same move
-    // (`command-outcomes.ts`).
-    const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
-    if (refusedUnder !== selectedMapId) {
-      setRefusedUnder(selectedMapId);
-      setMapDeleteMessage(null);
-    }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
      * read as **render-time transitions rather than effects**.
@@ -773,20 +751,25 @@ export const createApp = (
      */
     /**
      * Map Edits on the Space the canvas draws: rename while a chrome command
-     * may run, and creation while Add Map may. Rebuilt when either answer
-     * moves, so the capability the Dock is drawn from and the one it invokes
+     * may run, creation while Add Map may, and deletion while entity Edits
+     * may. Rebuilt when any answer moves, so the capability the Dock is drawn from and the one it invokes
      * read the same render — both answers are React state, and nothing
      * outside the render holds a later one.
      */
     const chromeTitleEdit = availability.chromeTitleEdit;
     const createMapAvailable = availability.createMap;
+    const entityEdits = availability.entityEdits;
     const mapAuthoring = useMemo(
       () =>
-        topLevelMapAuthoringCommands(composition, {
-          rename: () => chromeTitleEdit,
-          create: () => createMapAvailable,
-        }),
-      [chromeTitleEdit, createMapAvailable],
+        topLevelMapAuthoringCommands(
+          { app: composition, spaceResources },
+          {
+            rename: () => chromeTitleEdit,
+            create: () => createMapAvailable,
+            delete: () => entityEdits,
+          },
+        ),
+      [chromeTitleEdit, createMapAvailable, entityEdits],
     );
     const renameChromeTitle = useCallback(
       (subject: SpaceChromeTitleSubject, title: string): string | null => {
@@ -870,36 +853,15 @@ export const createApp = (
           // a Resource has no rename here either — its title is renamed in place
           // on the canvas.
           onRename: null,
-          onDeleteMap: availability.entityEdits
-            ? async (mapId) => {
-                const result = await coordinatedMapDelete(spaceResources.deleteMap, {
-                  targetSpaceId: renderedSpace.id,
-                  mapId,
-                  preferredMapId: null,
-                });
-                setMapDeleteMessage(null);
-                if (result.kind === 'error') {
-                  setMapDeleteMessage(result.message);
-                  return false;
-                }
-                if (result.kind === 'completed') {
-                  navigation.selectMap(result.mapId);
-                  navigation.activateGraph(result.graphId);
-                }
-                return coordinatedDeleteOk(result);
-              }
-            : null,
+          // No Delete Map item either: the Dock deletes its Map through Map
+          // authoring (`mapAuthoring` above), which owns the last-Map rule,
+          // the cross-Space coordination and the survivor the canvas lands on.
+          onDeleteMap: null,
         }),
       // `authoring` is the composition's, closed over rather than rendered, so it
       // is not a dependency a render can move. `resourceDeletion` says the same of
       // `spaceResources`.
-      [
-        renderedSpace.id,
-        renderedSpace.title,
-        copyProductDestination,
-        openProductDestination,
-        availability.entityEdits,
-      ],
+      [renderedSpace.id, renderedSpace.title, copyProductDestination, openProductDestination],
     );
 
     /**
@@ -1516,11 +1478,9 @@ export const createApp = (
                 ? (mapId, title) => renameChromeTitle({ kind: 'map', id: mapId }, title)
                 : null,
               createDisabled: !mapAuthoring.create.available,
-              // The same answer `onDeleteMap` above is built from, said on
-              // the row as well: when entity Edits are withdrawn the
-              // `delete-map` action is not built at all, and a row that did
-              // not know it dispatched into nothing.
-              deleteDisabled: !availability.entityEdits,
+              // The capability the row invokes, so the unavailable treatment
+              // and the press read one answer — the last Map included.
+              deleteDisabled: !mapAuthoring.map(selectedMap.map.id).delete.available,
               /**
                * **It opens nothing, and the author continues in the name.**
                *
@@ -1550,12 +1510,13 @@ export const createApp = (
               },
               didCreateMoveCaret: () => createMapMovedCaret.current,
               // The Dock's Delete names the Map its cluster is showing, which is
-              // the drawing one — resolved from the id it hands back rather than
-              // closed over, so the command and the name it carries cannot come apart.
+              // the drawing one. Map authoring deletes it, repoints every Space
+              // Resource that selected it and leaves the canvas on the survivor;
+              // command outcomes holds a refusal as "Map not deleted".
               onDelete: (mapId) => {
-                const map = renderedSpace.maps.find((candidate) => candidate.id === mapId);
-                if (map === undefined) return;
-                runEntityCommand({ kind: 'map', map }, DELETE_MAP_ACTION_ID)();
+                void commandOutcomes.run('map-delete', () =>
+                  mapAuthoring.map(mapId).delete.invoke(),
+                );
               },
               onCopyLink: runEntityCommand(
                 { kind: 'map', map: selectedMap.map },
@@ -1706,11 +1667,6 @@ export const createApp = (
                 </ShellNotice>
               );
             })}
-            {mapDeleteMessage === null ? null : (
-              <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
-                {mapDeleteMessage}
-              </ShellNotice>
-            )}
             {/* **The one report here with no dismissal, and it is not an
                 oversight.** The others are about a press that is over, so
                 putting one away changes nothing it is about. This one is about

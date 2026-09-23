@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
-  coordinatedDeleteOk,
-  coordinatedMapDelete,
   coordinatedGraphDelete,
   type CoordinatedContextDeleteResult,
 } from '../src/coordinated-context-delete';
@@ -16,11 +14,6 @@ const REPLACEMENT_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000005
 
 const PERSISTENCE_UNSETTLED = 'The change could not be saved. Check the Space persistence status.';
 
-const mapInput = {
-  targetSpaceId: TARGET,
-  mapId: MAP,
-  preferredMapId: null,
-};
 const graphInput = {
   targetSpaceId: TARGET,
   mapId: MAP,
@@ -58,36 +51,6 @@ const expectReplacementPair = (result: CoordinatedContextDeleteResult) => {
   });
 };
 
-describe('coordinated Map delete', () => {
-  it('maps a lifecycle refusal into the author-facing sentence', async () => {
-    expectMappedRefusal(await coordinatedMapDelete(refuse, mapInput));
-  });
-
-  it('returns the replacement Map and Graph pair', async () => {
-    expectReplacementPair(
-      await coordinatedMapDelete(succeed, mapInput, () => Promise.resolve(true)),
-    );
-  });
-
-  it('answers the persistence error and does not delete when waitBefore returns false', async () => {
-    let deleted = false;
-    const result = await coordinatedMapDelete(
-      () => {
-        deleted = true;
-        return succeed();
-      },
-      mapInput,
-      () => Promise.resolve(false),
-    );
-    expect(deleted).toBe(false);
-    expect(result).toEqual({ kind: 'error', message: PERSISTENCE_UNSETTLED });
-  });
-
-  it('passes a lifecycle no-op through as unchanged', async () => {
-    expect(await coordinatedMapDelete(noop, mapInput)).toEqual({ kind: 'unchanged' });
-  });
-});
-
 describe('coordinated Graph delete', () => {
   it('maps a lifecycle refusal into the author-facing sentence', async () => {
     expectMappedRefusal(await coordinatedGraphDelete(refuse, graphInput));
@@ -118,33 +81,22 @@ describe('coordinated Graph delete', () => {
   });
 });
 
-describe('coordinated delete and the entity menu', () => {
-  it('does not report unchanged as a menu failure', () => {
-    expect(coordinatedDeleteOk({ kind: 'unchanged' })).toBe(true);
-    expect(
-      coordinatedDeleteOk({
-        kind: 'completed',
-        mapId: REPLACEMENT_MAP,
-        graphId: REPLACEMENT_GRAPH,
-      }),
-    ).toBe(true);
-    expect(coordinatedDeleteOk({ kind: 'error', message: PERSISTENCE_UNSETTLED })).toBe(false);
-  });
-});
-
 /**
- * Ticket 03: Dock Map and Graph delete share the wrappers, with no preferred
+ * Ticket 03: Dock Graph delete goes through the wrapper, with no preferred
  * replacement — Navigation always adopts the pair the lifecycle returns.
- * `spaceResources.deleteMap({` / `deleteGraph({` would be a second orchestration
- * path beside the wrappers.
+ * `spaceResources.deleteGraph({` would be a second orchestration path beside
+ * it. Map deletion left the wrapper for Map authoring
+ * (`.scratch/command-outcomes/issues/08`), which owns its coordination; a
+ * direct `spaceResources.deleteMap` in App would be a second path beside that.
  */
 describe('Dock delete wiring', () => {
   const app = readFileSync(new URL('../src/App.tsx', import.meta.url), { encoding: 'utf8' });
 
-  it('sends Map delete through the wrapper with no preferred Map', () => {
-    expect(app).toMatch(/coordinatedMapDelete\(\s*spaceResources\.deleteMap,/u);
-    expect(app).toMatch(/preferredMapId:\s*null/u);
-    expect(app).not.toMatch(/spaceResources\.deleteMap\(\s*\{/u);
+  it('sends Map delete through Map authoring rather than the lifecycle', () => {
+    expect(app).toMatch(
+      /commandOutcomes\.run\('map-delete',\s*\(\)\s*=>\s*mapAuthoring\.map\(mapId\)\.delete\.invoke\(\)/u,
+    );
+    expect(app).not.toMatch(/spaceResources\.deleteMap\b/u);
   });
 
   it('sends Graph delete through the wrapper with no preferred Graph', () => {

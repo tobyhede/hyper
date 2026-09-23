@@ -5,11 +5,7 @@ import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import {
-  coordinatedMapDelete,
-  coordinatedGraphDelete,
-  PERSISTENCE_UNSETTLED,
-} from './coordinated-context-delete';
+import { coordinatedGraphDelete, PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import { coordinatedContextCreate } from './coordinated-context-create';
 import { embeddedMapAuthoringCommands, renameDraftAnswer } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
@@ -73,7 +69,8 @@ export function spaceResourceContextCommands(
   const map = space.maps.find((each) => each.id === mapId);
   const graph = map?.graphs.find((each) => each.id === graphId);
   const mapCommands: CanvasSpaceResourceCommands = {
-    deleteDisabled: space.maps.length <= 1 || map === undefined,
+    // Map authoring's answer, the last Map and a Map that has gone included.
+    deleteDisabled: !mapAuthoring.map(mapId).delete.available,
     // The containing canvas's command outcomes hold the report: the notice
     // is drawn by the Space the author is looking at, not by the target.
     onRename: (title) =>
@@ -97,23 +94,14 @@ export function spaceResourceContextCommands(
       }
       return outcome.kind === 'refused' ? outcome.report.message : null;
     },
+    // Map authoring waits for both Spaces, repoints every Space Resource that
+    // selected the Map — this one included — and leaves the target's canvas
+    // on the survivor; the containing canvas holds a refusal.
     onDelete: async () => {
-      const selected = entry.app.navigation.getState().selectedMapId;
-      const result = await coordinatedMapDelete(
-        entry.spaceResources.deleteMap,
-        {
-          targetSpaceId: entry.id,
-          mapId,
-          preferredMapId: selected,
-        },
-        settled,
+      const outcome = await commandOutcomes.run('map-delete', () =>
+        mapAuthoring.map(mapId).delete.invoke(),
       );
-      if (result.kind === 'error') return result.message;
-      if (result.kind === 'completed' && entry.app.navigation.getState().selectedMapId === mapId) {
-        entry.app.navigation.selectMap(result.mapId);
-        entry.app.navigation.activateGraph(result.graphId);
-      }
-      return null;
+      return outcome.kind === 'refused' ? outcome.report.message : null;
     },
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };

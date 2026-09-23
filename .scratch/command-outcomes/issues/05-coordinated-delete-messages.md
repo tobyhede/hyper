@@ -11,7 +11,7 @@ Blocked by: 02, 03, 04
 
 - [x] `graphDeleteMessage` is deleted from App.
 - [x] Graph coordination remains in its existing helper; ticket 08 owns the separate Map deletion deepening.
-- [ ] Every shell notice App draws, except "Link not copied" and the destination-not-found report, reads from the module's state.
+- [x] Every shell notice App draws, except "Link not copied" and the destination-not-found report, reads from the module's state. (Closed by ticket 08, which moved "Map not deleted", the last one.)
 
 ## Tests
 

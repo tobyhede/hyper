@@ -127,6 +127,9 @@ interface ContractContext {
   readonly mapId: MapId;
   readonly commands: MapAuthoringCommands;
   readonly withdraw: () => void;
+  readonly spaces: ReturnType<typeof openSpaces>;
+  /** The backend's commit control, to fail a save. */
+  readonly control: MemorySpaceBackendTestControl;
 }
 
 const titleOf = (space: OpenSpace, mapId: MapId): string | undefined =>
@@ -147,31 +150,38 @@ const contexts: readonly {
   {
     name: 'the top-level Space',
     setup: async () => {
-      const spaces = openSpaces();
+      const control = new MemorySpaceBackendTestControl();
+      const spaces = openSpaces(control);
       const authored = await spaces.open(TARGET);
       let available = true;
       return {
         authored,
         outcomes: authored.app.commandOutcomes,
         mapId: FIRST_MAP,
-        commands: topLevelMapAuthoringCommands(authored.app, {
+        commands: topLevelMapAuthoringCommands(authored, {
           rename: () => available,
           create: () => available,
+          delete: () => available,
         }),
         withdraw: () => {
           available = false;
         },
+        spaces,
+        control,
       };
     },
   },
   {
     name: 'an embedded Space Resource',
     setup: async () => {
-      const spaces = openSpaces();
+      const control = new MemorySpaceBackendTestControl();
+      const spaces = openSpaces(control);
       const source = await spaces.open(META);
       const authored = await spaces.embed(TARGET);
       let available = true;
       return {
+        spaces,
+        control,
         authored,
         outcomes: source.app.commandOutcomes,
         mapId: document.map,
@@ -260,9 +270,10 @@ describe('what each context addresses', () => {
   it('does not rename a Map the top-level canvas has moved off', async () => {
     const spaces = openSpaces();
     const authored = await spaces.open(TARGET);
-    const commands = topLevelMapAuthoringCommands(authored.app, {
+    const commands = topLevelMapAuthoringCommands(authored, {
       rename: () => true,
       create: () => true,
+      delete: () => true,
     });
     expect(commands.map(SECOND_MAP).rename.available).toBe(false);
     expect(commands.map(SECOND_MAP).rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
@@ -373,9 +384,10 @@ describe('what each context creates in', () => {
   it('selects the created Map on the top-level canvas', async () => {
     const spaces = openSpaces();
     const authored = await spaces.open(TARGET);
-    const commands = topLevelMapAuthoringCommands(authored.app, {
+    const commands = topLevelMapAuthoringCommands(authored, {
       rename: () => true,
       create: () => true,
+      delete: () => true,
     });
     const outcome = await commands.create.invoke();
     if (outcome.kind !== 'completed') throw new Error(`Map creation answered ${outcome.kind}`);
@@ -388,9 +400,10 @@ describe('what each context creates in', () => {
   it('creates nothing when only rename is available at the top level', async () => {
     const spaces = openSpaces();
     const authored = await spaces.open(TARGET);
-    const commands = topLevelMapAuthoringCommands(authored.app, {
+    const commands = topLevelMapAuthoringCommands(authored, {
       rename: () => true,
       create: () => false,
+      delete: () => true,
     });
     expect(commands.create.available).toBe(false);
     expect(commands.map(FIRST_MAP).rename.available).toBe(true);
@@ -508,6 +521,261 @@ describe('what each context creates in', () => {
     await spaces.exit(TARGET);
     expect(await creating).toEqual({ kind: 'unavailable' });
     expect(authored.session.getState().working).toBe(before);
+  });
+});
+
+/** Where the Space Resource in the containing Space points, as its Space now holds it. */
+const referringSelection = async (spaces: ReturnType<typeof openSpaces>) =>
+  storedSelection(await spaces.open(META));
+
+/**
+ * Deletion addresses the Map the Space Resource selects, shown on the
+ * authored canvas: the top level only deletes the Map it shows, and the
+ * embedded context deletes any Map of its target.
+ */
+const showSecond = (authored: OpenSpace): MapId => {
+  authored.app.navigation.selectMap(SECOND_MAP);
+  return SECOND_MAP;
+};
+
+describe.each(contexts)('Map deletion through $name', ({ setup }) => {
+  it('deletes the Map, repoints every Space Resource that selected it and continues on the survivor', async () => {
+    const { authored, commands, spaces } = await setup();
+    const mapId = showSecond(authored);
+    const remove = commands.map(mapId).delete;
+    expect(remove.available).toBe(true);
+    expect(await remove.invoke()).toEqual({
+      kind: 'completed',
+      mapId: FIRST_MAP,
+      graphId: FIRST_GRAPH,
+    });
+    expect(mapsOf(authored)).toEqual([FIRST_MAP]);
+    expect(authored.app.navigation.getState()).toMatchObject({
+      selectedMapId: FIRST_MAP,
+      activeGraphId: FIRST_GRAPH,
+    });
+    expect(await referringSelection(spaces)).toEqual({ map: FIRST_MAP, graph: FIRST_GRAPH });
+  });
+
+  it('continues on the Space’s opening Map, where the Resources that selected the deleted Map go too', async () => {
+    const { authored, commands, spaces } = await setup();
+    // `created-map` makes the new Map the Space's opening Map.
+    expect(authored.app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+    const opening = authored.app.currentSpace().defaultMap;
+    const mapId = showSecond(authored);
+    const outcome = await commands.map(mapId).delete.invoke();
+    if (outcome.kind !== 'completed') throw new Error(`Map deletion answered ${outcome.kind}`);
+    expect(outcome.mapId).toBe(opening);
+    expect(authored.app.navigation.getState().selectedMapId).toBe(opening);
+    expect(await referringSelection(spaces)).toEqual({
+      map: outcome.mapId,
+      graph: outcome.graphId,
+    });
+  });
+
+  it('leaves a canvas the author moved while the Map was being deleted where the author put it', async () => {
+    const { authored, commands } = await setup();
+    expect(authored.app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+    const opening = authored.app.currentSpace().defaultMap;
+    const mapId = showSecond(authored);
+    // The lifecycle Edit is held at its start, so the author's choice lands
+    // after the deletion was pressed and before it completes.
+    const { deleteMap } = authored.spaceResources;
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.spyOn(authored.spaceResources, 'deleteMap').mockImplementationOnce(async (input) => {
+      await held;
+      return deleteMap(input);
+    });
+    const deleting = commands.map(mapId).delete.invoke();
+    await vi.waitFor(() => expect(authored.spaceResources.deleteMap).toHaveBeenCalled());
+    authored.app.navigation.selectMap(FIRST_MAP);
+    release();
+    const outcome = await deleting;
+    if (outcome.kind !== 'completed') throw new Error(`Map deletion answered ${outcome.kind}`);
+    expect(outcome.mapId).toBe(opening);
+    expect(authored.app.navigation.getState().selectedMapId).toBe(FIRST_MAP);
+  });
+
+  it('answers a stale invocation as unavailable without deleting anything', async () => {
+    const { authored, commands, outcomes, withdraw } = await setup();
+    const remove = commands.map(showSecond(authored)).delete;
+    withdraw();
+    expect(await outcomes.run('map-delete', () => remove.invoke())).toEqual({
+      kind: 'unavailable',
+    });
+    expect(mapsOf(authored)).toEqual([FIRST_MAP, SECOND_MAP]);
+    expect(commands.map(SECOND_MAP).delete.available).toBe(false);
+    expect(outcomes.getState().notices.has('map-delete')).toBe(false);
+  });
+
+  it('withholds the last Map, and rechecks that when invoked', async () => {
+    const { authored, commands } = await setup();
+    const remove = commands.map(showSecond(authored)).delete;
+    expect(remove.available).toBe(true);
+    const other = await authored.spaceResources.deleteMap({
+      targetSpaceId: TARGET,
+      mapId: FIRST_MAP,
+      preferredMapId: null,
+    });
+    expect(other.kind).toBe('completed');
+    expect(commands.map(SECOND_MAP).delete.available).toBe(false);
+    expect(await remove.invoke()).toEqual({ kind: 'unavailable' });
+    expect(mapsOf(authored)).toEqual([SECOND_MAP]);
+  });
+
+  it('answers a Map that has gone as unavailable', async () => {
+    const { authored, commands } = await setup();
+    const remove = commands.map(showSecond(authored)).delete;
+    const gone = await authored.spaceResources.deleteMap({
+      targetSpaceId: TARGET,
+      mapId: SECOND_MAP,
+      preferredMapId: null,
+    });
+    expect(gone.kind).toBe('completed');
+    const deleteMap = vi.spyOn(authored.spaceResources, 'deleteMap');
+    expect(await remove.invoke()).toEqual({ kind: 'unavailable' });
+    expect(deleteMap).not.toHaveBeenCalled();
+    expect(commands.map(SECOND_MAP).delete.available).toBe(false);
+  });
+
+  it('deletes nothing while the target has not saved, and reports a Map not deleted', async () => {
+    const { authored, commands, control, spaces, outcomes } = await setup();
+    const mapId = showSecond(authored);
+    control.throwNext(new Error('offline'));
+    expect(
+      authored.app.authoring.complete({ kind: 'renamed-map', mapId, title: 'Renamed' }).kind,
+    ).toBe('completed');
+    expect(await spaces.waitForPersistence(TARGET)).toBe(false);
+    const outcome = await outcomes.run('map-delete', () => commands.map(mapId).delete.invoke());
+    if (outcome.kind !== 'refused') throw new Error(`Map deletion answered ${outcome.kind}`);
+    expect(outcome.report.title).toBe('Map not deleted');
+    expect(outcomes.getState().notices.get('map-delete')).toEqual(outcome.report);
+    expect(mapsOf(authored)).toEqual([FIRST_MAP, SECOND_MAP]);
+  });
+
+  it('answers a refused deletion with the complete Map report, which command outcomes holds', async () => {
+    const { authored, commands, outcomes } = await setup();
+    const mapId = showSecond(authored);
+    vi.spyOn(authored.spaceResources, 'deleteMap').mockResolvedValueOnce({
+      kind: 'refused',
+      refusal: { code: 'map-not-found', mapId },
+    });
+    const report = {
+      title: 'Map not deleted',
+      message: 'This Map is no longer part of the Space.',
+    };
+    expect(await outcomes.run('map-delete', () => commands.map(mapId).delete.invoke())).toEqual({
+      kind: 'refused',
+      report,
+    });
+    // A refusal moves nothing, so the settlement is not dropped as stale.
+    expect(authored.app.navigation.getState().selectedMapId).toBe(mapId);
+    expect(outcomes.getState().notices.get('map-delete')).toEqual(report);
+    outcomes.dismiss('map-delete');
+    expect(outcomes.getState().notices.has('map-delete')).toBe(false);
+  });
+
+  it('answers an unchanged deletion as unchanged, and moves nothing', async () => {
+    const { authored, commands } = await setup();
+    const mapId = showSecond(authored);
+    vi.spyOn(authored.spaceResources, 'deleteMap').mockResolvedValueOnce({ kind: 'unchanged' });
+    expect(await commands.map(mapId).delete.invoke()).toEqual({ kind: 'unchanged' });
+    expect(authored.app.navigation.getState().selectedMapId).toBe(mapId);
+  });
+});
+
+describe('what each context deletes', () => {
+  it('does not delete a Map the top-level canvas has moved off', async () => {
+    const spaces = openSpaces();
+    const authored = await spaces.open(TARGET);
+    const commands = topLevelMapAuthoringCommands(authored, {
+      rename: () => true,
+      create: () => true,
+      delete: () => true,
+    });
+    expect(commands.map(SECOND_MAP).delete.available).toBe(false);
+    expect(await commands.map(SECOND_MAP).delete.invoke()).toEqual({ kind: 'unavailable' });
+    expect(mapsOf(authored)).toEqual([FIRST_MAP, SECOND_MAP]);
+  });
+
+  it('withholds deletion alone when only deletion is withdrawn at the top level', async () => {
+    const spaces = openSpaces();
+    const authored = await spaces.open(TARGET);
+    const commands = topLevelMapAuthoringCommands(authored, {
+      rename: () => true,
+      create: () => true,
+      delete: () => false,
+    });
+    expect(commands.map(FIRST_MAP).rename.available).toBe(true);
+    expect(commands.map(FIRST_MAP).delete.available).toBe(false);
+    expect(await commands.map(FIRST_MAP).delete.invoke()).toEqual({ kind: 'unavailable' });
+  });
+
+  it('deletes a Map an embedded target is not showing without moving its canvas', async () => {
+    const spaces = openSpaces();
+    const source = await spaces.open(META);
+    const authored = await spaces.embed(TARGET);
+    const commands = embeddedMapAuthoringCommands({
+      target: authored,
+      spaces,
+      containingSpaceId: META,
+      select: selectOn(source),
+      available: () => true,
+    });
+    expect(authored.app.navigation.getState().selectedMapId).toBe(FIRST_MAP);
+    expect(await commands.map(SECOND_MAP).delete.invoke()).toEqual({
+      kind: 'completed',
+      mapId: FIRST_MAP,
+      graphId: FIRST_GRAPH,
+    });
+    expect(storedSelection(source)).toEqual({ map: FIRST_MAP, graph: FIRST_GRAPH });
+    // The containing canvas stays on its own Map.
+    expect(source.app.navigation.getState().selectedMapId).toBe(META_MAP);
+  });
+
+  it('deletes nothing while the containing Space has not saved', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const spaces = openSpaces(control);
+    const source = await spaces.open(META);
+    const authored = await spaces.embed(TARGET);
+    const commands = embeddedMapAuthoringCommands({
+      target: authored,
+      spaces,
+      containingSpaceId: META,
+      select: selectOn(source),
+      available: () => true,
+    });
+    control.throwNext(new Error('offline'));
+    expect(
+      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
+        .kind,
+    ).toBe('completed');
+    expect(await commands.map(SECOND_MAP).delete.invoke()).toEqual({
+      kind: 'refused',
+      report: { title: 'Map not deleted', message: PERSISTENCE_UNSETTLED },
+    });
+    expect(mapsOf(authored)).toEqual([FIRST_MAP, SECOND_MAP]);
+  });
+
+  it('deletes nothing in an embedded target exited while its Spaces were saving', async () => {
+    const spaces = openSpaces();
+    const source = await spaces.open(META);
+    const authored = await spaces.embed(TARGET);
+    const commands = embeddedMapAuthoringCommands({
+      target: authored,
+      spaces,
+      containingSpaceId: META,
+      select: selectOn(source),
+      available: () => true,
+    });
+    const deleteMap = vi.spyOn(authored.spaceResources, 'deleteMap');
+    const deleting = commands.map(SECOND_MAP).delete.invoke();
+    await spaces.exit(TARGET);
+    expect(await deleting).toEqual({ kind: 'unavailable' });
+    expect(deleteMap).not.toHaveBeenCalled();
   });
 });
 
