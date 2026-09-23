@@ -20,11 +20,11 @@ The other three assertions the baseline records for `render-adapter.ts` are out 
 
 ## Build: nodes
 
-- [ ] Make `owned` a `Map<string, ResourceId>` from `node.id` to `node.data.resourceId`. The filter becomes "has an owned identity", and the selection change reads the `ResourceId` from the same lookup — no new work per frame; the lookup is already paid.
-- [ ] Give `consumeSettledMoves` the owned identities and key its result through them.
-- [ ] `placementFromNodes` reads `node.data.resourceId`.
-- [ ] Delete the three `SAFETY:` comments with their assertions, and the stale "repairs below/above" references in the comments that remain (`:136`, `:144`).
-- [ ] Tests: an unowned (embedded) id in a mixed batch contributes neither a selection nor a settled move — neither `packages/app/test/render-adapter.test.ts` nor `SpaceCanvas.test.tsx` feeds an `embedded:` id today, so this is a new case, most cheaply in `render-adapter.test.ts`. Run `pnpm verify`, `pnpm e2e`; `--prune-suppressions` lowers `render-adapter.ts` from 8 to 5.
+- [x] Make `owned` a `Map<string, ResourceId>` from `node.id` to `node.data.resourceId`. The filter becomes "has an owned identity", and the selection change reads the `ResourceId` from the same lookup — no new work per frame; the lookup is already paid.
+- [x] Give `consumeSettledMoves` the owned identities and key its result through them.
+- [x] `placementFromNodes` reads `node.data.resourceId`.
+- [x] Delete the three `SAFETY:` comments with their assertions, and the stale "repairs below/above" references in the comments that remain (`:136`, `:144`).
+- [x] Tests: an unowned (embedded) id in a mixed batch contributes neither a selection nor a settled move — neither `packages/app/test/render-adapter.test.ts` nor `SpaceCanvas.test.tsx` feeds an `embedded:` id today, so this is a new case, most cheaply in `render-adapter.test.ts`. Run `pnpm verify`, `pnpm e2e`; `--prune-suppressions` lowers `render-adapter.ts` from 8 to 5.
 
 ## Open: edges
 
@@ -35,3 +35,28 @@ Decide how `edgeSelectionOf` comes to know it is looking at a host Edge, rather 
 - Leaving it, with the `SAFETY:` comment rewritten to name the real invariant — embedded edges are neither reconnectable nor deletable, `embedded-map.ts` — is a legitimate outcome if the lookup costs more clarity than it buys.
 
 If the chosen shape changes what the render adapter or the projection publishes, it earns its own ADR. Read `docs/agents/rendering.md` and ADR 0062 first.
+
+## Progress — nodes built, edges open
+
+Commit `27f61037` on `resource-identity-07`. In `packages/app/src/render-adapter.ts`, `changeNodes` builds `owned` as a `Map<string, ResourceId>` from `node.id` to `node.data.resourceId`; the ownership filter reads `owned.has`, the selection change reads its `ResourceId` from `owned.get`, and `consumeSettledMoves` takes `owned` and keys `moved` through it. `placementFromNodes` reads `node.data.resourceId`. The three node assertions and their `SAFETY:` comments are gone, as are the "repairs below/above" references in `edgeSelectionOf`'s doc comment and `SAFETY:` comment. `edgeSelectionOf`'s own two assertions are untouched. Lint's `--prune-suppressions` lowered `render-adapter.ts` in `eslint-suppressions.json` from 8 to 5.
+
+The deleted selection-site comment was the `:585` comment the Edge section below cites. Its reasoning — no parse, so no throw on the per-pointer-frame path — still holds, and the section needs no rewording.
+
+New case in `packages/app/test/render-adapter.test.ts`: *takes neither a selection nor a settled move from an embedded node in a mixed batch*. One batch sends a `select` and a settled `position` for `embeddedNodeId(RESOURCE_B, RESOURCE_C)` beside a settled host drag of `RESOURCE_A`. The selection stays `none` and the only completion is A's move. The case passed before the change too, because the ownership filter was already there. To show it is not vacuous, the filter was replaced with `true` on the pre-change source: the new case failed, along with *publishes nothing new for a change aimed at a node it does not own*.
+
+Verification, run on the finished state while the machine was heavily loaded by other work (`uptime` load average between 60 and 220):
+
+- `pnpm verify`: `typecheck:toolchain`, `typecheck`, `typecheck:packages`, `ui:catalog:check`, `lint`, `lint:anti-slop` and `format:check` pass. `test:coverage` failed 18 of 3116 tests in 5 files, mostly `Test timed out`. A second `pnpm test:coverage` failed 13 tests, a mostly different set, also in 5 files. Run in isolation with this change applied, each set's files pass: 121 of 122 for the first set, and that one failure passed when run alone, both with and without this change; 127 of 127 for the second set. No failing test touches the render adapter's node path. They are load-dependent, not caused by this change, but the full suite was not seen green in one run.
+- `pnpm e2e`: 227 passed.
+- `pnpm e2e:ladle`: not run. No component or story changed.
+
+### Edge findings for the decision
+
+The caller list above is incomplete. `edgeSelectionOf` has three more production callers, and two of them see embedded Edges today:
+
+- `AuthorableEdge.tsx:72` renders every `routed` Edge. `embeddedMap` keeps the host Edge's `type` (`embedded-map.ts:324-334`), and `SpaceCanvas` gives React Flow host and embedded Edges together (`SpaceCanvas.tsx:675`, `:1131`). So this site builds an Edge subject whose `from`/`to` are `embedded:` placement ids. It is harmless only because that subject is used behind `props.selected`, and embedded Edges are `selectable: false` (`embedded-map.ts:335`).
+- `CanvasContinuation.tsx:97` resolves against React Flow's synced `state.edges` (`:76`), which include embedded Edges. It is harmless only because `sameEdgeSubject` compares against a host subject, and a UUID never equals an `embedded:` string.
+- `edge-authoring-react.tsx:544` (the decoration) reads the host `edges` `SpaceCanvas` passes in (`:507-509`), so it is host-only.
+
+So the third option's rewritten comment ("embedded Edges are neither reconnectable nor deletable") would not cover these two sites: at each, the assertion is false at runtime. `data.graphId` is read by `edgeSelectionOf` alone (`render-adapter.ts:141`; nothing else in `packages/*/src` reads it). That suggests a fourth option, which the ticket should weigh: `embeddedMap` publishes embedded Edges without the host Edge's `graphId`, so `edgeSelectionOf` answers `null` for them by construction, in the module that mints them. Typed `from`/`to` on the published data (the second option) is then safe, and the `source`/`target` assertion goes. This changes what the projection publishes, so by the rule above it earns an ADR.
+
