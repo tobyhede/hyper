@@ -322,7 +322,7 @@ describe('the Map an Open Space Resource draws', () => {
       const remote = { ...target, document: { ...target.document, title: 'Remote Architecture' } };
       control.queueResult(
         kind === 'failed'
-          ? { kind: 'retryable-failure', code: 'network', message: 'Target is offline' }
+          ? { kind: 'retryable-failure', code: 'network' }
           : {
               kind: 'conflict',
               conflicts: [

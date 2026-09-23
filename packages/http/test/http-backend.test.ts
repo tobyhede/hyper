@@ -121,7 +121,6 @@ describe('HTTP Space backend failure mapping', () => {
     expect(result).toMatchObject({
       kind: 'retryable-failure',
       code: resultCode,
-      message: 'Try later',
     });
   });
 
@@ -139,7 +138,6 @@ describe('HTTP Space backend failure mapping', () => {
     ).resolves.toEqual({
       kind: 'permanent-failure',
       code: resultCode,
-      message: 'Correct the request.',
     });
   });
 
@@ -147,9 +145,9 @@ describe('HTTP Space backend failure mapping', () => {
    * Two commits rejected alike are two rejections.
    *
    * `PersistenceControl` acknowledges a rejection by the identity of the failure
-   * the session published, because nothing in the value separates two now that
-   * `message` is unread (ADR 0057) — two `forbidden` rejections are equal field
-   * for field. That makes "a fresh result per commit" load-bearing rather than
+   * the session published, because nothing in the value separates two — a
+   * failure carries its code and no prose (ADR 0057), so two `forbidden`
+   * rejections are equal field for field. That makes "a fresh result per commit" load-bearing rather than
    * incidental: a backend that answered a memoised `CommitResult` would leave
    * the second rejection acknowledged by the author's dismissal of the first,
    * and the dialog would never draw. Pinned here, at the one production backend
@@ -173,7 +171,11 @@ describe('HTTP Space backend failure mapping', () => {
   it('requires Problem Details for an ordinary error response', async () => {
     await expect(
       backendAnswering(jsonResponse({ message: 'old shape' }, 400)).commit(commit),
-    ).resolves.toMatchObject({ kind: 'permanent-failure', code: 'protocol' });
+    ).resolves.toEqual({
+      kind: 'permanent-failure',
+      code: 'protocol',
+      fault: { kind: 'problem-media-type', contentType: 'application/json; charset=utf-8' },
+    });
   });
 
   it('rejects Problem Details whose status disagrees with the response', async () => {
@@ -186,7 +188,7 @@ describe('HTTP Space backend failure mapping', () => {
     await expect(backendAnswering(response).commit(commit)).resolves.toEqual({
       kind: 'permanent-failure',
       code: 'protocol',
-      message: 'Problem status does not match the HTTP status',
+      fault: { kind: 'problem-status-mismatch', httpStatus: 503, problemStatus: 400 },
     });
   });
 
@@ -204,7 +206,7 @@ describe('HTTP Space backend failure mapping', () => {
     await expect(backendAnswering(response).commit(commit)).resolves.toEqual({
       kind: 'permanent-failure',
       code: 'protocol',
-      message: 'Malformed response',
+      fault: { kind: 'malformed-response', cause: null },
     });
   });
 
@@ -218,7 +220,6 @@ describe('HTTP Space backend failure mapping', () => {
     await expect(backend.commit(commit)).resolves.toEqual({
       kind: 'retryable-failure',
       code: 'network',
-      message: 'Network request failed',
     });
   });
 });

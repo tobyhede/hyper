@@ -341,7 +341,7 @@ describe('Open Spaces', () => {
 
   it.each([
     [
-      { kind: 'retryable-failure', code: 'network', message: 'offline' } satisfies CommitResult,
+      { kind: 'retryable-failure', code: 'network' } satisfies CommitResult,
       { kind: 'refused', refusal: { code: 'persistence-recovery-required', recovery: 'retry' } },
     ],
     [
@@ -409,7 +409,7 @@ describe('Open Spaces', () => {
 
   it('warns before exiting rejected work and permits an explicit exit', async () => {
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'no' });
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
     const { openSpaces } = setup(control);
     const other = await openSpaces.open(OTHER_ID);
     other.session.submit(edit(other.session.getState().working));

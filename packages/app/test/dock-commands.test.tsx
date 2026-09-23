@@ -579,7 +579,7 @@ function TwoSpacesWithAnUnwellOpener() {
           control,
         );
         const openedOpener = await spaces.open(opener.id);
-        control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'Unavailable' });
+        control.queueResult({ kind: 'retryable-failure', code: 'network' });
         const resource = opener.resources[0];
         if (resource === undefined) throw new Error('The Opener needs a Resource');
         const edit = openedOpener.app.authoring.complete({

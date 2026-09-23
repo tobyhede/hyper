@@ -294,8 +294,12 @@ describe('loadWorkingSpace', () => {
 
   it.each([
     { kind: 'rejected', code: 'invalid-commit', message: 'No write occurred' },
-    { kind: 'retryable-failure', code: 'network', message: 'No write occurred' },
-    { kind: 'permanent-failure', code: 'protocol', message: 'No write occurred' },
+    { kind: 'retryable-failure', code: 'network' },
+    {
+      kind: 'permanent-failure',
+      code: 'protocol',
+      fault: { kind: 'revision-omitted', spaceId: SPACE },
+    },
   ] satisfies readonly (CommitResult | RepositoryCommitResult)[])(
     'does not expose a draft when initialization is %s',
     async (result) => {

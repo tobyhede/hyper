@@ -580,7 +580,7 @@ describe('Space session registry', () => {
       exportedRevision: null,
     };
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     const backend = new MemorySpaceBackend(META_ID, [target, meta, affectedB], control);
     const registry = createSpaceSessionRegistry(backend);
     registry.open(target);
@@ -684,7 +684,7 @@ describe('Space session registry', () => {
     registry.open(target);
     const siblingSession = registry.open(sibling);
 
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     siblingSession.submit({
       ...sibling.snapshot,
       resources: [
@@ -806,7 +806,7 @@ describe('Space session registry', () => {
     registry.open(target);
     const siblingSession = registry.open(sibling);
 
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     // Sibling's own edit moves its Space Resource away from the Graph this
     // Edit is about to delete, but the commit fails transiently: storage
     // still selects the doomed Graph, even though Sibling's working no

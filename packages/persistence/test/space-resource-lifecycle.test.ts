@@ -157,7 +157,10 @@ describe('Space Resource lifecycle', () => {
 
       expect(result).toEqual({
         kind: 'refused',
-        refusal: { code: 'persistence-read-failed' },
+        refusal: {
+          code: 'persistence-read-failed',
+          cause: new Error('aggregate transport exploded'),
+        },
       });
       expect(meta.getState()).toEqual(before);
       if (operation === 'create') {
@@ -227,7 +230,10 @@ describe('Space Resource lifecycle', () => {
       lifecycle.delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID }),
     ).resolves.toEqual({
       kind: 'refused',
-      refusal: { code: 'persistence-read-failed' },
+      refusal: {
+        code: 'persistence-read-failed',
+        cause: new Error('aggregate transport exploded'),
+      },
     });
     expect(meta.getState()).toEqual(before);
     meta.submit({
@@ -407,7 +413,7 @@ describe('Space Resource lifecycle', () => {
 
   it.each([
     {
-      result: { kind: 'retryable-failure', code: 'network', message: 'offline' } as const,
+      result: { kind: 'retryable-failure', code: 'network' } as const,
       persistence: 'failed',
       recovery: 'retry',
     },
@@ -562,7 +568,7 @@ describe('Space Resource lifecycle', () => {
       },
     };
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     const backend = new MemorySpaceBackend(
       META_ID,
       [
@@ -594,7 +600,7 @@ describe('Space Resource lifecycle', () => {
 
   it.each([
     {
-      result: { kind: 'permanent-failure', code: 'invalid-commit', message: 'refused' } as const,
+      result: { kind: 'permanent-failure', code: 'invalid-commit' } as const,
       state: 'rejected',
     },
     {
@@ -649,7 +655,8 @@ describe('Space Resource lifecycle', () => {
 
   it('releases the barrier and rejects every participant when the backend throws', async () => {
     const control = new MemorySpaceBackendTestControl();
-    control.throwNext(new Error('transport exploded'));
+    const thrown = new Error('transport exploded');
+    control.throwNext(thrown);
     const backend = new MemorySpaceBackend(
       META_ID,
       [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
@@ -669,7 +676,56 @@ describe('Space Resource lifecycle', () => {
     });
     await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
 
-    expect(registry.session(TARGET_ID)?.getState().persistence.kind).toBe('rejected');
+    // The thrown value itself is the diagnostic, carried as typed context.
+    const rejected = {
+      kind: 'rejected',
+      failure: {
+        kind: 'permanent-failure',
+        code: 'protocol',
+        fault: { kind: 'coordinated-commit-threw', cause: thrown },
+      },
+    };
+    expect(meta.getState().persistence).toEqual(rejected);
+    expect(registry.session(TARGET_ID)?.getState().persistence).toEqual(rejected);
+  });
+
+  it('names the participant a malformed coordinated result omitted', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    // Acknowledges the containing Space and says nothing of the created target.
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: META_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(
+      idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
+    );
+
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      title: 'Architecture',
+      position: { x: 240, y: 80 },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
+
+    const rejected = {
+      kind: 'rejected',
+      failure: {
+        kind: 'permanent-failure',
+        code: 'protocol',
+        fault: { kind: 'coordinated-result-malformed', omittedSpaceIds: [TARGET_ID] },
+      },
+    };
+    expect(meta.getState().persistence).toEqual(rejected);
+    expect(registry.session(TARGET_ID)?.getState().persistence).toEqual(rejected);
   });
 
   it('accepts stored state across a conflicted create and removes its provisional target', async () => {
@@ -870,7 +926,7 @@ describe('Space Resource lifecycle', () => {
 
   it('retries every participant together with later local work', async () => {
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     const backend = new MemorySpaceBackend(
       META_ID,
       [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
@@ -917,7 +973,7 @@ describe('Space Resource lifecycle', () => {
 
   it('reattempts a permanently rejected coordinated edit with every original participant', async () => {
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'denied' });
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
     const backend = new MemorySpaceBackend(
       META_ID,
       [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
@@ -1402,7 +1458,7 @@ describe('Space Resource lifecycle', () => {
       ],
     };
     const control = new MemorySpaceBackendTestControl();
-    control.queueResult({ kind: 'permanent-failure', code: 'forbidden', message: 'denied' });
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
     const backend = new MemorySpaceBackend(
       META_ID,
       [
@@ -1744,7 +1800,7 @@ describe('Space Resource lifecycle', () => {
       revision: 2n,
       exportedRevision: null,
     });
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     siblingSession.submit({
       ...sibling,
       resources: [
@@ -1909,7 +1965,7 @@ describe('Space Resource lifecycle', () => {
 
   it.each([
     {
-      result: { kind: 'retryable-failure', code: 'network', message: 'offline' } as const,
+      result: { kind: 'retryable-failure', code: 'network' } as const,
       persistence: 'failed',
       recovery: 'retry',
     },
@@ -2047,7 +2103,7 @@ describe('Space Resource lifecycle', () => {
       exportedRevision: null,
     });
     const siblingLifecycle = registry.spaceResources(idSource([]));
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
 
     // Sibling's own attempt to remove its reference to Target is installed
     // locally (ADR 0076: the operation answers `completed` once installed)
@@ -2128,7 +2184,7 @@ describe('Space Resource lifecycle', () => {
       revision: 1n,
       exportedRevision: null,
     });
-    control.queueResult({ kind: 'retryable-failure', code: 'network', message: 'offline' });
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
     unrelatedSession.submit({ ...unrelated, document: { version: 1, title: 'Unrelated 2' } });
     await vi.waitFor(() => expect(unrelatedSession.getState().persistence.kind).toBe('failed'));
     const lifecycle = registry.spaceResources(idSource([]));

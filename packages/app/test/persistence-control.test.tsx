@@ -119,15 +119,15 @@ describe('PersistenceControl', () => {
 
   /**
    * The rejection dialog's other arm. An aggregate refusal is structured and
-   * already described from its errors; a permanent failure carries only a code
-   * and the transport's message, and until now the message is what showed.
+   * already described from its errors; a permanent failure carries only a code,
+   * and the sentence is the application's for that code.
    */
-  it('explains a permanent rejection from its code rather than the wire’s message', () => {
+  it('explains a permanent rejection from its code', () => {
     render(
       <PersistenceControl
         persistence={{
           kind: 'rejected',
-          failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+          failure: { kind: 'permanent-failure', code: 'forbidden' },
         }}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -135,7 +135,6 @@ describe('PersistenceControl', () => {
     );
 
     expect(screen.getByText('You do not have permission to save this space.')).toBeVisible();
-    expect(screen.queryByText('Permission denied')).toBeNull();
   });
 
   /**
@@ -180,9 +179,8 @@ describe('PersistenceControl', () => {
    *
    * Dismissing the dialog is an acknowledgement of the failure in front of the
    * author, not a standing preference, so the next failure has to draw it
-   * again. Nothing in the failure's *value* can tell the two apart now the
-   * transport's message is unread — both are `invalid-commit` and nothing else
-   * — so what separates them is that they are different publications, and the
+   * again. Nothing in the failure's *value* can tell the two apart — both are
+   * `invalid-commit` and nothing else — so what separates them is that they are different publications, and the
    * control follows the failure it was handed rather than a key derived from
    * what that failure says.
    *
@@ -192,18 +190,12 @@ describe('PersistenceControl', () => {
    * not guaranteed to happen.
    */
   it('draws a second rejection of the same code after the first was dismissed', () => {
-    // Byte-identical on purpose. A key derived from what the failure *says* —
-    // `${code}:${message}`, which is what this replaced — tells two different
-    // messages apart and would pass this test without the fix. Two rejections
-    // that are equal by value are exactly the pair the fix is for.
+    // Equal by value on purpose: a key derived from what the failure *says*
+    // cannot tell these two apart, and they are exactly the pair the fix is for.
     const rejection = () =>
       ({
         kind: 'rejected',
-        failure: {
-          kind: 'permanent-failure',
-          code: 'invalid-commit',
-          message: 'Send a request body no larger than 1048576 bytes.',
-        },
+        failure: { kind: 'permanent-failure', code: 'invalid-commit' },
       }) as const;
     const view = render(
       <PersistenceControl
@@ -239,7 +231,7 @@ describe('PersistenceControl', () => {
   it('draws an aggregate refusal after acknowledging an unrelated permanent rejection', () => {
     const rejection = {
       kind: 'rejected',
-      failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+      failure: { kind: 'permanent-failure', code: 'forbidden' },
     } as const;
     const refusal = {
       kind: 'refused',
@@ -284,7 +276,7 @@ describe('PersistenceControl', () => {
   it('keeps a rejection dismissed across a switch away from the Space', () => {
     const persistence = {
       kind: 'rejected',
-      failure: { kind: 'permanent-failure', code: 'forbidden', message: 'Permission denied' },
+      failure: { kind: 'permanent-failure', code: 'forbidden' },
     } as const;
     const control = (active: boolean) => (
       <PersistenceControl
@@ -341,26 +333,22 @@ describe('PersistenceControl', () => {
 });
 
 /**
- * The standing notice behind the toolbar's red dot.
- *
- * A retryable failure's `message` is whatever the transport had to hand —
- * `problem.detail` from the server, or a thrown `Error`'s own text — so it
- * arrives in the server's voice, or in none at all. The author reads the
- * application's sentence for the code instead (ADR 0057).
+ * The standing notice behind the toolbar's red dot. A retryable failure
+ * carries a code and no prose, and the author reads the application's sentence
+ * for it (ADR 0057).
  */
 describe('PersistenceNotice', () => {
-  it('explains a retryable failure from its code rather than the wire’s message', () => {
+  it('explains a retryable failure from its code', () => {
     render(
       <PersistenceNotice
         persistence={{
           kind: 'failed',
-          failure: { kind: 'retryable-failure', code: 'network', message: 'Failed to fetch' },
+          failure: { kind: 'retryable-failure', code: 'network' },
         }}
         onRetry={vi.fn()}
       />,
     );
 
     expect(screen.getByText('Your device could not reach the server.')).toBeVisible();
-    expect(screen.queryByText('Failed to fetch')).toBeNull();
   });
 });

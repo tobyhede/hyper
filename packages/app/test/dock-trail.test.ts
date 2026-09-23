@@ -16,7 +16,6 @@ const failedOn = (listing: readonly OpenListingRow[], spaceId: string): readonly
             failure: {
               kind: 'retryable-failure' as const,
               code: 'network' as const,
-              message: 'The space could not be reached.',
             },
           },
         }

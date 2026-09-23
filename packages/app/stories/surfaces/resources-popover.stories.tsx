@@ -189,14 +189,7 @@ export const PersistenceFailure: Story = () => (
       <PersistenceNotice
         persistence={{
           kind: 'failed',
-          failure: {
-            kind: 'retryable-failure',
-            code: 'network',
-            // Deliberately the transport's own voice. `PersistenceNotice`
-            // describes the code, so what this story proves is that this
-            // sentence is the one the author does *not* read (ADR 0057).
-            message: 'Failed to fetch',
-          },
+          failure: { kind: 'retryable-failure', code: 'network' },
         }}
         onRetry={() => undefined}
       />

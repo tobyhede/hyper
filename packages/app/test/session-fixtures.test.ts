@@ -20,7 +20,7 @@ describe('waitForSettled', () => {
   it('rejects an already-failed persistence state without subscribing', async () => {
     const failed = withPersistence({
       kind: 'failed',
-      failure: { kind: 'retryable-failure', code: 'unavailable', message: 'Try later' },
+      failure: { kind: 'retryable-failure', code: 'unavailable' },
     });
 
     await expect(
@@ -48,7 +48,7 @@ describe('waitForSettled', () => {
 
     current = withPersistence({
       kind: 'rejected',
-      failure: { kind: 'permanent-failure', code: 'invalid-commit', message: 'Invalid' },
+      failure: { kind: 'permanent-failure', code: 'invalid-commit' },
     });
     notify?.();
 

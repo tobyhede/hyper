@@ -58,12 +58,47 @@ export type CommitOutcome =
   | { kind: 'conflict'; conflicts: readonly SpaceConflict[] }
   | { kind: 'aggregate-refused'; errors: readonly SpaceAggregateError[] };
 
+/**
+ * Which expectation a `protocol` failure broke (ADR 0057).
+ *
+ * Nothing an author did causes one, so the author reads the one `protocol`
+ * sentence whatever this says; it is typed context for a diagnostic rather than
+ * copy, and never prose — a thrown value is carried as it was thrown.
+ */
+export type ProtocolFault =
+  /** A committed answer to a single-Space commit named no revision for it. */
+  | { kind: 'revision-omitted'; spaceId: UUID }
+  /** A committed answer to a single-Space commit deleted Spaces it never asked to. */
+  | { kind: 'unexpected-deletion'; spaceId: UUID; deletedSpaceIds: readonly UUID[] }
+  /** A conflict answer to a single-Space commit named no conflict for it. */
+  | { kind: 'conflict-omitted-space'; spaceId: UUID }
+  /** Preparing or sending a coordinated commit threw rather than answering. */
+  | { kind: 'coordinated-commit-threw'; cause: unknown }
+  /**
+   * A committed answer to a coordinated commit did not acknowledge each
+   * participant and requested deletion exactly once. `omittedSpaceIds` names
+   * the requested ones it left out, and is empty when what broke was a
+   * repeated or unrequested entry instead.
+   */
+  | { kind: 'coordinated-result-malformed'; omittedSpaceIds: readonly UUID[] }
+  /** An error response did not use `application/problem+json`. */
+  | { kind: 'problem-media-type'; contentType: string | null }
+  /** A Problem Details body's `status` disagreed with the HTTP status. */
+  | { kind: 'problem-status-mismatch'; httpStatus: number; problemStatus: number }
+  /** A response body failed to read or decode. */
+  | { kind: 'malformed-response'; cause: unknown }
+  /** A well-formed Problem Details code a commit never answers. */
+  | {
+      kind: 'unexpected-problem';
+      problemCode:
+        'not-found' | 'invalid-space-id' | 'unsupported-media-type' | 'method-not-allowed';
+    };
+
 export type CommitResult =
   | CommitOutcome
   | {
       kind: 'retryable-failure';
       code: 'network' | 'timeout' | 'unavailable' | 'rate-limited';
-      message: string;
       retryAfterMs?: number;
     }
   | {
@@ -72,9 +107,9 @@ export type CommitResult =
       // server declining the request as sent: it is the one permanent failure
       // an author can act on, by shortening what they wrote, and folding it in
       // with a format disagreement leaves them a sentence they cannot use.
-      code: 'invalid-commit' | 'forbidden' | 'payload-too-large' | 'protocol';
-      message: string;
-    };
+      code: 'invalid-commit' | 'forbidden' | 'payload-too-large';
+    }
+  | { kind: 'permanent-failure'; code: 'protocol'; fault: ProtocolFault };
 
 export interface SpaceBackend {
   listSpaces(): Promise<readonly SpaceSummary[]>;
