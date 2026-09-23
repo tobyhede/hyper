@@ -2,6 +2,10 @@ import { Component, type ReactNode } from 'react';
 import { SpaceAppFailureView } from './SpaceAppFailureView';
 import { failureMessage } from '../failure-message';
 
+interface SpaceAppFailureProps {
+  readonly children: ReactNode;
+}
+
 interface SpaceAppFailureState {
   readonly message: string | null;
 }
@@ -21,7 +25,7 @@ interface SpaceAppFailureState {
  * snapshot leaves everything on screen still working, so it reports *inside* the
  * app, next to the control that was clicked (`App.tsx`).
  */
-export class SpaceAppFailure extends Component<{ children: ReactNode }, SpaceAppFailureState> {
+export class SpaceAppFailure extends Component<SpaceAppFailureProps, SpaceAppFailureState> {
   override state: SpaceAppFailureState = { message: null };
 
   static getDerivedStateFromError(error: unknown): SpaceAppFailureState {

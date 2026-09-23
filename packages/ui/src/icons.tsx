@@ -243,11 +243,16 @@ export const SpaceResourceIcon = SpaceIcon;
  */
 export type ResourceBaseKind = Exclude<Resource['kind'], 'reference'>;
 
+/** What every base glyph accepts. */
+interface BaseGlyphProps {
+  size?: number;
+}
+
 /** The silhouette each Resource kind that owns one draws. */
 export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
   space: SpaceResourceIcon,
-} satisfies Record<ResourceBaseKind, ComponentType<{ size?: number }>>;
+} satisfies Record<ResourceBaseKind, ComponentType<BaseGlyphProps>>;
 
 /**
  * A Reference Resource, drawn as the glyph of the Resource it points at with a badge on it.

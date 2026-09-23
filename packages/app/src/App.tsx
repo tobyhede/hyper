@@ -110,6 +110,23 @@ const noOpenSpacesChanges = (): (() => void) => () => undefined;
  */
 const REFERENCE_OFFSET_RATIO = 0.75;
 
+/** A request that the Dock disclose its Resources list, naming the addressed Resource that asked. */
+interface ResourcesDisclosure {
+  readonly resourceId: ResourceId;
+}
+
+/** A Resource being dragged from the Resources list, and the Map selected when the drag began. */
+interface ResourcesDrag {
+  readonly resourceId: ResourceId;
+  readonly mapId: MapId;
+}
+
+/** The Map and Resource an address last revealed the Resources list for. */
+interface RevealedAddress {
+  readonly mapId: MapId;
+  readonly resourceId: ResourceId;
+}
+
 export const createApp = (
   { app: composition, session: spaceSession, spaceResources }: OpenSpace,
   browserLocation: BrowserLocation,
@@ -289,13 +306,8 @@ export const createApp = (
      * (`DockResourcesList`). A fresh object per request is the signal; an equal one
      * recomputed by an unrelated edit reopens nothing the reader has closed.
      */
-    const [discloseResources, setDiscloseResources] = useState<{
-      readonly resourceId: ResourceId;
-    } | null>(null);
-    const resourcesDrag = useRef<{
-      readonly resourceId: ResourceId;
-      readonly mapId: MapId;
-    } | null>(null);
+    const [discloseResources, setDiscloseResources] = useState<ResourcesDisclosure | null>(null);
+    const resourcesDrag = useRef<ResourcesDrag | null>(null);
     const renderedSpace = useMemo(
       () => readWorkingSpace(sessionState.working),
       [sessionState.working],
@@ -684,10 +696,7 @@ export const createApp = (
     // link addresses no Map of its own, so the same Resource can be
     // revealed once in one Map and then adopt a different default Map
     // that omits it, and that is a second reveal rather than a repeat.
-    const [revealedAddress, setRevealedAddress] = useState<{
-      readonly mapId: MapId;
-      readonly resourceId: ResourceId;
-    } | null>(null);
+    const [revealedAddress, setRevealedAddress] = useState<RevealedAddress | null>(null);
     if (addressedResourceId === null) {
       // Only a real navigation clears the address — choosing a Map,
       // activating a Graph, or restoring a destination that names no Resource — so

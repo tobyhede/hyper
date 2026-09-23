@@ -150,6 +150,12 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
   );
 }
 
+/** A refused recovery, and the conflict it was refused under. */
+interface RefusedRecovery {
+  readonly conflict: Conflict;
+  readonly refusal: StoredSpaceRefusal;
+}
+
 /**
  * A refusal belongs to the conflict that raised it.
  *
@@ -171,10 +177,7 @@ function ConflictControl({
   readonly onKeepLocal: () => void;
 }) {
   const recovery = conflictRecovery(conflict);
-  const [refused, setRefused] = useState<{
-    readonly conflict: Conflict;
-    readonly refusal: StoredSpaceRefusal;
-  } | null>(null);
+  const [refused, setRefused] = useState<RefusedRecovery | null>(null);
 
   if (refused !== null && refused.conflict !== conflict) setRefused(null);
   const remoteRefusal = refused !== null && refused.conflict === conflict ? refused.refusal : null;
