@@ -14,3 +14,7 @@ If the answer is yes, ImpactGate's `comment` subcommand posts the markdown repor
 - [ ] If yes: the write permission is scoped to the impact job alone, and `ci.yml`'s stance is untouched.
 - [ ] If yes: one comment per PR, updated in place and not duplicated per push.
 - [ ] If yes: a missing permission or token degrades to a warning and never fails the job.
+
+## Comments
+
+Evidence from ticket 04 that bears on this decision without settling it. The report's "Top cost drivers" table is not reliable on this repo. ImpactGate takes per-function spans from lizard, and lizard mis-spans our TypeScript in both directions: `ResourcesTrigger`, a 9-line branchless function, is reported at CC 92, and `deriveCompletedEdit` after PR #267 is cut off mid-function at CC 30. A sticky comment would put that table in front of every PR author by default, where the job summary only reaches whoever opens the job. Ticket 05 reduces the defect to a repro, and ticket 04's Answer has the details.
