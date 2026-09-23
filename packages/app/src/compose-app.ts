@@ -1,6 +1,7 @@
 import { newUuid, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
+import { createCommandOutcomes, type CommandOutcomes } from './command-outcomes';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
@@ -126,6 +127,13 @@ export interface ComposedApp extends AppCore {
    */
   readonly continuation: Continuation;
   readonly edgeAuthoring: EdgeAuthoring;
+  /**
+   * What the author is told after a chrome command, per channel.
+   *
+   * Composed after the continuation, which it publishes into, and before
+   * Resource deletion, which runs its deletions through it.
+   */
+  readonly commandOutcomes: CommandOutcomes;
   /** The Delete Resource confirmation interaction for this Space. */
   readonly resourceDeletion: ResourceDeletion;
   /**
@@ -175,6 +183,11 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
+  // Resolved once for the collaborators that take the sink required. The
+  // others still receive what the caller gave, so each keeps its own console
+  // default when none was given.
+  const compositionReporter: ObserverErrorReporter =
+    reportObserverError ?? ((error) => console.error('Space composition observer failed', error));
   const authoring = createSpaceAuthoring({
     session: spaceSession,
     navigation,
@@ -194,9 +207,16 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     reportObserverError,
   });
+  const commandOutcomes = createCommandOutcomes({
+    authoring,
+    navigation,
+    continuation,
+    reportObserverError: compositionReporter,
+  });
   const resourceDeletion = createResourceDeletion({
     authoring,
     currentSpace,
+    commandOutcomes,
     spaceResources,
     reportObserverError,
   });
@@ -206,8 +226,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     adapter,
     continuation,
     edgeAuthoring,
+    commandOutcomes,
     resourceDeletion,
-    reportObserverError:
-      reportObserverError ?? ((error) => console.error('Space composition observer failed', error)),
+    reportObserverError: compositionReporter,
   };
 }

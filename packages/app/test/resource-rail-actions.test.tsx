@@ -13,7 +13,7 @@ import { loadSpaceSnapshot } from '@project/graph';
 import { productDestinationPath } from '@project/http';
 import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import type { HistoryApi } from '../src/browser-location';
-import { composeApp } from '../src/compose-app';
+import { composeApp, type ComposedApp } from '../src/compose-app';
 import type { DestinationOpening } from '../src/destination-opening';
 import { recordingHistory } from './browser-history';
 import { expectMenuGroups } from './menu-assertions';
@@ -140,6 +140,8 @@ function mount(
   history?: HistoryApi,
   /** The Space to mount, for the one case that needs a Reference Resource already in it. */
   mounted: SpaceSnapshot = snapshot,
+  /** Adjusts the composition before it is mounted, for a case that needs a refusal. */
+  prepare?: (app: ComposedApp) => void,
 ): SpaceSession {
   const stored = { snapshot: mounted, revision: 0n, exportedRevision: null };
   const { spaceSession: session, spaceResources } = openTestSpace(
@@ -175,11 +177,13 @@ function mount(
     stored,
   );
   let view: RenderResult | undefined;
+  const app = composeApp({ spaceSession: session, spaceResources });
+  prepare?.(app);
   mountSpace(
     {
       id: runtime(mounted).id,
       session,
-      app: composeApp({ spaceSession: session, spaceResources }),
+      app,
       spaceResources,
     },
     (app) => {
@@ -313,6 +317,34 @@ describe('a Resource’s commands on the canvas rail', () => {
       expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]).toBeUndefined();
     });
     expect(resourceIds(session)).toEqual([RESOURCE_ID, OTHER_RESOURCE_ID]);
+    await settled(session);
+  });
+
+  /**
+   * Remove from Map reports on its own channel. It used to borrow Delete from
+   * Space's, so a refused removal read "Resource not deleted" about a Resource
+   * nobody was deleting.
+   */
+  it('shows a refused removal as "Resource not removed" and dismisses it', async () => {
+    const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
+      const complete = authoring.complete;
+      vi.spyOn(authoring, 'complete').mockImplementation((completion) =>
+        completion.kind === 'removed-resource-from-map'
+          ? { kind: 'refused', refusal: { code: 'resource-not-found' } }
+          : complete(completion),
+      );
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Resource not removed');
+    expect(alert).toHaveTextContent('This Resource is no longer part of the Space.');
+    expect(screen.queryByText('Resource not deleted')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Resource not removed' }));
+    await waitFor(() => expect(screen.queryByText('Resource not removed')).not.toBeInTheDocument());
     await settled(session);
   });
 

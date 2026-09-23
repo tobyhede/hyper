@@ -77,6 +77,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
+import { COMMAND_CHANNELS } from './command-outcomes';
 import { useOpenSpaces } from './open-spaces-context';
 
 /**
@@ -123,6 +124,7 @@ export const createApp = (
     adapter: useRenderAdapter,
     continuation,
     edgeAuthoring,
+    commandOutcomes,
     resourceDeletion,
     reportObserverError,
   } = composition;
@@ -244,6 +246,10 @@ export const createApp = (
     const resourceDeletionState = useSyncExternalStore(
       resourceDeletion.subscribe,
       resourceDeletion.getState,
+    );
+    const { notices: commandNotices } = useSyncExternalStore(
+      commandOutcomes.subscribe,
+      commandOutcomes.getState,
     );
     /**
      * Copy one address, answering whether it reached the clipboard.
@@ -747,10 +753,8 @@ export const createApp = (
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Resource deletion refusal was outside this and cleared only when the next
-    // Delete Resource was armed, so a refused deletion stayed pinned to the shell
-    // through Map switches and unrelated Edits until someone pressed Delete
-    // again.
+    // The Resource deletion and removal notices are command outcomes' channels,
+    // and that module clears them on the same move (`command-outcomes.ts`).
     const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
     if (refusedUnder !== selectedMapId) {
       setRefusedUnder(selectedMapId);
@@ -759,7 +763,6 @@ export const createApp = (
       setMapDeleteMessage(null);
       setGraphRefusal(null);
       setGraphDeleteMessage(null);
-      resourceDeletion.dismissRefusal();
     }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
@@ -1087,13 +1090,12 @@ export const createApp = (
                   label: 'Remove from Map',
                   icon: <RemoveFromMapIcon />,
                   onSelect: (): EntityActionOutcome => {
-                    const result = authoring.complete({
-                      kind: 'removed-resource-from-map',
-                      resourceId: resource.id,
-                    });
-                    if (result.kind === 'refused') {
-                      resourceDeletion.reportRefusal(describeAuthoringRefusal(result.refusal));
-                    }
+                    commandOutcomes.run('resource-remove', () =>
+                      authoring.complete({
+                        kind: 'removed-resource-from-map',
+                        resourceId: resource.id,
+                      }),
+                    );
                     return 'done';
                   },
                 },
@@ -1753,11 +1755,18 @@ export const createApp = (
                 {clipboardFailure}
               </ShellNotice>
             )}
-            {resourceDeletionState.refusal === null ? null : (
-              <ShellNotice title="Resource not deleted" onDismiss={resourceDeletion.dismissRefusal}>
-                {resourceDeletionState.refusal}
-              </ShellNotice>
-            )}
+            {COMMAND_CHANNELS.map((channel) => {
+              const notice = commandNotices.get(channel);
+              return notice === undefined ? null : (
+                <ShellNotice
+                  key={channel}
+                  title={notice.title}
+                  onDismiss={() => commandOutcomes.dismiss(channel)}
+                >
+                  {notice.message}
+                </ShellNotice>
+              );
+            })}
             {mapRefusal === null ? null : (
               <ShellNotice
                 /* Named for the command that was refused rather than for the

@@ -14,7 +14,7 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: RESOURCE_A, to: RESOURCE_B } as const;
-const NONE = { pending: null, deleting: false, refusal: null };
+const NONE = { pending: null, deleting: false };
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -49,9 +49,19 @@ function open(stored: SpaceSnapshot = snapshot, storedRevision = 0n) {
     exportedRevision: null,
   });
   const { spaceSession: session, spaceResources } = openTestSpace(backend, loaded);
-  const composed = composeApp({ spaceSession: session, selection: MAP_ID, spaceResources });
-  return { session, spaceResources, ...composed };
+  const reported: unknown[] = [];
+  const composed = composeApp({
+    spaceSession: session,
+    selection: MAP_ID,
+    spaceResources,
+    reportObserverError: (error) => reported.push(error),
+  });
+  return { session, spaceResources, reported, ...composed };
 }
+
+/** The standing notice on Resource deletion's channel, or `null`. */
+const deletionNotice = ({ commandOutcomes }: ReturnType<typeof open>) =>
+  commandOutcomes.getState().notices.get('resource-delete') ?? null;
 
 const lookupResource = (composed: ReturnType<typeof open>, id = RESOURCE_A): Resource =>
   composed.currentSpace().lookup.resource(id)!;
@@ -74,7 +84,7 @@ describe('arming and cancellation', () => {
 
     expect(resourceDeletion.getState().pending?.id).toBe(RESOURCE_A);
     expect(resourceDeletion.getState().deleting).toBe(false);
-    expect(resourceDeletion.getState().refusal).toBeNull();
+    expect(deletionNotice(opened)).toBeNull();
     expect(session.getState().working).toBe(before);
   });
 
@@ -132,7 +142,8 @@ describe('confirmation', () => {
     resourceDeletion.confirm();
     await vi.waitFor(() => expect(resourceDeletion.getState().pending).toBeNull());
 
-    expect(resourceDeletion.getState().refusal).toContain('Reference Resources');
+    expect(deletionNotice(opened)?.title).toBe('Resource not deleted');
+    expect(deletionNotice(opened)?.message).toContain('Reference Resources');
     expect(session.getState().working).toBe(before);
   });
 
@@ -164,23 +175,34 @@ describe('confirmation', () => {
     await vi.waitFor(() => expect(resourceDeletion.getState().deleting).toBe(false));
   });
 
-  it('reports an unexpected failure without treating it as a domain refusal', async () => {
+  /**
+   * A thrown deletion is a defect: it keeps `failureMessage`'s sentence on the
+   * channel and now reaches the reporter as well, where it used to be swallowed.
+   */
+  it('reports a thrown Markdown Resource deletion and publishes its sentence', async () => {
     const opened = open();
-    const { resourceDeletion, authoring } = opened;
+    const { resourceDeletion, authoring, reported } = opened;
+    const failure = new Error('coordination broke');
     vi.spyOn(authoring, 'complete').mockImplementation(() => {
-      throw new Error('coordination broke');
+      throw failure;
     });
     resourceDeletion.arm(lookupResource(opened));
 
     resourceDeletion.confirm();
-    await vi.waitFor(() => expect(resourceDeletion.getState().refusal).toBe('coordination broke'));
+    await vi.waitFor(() => expect(resourceDeletion.getState().pending).toBeNull());
 
-    expect(resourceDeletion.getState().pending).toBeNull();
+    expect(deletionNotice(opened)).toEqual({
+      title: 'Resource not deleted',
+      message: 'coordination broke',
+    });
+    expect(reported).toEqual([failure]);
   });
 
-  it('reports a rejected promise from a Space Resource deletion', async () => {
-    const { resourceDeletion, spaceResources } = open();
-    vi.spyOn(spaceResources, 'delete').mockRejectedValue(new Error('network failed'));
+  it('reports a thrown Space Resource deletion and publishes its sentence', async () => {
+    const opened = open();
+    const { resourceDeletion, spaceResources, reported } = opened;
+    const failure = new Error('network failed');
+    vi.spyOn(spaceResources, 'delete').mockRejectedValue(failure);
     const spaceResource: Resource = {
       id: SPACE_RESOURCE,
       title: 'Linked',
@@ -192,8 +214,13 @@ describe('confirmation', () => {
     resourceDeletion.arm(spaceResource);
 
     resourceDeletion.confirm();
-    await vi.waitFor(() => expect(resourceDeletion.getState().refusal).toBe('network failed'));
-    expect(resourceDeletion.getState().pending).toBeNull();
+    await vi.waitFor(() => expect(resourceDeletion.getState().pending).toBeNull());
+
+    expect(deletionNotice(opened)).toEqual({
+      title: 'Resource not deleted',
+      message: 'network failed',
+    });
+    expect(reported).toEqual([failure]);
   });
 });
 
