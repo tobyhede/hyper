@@ -407,10 +407,25 @@ export interface DockCanvas {
   /** The Map that is drawing. */
   readonly selected: Map;
   readonly onSelect: (mapId: MapId) => void;
-  /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
-  readonly onRename: ((mapId: MapId, title: string) => string | null) | null;
-  /** Create an empty Map and select it. */
-  readonly onCreate: () => void;
+  /**
+   * Rename the drawing Map. Absent while no chrome rename may begin —
+   * {@link DockSpace.onRename}'s second arm.
+   */
+  readonly onRename: ((title: string) => string | null) | null;
+  /**
+   * Create an empty Map and select it, or `null` while New Map may not run.
+   *
+   * One field, so the row's unavailable treatment and its press are the one
+   * answer Map authoring's capability gave (`map-authoring-commands.ts`,
+   * `offered`). Among that answer's terms is one beyond Create Resource's:
+   * creating a Map **selects** it, and the created Map is empty — so the
+   * canvas re-derives with no nodes and a Resource holding a live title draft
+   * unmounts, taking the draft, the announced reason and the caret with it. A
+   * valid draft is safe, because pressing the control blurs the input and a
+   * valid blur completes the Title (ADR 0065); a refused one is re-focused
+   * instead and the press lands anyway.
+   */
+  readonly onCreate: (() => void) | null;
   /**
    * Whether New Map's rename continuation landed — read when the menu closes.
    *
@@ -422,28 +437,16 @@ export interface DockCanvas {
    */
   readonly didCreateMoveCaret: () => boolean;
   /**
-   * Whether New Map may run.
+   * Delete the drawing Map, or `null` while Delete may not run.
    *
-   * Its own term beyond Create Resource's: creating a Map **selects** it, and the
-   * created Map is empty — so the canvas re-derives with no nodes and a Resource
-   * holding a live title draft unmounts, taking the draft, the announced reason
-   * and the caret with it. A valid draft is safe, because pressing the control
-   * blurs the input and a valid blur completes the Title (ADR 0065); a refused
-   * one is re-focused instead and the press lands anyway.
+   * One field for the same reason as {@link DockCanvas.onCreate}. The answer
+   * holds two rules, and neither is derivable here without restating it: the
+   * last Map cannot be deleted (ADR 0079), and every entity Edit is withdrawn
+   * while a title editor or a live content edit owns the caret
+   * (`authoring-availability.ts`). A row that read only the first used to
+   * press cleanly, run nothing, and report nothing.
    */
-  readonly createDisabled: boolean;
-  readonly onDelete: (mapId: MapId) => void;
-  /**
-   * Whether Delete Map may run, beyond the rule the row already knows.
-   *
-   * The last Map cannot be deleted (ADR 0079) and the surface reads that off
-   * `maps` itself — but that is one of *two* rules, and the second is not
-   * derivable here: every entity Edit is withdrawn while a title editor or a
-   * live content edit owns the caret (`authoring-availability.ts`). The command
-   * this row dispatches does not exist in that state, so a row that read only
-   * the ADR rule pressed cleanly, ran nothing, and reported nothing.
-   */
-  readonly deleteDisabled: boolean;
+  readonly onDelete: (() => void) | null;
   /**
    * Copy the drawing Map's address — the one form a Map has.
    *
@@ -968,11 +971,7 @@ function MapControls({
         testId="selected-canvas"
         title={canvas.selected.title}
         triggerTitle="Switch Map"
-        onRename={
-          canvas.onRename === null
-            ? null
-            : (title) => canvas.onRename?.(canvas.selected.id, title) ?? null
-        }
+        onRename={canvas.onRename}
       >
         {(disclosure) => <MapIdentityMenu canvas={canvas} side={side} disclosure={disclosure} />}
       </IdentitySurface>
@@ -1020,11 +1019,9 @@ function MapIdentityMenu({
       <MapMenuActions
         title={canvas.selected.title}
         renameItem={renameItem}
-        createDisabled={canvas.createDisabled}
-        deleteDisabled={canvas.deleteDisabled || canvas.maps.length <= 1}
         onCreate={canvas.onCreate}
         onCopyLink={canvas.onCopyLink}
-        onDelete={() => canvas.onDelete(canvas.selected.id)}
+        onDelete={canvas.onDelete}
       />
     </ChoiceMenu>
   );

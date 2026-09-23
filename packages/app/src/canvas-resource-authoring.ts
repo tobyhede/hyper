@@ -17,7 +17,7 @@ import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import { completeEmbeddedAuthoring } from './embedded-authoring';
-import type { Continuation } from './continuation';
+import type { CommandOutcomes } from './command-outcomes';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import type { SpaceResourceFraming } from './space-resource-framing';
 import {
@@ -85,7 +85,8 @@ const completeEditedSpaceResource = (
 };
 
 export interface CanvasResourceAuthoringInput {
-  readonly continuation?: Continuation;
+  /** Where a Space Resource rail's Map report is held — the containing canvas's. */
+  readonly commandOutcomes?: CommandOutcomes;
   readonly nodes: readonly ResourceFlowNode[];
   /**
    * What may be authored right now, answered once for the whole application.
@@ -152,7 +153,7 @@ export interface CanvasResourceAuthoring {
  * Resource. Space Authoring remains authoritative for every completed Edit.
  */
 export function useCanvasResourceAuthoring({
-  continuation,
+  commandOutcomes,
   nodes,
   availability,
   nameOnCreation,
@@ -487,7 +488,7 @@ export function useCanvasResourceAuthoring({
       spaceDocuments,
       spaceResourceTargets,
       spaces,
-      continuation,
+      commandOutcomes,
       completeSpaceResourceSelection,
       completeEmbedded: completeEmbeddedAuthoring,
       portalEditing,
@@ -503,7 +504,7 @@ export function useCanvasResourceAuthoring({
       spaceDocuments,
       spaceResourceTargets,
       spaces,
-      continuation,
+      commandOutcomes,
       completeSpaceResourceSelection,
       portalEditing,
       onPortalEditingChange,

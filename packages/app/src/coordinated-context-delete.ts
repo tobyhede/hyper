@@ -1,6 +1,5 @@
 import type { UUID } from '@project/core';
 import type {
-  DeleteReferencedMapInput,
   DeleteReferencedGraphInput,
   SpaceResourceContextDeletionResult,
 } from '@project/persistence';
@@ -20,23 +19,16 @@ export type CoordinatedContextDeleteResult =
   | { readonly kind: 'error'; readonly message: string }
   | { readonly kind: 'unchanged' };
 
-/**
- * The boolean an entity-menu Delete reads: false only when the author should
- * see a failure. Lifecycle `unchanged` is a no-op, not a refusal
- * (`coordinated-context-delete.test.ts` — "does not report unchanged as a menu
- * failure").
- */
-export const coordinatedDeleteOk = (result: CoordinatedContextDeleteResult): boolean =>
-  result.kind !== 'error';
-
-const run = async (
-  del: () => Promise<SpaceResourceContextDeletionResult>,
-  waitBefore: (() => Promise<boolean>) | undefined,
+/** Coordinated Graph deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
+export const coordinatedGraphDelete = async (
+  deleteGraph: (input: DeleteReferencedGraphInput) => Promise<SpaceResourceContextDeletionResult>,
+  input: DeleteReferencedGraphInput,
+  waitBefore?: () => Promise<boolean>,
 ): Promise<CoordinatedContextDeleteResult> => {
   if (waitBefore !== undefined && !(await waitBefore())) {
     return { kind: 'error', message: PERSISTENCE_UNSETTLED };
   }
-  const result = await del();
+  const result = await deleteGraph(input);
   if (result.kind === 'refused') {
     return { kind: 'error', message: describeSpaceResourceRefusal(result.refusal) };
   }
@@ -49,17 +41,3 @@ const run = async (
   }
   return { kind: 'unchanged' };
 };
-
-/** Coordinated Map deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
-export const coordinatedMapDelete = (
-  deleteMap: (input: DeleteReferencedMapInput) => Promise<SpaceResourceContextDeletionResult>,
-  input: DeleteReferencedMapInput,
-  waitBefore?: () => Promise<boolean>,
-): Promise<CoordinatedContextDeleteResult> => run(() => deleteMap(input), waitBefore);
-
-/** Coordinated Graph deletion: gate, lifecycle, mapped refusal. Callers own follow-up. */
-export const coordinatedGraphDelete = (
-  deleteGraph: (input: DeleteReferencedGraphInput) => Promise<SpaceResourceContextDeletionResult>,
-  input: DeleteReferencedGraphInput,
-  waitBefore?: () => Promise<boolean>,
-): Promise<CoordinatedContextDeleteResult> => run(() => deleteGraph(input), waitBefore);

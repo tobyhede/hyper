@@ -309,6 +309,7 @@ function CanvasHarness({
   adapter,
   edgeAuthoring,
   continuation,
+  commandOutcomes,
   currentSpace,
   authoring,
   session,
@@ -316,7 +317,13 @@ function CanvasHarness({
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
-  'adapter' | 'edgeAuthoring' | 'continuation' | 'currentSpace' | 'authoring' | 'session'
+  | 'adapter'
+  | 'edgeAuthoring'
+  | 'continuation'
+  | 'commandOutcomes'
+  | 'currentSpace'
+  | 'authoring'
+  | 'session'
 > & {
   /** A modal pane is open over the graph, withdrawing everything on it. */
   readonly covered: boolean;
@@ -336,7 +343,7 @@ function CanvasHarness({
         onSelectEdge={adapter.getState().selectEdge}
       />
       <SpaceCanvas
-        continuation={continuation}
+        commandOutcomes={commandOutcomes}
         nodes={projection?.nodes ?? []}
         edges={projection?.edges ?? []}
         projectedNodes={null}

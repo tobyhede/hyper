@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { type ReactNode } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   SpaceResourceSelectors,
@@ -73,10 +73,9 @@ describe('SpaceResourceSelectors', () => {
       clusters({
         mapCommands: {
           onRename,
-          onCreate: () => Promise.resolve(null),
-          onDelete: () => Promise.resolve(null),
+          onCreate: () => Promise.resolve(false),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
         },
       }),
       <button>Destination</button>,
@@ -123,14 +122,13 @@ describe('SpaceResourceSelectors', () => {
         mapCommands: {
           onRename: () => null,
           onCreate: () =>
-            new Promise<string | null>((_, reject) => {
+            new Promise<boolean>((_, reject) => {
               rejectCreate = () => {
                 reject(new Error('persist failed'));
               };
             }),
-          onDelete: () => Promise.resolve(null),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
         },
       }),
     );
@@ -153,15 +151,14 @@ describe('SpaceResourceSelectors', () => {
       clusters({
         mapCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve(null),
+          onCreate: () => Promise.resolve(false),
           onDelete: () =>
-            new Promise<string | null>((_, reject) => {
+            new Promise<void>((_, reject) => {
               rejectDelete = () => {
                 reject(new Error('persist failed'));
               };
             }),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
         },
       }),
     );
@@ -176,6 +173,75 @@ describe('SpaceResourceSelectors', () => {
       await Promise.resolve();
     });
     expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
+  });
+
+  /**
+   * A Map command is one field, its press or `null`, so the row is drawn
+   * unavailable from the same answer that would invoke it.
+   */
+  it('draws each Map command the application withholds as unavailable', () => {
+    mount(
+      clusters({
+        mapCommands: {
+          onRename: null,
+          onCreate: null,
+          onDelete: null,
+          onCopyLink: () => Promise.resolve(null),
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-resource-map'));
+
+    for (const name of ['New Map', 'Rename', 'Delete Collection 1']) {
+      expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true');
+    }
+    expect(screen.getByRole('menuitem', { name: 'Copy link to Map' })).not.toHaveAttribute(
+      'aria-disabled',
+    );
+  });
+
+  /**
+   * A Map creation's refusal is the containing canvas's notice, so the rail
+   * reports no sentence of its own for it; it learns only whether the caret
+   * went on. A Graph creation still answers the sentence the rail reports.
+   */
+  it('reports no sentence of its own for a Map creation, and a Graph creation’s refusal', async () => {
+    const onReport = vi.fn();
+    mount(
+      clusters({
+        onReport,
+        mapCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(false),
+          onDelete: () => Promise.resolve(),
+          onCopyLink: () => Promise.resolve(null),
+        },
+        graphCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve('Graph refused.'),
+          onDelete: () => Promise.resolve(null),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+          color: '#1f77b4',
+          colors: [{ color: '#1f77b4', label: 'Blue' }],
+          onRecolor: () => null,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-resource-map'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'New Map' }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByTestId('space-resource-graph')).toBeEnabled());
+    expect(onReport).toHaveBeenLastCalledWith(null);
+
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'New Graph' }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(onReport).toHaveBeenLastCalledWith('Graph refused.'));
   });
 
   it('draws a selection the target no longer holds as unavailable', () => {
@@ -203,10 +269,9 @@ describe('SpaceResourceSelectors', () => {
       clusters({
         mapCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve(null),
-          onDelete: () => Promise.resolve(null),
+          onCreate: () => Promise.resolve(false),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
         },
       }),
     );

@@ -1,22 +1,12 @@
-import type { GraphId, ResourceDocument, UUID } from '@project/core';
+import type { GraphId, ResourceDocument } from '@project/core';
 import { SpaceResourceSelectors, type SpaceResourceSelectorsProps } from '@project/ui';
-import type { Continuation } from './continuation';
-import type { OpenSpace, OpenSpaces } from './open-spaces';
-import { spaceResourceContextCommands } from './space-resource-context-commands';
-import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
+import {
+  spaceResourceContextCommands,
+  type SpaceResourceRailContext,
+} from './space-resource-context-commands';
 import type { SpaceResourceTarget, SpaceResourceTargetMap } from './space-resource-lifecycle';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
-
-export interface SpaceResourceRailContext {
-  readonly entry: OpenSpace;
-  readonly spaces: OpenSpaces;
-  readonly containingSpaceId: UUID;
-  readonly continuation: Continuation;
-  readonly complete: (
-    completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
-  ) => AuthoringResult;
-}
 
 /**
  * The two lists an Open Space Resource chooses from, the commands that act on
@@ -53,15 +43,7 @@ export function buildSpaceResourceRail({
   const commands =
     context === undefined || document === undefined
       ? undefined
-      : spaceResourceContextCommands(
-          context.entry,
-          context.spaces,
-          context.containingSpaceId,
-          document,
-          complete,
-          context.continuation,
-          context.complete,
-        );
+      : spaceResourceContextCommands(context, document, complete, () => !disabled);
   const optional: Mutable<
     Pick<SpaceResourceSelectorsProps, 'onEditingChange' | 'mapCommands' | 'graphCommands'>
   > = {};

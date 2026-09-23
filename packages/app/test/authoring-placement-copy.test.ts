@@ -3,7 +3,7 @@ import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import { coordinatedMapDelete } from '../src/coordinated-context-delete';
+import { topLevelMapAuthoringCommands } from '../src/map-authoring-commands';
 import { createOpenSpaces } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
@@ -75,18 +75,18 @@ describe('Map delete draws the right geometry (ticket 02, item 1)', () => {
     const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(DELETED_MAP_ID);
 
-    // What `App.tsx`'s Dock entity command does (`onDeleteMap`): coordinate
-    // the delete, then select and activate whatever it answers.
-    const result = await coordinatedMapDelete(spaceResources.deleteMap, {
-      targetSpaceId: SPACE_ID,
-      mapId: DELETED_MAP_ID,
-      preferredMapId: null,
-    });
+    // What `App.tsx`'s Dock Delete does: Map authoring deletes the Map and
+    // leaves the canvas on the survivor.
+    const everything = () => true;
+    const result = await topLevelMapAuthoringCommands(
+      { app, spaceResources },
+      { rename: everything, create: everything, delete: everything },
+    )
+      .map(DELETED_MAP_ID)
+      .delete.invoke();
     if (result.kind !== 'completed')
       throw new Error(`Expected a completed delete, got ${result.kind}`);
     expect(result.mapId).toBe(SURVIVING_MAP_ID);
-    app.navigation.selectMap(result.mapId);
-    app.navigation.activateGraph(result.graphId);
     expect(app.navigation.getState().selectedMapId).toBe(SURVIVING_MAP_ID);
 
     // An Edit that touches no position — renaming the surviving Map's own

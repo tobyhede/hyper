@@ -201,6 +201,13 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 async function mount(value: SpaceSnapshot): Promise<SpaceSession> {
+  return (await mountOpenSpaces(value)).session;
+}
+
+/** {@link mount}, answering the Open Spaces it mounted as well. */
+async function mountOpenSpaces(
+  value: SpaceSnapshot,
+): Promise<{ readonly session: SpaceSession; readonly spaces: OpenSpaces }> {
   const backend = new MemorySpaceBackend(
     META_ID,
     [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
@@ -214,7 +221,7 @@ async function mount(value: SpaceSnapshot): Promise<SpaceSession> {
   });
   const initial = await spaces.open(HOME_ID);
   render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-  return initial.session;
+  return { session: initial.session, spaces };
 }
 
 const queryEmbeddedNode = (resourceId: ResourceId): HTMLElement | null => {
@@ -365,6 +372,85 @@ describe('the Map an Open Space Resource draws', () => {
         expect(spaces.entry(TARGET_ID)?.session.getState().working).toEqual(remote);
     },
   );
+
+  /**
+   * A refused rail rename is answered twice, each by its owner: the editor
+   * holds the draft open on the sentence, and the containing canvas's command
+   * outcomes hold the report as "Map unchanged" until it is dismissed.
+   */
+  it('holds a refused rail Map rename open and reports it on the containing Space', async () => {
+    const session = await mount(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        map: SELECTED_MAP_ID,
+        graph: SELECTED_GRAPH_ID,
+      }),
+    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    fireEvent.click(
+      within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const editor = await screen.findByRole('textbox', { name: 'Map name' });
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveAccessibleDescription(
+      'A Map title is required.',
+    );
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Map unchanged' });
+    fireEvent.click(dismiss);
+    await waitFor(() => expect(screen.queryByText('Map unchanged')).not.toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: 'Map name' })).toBeInTheDocument();
+    expect(session.getState().working.resources).toHaveLength(2);
+  });
+
+  /**
+   * A refused rail Map deletion is said once, by the containing canvas's
+   * command outcomes: the rail reports no sentence of its own beside the
+   * notice, whose dismissal would otherwise leave a second copy behind
+   * (`.scratch/command-outcomes/issues/09`).
+   *
+   * Refused through a spy on the target's Space Resource lifecycle, because
+   * its refusals are races or recovery states no mount can stage.
+   */
+  it('says a refused rail Map deletion once, as the containing Space’s notice', async () => {
+    const { spaces } = await mountOpenSpaces(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        map: SELECTED_MAP_ID,
+        graph: SELECTED_GRAPH_ID,
+      }),
+    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    const entry = spaces.entry(TARGET_ID);
+    if (entry === undefined) throw new Error('the target is not embedded');
+    vi.spyOn(entry.spaceResources, 'deleteMap').mockResolvedValue({
+      kind: 'refused',
+      refusal: { code: 'map-not-found', mapId: SELECTED_MAP_ID },
+    });
+    fireEvent.click(
+      within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Collection 1' }));
+
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Map not deleted' });
+    await waitFor(() =>
+      expect(
+        within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
+      ).toBeEnabled(),
+    );
+    expect(screen.getAllByText('This Map is no longer part of the Space.')).toHaveLength(1);
+    fireEvent.click(dismiss);
+    await waitFor(() => expect(screen.queryByText('Map not deleted')).not.toBeInTheDocument());
+    expect(screen.queryByText('This Map is no longer part of the Space.')).not.toBeInTheDocument();
+    expect(entry.app.currentSpace().maps).toHaveLength(2);
+  });
 
   it('keeps the embedded Map inert until Edit, and Done returns it to Read', async () => {
     const value = home({

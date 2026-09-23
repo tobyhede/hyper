@@ -27,7 +27,7 @@ import { createNonThrowingReporter, type SpaceSummary } from '@project/persisten
 import { Placement } from '@project/graph';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace, OpenSpacesState, RejectedExitConfirmation } from './open-spaces';
-import type { AuthoringRefusal, AuthoringResult } from './space-authoring';
+import type { AuthoringResult } from './space-authoring';
 import { authoringAvailability } from './authoring-availability';
 import { selectedResourceOf, type EdgeSubject } from './render-adapter';
 import { canvasProjection } from './canvas-projection';
@@ -35,15 +35,9 @@ import { canvasContent } from './canvas-content';
 import {
   describeAuthoringRefusal,
   describeSpaceResourceBreak,
-  describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
-import {
-  coordinatedDeleteOk,
-  coordinatedMapDelete,
-  coordinatedGraphDelete,
-} from './coordinated-context-delete';
-import { coordinatedContextCreate, createdMapContext } from './coordinated-context-create';
+import { coordinatedGraphDelete } from './coordinated-context-delete';
 import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
@@ -52,7 +46,6 @@ import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
   COPY_LINK_ACTION_ID,
-  DELETE_MAP_ACTION_ID,
   spaceEntityActions,
   type EntityCommandId,
   type SpaceChromeTitleSubject,
@@ -77,7 +70,9 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
 import { ShellNotice } from './components/ShellNotice';
+import { COMMAND_CHANNELS } from './command-outcomes';
 import { useOpenSpaces } from './open-spaces-context';
+import { offered, renameDraftAnswer, topLevelMapAuthoringCommands } from './map-authoring-commands';
 
 /**
  * What an isolated single-Space mount reads in place of the session's open set.
@@ -140,6 +135,7 @@ export const createApp = (
     adapter: useRenderAdapter,
     continuation,
     edgeAuthoring,
+    commandOutcomes,
     resourceDeletion,
     reportObserverError,
   } = composition;
@@ -238,29 +234,14 @@ export const createApp = (
      */
     const [editingResourceBody, setEditingResourceBody] = useState(false);
     const [editingResourceTitle, setEditingResourceTitle] = useState(false);
-    const [createMapRefusal, setCreateMapRefusal] = useState<AuthoringRefusal | null>(null);
-    const [mapManagementRefusal, setMapManagementRefusal] = useState<AuthoringRefusal | null>(null);
-    const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
-    const [graphDeleteMessage, setGraphDeleteMessage] = useState<string | null>(null);
-    /**
-     * A Space command that broke rather than refusing, in words.
-     *
-     * Switching and exiting are the two commands that reach *another* Space's
-     * session, and either can fail for a reason that is not a refusal — a Space
-     * that cannot be re-composed, a backend that will not answer. Both used to
-     * be reported: `OpenSpacesApplication` drew a "Space could not be opened"
-     * panel and `ExitSpaceControl` an `Alert`. Both surfaces went with the
-     * Sidebar and the failures went to `console.error` with them, which leaves
-     * the reader pressing a row that does nothing. `reportBreak` still runs —
-     * a broken command is a diagnostic as well as a report.
-     */
-    const [spaceCommandBreak, setSpaceCommandBreak] = useState<string | null>(null);
-    /** Why the last Graph Edit did not run, or `null` — see `reportGraphEdit`. */
-    const [graphRefusal, setGraphRefusal] = useState<AuthoringRefusal | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
       resourceDeletion.subscribe,
       resourceDeletion.getState,
+    );
+    const { notices: commandNotices } = useSyncExternalStore(
+      commandOutcomes.subscribe,
+      commandOutcomes.getState,
     );
     /**
      * Copy one address, answering whether it reached the clipboard.
@@ -473,29 +454,6 @@ export const createApp = (
       [centreAnchor],
     );
 
-    /**
-     * The Space Resource creation that has not settled, said in one sentence.
-     *
-     * **The Dock's refusal channel, beside `createMapRefusal`.** A creation
-     * that completes on activation has no pane to hold its own failure against
-     * the field that caused it (ADR 0089), so it reports through the surface
-     * that owns the command. The sentence has to name the Space, because the
-     * author may be typing into the Resource when it goes.
-     */
-    const [spaceResourceRefusal, setSpaceResourceRefusal] = useState<string | null>(null);
-
-    /**
-     * The Reference Resource creation that refused, said in one sentence.
-     *
-     * **Beside `spaceResourceRefusal`, for the reason that one exists.** Create
-     * Reference Resource completes on activation and closes the menu it was pressed in
-     * (ADR 0089), so it has no field and no row of its own to hold a failure
-     * against — the surface that owns the command is the Space chrome, and this
-     * is its channel. The rows that can refuse by kind are drawn unavailable, so
-     * what lands here is a Target that went between the draw and the press.
-     */
-    const [referenceRefusal, setReferenceRefusal] = useState<string | null>(null);
-
     const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
 
     /**
@@ -509,7 +467,8 @@ export const createApp = (
      * from out here. A refusal is delivered on that same resolution, before any
      * Resource is installed, so there is no half-made Resource to take away: what the
      * ticket calls removing a refused creation is the lifecycle leaving none
-     * standing, and the sentence below is the half the author can see.
+     * standing, and the "Space not created" notice command outcomes publishes
+     * is the half the author can see.
      *
      * `Space N` is minted from this Space's own Resource titles and handed to both
      * the Space and the Resource that names it, so the two agree at creation
@@ -518,51 +477,46 @@ export const createApp = (
      */
     const createSpaceResource = useCallback((): void => {
       setCreatingSpaceResource(true);
-      setSpaceResourceRefusal(null);
-      void (async () => {
-        try {
-          const title = nextSpaceTitle(spaceSession.getState().working);
-          // Resolved at the press rather than closed over, which is the rule the
-          // pane needed for a surface open across renders and this keeps for a
-          // gesture whose Edit lands one await later. `create` still refuses
-          // `map-not-found` on its own account, against the Map the
-          // coordinated Edit actually sees.
-          const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
-          const result = await spaceResources.create({
-            containingSpaceId: currentSpace().id,
-            mapId: resolved.map.id,
-            title,
-            position: centreAnchor(),
-          });
-          if (result.kind === 'refused') {
-            setSpaceResourceRefusal(describeSpaceResourceRefusal(result.refusal));
-            return;
-          }
-          // Named rather than narrowed to "not refused": a lifecycle that
-          // changed nothing made no Resource, and continuing at one would name an
-          // id nothing draws. Not reachable from `create` today.
-          if (result.kind === 'unchanged') return;
-          // The id the lifecycle minted, not the Resource that appeared. Nothing
-          // prevents a Markdown creation between this press and the installed
-          // Edit — that creation lands synchronously — so "which Resource is new"
-          // answers a different question from "which Resource did this press make",
-          // and the two disagree exactly when it matters.
-          //
-          // Nothing bumps the Spaces epoch here: a created Space joins the Meta
-          // Space for *every* open Space, so the lifecycle that made it is what
-          // announces it (`space-resource-lifecycle.ts`).
-          continuation.request({
-            target: { kind: 'resource', resourceId: result.resourceId },
-            select: true,
-            then: 'rename',
-          });
-        } catch (failure) {
-          reportBreak(failure);
-          setSpaceResourceRefusal(describeSpaceResourceCreationBreak(failure));
-        } finally {
-          setCreatingSpaceResource(false);
-        }
-      })();
+      // An `async` thunk so a throw from the title minting or `resolveMap`
+      // arrives at `run` as a rejection, as the lifecycle's own does.
+      void commandOutcomes
+        .run(
+          'space-resource-create',
+          async () => {
+            const title = nextSpaceTitle(spaceSession.getState().working);
+            // Resolved at the press rather than closed over, which is the rule
+            // the pane needed for a surface open across renders and this keeps
+            // for a gesture whose Edit lands one await later. `create` still
+            // refuses `map-not-found` on its own account, against the Map the
+            // coordinated Edit actually sees.
+            const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
+            return spaceResources.create({
+              containingSpaceId: currentSpace().id,
+              mapId: resolved.map.id,
+              title,
+              position: centreAnchor(),
+            });
+          },
+          {
+            // The id the lifecycle minted, not the Resource that appeared.
+            // Nothing prevents a Markdown creation between this press and the
+            // installed Edit — that creation lands synchronously — so "which
+            // Resource is new" answers a different question from "which
+            // Resource did this press make", and the two disagree exactly when
+            // it matters. A refusal or an `unchanged` made no Resource, so
+            // command outcomes requests nothing for either.
+            //
+            // Nothing bumps the Spaces epoch here: a created Space joins the
+            // Meta Space for *every* open Space, so the lifecycle that made it
+            // is what announces it (`space-resource-lifecycle.ts`).
+            continueAt: ({ resourceId }) => ({
+              target: { kind: 'resource', resourceId },
+              select: true,
+              then: 'rename',
+            }),
+          },
+        )
+        .finally(() => setCreatingSpaceResource(false));
     }, [centreAnchor]);
 
     const selectedMap = useMemo(
@@ -749,27 +703,6 @@ export const createApp = (
     const resourceResize = useRenderAdapter((s) => s.resourceResize);
     const reportEmbeddedMapEditing = useRenderAdapter((s) => s.reportEmbeddedMapEditing);
     const canvas = canvasContent(placement, hasResourcesOnCanvas);
-    // Every standing refusal is about the Map that was selected when it was
-    // refused — the Edit New Map would have made, the Rename or Delete on
-    // the one it named, the Graph Edit inside it, the Resource it would not remove
-    // from it. None of them says anything about the Map the reader has moved
-    // to, so the move clears them together, during the render that moves rather
-    // than one frame after it.
-    //
-    // The Resource deletion refusal was outside this and cleared only when the next
-    // Delete Resource was armed, so a refused deletion stayed pinned to the shell
-    // through Map switches and unrelated Edits until someone pressed Delete
-    // again.
-    const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
-    if (refusedUnder !== selectedMapId) {
-      setRefusedUnder(selectedMapId);
-      setCreateMapRefusal(null);
-      setMapManagementRefusal(null);
-      setMapDeleteMessage(null);
-      setGraphRefusal(null);
-      setGraphDeleteMessage(null);
-      resourceDeletion.dismissRefusal();
-    }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
      * read as **render-time transitions rather than effects**.
@@ -807,34 +740,48 @@ export const createApp = (
     }
 
     /**
-     * One chrome rename, answered rather than performed twice.
+     * Map Edits on the Space the canvas draws: rename while a chrome command
+     * may run, creation while Add Map may, and deletion while entity Edits
+     * may. Rebuilt when any answer moves, so the capability the Dock is drawn
+     * from and the one it invokes read the same render — both answers are React
+     * state, and nothing outside the render holds a later one.
+     */
+    const chromeTitleEdit = availability.chromeTitleEdit;
+    const createMapAvailable = availability.createMap;
+    const entityEdits = availability.entityEdits;
+    const mapAuthoring = useMemo(
+      () =>
+        topLevelMapAuthoringCommands(
+          { app: composition, spaceResources },
+          {
+            rename: () => chromeTitleEdit,
+            create: () => createMapAvailable,
+            delete: () => entityEdits,
+          },
+        ),
+      [chromeTitleEdit, createMapAvailable, entityEdits],
+    );
+    /**
+     * A Space or Graph rename from the Dock. A Map's is not here: the Dock
+     * renames its Map through `mapAuthoring`, above.
      *
-     * The editor is `InlineTitleEditor`, mounted by the Dock's own name control,
-     * and it holds a refused draft open and editable — so this returns the
-     * refusal's sentence rather than swallowing it, and `null` for an Edit that
-     * landed. `unchanged` is `null` too: renaming a Map to the title it
-     * already has is the value the author already authored, and closing the
-     * editor is the right answer to it (`space-authoring.ts`).
-     *
-     * **Three subjects through one seam, not three seams.** The Space joined the
-     * Map and the Graph here rather than beside them, because every part of
-     * this that is worth writing down is the same for all three: which Edit the
-     * name completes is the only difference, and the answer — a sentence or
-     * `null` — is what the editor spends. A second callback for the Space would
-     * have been a second place for the refusal-versus-`unchanged` reading to
-     * drift, and the Dock has one rename slot under the whole bar precisely so
-     * that there is one of these.
+     * The editor is `InlineTitleEditor`, which holds a refused draft open and
+     * editable, so this answers the refusal's sentence rather than swallowing
+     * it, and `null` for an Edit that landed. `unchanged` is `null` too: a
+     * title the subject already has is the value the author already authored,
+     * and closing the editor is the right answer to it (`space-authoring.ts`).
      */
     const renameChromeTitle = useCallback(
-      (subject: SpaceChromeTitleSubject, title: string): string | null => {
+      (
+        subject: Exclude<SpaceChromeTitleSubject, { kind: 'map' }>,
+        title: string,
+      ): string | null => {
         const result =
           subject.kind === 'space'
             ? // No id: the Edit writes `document.title` on the session this
               // composition is closed over, which is the Space the Dock draws.
               authoring.complete({ kind: 'renamed-space', title })
-            : subject.kind === 'map'
-              ? authoring.complete({ kind: 'renamed-map', mapId: subject.id, title })
-              : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
+            : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
       [],
@@ -899,37 +846,11 @@ export const createApp = (
           // a Resource has no rename here either — its title is renamed in place
           // on the canvas.
           onRename: null,
-          onDeleteMap: availability.entityEdits
-            ? async (mapId) => {
-                const result = await coordinatedMapDelete(spaceResources.deleteMap, {
-                  targetSpaceId: renderedSpace.id,
-                  mapId,
-                  preferredMapId: null,
-                });
-                setMapManagementRefusal(null);
-                setMapDeleteMessage(null);
-                if (result.kind === 'error') {
-                  setMapDeleteMessage(result.message);
-                  return false;
-                }
-                if (result.kind === 'completed') {
-                  navigation.selectMap(result.mapId);
-                  navigation.activateGraph(result.graphId);
-                }
-                return coordinatedDeleteOk(result);
-              }
-            : null,
         }),
       // `authoring` is the composition's, closed over rather than rendered, so it
       // is not a dependency a render can move. `resourceDeletion` says the same of
       // `spaceResources`.
-      [
-        renderedSpace.id,
-        renderedSpace.title,
-        copyProductDestination,
-        openProductDestination,
-        availability.entityEdits,
-      ],
+      [renderedSpace.id, renderedSpace.title, copyProductDestination, openProductDestination],
     );
 
     /**
@@ -991,35 +912,43 @@ export const createApp = (
                 x: at.x + (at.open ? Math.max(RESOURCE_WIDTH, across) : across),
                 y: at.y + (at.open ? Math.max(RESOURCE_HEIGHT, down) : down),
               };
-        const created = authoring.complete({
-          kind: 'created-reference',
-          target: resource.id,
-          title: resource.title,
-          anchor,
-        });
-        // Each arm named rather than narrowed in one comparison, so the compiler
-        // asks again the day a fifth joins the union.
-        //
         // A refusal takes the standing notice rather than the menu it was
         // pressed in: this command closes its menu, because it moves the caret
         // onto the canvas, so by the time an answer exists there is no row left
         // to swap a word on. The rows that *can* refuse are drawn unavailable
         // above, so what reaches here is a Target that went between the draw and
         // the press — which is why it is worth a sentence rather than silence.
-        if (created.kind === 'refused') {
-          setReferenceRefusal(describeAuthoringRefusal(created.refusal));
-          return 'failed';
+        const created = commandOutcomes.run(
+          'reference-create',
+          () =>
+            authoring.complete({
+              kind: 'created-reference',
+              target: resource.id,
+              title: resource.title,
+              anchor,
+            }),
+          {
+            continueAt: ({ createdResourceId }) =>
+              createdResourceId === undefined
+                ? null
+                : {
+                    target: { kind: 'resource', resourceId: createdResourceId },
+                    select: true,
+                    then: 'rename',
+                  },
+          },
+        );
+        switch (created.kind) {
+          case 'refused':
+          case 'broke':
+            return 'failed';
+          // A discarded creation has nothing to say.
+          case 'completed':
+          case 'unchanged':
+          case 'queued':
+          case 'discarded':
+            return 'done';
         }
-        setReferenceRefusal(null);
-        if (created.kind === 'queued') return 'done';
-        if (created.kind === 'unchanged') return 'done';
-        if (created.createdResourceId === undefined) return 'done';
-        continuation.request({
-          target: { kind: 'resource', resourceId: created.createdResourceId },
-          select: true,
-          then: 'rename',
-        });
-        return 'done';
       },
       [selectedMap.map, centreAnchor],
     );
@@ -1029,16 +958,12 @@ export const createApp = (
         if (spaces === null) return;
         const resource = renderedSpace.lookup.resource(resourceId);
         if (resource?.kind !== 'space') return;
-        const title = titleName(resource.title);
-        setSpaceCommandBreak(null);
-        void (async () => {
-          try {
-            await spaces.enter(resource.spaceId, resource.map, resource.graph, resource.framing);
-          } catch (failure) {
-            reportBreak(failure);
-            setSpaceCommandBreak(`${title} could not be entered.`);
-          }
-        })();
+        void commandOutcomes.run(
+          'space-enter',
+          async () =>
+            spaces.enter(resource.spaceId, resource.map, resource.graph, resource.framing),
+          { subject: titleName(resource.title) },
+        );
       },
       [spaces, renderedSpace],
     );
@@ -1096,13 +1021,12 @@ export const createApp = (
                   label: 'Remove from Map',
                   icon: <RemoveFromMapIcon />,
                   onSelect: (): EntityActionOutcome => {
-                    const result = authoring.complete({
-                      kind: 'removed-resource-from-map',
-                      resourceId: resource.id,
-                    });
-                    if (result.kind === 'refused') {
-                      resourceDeletion.reportRefusal(describeAuthoringRefusal(result.refusal));
-                    }
+                    commandOutcomes.run('resource-remove', () =>
+                      authoring.complete({
+                        kind: 'removed-resource-from-map',
+                        resourceId: resource.id,
+                      }),
+                    );
                     return 'done';
                   },
                 },
@@ -1388,26 +1312,14 @@ export const createApp = (
     const opener = spaces?.opener(renderedSpace.id) ?? null;
 
     /**
-     * The one Map refusal there is anywhere to put, now that Add Map and
-     * Delete Map report in the same place.
+     * A Graph Edit from the cluster, reported on `graph-edit`.
      *
-     * Both were drawn under Add Map in the Sidebar and both are about the
-     * Map that was selected when they were refused, which is why moving
-     * between Maps already clears them together.
+     * One reporter for the cluster's commands rather than call sites each
+     * naming the channel: what the reader needs to know is which Graph Edit
+     * did not happen and why, and each answers that in the same words.
      */
-    const mapRefusal = createMapRefusal ?? mapManagementRefusal;
-
-    /**
-     * Where a refused Graph Edit is drawn, which is the notice every other
-     * refused chrome command is drawn in.
-     *
-     * One reporter for the cluster's three commands rather than three call
-     * sites setting the same state: what the reader needs to know is which
-     * Graph Edit did not happen and why, and all three answer that in the same
-     * words.
-     */
-    const reportGraphEdit = (result: AuthoringResult): void => {
-      setGraphRefusal(result.kind === 'refused' ? result.refusal : null);
+    const runGraphEdit = (operation: () => AuthoringResult): void => {
+      commandOutcomes.run('graph-edit', operation);
     };
 
     const [exitReport, setExitReport] = useState<SpaceExitReport | null>(null);
@@ -1443,18 +1355,23 @@ export const createApp = (
           spaces.entry(spaceId)?.session.getState().working.document.title ?? renderedSpace.title;
         setExiting(spaceId);
         setExitReport(null);
-        setSpaceCommandBreak(null);
-        void (async () => {
-          try {
-            const result = await spaces.exit(spaceId, confirmation);
-            setExitReport(result.kind === 'exited' ? null : { spaceId, title, outcome: result });
-          } catch (failure) {
-            reportBreak(failure);
-            setSpaceCommandBreak(`${title} could not be exited.`);
-          } finally {
-            setExiting(null);
-          }
-        })();
+        void commandOutcomes
+          .run('space-exit', async () => spaces.exit(spaceId, confirmation), { subject: title })
+          .then((result) => {
+            switch (result.kind) {
+              case 'warning':
+              case 'refused':
+                setExitReport({ spaceId, title, outcome: result });
+                return;
+              // A discarded exit has nothing to say, and a broken one is the
+              // standing notice's.
+              case 'exited':
+              case 'broke':
+              case 'discarded':
+                return;
+            }
+          })
+          .finally(() => setExiting(null));
       },
       [spaces, renderedSpace.title, exiting],
     );
@@ -1548,18 +1465,9 @@ export const createApp = (
                */
               onSelect: (spaceId, title) => {
                 if (spaces === null) return;
-                setSpaceCommandBreak(null);
-                void (async () => {
-                  try {
-                    const result = await spaces.select(spaceId);
-                    if (result.kind === 'refused') {
-                      setSpaceCommandBreak(`${title} could not be opened.`);
-                    }
-                  } catch (failure) {
-                    reportBreak(failure);
-                    setSpaceCommandBreak(`${title} could not be opened.`);
-                  }
-                })();
+                void commandOutcomes.run('space-open', async () => spaces.select(spaceId), {
+                  subject: title,
+                });
               },
               onExit: exitSpace,
               // `openSpaces.exit`'s own rule, asked of the same aggregate that
@@ -1575,15 +1483,18 @@ export const createApp = (
               maps: renderedSpace.maps,
               selected: selectedMap.map,
               onSelect: selectMap,
-              onRename: availability.chromeTitleEdit
-                ? (mapId, title) => renameChromeTitle({ kind: 'map', id: mapId }, title)
-                : null,
-              createDisabled: !availability.createMap,
-              // The same answer `onDeleteMap` above is built from, said on
-              // the row as well: when entity Edits are withdrawn the
-              // `delete-map` action is not built at all, and a row that did
-              // not know it dispatched into nothing.
-              deleteDisabled: !availability.entityEdits,
+              // Each Map command is the press built from the capability that
+              // answers its availability (`offered`), so the Dock draws a row
+              // unavailable exactly when invoking it would answer so — the last
+              // Map included. The Dock names only the drawing Map, which is the
+              // one the top-level capabilities address. Map authoring decides
+              // availability and the report; command outcomes holds the report,
+              // and the editor holds a refused draft open on its sentence.
+              onRename: offered(
+                mapAuthoring.map(selectedMap.map.id).rename,
+                (rename) => (title: string) =>
+                  renameDraftAnswer(commandOutcomes.run('map-manage', () => rename(title))),
+              ),
               /**
                * **It opens nothing, and the author continues in the name.**
                *
@@ -1595,36 +1506,30 @@ export const createApp = (
                * self-announcing in a product with no undo
                * (`.scratch/command-dock/issues/13`).
                */
-              onCreate: () => {
-                void coordinatedContextCreate({
-                  create: () => {
-                    const result = authoring.complete({ kind: 'created-map' });
-                    setCreateMapRefusal(result.kind === 'refused' ? result.refusal : null);
-                    setMapManagementRefusal(null);
-                    createMapMovedCaret.current = false;
-                    return result;
-                  },
-                  createdOf: () =>
-                    createdMapContext(currentSpace().maps, navigation.getState().selectedMapId),
-                  afterCreated: () => {
-                    continuation.request({
-                      target: { kind: 'control', name: 'map-name' },
-                      select: false,
-                      then: 'rename',
-                    });
-                    return null;
-                  },
+              onCreate: offered(mapAuthoring.create, (create) => () => {
+                createMapMovedCaret.current = false;
+                // Map authoring creates and selects the Map, and command
+                // outcomes holds a refusal as "Map not created". Where the
+                // caret continues is the Dock's; command outcomes requests it
+                // only for a current completion. The creation selects the new
+                // Map on this canvas, so its completion claims that move.
+                void commandOutcomes.run('map-create', create, {
+                  completionMovesMap: true,
+                  continueAt: () => ({
+                    target: { kind: 'control', name: 'map-name' },
+                    select: false,
+                    then: 'rename',
+                  }),
                 });
-              },
+              }),
               didCreateMoveCaret: () => createMapMovedCaret.current,
-              // The Dock's Delete names the Map its cluster is showing, which is
-              // the drawing one — resolved from the id it hands back rather than
-              // closed over, so the command and the name it carries cannot come apart.
-              onDelete: (mapId) => {
-                const map = renderedSpace.maps.find((candidate) => candidate.id === mapId);
-                if (map === undefined) return;
-                runEntityCommand({ kind: 'map', map }, DELETE_MAP_ACTION_ID)();
-              },
+              // Map authoring deletes the drawing Map, repoints every Space
+              // Resource that selected it and leaves the canvas on the survivor;
+              // command outcomes holds a refusal as "Map not deleted". Leaving
+              // this canvas on the survivor is its completion's move.
+              onDelete: offered(mapAuthoring.map(selectedMap.map.id).delete, (remove) => () => {
+                void commandOutcomes.run('map-delete', remove, { completionMovesMap: true });
+              }),
               onCopyLink: runEntityCommand(
                 { kind: 'map', map: selectedMap.map },
                 COPY_LINK_ACTION_ID,
@@ -1646,28 +1551,28 @@ export const createApp = (
               // that answer closes its menu having changed nothing, said nothing
               // and logged nothing.
               onRecolor: (graphId, color) => {
-                reportGraphEdit(authoring.complete({ kind: 'recolored-graph', graphId, color }));
+                runGraphEdit(() => authoring.complete({ kind: 'recolored-graph', graphId, color }));
               },
               onCreate: () => {
-                reportGraphEdit(authoring.complete({ kind: 'added-graph' }));
+                runGraphEdit(() => authoring.complete({ kind: 'added-graph' }));
               },
+              // The notice is command outcomes'; the Graph Navigation adopts
+              // after a completed delete is this caller's.
               onDelete: (graphId) => {
-                void (async () => {
-                  setGraphDeleteMessage(null);
-                  const result = await coordinatedGraphDelete(spaceResources.deleteGraph, {
-                    targetSpaceId: renderedSpace.id,
-                    mapId: selectedMap.map.id,
-                    graphId,
-                    preferredGraphId: null,
+                void commandOutcomes
+                  .run('graph-delete', () =>
+                    coordinatedGraphDelete(spaceResources.deleteGraph, {
+                      targetSpaceId: renderedSpace.id,
+                      mapId: selectedMap.map.id,
+                      graphId,
+                      preferredGraphId: null,
+                    }),
+                  )
+                  .then((result) => {
+                    if (result.kind === 'completed') {
+                      navigation.activateGraph(result.graphId);
+                    }
                   });
-                  if (result.kind === 'error') {
-                    setGraphDeleteMessage(result.message);
-                    return;
-                  }
-                  if (result.kind === 'completed') {
-                    navigation.activateGraph(result.graphId);
-                  }
-                })();
               },
               editsDisabled: !availability.entityEdits,
               onCopyLink: runEntityCommand(
@@ -1762,74 +1667,18 @@ export const createApp = (
                 {clipboardFailure}
               </ShellNotice>
             )}
-            {resourceDeletionState.refusal === null ? null : (
-              <ShellNotice title="Resource not deleted" onDismiss={resourceDeletion.dismissRefusal}>
-                {resourceDeletionState.refusal}
-              </ShellNotice>
-            )}
-            {mapRefusal === null ? null : (
-              <ShellNotice
-                /* Named for the command that was refused rather than for the
-                   Map, because a refused *creation* left no Map to be
-                   unchanged — "Map unchanged" told the author an existing
-                   Map had been left alone when none had been made. */
-                title={createMapRefusal === null ? 'Map unchanged' : 'Map not created'}
-                // Both, because the one that is standing is whichever was
-                // written last and the reader is dismissing what they can see.
-                onDismiss={() => {
-                  setCreateMapRefusal(null);
-                  setMapManagementRefusal(null);
-                }}
-              >
-                {describeAuthoringRefusal(mapRefusal)}
-              </ShellNotice>
-            )}
-            {mapDeleteMessage === null ? null : (
-              <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
-                {mapDeleteMessage}
-              </ShellNotice>
-            )}
-            {spaceResourceRefusal === null ? null : (
-              <ShellNotice
-                /* It names what died. A Space Resource's placement is optimistic
-                   (ADR 0089), so the author may be typing into the Resource when
-                   the lifecycle answers — "Space not created" is the sentence
-                   that makes a Resource vanishing from under the caret legible. */
-                title="Space not created"
-                onDismiss={() => setSpaceResourceRefusal(null)}
-              >
-                {spaceResourceRefusal}
-              </ShellNotice>
-            )}
-            {referenceRefusal === null ? null : (
-              <ShellNotice
-                /* It names what was not made. The menu the command was pressed
-                   in has closed by the time this can be shown, so this is the
-                   only place the author learns the press did nothing. */
-                title="Reference Resource not created"
-                onDismiss={() => setReferenceRefusal(null)}
-              >
-                {referenceRefusal}
-              </ShellNotice>
-            )}
-            {spaceCommandBreak === null ? null : (
-              <ShellNotice
-                title="Space command failed"
-                onDismiss={() => setSpaceCommandBreak(null)}
-              >
-                {spaceCommandBreak}
-              </ShellNotice>
-            )}
-            {graphRefusal === null ? null : (
-              <ShellNotice title="Graph unchanged" onDismiss={() => setGraphRefusal(null)}>
-                {describeAuthoringRefusal(graphRefusal)}
-              </ShellNotice>
-            )}
-            {graphDeleteMessage === null ? null : (
-              <ShellNotice title="Graph not deleted" onDismiss={() => setGraphDeleteMessage(null)}>
-                {graphDeleteMessage}
-              </ShellNotice>
-            )}
+            {COMMAND_CHANNELS.map((channel) => {
+              const notice = commandNotices.get(channel);
+              return notice === undefined ? null : (
+                <ShellNotice
+                  key={channel}
+                  title={notice.title}
+                  onDismiss={() => commandOutcomes.dismiss(channel)}
+                >
+                  {notice.message}
+                </ShellNotice>
+              );
+            })}
             {/* **The one report here with no dismissal, and it is not an
                 oversight.** The others are about a press that is over, so
                 putting one away changes nothing it is about. This one is about
@@ -1920,7 +1769,7 @@ export const createApp = (
                 onSelectEdge={selectEdge}
               />
               <SpaceCanvas
-                continuation={continuation}
+                commandOutcomes={commandOutcomes}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but

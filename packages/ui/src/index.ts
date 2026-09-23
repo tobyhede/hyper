@@ -22,7 +22,7 @@ export type {
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export type {
   CanvasSpaceResourceChoice,
-  CanvasSpaceResourceCommands,
+  CanvasSpaceResourceMapCommands,
   CanvasSpaceResourceGraphCommands,
   CanvasSpaceResourceSelection,
   SpaceResourceSelectorsProps,

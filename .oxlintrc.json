@@ -393,7 +393,8 @@
       // them are the error being reported, not a wrapped cause, and inventing
       // a name to dodge a linter is worse than a scoped exception.
       // `failure-message.ts` is that narrowing itself, extracted so the five
-      // copies of it became one. Two are
+      // copies of it became one; `command-outcomes.ts` is the one place a
+      // chrome command's throw is caught, reported and described. Two are
       // genuine external contracts, not our own seam: `SpaceApp.tsx`'s
       // `getDerivedStateFromError` overrides React's own lifecycle method
       // signature, and `space-authoring.test.ts`'s
@@ -403,6 +404,7 @@
       // composition-time injection seam).
       "files": [
         "packages/app/src/authoring-refusal.ts",
+        "packages/app/src/command-outcomes.ts",
         "packages/app/src/failure-message.ts",
         "packages/app/src/navigation.ts",
         "packages/app/src/placement-rendering.ts",

@@ -782,6 +782,10 @@ export function createOpenSpaces({
     // owning. Each collaborator is released by name rather than relying on
     // `authoring.dispose` clearing the subscriber set the others registered in:
     // that is true today and is an ordering nothing here states or tests.
+    // Command outcomes goes first because it publishes into the continuation:
+    // disposed, it drops every in-flight run, so none can settle later and
+    // request a continuation from the disposed one below.
+    target.app.commandOutcomes.dispose();
     target.app.edgeAuthoring.dispose();
     target.app.resourceDeletion.dispose();
     target.app.continuation.dispose();

@@ -1,24 +1,18 @@
-import type { Map, GraphId, UUID } from '@project/core';
+import type { GraphId, UUID } from '@project/core';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import type { AuthoringResult } from './space-authoring';
 
-/** The identities a completed New Map leaves for the call site. */
+/** The identities a completed creation leaves for the call site. */
 export interface CreatedContext {
   readonly created: { readonly id: UUID };
   readonly active: GraphId;
 }
 
-export const createdMapContext = (
-  maps: readonly Map[],
-  selectedMapId: UUID | null,
-): CreatedContext | undefined => {
-  const created = maps.find((each) => each.id === selectedMapId);
-  const active = created?.activeGraph ?? created?.graphs[0]?.id;
-  return created !== undefined && active !== undefined ? { created, active } : undefined;
-};
-
 /**
+ * Graph creation on an Open Space Resource rail — the one caller since Map
+ * creation moved behind `map-authoring-commands.ts`.
+ *
  * Settled → create → persist → hook. Call sites own selection writes and
  * rename continuation; this module does not import continuation targets
  * (`coordinated-context-create.test.ts` — "does not import continuation targets").

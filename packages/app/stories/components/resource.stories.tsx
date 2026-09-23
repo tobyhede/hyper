@@ -508,7 +508,6 @@ export const OpenIndependently: Story = () => {
       return true;
     },
     onRename: null,
-    onDeleteMap: null,
   })({ kind: 'resource', resource: ARCHITECTURE, map: CONTAINING_MAP });
   return (
     <div className="p-8">
@@ -552,7 +551,6 @@ export const RailActions: Story = () => {
     },
     onOpenIndependently: null,
     onRename: null,
-    onDeleteMap: null,
   });
   return (
     <div className="p-8" style={resourceSizeVars}>

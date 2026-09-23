@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { coordinatedContextCreate, createdMapContext } from '../src/coordinated-context-create';
+import { coordinatedContextCreate } from '../src/coordinated-context-create';
 import type { AuthoringResult } from '../src/space-authoring';
 
 const MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -94,32 +94,6 @@ describe('coordinated context create', () => {
     });
     expect(received).toEqual([{ id: MAP, active: GRAPH }]);
     expect(result).toBe('stored selection refused');
-  });
-});
-
-describe('created Map context', () => {
-  const map = {
-    id: MAP,
-    title: 'Map 1',
-    kind: 'positioned' as const,
-    positions: {},
-    graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
-  };
-
-  it('reads the selected Map and its Active Graph', () => {
-    const selected = { ...map, activeGraph: GRAPH };
-    expect(createdMapContext([selected], MAP)).toEqual({
-      created: selected,
-      active: GRAPH,
-    });
-  });
-
-  it("falls back to the Map's first Graph when none is Active", () => {
-    expect(createdMapContext([map], MAP)?.active).toBe(GRAPH);
-  });
-
-  it('answers undefined when the selected Map is missing', () => {
-    expect(createdMapContext([map], null)).toBeUndefined();
   });
 });
 
