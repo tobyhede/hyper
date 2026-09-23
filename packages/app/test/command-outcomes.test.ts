@@ -544,6 +544,75 @@ describe('space-command', () => {
   });
 });
 
+describe('graph-delete', () => {
+  it('publishes the coordinated helper\'s message under "Graph not deleted"', async () => {
+    const { outcomes } = open();
+
+    const result = await outcomes.run('graph-delete', () => Promise.resolve(refusedGraphDelete));
+
+    expect(result).toBe(refusedGraphDelete);
+    expect(notice(outcomes, 'graph-delete')).toEqual({
+      title: 'Graph not deleted',
+      message: 'Graph refused.',
+    });
+  });
+
+  it('answers a completed delete to the caller and leaves the channel clear', async () => {
+    const { outcomes } = open();
+    const completed: CoordinatedContextDeleteResult = {
+      kind: 'completed',
+      mapId: MAP_A,
+      graphId: GRAPH_A,
+    };
+    outcomes.run('graph-delete', () => refusedGraphDelete);
+
+    await expect(outcomes.run('graph-delete', () => Promise.resolve(completed))).resolves.toBe(
+      completed,
+    );
+    expect(notice(outcomes, 'graph-delete')).toBeNull();
+
+    outcomes.run('graph-delete', () => refusedGraphDelete);
+    await outcomes.run('graph-delete', () => Promise.resolve({ kind: 'unchanged' } as const));
+    expect(notice(outcomes, 'graph-delete')).toBeNull();
+  });
+
+  it('is cleared by a Map change', async () => {
+    const { outcomes, navigation } = open();
+    await outcomes.run('graph-delete', () => Promise.resolve(refusedGraphDelete));
+
+    navigation.selectMap(MAP_B);
+
+    expect(notice(outcomes, 'graph-delete')).toBeNull();
+  });
+
+  it('drops a delete pressed on one Map that settles under another', async () => {
+    const { outcomes, navigation } = open();
+    const pending = deferred<CoordinatedContextDeleteResult>();
+    const running = outcomes.run('graph-delete', () => pending.promise);
+
+    navigation.selectMap(MAP_B);
+    pending.resolve(refusedGraphDelete);
+
+    await expect(running).resolves.toBe(refusedGraphDelete);
+    expect(notice(outcomes, 'graph-delete')).toBeNull();
+  });
+
+  it('says a thrown delete in the words the failure carries, and reports it', async () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('lifecycle broke');
+
+    await expect(outcomes.run('graph-delete', () => Promise.reject(failure))).resolves.toBe(
+      COMMAND_BROKE,
+    );
+
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'graph-delete')).toEqual({
+      title: 'Graph not deleted',
+      message: 'lifecycle broke',
+    });
+  });
+});
+
 describe('staleness', () => {
   it('drops a Map-scoped run that settles after the Map changed', async () => {
     const { outcomes, navigation } = open();

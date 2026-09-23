@@ -281,6 +281,8 @@ const COMMANDS: CommandDefinitions = {
   'map-manage': reportedMapCommand('map-manage'),
   'map-delete': reportedMapCommand('map-delete'),
   'graph-edit': authoringCommand('graph-edit'),
+  // `coordinatedGraphDelete` has already said its gate and its lifecycle
+  // refusal in a sentence, so the describer is that sentence.
   'graph-delete': {
     channel: 'graph-delete',
     settle: (result) =>

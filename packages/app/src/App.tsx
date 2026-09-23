@@ -225,7 +225,6 @@ export const createApp = (
     const [createMapRefusal, setCreateMapRefusal] = useState<AuthoringRefusal | null>(null);
     const [mapManagementRefusal, setMapManagementRefusal] = useState<AuthoringRefusal | null>(null);
     const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
-    const [graphDeleteMessage, setGraphDeleteMessage] = useState<string | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
       resourceDeletion.subscribe,
@@ -710,16 +709,15 @@ export const createApp = (
     // to, so the move clears them together, during the render that moves rather
     // than one frame after it.
     //
-    // The Graph Edit and the Resource deletion and removal notices are command
-    // outcomes' channels, and that module clears them on the same move
-    // (`command-outcomes.ts`).
+    // The Graph Edit and deletion notices and the Resource deletion and removal
+    // notices are command outcomes' channels, and that module clears them on
+    // the same move (`command-outcomes.ts`).
     const [refusedUnder, setRefusedUnder] = useState(selectedMapId);
     if (refusedUnder !== selectedMapId) {
       setRefusedUnder(selectedMapId);
       setCreateMapRefusal(null);
       setMapManagementRefusal(null);
       setMapDeleteMessage(null);
-      setGraphDeleteMessage(null);
     }
     /**
      * The two facts that end a chrome rename that is not the author ending it,
@@ -1579,23 +1577,23 @@ export const createApp = (
               onCreate: () => {
                 runGraphEdit(() => authoring.complete({ kind: 'added-graph' }));
               },
+              // The notice is command outcomes'; the Graph Navigation adopts
+              // after a completed delete is this caller's.
               onDelete: (graphId) => {
-                void (async () => {
-                  setGraphDeleteMessage(null);
-                  const result = await coordinatedGraphDelete(spaceResources.deleteGraph, {
-                    targetSpaceId: renderedSpace.id,
-                    mapId: selectedMap.map.id,
-                    graphId,
-                    preferredGraphId: null,
+                void commandOutcomes
+                  .run('graph-delete', () =>
+                    coordinatedGraphDelete(spaceResources.deleteGraph, {
+                      targetSpaceId: renderedSpace.id,
+                      mapId: selectedMap.map.id,
+                      graphId,
+                      preferredGraphId: null,
+                    }),
+                  )
+                  .then((result) => {
+                    if (result !== COMMAND_BROKE && result.kind === 'completed') {
+                      navigation.activateGraph(result.graphId);
+                    }
                   });
-                  if (result.kind === 'error') {
-                    setGraphDeleteMessage(result.message);
-                    return;
-                  }
-                  if (result.kind === 'completed') {
-                    navigation.activateGraph(result.graphId);
-                  }
-                })();
               },
               editsDisabled: !availability.entityEdits,
               onCopyLink: runEntityCommand(
@@ -1722,11 +1720,6 @@ export const createApp = (
             {mapDeleteMessage === null ? null : (
               <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
                 {mapDeleteMessage}
-              </ShellNotice>
-            )}
-            {graphDeleteMessage === null ? null : (
-              <ShellNotice title="Graph not deleted" onDismiss={() => setGraphDeleteMessage(null)}>
-                {graphDeleteMessage}
               </ShellNotice>
             )}
             {/* **The one report here with no dismissal, and it is not an
