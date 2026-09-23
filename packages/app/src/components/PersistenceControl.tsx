@@ -222,8 +222,8 @@ function ConflictControl({
  *
  * Dismissing this dialog acknowledges the failure in front of the author, not
  * every failure after it, so the next one draws again. What separates two is
- * that they are different publications rather than anything they say: the
- * transport's `message` is unread now (ADR 0057), so two `invalid-commit`
+ * that they are different publications rather than anything they say: a
+ * failure carries its code and no prose (ADR 0057), so two `invalid-commit`
  * rejections are equal by value and a key derived from the failure cannot tell
  * them apart. The acknowledgement therefore records *which failure* was
  * dismissed and is spent the moment the session hands over another.

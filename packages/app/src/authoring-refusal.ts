@@ -348,11 +348,11 @@ export type PersistenceFailure =
  * What each persistence failure means, in the author's terms rather than the
  * transport's.
  *
- * Every one of these also carries a `message`, and that message is the wire's:
- * `problem.detail` from the server, or a thrown `Error`'s own text. ADR 0057
- * rejected `{ message: string }` by name for exactly this — the code is the
- * identity that crosses the seam and the sentence is the application's, so the
- * message is a diagnostic and never what the author reads.
+ * None of these carries prose of the transport's: ADR 0057 rejected
+ * `{ message: string }` by name — the code is the identity that crosses the
+ * seam and the sentence is the application's. A `protocol` failure's `fault`
+ * is typed context for a diagnostic and never what the author reads, so every
+ * fault reads the one `protocol` sentence.
  *
  * The sentences complement their surfaces rather than repeating them. A
  * retryable failure is drawn under "Changes not saved" beside a Retry button
