@@ -129,3 +129,28 @@ ImpactGate internals, from the `impact-gate==0.3.2` wheel's source:
 - **Baseline observations:** a leaf merged PR is one observation (merge-base to tip). A PR scored in range mode goes through the same `score_change`, so the comparison is like-for-like. Direct-to-main commits are also observations.
 - **Absent:** normalisation by file count, per-file or per-function thresholds, and any exemption for mechanical renames.
 
+
+Excluding rename PRs from the baseline. Asked in review, because renames are relatively rare. It changes no verdict and is not adopted.
+
+`main` holds six mechanical vocabulary renames, found by title and then by width. Four of them are among the six widest PRs the repo has merged:
+
+| PR | files | rename |
+|---|---|---|
+| #250 | 523 | Diagram → Map, Thing → Resource |
+| #187 | 390 | Card → Thing |
+| #185 | 270 | Layout → Diagram |
+| #36 | 153 | Route → Graph |
+| #224 | 126 | Alias → Reference Thing |
+| #249 | 105 | prose sweep before #250 |
+
+Method. Four baselines were built locally over `origin/main` at `9a978bcd` with `impact-gate==0.3.2`: with and without tests, each with and without `--exclude-subject-pattern '#(36|185|187|224|249|250) from'`. Each exclusion removed exactly six observations (432 → 426 with tests, 392 → 386 without), so each rename was one leaf observation. Every calibration score above was then re-graded against each pair with ImpactGate's own `baseline.grade_value` (`K = 200`, TypeScript seed). These are grades against today's baseline, so they differ slightly from what CI reported at the time.
+
+Findings:
+
+- **Where the renames sit.** Five of the six rank above p95 of project history, and three above p99. They are most of the extreme tail but not all of it: the largest non-rename observation is 1,227,356,704 with tests.
+- **What happens to every other PR.** Every grade rises, because removing the top of the tail leaves less above everyone else. With codemods excluded, the shift was +0.01 to +0.86 points with tests and +0.02 to +0.94 without. No branch crossed p90 or p98 in either direction. `snapshot-edits-split-03` went 91.85 → 92.57, `dock-always-reaches-meta` 95.81 → 96.57, and `one-sql-repository` 90.11 → 90.97. The effect is small because six is 1.4% of the observations, and the project curve carries only `w ≈ 0.68` of the blend.
+- **Where it does matter.** The smallest observed score graded at or above p98 fell by about a third: 157,411,884 → 106,068,040 with tests, and 69,498,520 → 46,794,110 without. p90 moved less: 7,313,709 → 6,762,096 and 2,750,208 → 2,250,647. Under warn-only, nothing reads p98.
+
+Why not adopt it anyway: the pattern matches the merge subject, `Merge pull request #N from owner/branch`, which carries the PR number and branch name but never the title. The six renames used six unrelated branch names. Excluding them means either a hand-kept list of PR numbers edited after every rename, or a branch-naming convention (`rename/…`) that nothing enforces. That is maintenance for a sub-point shift that changes no verdict.
+
+If this ticket reopens for a gate, adopt the exclusion then, through the branch convention. That is when a p98 bar a third lower matters.
