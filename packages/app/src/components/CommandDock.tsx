@@ -55,6 +55,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type MutableRefObject,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -690,7 +691,7 @@ type IdentityDisclosure = {
  * passing a ref-backed function through a function called during render is
  * what `react-hooks/refs` reports.
  */
-const IdentityCaretContext = createContext<{ current: boolean } | null>(null);
+const IdentityCaretContext = createContext<MutableRefObject<boolean> | null>(null);
 
 function useIdentityCaret() {
   const caretMovedRef = useContext(IdentityCaretContext);
@@ -1335,6 +1336,12 @@ const DockDisclosureContext = createContext<DockDisclosure>({
  * inert slot, so an identity mounted outside a provider draws its name and
  * never opens an editor, rather than opening one nothing can end.
  */
+/** The one identity being renamed, and which entity it named when the rename began. */
+interface RenamingSubject {
+  readonly name: DockIdentity;
+  readonly subject: string;
+}
+
 interface DockRenaming {
   readonly renaming: DockIdentity | null;
   /** Take the slot for one identity, or release it. */
@@ -1397,10 +1404,7 @@ function useDockRenaming(chrome: DockChrome): DockRenaming {
     Graph: { subject: chrome.graph.active.id, renameable: chrome.graph.onRename !== null },
   } satisfies Record<DockIdentity, { readonly subject: string; readonly renameable: boolean }>;
 
-  const [renaming, setRenaming] = useState<{
-    readonly name: DockIdentity;
-    readonly subject: string;
-  } | null>(null);
+  const [renaming, setRenaming] = useState<RenamingSubject | null>(null);
   const [renamedUnder, setRenamedUnder] = useState(chrome.replacementEpoch);
   if (renamedUnder !== chrome.replacementEpoch) {
     setRenamedUnder(chrome.replacementEpoch);

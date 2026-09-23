@@ -30,7 +30,8 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
  * because an explicit trigger is the only way to make the throw deterministic.
  */
 
-type ProbeNode = Node<{ handles: number }, 'probe'>;
+type ProbeData = { handles: number };
+type ProbeNode = Node<ProbeData, 'probe'>;
 
 function ProbeNode({ id, data }: NodeProps<ProbeNode>) {
   const updateNodeInternals = useUpdateNodeInternals();

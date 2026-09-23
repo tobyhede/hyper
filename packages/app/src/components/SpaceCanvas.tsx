@@ -296,6 +296,12 @@ export interface SpaceCanvasProps {
   resourceEntityActions?: (resourceId: ResourceId) => readonly EntityActionGroup[];
 }
 
+/** Where an Edge drawn inside an embedded Map began: the embedding node's id, and the Resource dragged from. */
+interface EmbeddedConnectionStart {
+  readonly parentId: string;
+  readonly from: ResourceId;
+}
+
 export function SpaceCanvas({
   continuation,
   nodes,
@@ -491,7 +497,7 @@ export function SpaceCanvas({
     [embeddedRequests, embeddedPublications, resumeEmbedded],
   );
 
-  const embedConnectFrom = useRef<{ parentId: string; from: ResourceId } | null>(null);
+  const embedConnectFrom = useRef<EmbeddedConnectionStart | null>(null);
   const mayOfferEmbedded = useCallback(
     (resourceId: ResourceId) => {
       const session = embedConnectFrom.current;

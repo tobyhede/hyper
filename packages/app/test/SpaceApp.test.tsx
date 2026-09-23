@@ -281,12 +281,17 @@ describe('Space app conflict recovery', () => {
     expect(resourceNode).toHaveStyle({ transform: 'translate(900px,700px)' });
   });
 
+  interface RefusedRemote {
+    readonly local: SpaceSnapshot;
+    readonly session: SpaceSession;
+  }
+
   /**
    * A conflicted session whose remote snapshot does not load. Mounted, with the
    * accept already clicked, because both tests below assert on what that leaves
    * behind.
    */
-  const refusedRemote = async (): Promise<{ local: SpaceSnapshot; session: SpaceSession }> => {
+  const refusedRemote = async (): Promise<RefusedRemote> => {
     const local = snapshot('Local space', 'Local resource', 10, 20);
     const dangling = withDanglingGraph(local, 'Remote space');
     const control = new MemorySpaceBackendTestControl();
