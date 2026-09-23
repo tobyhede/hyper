@@ -1,6 +1,6 @@
 # 07 — Prove Resource identity across the React Flow boundary
 
-**What to build:** Derive a node change's `ResourceId` from the ownership lookup `changeNodes` already performs, and read a node's from its typed `data`, so the three node assertions in `render-adapter.ts` go with the comments that misstate why they hold. Then decide the Edge question below; it is not settled.
+**What to build:** Derive a node change's `ResourceId` from the ownership lookup `changeNodes` already performs, and read a node's from its typed `data`, so the three node assertions in `render-adapter.ts` go with the comments that misstate why they hold. The Edge question below is decided in 13, which builds it.
 
 **Status:** needs-triage
 
@@ -60,3 +60,9 @@ The caller list above is incomplete. `edgeSelectionOf` has three more production
 
 So the third option's rewritten comment ("embedded Edges are neither reconnectable nor deletable") would not cover these two sites: at each, the assertion is false at runtime. `data.graphId` is read by `edgeSelectionOf` alone (`render-adapter.ts:141`; nothing else in `packages/*/src` reads it). That suggests a fourth option, which the ticket should weigh: `embeddedMap` publishes embedded Edges without the host Edge's `graphId`, so `edgeSelectionOf` answers `null` for them by construction, in the module that mints them. Typed `from`/`to` on the published data (the second option) is then safe, and the `source`/`target` assertion goes. This changes what the projection publishes, so by the rule above it earns an ADR.
 
+
+## Edge decision — 2026-09-23
+
+Decided after three parallel designs were compared: an embedded Map's Edges become their own React Flow Edge type, minted by the embedding, and the Edge conversion answers only for the routed type. The build, the rejected alternatives (including the fourth option above in its original form) and the reasons are in 13 — An embedded Map's Edges are their own Edge type. This ticket closes on the node work once `pnpm verify` is seen green in one run.
+
+A side finding from that review, unrelated to identity, is `embedded-open-space-thing/04`: the embedding's zero interaction width on its Edges has no effect.
