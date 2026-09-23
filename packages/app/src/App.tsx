@@ -226,19 +226,6 @@ export const createApp = (
     const [mapManagementRefusal, setMapManagementRefusal] = useState<AuthoringRefusal | null>(null);
     const [mapDeleteMessage, setMapDeleteMessage] = useState<string | null>(null);
     const [graphDeleteMessage, setGraphDeleteMessage] = useState<string | null>(null);
-    /**
-     * A Space command that broke rather than refusing, in words.
-     *
-     * Switching and exiting are the two commands that reach *another* Space's
-     * session, and either can fail for a reason that is not a refusal — a Space
-     * that cannot be re-composed, a backend that will not answer. Both used to
-     * be reported: `OpenSpacesApplication` drew a "Space could not be opened"
-     * panel and `ExitSpaceControl` an `Alert`. Both surfaces went with the
-     * Sidebar and the failures went to `console.error` with them, which leaves
-     * the reader pressing a row that does nothing. `reportBreak` still runs —
-     * a broken command is a diagnostic as well as a report.
-     */
-    const [spaceCommandBreak, setSpaceCommandBreak] = useState<string | null>(null);
     const [clipboardFailure, setClipboardFailure] = useState<string | null>(null);
     const resourceDeletionState = useSyncExternalStore(
       resourceDeletion.subscribe,
@@ -991,16 +978,12 @@ export const createApp = (
         if (spaces === null) return;
         const resource = renderedSpace.lookup.resource(resourceId);
         if (resource?.kind !== 'space') return;
-        const title = titleName(resource.title);
-        setSpaceCommandBreak(null);
-        void (async () => {
-          try {
-            await spaces.enter(resource.spaceId, resource.map, resource.graph, resource.framing);
-          } catch (failure) {
-            reportBreak(failure);
-            setSpaceCommandBreak(`${title} could not be entered.`);
-          }
-        })();
+        void commandOutcomes.run(
+          'space-enter',
+          async () =>
+            spaces.enter(resource.spaceId, resource.map, resource.graph, resource.framing),
+          { subject: titleName(resource.title) },
+        );
       },
       [spaces, renderedSpace],
     );
@@ -1402,18 +1385,13 @@ export const createApp = (
           spaces.entry(spaceId)?.session.getState().working.document.title ?? renderedSpace.title;
         setExiting(spaceId);
         setExitReport(null);
-        setSpaceCommandBreak(null);
-        void (async () => {
-          try {
-            const result = await spaces.exit(spaceId, confirmation);
-            setExitReport(result.kind === 'exited' ? null : { spaceId, title, outcome: result });
-          } catch (failure) {
-            reportBreak(failure);
-            setSpaceCommandBreak(`${title} could not be exited.`);
-          } finally {
-            setExiting(null);
-          }
-        })();
+        void commandOutcomes
+          .run('space-exit', async () => spaces.exit(spaceId, confirmation), { subject: title })
+          .then((result) => {
+            if (result.kind === 'broke' || result.kind === 'exited') return;
+            setExitReport({ spaceId, title, outcome: result });
+          })
+          .finally(() => setExiting(null));
       },
       [spaces, renderedSpace.title, exiting],
     );
@@ -1507,18 +1485,9 @@ export const createApp = (
                */
               onSelect: (spaceId, title) => {
                 if (spaces === null) return;
-                setSpaceCommandBreak(null);
-                void (async () => {
-                  try {
-                    const result = await spaces.select(spaceId);
-                    if (result.kind === 'refused') {
-                      setSpaceCommandBreak(`${title} could not be opened.`);
-                    }
-                  } catch (failure) {
-                    reportBreak(failure);
-                    setSpaceCommandBreak(`${title} could not be opened.`);
-                  }
-                })();
+                void commandOutcomes.run('space-open', async () => spaces.select(spaceId), {
+                  subject: title,
+                });
               },
               onExit: exitSpace,
               // `openSpaces.exit`'s own rule, asked of the same aggregate that
@@ -1753,14 +1722,6 @@ export const createApp = (
             {mapDeleteMessage === null ? null : (
               <ShellNotice title="Map not deleted" onDismiss={() => setMapDeleteMessage(null)}>
                 {mapDeleteMessage}
-              </ShellNotice>
-            )}
-            {spaceCommandBreak === null ? null : (
-              <ShellNotice
-                title="Space command failed"
-                onDismiss={() => setSpaceCommandBreak(null)}
-              >
-                {spaceCommandBreak}
               </ShellNotice>
             )}
             {graphDeleteMessage === null ? null : (

@@ -105,6 +105,11 @@ const CHANNELS = {
     words: 'described',
     title: 'Reference Resource not created',
   },
+  // Enter, Exit and Open reach *another* Space's session, and each can fail
+  // for a reason that is not a refusal — a Space that cannot be re-composed, a
+  // backend that will not answer. The surfaces that used to report them went
+  // with the Sidebar, which left the reader pressing a row that did nothing;
+  // this notice is what says so, and the reporter still hears the defect.
   'space-command': { resetsOnMapChange: false, words: 'described', title: 'Space command failed' },
 } as const satisfies Record<string, ChannelEntry>;
 

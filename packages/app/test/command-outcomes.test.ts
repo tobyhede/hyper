@@ -497,6 +497,53 @@ describe('subject', () => {
   });
 });
 
+describe('space-command', () => {
+  it('says each operation that broke in its own sentence, naming its subject', async () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('backend gone');
+
+    const entered = await outcomes.run('space-enter', () => Promise.reject(failure), {
+      subject: 'Architecture',
+    });
+    expect(entered).toBe(COMMAND_BROKE);
+    expect(notice(outcomes, 'space-command')).toEqual({
+      title: 'Space command failed',
+      message: 'Architecture could not be entered.',
+    });
+
+    await outcomes.run('space-exit', () => Promise.reject(failure), { subject: 'Platform' });
+    expect(notice(outcomes, 'space-command')).toEqual({
+      title: 'Space command failed',
+      message: 'Platform could not be exited.',
+    });
+
+    await outcomes.run('space-open', () => Promise.reject(failure), { subject: 'Meta' });
+    expect(notice(outcomes, 'space-command')).toEqual({
+      title: 'Space command failed',
+      message: 'Meta could not be opened.',
+    });
+
+    expect(reported).toEqual([failure, failure, failure]);
+  });
+
+  it('leaves an exit that answered clear, whatever it answered', async () => {
+    const { outcomes } = open();
+    await outcomes.run('space-enter', () => Promise.reject(new Error('gone')), {
+      subject: 'Architecture',
+    });
+
+    const exited = await outcomes.run(
+      'space-exit',
+      () =>
+        Promise.resolve({ kind: 'refused', refusal: { code: 'meta-space-permanent' } } as const),
+      { subject: 'Meta' },
+    );
+
+    expect(exited).toEqual({ kind: 'refused', refusal: { code: 'meta-space-permanent' } });
+    expect(notice(outcomes, 'space-command')).toBeNull();
+  });
+});
+
 describe('staleness', () => {
   it('drops a Map-scoped run that settles after the Map changed', async () => {
     const { outcomes, navigation } = open();

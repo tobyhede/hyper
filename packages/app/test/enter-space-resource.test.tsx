@@ -307,6 +307,10 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     });
   });
 
+  /**
+   * Drawn from command outcomes' `space-command` channel on the Space being
+   * left, and put away through it.
+   */
   it('reports a failed Enter on the Space being left', async () => {
     const spaces = await mount();
     vi.spyOn(spaces, 'enter').mockRejectedValueOnce(
@@ -317,11 +321,15 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Enter' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Architecture could not be entered.');
+      expect(screen.getByRole('alert')).toHaveTextContent('Space command failed');
     });
+    expect(screen.getByRole('alert')).toHaveTextContent('Architecture could not be entered.');
     expect(showingSpace()).toHaveTextContent('Home');
     expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
     expect(spaces.entry(TARGET_ID)).toBeUndefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Space command failed' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('does not exit on Escape', async () => {
