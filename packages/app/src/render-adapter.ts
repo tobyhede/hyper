@@ -132,8 +132,7 @@ export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
  * Authoring, the toolbar inside the Edge itself — and three hand-rolled copies
  * would be three chances to widen `source` and `target` differently.
  *
- * They are `ResourceId`s widened to `string` by React Flow's `Edge` type, the same
- * erasure `placementFromNodes` repairs for a node id below.
+ * They are `ResourceId`s widened to `string` by React Flow's `Edge` type.
  */
 export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
   // SAFETY: `edge.data` is React Flow's generic bag, but every Edge this
@@ -142,7 +141,7 @@ export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
   const graphId = (edge.data as RoutedEdgeData | undefined)?.graphId;
   if (graphId === undefined) return null;
   // SAFETY: `source`/`target` are `ResourceId`s widened to `string` by React
-  // Flow's `Edge` type — the same erasure `placementFromNodes` repairs below.
+  // Flow's `Edge` type.
   return {
     kind: 'edge',
     graphId,
@@ -277,15 +276,13 @@ export interface RenderAdapterState {
 export type RenderAdapter = UseBoundStore<StoreApi<RenderAdapterState>>;
 
 /**
- * Reduce React Flow's widened node ids and positions to a `Placement` of what
- * is currently drawn. Read by `renderedPlacement`, the "is anything on screen
- * yet" question Edge Authoring asks before completing a connection.
+ * Reduce the drawn nodes to a `Placement` of what is currently on screen, keyed
+ * by each node's typed `data.resourceId` rather than its React Flow id. Read by
+ * `renderedPlacement`, the "is anything on screen yet" question Edge Authoring
+ * asks before completing a connection.
  */
 function placementFromNodes(nodes: readonly ResourceFlowNode[]): Placement {
-  // SAFETY: a node id is the Resource id it was projected from, widened to
-  // `string` by React Flow's `Node` type — the same erasure
-  // `consumeSettledMoves` repairs below.
-  return Placement.fromEntries(nodes.map((node) => [node.id as ResourceId, node.position]));
+  return Placement.fromEntries(nodes.map((node) => [node.data.resourceId, node.position]));
 }
 
 function trackDragOrigins(
@@ -304,12 +301,16 @@ function trackDragOrigins(
  * The moved Resources' own drop points, exactly: which settled changes actually
  * ended somewhere other than where the drag began, and where.
  *
+ * Each change is keyed through `owned`, the host nodes' own identities, so a
+ * change for a node this store does not draw contributes nothing.
+ *
  * Answers the drop points directly rather than a list of ids — Authoring now
  * merges these over the Map's own positions at derivation, so there is no
  * second lookup back into `nodes` for a caller to get wrong.
  */
 function consumeSettledMoves(
   settled: readonly NodePositionChange[],
+  owned: ReadonlyMap<string, ResourceId>,
   dragOrigins: globalThis.Map<string, MapPosition>,
   beforeById: ReadonlyMap<string, MapPosition>,
   afterById: ReadonlyMap<string, MapPosition>,
@@ -318,14 +319,15 @@ function consumeSettledMoves(
   for (const change of settled) {
     const origin = dragOrigins.get(change.id) ?? beforeById.get(change.id);
     const after = afterById.get(change.id);
+    const resourceId = owned.get(change.id);
     dragOrigins.delete(change.id);
     if (
+      resourceId !== undefined &&
       origin !== undefined &&
       after !== undefined &&
       (origin.x !== after.x || origin.y !== after.y)
     ) {
-      // SAFETY: same `Node.id` erasure `placementFromNodes` repairs above.
-      moved.set(change.id as ResourceId, after);
+      moved.set(resourceId, after);
     }
   }
   return moved;
@@ -559,7 +561,14 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // node's change round-trips into a re-sync and re-measures forever.
       // Returning no update when nothing real changed keeps the array
       // reference stable and is what breaks that loop.
-      const owned = new Set(projection.nodes.map((node) => node.id));
+      // Keyed by React Flow id and answering the node's typed Resource identity:
+      // the one lookup is both the ownership filter and the source of every
+      // `ResourceId` a change below is read as. An embedded Map's nodes share
+      // this React Flow instance under `embedded:` placement ids, which are
+      // never keys here.
+      const owned = new Map(
+        projection.nodes.map((node) => [node.id, node.data.resourceId] as const),
+      );
       // No resize clause here, deliberately. `NodeResizeControl` emits its
       // node-only `dimensions` change from the same callback `shouldResize`
       // gates, and the Resource answers `false` to every frame while still handing
@@ -581,14 +590,11 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // subject. See `changeEdges` for the other half of the same rule.
       const selection = additiveSelection(
         state.selection,
-        selectChanges(relevant).map((change) => {
-          // SAFETY: the same `Node.id` erasure as `placementFromNodes` above.
-          // Parsing here instead would put a throw on the per-pointer-frame
-          // path for a failure the other readings agree cannot happen.
-          return {
-            subject: { kind: 'resource', resourceId: change.id as ResourceId } as const,
-            selected: change.selected,
-          };
+        selectChanges(relevant).flatMap((change) => {
+          const resourceId = owned.get(change.id);
+          return resourceId === undefined
+            ? []
+            : [{ subject: { kind: 'resource', resourceId } as const, selected: change.selected }];
         }),
       );
       const nodes = withSelection(applied, selection);
@@ -607,7 +613,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Only a settled drag compares its last position to the gesture origin.
       // Intermediate pointer frames publish above without paying for this map.
       const afterById = new Map(nodes.map((node) => [node.id, node.position]));
-      const moved = consumeSettledMoves(settled, dragOrigins, beforeById, afterById);
+      const moved = consumeSettledMoves(settled, owned, dragOrigins, beforeById, afterById);
 
       if (moved.size === 0) {
         set({ projection: { ...projection, nodes }, dragOrigins, selection });

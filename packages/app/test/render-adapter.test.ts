@@ -8,6 +8,7 @@ import { mintingIds } from './minting';
 import { composeApp } from '../src/compose-app';
 import { createRenderAdapter, type RenderAdapter } from '../src/render-adapter';
 import { createConnectionCompletion } from '../src/connection-completion';
+import { embeddedNodeId } from '../src/embedded-map';
 import type {
   AuthoringResult,
   EdgeEligibility,
@@ -806,6 +807,38 @@ describe('render adapter', () => {
     // it again, forever. Holding the published value's identity is what breaks
     // that loop, so identity — not equality — is the assertion.
     expect(store.getState().projection).toBe(published);
+  });
+
+  it('takes neither a selection nor a settled move from an embedded node in a mixed batch', () => {
+    // One React Flow instance draws the host Map and every embedded Map, so a
+    // batch carries embedded placement ids beside host Resource ids. Only the
+    // host node's own identity may reach the selection or a movement Edit.
+    const spy = authoringSpy();
+    const store = createRenderAdapter(spy.authoring);
+    store.getState().syncProjection([node(RESOURCE_A, 10, 20)], []);
+    const embedded = embeddedNodeId(RESOURCE_B, RESOURCE_C);
+
+    store
+      .getState()
+      .changeNodes([
+        ...moving(RESOURCE_A, 500, 400),
+        { type: 'position', id: embedded, position: { x: 0, y: 0 }, dragging: true },
+      ]);
+    store
+      .getState()
+      .changeNodes([
+        { type: 'select', id: embedded, selected: true },
+        ...settled(RESOURCE_A, 500, 400),
+        { type: 'position', id: embedded, position: { x: 90, y: 90 }, dragging: false },
+      ]);
+
+    expect(store.getState().selection).toEqual({ kind: 'none' });
+    expect(spy.completions).toEqual([
+      {
+        kind: 'settled-resource-movement',
+        moved: new Map([[RESOURCE_A, { x: 500, y: 400 }]]),
+      },
+    ]);
   });
 
   it('completes a settled-resource-movement Edit for a drag that lands somewhere new', () => {
