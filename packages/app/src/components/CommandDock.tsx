@@ -111,7 +111,7 @@ import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
-import { GRAPH_PALETTE_ENTRIES } from '../colors';
+import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { MapMemberships } from '../map-memberships';
 import {
   DOCK_ALONGS,

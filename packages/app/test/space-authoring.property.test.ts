@@ -10,9 +10,8 @@ import {
   type MapId,
   type SpaceSnapshot,
 } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
+import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { GRAPH_PALETTE } from '../src/colors';
 import { composeApp } from '../src/compose-app';
 import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
 

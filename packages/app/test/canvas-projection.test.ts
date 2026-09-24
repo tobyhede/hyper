@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type MapId } from '@project/core';
-import { loadSpace, Placement, positionedStrategy, type Space } from '@project/graph';
+import {
+  GRAPH_PALETTE,
+  loadSpace,
+  Placement,
+  positionedStrategy,
+  type Space,
+} from '@project/graph';
 import { OTHER_GRAPH_OPACITY } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
-import { GRAPH_PALETTE } from '../src/colors';
 import { resolveMap } from '../src/map-resolution';
 import { resourceFile } from './resource-files';
 

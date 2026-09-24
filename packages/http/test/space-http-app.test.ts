@@ -1,4 +1,5 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { nextGraphColor } from '@project/graph';
 import {
   AggregateInvariantError,
   PersistenceUnavailableError,
@@ -399,7 +400,7 @@ describe('Space HTTP reads', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: {},
-              graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+              graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
               activeGraph: GRAPH_ID,
             },
           ],

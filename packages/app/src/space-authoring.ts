@@ -13,7 +13,9 @@ import {
   type UUID,
 } from '@project/core';
 import {
+  graphColorsByGraphId,
   loadSpaceSnapshot,
+  nextGraphColor,
   Placement,
   SnapshotEdit,
   type SnapshotEditOutcome,
@@ -29,7 +31,6 @@ import {
   type SpaceSession,
   type SpaceSessionState,
 } from '@project/persistence';
-import { graphColorsByGraphId, nextGraphColor } from './colors';
 import { mapShowsGraph } from './navigation';
 import type { Navigation, NavigationState } from './navigation';
 import { updatePositionedMap } from './snapshot';

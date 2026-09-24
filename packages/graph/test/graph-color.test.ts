@@ -3,14 +3,17 @@ import { describe, expect, it } from 'vitest';
 import {
   GRAPH_PALETTE,
   GRAPH_PALETTE_ENTRIES,
-  GRAPH_PALETTE_LABELS,
   graphColorDistance,
   nextGraphColor,
-} from '../src/colors';
+} from '../src/graph-color';
 
-/** The dark slot of each hue — the even slots, by the layout the last test below holds. */
+/** The dark slot of each hue — the even slots, by the layout the palette tests below hold. */
 const DARK_SLOTS = GRAPH_PALETTE.filter((_, index) => index % 2 === 0);
 const LIGHT_SLOTS = GRAPH_PALETTE.filter((_, index) => index % 2 === 1);
+
+/** Each slot's label, read back through the entries the swatch picker draws. */
+const labelOf = (color: string): string | undefined =>
+  GRAPH_PALETTE_ENTRIES.find((entry) => entry.color === color)?.label;
 
 /** The closest `existing` colour to `candidate`, ignoring what cannot be read as a colour. */
 const minimumDistance = (candidate: string, existing: readonly string[]): number =>
@@ -22,9 +25,8 @@ const minimumDistance = (candidate: string, existing: readonly string[]): number
 describe('GRAPH_PALETTE', () => {
   it('holds twenty Tableau 20 slots with a label for each', () => {
     expect(GRAPH_PALETTE).toHaveLength(20);
-    expect(GRAPH_PALETTE_ENTRIES).toHaveLength(20);
-    for (const { color, label } of GRAPH_PALETTE_ENTRIES) {
-      expect(GRAPH_PALETTE_LABELS[color]).toBe(label);
+    expect(GRAPH_PALETTE_ENTRIES.map((entry) => entry.color)).toEqual(GRAPH_PALETTE);
+    for (const { label } of GRAPH_PALETTE_ENTRIES) {
       expect(label.length).toBeGreaterThan(0);
     }
   });
@@ -33,10 +35,10 @@ describe('GRAPH_PALETTE', () => {
     expect(GRAPH_PALETTE.slice(0, 4)).toEqual(['#1f77b4', '#aec7e8', '#17becf', '#9edae5']);
     expect(GRAPH_PALETTE.slice(-4)).toEqual(['#8c564b', '#c49c94', '#7f7f7f', '#c7c7c7']);
     for (const light of LIGHT_SLOTS) {
-      expect(GRAPH_PALETTE_LABELS[light]).toMatch(/ light$/);
+      expect(labelOf(light)).toMatch(/ light$/);
     }
     for (const dark of DARK_SLOTS) {
-      expect(GRAPH_PALETTE_LABELS[dark]).not.toMatch(/ light$/);
+      expect(labelOf(dark)).not.toMatch(/ light$/);
     }
   });
 });
@@ -83,6 +85,19 @@ describe('nextGraphColor', () => {
   it('breaks ties by palette order', () => {
     // Every slot already in use puts every candidate at distance zero.
     expect(nextGraphColor(GRAPH_PALETTE)).toBe(GRAPH_PALETTE[0]);
+    // Nothing readable puts every candidate at infinity.
+    expect(nextGraphColor(['rebeccapurple'])).toBe(GRAPH_PALETTE[0]);
+  });
+
+  it('meets no tie at a nonzero finite distance while the Map carries only palette colours', () => {
+    // Two candidates tie at a nonzero minimum only if two different palette
+    // pairs lie at exactly the same distance. None do, so the palette-order
+    // tie-break is reached from palette colours only at zero or at infinity,
+    // which the example above covers.
+    const distances = GRAPH_PALETTE.flatMap((first, index) =>
+      GRAPH_PALETTE.slice(index + 1).map((second) => graphColorDistance(first, second)),
+    );
+    expect(new Set(distances).size).toBe(distances.length);
   });
 
   it('ignores a colour it cannot read', () => {

@@ -38,6 +38,16 @@ export type {
 // The rule for "the same Edge twice in one Graph" (ADR 0032).
 export { repeatedGraphEdges } from './graph-edges';
 
+// The palette and the rule that picks from it. `graphColorDistance` stays in its
+// module: it is the rule's measure, named by the module's own tests and by no
+// caller, which asks `nextGraphColor` instead.
+export {
+  GRAPH_PALETTE,
+  GRAPH_PALETTE_ENTRIES,
+  graphColorsByGraphId,
+  nextGraphColor,
+} from './graph-color';
+
 export { gridStrategy } from './grid';
 export type { GridStrategyOptions } from './grid';
 

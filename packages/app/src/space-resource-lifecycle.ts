@@ -1,4 +1,4 @@
-import { loadSpaceSnapshot, type Space } from '@project/graph';
+import { graphColorsByGraphId, loadSpaceSnapshot, type Space } from '@project/graph';
 import {
   createObservableState,
   type ObserverErrorReporter,
@@ -9,7 +9,6 @@ import {
 } from '@project/persistence';
 import type { GraphId, Map, UUID } from '@project/core';
 import { graphColor } from '@project/ui';
-import { graphColorsByGraphId } from './colors';
 
 export type {
   CreateSpaceResourceInput,

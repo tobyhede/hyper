@@ -9,7 +9,7 @@ import {
   type UUID,
 } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { GRAPH_PALETTE, nextGraphColor } from '../src/colors';
+import { GRAPH_PALETTE, nextGraphColor } from '@project/graph';
 import { composeApp } from '../src/compose-app';
 
 import { mintingIds } from './minting';

@@ -2,7 +2,7 @@ import type { ResourceDocument, GraphId, UUID } from '@project/core';
 import type { CanvasSpaceResourceGraphCommands, CanvasSpaceResourceMapCommands } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
-import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from './colors';
+import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from '@project/graph';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { coordinatedGraphDelete, PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import { coordinatedContextCreate } from './coordinated-context-create';

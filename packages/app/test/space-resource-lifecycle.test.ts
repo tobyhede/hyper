@@ -6,7 +6,7 @@ import {
   MemorySpaceBackendTestControl,
   type ObserverErrorReporter,
 } from '@project/persistence';
-import { GRAPH_PALETTE } from '../src/colors';
+import { GRAPH_PALETTE } from '@project/graph';
 import { createSpaceResourceLifecycle } from '../src/space-resource-lifecycle';
 
 /*

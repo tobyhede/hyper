@@ -2,6 +2,7 @@ import type { ResourceId, Graph, GraphId } from '@project/core';
 import {
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
+  graphColorsByGraphId,
   Placement,
   type LayoutStrategyGraph,
   type ResolvedMap,
@@ -14,7 +15,7 @@ import {
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
 import { RESOURCE_SIZE } from './resource';
-import { activeGraphColor, graphColorsByGraphId } from './colors';
+import { activeGraphColor } from './colors';
 import { mapResources } from './map-resolution';
 
 /**
