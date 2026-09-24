@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { loadSpace } from '../src/index';
+import { loadSpace, loadSpaceSnapshot } from '../src/index';
 import { resourceFile } from './resource-files';
 
 /**
@@ -90,6 +90,64 @@ describe('loadSpace over resource files', () => {
           backwards.space.resources.map((r) => r.id),
         );
       }),
+    );
+  });
+});
+
+/**
+ * Input that fails at the root: not an object at all, so no key of it can be
+ * where the shape went wrong. The four constants are the values that tell the
+ * loaders' own object guards apart — `null` passes a `typeof` check that
+ * `undefined` fails, and neither may be read into.
+ */
+const rootLevelInput = fc
+  .oneof(
+    fc.constantFrom(null, undefined, 'a string', 42),
+    fc.string(),
+    fc.double(),
+    fc.boolean(),
+    fc.bigInt(),
+    fc.array(fc.anything(), { maxLength: 3 }),
+  )
+  .map((input) => ({ input, rootLevel: true }));
+
+/** Any other object: a key of it may be what the loaders refuse. */
+const objectInput = fc.object().map((input) => ({ input, rootLevel: false }));
+
+/** The refusals a document earns before a single Resource or reference is read. */
+const DOCUMENT_REFUSALS = ['invalid-shape', 'unsupported-version', 'retired-space-graphs'];
+
+describe('intake over arbitrary input', () => {
+  /**
+   * Both loaders take `unknown`, and their callers turn a refusal into their
+   * own error rather than catching a throw. So every input, however far from a
+   * document, is answered with errors — and a root-level failure is located at
+   * `(root)`, since it has no key path to name.
+   */
+  it('refuses whatever it is handed with errors, and never throws', () => {
+    fc.assert(
+      fc.property(fc.oneof(rootLevelInput, objectInput), ({ input, rootLevel }) => {
+        for (const result of [loadSpace(input, []), loadSpaceSnapshot(input)]) {
+          expect(result.ok).toBe(false);
+          if (result.ok) return;
+          expect(result.errors.length).toBeGreaterThan(0);
+          for (const error of result.errors) {
+            expect(DOCUMENT_REFUSALS).toContain(error.kind);
+            expect(error.message).not.toBe('');
+          }
+          if (!rootLevel) continue;
+          expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-shape']);
+          expect(result.errors[0]?.message).toMatch(/^\(root\): \S/);
+        }
+      }),
+      {
+        examples: [
+          [{ input: null, rootLevel: true }],
+          [{ input: undefined, rootLevel: true }],
+          [{ input: 'a string', rootLevel: true }],
+          [{ input: 42, rootLevel: true }],
+        ],
+      },
     );
   });
 });
