@@ -354,7 +354,7 @@ describe('planDelete', () => {
  * linked from a Space made before it, so references run from lower to higher
  * index and each ordinary Space has at least one.
  */
-const aggregateShape = fc.integer({ min: 2, max: 7 }).chain((count) =>
+const lifecycleAggregates = fc.integer({ min: 2, max: 7 }).chain((count) =>
   fc
     .tuple(
       ...Array.from({ length: count - 1 }, (_, index) =>
@@ -382,7 +382,7 @@ const spaceResourceTargets = (snapshot: SpaceSnapshot): UUID[] =>
 describe('planDelete over any lifecycle-built aggregate', () => {
   it('leaves no Space Resource dangling and no ordinary Space unreferenced', () => {
     fc.assert(
-      fc.property(aggregateShape, ({ links, deleted: [from, to] }) => {
+      fc.property(lifecycleAggregates, ({ links, deleted: [from, to] }) => {
         const stored = links.map((targets, i) => space(i, targets));
         const outcome = planDelete(view(stored, { live: [spaceOf(from)] }), {
           containingSpaceId: spaceOf(from),
