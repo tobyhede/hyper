@@ -12,16 +12,14 @@ import { Input } from './components/input';
 import { Textarea } from './components/textarea';
 import { Field, FieldError } from './components/field';
 import { cn } from './lib/utils';
+import './inline-title-editor.css';
 
 /**
- * Which surface the field is standing in.
- *
- * Two, since ADR 0082: a Resource on the canvas and a name on the Command Dock.
- * There was a `'sidebar'` arm and it went with the Sidebar — a variant with no
- * caller is an invitation, and the next chrome control would reasonably have
- * been written against it and taken styling tuned for a sixteen-rem column.
+ * Which surface the field is standing in: a Resource on the canvas, a name on
+ * the Command Dock, or an Edge's Title. `edge` is a variant rather than a
+ * `className` because `className` reaches the wrapper, not the field.
  */
-export type InlineTitleEditorVariant = 'resource' | 'header';
+export type InlineTitleEditorVariant = 'resource' | 'header' | 'edge';
 
 /** The two controls this editor drives, which share every handler it writes. */
 type TitleField = HTMLInputElement | HTMLTextAreaElement;
@@ -100,7 +98,8 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  *   component's to decide and `Shift` is what it decides on.
  * - Custom behavior: only that lifecycle, in the two shapes {@link InlineTitleEditorBase.multiline}
  *   selects; product identity and authorship stay in the caller.
- * - Tests: `InlineTitleEditor.test.tsx`, `CanvasResource.test.tsx` for the `resource` variant and
+ * - Tests: `InlineTitleEditor.test.tsx` (the `edge` variant's only test until an Edge mounts
+ *   it), `CanvasResource.test.tsx` for the `resource` variant and
  *   `SpaceApp.test.tsx` for the `header` one, which is where the Command Dock renames a
  *   Map and a Graph now that ADR 0082 has retired the Sidebar that used to; application
  *   Playwright in `e2e/editing.spec.ts` and Ladle Playwright in
@@ -203,6 +202,7 @@ export function InlineTitleEditor({
   const controlClassName = cn(
     variant === 'resource' && 'resource__title-input',
     variant === 'header' && 'h-7 rounded-md border-transparent px-1 py-0 font-medium',
+    variant === 'edge' && 'inline-title-editor__edge-field',
   );
 
   const control = multiline ? (
@@ -236,7 +236,11 @@ export function InlineTitleEditor({
   return (
     <Field
       data-invalid={error !== null}
-      className={cn('nodrag nopan nowheel min-w-0 gap-1', className)}
+      className={cn(
+        'nodrag nopan nowheel min-w-0 gap-1',
+        variant === 'edge' && 'inline-title-editor--edge',
+        className,
+      )}
     >
       {control}
       <FieldError id={errorId} className="text-xs">

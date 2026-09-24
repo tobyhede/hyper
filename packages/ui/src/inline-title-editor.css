@@ -1,0 +1,42 @@
+/* The `edge` variant of `InlineTitleEditor`. The field has no box of its own:
+   the Edge's box stays drawn round it while editing. The floor keeps an empty
+   draft clickable.
+
+   Unlayered, so it wins over the utilities `Input` and `Field` carry. */
+
+.inline-title-editor--edge {
+  align-items: center;
+  width: max-content;
+}
+
+/* The size is stated, not read, because `--canvas-resource-title-size` is scoped
+   to `.canvas-resource`. `InlineTitleEditor.test.tsx` holds the weight to
+   `--canvas-resource-title-weight`. */
+.inline-title-editor__edge-field {
+  --inline-title-editor-edge-size: 12px;
+  --inline-title-editor-edge-leading: 1.25;
+  --inline-title-editor-edge-weight: 600;
+  --inline-title-editor-edge-floor: 3rem;
+  --inline-title-editor-edge-ceiling: 14rem;
+
+  display: block;
+  box-sizing: content-box;
+  width: auto;
+  min-width: var(--inline-title-editor-edge-floor);
+  max-width: var(--inline-title-editor-edge-ceiling);
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--canvas-resource-title-color);
+  font: inherit;
+  font-size: var(--inline-title-editor-edge-size);
+  font-weight: var(--inline-title-editor-edge-weight);
+  line-height: var(--inline-title-editor-edge-leading);
+  text-align: center;
+  field-sizing: content;
+}
