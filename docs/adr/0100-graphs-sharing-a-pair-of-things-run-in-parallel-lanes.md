@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0087
+Refined by: 0103
 Related: 0045, 0086
 
 Where more than one Edge joins the same two Things — from different Graphs, in either direction — each is drawn in its own **lane**: the path a lone Edge would take, moved sideways whole. Both anchors move by one vector along the side of the Thing they sit on, and the curve between them is React Flow's `getBezierPath` over the moved anchors. Because React Flow places its control points relative to the anchors, the result is an exact translate: a straight Edge's lanes are straight lines beside it, and a curved Edge's lanes are the same curve beside it. Lanes are 8 flow units apart.

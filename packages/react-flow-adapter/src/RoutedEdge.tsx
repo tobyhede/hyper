@@ -34,11 +34,17 @@ export type RoutedEdgeData = {
   graphId: GraphId;
   /**
    * How far below (or right of) where its two anchors put it this Edge is
-   * drawn, whole — above (or left) when negative — so the Edges of several
+   * drawn — above (or left) when negative — so the Edges of several
    * Graphs joining the same two Resources run as parallel lines rather than over
    * each other. Zero for a lone Edge.
    */
   laneOffset: number;
+  /**
+   * How far from the centre line the outermost lane of this Edge's pair runs.
+   * Every lane of the pair is drawn the same way at that distance, so they
+   * never run out of order (ADR 0103).
+   */
+  laneReach: number;
   /**
    * What fraction of its length the Edge leaves undrawn at each end. Zero for
    * an Edge that connects; a Graph other than the Active one runs beside it and
@@ -78,9 +84,9 @@ export interface RoutedEdgeGeometry {
  */
 function routedEdgeGeometry(
   attachment: EdgeAttachment,
-  { laneOffset, endTrim }: Pick<RoutedEdgeData, 'laneOffset' | 'endTrim'>,
+  { laneOffset, laneReach, endTrim }: Pick<RoutedEdgeData, 'laneOffset' | 'laneReach' | 'endTrim'>,
 ): RoutedEdgeGeometry {
-  return laneBezier(attachment, laneOffset, endTrim);
+  return laneBezier(attachment, laneOffset, endTrim, laneReach);
 }
 
 /**
@@ -93,7 +99,10 @@ function routedEdgeGeometry(
  * the same question, and the two would disagree the day the curve changed.
  */
 export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedEdgeGeometry {
-  return routedEdgeGeometry(useEdgeAttachment(props), props.data ?? { laneOffset: 0, endTrim: 0 });
+  return routedEdgeGeometry(
+    useEdgeAttachment(props),
+    props.data ?? { laneOffset: 0, laneReach: 0, endTrim: 0 },
+  );
 }
 
 /**
