@@ -106,7 +106,7 @@ import {
 import type { Resource, ResourceId, Graph, GraphId, Map, MapId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
-import type { SettlePlacement } from '../resources-drag';
+import type { SettlePlacement, SettleResource } from '../resources-drag';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
@@ -540,7 +540,7 @@ export interface DockResourcesList {
   /** Returns a refusal that stays on the list, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
   /** A Resource row left the list on a drag; `settle` takes the drop's answer back to that list. */
-  readonly onDragStart: (resourceId: ResourceId, settle: SettlePlacement) => void;
+  readonly onDragStart: (resourceId: ResourceId, settle: SettleResource) => void;
   /** A Space row left the list on a drag; `settle` takes the drop's answer back to that list. */
   readonly onSpaceDragStart?:
     ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;

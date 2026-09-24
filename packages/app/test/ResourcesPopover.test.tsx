@@ -7,7 +7,7 @@ import {
   RESOURCE_DRAG_TYPE,
   SPACE_DRAG_TYPE,
 } from '../src/components/ResourcesPopover';
-import type { SettlePlacement } from '../src/resources-drag';
+import type { SettlePlacement, SettleResource } from '../src/resources-drag';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
@@ -63,7 +63,7 @@ function Fixture({
   readonly allResources?: readonly Resource[];
   readonly disabled?: boolean;
   readonly onAdd?: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
-  readonly onDragStart?: (resourceId: Resource['id'], settle: SettlePlacement) => void;
+  readonly onDragStart?: (resourceId: Resource['id'], settle: SettleResource) => void;
   readonly spaceTitleById?: ReadonlyMap<UUID, string>;
   readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
   readonly onAddSpace?: (space: {
@@ -356,7 +356,7 @@ describe('ResourcesPopover', () => {
   });
 
   it('draws a dropped Resource’s refusal on the list that started the drag', async () => {
-    let settle: SettlePlacement | null = null;
+    let settle: SettleResource | null = null;
     render(
       <Fixture
         onDragStart={(_resourceId, given) => {
@@ -378,7 +378,7 @@ describe('ResourcesPopover', () => {
   });
 
   it('clears a standing refusal when a Resource drop completes', async () => {
-    let settle: SettlePlacement | null = null;
+    let settle: SettleResource | null = null;
     render(
       <Fixture
         onAdd={() => 'This Resource is no longer available.'}

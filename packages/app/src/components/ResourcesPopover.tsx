@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
-import type { SettlePlacement } from '../resources-drag';
+import type { SettlePlacement, SettleResource } from '../resources-drag';
 import {
   Button,
   Alert,
@@ -168,7 +168,7 @@ export interface ResourcesPopoverProps {
    * `settle` is where the drop's answer comes back, bound to the opening the
    * drag started from, as {@link onSpaceDragStart}'s is.
    */
-  readonly onDragStart: (resourceId: ResourceId, settle: SettlePlacement) => void;
+  readonly onDragStart: (resourceId: ResourceId, settle: SettleResource) => void;
   readonly onDragEnd?: (() => void) | undefined;
   readonly revealedResourceId?: ResourceId | null | undefined;
   /**
@@ -512,8 +512,8 @@ export function ResourcesPopover({
   }, [titleById, spaceTitles, resources, spaces, shown, needle]);
 
   /**
-   * What a Space placement answered, drawn only on the opening that asked for
-   * it — see {@link StandingRefusal}.
+   * What a Space placement or a dropped Resource answered, drawn only on the
+   * opening that asked for it — see {@link StandingRefusal}.
    */
   const showSettlement =
     (asked: number) =>
@@ -534,18 +534,13 @@ export function ResourcesPopover({
     };
 
   /**
-   * The one way a drop's answer, or a Space press's, reaches this list: a
-   * standing sentence goes as the placement is asked for, and whatever it
-   * answers is drawn on the opening `asked` names — at once when the answer is
-   * synchronous, as a Resource's is.
+   * The one way a Space placement's answer — a drop's or a press's — reaches
+   * this list: a standing sentence goes as the placement is asked for, and
+   * whatever it answers is drawn on the opening `asked` names.
    */
   const settlementFor =
     (asked: number): SettlePlacement =>
     (answer) => {
-      if (answer === null || typeof answer === 'string') {
-        showSettlement(asked)(answer);
-        return;
-      }
       showSettlement(asked)(null);
       void answer.then(showSettlement(asked), showBreak(asked));
     };
@@ -553,7 +548,7 @@ export function ResourcesPopover({
   const beginDrag = (event: DragEvent<HTMLButtonElement>, resourceId: ResourceId): void => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(RESOURCE_DRAG_TYPE, resourceId);
-    onDragStart(resourceId, settlementFor(standing.opening));
+    onDragStart(resourceId, showSettlement(standing.opening));
   };
 
   const beginSpaceDrag = (

@@ -1,26 +1,29 @@
 import type { MapId, ResourceId, UUID } from '@project/core';
 
 /**
- * Hands the answer of a placement the Resources list started back to the list:
- * a refusal sentence to draw on its alert, or `null` for a completed placement.
+ * Hands a Resource drop's answer back to the Resources list: a refusal sentence
+ * to draw on its alert, or `null` for a completed placement.
  *
  * Built by the list at dragstart and bound to the opening that started the
  * drag, so an answer arriving after that opening has closed is dropped exactly
- * as a press's would be (`StandingRefusal` in `ResourcesPopover`).
- *
- * A Resource's answer is synchronous and is taken as it is, so it settles
- * immediately; a Space's is a promise, because placing a Space is a
- * coordinated Edit across Spaces.
+ * as a press's would be (`StandingRefusal` in `ResourcesPopover`). A Resource's
+ * answer is synchronous, so it settles immediately.
  */
-export type SettlePlacement = (answer: string | null | Promise<string | null>) => void;
+export type SettleResource = (answer: string | null) => void;
+
+/**
+ * {@link SettleResource} for a Space drop, whose answer is a promise because
+ * placing a Space is a coordinated Edit across Spaces.
+ */
+export type SettlePlacement = (answer: Promise<string | null>) => void;
 
 /** A Resource being dragged out of the Resources list. */
 export interface ResourceDrag {
   readonly kind: 'resource';
   readonly resourceId: ResourceId;
   readonly mapId: MapId;
-  /** Where the drop's answer goes — see {@link SettlePlacement}. */
-  readonly settle: SettlePlacement;
+  /** Where the drop's answer goes — see {@link SettleResource}. */
+  readonly settle: SettleResource;
 }
 
 /** A Space the Resources list offers, as a drag carries it. */
