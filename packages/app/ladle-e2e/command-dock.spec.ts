@@ -793,8 +793,7 @@ test(
     await expect(strip.getByRole('group', { name: 'Create a Resource' })).toBeAttached();
     const createSpace = strip.getByRole('button', { name: 'Create Space Resource', exact: true });
     await expect(createSpace.locator('[data-icon="space"]')).toBeVisible();
-    // The kind glyph is drawn only in a selected Resource's toolbar (ADR 0102), so
-    // what the press made is read off the Resource's own kind instead.
+    // What the press made is read off the Resource's own kind.
     const spaceResources = page.locator(
       '.react-flow__node:visible .canvas-resource[data-kind="space"]',
     );

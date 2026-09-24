@@ -131,6 +131,12 @@ interface CanvasResourceCommonProps {
    * `ResourceNode`. Absent, the toolbar is drawn in the rail, always shown.
    */
   readonly renderToolbar?: (toolbar: ReactNode) => ReactNode;
+  /**
+   * Hand focus back to the Resource the adapter renders this front inside. Where an
+   * edit ends on a Resource whose toolbar is no longer drawn, there is no Edit
+   * control to return to, so focus returns to the Resource instead.
+   */
+  readonly onReturnFocus?: () => void;
   /** Reports the content-sized title footer in unscaled layout pixels. */
   readonly onBodyHeightChange?: (height: number | null) => void;
   /**
@@ -357,10 +363,14 @@ export function CanvasResource(props: CanvasResourceProps) {
     markdownBodyProps.autoFocus = front.autoFocusEditor;
   }
 
+  const returnFocus = props.onReturnFocus;
   useLayoutEffect(() => {
-    if (contentEditingWas.current && contentEdit === null) editControl.current?.focus();
+    if (contentEditingWas.current && contentEdit === null) {
+      if (editControl.current !== null) editControl.current.focus();
+      else returnFocus?.();
+    }
     contentEditingWas.current = contentEdit !== null;
-  }, [contentEdit]);
+  }, [contentEdit, returnFocus]);
 
   useLayoutEffect(() => {
     if (contentControl.current !== null) {

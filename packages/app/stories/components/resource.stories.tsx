@@ -90,15 +90,16 @@ const FRONTS = [
  * dotted for a Reference Resource, solid for every other front — and the
  * Resource's Title, as one `.canvas-resource__title-line` per Title Line. Nothing
  * is drawn beneath the Title: a closed Resource's whole content is the Title its
- * author wrote. No specimen is handed an authoring callback, so no toolbar is
- * drawn, and with it no kind glyph, which trails the commands in the toolbar
- * (ADR 0102); `Hover` and `Actions` are where those live.
+ * author wrote. A closed front draws its kind glyph at its top-right corner,
+ * whether or not it has a toolbar; an Open Resource draws none. No specimen is
+ * handed an authoring callback, so no toolbar is drawn (ADR 0102); `Hover` and
+ * `Actions` are where the commands live.
  */
 export const Front: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource front"
-      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. Its kind glyph trails its commands in its toolbar, so a front handed no command draws none."
+      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none."
     >
       <div className="inv-row">
         {FRONTS.map((front) => (
@@ -305,8 +306,7 @@ function Instance({
   const front: CanvasResourceFront =
     kind === 'reference'
       ? // Every kind Opens and Closes through the one operation (ADR 0070), so the
-        // Reference Resource carries it too — and with it the toolbar its kind
-        // glyph trails (ADR 0102).
+        // Reference Resource carries it too.
         {
           kind: 'reference',
           target: { kind: 'markdown', source: 'Markdown content' },

@@ -86,10 +86,8 @@ test(
     await selectCanvas(page, 'Collection 1');
 
     const reference = nodeByTitle(page, 'A′').first();
-    // The kind glyph is drawn on the Resource's toolbar, which a selection draws.
-    await expect(
-      (await resourceControls(page, reference)).getByRole('img', { name: 'Reference Resource' }),
-    ).toBeVisible();
+    // A closed Resource draws its kind glyph on itself, selected or not.
+    await expect(reference.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
 
     const markdown = nodeByTitle(page, 'A').first();
     const controls = await resourceControls(page, markdown);

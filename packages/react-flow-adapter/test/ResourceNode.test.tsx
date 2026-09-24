@@ -448,6 +448,28 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     expect(toolbar()).toBeNull();
   });
 
+  it('returns focus to the Resource when an edit ends on a Resource no longer selected', async () => {
+    const running = props({
+      expanded: true,
+      body: 'Body',
+      onEditResource: vi.fn(),
+      bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+    });
+    const inNode = (node: NodeProps<ResourceFlowNode>) => (
+      <div className="react-flow__node" tabIndex={-1}>
+        <ResourceNode {...node} />
+      </div>
+    );
+    const { container, rerender } = render(inNode(running));
+    await screen.findByRole('button', { name: 'Save Resource A' });
+
+    // Save or Cancel ends the edit, and with it the reason the toolbar was drawn.
+    rerender(inNode(props({ expanded: true, body: 'Body', onEditResource: vi.fn() })));
+
+    expect(toolbar()).toBeNull();
+    expect(container.querySelector('.react-flow__node')).toHaveFocus();
+  });
+
   it('keeps the exits of a running edit although the Resource is no longer selected', () => {
     render(
       <ResourceNode

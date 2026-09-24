@@ -178,12 +178,8 @@ test(
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-space-id', /.+/);
     await expect(row.locator('[data-icon="space"]')).toBeVisible();
-    // The Resource's kind glyph trails its floating toolbar, drawn while it is
-    // selected (ADR 0102).
-    const architecture = nodeByTitle(page, 'Architecture');
-    await expect(
-      (await resourceControls(page, architecture)).locator('[data-icon="space"]'),
-    ).toBeVisible();
+    // A closed Resource draws its kind glyph on itself, selected or not.
+    await expect(nodeByTitle(page, 'Architecture').locator('[data-icon="space"]')).toBeVisible();
     await expect(list).toBeVisible();
 
     await expect(
@@ -247,11 +243,8 @@ test(
     await expect(list.getByRole('alert')).toHaveCount(0);
     await settled(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-    // A Space Resource: its kind glyph trails the toolbar drawn while it is
-    // selected (ADR 0102).
-    await expect(
-      (await resourceControls(page, added)).locator('[data-icon="space"]'),
-    ).toBeVisible();
+    // A Space Resource, by the kind glyph a closed Resource draws on itself.
+    await expect(added.locator('[data-icon="space"]')).toBeVisible();
   },
 );
 

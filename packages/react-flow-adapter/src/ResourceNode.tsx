@@ -505,6 +505,7 @@ export function ResourceNode({
           title={data.title}
           graphColor={data.activeGraphColor}
           state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}
+          onReturnFocus={onReturnFocus}
           {...canvasResourceOptionalProps}
         />
       )}
