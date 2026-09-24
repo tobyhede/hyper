@@ -53,7 +53,6 @@ import {
   useId,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type MutableRefObject,
   type ReactNode,
@@ -114,26 +113,31 @@ import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore'
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import type { MapMemberships } from '../map-memberships';
 import {
-  DOCK_ALONGS,
-  DOCK_EDGES,
-  dockSlot,
   exitReportSentence,
-  nearestAlong,
-  nearestEdge,
   openCount,
-  orientationOf,
-  slotValue,
   unwellElsewhere,
   unwellReport,
-  type DockAlong,
-  type DockBox,
-  type DockEdge,
-  type DockOrientation,
-  type DockPosition,
   type ExitOutcome,
   openSpacesName,
   SPACES_LABEL,
 } from '../dock-model';
+import {
+  alongLabel,
+  DOCK_ALONGS,
+  DOCK_EDGES,
+  dockSlot,
+  dockStyle,
+  EDGE_LABEL,
+  exceedsDragThreshold,
+  MENU_SIDE,
+  nearestSlot,
+  orientationOf,
+  slotLabel,
+  slotValue,
+  type DockEdge,
+  type DockPosition,
+  type MenuSide,
+} from '../dock-placement';
 import { RESOURCES_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
 import { ResourcesPopover } from './ResourcesPopover';
 import './command-dock.css';
@@ -638,15 +642,6 @@ export interface DockPersistence {
   /** Keep the local Space and commit it again, ending a conflict. */
   readonly onKeepLocal: () => void;
 }
-
-/**
- * Which way a menu opens, decided by the dock rather than the control.
- *
- * A bottom-edge dock's menus must open upward: Base UI's default `bottom`
- * puts the popup below the viewport, where it is open and invisible, which
- * reads exactly like a control that does nothing.
- */
-type MenuSide = 'top' | 'bottom' | 'left' | 'right';
 
 /* ----------------------------------------------------------------- pieces */
 
@@ -2104,133 +2099,6 @@ function SpacesControl({
 
 /* ---------------------------------------------------------------- docking */
 
-/**
- * How far each edge holds the dock off.
- *
- * The bottom is not the same as the others and this asymmetry is the point:
- * the macOS Dock, its reveal strip and the window resize handle all live in the
- * last few dozen pixels, and the OS takes the pointer before the page does.
- */
-const EDGE_INSET = {
-  top: 16,
-  right: 16,
-  bottom: 44,
-  left: 16,
-} satisfies Record<DockEdge, number>;
-
-/** A menu opens into the canvas, never off the edge the dock is against. */
-const MENU_SIDE = {
-  top: 'bottom',
-  bottom: 'top',
-  left: 'right',
-  right: 'left',
-} satisfies Record<DockEdge, MenuSide>;
-
-/**
- * The twelve slots, as something other than a drag can offer them.
- *
- * **A drag cannot be the only way to move the Dock**, on two independent
- * grounds that happen to have one answer. It is not reachable from a keyboard
- * at all — the grip was a `button` carrying four pointer handlers and no
- * `onKeyDown`, so the Dock's own position was the one command in the surface a
- * keyboard could not reach. And it is not reachable from a test either: a
- * synthetic pointer sequence carries no pointer capture, and stubbing capture
- * to force one freezes the renderer, which is the whole reason `DockedLeft`
- * exists as a second story rather than as an assertion inside the first.
- *
- * So the grip discloses the set, and the drag becomes the shortcut rather than
- * the mechanism. That is the ordinary reading of a grip on a movable panel, and
- * it costs nothing the drag was providing.
- *
- * **Twelve rows in four labelled groups, and not eight.** The eight *targets* —
- * four corners and four edge-middles — are what the geometry offers a pointer,
- * because a corner is one place two edges both reach. A menu is not a place,
- * and a reader choosing from it is making the two choices the drag makes
- * separately: the edge, which decides the orientation, and the stop along it.
- * Collapsing them to eight would make the two corners that carry an orientation
- * choice indistinguishable from the two that do not.
- */
-const EDGE_LABEL = {
-  top: 'Top edge',
-  right: 'Right edge',
-  bottom: 'Bottom edge',
-  left: 'Left edge',
-} satisfies Record<DockEdge, string>;
-
-/**
- * A stop is named for the direction its edge runs, not for the enum.
- *
- * `start` of the top edge is the left of the screen and `start` of the left
- * edge is the top of it, and a reader picking a slot is picking a place rather
- * than a coordinate. One name for both would have to be the enum's, which names
- * neither.
- */
-const ALONG_LABEL = {
-  horizontal: { start: 'Left', center: 'Centre', end: 'Right' },
-  vertical: { start: 'Top', center: 'Middle', end: 'Bottom' },
-} satisfies Record<DockOrientation, Record<DockAlong, string>>;
-
-/** Where the Dock is, said the way the grip's label says it. */
-const slotLabel = (position: DockPosition): string =>
-  `${EDGE_LABEL[position.edge]}, ${ALONG_LABEL[orientationOf(position.edge)][position.along].toLowerCase()}`;
-
-/**
- * The slot a release lands in: an edge, then a stop along it.
- *
- * Two independent questions rather than one list of eight, because the edge is
- * what decides the dock's orientation and which way its menus open, and the
- * stop only decides where along that edge it sits. Asking them separately is
- * also what makes a corner reachable from either side with a different
- * orientation, which a flat list of eight positions could not express.
- */
-const nearestSlot = (bounds: DockBox, box: DockBox): DockPosition => {
-  const edge = nearestEdge(bounds, box);
-  return { edge, along: nearestAlong(bounds, box, edge) };
-};
-
-/**
- * The two insets a docked position spends: one holding it off its own edge, one
- * holding it off the edge it is aligned to at a corner.
- *
- * `center` is the only stop that translates, because it is the only one
- * positioned by its own midpoint. `start` and `end` are pinned to a corner, and
- * a translate there would hang the dock half off the container — which is what
- * a single centred rule did when every stop was a fraction.
- */
-const alongStyle = (edge: DockEdge, along: DockAlong): CSSProperties => {
-  const cross = EDGE_INSET[edge === 'bottom' ? 'top' : edge === 'right' ? 'left' : edge];
-  if (orientationOf(edge) === 'horizontal') {
-    if (along === 'start') return { left: cross };
-    if (along === 'end') return { right: cross };
-    return { left: '50%', transform: 'translateX(-50%)' };
-  }
-  if (along === 'start') return { top: cross };
-  if (along === 'end') return { bottom: EDGE_INSET.bottom };
-  return { top: '50%', transform: 'translateY(-50%)' };
-};
-
-const dockStyle = ({ edge, along }: DockPosition): CSSProperties => {
-  const inset = EDGE_INSET[edge];
-  const anchor =
-    edge === 'top'
-      ? { top: inset }
-      : edge === 'bottom'
-        ? { bottom: inset }
-        : edge === 'left'
-          ? { left: inset }
-          : { right: inset };
-  return { ...anchor, ...alongStyle(edge, along) };
-};
-
-/**
- * How far a press travels before it stops being a click.
- *
- * Without it every press on the grip is a drag of zero pixels, and a reader who
- * clicks the grip with an unsteady hand redocks the surface instead of opening
- * the slots. Four pixels is what a browser's own click tolerance is worth.
- */
-const DRAG_THRESHOLD = 4;
-
 interface DragState {
   /**
    * The pointer that took hold, and the only one this gesture answers.
@@ -2484,8 +2352,10 @@ function Dock({
     // under a reader who only meant to press it.
     if (
       !held.moved &&
-      Math.abs(event.clientX - held.fromX) <= DRAG_THRESHOLD &&
-      Math.abs(event.clientY - held.fromY) <= DRAG_THRESHOLD
+      !exceedsDragThreshold(
+        { x: held.fromX, y: held.fromY },
+        { x: event.clientX, y: event.clientY },
+      )
     )
       return;
     // Past the threshold this press is a drag, so the `click` that ends it is
@@ -2644,7 +2514,7 @@ function Dock({
                         value={slotValue({ edge, along })}
                         closeOnClick
                       >
-                        {ALONG_LABEL[orientationOf(edge)][along]}
+                        {alongLabel(edge, along)}
                       </DropdownMenuRadioItem>
                     ))}
                   </Fragment>
