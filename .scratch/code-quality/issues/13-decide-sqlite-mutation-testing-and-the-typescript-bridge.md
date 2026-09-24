@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] For each: what it costs (CI jobs and time, code, config) and what it has caught or enabled, with evidence
-- [ ] Each has a recorded decision. A removal comes with an ADR superseding the one that adopted it, and a removal ticket
+- [x] For each: what it costs (CI jobs and time, code, config) and what it has caught or enabled, with evidence
+- [x] Each has a recorded decision. A removal comes with an ADR superseding the one that adopted it, and a removal ticket
 
 ## Evidence (gathered 2026-09-24 on `origin/main` at `bde05042`)
 
@@ -98,7 +98,7 @@ Decision: **Keep** (Toby Hede, 2026-09-24). SQLite is important for portability:
 
 **The single fact to decide on:** it has not visibly been run since 2026-08-22, and its two findings tickets (05, 06) are still `needs-triage`. Its value depends entirely on someone running it deliberately, because nothing runs it automatically.
 
-Decision:
+Decision: **Keep, and run it in CI** (Toby Hede, 2026-09-25). Since this evidence was gathered, #283 closed both findings tickets (mutation 05 and 06), so the "findings sit untriaged" argument no longer holds. Running it in CI reverses the standing "local diagnostic, never a gate" rule in AGENTS.md and `build-tooling.md`, so the change needs an ADR. Follow-up: ticket 25.
 
 ### 3. The TypeScript 6 compatibility bridge beside TypeScript 7
 
@@ -136,4 +136,4 @@ The toolchain assertion itself has no recorded catch in git history. That is exp
 
 **The single fact to decide on:** as of 2026-09-24, both `typescript-eslint@latest` (8.70.1) and its canary peer on `typescript <6.1.0`, and TypeScript 7.0.2 exposes its API only under `unstable/*`. The removal condition is blocked upstream on two independent clauses.
 
-Decision:
+Decision: **Keep** (Toby Hede, 2026-09-25). The removal condition is blocked upstream on clauses 1 and 2.
