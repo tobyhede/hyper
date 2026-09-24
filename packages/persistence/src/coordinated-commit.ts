@@ -24,7 +24,8 @@
  * every participant. Accepting the stored side completes at once. A replay is
  * `recovering` until its own commit has prepared every participant, which
  * hands the participants' recovery over to it; a replay that ends before that
- * — a refused read, a throw — returns this commit to the phase it recovered from, so the same
+ * — a refused read, a participant another coordination's recovery holds, a
+ * throw — returns this commit to the phase it recovered from, so the same
  * recovery can be asked for again. Requests made while `recovering` or once
  * `recovered` are ignored. Any other move is refused.
  */
@@ -33,6 +34,7 @@ import type { CommitResult, LoadedSpace, ProtocolFault, SpaceChange } from './ba
 import type { CoordinatedRecovery, ManagedSpaceSession } from './session';
 import {
   changedSpaceId,
+  recoveryRefusal,
   type SpaceResourceChanges,
   type SpaceResourceLifecycleChange,
   type SpaceResourcePlanningView,
@@ -95,11 +97,29 @@ export type SpaceResourceReplayItem =
   | { readonly kind: 'update'; readonly spaceId: UUID }
   | { readonly kind: 'delete'; readonly spaceId: UUID };
 
-/** A replay's plan: each `update` resolved against the Spaces the replay read. */
+const replayedSpaceId = (item: SpaceResourceReplayItem): UUID =>
+  item.kind === 'create' ? item.snapshot.id : item.spaceId;
+
+/**
+ * A replay's plan: each `update` resolved against the Spaces the replay read.
+ *
+ * `holders` are the participants that still answer to the recovery this
+ * replay carries out. Any other participant that needs recovery answers to a
+ * different coordination's, which is the only thing allowed to settle it
+ * (ADR 0076), so the replay refuses rather than commit over it.
+ */
 export const planReplay = (
   view: SpaceResourcePlanningView,
-  [first, ...rest]: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]],
+  items: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]],
+  holders: ReadonlySet<UUID>,
 ): SpaceResourcePlanOutcome => {
+  for (const item of items) {
+    const id = replayedSpaceId(item);
+    if (holders.has(id)) continue;
+    const refusal = recoveryRefusal(view.recovery, id);
+    if (refusal !== undefined) return refusal;
+  }
+  const [first, ...rest] = items;
   const resolve = (item: SpaceResourceReplayItem): SpaceResourceLifecycleChange => {
     if (item.kind !== 'update') return item;
     const snapshot = view.spaces.get(item.spaceId);
@@ -298,6 +318,15 @@ export class CoordinatedCommit {
 
   get phase(): CoordinatedCommitPhase {
     return this.#phase;
+  }
+
+  /** The participants that still answer to this commit's recovery. */
+  recoveryHolders(): ReadonlySet<UUID> {
+    return new Set(
+      [...this.#participants]
+        .filter(([, managed]) => managed.holdsCoordinatedRecovery(this.#recovery))
+        .map(([id]) => id),
+    );
   }
 
   /**

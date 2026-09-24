@@ -2972,3 +2972,243 @@ describe('Space Resource recovery after a replay that never installed', () => {
     expect(backend.loadAggregateCalls).toBe(3);
   });
 });
+
+describe('Space Resource recovery another coordination holds', () => {
+  /**
+   * Ticket 23's sequence up to the replay: C0 creates TARGET in Meta and is
+   * rejected, so Meta and TARGET hold C0's recovery; C1 then creates CHILD in
+   * the rejected TARGET, which ADR 0076 lets take part, and conflicts, so TARGET
+   * and CHILD hold C1's. Meta's next Edit asks C0's recovery to replay, and
+   * `committed` answers that replay if it reaches the backend.
+   */
+  const supersededSequence = async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(
+      idSource([
+        TARGET_ID,
+        TARGET_RESOURCE_ID,
+        TARGET_MAP_ID,
+        TARGET_GRAPH_ID,
+        SPACE_RESOURCE_ID,
+        CHILD_ID,
+        CHILD_RESOURCE_ID,
+        CHILD_MAP_ID,
+        CHILD_GRAPH_ID,
+        SECOND_SPACE_RESOURCE_ID,
+      ]),
+    );
+
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      title: 'Target',
+      position: { x: 0, y: 0 },
+    });
+    await registry.waitUntilRetirable(META_ID);
+    expect(meta.getState().persistence.kind).toBe('rejected');
+    const target = registry.session(TARGET_ID);
+    if (target === undefined) throw new Error('target session was not installed');
+
+    const storedTarget: SpaceSnapshot = {
+      ...target.getState().working,
+      document: { ...target.getState().working.document, title: 'Stored elsewhere' },
+    };
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: TARGET_ID,
+          current: { snapshot: storedTarget, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    await lifecycle.create({
+      containingSpaceId: TARGET_ID,
+      mapId: TARGET_MAP_ID,
+      title: 'Child',
+      position: { x: 300, y: 0 },
+    });
+    await registry.waitUntilRetirable(TARGET_ID);
+    expect(target.getState().persistence.kind).toBe('conflicted');
+    const child = registry.session(CHILD_ID);
+    if (child === undefined) throw new Error('child session was not installed');
+
+    control.queueResult({
+      kind: 'committed',
+      revisions: [
+        { spaceId: META_ID, revision: 4n },
+        { spaceId: TARGET_ID, revision: 10n },
+      ],
+      deletedSpaceIds: [],
+    });
+    meta.submit(meta.getState().working);
+    await registry.waitUntilRetirable(META_ID);
+    return { control, registry, meta, target, child, storedTarget };
+  };
+
+  it('does not replay a coordination over a participant another conflicted coordination holds', async () => {
+    const { control, registry, meta, target, child } = await supersededSequence();
+
+    // C0's replay is refused before it reaches the backend: TARGET answers to
+    // C1 until C1 is resolved, so nothing settles it behind C1's back.
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState().persistence.kind).toBe('rejected');
+    expect(target.getState()).toMatchObject({
+      acknowledgedRevision: 9n,
+      persistence: { kind: 'conflicted' },
+    });
+    expect(child.getState().persistence.kind).toBe('conflicted');
+    expect(registry.session(CHILD_ID)).toBe(child);
+  });
+
+  it("resolves CHILD and TARGET together through CHILD's Accept stored", async () => {
+    const { registry, target, child, storedTarget } = await supersededSequence();
+
+    child.acceptRemote();
+
+    // TARGET takes the Space C1's conflict answered. CHILD was never stored
+    // and has no baseline, so accepting the stored side lets it go.
+    expect(target.getState()).toMatchObject({
+      working: storedTarget,
+      acknowledgedRevision: 9n,
+      persistence: { kind: 'settled' },
+    });
+    expect(child.getState().persistence.kind).toBe('settled');
+    expect(registry.session(CHILD_ID)).toBeUndefined();
+  });
+
+  it('does not let a superseded recovery roll a participant back from a revision a later commit acknowledged', async () => {
+    const { control, registry, meta, target, child } = await supersededSequence();
+    child.acceptRemote();
+
+    // With C1 resolved, Meta's next Edit replays C0 over TARGET.
+    meta.submit(meta.getState().working);
+    await registry.waitUntilRetirable(META_ID);
+    expect(control.requests).toHaveLength(3);
+    const acknowledged = target.getState();
+    expect(acknowledged).toMatchObject({
+      acknowledgedRevision: 10n,
+      persistence: { kind: 'settled' },
+    });
+
+    child.acceptRemote();
+    target.acceptRemote();
+
+    expect(target.getState()).toBe(acknowledged);
+  });
+
+  it('does not let a superseded recovery settle a session over its in-flight commit', async () => {
+    const { control, registry, meta, target, child } = await supersededSequence();
+    child.acceptRemote();
+    meta.submit(meta.getState().working);
+    await registry.waitUntilRetirable(META_ID);
+    expect(target.getState().acknowledgedRevision).toBe(10n);
+
+    // An ordinary commit in flight on TARGET.
+    const releaseCommit = control.deferNextCommit();
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: TARGET_ID, revision: 11n }],
+      deletedSpaceIds: [],
+    });
+    target.submit({
+      ...target.getState().working,
+      document: { ...target.getState().working.document, title: 'Local edit in flight' },
+    });
+    expect(target.getState().persistence.kind).toBe('pending');
+
+    child.acceptRemote();
+    target.acceptRemote();
+
+    expect(target.getState().persistence.kind).toBe('pending');
+    expect(target.getState().working.document.title).toBe('Local edit in flight');
+
+    releaseCommit();
+    await registry.waitUntilRetirable(TARGET_ID);
+    const stored = control.requests.at(-1)?.changes;
+    expect(stored).toMatchObject([{ kind: 'update', spaceId: TARGET_ID, expectedRevision: 10n }]);
+    expect(target.getState()).toMatchObject({
+      working: stored?.[0]?.kind === 'update' ? stored[0].snapshot : undefined,
+      acknowledgedRevision: 11n,
+      persistence: { kind: 'settled' },
+    });
+  });
+
+  it('answers an Edit after an ordinary rejection with its own commit once a later coordination acknowledged the Space', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(
+      idSource([
+        SPACE_RESOURCE_ID,
+        CHILD_ID,
+        CHILD_RESOURCE_ID,
+        CHILD_MAP_ID,
+        CHILD_GRAPH_ID,
+        SECOND_SPACE_RESOURCE_ID,
+      ]),
+    );
+
+    // C1, a link, is rejected: Meta holds its recovery.
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
+    await lifecycle.link({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      targetSpaceId: TARGET_ID,
+      title: 'Architecture',
+      position: { x: 240, y: 80 },
+    });
+    await registry.waitUntilRetirable(META_ID);
+    expect(meta.getState().persistence.kind).toBe('rejected');
+
+    // C2 takes the rejected Meta and lands, carrying C1's link with it.
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      title: 'Child',
+      position: { x: 300, y: 0 },
+    });
+    await registry.waitUntilRetirable(META_ID);
+    expect(meta.getState()).toMatchObject({
+      acknowledgedRevision: 4n,
+      persistence: { kind: 'settled' },
+    });
+
+    // An ordinary commit is rejected on its own account.
+    control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Rejected alone' },
+    });
+    await registry.waitUntilRetirable(META_ID);
+    expect(meta.getState().persistence.kind).toBe('rejected');
+
+    // The next Edit is Meta's own commit, not a replay of the C1 it moved past.
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Resubmitted alone' },
+    });
+    expect(meta.getState().persistence.kind).toBe('pending');
+    await registry.waitUntilRetirable(META_ID);
+    expect(meta.getState()).toMatchObject({
+      acknowledgedRevision: 5n,
+      persistence: { kind: 'settled' },
+    });
+  });
+});

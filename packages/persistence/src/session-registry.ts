@@ -450,13 +450,13 @@ const commitPlan = async <C>(
  * `predecessor` marks a recovery replaying a change set an earlier turn
  * already decided and pre-checked. Its commit takes the predecessor's
  * recovery over once it prepares; a turn that ends before that — a refused
- * read, a throw — resumes the predecessor's recovery before the turn is
- * finished, so the participants can ask for it again. It still reads the
- * aggregate — the barrier still waits, and a read failure still refuses — but
- * skips the pre-check: against
- * `MemorySpaceBackend`'s test double a queued `conflict` or failure installs
- * the acknowledged revision onto the session but not into the stored copy, so
- * the pre-check would answer a conflict of its own. The repository
+ * read, a participant another coordination's recovery holds, a throw —
+ * resumes the predecessor's recovery before the turn is finished, so the
+ * participants can ask for it again. It still reads the aggregate — the
+ * barrier still waits, and a read failure still refuses — but skips the
+ * pre-check: against `MemorySpaceBackend`'s test double a queued `conflict`
+ * or failure installs the acknowledged revision onto the session but not into
+ * the stored copy, so the pre-check would answer a conflict of its own. The repository
  * re-validates every commit regardless (ADR 0095).
  */
 const runCoordination = async <P, C>(
@@ -521,12 +521,16 @@ const coordinate = async <P, C>(
   return installation.promise;
 };
 
-/** A recovery's replay: no wait of its own, and a plan that resolves each update. */
+/**
+ * A recovery's replay: no wait of its own, and a plan that resolves each update
+ * and refuses a participant that needs recovery `predecessor` does not hold.
+ */
 const replayOperation = (
   items: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]],
+  predecessor: CoordinatedCommit,
 ): SpaceResourceCoordinatedOperation<undefined, undefined> => ({
   prepare: () => Promise.resolve({ kind: 'proceed', prepared: undefined }),
-  plan: (view) => planReplay(view, items),
+  plan: (view) => planReplay(view, items, predecessor.recoveryHolders()),
 });
 
 /**
@@ -688,7 +692,9 @@ export function createSpaceSessionRegistry(
     // carry the outcome, and one that never installed has resumed the
     // predecessor's recovery, so a rejection is settled here.
     replay: (items, predecessor) => {
-      void coordinate(coordinator, replayOperation(items), predecessor).catch(() => undefined);
+      void coordinate(coordinator, replayOperation(items, predecessor), predecessor).catch(
+        () => undefined,
+      );
     },
   };
 

@@ -92,6 +92,8 @@ export interface ManagedSpaceSession {
     result: Exclude<CommitResult, { kind: 'committed' } | { kind: 'conflict' }>,
   ) => void;
   readonly setCoordinatedRecovery: (recovery: CoordinatedRecovery | undefined) => void;
+  /** Whether this session answers to `recovery` for its coordinated outcome. */
+  readonly holdsCoordinatedRecovery: (recovery: CoordinatedRecovery) => boolean;
   readonly restoreCoordinatedCommit: (snapshot: SpaceSnapshot, revision: bigint) => void;
 }
 
@@ -137,17 +139,16 @@ export const openManagedSpaceSession = (
     persistence: { kind: 'settled' },
   };
   /**
-   * Whether a commit `startCommit` began is awaiting its answer.
-   *
-   * **While it holds, the persistence state is never `failed` or `conflicted`.**
-   * `startCommit` is the only place that sets it, and publishes `pending` in
-   * the same step; the answer clears it before publishing anything. The only
-   * other writers of those two kinds, `failCoordinatedCommit` and
-   * `conflictCoordinatedCommit`, settle the coordination in progress, which
-   * `prepareCoordinatedCommit` refuses to begin while this holds, and no
-   * commit starts while one is in progress. So `failed` and `conflicted` each
-   * imply that nothing is in flight, which is why the guards in `retry` and
-   * `resolveConflict` do not name it.
+   * Whether `startCommit` has handed the backend a commit it has not answered.
+   * While it is true `persistence.kind` is `pending`: only that answer leaves
+   * `pending`, and no coordinated completion reaches a session with a commit
+   * in flight. A coordination waits for idle before it prepares, and a
+   * recovery settles only participants that still hold it, none of which can
+   * start a commit of its own. So `failed` and `conflicted` each imply that
+   * nothing is in flight, which is why the guards in `retry` and
+   * `resolveConflict` do not name it. Held by `space-resource-lifecycle.test.ts`'s
+   * "does not let a superseded recovery settle a session over its in-flight
+   * commit".
    */
   let inFlight = false;
   let coordinating = false;
@@ -493,6 +494,7 @@ export const openManagedSpaceSession = (
     notifyCoordinatedCommit: observable.notify,
     acknowledgeCoordinatedCommit: (revision) => {
       coordinating = false;
+      coordinatedRecovery = undefined;
       const nextWaiting = waiting;
       waiting = persistencePaused ? nextWaiting : undefined;
       const state = observable.getState();
@@ -508,6 +510,7 @@ export const openManagedSpaceSession = (
     },
     completeCoordinatedDeletion: () => {
       coordinating = false;
+      coordinatedRecovery = undefined;
       waiting = undefined;
       committing = undefined;
       observable.install({ ...observable.getState(), persistence: { kind: 'settled' } });
@@ -540,6 +543,7 @@ export const openManagedSpaceSession = (
     setCoordinatedRecovery: (recovery) => {
       coordinatedRecovery = recovery;
     },
+    holdsCoordinatedRecovery: (recovery) => coordinatedRecovery === recovery,
     restoreCoordinatedCommit: (snapshot, revision) => {
       coordinating = false;
       waiting = undefined;
