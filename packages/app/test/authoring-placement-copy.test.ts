@@ -75,7 +75,7 @@ describe('Map delete draws the right geometry (ticket 02, item 1)', () => {
     const app = composeApp({ spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(DELETED_MAP_ID);
 
-    // What `App.tsx`'s Dock Delete does: Map authoring deletes the Map and
+    // What the Dock's Delete does (`dock-chrome.ts`): Map authoring deletes the Map and
     // leaves the canvas on the survivor.
     const everything = () => true;
     const result = await topLevelMapAuthoringCommands(

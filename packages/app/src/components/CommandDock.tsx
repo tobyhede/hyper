@@ -152,7 +152,7 @@ const RESOURCE_KINDS = ['markdown', 'space'] as const;
  * A kind the Create cluster draws a control for.
  *
  * Named rather than written inline at the prop, because it is the type the
- * *dispatch* is held to: `App.tsx` answers every press through a record over
+ * *dispatch* is held to: `dock-chrome.ts` answers every press through a record over
  * this, so a kind added above has to say what pressing it does before the
  * application compiles.
  */

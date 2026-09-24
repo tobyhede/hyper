@@ -23,7 +23,7 @@ interface SpaceAppFailureState {
  *
  * It catches render throws only, and nothing else reports here. A refused remote
  * snapshot leaves everything on screen still working, so it reports *inside* the
- * app, next to the control that was clicked (`App.tsx`).
+ * app, next to the control that was clicked (`dock-chrome.ts`).
  */
 export class SpaceAppFailure extends Component<SpaceAppFailureProps, SpaceAppFailureState> {
   override state: SpaceAppFailureState = { message: null };
