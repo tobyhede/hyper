@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema } from '@project/core';
+import { nextGraphColor } from '@project/graph';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
 import { runDatabaseCli } from '../../src/cli/database-entry';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
@@ -118,7 +119,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
                 title: 'Map 1',
                 kind: 'positioned',
                 positions: { [resourceId]: { x: 0, y: 0, open: false } },
-                graphs: [{ id: graph.id, title: 'Graph 1', edges: [] }],
+                graphs: [{ id: graph.id, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
                 activeGraph: graph.id,
               },
             ],

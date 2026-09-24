@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import { loadSpace } from '@project/graph';
+import { graphColorsByGraphId, loadSpace } from '@project/graph';
 import { describeMembership, otherMapMemberships, membershipsOf } from '../src/map-memberships';
-import { graphColorsByGraphId } from '../src/colors';
 import { resourceFile } from './resource-files';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);

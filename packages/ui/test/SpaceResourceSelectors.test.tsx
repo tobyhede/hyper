@@ -57,7 +57,7 @@ const clusters = (
     { id: 'l1', title: 'Collection 1' },
     { id: 'l2', title: 'Collection 2' },
   ],
-  graphs: [{ id: 'g1', title: 'Long' }],
+  graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4' }],
   mapId: 'l1',
   graphId: 'g1',
   onMapChange: vi.fn(),
@@ -298,7 +298,7 @@ describe('SpaceResourceSelectors', () => {
     expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
   });
 
-  it('groups the Graph menu into Colour…, New Graph, Rename with Copy link, then Delete', () => {
+  it('groups the Graph menu into New Graph, Colour… with Rename and Copy link, then Delete', () => {
     mount(
       clusters({
         graphCommands: {
@@ -324,17 +324,49 @@ describe('SpaceResourceSelectors', () => {
       'group',
       'separator',
       'group',
-      'separator',
-      'group',
     ]);
     expect(menuItemLabels(menu)).toEqual([
       'Long',
-      'Colour…',
       'New Graph',
+      'Colour…',
       'Rename',
       'Copy link to Graph',
       'Delete Long',
     ]);
     expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * A Graph row says which colour its Edges are drawn in with the same line
+   * the canvas HUD's key draws, and no Graph glyph: the list is already a list
+   * of Graphs, so a glyph on every row said nothing the caption does not.
+   */
+  it('marks each Graph row with a line in that Graph’s colour and no glyph', () => {
+    mount(
+      clusters({
+        graphs: [
+          { id: 'g1', title: 'Long', color: '#1f77b4' },
+          { id: 'g2', title: 'Short', color: '#ff7f0e' },
+        ],
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    const rows = screen.getAllByRole('menuitemradio');
+
+    expect(rows).toHaveLength(2);
+    const lines = rows.map((row) => row.querySelector('[data-slot="graph-color-line"]'));
+    expect(lines[0]).toHaveStyle({ backgroundColor: '#1f77b4' });
+    expect(lines[1]).toHaveStyle({ backgroundColor: '#ff7f0e' });
+    // The unchosen row draws nothing else; the chosen one draws only the
+    // radio indicator the menu marks the chosen member with.
+    expect(rows[1]?.querySelector('svg')).toBeNull();
+  });
+
+  it('leaves the Map rows unmarked', () => {
+    mount(clusters());
+    fireEvent.click(screen.getByTestId('space-resource-map'));
+
+    for (const row of screen.getAllByRole('menuitemradio'))
+      expect(row.querySelector('[data-slot="graph-color-line"]')).toBeNull();
   });
 });

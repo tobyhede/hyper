@@ -56,7 +56,7 @@ export function buildSpaceResourceRail({
     <SpaceResourceSelectors
       onReport={onReport}
       maps={target.maps.map(({ id, title }) => ({ id, title }))}
-      graphs={(selectedMap?.graphs ?? []).map(({ id, title }) => ({ id, title }))}
+      graphs={(selectedMap?.graphs ?? []).map(({ id, title, color }) => ({ id, title, color }))}
       mapId={selectedMap?.id ?? null}
       graphId={
         selectedMap?.graphs.some((graph) => graph.id === document?.graph)

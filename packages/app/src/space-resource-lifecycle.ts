@@ -1,4 +1,4 @@
-import { loadSpaceSnapshot, type Space } from '@project/graph';
+import { graphColorsByGraphId, loadSpaceSnapshot, type Space } from '@project/graph';
 import {
   createObservableState,
   type ObserverErrorReporter,
@@ -8,6 +8,7 @@ import {
   type SpaceSummary,
 } from '@project/persistence';
 import type { GraphId, Map, UUID } from '@project/core';
+import { graphColor } from '@project/ui';
 
 export type {
   CreateSpaceResourceInput,
@@ -25,7 +26,17 @@ export type {
 export interface SpaceResourceTargetMap {
   readonly id: UUID;
   readonly title: string;
-  readonly graphs: readonly { readonly id: GraphId; readonly title: string }[];
+  /**
+   * The Graphs this Map owns, each with the colour its Edges are drawn in —
+   * resolved here, against the target Space, because the target is the only
+   * Space that knows it, and through `graphColor` because the canvas resolves
+   * it there too.
+   */
+  readonly graphs: readonly {
+    readonly id: GraphId;
+    readonly title: string;
+    readonly color: string;
+  }[];
   readonly activeGraph?: GraphId;
 }
 
@@ -110,11 +121,18 @@ export interface SpaceResourceLifecycleOptions {
   readonly reportObserverError: ObserverErrorReporter;
 }
 
-const targetMap = (map: Map): SpaceResourceTargetMap => {
+const targetMap = (
+  map: Map,
+  colorByGraphId: Readonly<Record<string, string>>,
+): SpaceResourceTargetMap => {
   const read = {
     id: map.id,
     title: map.title,
-    graphs: map.graphs.map(({ id, title }) => ({ id, title })),
+    graphs: map.graphs.map((graph) => ({
+      id: graph.id,
+      title: graph.title,
+      color: graphColor(graph, colorByGraphId),
+    })),
   };
   return map.activeGraph === undefined ? read : { ...read, activeGraph: map.activeGraph };
 };
@@ -173,9 +191,10 @@ export function createSpaceResourceLifecycle({
 }
 
 export function spaceResourceTarget(space: Space): SpaceResourceTarget {
+  const colorByGraphId = graphColorsByGraphId(space);
   return {
     id: space.id,
     title: space.title,
-    maps: space.maps.map(targetMap),
+    maps: space.maps.map((map) => targetMap(map, colorByGraphId)),
   };
 }

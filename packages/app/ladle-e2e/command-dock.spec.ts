@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
 import { expectMenuGroups, resourceActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
@@ -226,11 +226,11 @@ test(
 
 /**
  * The Graph menu's one grouping grammar and its one address
- * (`.scratch/dock-menu-reorganisation/issues/01`): the Graph list, Colour…
- * on its own immediately after it, New Graph, Rename beside Copy link to
- * Graph, then Delete — one separator between each group. The application
- * writes the real within-Map product URL to the clipboard, and offers no
- * permanent address of the Graph's own.
+ * (`.scratch/dock-menu-reorganisation/issues/01`,
+ * `.scratch/graph-colour/issues/03`): the Graph list, New Graph, Colour…
+ * beside Rename and Copy link to Graph, then Delete — one separator
+ * between each group. The application writes the real within-Map product
+ * URL to the clipboard, and offers no permanent address of the Graph's own.
  */
 test(
   'the Graph menu groups its commands and copies only its within-Map address',
@@ -246,9 +246,8 @@ test(
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
     await expectMenuGroups(menu, [
       ['Long', 'Mid', 'Short'],
-      ['Colour…'],
       ['New Graph'],
-      ['Rename', 'Copy link to Graph'],
+      ['Colour…', 'Rename', 'Copy link to Graph'],
       ['Delete Long'],
     ]);
 
@@ -1149,5 +1148,65 @@ test(
     await expect(page.getByRole('textbox', { name: 'Graph name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(graph).toBeFocused();
+  },
+);
+
+/**
+ * A Graph row is marked with the line the canvas HUD's key draws, in that
+ * Graph's colour, and with no Graph glyph (`.scratch/graph-colour/issues/02`).
+ * The list and the key are compared on screen in the same page — colour and
+ * box — so the two cannot drift apart without this failing. The Graph identity
+ * and Colour… keep the coloured glyph; the Map list is unmarked.
+ */
+test(
+  'the Graph list marks each row with the colour line the HUD key draws',
+  { tag: '@parity:graph-choice-rows-draw-the-graph-colour-line' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const mark = (row: Locator) =>
+      row.locator('[data-slot="graph-color-line"]').evaluateAll((els) =>
+        els.map((el) => {
+          const style = getComputedStyle(el);
+          return { color: style.backgroundColor, width: style.width, height: style.height };
+        }),
+      );
+    // The key draws once the canvas has projected the Space, which is after
+    // the Dock names it — so wait on the key itself before reading it.
+    const legendItems = page
+      .getByTestId('graph-legend')
+      .filter({ visible: true })
+      .locator('.legend__item');
+    await expect(legendItems.nth(1)).toBeVisible();
+    const key = await mark(legendItems);
+
+    const identity = surface(page).getByRole('button', { name: /^Active Graph: / });
+    const identityStroke = await identity
+      .locator('svg')
+      .first()
+      .evaluate((el) => getComputedStyle(el).stroke);
+    const name = await identity.getAttribute('aria-label');
+    if (name === null) throw new Error('The Graph identity has no accessible name.');
+    const menu = await disclose(page, name);
+    const rows = menu.getByRole('menuitemradio');
+    await expect(rows).toHaveCount(key.length);
+    expect(await mark(rows)).toEqual(key);
+    expect(new Set(key.map((line) => line.color)).size).toBe(key.length);
+    // No Graph glyph: an unchosen row draws its line and its title, and the
+    // chosen row adds only the list's own radio indicator.
+    await expect(rows.and(page.locator('[aria-checked="false"]')).locator('svg')).toHaveCount(0);
+
+    // The identity and Colour… keep the glyph, in the Active Graph's colour.
+    const colour = menu.getByRole('menuitem', { name: 'Colour…' });
+    // The first glyph is the Graph's; the second is the submenu's own chevron.
+    await expect(colour.locator('svg').first()).toHaveCSS('stroke', identityStroke);
+    await expect(
+      rows.and(page.locator('[aria-checked="true"]')).locator('[data-slot="graph-color-line"]'),
+    ).toHaveCSS('background-color', identityStroke);
+
+    // The Map list, drawn by the same component, is unchanged.
+    await page.keyboard.press('Escape');
+    const maps = await disclose(page, 'Map: Collection 1');
+    await expect(maps.locator('[data-slot="graph-color-line"]')).toHaveCount(0);
   },
 );

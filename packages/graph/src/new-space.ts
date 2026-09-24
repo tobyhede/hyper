@@ -1,4 +1,5 @@
 import { SPACE_FILE_VERSION, type Resource, type SpaceFile, type UUID } from '@project/core';
+import { nextGraphColor } from './graph-color';
 import { serializeResourceFile, type ResourceFile } from './resource-file';
 
 /**
@@ -41,7 +42,8 @@ export interface InitializeSpaceOptions {
  * other Space.
  *
  * A normal Space begins complete: one Markdown Resource in its default authored
- * Map, with one empty Active Graph. Meta bootstrap, ordinary startup and
+ * Map, with one empty Active Graph carrying the colour {@link nextGraphColor}
+ * gives an empty Map's first Graph. Meta bootstrap, ordinary startup and
  * Space Resource creation share this shape.
  *
  * The supplied title names the **Space** and nothing else. Its first Resource takes
@@ -74,7 +76,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
           title: 'Map 1',
           kind: 'positioned',
           positions: { [resourceId]: { x: 0, y: 0, open: false } },
-          graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+          graphs: [{ id: graphId, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
           activeGraph: graphId,
         },
       ],

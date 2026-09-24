@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { nextGraphColor } from '@project/graph';
 import {
   createWorkingSpaceLoader,
   type CommitResult,
@@ -77,7 +78,7 @@ describe('loadWorkingSpace', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: {},
-              graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
+              graphs: [{ id: GRAPH, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
               activeGraph: GRAPH,
             },
           ],

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot, type ResourceDocument } from '@project/core';
+import { GRAPH_PALETTE } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
 import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
 import { createOpenSpaces } from '../src/open-spaces';
@@ -148,6 +149,16 @@ describe('the rail’s Map commands', () => {
     expect(commands.mapCommands.onRename).toBeNull();
     expect(commands.mapCommands.onCreate).toBeNull();
     expect(commands.mapCommands.onDelete).toBeNull();
+  });
+});
+
+describe('the rail’s Graph commands', () => {
+  it('marks as current the colour the Graph’s row line draws, for a Graph that stores none', async () => {
+    const { commands } = await setup();
+
+    // SECOND_GRAPH stores no colour and is the target's second Graph, so the
+    // Map draws it — and its row line resolves it — as the second slot.
+    expect(commands.graphCommands?.color).toBe(GRAPH_PALETTE[1]);
   });
 });
 

@@ -87,8 +87,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EditIcon,
-  FALLBACK_GRAPH_COLOR,
+  GraphColorLine,
   GraphIcon,
+  graphColor,
   InlineTitleEditor,
   MapIcon,
   ParentIcon,
@@ -104,13 +105,13 @@ import {
   ToolbarGroup,
 } from '@project/ui';
 import type { Resource, ResourceId, Graph, GraphId, Map, MapId, UUID } from '@project/core';
+import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
-import { GRAPH_PALETTE_ENTRIES } from '../colors';
 import type { MapMemberships } from '../map-memberships';
 import {
   DOCK_ALONGS,
@@ -1131,8 +1132,12 @@ function GraphControls({
 /**
  * The same `ChoiceMenu` the Map cluster and an Open Space Resource draw,
  * with each row carrying the colour its Graph is drawn in — a choice's
- * own glyph is the choice's, which is why it rides on the choice rather
- * than being rendered here.
+ * own mark is the choice's, which is why it rides on the choice rather
+ * than being rendered here. The mark is `GraphColorLine`, the line the canvas
+ * HUD's key draws, rather than a Graph glyph on every row: the list is already
+ * a list of Graphs, and the line is what a Graph's colour means on the canvas.
+ * The cluster's own identity and Colour… keep the coloured glyph, where it says
+ * which kind of entity the colour belongs to.
  */
 function GraphIdentityMenu({
   graph,
@@ -1153,7 +1158,7 @@ function GraphIdentityMenu({
       choices={graph.graphs.map((each) => ({
         id: each.id,
         title: each.title,
-        icon: <GraphIcon color={graph.colorByGraphId[each.id] ?? FALLBACK_GRAPH_COLOR} size={14} />,
+        icon: <GraphColorLine color={graphColor(each, graph.colorByGraphId)} />,
       }))}
       chosen={graph.active.id}
       onChoose={graph.onActivate}

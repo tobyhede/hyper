@@ -429,10 +429,10 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
 
 /**
  * The Graph menu's one grouping grammar and its one address
- * (`.scratch/dock-menu-reorganisation/issues/01`): the Graph list, Colour…
- * on its own immediately after it, New Graph, Rename beside Copy link to
- * Graph, then Delete — one separator between each group, and no permanent
- * address offered any more.
+ * (`.scratch/dock-menu-reorganisation/issues/01`,
+ * `.scratch/graph-colour/issues/03`): the Graph list, New Graph, Colour…
+ * beside Rename and Copy link to Graph, then Delete — one separator
+ * between each group, and no permanent address offered any more.
  */
 test(
   'the Graph menu copies its within-Map address and offers no permanent one',
@@ -448,9 +448,8 @@ test(
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
     await expectMenuGroups(menu, [
       ['Long', 'Mid', 'Short'],
-      ['Colour…'],
       ['New Graph'],
-      ['Rename', 'Copy link to Graph'],
+      ['Colour…', 'Rename', 'Copy link to Graph'],
       ['Delete Long'],
     ]);
 

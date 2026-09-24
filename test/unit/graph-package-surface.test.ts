@@ -37,6 +37,9 @@ import * as graphPackage from '@project/graph';
 const OFFERED_VALUES = [
   'Placement',
   'documentRefusal',
+  'GRAPH_PALETTE',
+  'GRAPH_PALETTE_ENTRIES',
+  'graphColorsByGraphId',
   'buildLayoutStrategyGraph',
   'buildGraphRenderEdges',
   'graphRenderEdgeId',
@@ -46,6 +49,7 @@ const OFFERED_VALUES = [
   'loadSpaceAggregate',
   'loadSpaceSnapshot',
   'newSpace',
+  'nextGraphColor',
   'outgoingEdges',
   'parseResourceFile',
   'parseImportResourceFile',

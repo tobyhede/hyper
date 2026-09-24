@@ -30,21 +30,21 @@ const target: SpaceResourceTarget = {
       id: FIRST_MAP_ID,
       title: 'Collection 1',
       graphs: [
-        { id: FIRST_GRAPH_ID, title: 'Overview' },
-        { id: SECOND_GRAPH_ID, title: 'Detail' },
+        { id: FIRST_GRAPH_ID, title: 'Overview', color: '#1f77b4' },
+        { id: SECOND_GRAPH_ID, title: 'Detail', color: '#ff7f0e' },
       ],
     },
     {
       id: SECOND_MAP_ID,
       title: 'Collection 2',
-      graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass' }],
+      graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass', color: '#2ca02c' }],
     },
     {
       id: THIRD_MAP_ID,
       title: 'Collection 3',
       graphs: [
-        { id: FOURTH_GRAPH_ID, title: 'Draft' },
-        { id: FIFTH_GRAPH_ID, title: 'Current' },
+        { id: FOURTH_GRAPH_ID, title: 'Draft', color: '#d62728' },
+        { id: FIFTH_GRAPH_ID, title: 'Current', color: '#9467bd' },
       ],
       activeGraph: FIFTH_GRAPH_ID,
     },
@@ -80,6 +80,32 @@ describe('buildSpaceResourceRail', () => {
 
     expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Graph: Overview' })).toBeEnabled();
+  });
+
+  /**
+   * The Graph list marks each row with the colour the target draws that Graph
+   * in, which is the colour the target resolved rather than one derived here.
+   */
+  it('marks each Graph row with the colour the target draws it in', () => {
+    mountRail(
+      buildSpaceResourceRail({
+        target,
+        document: documentOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
+        disabled: false,
+        complete: () => null,
+        onReport: () => undefined,
+        context: undefined,
+      }),
+    );
+
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    const lines = screen
+      .getAllByRole('menuitemradio')
+      .map((row) => row.querySelector('[data-slot="graph-color-line"]'));
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toHaveStyle({ backgroundColor: '#1f77b4' });
+    expect(lines[1]).toHaveStyle({ backgroundColor: '#ff7f0e' });
   });
 
   /**

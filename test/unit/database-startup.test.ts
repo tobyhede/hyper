@@ -1,4 +1,5 @@
 import { uuidSchema, type UUID } from '@project/core';
+import { nextGraphColor } from '@project/graph';
 import postgres from '@prisma-next/postgres/runtime';
 import {
   AggregateInvariantError,
@@ -89,7 +90,7 @@ describe('defaultContentAggregate', () => {
                 title: 'Map 1',
                 kind: 'positioned',
                 positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-                graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+                graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],
@@ -540,7 +541,7 @@ describe('resolveDatabaseStartup', () => {
                 title: 'Map 1',
                 kind: 'positioned',
                 positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-                graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+                graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
                 activeGraph: GRAPH_ID,
               },
             ],

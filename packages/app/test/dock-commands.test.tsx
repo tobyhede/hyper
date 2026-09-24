@@ -653,3 +653,59 @@ describe('the last Map and Graph', () => {
     expect(within(dock()).getByRole('button', { name: /^Active Graph: / })).toBeInTheDocument();
   });
 });
+
+/**
+ * **A Graph row carries the Graph's colour as a line, and the identity keeps
+ * the glyph** (`.scratch/graph-colour/issues/02`). The rows of the Graph list
+ * draw the line the canvas HUD's key draws, so a Graph looks the same in the
+ * list as beside its Edges; the cluster's own identity and Colour… keep the
+ * coloured Graph glyph, where it says which kind of entity the colour is.
+ */
+describe('the Graph list marks each row with its colour line', () => {
+  const graphIdentity = (): HTMLElement =>
+    within(dock()).getByRole('button', { name: /^Active Graph: / });
+
+  it('draws a line per Graph row and no Graph glyph', async () => {
+    await renderDock(<Default />);
+    fireEvent.click(graphIdentity());
+
+    const rows = within(screen.getByRole('menu')).getAllByRole('menuitemradio');
+    expect(rows.length).toBeGreaterThan(1);
+    const colors = rows.map((row) => {
+      const line = row.querySelector<HTMLElement>('[data-slot="graph-color-line"]');
+      if (line === null) throw new Error(`${row.textContent} draws no colour line`);
+      return line.style.background;
+    });
+    // Each Graph in its own colour, and nothing drawn on an unchosen row but
+    // the line: the chosen row's radio indicator is the list's, not the Graph's.
+    expect(new Set(colors).size).toBe(rows.length);
+    for (const row of rows.filter((each) => each.getAttribute('aria-checked') !== 'true'))
+      expect(row.querySelector('svg')).toBeNull();
+  });
+
+  it('keeps the coloured Graph glyph on the identity and on Colour…', async () => {
+    await renderDock(<Default />);
+    const identityGlyph = graphIdentity().querySelector('svg');
+    const activeColor = identityGlyph?.getAttribute('stroke');
+    expect(activeColor).toMatch(/^#/);
+
+    fireEvent.click(graphIdentity());
+    const menu = screen.getByRole('menu');
+    const chosen = within(menu)
+      .getAllByRole('menuitemradio')
+      .find((row) => row.getAttribute('aria-checked') === 'true');
+    expect(
+      chosen?.querySelector<HTMLElement>('[data-slot="graph-color-line"]')?.style.background,
+    ).not.toBe('');
+    const colour = within(menu).getByRole('menuitem', { name: 'Colour…' });
+    expect(colour.querySelector('svg')).toHaveAttribute('stroke', activeColor ?? '');
+  });
+
+  it('leaves the Map list unmarked', async () => {
+    await renderDock(<Default />);
+    fireEvent.click(within(dock()).getByRole('button', { name: /^Map: / }));
+
+    for (const row of within(screen.getByRole('menu')).getAllByRole('menuitemradio'))
+      expect(row.querySelector('[data-slot="graph-color-line"]')).toBeNull();
+  });
+});

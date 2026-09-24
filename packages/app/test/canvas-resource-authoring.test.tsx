@@ -527,7 +527,7 @@ describe('canvas Resource authoring Space rail', () => {
       {
         id: TARGET_MAP_ID,
         title: 'Collection 1',
-        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview' }],
+        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4' }],
       },
     ],
   };
@@ -604,7 +604,7 @@ describe('canvas Resource authoring decoration identity', () => {
       {
         id: TARGET_MAP_ID,
         title: 'Collection 1',
-        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview' }],
+        graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4' }],
       },
     ],
   };

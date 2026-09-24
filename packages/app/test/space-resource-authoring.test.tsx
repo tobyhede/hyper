@@ -15,7 +15,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
+import { loadSpaceSnapshot, nextGraphColor } from '@project/graph';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
@@ -811,7 +811,7 @@ describe('referencing an existing Space', () => {
         title: 'Map 1',
         kind: 'positioned',
         positions: {},
-        graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', edges: [] }],
+        graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
         activeGraph: MINTED_GRAPH_ID,
       },
     ]);

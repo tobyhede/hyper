@@ -1,7 +1,6 @@
 import type { GraphId, MapId, ResourceId } from '@project/core';
-import type { Space } from '@project/graph';
+import { graphColorsByGraphId, type Space } from '@project/graph';
 import { graphColor } from '@project/ui';
-import { graphColorsByGraphId } from './colors';
 
 /** A Graph as a Resources list row names it: its title and the colour the canvas draws it in. */
 export interface MembershipGraph {

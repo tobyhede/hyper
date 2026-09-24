@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newUuid, spaceFileSchema, uuidSchema } from '@project/core';
-import { initializeSpace, loadSpace, newSpace } from '../src/index';
+import { initializeSpace, loadSpace, newSpace, nextGraphColor } from '../src/index';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -43,6 +43,8 @@ describe('newSpace', () => {
     const resource = result.space.resources[0]!;
     expect(map).toMatchObject({ title: 'Map 1', activeGraph: map.graphs[0]?.id });
     expect(map.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
+    // An empty Map's first Graph stores the colour the one creation rule picks.
+    expect(map.graphs[0]?.color).toBe(nextGraphColor([]));
     expect(map.positions[resource.id]).toEqual({ x: 0, y: 0, open: false });
     expect(result.space.defaultMap).toBe(map.id);
   });
@@ -96,7 +98,7 @@ describe('initializeSpace', () => {
         title: 'Map 1',
         kind: 'positioned',
         positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-        graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+        graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
         activeGraph: GRAPH_ID,
       },
     ]);

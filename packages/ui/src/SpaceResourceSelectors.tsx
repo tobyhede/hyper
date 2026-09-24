@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { DropdownMenuItem } from './components/dropdown-menu';
-import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
+import { ChoiceMenu, ChoiceMenuTrigger, type ChoiceMenuChoice } from './ChoiceMenu';
+import { GraphColorLine } from './GraphColorLine';
 import { ToolbarButton, ToolbarGroup } from './components/toolbar';
 import { MapMenuActions, GraphMenuActions } from './IdentityMenuActions';
 import { MapIcon, EditIcon, GraphIcon } from './icons';
@@ -11,6 +12,12 @@ import type { PaletteColorEntry } from './PaletteColorPicker';
 export interface CanvasSpaceResourceChoice {
   readonly id: string;
   readonly title: string;
+}
+
+/** A Graph a Space Resource can select, carrying the colour its row is marked in. */
+export interface CanvasSpaceResourceGraphChoice extends CanvasSpaceResourceChoice {
+  /** The Graph's resolved colour, through the shared `graphColor` seam. */
+  readonly color: string;
 }
 
 /**
@@ -119,7 +126,7 @@ export interface CanvasSpaceResourceSelection {
   readonly mapCommands?: CanvasSpaceResourceMapCommands;
   readonly graphCommands?: CanvasSpaceResourceGraphCommands;
   readonly maps: readonly CanvasSpaceResourceChoice[];
-  readonly graphs: readonly CanvasSpaceResourceChoice[];
+  readonly graphs: readonly CanvasSpaceResourceGraphChoice[];
   /** The selected Map, or `null` where the Resource selects none. */
   readonly mapId: string | null;
   readonly graphId: string | null;
@@ -198,7 +205,11 @@ export function SpaceResourceSelectors({
         onReport={onReport}
         icon={<GraphIcon size={14} />}
         testId="space-resource-graph"
-        choices={graphs}
+        choices={graphs.map(({ id, title, color }) => ({
+          id,
+          title,
+          icon: <GraphColorLine color={color} />,
+        }))}
         chosen={graphId}
         disabled={disabled === true || busy}
         onChoose={onGraphChange}
@@ -216,7 +227,8 @@ interface SpaceResourceSelectorProps {
   readonly label: string;
   readonly icon: ReactNode;
   readonly testId: string;
-  readonly choices: readonly CanvasSpaceResourceChoice[];
+  /** Each row's own mark rides on its choice: a Graph's colour line, and nothing on a Map. */
+  readonly choices: readonly ChoiceMenuChoice<string>[];
   readonly chosen: string | null;
   /** Authoring is withdrawn from this canvas; the selection itself is known. */
   readonly disabled: boolean;

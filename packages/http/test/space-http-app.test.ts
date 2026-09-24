@@ -373,6 +373,8 @@ describe('commit wire policy', () => {
 
 describe('Space HTTP reads', () => {
   it('retains collection listing and lazy resource loading', async () => {
+    // Which colour initialization stores is persistence's rule, held by its own tests.
+    const storedColour: unknown = expect.any(String);
     const ids = [MAP_ID, GRAPH_ID];
     const base = repository();
     const commit = vi.fn((request: Parameters<typeof base.commit>[0]) => base.commit(request));
@@ -399,7 +401,7 @@ describe('Space HTTP reads', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: {},
-              graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+              graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: storedColour, edges: [] }],
               activeGraph: GRAPH_ID,
             },
           ],

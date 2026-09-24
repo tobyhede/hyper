@@ -1,5 +1,5 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
-import { loadSpaceSnapshot } from '@project/graph';
+import { loadSpaceSnapshot, nextGraphColor } from '@project/graph';
 import type { LoadedSpace } from './backend';
 import type { CommitResult, SpaceCommit } from './backend';
 import type { RepositoryCommitResult, StoredSpaceRepository } from './repository';
@@ -43,7 +43,7 @@ const initializedSnapshot = (
           title: 'Map 1',
           kind: 'positioned',
           positions: {},
-          graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
+          graphs: [{ id: graphId, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
           activeGraph: graphId,
         },
       ],

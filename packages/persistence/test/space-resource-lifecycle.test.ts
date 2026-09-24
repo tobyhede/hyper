@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { nextGraphColor } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import type { SpaceSessionState } from '../src/session';
 import { createSpaceSessionRegistry, type SpaceResourceRefusal } from '../src/session-registry';
@@ -1162,7 +1163,9 @@ describe('Space Resource lifecycle', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
-              graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
+              graphs: [
+                { id: TARGET_GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] },
+              ],
               activeGraph: TARGET_GRAPH_ID,
             },
           ],
@@ -1385,7 +1388,9 @@ describe('Space Resource lifecycle', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: {},
-              graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
+              graphs: [
+                { id: TARGET_GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] },
+              ],
               activeGraph: TARGET_GRAPH_ID,
             },
           ],

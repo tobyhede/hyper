@@ -6,11 +6,14 @@ import {
   type SpaceFile,
   type UUID,
 } from '@project/core';
-import { loadSpace, serializeResourceFile, type ResourceFile, type Space } from '@project/graph';
 import {
   GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE,
   GRAPH_PALETTE_ENTRIES as PRODUCTION_GRAPH_PALETTE_ENTRIES,
-} from '#src/colors';
+  loadSpace,
+  serializeResourceFile,
+  type ResourceFile,
+  type Space,
+} from '@project/graph';
 
 /**
  * The inventory's fixture: a small, believable Space, shaped to exercise the

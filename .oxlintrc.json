@@ -181,7 +181,7 @@
       // dictionary-types.ts`'s `classifyWideningTarget`, which doesn't look at
       // the key type at all). Returning a `Map` instead would dodge the rule but
       // is an API change beyond a lint migration's scope.
-      "files": ["packages/app/src/colors.ts"],
+      "files": ["packages/graph/src/graph-color.ts"],
       "rules": {
         "anti-slop/no-known-value-widening": "off"
       }
