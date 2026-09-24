@@ -870,6 +870,58 @@ describe('Space Resource lifecycle', () => {
     ]);
   });
 
+  it('restores a colliding created Space to its stored copy when a later conflict is accepted', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(
+      idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
+    );
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      title: 'Replacement',
+      position: { x: 240, y: 80 },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+    // The replay of the kept Space conflicts on Meta alone.
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: META_ID,
+          current: { snapshot: metaSnapshot, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    const target = registry.session(TARGET_ID);
+    if (target === undefined) throw new Error('target session was not installed');
+    target.resolveConflict(target.getState().working);
+    await vi.waitFor(() => expect(control.requests).toHaveLength(2));
+    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('conflicted'));
+
+    target.acceptRemote();
+
+    expect(meta.getState()).toMatchObject({
+      working: metaSnapshot,
+      acknowledgedRevision: 9n,
+      persistence: { kind: 'settled' },
+    });
+    expect(registry.session(TARGET_ID)?.getState()).toMatchObject({
+      working: targetSnapshot,
+      acknowledgedRevision: 7n,
+      persistence: { kind: 'settled' },
+    });
+  });
+
   it('keeps a locally updated Space deleted remotely by retrying it as a create', async () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
@@ -2310,5 +2362,613 @@ describe('Space Resource lifecycle', () => {
     ).resolves.toEqual({ kind: 'completed' });
 
     expect(backend.loadAggregateCalls).toBe(1);
+  });
+});
+
+/*
+ * Characterisation of the coordinated commit, one test per path the existing
+ * cases above leave open. Each name leads with the path it pins.
+ */
+describe('Space Resource coordination paths', () => {
+  const linkedMeta: SpaceSnapshot = {
+    ...metaSnapshot,
+    resources: [
+      ...metaSnapshot.resources,
+      {
+        id: SPACE_RESOURCE_ID,
+        document: {
+          title: 'Target',
+          kind: 'space',
+          spaceId: TARGET_ID,
+          map: TARGET_MAP_ID,
+          graph: TARGET_GRAPH_ID,
+        },
+      },
+    ],
+    document: {
+      ...metaSnapshot.document,
+      maps: metaSnapshot.document.maps?.map((map) => ({
+        ...map,
+        positions: { ...map.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false } },
+      })),
+    },
+  };
+  const createIds = () =>
+    idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]);
+  const createInput = {
+    containingSpaceId: META_ID,
+    mapId: META_MAP_ID,
+    title: 'Architecture',
+    position: { x: 240, y: 80 },
+  };
+
+  it('barrier: holds retirement until the coordination turn and its queued work are done', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const releaseCommit = control.deferNextCommit();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
+
+    await lifecycle.link({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      targetSpaceId: TARGET_ID,
+      title: 'Link',
+      position: { x: 240, y: 80 },
+    });
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Queued behind the turn' },
+    });
+    let retirable = false;
+    const waiting = registry.waitUntilRetirable(META_ID).then(() => {
+      retirable = true;
+    });
+
+    expect(registry.release(META_ID)).toBe(false);
+    await Promise.resolve();
+    expect(retirable).toBe(false);
+    expect(control.requests).toHaveLength(1);
+
+    releaseCommit();
+    await waiting;
+
+    // The queued title committed before the Space was reported retirable.
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState().persistence.kind).toBe('settled');
+    expect(registry.release(META_ID)).toBe(true);
+    expect(registry.entry(META_ID)).toBeUndefined();
+  });
+
+  it('barrier: an idle Space waits out a coordination that has claimed its turn', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const releaseCommit = control.deferNextCommit();
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [
+          { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+          { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+        ],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const linking = registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      targetSpaceId: TARGET_ID,
+      title: 'Link',
+      position: { x: 240, y: 80 },
+    });
+    let retirable = false;
+    const waiting = registry.waitUntilRetirable(META_ID).then(() => {
+      retirable = true;
+    });
+
+    // Meta is idle with nothing queued, yet a coordination holds a turn it
+    // will take part in.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(retirable).toBe(false);
+
+    await linking;
+    releaseCommit();
+    await waiting;
+    expect(meta.getState().persistence.kind).toBe('settled');
+  });
+
+  it('barrier: an unopened Space is retirable and released at once', async () => {
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(META_ID, [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+      ]),
+    );
+
+    await expect(registry.waitUntilRetirable(TARGET_ID)).resolves.toBeUndefined();
+    expect(registry.release(TARGET_ID)).toBe(true);
+  });
+
+  it('barrier: a session with an ordinary commit in flight is not released', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const releaseCommit = control.deferNextCommit();
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'In flight' },
+    });
+
+    expect(registry.release(META_ID)).toBe(false);
+    releaseCommit();
+    await registry.waitUntilRetirable(META_ID);
+    expect(registry.release(META_ID)).toBe(true);
+  });
+
+  it('update: deleting the only Map is unchanged before any read or commit', async () => {
+    class CountingAggregateBackend extends MemorySpaceBackend {
+      loadAggregateCalls = 0;
+      override loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
+        this.loadAggregateCalls += 1;
+        return super.loadAggregate();
+      }
+    }
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new CountingAggregateBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+
+    await expect(
+      registry
+        .spaceResources(idSource([]))
+        .deleteMap({ targetSpaceId: META_ID, mapId: META_MAP_ID, preferredMapId: null }),
+    ).resolves.toEqual({ kind: 'unchanged' });
+
+    expect(backend.loadAggregateCalls).toBe(0);
+    expect(control.requests).toHaveLength(0);
+    expect(meta.getState().working).toEqual(metaSnapshot);
+  });
+
+  it('update: deleting a Map of a Space that needs recovery is refused by name', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    meta.submit(meta.getState().working);
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('failed'));
+
+    await expect(
+      registry
+        .spaceResources(idSource([]))
+        .deleteMap({ targetSpaceId: META_ID, mapId: META_MAP_ID, preferredMapId: null }),
+    ).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', spaceId: META_ID, recovery: 'retry' },
+    });
+    expect(control.requests).toHaveLength(1);
+  });
+
+  it('unwind: a throw before any participant begins rejects the Edit and releases the barrier', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const target = registry.open({
+      snapshot: targetSnapshot,
+      revision: 7n,
+      exportedRevision: null,
+    });
+
+    // Meta has no live session, so the Edit cannot read its containing Space.
+    await expect(
+      registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Link',
+        position: { x: 240, y: 80 },
+      }),
+    ).rejects.toThrow(`Space ${META_ID} has no live session`);
+
+    expect(control.requests).toHaveLength(0);
+    target.submit({
+      ...target.getState().working,
+      document: { ...target.getState().working.document, title: 'After the throw' },
+    });
+    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('settled'));
+    expect(control.requests).toHaveLength(1);
+  });
+
+  it('unwind: a thrown commit leaves every participant recoverable by one later Edit', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.throwNext(new Error('transport exploded'));
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+
+    await expect(registry.spaceResources(createIds()).create(createInput)).resolves.toEqual({
+      kind: 'completed',
+      resourceId: SPACE_RESOURCE_ID,
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
+    expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'After the throw' },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, snapshot: { document: { title: 'After the throw' } } },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    expect(registry.session(TARGET_ID)?.getState().persistence.kind).toBe('settled');
+  });
+
+  it.each([
+    { outcome: 'committed', result: undefined, thrown: false },
+    {
+      outcome: 'failed',
+      result: { kind: 'retryable-failure', code: 'network' } as const,
+      thrown: false,
+    },
+    {
+      outcome: 'rejected',
+      result: { kind: 'permanent-failure', code: 'forbidden' } as const,
+      thrown: false,
+    },
+    {
+      outcome: 'conflicted',
+      result: {
+        kind: 'conflict',
+        conflicts: [
+          {
+            spaceId: META_ID,
+            current: { snapshot: metaSnapshot, revision: 9n, exportedRevision: null },
+          },
+        ],
+      } as const,
+      thrown: false,
+    },
+    {
+      outcome: 'malformed',
+      result: {
+        kind: 'committed',
+        revisions: [{ spaceId: META_ID, revision: 4n }],
+        deletedSpaceIds: [],
+      } as const,
+      thrown: false,
+    },
+    { outcome: 'thrown', result: undefined, thrown: true },
+  ])(
+    'provisional: a created Space is no longer provisional once the commit is $outcome',
+    async ({ result, thrown }) => {
+      const control = new MemorySpaceBackendTestControl();
+      if (result !== undefined) control.queueResult(result);
+      if (thrown) control.throwNext(new Error('transport exploded'));
+      const releaseCommit = control.deferNextCommit();
+      const registry = createSpaceSessionRegistry(
+        new MemorySpaceBackend(
+          META_ID,
+          [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+          control,
+        ),
+      );
+      const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+
+      await registry.spaceResources(createIds()).create(createInput);
+      // While the commit is in flight the created Space is a live participant.
+      expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+      expect(registry.release(TARGET_ID)).toBe(false);
+
+      releaseCommit();
+      await registry.waitUntilRetirable(META_ID);
+      await registry.waitUntilRetirable(TARGET_ID);
+      expect(meta.getState().persistence.kind).not.toBe('pending');
+
+      // Retiring the session leaves nothing behind: a provisional entry would
+      // surface here and refuse the reopen below.
+      if (registry.session(TARGET_ID) !== undefined) {
+        expect(registry.release(TARGET_ID)).toBe(true);
+      }
+      expect(registry.entry(TARGET_ID)).toBeUndefined();
+      expect(() =>
+        registry.open({ snapshot: targetSnapshot, revision: 0n, exportedRevision: null }),
+      ).not.toThrow();
+    },
+  );
+
+  it('keep-local: a deleted participant the conflict reports absent is completed, and the rest retried', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: TARGET_ID, current: undefined }],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+
+    await expect(
+      registry
+        .spaceResources(idSource([]))
+        .delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID }),
+    ).resolves.toEqual({ kind: 'completed' });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+    expect(registry.session(TARGET_ID)?.getState().persistence).toMatchObject({
+      kind: 'conflicted',
+      current: undefined,
+    });
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: META_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+
+    meta.resolveConflict(meta.getState().working);
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+
+    expect(registry.session(TARGET_ID)).toBeUndefined();
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, expectedRevision: 3n },
+    ]);
+    expect(control.requests[1]?.changes).toHaveLength(1);
+  });
+});
+
+/** A memory backend whose next aggregate reads can be held or refused. */
+class ScriptedAggregateBackend extends MemorySpaceBackend {
+  loadAggregateCalls = 0;
+  readonly #failures: Error[] = [];
+  readonly #gates: Promise<void>[] = [];
+
+  failNextLoad(error: Error): void {
+    this.#failures.push(error);
+  }
+
+  deferNextLoad(): () => void {
+    const gate = Promise.withResolvers<undefined>();
+    this.#gates.push(gate.promise.then(() => undefined));
+    return () => {
+      gate.resolve(undefined);
+    };
+  }
+
+  override async loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
+    this.loadAggregateCalls += 1;
+    await this.#gates.shift();
+    const failure = this.#failures.shift();
+    if (failure !== undefined) throw failure;
+    return super.loadAggregate();
+  }
+}
+
+describe('Space Resource recovery after a replay that never installed', () => {
+  const createInput = {
+    containingSpaceId: META_ID,
+    mapId: META_MAP_ID,
+    title: 'Architecture',
+    position: { x: 240, y: 80 },
+  };
+  const committedBoth = {
+    kind: 'committed',
+    revisions: [
+      { spaceId: META_ID, revision: 4n },
+      { spaceId: TARGET_ID, revision: 0n },
+    ],
+    deletedSpaceIds: [],
+  } as const;
+
+  /** A created Space Resource whose coordinated commit answered `first`. */
+  const failedCreate = async (
+    first: Parameters<MemorySpaceBackendTestControl['queueResult']>[0],
+  ) => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult(first);
+    const backend = new ScriptedAggregateBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    await registry
+      .spaceResources(
+        idSource([
+          TARGET_ID,
+          TARGET_RESOURCE_ID,
+          TARGET_MAP_ID,
+          TARGET_GRAPH_ID,
+          SPACE_RESOURCE_ID,
+        ]),
+      )
+      .create(createInput);
+    await registry.waitUntilRetirable(META_ID);
+    const target = registry.session(TARGET_ID);
+    if (target === undefined) throw new Error('target session was not installed');
+    return { control, backend, registry, meta, target };
+  };
+
+  it('retries every participant together once the backend is back, after a replay read failed', async () => {
+    const { control, backend, registry, meta, target } = await failedCreate({
+      kind: 'retryable-failure',
+      code: 'network',
+    });
+    expect(meta.getState().persistence.kind).toBe('failed');
+
+    backend.failNextLoad(new Error('aggregate read refused'));
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(1);
+    expect(meta.getState().persistence.kind).toBe('failed');
+    expect(target.getState().persistence.kind).toBe('failed');
+    expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Later local title' },
+    });
+    control.queueResult(committedBoth);
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(3);
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, snapshot: { document: { title: 'Later local title' } } },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    expect(meta.getState()).toMatchObject({
+      acknowledgedRevision: 4n,
+      persistence: { kind: 'settled' },
+    });
+    expect(target.getState().persistence.kind).toBe('settled');
+    expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+  });
+
+  it('keeps local work across every participant once the backend is back, after a replay read failed', async () => {
+    const { control, backend, registry, meta, target } = await failedCreate({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: META_ID,
+          current: { snapshot: metaSnapshot, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    expect(meta.getState().persistence.kind).toBe('conflicted');
+
+    backend.failNextLoad(new Error('aggregate read refused'));
+    target.resolveConflict(target.getState().working);
+    await registry.waitUntilRetirable(TARGET_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(1);
+    expect(meta.getState().persistence.kind).toBe('conflicted');
+    expect(target.getState().persistence.kind).toBe('conflicted');
+
+    control.queueResult({
+      kind: 'committed',
+      revisions: [
+        { spaceId: META_ID, revision: 10n },
+        { spaceId: TARGET_ID, revision: 0n },
+      ],
+      deletedSpaceIds: [],
+    });
+    target.resolveConflict(target.getState().working);
+    await registry.waitUntilRetirable(TARGET_ID);
+
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, expectedRevision: 9n },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    expect(meta.getState()).toMatchObject({
+      acknowledgedRevision: 10n,
+      persistence: { kind: 'settled' },
+    });
+    expect(target.getState().persistence.kind).toBe('settled');
+  });
+
+  it('replays once for recovery requests pressed while a replay is still reading', async () => {
+    const { control, backend, registry, meta, target } = await failedCreate({
+      kind: 'retryable-failure',
+      code: 'network',
+    });
+    const releaseRead = backend.deferNextLoad();
+    control.queueResult(committedBoth);
+
+    meta.retry();
+    meta.retry();
+    target.retry();
+    releaseRead();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState().persistence.kind).toBe('settled');
+    expect(target.getState().persistence.kind).toBe('settled');
+  });
+
+  it('answers a replay that throws before installing by leaving recovery usable and the barrier down', async () => {
+    const { control, backend, registry, target } = await failedCreate({
+      kind: 'retryable-failure',
+      code: 'network',
+    });
+    // A failed participant is idle, so its owner may retire it; the replay
+    // then names a Space with no live session and throws before enlisting.
+    expect(registry.release(META_ID)).toBe(true);
+
+    target.retry();
+    await registry.waitUntilRetirable(TARGET_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(1);
+    expect(target.getState().persistence.kind).toBe('failed');
+
+    // The barrier is down: an ordinary Space opened now commits on its own.
+    const reopened = registry.open({
+      snapshot: metaSnapshot,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    reopened.submit({
+      ...metaSnapshot,
+      document: { ...metaSnapshot.document, title: 'After the thrown replay' },
+    });
+    await registry.waitUntilRetirable(META_ID);
+    expect(reopened.getState().persistence.kind).toBe('settled');
+    expect(control.requests).toHaveLength(2);
+
+    // And the stranded participant's recovery is asked for again, not ignored.
+    target.retry();
+    await registry.waitUntilRetirable(TARGET_ID);
+    expect(backend.loadAggregateCalls).toBe(3);
   });
 });

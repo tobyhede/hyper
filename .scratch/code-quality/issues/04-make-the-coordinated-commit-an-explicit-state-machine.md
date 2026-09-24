@@ -4,10 +4,14 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Each state and transition is named, and an illegal transition cannot be expressed or is refused
-- [ ] Unwinding after a throw is one transition, not recovery code scattered across callers
-- [ ] No function in the registry is longer than about 150 lines, and closures nest at most two levels deep
-- [ ] 02's tests pass unchanged
-- [ ] `pnpm verify` green
+- [x] Each state and transition is named, and an illegal transition cannot be expressed or is refused
+- [x] Unwinding after a throw is one transition, not recovery code scattered across callers
+- [x] No function in the registry is longer than about 150 lines, and closures nest at most two levels deep
+- [x] 02's tests pass unchanged
+- [x] `pnpm verify` green
+
+## Answer
+
+The machine is `CoordinatedCommit` in `packages/persistence/src/coordinated-commit.ts`: phases `planned → enlisted → prepared → published → committed | conflicted | failed`, `unwound` from any of `enlisted`, `prepared` or `published`, and, from `conflicted`, `failed` or `unwound`, `recovered` at once or through `recovering` while a replay runs (ticket 14), which the replay hands over once it has prepared every participant, or which returns to the phase it began in if the replay ends first. A `TRANSITIONS` table refuses every other move by throwing; a second recovery request is ignored, as before. The per-commit state that nested closures used to share (participants, begun, baselines, conflicts, the recovery flag) is private to the machine. `session-registry.ts` is the shell: `LiveSpaces` holds the registry-wide sessions, provisional entries and barrier; `CoordinationTurns` the turn queue; `runCoordination` and `commitPlan` read, plan and drive the machine. The aggregate read and plan are the registry's own steps before the machine starts, since the machine begins from a decided plan (`space-resource-planning.ts`). Install is not a phase either: `commitPlan` calls `installed` itself between `publish()` and `backend.commit`, so the transition table does not order it.
