@@ -26,6 +26,7 @@ const resourceSheet = read('packages/ui/src/canvas-resource.css');
 const railSheet = read('packages/ui/src/resource-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const canvasCommandToolbar = read('packages/ui/src/CanvasCommandToolbar.tsx');
+const dockMapGraph = read('packages/app/src/components/CommandDockMapGraph.tsx');
 const resourceRailActions = read('packages/ui/src/ResourceRailActions.tsx');
 const edgeToolbar = read('packages/ui/src/EdgeToolbar.tsx');
 const spaceResourceSelectors = read('packages/ui/src/SpaceResourceSelectors.tsx');
@@ -164,8 +165,8 @@ describe('choosing a Map or a Graph', () => {
    * whoever draws it.
    */
   it('is the same shared menu on the Dock and on a Space Resource', () => {
-    expect(dock).toContain('<ChoiceMenu<MapId>');
-    expect(dock).toContain('<ChoiceMenu<GraphId>');
+    expect(dockMapGraph).toContain('<ChoiceMenu<MapId>');
+    expect(dockMapGraph).toContain('<ChoiceMenu<GraphId>');
     expect(spaceResourceSelectors).toContain('<ChoiceMenu<string>');
   });
 
