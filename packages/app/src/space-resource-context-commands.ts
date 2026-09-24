@@ -1,8 +1,12 @@
 import type { ResourceDocument, GraphId, UUID } from '@project/core';
-import type { CanvasSpaceResourceGraphCommands, CanvasSpaceResourceMapCommands } from '@project/ui';
+import {
+  graphColor,
+  type CanvasSpaceResourceGraphCommands,
+  type CanvasSpaceResourceMapCommands,
+} from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
-import { GRAPH_PALETTE_ENTRIES, GRAPH_PALETTE } from '@project/graph';
+import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import { coordinatedGraphDelete, PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import { coordinatedContextCreate } from './coordinated-context-create';
@@ -111,7 +115,9 @@ export function spaceResourceContextCommands(
     mapCommands,
     graphCommands: {
       deleteDisabled: map.graphs.length <= 1,
-      color: graph.color ?? GRAPH_PALETTE[0],
+      // The colour the Graph's row line draws, so the two marks agree for a
+      // Graph that stores none.
+      color: graphColor(graph, graphColorsByGraphId(space)),
       colors: GRAPH_PALETTE_ENTRIES,
       onRename: (title) => refusalOf(complete({ kind: 'renamed-graph', graphId, title })),
       onRecolor: (color) => refusalOf(complete({ kind: 'recolored-graph', graphId, color })),

@@ -34,7 +34,8 @@ const PANEL_INSET = 15;
  * is collapsed or off-canvas below the mobile breakpoint. What the two must
  * never do is disagree, which is why both resolve a Graph's colour through the
  * one shared `graphColor` seam rather than each deriving its own — and why each
- * key row draws `GraphColorLine`, the same mark the Graph choice lists draw.
+ * key row draws `GraphColorLine`, the same mark the Graph choice lists draw
+ * (held by the `graph-choice-rows-draw-the-graph-colour-line` parity claim).
  *
  * It lives in the adapter because the MiniMap is a React Flow component, and it
  * owns its own semantic presentation rather than delegating the markup: the key

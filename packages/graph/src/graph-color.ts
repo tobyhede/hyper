@@ -140,7 +140,8 @@ const GRAPH_PALETTE_DARK_SLOTS = GRAPH_PALETTE.filter((_, index) => index % 2 ==
  * A colour in `existing` that is not `#rrggbb` or `#rgb` is ignored: it neither
  * pushes candidates away nor marks a slot used. It is the caller's to say what a
  * Graph with no stored colour counts as; Space Authoring passes the colour the
- * Map draws for it.
+ * Map draws for it (`space-authoring-operations.test.ts`, "counts a Graph with
+ * no stored colour as the colour the Map draws for it").
  *
  * Stored rather than resolved. Every creation gesture chooses by this same
  * Map-local rule — including `initializeSpace`'s first Graph and the

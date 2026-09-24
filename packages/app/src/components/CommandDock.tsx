@@ -105,13 +105,13 @@ import {
   ToolbarGroup,
 } from '@project/ui';
 import type { Resource, ResourceId, Graph, GraphId, Map, MapId, UUID } from '@project/core';
+import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
-import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { MapMemberships } from '../map-memberships';
 import {
   DOCK_ALONGS,
