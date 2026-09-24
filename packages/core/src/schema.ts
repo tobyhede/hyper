@@ -219,15 +219,19 @@ export const graphSchema = z.object({
   edges: z.array(graphEdgeSchema),
 });
 
-/** Where a positioned map puts a resource, in the map's own coordinate space. */
+/**
+ * Where a positioned map puts a resource, in the map's own coordinate space.
+ * Finite, because JSON decodes an overflowing number such as `1e400` to
+ * `Infinity`, which no stored document can encode back.
+ */
 export const mapPositionSchema = z.object({
-  x: z.number(),
-  y: z.number(),
+  x: z.number().finite(),
+  y: z.number().finite(),
 });
 
 const openSizeSchema = z.object({
-  width: z.number().min(COLLAPSED_RESOURCE_SIZE.width),
-  height: z.number().min(COLLAPSED_RESOURCE_SIZE.height),
+  width: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.width),
+  height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
 });
 
 /** What a Map stores for one Resource: its origin, Open/Closed state and remembered Open Size. */

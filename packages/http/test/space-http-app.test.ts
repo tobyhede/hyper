@@ -871,6 +871,46 @@ describe('Space HTTP commit request policy', () => {
     expect(refusal.detail.length).toBeLessThan(200);
   });
 
+  // `1e400` is valid JSON that decodes to `Infinity`, a number no stored
+  // document can hold; the wire refuses it before the repository is asked.
+  it('refuses a coordinate that overflows to infinity without calling the repository', async () => {
+    const commit = vi.fn();
+    const positioned: SpaceSnapshot = {
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        defaultMap: MAP_ID,
+        maps: [
+          {
+            id: MAP_ID,
+            title: 'Map 1',
+            kind: 'positioned',
+            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+            graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
+            activeGraph: GRAPH_ID,
+          },
+        ],
+      },
+    };
+    const body = JSON.stringify(encodeCommitRequest(updateCommit(positioned))).replace(
+      '"x":0',
+      '"x":1e400',
+    );
+    expect(body).toContain('"x":1e400');
+
+    const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    const refusal = await expectProblem(response, 'invalid-request');
+    expect(refusal.detail).toMatch(
+      /^update change snapshot is invalid: document\.maps\.0\.positions/,
+    );
+    expect(commit).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed body without calling the repository', async () => {
     const commit = vi.fn();
     const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
