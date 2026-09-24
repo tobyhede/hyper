@@ -6,9 +6,10 @@ import { ResourcesPopover, SPACE_DRAG_TYPE } from '#components/ResourcesPopover'
 import { PersistenceNotice } from '#components/PersistenceControl';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { composeApp } from '#src/compose-app';
-import { resourcesOutsideMap } from '#src/map-resolution';
+import { resolveMap, resourcesOutsideMap } from '#src/map-resolution';
+import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
-import { sparseAuthoredSnapshot } from '../support/spaces';
+import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
 
 export default { title: 'Surfaces/Resources Popover' };
 
@@ -53,12 +54,14 @@ function ResourcesPopoverFixture({
   disabled = false,
   notice,
   spaces,
+  memberships,
 }: {
   readonly resources?: readonly Resource[];
   readonly allResources?: readonly Resource[];
   readonly disabled?: boolean;
   readonly notice?: ReactNode;
   readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
+  readonly memberships?: MapMemberships;
 }) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<readonly string[]>([]);
@@ -101,6 +104,7 @@ function ResourcesPopoverFixture({
           onDragEnd={() => {
             spaceDrag.current = null;
           }}
+          memberships={memberships}
         />
       </header>
       {notice}
@@ -190,6 +194,29 @@ AvailableResources.meta = { iframed: true };
  */
 export const MetaSpaces: Story = () => <ResourcesPopoverFixture spaces={SPACES} />;
 MetaSpaces.meta = { iframed: true };
+
+/**
+ * Each Resource this Map leaves out, marked with the other Maps it is in.
+ *
+ * The Space opens on `Collection 2`; the three Resources it does not place all
+ * sit in `Collection 1`: Resource 3 on three of its Graphs, Resource 5 on one,
+ * and Resource 4 on ten (`widelyPlacedSnapshot`), past the capsule's dot cap and
+ * wider than one line of the tooltip. Memberships come
+ * from the production derivation over the loaded Space, so each capsule holds
+ * the colours the canvas draws those Graphs in.
+ */
+export const PlacedElsewhere: Story = () => {
+  const { map } = resolveMap(widelyPlacedSpace);
+  const outside = resourcesOutsideMap(widelyPlacedSpace, map);
+  return (
+    <ResourcesPopoverFixture
+      resources={outside}
+      allResources={widelyPlacedSpace.resources}
+      memberships={otherMapMemberships(widelyPlacedSpace, map.id)}
+    />
+  );
+};
+PlacedElsewhere.meta = { iframed: true };
 
 export const Empty: Story = () => (
   <ResourcesPopoverFixture resources={[]} allResources={RESOURCES} />

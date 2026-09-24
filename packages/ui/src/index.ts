@@ -228,6 +228,7 @@ export {
   InputGroupText,
   InputGroupTextarea,
 } from './components/input-group';
+export { Badge } from './components/badge';
 export { Kbd, KbdGroup } from './components/kbd';
 export { Label } from './components/label';
 export { Separator } from './components/separator';

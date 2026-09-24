@@ -93,6 +93,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Each filter switch draws its glyph beside the number of rows it is contributing under the current search — including zero, and including a switch the reader has turned off — and the count moves with the search rather than reporting what the Space holds.',
   },
   {
+    id: 'resources-popover-marks-where-else-a-resource-is-placed',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'PlacedElsewhere',
+    claim:
+      'A Resource the Map leaves out carries one capsule per other Map that places it, holding a dot for each of that Map’s Graphs with an Edge at it; hovering or focusing the row names each Map and its Graphs, and the row’s accessible description says the same.',
+  },
+  {
     id: 'resources-popover-distinguishes-an-empty-map',
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'Empty',

@@ -79,7 +79,8 @@ test(
     const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Map' });
     await expect(spaceRow).toHaveAttribute('draggable', 'true');
     await expect(spaceRow.locator('.resources-popover__row-grip')).toBeAttached();
-    await expect(spaceRow).toHaveAttribute('title', /or drag it onto the canvas$/);
+    await spaceRow.hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('drag to place');
 
     await spaceRow.dragTo(page.getByRole('button', { name: 'The canvas behind it' }));
 
@@ -222,5 +223,64 @@ test(
     await behind.click();
     await expect(page.getByText('Added: canvas')).toBeVisible();
     await expect(list).toBeVisible();
+  },
+);
+
+test(
+  'a Resource placed in another Map carries that Map’s capsule, named on focus and wrapped inside the tooltip',
+  { tag: '@parity:resources-popover-marks-where-else-a-resource-is-placed' },
+  async ({ page }) => {
+    await page.goto(story('placed-elsewhere'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    // Resource 3 sits on three of Collection 1's Graphs, Resource 5 on one, and
+    // Resource 4 on ten: past the capsule's three dots.
+    const three = page.getByRole('button', { name: 'Add Resource 3 to Map' });
+    const four = page.getByRole('button', { name: 'Add Resource 4 to Map' });
+    const five = page.getByRole('button', { name: 'Add Resource 5 to Map' });
+    await expect(three.locator('[data-map-id]')).toHaveCount(1);
+    await expect(three.locator('[data-graph-id]')).toHaveCount(3);
+    await expect(five.locator('[data-graph-id]')).toHaveCount(1);
+    await expect(four.locator('[data-graph-id]')).toHaveCount(3);
+    await expect(four.locator('[data-more-graphs]')).toHaveText('+7');
+    await expect(three).toHaveAccessibleDescription('Also in Collection 1: Long, Mid, Short');
+
+    // The names reach the keyboard: the tooltip opens on focus, not only hover.
+    // Rows sort by name, so Resource 3 is first: the filter group is one tab
+    // stop and the first row is the next.
+    await page.getByRole('textbox', { name: 'Search resources' }).focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    await expect(three).toBeFocused();
+    const tooltip = page.locator('[data-slot="tooltip-content"]');
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText('Collection 1');
+    await expect(tooltip).toContainText('Long');
+    await expect(tooltip).toContainText('Short');
+
+    // Resource 4 is the next row. Its ten Graph names wrap inside the tooltip
+    // rather than running past it and the viewport.
+    await page.keyboard.press('Tab');
+    await expect(four).toBeFocused();
+    const dots = tooltip.locator('[data-graph-id]');
+    await expect(dots).toHaveCount(10);
+    const bounds = await tooltip.boundingBox();
+    expect(bounds, 'the tooltip is drawn').not.toBeNull();
+    if (bounds === null) return;
+    const viewport = page.viewportSize();
+    expect(viewport, 'the viewport has a size').not.toBeNull();
+    if (viewport === null) return;
+    expect(bounds.x + bounds.width, 'the tooltip ends inside the viewport').toBeLessThanOrEqual(
+      viewport.width,
+    );
+    // Each Graph's entry is its dot's parent: the dot and the name beside it.
+    for (const dot of await dots.all()) {
+      const entry = await dot.locator('xpath=..').boundingBox();
+      expect(entry, 'each Graph entry is drawn').not.toBeNull();
+      if (entry === null) continue;
+      expect(entry.x + entry.width, 'each Graph name ends inside the tooltip').toBeLessThanOrEqual(
+        bounds.x + bounds.width,
+      );
+    }
   },
 );

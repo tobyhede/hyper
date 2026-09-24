@@ -202,6 +202,40 @@ export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
 export const sparseAuthoredSpace: Space = loaded(loadSpaceSnapshot(sparseAuthoredSnapshot));
 
 /**
+ * {@link sparseAuthoredSnapshot} with eight more Graphs in `Collection 1`, each
+ * one Edge from Resource 4 to Resource 1, under titles long enough that ten of
+ * them cannot share one line of a tooltip.
+ *
+ * Resource 4 is outside `Collection 2`, where the Space opens, so its row in
+ * the Resources list names ten of `Collection 1`'s Graphs — past the capsule's
+ * dot cap and wider than the tooltip. Resources 3 and 5 keep the Graphs the
+ * sparse Space gives them.
+ */
+export const widelyPlacedSnapshot: SpaceSnapshot = {
+  ...sparseAuthoredSnapshot,
+  document: {
+    ...sparseAuthoredSnapshot.document,
+    maps: (sparseAuthoredSnapshot.document.maps ?? []).map((map) =>
+      map.id === COLLECTION_ONE
+        ? {
+            ...map,
+            graphs: [
+              ...map.graphs,
+              ...Array.from({ length: 8 }, (_, index) => ({
+                id: uuidSchema.parse(`00000000-0000-4000-8000-0000000000b${String(index)}`),
+                title: `Supporting argument ${String(index + 1)}`,
+                edges: [{ from: RESOURCE_D, to: RESOURCE_A }],
+              })),
+            ],
+          }
+        : map,
+    ),
+  },
+};
+
+export const widelyPlacedSpace: Space = loaded(loadSpaceSnapshot(widelyPlacedSnapshot));
+
+/**
  * {@link authoredSnapshot} one Edit later: a third Map, `Collection 3`.
  *
  * What a story submits has to differ from what it loaded, or a failed save and
