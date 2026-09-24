@@ -3412,13 +3412,7 @@ test('Escape discards a Reference Resource rename without undoing the Reference 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-/**
- * The Resource menu's one grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/03`): Create Reference on its own,
- * both copy links beside each other, then Remove from Map and Delete from
- * Space sharing the trailing destructive group — one separator between each.
- */
-test('the Resource menu groups Create Reference, both copy links, then Remove and Delete', async ({
+test('the Resource menu groups Create Reference, Connect, both copy links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3429,6 +3423,7 @@ test('the Resource menu groups Create Reference, both copy links, then Remove an
   const menu = await resourceActions(page, 'B');
   await expectMenuGroups(menu, [
     ['Create Reference'],
+    ['Connect to Resource'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -3450,6 +3445,7 @@ test(
 
     const groups = [
       ['Create Reference'],
+      ['Connect to Resource'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];
@@ -3492,6 +3488,7 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
   await expect(row).toHaveAttribute('aria-disabled', 'true');
   await expectMenuGroups(menu, [
     [/^Create Reference/],
+    ['Connect to Resource'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);

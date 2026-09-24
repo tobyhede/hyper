@@ -56,6 +56,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     beginPointerConnect: () => undefined,
     connect: () => undefined,
     createConnectedResource: () => undefined,
+    connectTo: () => ({ kind: 'unavailable' }),
     endPointerDrag: () => undefined,
     beginTitleEdit: () => undefined,
     completeTitle: () => null,
@@ -242,6 +243,7 @@ describe('opening framing on a mounted canvas', () => {
               }}
               reportEmbeddedMapEditing={() => undefined}
               spaceTitle="Test Space"
+              mapId={MAP_ID}
               mapTitle="Test Map"
               graphs={[]}
               colorByGraphId={{}}
@@ -376,6 +378,7 @@ describe('opening framing on a mounted canvas', () => {
             }}
             reportEmbeddedMapEditing={() => undefined}
             spaceTitle="Test Space"
+            mapId={MAP_ID}
             mapTitle="Test Map"
             graphs={[]}
             colorByGraphId={{}}

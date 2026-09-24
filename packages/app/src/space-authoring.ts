@@ -7,6 +7,8 @@ import {
   type Map,
   type MapId,
   type MapPosition,
+  type ResourcePlacement,
+  COLLAPSED_RESOURCE_SIZE,
   EDGE_TITLE_ONE_LINE,
   isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
@@ -59,6 +61,27 @@ export type EdgeEligibility =
   { readonly kind: 'eligible' } | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
 
 const ELIGIBLE = { kind: 'eligible' } as const;
+
+/**
+ * The room left between a Resource and one created beside it: half a collapsed
+ * width, so the Edge joining them is long enough to carry a Title.
+ */
+const BESIDE_GAP = COLLAPSED_RESOURCE_SIZE.width / 2;
+
+/**
+ * Right of the source, tops level: past its drawn rect so an Open source does
+ * not cover it, and past the collapsed right edge so Closing the source
+ * reclaims width only (ADR 0093).
+ */
+const besideSource = (at: ResourcePlacement): MapPosition => ({
+  x:
+    at.x +
+    (at.open
+      ? Math.max(COLLAPSED_RESOURCE_SIZE.width, at.openSize.width)
+      : COLLAPSED_RESOURCE_SIZE.width) +
+    BESIDE_GAP,
+  y: at.y,
+});
 
 const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
   const loaded = loadSpaceSnapshot(snapshot);
@@ -120,7 +143,8 @@ export type AuthoringCompletion =
   | {
       readonly kind: 'create-and-connect';
       readonly from: ResourceId;
-      readonly position: MapPosition;
+      /** An Option/Alt drop point, kept exactly, or `beside-source` for the Connect list's New Resource row. */
+      readonly position: MapPosition | 'beside-source';
     }
   /** Add Resource: a detached Markdown Resource at the visible centre, neutrally titled. */
   | { readonly kind: 'created-resource'; readonly anchor: MapPosition }
@@ -1231,14 +1255,20 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'create-and-connect') {
       const refusal = connectRefusal(completion.from, null, placement);
       if (refusal !== null) return refuse(refusal);
-      // The drop point is aimed at, so it is kept exactly: the gesture only
-      // offers an empty-canvas release, and stepping off it would move the Resource
-      // away from where the author watched the preview sit.
-      const created = createResource(
-        { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
-        completion.position,
-        'exact',
-      );
+      // A drop point is kept exactly, where the preview sat; beside-source has
+      // no aimed point, so it avoids overlap. `connectRefusal` already proved the
+      // source placed; the refusal below only satisfies the compiler.
+      const source = placement.get(completion.from);
+      if (source === undefined) return refuse({ code: 'edge-resource-outside-map' });
+      const newResource: ResourceDocument = {
+        title: nextResourceTitle(snapshot),
+        kind: 'markdown',
+        body: '',
+      };
+      const created =
+        completion.position === 'beside-source'
+          ? createResource(newResource, besideSource(source), 'avoidingOverlap')
+          : createResource(newResource, completion.position, 'exact');
       if ('kind' in created) return created;
       createdResourceId = created.id;
       connection = { from: completion.from, to: created.id };

@@ -375,6 +375,7 @@ function CanvasHarness({
         }}
         reportEmbeddedMapEditing={() => undefined}
         spaceTitle="Test Space"
+        mapId={MAP_ID}
         mapTitle="Test Map"
         graphs={currentSpace().graphs}
         colorByGraphId={{}}

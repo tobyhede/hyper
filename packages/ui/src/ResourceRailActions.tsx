@@ -133,8 +133,7 @@ export const ResourceRailSharedActions = forwardRef<HTMLDivElement, ResourceRail
  * `holdFocus` matters here: the caret may sit in the Resource's content, and
  * pressing a rail control must not take it.
  *
- * `resource__rail-action` survives as the canvas hook this component needs and not
- * as a second appearance.
+ * `resource__rail-action` is a canvas hook, not a second appearance.
  */
 export type ResourceRailActionProps = CanvasCommandProps;
 

@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -44,6 +45,7 @@ const SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007
 const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const GRAPH_ID_2 = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 
 /**
  * Two placed Resources and no Edges.
@@ -261,14 +263,10 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * The Resource menu's one grouping grammar
-   * (`.scratch/dock-menu-reorganisation/issues/03`): Create Reference on its own,
-   * both copy links beside each other, then Remove from Map and Delete
-   * from Space sharing the trailing destructive group — one separator between
-   * each. The dropdown and the context menu draw the identical list
+   * The dropdown and the context menu draw the identical list
    * (`EntityActionItems`), so this is the one place the order has to hold.
    */
-  it('groups Create Reference, both copy links, then Remove and Delete, in that order', async () => {
+  it('groups Create Reference, Connect, both copy links, then Remove and Delete, in that order', async () => {
     const session = mount();
 
     await selectResource('A');
@@ -277,6 +275,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     expectMenuGroups(menu, [
       ['Create Reference'],
+      ['Connect to Resource'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -299,6 +298,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     expectMenuGroups(menu, [
       ['Create Reference'],
+      ['Connect to Resource'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -709,7 +709,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * each. Rename is absent, which this exact-order assertion would catch as
    * an extra row if it were not.
    */
-  it('groups Create Reference, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
+  it('groups Create Reference, Connect, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
 
     await selectResource('A space');
@@ -718,6 +718,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     expectMenuGroups(menu, [
       ['Create Reference'],
+      ['Connect to Resource'],
       ['Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],
@@ -905,6 +906,172 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(resourceIds(session)).toEqual([RESOURCE_ID, OTHER_RESOURCE_ID]);
+    await settled(session);
+  });
+});
+
+/** Asserted through the Actions menu, not Edge Authoring, to hold the menu-to-Edit wiring. */
+describe('Connect to Resource in a Resource’s Actions menu', () => {
+  const edgesOf = (session: SpaceSession) =>
+    session.getState().working.document.maps?.[0]?.graphs[0]?.edges ?? [];
+
+  /** A third Resource in the Space that the Map does not place. */
+  const withUnplaced: SpaceSnapshot = spaceSnapshotSchema.parse({
+    ...snapshot,
+    resources: [
+      ...snapshot.resources,
+      { id: REFERENCE_ID, document: { title: 'C', kind: 'markdown', body: 'C source' } },
+    ],
+  });
+
+  const openConnect = async (name: string) => {
+    await selectResource(name);
+    fireEvent.click(await screen.findByRole('button', { name: `Actions for Resource ${name}` }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Connect to Resource' }));
+    return await screen.findByRole('dialog', { name: `Connect Resource ${name}` });
+  };
+
+  /** A rail Connect command would cover the closed header, where a Resource is grabbed to drag. */
+  it('is not a command on the rail', async () => {
+    const session = mount();
+
+    await selectResource('A');
+    await screen.findByRole('button', { name: 'Actions for Resource A' });
+    expect(screen.queryByRole('button', { name: /^Connect Resource / })).not.toBeInTheDocument();
+    await settled(session);
+  });
+
+  it('lists the Map’s placed Resources bar this one, and draws the Edge to the chosen one', async () => {
+    const session = mount(undefined, undefined, withUnplaced);
+
+    const list = await openConnect('A');
+
+    expect(
+      within(list)
+        .getAllByRole('button', { name: /^Connect to / })
+        .map((row) => row.getAttribute('aria-label')),
+    ).toEqual(['Connect to B', 'Connect to a new Resource']);
+
+    fireEvent.click(within(list).getByRole('button', { name: 'Connect to B' }));
+
+    expect(edgesOf(session)).toEqual([{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await settled(session);
+  });
+
+  it('keeps an Edge the Graph already has listed, unavailable, with the reason', async () => {
+    const session = mount();
+    fireEvent.click(within(await openConnect('A')).getByRole('button', { name: 'Connect to B' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    const row = within(await openConnect('A')).getByRole('button', { name: 'Connect to B' });
+
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(row).toHaveAccessibleDescription('These Resources are already connected in this Graph.');
+    await settled(session);
+  });
+
+  it('creates a Markdown Resource beside this one and connects to it', async () => {
+    const session = mount();
+
+    fireEvent.click(
+      within(await openConnect('A')).getByRole('button', { name: 'Connect to a new Resource' }),
+    );
+
+    const created = session
+      .getState()
+      .working.resources.find(({ id }) => id !== RESOURCE_ID && id !== OTHER_RESOURCE_ID);
+    expect(created?.document.kind).toBe('markdown');
+    expect(edgesOf(session)).toEqual([{ from: RESOURCE_ID, to: created?.id }]);
+    await settled(session);
+  });
+
+  /** The list is canvas state, not the rail's, so the canvas must dispose of it. */
+  it('closes when presenting withdraws authoring, and does not reopen when it returns', async () => {
+    const withEdge: SpaceSnapshot = spaceSnapshotSchema.parse({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: [
+          {
+            ...snapshot.document.maps?.[0],
+            graphs: [
+              {
+                id: GRAPH_ID,
+                title: 'Graph',
+                edges: [{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    let composed: ComposedApp | undefined;
+    const session = mount(undefined, undefined, withEdge, (app) => {
+      composed = app;
+    });
+    await openConnect('A');
+
+    act(() => composed?.navigation.present());
+    expect(composed?.navigation.getState().mode).toBe('presenting');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Connect Resource A' })).not.toBeInTheDocument(),
+    );
+
+    act(() => composed?.navigation.exitPresenting());
+    await screen.findByRole('button', { name: 'Actions for Resource A' });
+    expect(screen.queryByRole('dialog', { name: 'Connect Resource A' })).not.toBeInTheDocument();
+    await settled(session);
+  });
+
+  it('closes when another Map is selected, although that Map places the same Resource', async () => {
+    const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
+    const twoMaps: SpaceSnapshot = spaceSnapshotSchema.parse({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: [
+          ...(snapshot.document.maps ?? []),
+          {
+            id: OTHER_MAP_ID,
+            title: 'Other Map',
+            kind: 'positioned',
+            positions: {
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
+            },
+            graphs: [{ id: GRAPH_ID_2, title: 'Graph', edges: [] }],
+          },
+        ],
+      },
+    });
+    let composed: ComposedApp | undefined;
+    const session = mount(undefined, undefined, twoMaps, (app) => {
+      composed = app;
+    });
+    await openConnect('A');
+
+    act(() => composed?.navigation.selectMap(OTHER_MAP_ID));
+
+    await screen.findByRole('button', { name: 'Actions for Resource A' });
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Connect Resource A' })).not.toBeInTheDocument(),
+    );
+    await settled(session);
+  });
+
+  it('closes on Escape back to the Actions trigger it was opened from', async () => {
+    const session = mount();
+
+    const list = await openConnect('A');
+    fireEvent.keyDown(within(list).getByRole('textbox', { name: 'Search resources' }), {
+      key: 'Escape',
+    });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Actions for Resource A' })).toHaveFocus(),
+    );
     await settled(session);
   });
 });

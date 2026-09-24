@@ -84,7 +84,7 @@ const copied = (
   // The command is awaited nowhere here: what is being read is which
   // destination it hands `onCopy`, and that happens on the call. What it
   // answers afterwards is `EntityActionsMenu`'s business and is proved there.
-  void action.onSelect();
+  void action.onSelect(null);
   return captured[0] ?? 'copied nothing';
 };
 
@@ -294,7 +294,7 @@ describe('spaceEntityActions', () => {
     const action = commands(actions).find((candidate) => candidate.label === 'Open in New Tab');
 
     expect(action).toBeDefined();
-    expect(await action?.onSelect()).toBe('done');
+    expect(await action?.onSelect(null)).toBe('done');
     expect(opened).toEqual([{ kind: 'space', spaceId: TARGET_SPACE_ID }]);
   });
 
@@ -350,7 +350,7 @@ describe('spaceEntityActions', () => {
     commands(build({ onRename })({ kind: 'graph', graph: GRAPH, map: MAP }))
       .filter((action) => action.id === 'rename')
       .forEach((action) => {
-        void action.onSelect();
+        void action.onSelect(null);
       });
 
     expect(onRename).toHaveBeenCalledOnce();

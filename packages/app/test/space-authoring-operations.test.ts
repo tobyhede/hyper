@@ -983,8 +983,7 @@ describe('Edge lifecycle', () => {
       }),
     ).toEqual({ kind: 'completed' });
 
-    // Removing the last Edge retains the Graph: Graphs go only through Delete
-    // Graph, and this Map has just the one anyway.
+    // Removing the last Edge keeps the Graph: only Delete Graph removes one.
     expect(graphsOf(session.getState().working)).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
     ]);

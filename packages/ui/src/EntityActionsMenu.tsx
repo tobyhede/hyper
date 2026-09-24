@@ -129,7 +129,15 @@ export interface EntityAction {
    * pointer and keyboard alike and keep the item in the accessibility tree.
    */
   readonly disabled?: boolean | undefined;
-  readonly onSelect: () => EntityActionOutcome | Promise<EntityActionOutcome>;
+  /**
+   * Handed the element the menu was opened from, so a command that opens its
+   * own surface has something to anchor it to once the menu closes. `null`
+   * without a menu or once that element has gone. A context menu without
+   * `render` hands its `display: contents` wrapper, which has no box.
+   */
+  readonly onSelect: (
+    opener: HTMLElement | null,
+  ) => EntityActionOutcome | Promise<EntityActionOutcome>;
 }
 
 /**
@@ -217,7 +225,7 @@ function useConfirmation() {
     [],
   );
 
-  const fire = useCallback((action: EntityAction) => {
+  const fire = useCallback((action: EntityAction, opener: HTMLElement | null) => {
     // Read once, up front: an item that names its words has one for every
     // outcome, so past this line there is always a word to show and the menu
     // the press held open is never held over nothing.
@@ -245,7 +253,7 @@ function useConfirmation() {
      */
     void (async () => {
       try {
-        confirm(await action.onSelect());
+        confirm(await action.onSelect(opener));
       } catch (failure) {
         /*
          * A command that threw is a command that failed, and is reported as
@@ -403,12 +411,14 @@ export function EntityActionsTrigger({
   className,
 }: EntityActionsTriggerProps) {
   const { report, fire, announcement } = useConfirmation();
+  const opener = useRef<HTMLButtonElement>(null);
   const renderProp: Mutable<Pick<EntityActionsTriggerProps, 'render'>> = {};
   if (render !== undefined) renderProp.render = render;
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
+          ref={opener}
           {...renderProp}
           aria-label={label}
           className={className}
@@ -421,7 +431,12 @@ export function EntityActionsTrigger({
             overrides `DropdownMenuContent`'s `w-(--anchor-width)`, which would
             otherwise size this menu to the icon that opened it. */}
         <DropdownMenuContent align="end" className={MENU_WIDTH}>
-          <EntityActionItems groups={groups} report={report} fire={fire} as="menu" />
+          <EntityActionItems
+            groups={groups}
+            report={report}
+            fire={(action) => fire(action, opener.current)}
+            as="menu"
+          />
         </DropdownMenuContent>
       </DropdownMenu>
       {announcement}
@@ -457,10 +472,12 @@ export interface EntityActionsProps {
  */
 export function EntityActions({ groups, children, className, render }: EntityActionsProps) {
   const { report, fire, announcement } = useConfirmation();
+  const opener = useRef<HTMLDivElement>(null);
   return (
     <>
       <ContextMenu>
         <ContextMenuTrigger
+          ref={opener}
           data-slot="entity-actions"
           render={render}
           className={cn(render === undefined && 'contents', className)}
@@ -468,7 +485,12 @@ export function EntityActions({ groups, children, className, render }: EntityAct
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className={MENU_WIDTH}>
-          <EntityActionItems groups={groups} report={report} fire={fire} as="context-menu" />
+          <EntityActionItems
+            groups={groups}
+            report={report}
+            fire={(action) => fire(action, opener.current)}
+            as="context-menu"
+          />
         </ContextMenuContent>
       </ContextMenu>
       {announcement}

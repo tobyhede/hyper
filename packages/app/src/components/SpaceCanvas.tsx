@@ -30,10 +30,11 @@ import {
   type ResourceId,
   type Graph,
   type GraphId,
+  type MapId,
   type UUID,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type EntityActionGroup } from '@project/ui';
+import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, GraphIcon, type EntityActionGroup } from '@project/ui';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -53,6 +54,7 @@ import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { RESOURCE_SIZE } from '../resource';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from './ResourcesPopover';
+import { ResourceConnect, type Connecting } from './ResourceConnect';
 import { OverviewCamera, PresentingCamera, OpeningFramingCamera } from './cameras';
 import {
   canvasNodeConnection,
@@ -280,6 +282,8 @@ export interface SpaceCanvasProps {
   reportEmbeddedMapEditing: (editing: boolean) => void;
   /** Identity of the authored surface this canvas and its HUD are drawing. */
   spaceTitle: string;
+  /** The selected Map, whose change disposes of an open Connect list. */
+  mapId: MapId;
   mapTitle: string;
   graphs: readonly Graph[];
   colorByGraphId: Readonly<Record<string, string>>;
@@ -300,8 +304,14 @@ export interface SpaceCanvasProps {
    * whenever `nodes` changes identity" to "whenever this canvas renders".
    * Correctness is unaffected, and closing it is the same per-node cache that
    * note already names.
+   *
+   * Handed the Resource's Connect to Resource group, so the caller places it
+   * among the others.
    */
-  resourceEntityActions?: (resourceId: ResourceId) => readonly EntityActionGroup[];
+  resourceEntityActions?: (
+    resourceId: ResourceId,
+    connect: EntityActionGroup,
+  ) => readonly EntityActionGroup[];
 }
 
 /** Where an Edge drawn inside an embedded Map began: the embedding node's id, and the Resource dragged from. */
@@ -338,6 +348,7 @@ export function SpaceCanvas({
   resourceResize,
   reportEmbeddedMapEditing,
   spaceTitle,
+  mapId,
   mapTitle,
   graphs,
   colorByGraphId,
@@ -426,6 +437,56 @@ export function SpaceCanvas({
     reportEmbeddedMapEditing(embeddedEditing);
     return () => reportEmbeddedMapEditing(false);
   }, [embeddedEditing, reportEmbeddedMapEditing]);
+  /**
+   * The open Connect list: its source, the Actions trigger it hangs from, and
+   * the Map it was opened on. It is disposed of during render when authoring is
+   * withdrawn, another Map is selected, or the source stops being placed, so it
+   * never outlives its context (`resource-rail-actions.test.tsx`).
+   */
+  const [connecting, setConnecting] = useState<{
+    readonly from: ResourceId;
+    readonly anchor: HTMLElement | null;
+    readonly mapId: MapId;
+  } | null>(null);
+  const connectingLive =
+    connecting !== null && availability.authorOnCanvas && connecting.mapId === mapId;
+  if (connecting !== null && !connectingLive) setConnecting(null);
+  const connectingFrom = !connectingLive
+    ? undefined
+    : placedResources.find((resource) => resource.id === connecting.from);
+  const openConnect: Connecting | null =
+    connecting === null || connectingFrom === undefined
+      ? null
+      : { from: connectingFrom, anchor: connecting.anchor };
+  /**
+   * Connect to Resource, for placed Resources only. Choosing it selects the
+   * Resource: the list is portalled out of it, so without the selection moving
+   * into the list would withdraw the rail and the trigger the list hangs from.
+   */
+  const resourceActions = useMemo(
+    () =>
+      resourceEntityActions === undefined
+        ? undefined
+        : (resourceId: ResourceId) =>
+            resourceEntityActions(
+              resourceId,
+              placedResources.some((resource) => resource.id === resourceId)
+                ? [
+                    {
+                      id: 'connect',
+                      label: 'Connect to Resource',
+                      icon: <GraphIcon size={14} />,
+                      onSelect: (opener) => {
+                        onSelectResource(resourceId);
+                        setConnecting({ from: resourceId, anchor: opener, mapId });
+                        return 'done';
+                      },
+                    },
+                  ]
+                : [],
+            ),
+    [resourceEntityActions, placedResources, onSelectResource, mapId],
+  );
   const resourceAuthoring = useCanvasResourceAuthoring({
     commandOutcomes,
     nodes,
@@ -436,7 +497,7 @@ export function SpaceCanvas({
     resourceResize,
     onSelectResource,
     spaceResourceTargets,
-    resourceEntityActions,
+    resourceEntityActions: resourceActions,
     portalEditing: editingPortals,
     onPortalEditingChange,
   });
@@ -1348,6 +1409,13 @@ export function SpaceCanvas({
       <PresentingCamera activeResourceId={activeResourceId} />
       <OpeningFramingCamera framing={openingFraming} />
       {edgeSurface.layer}
+      <ResourceConnect
+        connecting={openConnect}
+        placed={placedResources}
+        edgeAuthoring={edgeAuthoring}
+        projectedNodes={projectedNodes}
+        onClose={() => setConnecting(null)}
+      />
     </ReactFlow>,
   );
 }

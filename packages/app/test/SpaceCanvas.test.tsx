@@ -116,6 +116,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     beginPointerConnect: () => undefined,
     connect: () => undefined,
     createConnectedResource: () => undefined,
+    connectTo: () => ({ kind: 'unavailable' }),
     endPointerDrag: () => undefined,
     beginTitleEdit: () => undefined,
     completeTitle: () => null,
@@ -202,6 +203,7 @@ function mountGraph(
         resourceResize={resourceResize}
         reportEmbeddedMapEditing={() => undefined}
         spaceTitle="Test Space"
+        mapId={MAP_ID}
         mapTitle="Test Map"
         graphs={[]}
         colorByGraphId={{}}

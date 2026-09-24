@@ -230,15 +230,11 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
   });
 
   /**
-   * The Space Resource menu's own grouping grammar
-   * (`.scratch/dock-menu-reorganisation/issues/04`): Create Reference on its own,
-   * then Enter beside Open in New Tab, then the three copy links, then Remove
-   * from Map and Delete from Space sharing the trailing destructive group
-   * — one separator between each. Rename is absent. Unlike
-   * `resource-rail-actions.test.tsx`'s isolated single-Space mount, this file's
-   * `OpenSpacesApplication` composition is what makes Enter reachable at all.
+   * Rename is absent. Unlike `resource-rail-actions.test.tsx`'s isolated
+   * single-Space mount, this file's `OpenSpacesApplication` composition is what
+   * makes Enter reachable at all.
    */
-  it('groups Create Reference, Enter and Open in New Tab, the copy links, then Remove and Delete', async () => {
+  it('groups Create Reference, Connect, Enter and Open in New Tab, the copy links, then Remove and Delete', async () => {
     await mount();
 
     await openArchitectureActions();
@@ -246,6 +242,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
 
     expectMenuGroups(menu, [
       ['Create Reference'],
+      ['Connect to Resource'],
       ['Enter', 'Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],

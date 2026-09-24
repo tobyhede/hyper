@@ -62,7 +62,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/ui/src/ResourceSearchCombobox.tsx',
     reason:
-      "Without a consumer since `.scratch/edge-toolbar/issues/05` removed reconnection: the selected Edge's endpoint editor was its only caller, and moving an Edge's end is now Delete and draw again. `issues/07` sites choosing a Connect target on `ResourcesPopover` instead and owns updating the note `CLAUDE.md` keeps about this component; whether to retire it is a foundation decision rather than a surface one.",
+      "Without a consumer since `.scratch/edge-toolbar/issues/05` removed reconnection: the selected Edge's endpoint editor was its only caller, and moving an Edge's end is now Delete and draw again. `issues/07` chose a Connect target on `ResourcesPopover` instead, and the note `CLAUDE.md` keeps about this component now says it has no consumer and that `ResourcesPopover` is how a Resource is chosen; whether to retire it is a foundation decision rather than a surface one.",
   },
   {
     module: 'packages/ui/src/components/combobox.tsx',

@@ -54,10 +54,13 @@ export interface ConnectionCompletion {
     to: ResourceId,
     projected: readonly ResourceFlowNode[] | null,
   ) => ConnectionResult;
-  /** Author a Resource at an Option/Alt empty drop and the Edge that reaches it. */
+  /**
+   * Author a Resource and the Edge that reaches it: at an Option/Alt empty
+   * drop's point, or beside the source for the Connect list's New Resource row.
+   */
   readonly createAndConnect: (
     from: ResourceId,
-    position: MapPosition,
+    position: MapPosition | 'beside-source',
     projected: readonly ResourceFlowNode[] | null,
   ) => ConnectionResult;
 }
@@ -152,7 +155,7 @@ export function createConnectionCompletion({
       if (adapter.getState().renderedPlacement() === null) return UNAVAILABLE;
       const refusal = eligible({ kind: 'create-and-connect', from });
       if (refusal !== null) return { kind: 'refused', refusal };
-      // The dropped Resource is placed by `position` inside the completion itself.
+      // The new Resource is placed by `position` inside the completion itself.
       return complete(
         { kind: 'create-and-connect', from, position },
         projected,

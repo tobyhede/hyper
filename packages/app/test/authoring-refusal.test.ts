@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
+  describeConnectChoice,
   describePersistenceFailure,
   describeStoredSpaceRefusal,
   type PersistenceFailure,
@@ -203,5 +204,26 @@ describe('describeStoredSpaceRefusal', () => {
     expect(description).toContain('The remote space is invalid and was not accepted');
     expect(description).toContain(MISSING_RESOURCE_ID);
     expect(description).not.toContain('graph edge references unknown resource');
+  });
+});
+
+/**
+ * The Connect list closes on `null`, so every result that drew nothing, including
+ * `unavailable`, must answer a sentence.
+ */
+describe('describeConnectChoice', () => {
+  it('answers null only for a drawn Edge', () => {
+    expect(describeConnectChoice({ kind: 'completed', resourceId: TARGET_ID })).toBeNull();
+  });
+
+  it('keeps the list open with the refusal’s own sentence', () => {
+    const refusal: AuthoringRefusal = { code: 'edge-already-exists' };
+    expect(describeConnectChoice({ kind: 'refused', refusal })).toBe(
+      describeAuthoringRefusal(refusal),
+    );
+  });
+
+  it('keeps the list open when the canvas cannot take the Edit yet', () => {
+    expect(describeConnectChoice({ kind: 'unavailable' })).toEqual(expect.any(String));
   });
 });

@@ -5,6 +5,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { composeApp } from '../src/compose-app';
 import {
+  connectChoices,
   dropTarget,
   newResourceDrop,
   type ConnectionGesture,
@@ -566,6 +567,155 @@ describe('completing a pointer connection', () => {
 
     expect(edges.getState().draft).toBeNull();
     expect(edges.getState().refusal).not.toBeNull();
+  });
+});
+
+describe('what the Connect list offers', () => {
+  const placed = [{ id: RESOURCE_A }, { id: RESOURCE_B }, { id: RESOURCE_C }];
+
+  it('offers every placed Resource bar the source, asking each the pointer rule', () => {
+    const { edges } = open();
+
+    expect(connectChoices(RESOURCE_A, placed, edges.eligibility)).toEqual({
+      // A→B is already in the Active Graph: kept, with its reason.
+      resources: [
+        { resource: { id: RESOURCE_B }, refusal: { code: 'edge-already-exists' } },
+        { resource: { id: RESOURCE_C }, refusal: null },
+      ],
+      newResource: null,
+    });
+  });
+
+  it('refuses every row, New Resource included, from a source the Map does not place', () => {
+    const { edges } = open(positionedSnapshot, OTHER_MAP_ID);
+
+    const choices = connectChoices(RESOURCE_A, placed, edges.eligibility);
+
+    expect(choices.newResource).toEqual({ code: 'edge-resource-outside-map' });
+    for (const { refusal } of choices.resources) {
+      expect(refusal).toEqual({ code: 'edge-resource-outside-map' });
+    }
+  });
+
+  it('answers the same eligibility a drag asks, row for row', () => {
+    const { edges } = open();
+    const ids = fc.constantFrom(RESOURCE_A, RESOURCE_B, RESOURCE_C);
+    fc.assert(
+      fc.property(ids, (from) => {
+        const choices = connectChoices(from, placed, edges.eligibility);
+        expect(choices.resources.map(({ resource }) => resource.id)).not.toContain(from);
+        for (const { resource, refusal } of choices.resources) {
+          expect(refusal === null).toBe(edges.accepts({ kind: 'connect', from, to: resource.id }));
+        }
+        expect(choices.newResource === null).toBe(
+          edges.accepts({ kind: 'create-and-connect', from }),
+        );
+      }),
+    );
+  });
+});
+
+describe('connecting from the Connect list', () => {
+  it('draws the Edge in the Active Graph and continues at it, selected and focused', () => {
+    const { edges, session, continuation } = open();
+
+    expect(
+      edges.connectTo(RESOURCE_B, { kind: 'resource', resourceId: RESOURCE_C }, PROJECTED),
+    ).toEqual({ kind: 'completed', resourceId: RESOURCE_C });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      EDGE,
+      { from: RESOURCE_B, to: RESOURCE_C },
+    ]);
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'edge', graphId: GRAPH_ID, edge: { from: RESOURCE_B, to: RESOURCE_C } },
+      select: true,
+      then: 'focus',
+    });
+  });
+
+  it('answers a refusal to the list that asked, and leaves nothing on the canvas', () => {
+    const { edges, session, continuation } = open();
+    const before = session.getState().working;
+
+    expect(
+      edges.connectTo(RESOURCE_A, { kind: 'resource', resourceId: RESOURCE_B }, PROJECTED),
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
+
+    expect(session.getState().working).toBe(before);
+    expect(continuation.getState().pending).toBeNull();
+    // The list owns the sentence; the canvas announcement is a finished drag's.
+    expect(edges.getState().refusal).toBeNull();
+  });
+
+  it('authors a Markdown Resource beside the source and continues at the Edge to it', () => {
+    const { edges, session, continuation } = open();
+
+    expect(edges.connectTo(RESOURCE_A, { kind: 'new-resource' }, PROJECTED)).toEqual({
+      kind: 'completed',
+      resourceId: MINTED,
+    });
+
+    const working = session.getState().working;
+    expect(working.resources.find((resource) => resource.id === MINTED)?.document.kind).toBe(
+      'markdown',
+    );
+    expect(graphsOf(working)[0]?.edges).toEqual([EDGE, { from: RESOURCE_A, to: MINTED }]);
+    // Right of the source, past its collapsed width and half as much again,
+    // top edges level.
+    expect(working.document.maps?.[0]?.positions[MINTED]).toEqual({
+      x: 10 + RESOURCE_SIZE.width * 1.5,
+      y: 20,
+      open: false,
+    });
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'edge', graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: MINTED } },
+      select: true,
+      then: 'focus',
+    });
+  });
+
+  it('places the new Resource past an Open source, where its Close reclaims the width alone', () => {
+    const openSource: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        maps: (positionedSnapshot.document.maps ?? []).map((map) =>
+          map.id === MAP_ID
+            ? {
+                ...map,
+                positions: {
+                  ...map.positions,
+                  [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+                },
+              }
+            : map,
+        ),
+      },
+    };
+    const { edges, session } = open(openSource);
+
+    edges.connectTo(RESOURCE_A, { kind: 'new-resource' }, PROJECTED);
+
+    expect(session.getState().working.document.maps?.[0]?.positions[MINTED]).toEqual({
+      x: 10 + 560 + RESOURCE_SIZE.width / 2,
+      y: 20,
+      open: false,
+    });
+  });
+
+  it('draws into whichever Graph is Active and continues at the Edge there', () => {
+    const { edges, session, navigation, continuation } = open();
+    navigation.activateGraph(OTHER_GRAPH_ID);
+
+    edges.connectTo(RESOURCE_A, { kind: 'resource', resourceId: RESOURCE_B }, PROJECTED);
+
+    expect(graphsOf(session.getState().working)[1]?.edges).toEqual([EDGE]);
+    expect(continuation.getState().pending?.target).toEqual({
+      kind: 'edge',
+      graphId: OTHER_GRAPH_ID,
+      edge: EDGE,
+    });
   });
 });
 

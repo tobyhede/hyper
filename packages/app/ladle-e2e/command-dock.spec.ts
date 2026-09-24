@@ -297,12 +297,13 @@ test('Copy link to Space copies the Space’s own durable address', async ({ pag
 /**
  * The Resource rail's own grouping grammar
  * (`.scratch/dock-menu-reorganisation/issues/03`), reached through the real
- * production host: Create Reference on its own, both copy links beside each
- * other, then Remove from Map and Delete from Space sharing the trailing
- * destructive group — one separator between each. The Command Dock draws no
- * Resource commands of its own (ADR 0073); this is the rail's own menu.
+ * production host: Create Reference on its own, Connect to Resource on its own,
+ * both copy links beside each other, then Remove from Map and Delete from Space
+ * sharing the trailing destructive group — one separator between each. The
+ * Command Dock draws no Resource commands of its own (ADR 0073); this is the
+ * rail's own menu.
  */
-test('a Markdown Resource’s actions menu groups Create Reference, both copy links, then Remove and Delete', async ({
+test('a Markdown Resource’s actions menu groups Create Reference, Connect, both copy links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto(story('default'));
@@ -310,6 +311,7 @@ test('a Markdown Resource’s actions menu groups Create Reference, both copy li
   const menu = await resourceActions(page, 'Opening');
   await expectMenuGroups(menu, [
     ['Create Reference'],
+    ['Connect to Resource'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -332,6 +334,7 @@ test('a Reference Resource’s actions menu keeps Create Reference leading, draw
   );
   await expectMenuGroups(menu, [
     [/^Create Reference/],
+    ['Connect to Resource'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -340,12 +343,12 @@ test('a Reference Resource’s actions menu keeps Create Reference leading, draw
 /**
  * A Space Resource's own grouping grammar
  * (`.scratch/dock-menu-reorganisation/issues/04`), reached through the real
- * production host: Create Reference; Enter and Open in New Tab; the three copy
- * links; then Remove from Map and Delete from Space sharing the trailing
- * destructive group — one separator between each. Rename is absent — the
- * Title still edits on the Resource front, unchanged by this grouping.
+ * production host: Create Reference; Connect to Resource; Enter and Open in New
+ * Tab; the three copy links; then Remove from Map and Delete from Space sharing
+ * the trailing destructive group — one separator between each. Rename is
+ * absent — the Title still edits on the Resource front, unchanged by this grouping.
  */
-test('a Space Resource’s actions menu groups Create Reference, Enter, links, then Remove and Delete', async ({
+test('a Space Resource’s actions menu groups Create Reference, Connect, Enter, links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto(story('default'));
@@ -353,6 +356,7 @@ test('a Space Resource’s actions menu groups Create Reference, Enter, links, t
   const menu = await resourceActions(page, 'Design system');
   await expectMenuGroups(menu, [
     ['Create Reference'],
+    ['Connect to Resource'],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
     ['Remove from Map', 'Delete from Space'],

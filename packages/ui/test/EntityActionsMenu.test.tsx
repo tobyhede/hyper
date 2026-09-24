@@ -313,4 +313,27 @@ describe('the entity actions menu', () => {
     expect(region?.closest('[aria-hidden="true"]')).toBeNull();
     expect(region?.getAttribute('aria-hidden')).toBeNull();
   });
+
+  /** The menu is gone by the time a command runs, so a surface it opens anchors here. */
+  it('hands a command the control its menu was opened from', async () => {
+    const onSelect = vi.fn((): EntityActionOutcome => 'done');
+    openMenu([{ id: 'connect', label: 'Connect to Resource', onSelect }]);
+    await press(/Connect to Resource/);
+
+    expect(onSelect).toHaveBeenCalledWith(screen.getByRole('button', { name: 'Actions' }));
+  });
+
+  it('hands a context-menu command the element that answered the right click', async () => {
+    const onSelect = vi.fn((): EntityActionOutcome => 'done');
+    render(
+      <EntityActions
+        groups={[[{ id: 'connect', label: 'Connect to Resource', onSelect }]]}
+        render={<div data-testid="row" />}
+      />,
+    );
+    fireEvent.contextMenu(screen.getByTestId('row'));
+    await press(/Connect to Resource/);
+
+    expect(onSelect).toHaveBeenCalledWith(screen.getByTestId('row'));
+  });
 });

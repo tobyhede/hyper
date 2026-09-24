@@ -615,6 +615,27 @@ export const parityClaims: readonly ParityClaim[] = [
       'Unreachable through any browser gesture — the eye is disabled without a Title, a single-line field cannot hold a line break, and a stale Edge needs the Space to change under a drawn toolbar. Covered instead by packages/app/test/edge-authoring-react.test.tsx (the region, its placement and its clearing) and packages/app/test/edge-authoring.test.ts (the retained refusal).',
   },
   {
+    id: 'resource-connect-draws-an-edge-from-the-keyboard',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "Connect to Resource in a Resource's Actions menu opens the Resources list over the Map's placed Resources bar this one, with its search and kind filters and no Spaces source; choosing one by keyboard draws an Edge in the Active Graph and lands focus on it, selected, so Enter reaches its toolbar.",
+  },
+  {
+    id: 'resource-connect-keeps-refused-targets',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'A Resource the Edge could not be drawn to stays in the Connect list, unavailable and reachable, with the reason the pointer gesture would meet; Escape closes the list back to the Resource’s Actions trigger.',
+  },
+  {
+    id: 'resource-connect-creates-a-new-resource',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "The Connect list's last row creates a Markdown Resource beside this one and draws the Edge to it, landing focus on that Edge.",
+  },
+  {
     id: 'canvas-zoom-control-operates-the-real-viewport',
     storyFile: 'components/zoom-control.stories.tsx',
     storyExport: 'Canvas',

@@ -1,5 +1,6 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
+import type { ConnectionResult } from './connection-completion';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
   SpaceResourceRefusal,
@@ -145,6 +146,21 @@ const AGGREGATE_REFUSAL_REASONS = {
  */
 export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[]): string =>
   [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
+
+/**
+ * What the Connect list says after a choice, or `null` once the Edge is drawn.
+ * The list closes on `null`, so `unavailable` must answer a sentence.
+ */
+export const describeConnectChoice = (result: ConnectionResult): string | null => {
+  switch (result.kind) {
+    case 'completed':
+      return null;
+    case 'refused':
+      return describeAuthoringRefusal(result.refusal);
+    case 'unavailable':
+      return 'The canvas is not ready to draw an Edge yet. Try again in a moment.';
+  }
+};
 
 /**
  * The sentence, without the detail that only some intake errors can supply.

@@ -176,6 +176,7 @@ export async function exerciseSpaceResourceEntityMenu(
   // Resource from the Map leaves the Resource and its target Space intact".
   await expectMenuGroups(page.getByRole('menu'), [
     ['Create Reference'],
+    ['Connect to Resource'],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
     ['Remove from Map'],

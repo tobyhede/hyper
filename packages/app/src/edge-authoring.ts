@@ -161,6 +161,54 @@ export function newResourceDrop(
   };
 }
 
+/** An Edge's other end from the Connect list: a placed Resource, or a new Markdown Resource beside the source. */
+export type ConnectTarget =
+  | { readonly kind: 'resource'; readonly resourceId: ResourceId }
+  | { readonly kind: 'new-resource' };
+
+/** One placed Resource the Connect list offers, with the refusal it would meet. */
+export interface ConnectCandidate<R> {
+  readonly resource: R;
+  /** `null` when an Edge to it may be drawn. */
+  readonly refusal: AuthoringRefusal | null;
+}
+
+/** Everything the Connect list draws for one source, refusals included. */
+export interface ConnectChoices<R> {
+  readonly resources: readonly ConnectCandidate<R>[];
+  /** The New Resource row's refusal, or `null` when it may be offered. */
+  readonly newResource: AuthoringRefusal | null;
+}
+
+/**
+ * What the Connect list offers from one Resource: the placed Resources bar the
+ * source, each asked the pointer gesture's own eligibility so the keyboard is
+ * offered exactly what a drag could release on. A refused target is kept with
+ * its reason so the author learns why it is unavailable.
+ *
+ * The source is left out although a self-Edge is legal; the handle drag still
+ * draws a loop.
+ */
+export function connectChoices<R extends { readonly id: ResourceId }>(
+  from: ResourceId,
+  placed: readonly R[],
+  eligibility: (proposal: EdgeProposal) => EdgeEligibility,
+): ConnectChoices<R> {
+  const refusalOf = (proposal: EdgeProposal): AuthoringRefusal | null => {
+    const answer = eligibility(proposal);
+    return answer.kind === 'refused' ? answer.refusal : null;
+  };
+  return {
+    resources: placed
+      .filter((resource) => resource.id !== from)
+      .map((resource) => ({
+        resource,
+        refusal: refusalOf({ kind: 'connect', from, to: resource.id }),
+      })),
+    newResource: refusalOf({ kind: 'create-and-connect', from }),
+  };
+}
+
 /**
  * The one Edge interaction in progress.
  *
@@ -224,6 +272,17 @@ export interface EdgeAuthoring {
     position: MapPosition,
     projected: readonly ResourceFlowNode[] | null,
   ) => void;
+  /**
+   * Draw an Edge from the Connect list in the Active Graph. A completion
+   * continues at the new Edge, selected and focused. A refusal is returned, not
+   * retained: the still-open list owns the sentence. No draft is begun, since
+   * the list is one press from open to Edit.
+   */
+  readonly connectTo: (
+    from: ResourceId,
+    target: ConnectTarget,
+    projected: readonly ResourceFlowNode[] | null,
+  ) => ConnectionResult;
   /**
    * End whichever pointer drag was in flight, requesting the continuation a
    * completed connection earns — the Resource it reached, selected.
@@ -522,6 +581,25 @@ export function createEdgeAuthoring({
       holdForDrag(
         settleConnection(connections.createAndConnect(from, position, projected), gestureRefusal),
       ),
+
+    connectTo: (from, target, projected) => {
+      const result =
+        target.kind === 'resource'
+          ? connections.connect(from, target.resourceId, projected)
+          : connections.createAndConnect(from, 'beside-source', projected);
+      if (result.kind !== 'completed') return result;
+      publish({ refusal: null });
+      // Read after the Edit: a Map with no Graph mints one for its first Edge.
+      const graphId = authoring.getState().navigation.activeGraphId;
+      if (graphId !== null) {
+        continuation.request({
+          target: { kind: 'edge', graphId, edge: { from, to: result.resourceId } },
+          select: true,
+          then: 'focus',
+        });
+      }
+      return result;
+    },
 
     endPointerDrag: () => {
       const reached = continueAt;
