@@ -2312,3 +2312,398 @@ describe('Space Resource lifecycle', () => {
     expect(backend.loadAggregateCalls).toBe(1);
   });
 });
+
+/*
+ * Characterisation of the coordinated commit, one test per path the existing
+ * cases above leave open. Each name leads with the path it pins.
+ */
+describe('Space Resource coordination paths', () => {
+  const linkedMeta: SpaceSnapshot = {
+    ...metaSnapshot,
+    resources: [
+      ...metaSnapshot.resources,
+      {
+        id: SPACE_RESOURCE_ID,
+        document: {
+          title: 'Target',
+          kind: 'space',
+          spaceId: TARGET_ID,
+          map: TARGET_MAP_ID,
+          graph: TARGET_GRAPH_ID,
+        },
+      },
+    ],
+    document: {
+      ...metaSnapshot.document,
+      maps: metaSnapshot.document.maps?.map((map) => ({
+        ...map,
+        positions: { ...map.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false } },
+      })),
+    },
+  };
+  const createIds = () =>
+    idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]);
+  const createInput = {
+    containingSpaceId: META_ID,
+    mapId: META_MAP_ID,
+    title: 'Architecture',
+    position: { x: 240, y: 80 },
+  };
+
+  it('barrier: holds retirement until the coordination turn and its queued work are done', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const releaseCommit = control.deferNextCommit();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(idSource([SPACE_RESOURCE_ID]));
+
+    await lifecycle.link({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      targetSpaceId: TARGET_ID,
+      title: 'Link',
+      position: { x: 240, y: 80 },
+    });
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Queued behind the turn' },
+    });
+    let retirable = false;
+    const waiting = registry.waitUntilRetirable(META_ID).then(() => {
+      retirable = true;
+    });
+
+    expect(registry.release(META_ID)).toBe(false);
+    await Promise.resolve();
+    expect(retirable).toBe(false);
+    expect(control.requests).toHaveLength(1);
+
+    releaseCommit();
+    await waiting;
+
+    // The queued title committed before the Space was reported retirable.
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState().persistence.kind).toBe('settled');
+    expect(registry.release(META_ID)).toBe(true);
+    expect(registry.entry(META_ID)).toBeUndefined();
+  });
+
+  it('barrier: an idle Space waits out a coordination that has claimed its turn', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const releaseCommit = control.deferNextCommit();
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [
+          { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+          { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+        ],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const linking = registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      targetSpaceId: TARGET_ID,
+      title: 'Link',
+      position: { x: 240, y: 80 },
+    });
+    let retirable = false;
+    const waiting = registry.waitUntilRetirable(META_ID).then(() => {
+      retirable = true;
+    });
+
+    // Meta is idle with nothing queued, yet a coordination holds a turn it
+    // will take part in.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(retirable).toBe(false);
+
+    await linking;
+    releaseCommit();
+    await waiting;
+    expect(meta.getState().persistence.kind).toBe('settled');
+  });
+
+  it('barrier: an unopened Space is retirable and released at once', async () => {
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(META_ID, [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+      ]),
+    );
+
+    await expect(registry.waitUntilRetirable(TARGET_ID)).resolves.toBeUndefined();
+    expect(registry.release(TARGET_ID)).toBe(true);
+  });
+
+  it('barrier: a session with an ordinary commit in flight is not released', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const releaseCommit = control.deferNextCommit();
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'In flight' },
+    });
+
+    expect(registry.release(META_ID)).toBe(false);
+    releaseCommit();
+    await registry.waitUntilRetirable(META_ID);
+    expect(registry.release(META_ID)).toBe(true);
+  });
+
+  it('update: deleting the only Map is unchanged before any read or commit', async () => {
+    class CountingAggregateBackend extends MemorySpaceBackend {
+      loadAggregateCalls = 0;
+      override loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
+        this.loadAggregateCalls += 1;
+        return super.loadAggregate();
+      }
+    }
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new CountingAggregateBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+
+    await expect(
+      registry
+        .spaceResources(idSource([]))
+        .deleteMap({ targetSpaceId: META_ID, mapId: META_MAP_ID, preferredMapId: null }),
+    ).resolves.toEqual({ kind: 'unchanged' });
+
+    expect(backend.loadAggregateCalls).toBe(0);
+    expect(control.requests).toHaveLength(0);
+    expect(meta.getState().working).toEqual(metaSnapshot);
+  });
+
+  it('update: deleting a Map of a Space that needs recovery is refused by name', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'retryable-failure', code: 'network' });
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    meta.submit(meta.getState().working);
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('failed'));
+
+    await expect(
+      registry
+        .spaceResources(idSource([]))
+        .deleteMap({ targetSpaceId: META_ID, mapId: META_MAP_ID, preferredMapId: null }),
+    ).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', spaceId: META_ID, recovery: 'retry' },
+    });
+    expect(control.requests).toHaveLength(1);
+  });
+
+  it('unwind: a throw before any participant begins rejects the Edit and releases the barrier', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const target = registry.open({
+      snapshot: targetSnapshot,
+      revision: 7n,
+      exportedRevision: null,
+    });
+
+    // Meta has no live session, so the Edit cannot read its containing Space.
+    await expect(
+      registry.spaceResources(idSource([SPACE_RESOURCE_ID])).link({
+        containingSpaceId: META_ID,
+        mapId: META_MAP_ID,
+        targetSpaceId: TARGET_ID,
+        title: 'Link',
+        position: { x: 240, y: 80 },
+      }),
+    ).rejects.toThrow(`Space ${META_ID} has no live session`);
+
+    expect(control.requests).toHaveLength(0);
+    target.submit({
+      ...target.getState().working,
+      document: { ...target.getState().working.document, title: 'After the throw' },
+    });
+    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('settled'));
+    expect(control.requests).toHaveLength(1);
+  });
+
+  it('unwind: a thrown commit leaves every participant recoverable by one later Edit', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.throwNext(new Error('transport exploded'));
+    const registry = createSpaceSessionRegistry(
+      new MemorySpaceBackend(
+        META_ID,
+        [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+        control,
+      ),
+    );
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+
+    await expect(registry.spaceResources(createIds()).create(createInput)).resolves.toEqual({
+      kind: 'completed',
+      resourceId: SPACE_RESOURCE_ID,
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
+    expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'After the throw' },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, snapshot: { document: { title: 'After the throw' } } },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    expect(registry.session(TARGET_ID)?.getState().persistence.kind).toBe('settled');
+  });
+
+  it.each([
+    { outcome: 'committed', result: undefined, thrown: false },
+    {
+      outcome: 'failed',
+      result: { kind: 'retryable-failure', code: 'network' } as const,
+      thrown: false,
+    },
+    {
+      outcome: 'rejected',
+      result: { kind: 'permanent-failure', code: 'forbidden' } as const,
+      thrown: false,
+    },
+    {
+      outcome: 'conflicted',
+      result: {
+        kind: 'conflict',
+        conflicts: [
+          {
+            spaceId: META_ID,
+            current: { snapshot: metaSnapshot, revision: 9n, exportedRevision: null },
+          },
+        ],
+      } as const,
+      thrown: false,
+    },
+    {
+      outcome: 'malformed',
+      result: {
+        kind: 'committed',
+        revisions: [{ spaceId: META_ID, revision: 4n }],
+        deletedSpaceIds: [],
+      } as const,
+      thrown: false,
+    },
+    { outcome: 'thrown', result: undefined, thrown: true },
+  ])(
+    'provisional: a created Space is no longer provisional once the commit is $outcome',
+    async ({ result, thrown }) => {
+      const control = new MemorySpaceBackendTestControl();
+      if (result !== undefined) control.queueResult(result);
+      if (thrown) control.throwNext(new Error('transport exploded'));
+      const releaseCommit = control.deferNextCommit();
+      const registry = createSpaceSessionRegistry(
+        new MemorySpaceBackend(
+          META_ID,
+          [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+          control,
+        ),
+      );
+      const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+
+      await registry.spaceResources(createIds()).create(createInput);
+      // While the commit is in flight the created Space is a live participant.
+      expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+      expect(registry.release(TARGET_ID)).toBe(false);
+
+      releaseCommit();
+      await registry.waitUntilRetirable(META_ID);
+      await registry.waitUntilRetirable(TARGET_ID);
+      expect(meta.getState().persistence.kind).not.toBe('pending');
+
+      // Retiring the session leaves nothing behind: a provisional entry would
+      // surface here and refuse the reopen below.
+      if (registry.session(TARGET_ID) !== undefined) {
+        expect(registry.release(TARGET_ID)).toBe(true);
+      }
+      expect(registry.entry(TARGET_ID)).toBeUndefined();
+      expect(() =>
+        registry.open({ snapshot: targetSnapshot, revision: 0n, exportedRevision: null }),
+      ).not.toThrow();
+    },
+  );
+
+  it('keep-local: a deleted participant the conflict reports absent is completed, and the rest retried', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [{ spaceId: TARGET_ID, current: undefined }],
+    });
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: linkedMeta, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: linkedMeta, revision: 3n, exportedRevision: null });
+
+    await expect(
+      registry
+        .spaceResources(idSource([]))
+        .delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID }),
+    ).resolves.toEqual({ kind: 'completed' });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+    expect(registry.session(TARGET_ID)?.getState().persistence).toMatchObject({
+      kind: 'conflicted',
+      current: undefined,
+    });
+    control.queueResult({
+      kind: 'committed',
+      revisions: [{ spaceId: META_ID, revision: 4n }],
+      deletedSpaceIds: [],
+    });
+
+    meta.resolveConflict(meta.getState().working);
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+
+    expect(registry.session(TARGET_ID)).toBeUndefined();
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, expectedRevision: 3n },
+    ]);
+    expect(control.requests[1]?.changes).toHaveLength(1);
+  });
+});
