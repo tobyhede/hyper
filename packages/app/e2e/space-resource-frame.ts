@@ -1,17 +1,28 @@
 import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { boxOf } from './graph';
+import {
+  boxOf,
+  createResourceControl,
+  resourceControls,
+  resourceToolbar,
+  selectResource,
+} from './graph';
 
-/** Put the Space Resource into portal Edit so its embedded Map can be authored. */
+/**
+ * Put the Space Resource into portal Edit so its embedded Map can be authored.
+ *
+ * Edit is on the Resource's floating toolbar, drawn while it is selected (ADR 0102).
+ */
 export async function beginPortalEdit(page: Page, resource: Locator): Promise<void> {
-  const id = await resource.getAttribute('data-id');
-  if (id === null) throw new Error('Resource placement id missing');
-  await resource.hover({ position: { x: 8, y: 80 } });
-  await page
-    .locator(`[data-resource-rail-for="${id}"]`)
-    .getByTestId('canvas-resource-actions')
+  await resourceControls(page, resource);
+  await (
+    await resourceToolbar(page, resource)
+  )
     .getByRole('button', { name: /^Edit Resource/ })
     .click({ delay: 120 });
+  await expect(
+    (await resourceToolbar(page, resource)).getByRole('button', { name: /^Done Resource/ }),
+  ).toBeVisible();
 }
 
 /** Wheel the portal camera from the containing Resource's left inset. */
@@ -215,29 +226,78 @@ export async function embeddedGraphEdgeCount(page: Page, parent: Locator): Promi
   return page.locator(`.react-flow:visible .react-flow__edge[data-id^="${id}:"]`).count();
 }
 
-export async function exerciseFloatingResourceDock(page: Page, parent: Locator) {
+/** The size of a control, in whole screen pixels. */
+const controlSize = async (control: Locator, label: string) => {
+  const box = await boxOf(control, label);
+  return { width: Math.round(box.width), height: Math.round(box.height) };
+};
+
+/**
+ * A selected Resource's toolbar floats above its top-right corner (ADR 0102).
+ *
+ * Outside the Resource in the DOM and on screen, clear of the top anchor, the
+ * Command Dock's control size at every zoom, and operable although the Open Space
+ * Resource below it draws another Space's Resources.
+ */
+export async function exerciseResourceToolbarFloats(page: Page, parent: Locator) {
   const name = await parent.getByRole('article').getAttribute('aria-label');
-  const dock = page.getByRole('toolbar', { name: `Resource ${name}`, exact: true });
-  await parent.hover({ position: { x: 8, y: 80 } });
-  const outer = await boxOf(parent, 'Space Resource');
-  const zoom = await parent.evaluate((node) =>
-    node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
-  );
-  const panel = await boxOf(dock, 'floating dock');
-  // The chrome's shadow is cast right and down and takes no room, so the right
-  // gap is measured past it. Read from the page, because a theme sets it.
-  const shadowOffset = await dock.evaluate((node) =>
-    Number.parseFloat(getComputedStyle(node).getPropertyValue('--shadow-chrome-elevated-offset')),
-  );
-  expect(shadowOffset).toBeGreaterThan(0);
-  expect((panel.y - outer.y) / zoom).toBeCloseTo(12, 0);
-  expect((outer.x + outer.width - panel.x - panel.width) / zoom).toBeCloseTo(12 + shadowOffset, 0);
-  await dock.getByRole('button', { name: /^Map:/ }).click({ delay: 120 });
+  await selectResource(parent);
+  const floating = await resourceToolbar(page, parent);
+  const toolbar = floating.getByRole('toolbar', { name: `Resource ${name}`, exact: true });
+  await expect(toolbar).toBeVisible();
+  // Portalled out of the Resource, so nothing of it is drawn inside the node.
+  await expect(parent.getByRole('toolbar')).toHaveCount(0);
+
+  // An icon control on the Dock, measured against an icon control on the toolbar.
+  const dockControl = createResourceControl(page, 'Markdown Resource');
+  const actions = toolbar.getByRole('button', { name: /^Actions for Resource/ });
+  const anchor = parent.locator('[data-handleid="authoring-source-top"]');
+
+  const expectFloatsAboveCorner = async (when: string) => {
+    const outer = await boxOf(parent, `Space Resource ${when}`);
+    const panel = await boxOf(floating, `floating toolbar ${when}`);
+    const top = await boxOf(anchor, `top anchor ${when}`);
+    // Above the Resource and above its top anchor, which reaches past the border.
+    expect(panel.y + panel.height).toBeLessThanOrEqual(outer.y);
+    expect(panel.y + panel.height).toBeLessThanOrEqual(top.y);
+    // Aligned to the Resource's right edge.
+    expect(panel.x + panel.width).toBeCloseTo(outer.x + outer.width, 0);
+    // The Dock's control size, whatever the canvas zoom.
+    expect(await controlSize(actions, `toolbar control ${when}`)).toEqual(
+      await controlSize(dockControl, 'Dock control'),
+    );
+  };
+
+  // Measured on both sides of 100%: the zoom the canvas opens at, and past 1:1.
+  const scaleOf = () =>
+    parent.evaluate((node) =>
+      node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
+    );
+  const opening = await scaleOf();
+  expect(opening).toBeLessThan(0.9);
+  await expectFloatsAboveCorner(`at the opening zoom ${opening.toFixed(2)}`);
+  // Operable while the embedded Map is drawn below it. Checked at the opening
+  // zoom: zoomed in, the toolbar can land past the viewport edge.
+  await expect(page.locator('.react-flow__node[data-id^="embedded:"]').first()).toBeVisible();
+  await toolbar.getByRole('button', { name: /^Map:/ }).click({ delay: 120 });
   await expect(page.getByRole('menu')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
-  await dock.getByRole('button', { name: /^Actions for Resource/ }).click({ delay: 120 });
+  await actions.click({ delay: 120 });
   await expect(page.getByRole('menuitem', { name: 'Create Reference', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(dock.locator('.resource-rail__kind')).toBeHidden();
+
+  const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+  await expect
+    .poll(
+      async () => {
+        await zoomIn.click();
+        await page.waitForTimeout(400);
+        return scaleOf();
+      },
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(1.1);
+  await expect(toolbar).toBeVisible();
+  await expectFloatsAboveCorner(`zoomed in to ${(await scaleOf()).toFixed(2)}`);
 }

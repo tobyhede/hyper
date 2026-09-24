@@ -20,6 +20,7 @@ import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { beginRename } from './command-dock';
+import { selectResource } from './resource-selection';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -207,12 +208,13 @@ const keepLocal = (): void => {
 };
 
 /**
- * Open-at-rest: the Resource starts Open, so Edit Markdown source is on screen
- * without an Open Edit. Persistence stays settled until the conflict is raised
- * afterwards with the draft already live.
+ * Open-at-rest: the Resource starts Open, so once it is selected Edit Markdown
+ * source is on screen without an Open Edit (ADR 0102). Persistence stays settled
+ * until the conflict is raised afterwards with the draft already live.
  */
 async function stageOpenMarkdownDraft(session: SpaceSession): Promise<void> {
   expect(session.getState().persistence.kind).toBe('settled');
+  await selectResource('Local resource');
   fireEvent.click(await screen.findByRole('button', { name: MARKDOWN_EDIT }));
   await screen.findByRole('textbox', { name: MARKDOWN_SOURCE }, { timeout: 5000 });
   const source = replaceMarkdownSource(MARKDOWN_DRAFT);
@@ -459,6 +461,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
 
   it('discards a Delete Resource confirmation when the stored Space is accepted', async () => {
     const session = await mountedSpaceApp();
+    await selectResource('Local resource');
     fireEvent.click(
       await screen.findByRole('button', { name: 'Actions for Resource Local resource' }),
     );

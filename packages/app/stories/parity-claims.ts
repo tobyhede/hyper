@@ -16,11 +16,18 @@ export interface ParityClaim {
 
 export const parityClaims: readonly ParityClaim[] = [
   {
-    id: 'resource-rail-reveal-distinguishes-pointer-and-keyboard',
+    id: 'resource-toolbar-survives-open-and-close',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenAndClose',
     claim:
-      'Pointer Open and Close allow the rail to hide on departure; keyboard activation keeps the focused command visible across both transitions.',
+      'Open and Close keep the Resource selected and its toolbar drawn, by pointer or keyboard, and keyboard activation keeps focus on the command across both transitions.',
+  },
+  {
+    id: 'resource-toolbar-draws-on-selection-with-open-last',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'OpenAndClose',
+    claim:
+      'A Resource at rest draws no toolbar; selected, its commands are drawn with Open last, while its kind glyph stays on the Resource at its top-right corner.',
   },
   {
     id: 'canvas-resource-actions-menu',
@@ -230,34 +237,21 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Colours',
     claim:
-      "A Resource's revealed commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Resource's authoring handles and its Edges keep that colour.",
+      "A selected Resource's commands are drawn on the same neutral command surface as the Command Dock at every Active Graph colour, while the Resource's authoring handles and its Edges keep that colour.",
   },
   {
     id: 'dragged-resource-returns-its-chrome-to-rest',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Drag',
     claim:
-      'A Resource being moved draws as dragging and reveals none of its hover chrome — no rail actions and no Edge handles — though the pointer is still on it and the drag has Selected it; hovering it after release reveals them again.',
+      'A Resource being moved draws as dragging and reveals none of its chrome — no toolbar and no Edge handles — though the pointer is still on it and the drag has Selected it; on release its toolbar is drawn again and hovering it reveals its handles.',
   },
   {
-    id: 'canvas-resource-hover-reveals-actions-and-handles-together',
+    id: 'canvas-resource-hover-reveals-handles-and-selection-draws-commands',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Hover',
     claim:
-      "Hovering the real React Flow node reveals CanvasResource's own rail actions and the adapter's Edge handles together.",
-    // The two halves of this claim already have real application evidence
-    // separately: hover revealing CanvasResource's rail actions is asserted in
-    // `editing.spec.ts` ("inline title editing persists without moving or
-    // opening the Resource", `await resource.hover(); ... toHaveCSS('opacity', '1')`
-    // on the Edit control), and hover/selection revealing the adapter's
-    // authoring handles is asserted in `overview.spec.ts` ("handles stay
-    // measurable...") and unit-tested in ResourceNode.test.tsx. What this story
-    // adds is mounting both through the same real `ResourceNode` in a real
-    // `ReactFlow` instance side by side, which is exactly what
-    // `CanvasResourceNodeSpecimen` does — not a facsimile of
-    // either half.
-    applicationEvidence:
-      "Hover revealing CanvasResource's rail actions is covered by editing.spec.ts (asserted on the `canvas-resource-actions` container, which is where the reveal's opacity lives — `opacity` does not inherit, so the same assertion on a button could not fail); hover/selection revealing the adapter's authoring handles is covered by overview.spec.ts and ResourceNode.test.tsx. This story mounts the real ResourceNode in a real ReactFlow instance (CanvasResourceNodeSpecimen, no facsimile) to show both together, which is not a distinct browser-observable behaviour beyond those two.",
+      "Hovering the real React Flow node reveals the adapter's Edge handles and none of CanvasResource's commands; selecting it draws its commands in React Flow's NodeToolbar.",
   },
   {
     id: 'canvas-resource-owns-title-editing-and-refusal',
@@ -654,11 +648,11 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Open Space Resource draws the Map it selects — the target Space's own Resources and the one Graph across them — as sub-flow children of the containing canvas, whose measured boxes stay inside the Space Resource's own rect.",
   },
   {
-    id: 'resource-dock-floats',
+    id: 'resource-toolbar-floats-above-its-corner',
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      'The Resource dock floats eight pixels inside the border, measured past its cast shadow on the right, remains operable above embedded content, and replaces the open kind glyph.',
+      "A selected Resource's toolbar floats above its top-right corner, outside the Resource and clear of its top anchor, at the Command Dock's control size whatever the zoom, and stays operable above an Open Space Resource's embedded content.",
   },
   {
     id: 'space-resource-content-sized-footer',

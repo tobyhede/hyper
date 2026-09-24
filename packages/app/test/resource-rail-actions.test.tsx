@@ -6,6 +6,7 @@ import {
   within,
   type RenderResult,
 } from '@testing-library/react';
+import { selectResource, selectResourceById } from './resource-selection';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
@@ -229,14 +230,15 @@ afterAll(() => vi.unstubAllGlobals());
 
 describe('a Resource’s commands on the canvas rail', () => {
   /**
-   * Reached without selecting anything first. The Space's command surface drew
-   * these for the selected Resource alone, which is the shape ADR 0073 rejects: the
-   * commands are the Resource's, so they are on the Resource whether or not the
-   * renderer has it selected.
+   * Reached by selecting the Resource first. The commands are the Resource's
+   * (ADR 0073) and float in React Flow's `NodeToolbar`, which draws them while that
+   * Resource is the one selected; the right-click menu still reaches the same
+   * actions without selecting.
    */
   it('offers both of a placed Resource’s addresses and its deletion', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     await screen.findByRole('menuitem', { name: 'Delete from Space' });
 
@@ -269,6 +271,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('groups Create Reference, both copy links, then Remove and Delete, in that order', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     const menu = await screen.findByRole('menu');
 
@@ -287,6 +290,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('keeps Create Reference leading and unavailable in a Reference Resource’s own menu', async () => {
     const session = mount(undefined, undefined, withReference);
 
+    await selectResource('A reference');
     fireEvent.click(
       await screen.findByRole('button', { name: 'Actions for Resource A reference' }),
     );
@@ -310,6 +314,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('removes the Resource from this Map and leaves it in the Space, without asking', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
 
@@ -336,6 +341,7 @@ describe('a Resource’s commands on the canvas rail', () => {
       );
     });
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
 
@@ -368,6 +374,7 @@ describe('a Resource’s commands on the canvas rail', () => {
       });
     });
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
     await waitFor(() => expect(newGraphItem('Graph')).not.toHaveAttribute('aria-disabled', 'true'));
@@ -423,6 +430,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     });
     const session = mount(undefined, undefined, opened);
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
 
     expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
@@ -430,12 +438,25 @@ describe('a Resource’s commands on the canvas rail', () => {
     await settled(session);
   });
 
-  /** Each Resource's menu names its own Resource, which is what makes them the Resource's. */
-  it('names every Resource on the canvas, not the one the renderer has selected', async () => {
+  /**
+   * Each Resource's menu names its own Resource, which is what makes them the Resource's.
+   * The commands float in React Flow's `NodeToolbar`, drawn only for the Resource that is
+   * selected, so selecting the other Resource replaces one named menu with the other.
+   */
+  it('names its own Resource in each menu, drawn for the selected Resource alone', async () => {
     const session = mount();
 
+    await selectResource('A');
     expect(await screen.findByRole('button', { name: 'Actions for Resource A' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Actions for Resource B' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Resource B' }),
+    ).not.toBeInTheDocument();
+
+    await selectResource('B');
+    expect(await screen.findByRole('button', { name: 'Actions for Resource B' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Resource A' }),
+    ).not.toBeInTheDocument();
     await settled(session);
   });
 
@@ -451,6 +472,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('creates a Reference Resource of the Resource whose menu ran the command', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
@@ -472,6 +494,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('continues in the new Reference Resource’s own Title editor, seeded from its Target', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
@@ -492,6 +515,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('places the Reference Resource at a fixed offset from the Resource it was made from', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
 
@@ -553,11 +577,15 @@ describe('a Resource’s commands on the canvas rail', () => {
         },
       });
       const session = mount(undefined, undefined, opened);
+      await selectResource('A');
       fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
       const editor = await screen.findByRole('textbox', { name: 'Resource title' });
       fireEvent.keyDown(editor, { key: 'Escape' });
       const reference = session.getState().working.resources[2]!.id;
+      // The Target is selected so its own toolbar is drawn. The Reference Resource
+      // carries the Target's name, so the Target is selected by its id.
+      await selectResourceById(RESOURCE_ID);
       fireEvent.click(await screen.findByRole('button', { name: 'Close Resource A' }));
       await waitFor(() => {
         const positions = session.getState().working.document.maps?.[0]?.positions;
@@ -586,6 +614,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('offers Create Reference unavailable on a Reference Resource, because referencing terminates', async () => {
     const session = mount(undefined, undefined, withReference);
 
+    await selectResource('A reference');
     fireEvent.click(
       await screen.findByRole('button', { name: 'Actions for Resource A reference' }),
     );
@@ -618,6 +647,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     try {
       const session = mount(undefined, undefined, withReference);
 
+      await selectResource('A reference');
       fireEvent.click(
         await screen.findByRole('button', { name: 'Actions for Resource A reference' }),
       );
@@ -651,6 +681,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     try {
       const session = mount(undefined, undefined, withReference);
 
+      await selectResource('A reference');
       fireEvent.click(
         await screen.findByRole('button', { name: 'Actions for Resource A reference' }),
       );
@@ -681,6 +712,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('groups Create Reference, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
 
+    await selectResource('A space');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
     const menu = await screen.findByRole('menu');
 
@@ -723,6 +755,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('offers Delete from Space on a Space Resource when deletion is available', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
 
+    await selectResource('A space');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
 
     expect(await screen.findByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
@@ -734,6 +767,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(window);
     const session = mount(undefined, undefined, withSpaceResource);
 
+    await selectResource('A space');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
     expect(await screen.findByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
     fireEvent.click(screen.getByRole('menuitem', { name: /^Open in New Tab/ }));
@@ -751,6 +785,7 @@ describe('a Resource’s commands on the canvas rail', () => {
 
   it('creates a Reference Resource from a Space Resource', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
+    await selectResource('A space');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A space' }));
     const row = await screen.findByRole('menuitem', { name: 'Create Reference' });
     expect(row).not.toHaveAttribute('aria-disabled', 'true');
@@ -794,6 +829,7 @@ describe('a Resource’s commands on the canvas rail', () => {
       ),
     );
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
@@ -821,6 +857,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('does not report a deletion while the question is still asking', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
     await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
@@ -845,6 +882,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.change(input, { target: { value: laddered } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
@@ -859,6 +897,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('leaves the Resource alone when the question is cancelled', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
     const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });

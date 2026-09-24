@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Handle,
-  ViewportPortal,
   NodeResizeControl,
+  NodeToolbar,
   Position,
   useConnection,
+  useStore,
   useViewport,
   type NodeProps,
   type OnResizeStart,
@@ -76,10 +77,6 @@ export function ResourceNode({
   selected,
   dragging,
   isConnectable,
-  positionAbsoluteX,
-  positionAbsoluteY,
-  width,
-  zIndex,
 }: NodeProps<ResourceFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
@@ -121,30 +118,6 @@ export function ResourceNode({
    * design-system component knowing React Flow exists.
    */
   const inner = useRef<HTMLDivElement>(null);
-  const [railHovered, setRailHovered] = useState(false);
-  const renderRail = useCallback(
-    (rail: ReactNode) => {
-      if (data.expanded !== true || data.spaceContent === undefined) return rail;
-      return (
-        <ViewportPortal>
-          <div
-            className="resource-rail-layer"
-            data-resource-rail-for={id}
-            style={{
-              transform: `translate(${positionAbsoluteX + 4}px, ${positionAbsoluteY + 4}px)`,
-              width: (width ?? 260) - 8,
-              zIndex: 2000 + zIndex,
-            }}
-            onPointerEnter={() => setRailHovered(true)}
-            onPointerLeave={() => setRailHovered(false)}
-          >
-            {rail}
-          </div>
-        </ViewportPortal>
-      );
-    },
-    [id, data.expanded, data.spaceContent, positionAbsoluteX, positionAbsoluteY, width, zIndex],
-  );
   const reportBodyHeight = data.onBodyHeightChange;
   const onBodyHeightChange = useCallback(
     (height: number | null) => reportBodyHeight?.(id, height),
@@ -267,10 +240,9 @@ export function ResourceNode({
   const canvasResourceOptionalProps: Mutable<
     Pick<
       CanvasResourceProps,
-      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice' | 'railHovered'
+      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice'
     >
   > = {};
-  if (railHovered) canvasResourceOptionalProps.railHovered = true;
   if (data.contextNotice !== undefined && data.contextNotice !== null) {
     canvasResourceOptionalProps.contextNotice = data.contextNotice;
   }
@@ -396,7 +368,45 @@ export function ResourceNode({
     return false;
   }, []);
   const expanded = data.expanded === true;
-  const resizeScale = Math.max(1 / useViewport().zoom, 1);
+  const { zoom } = useViewport();
+  const resizeScale = Math.max(1 / zoom, 1);
+
+  /**
+   * Whether React Flow holds some other Resource selected. The toolbar is one
+   * Resource's commands, so a multi-selection shows none — `NodeToolbar`'s own
+   * default. Asked of React Flow's own selection, because this Resource may be
+   * selected only by the authoring selection (`selectedForAuthoring`) for a render;
+   * and asked only of a selected Resource, so every other Resource answers without
+   * walking the flow.
+   */
+  const otherSelected = useStore((state) =>
+    visuallySelected ? state.nodes.some((node) => node.selected && node.id !== id) : false,
+  );
+  const toolbarVisible =
+    ((visuallySelected && !otherSelected) ||
+      data.bodyEditor !== undefined ||
+      data.portal?.editing === true) &&
+    !dragging &&
+    !resizeActive;
+  /**
+   * The Resource's commands float above its top-right corner, outside the Resource
+   * and at a constant screen size, as React Flow's `NodeToolbar` draws them. The
+   * offset is screen pixels and the top anchor reaches half its diameter above
+   * the Resource in canvas units, so the offset scales with it to keep the
+   * toolbar clear of the anchor at every zoom.
+   */
+  const renderToolbar = (toolbar: ReactNode) =>
+    toolbar === null ? null : (
+      <NodeToolbar
+        isVisible={toolbarVisible}
+        position={Position.Top}
+        align="end"
+        offset={(AUTHORING_HANDLE_DIAMETER / 2) * zoom + 6}
+        data-resource-rail-for={id}
+      >
+        {toolbar}
+      </NodeToolbar>
+    );
 
   const onReturnFocus = () => {
     inner.current?.closest<HTMLElement>('.react-flow__node')?.focus();
@@ -478,7 +488,7 @@ export function ResourceNode({
         <CanvasResource
           readOnly={data.readOnly}
           front={front}
-          renderRail={renderRail}
+          renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}
           state="editing"
@@ -491,10 +501,11 @@ export function ResourceNode({
         <CanvasResource
           readOnly={data.readOnly}
           front={front}
-          renderRail={renderRail}
+          renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}
           state={dragging ? 'dragging' : visuallySelected ? 'selected' : 'rest'}
+          onReturnFocus={onReturnFocus}
           {...canvasResourceOptionalProps}
         />
       )}

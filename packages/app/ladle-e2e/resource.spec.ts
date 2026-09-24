@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { resourceToolbar, selectResource } from '../e2e/graph';
 
 const specimen = (page: Page, label: string): Locator =>
   page.locator('.inv-specimen', {
@@ -71,8 +72,8 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  * states, kinds, hover, colours, opening, resizing — and two undecided elements
  * lived on the front for months because the slice that drew them was not the
  * slice anyone reviewed. So the assertions below are deliberately exhaustive
- * over the Resource's own box: the kind glyph, the border, one element per Title
- * Line at the role the domain gave it, and **nothing beneath the Title** — no
+ * over the Resource's own box: the border, one element per Title Line at the
+ * role the domain gave it, its kind glyph, and **nothing beneath the Title** — no
  * second line the application writes on the author's behalf, and no text on the
  * Resource that is not one of the Title Lines the author typed.
  */
@@ -92,6 +93,7 @@ test(
         await expect(resource).toHaveAttribute('data-state', 'rest');
         await expect(resource).toHaveAttribute('data-expanded', 'false');
         await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+        await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
         await expect(resource).toHaveCSS('border-style', front.border);
 
         // One block element per Title Line, carrying the role `titleLines` gave
@@ -281,23 +283,34 @@ test(
 );
 
 test(
-  "hovering the real React Flow node reveals CanvasResource's rail actions and the adapter's Edge handles together",
-  { tag: '@parity:canvas-resource-hover-reveals-actions-and-handles-together' },
+  "hovering the real React Flow node reveals the adapter's Edge handles and none of CanvasResource's commands; selecting it draws them",
+  { tag: '@parity:canvas-resource-hover-reveals-handles-and-selection-draws-commands' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--hover&mode=preview');
 
-    const node = specimen(page, 'hover to show actions and Edge handles').locator(
-      '.react-flow__node',
-    );
-    const actions = node.getByTestId('canvas-resource-actions');
+    const hovered = specimen(page, 'hover to show Edge handles, select to show commands');
+    const node = hovered.locator('.react-flow__node');
+    // Scoped to this specimen's canvas: the specimens beside it draw the same
+    // placement, selected, and `NodeToolbar` portals into its own renderer.
+    const toolbar = hovered.locator('[data-resource-rail-for]');
     const handle = node.locator('.rf-resource-node__authoring-handle--source').first();
 
-    await expect(actions).toHaveCSS('opacity', '0');
+    await page.mouse.move(0, 0);
+    await expect(toolbar).toHaveCount(0);
     await expect(handle).toHaveCSS('opacity', '0');
 
-    await node.hover();
-    await expect(actions).toHaveCSS('opacity', '1');
+    await node.hover({ position: { x: 10, y: 10 } });
     await expect(handle).toHaveCSS('opacity', '1');
+    await expect(toolbar).toHaveCount(0);
+    await expect(node.getByTestId('canvas-resource-actions')).toHaveCount(0);
+
+    await selectResource(node);
+    // Drawn by `NodeToolbar`, portalled out of the node into React Flow's renderer.
+    await expect(toolbar.getByTestId('canvas-resource-actions')).toBeVisible();
+    await expect(node.getByTestId('canvas-resource-actions')).toHaveCount(0);
+    expect(
+      await toolbar.evaluate((element) => element.closest('.react-flow__renderer') !== null),
+    ).toBe(true);
   },
 );
 
@@ -316,7 +329,7 @@ test(
 
     const node = specimen(page, 'drag to return the chrome to rest').locator('.react-flow__node');
     const inner = node.locator('.rf-resource-node__inner');
-    const actions = node.getByTestId('canvas-resource-actions');
+    const actions = (await resourceToolbar(page, node)).getByTestId('canvas-resource-actions');
     const handle = node.locator('.rf-resource-node__authoring-handle--source').first();
 
     const box = await node.boundingBox();
@@ -339,8 +352,8 @@ test(
     await expect(inner).toHaveAttribute('data-selected', 'true');
     await expect(node.getByRole('article')).toHaveAttribute('data-state', 'dragging');
     await expect(handle).toHaveCSS('opacity', '0');
-    // The rail is `CanvasResource`'s own withdrawal and predates this: a dragging
-    // Resource renders no actions at all, rather than hiding them.
+    // `ResourceNode` does not draw its toolbar while the Resource is dragged, so
+    // the commands are absent rather than hidden.
     await expect(actions).toHaveCount(0);
     // The anchors are not the rail's case. They stay mounted throughout, because
     // React Flow measures a handle and one that is not there reports nothing to
@@ -351,8 +364,13 @@ test(
     await page.mouse.up();
 
     await expect(inner).toHaveAttribute('data-dragging', 'false');
+    // The drag Selected the Resource, so its toolbar is drawn again on release.
+    await expect(node).toHaveClass(/\bselected\b/);
+    await expect(actions).toBeVisible();
     await expect(handle).toHaveCSS('opacity', '1');
-    await expect(actions).toHaveCSS('opacity', '1');
+    await page.mouse.move(0, 0);
+    await node.hover({ position: { x: 10, y: 10 } });
+    await expect(handle).toHaveCSS('opacity', '1');
   },
 );
 
@@ -388,11 +406,10 @@ test(
     const markdown = page.getByRole('article', { name: 'Strategies' });
     const actions = markdown.getByTestId('canvas-resource-actions');
     const open = page.getByRole('button', { name: 'Open Resource Strategies' });
-    // Hidden at rest and revealed on pointer hover, the same rule the actions
-    // rail draws by everywhere it appears.
-    await expect(actions).toHaveCSS('opacity', '0');
-    await markdown.hover();
-    await expect(actions).toHaveCSS('opacity', '1');
+    // Mounted without React Flow, the component draws its toolbar inline in the
+    // rail band, and the pointer reveals nothing: it is drawn at rest.
+    await page.mouse.move(0, 0);
+    await expect(actions).toBeVisible();
     await expect(open).toBeVisible();
 
     const title = markdown.getByRole('heading', { name: 'Strategies' });
@@ -421,7 +438,7 @@ test(
   },
 );
 
-test('reduced motion removes Resource content and rail-action transitions', async ({ page }) => {
+test('reduced motion removes Resource content transitions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/?story=components--resource--open-and-close&mode=preview');
 
@@ -429,12 +446,9 @@ test('reduced motion removes Resource content and rail-action transitions', asyn
     .getByRole('region', { name: 'Long Markdown Resource' })
     .getByRole('article');
   const content = resource.locator('.canvas-resource__content');
-  const action = resource.getByRole('button', { name: 'Close Resource Long Markdown' });
 
   await expect(content).toHaveCSS('transition-duration', '0s');
   await expect(content).toHaveCSS('transition-delay', '0s');
-  await expect(action).toHaveCSS('transition-duration', '0s');
-  await expect(action).toHaveCSS('transition-delay', '0s');
 });
 
 test(

@@ -245,15 +245,40 @@ const containingNode = (resourceId: ResourceId): HTMLElement => {
   return node;
 };
 
-/** Open Space Resource rails are lifted into the viewport so embedded Resources can pass beneath them. */
-const controlsOf = (node: HTMLElement): HTMLElement => {
+/** The toolbar a Resource's node draws its commands in, if it is drawn now. */
+const railFor = (node: HTMLElement): HTMLElement | null => {
   const id = node.dataset['id'];
-  if (id === undefined) return node;
+  if (id === undefined) return null;
   const rail = document.querySelector(`[data-resource-rail-for="${id}"]`);
-  if (!(rail instanceof HTMLElement)) {
-    throw new Error(`no lifted rail is drawn for ${id}`);
-  }
+  return rail instanceof HTMLElement ? rail : null;
+};
+
+/**
+ * A Resource's commands, selecting the Resource first when they are not drawn.
+ *
+ * The commands float in React Flow's `NodeToolbar`, portalled outside the node,
+ * and are drawn only while the Resource is the one selected or while a content or
+ * portal edit runs on it (`ResourceNode`). A click on the node wrapper is React
+ * Flow's own selection gesture.
+ */
+const queryControlsOf = (node: HTMLElement): HTMLElement | null => {
+  const drawn = railFor(node);
+  if (drawn !== null) return drawn;
+  fireEvent.click(node);
+  return railFor(node);
+};
+
+/** {@link queryControlsOf}, where no toolbar is a broken test rather than a claim. */
+const controlsOf = (node: HTMLElement): HTMLElement => {
+  const rail = queryControlsOf(node);
+  if (rail === null) throw new Error(`no toolbar is drawn for ${node.dataset['id'] ?? 'the node'}`);
   return rail;
+};
+
+/** One named command of a Resource, or null when the Resource offers none by that name. */
+const queryCommand = (node: HTMLElement, name: RegExp | string): HTMLElement | null => {
+  const rail = queryControlsOf(node);
+  return rail === null ? null : within(rail).queryByRole('button', { name });
 };
 
 /** Put the Space Resource into portal Edit so its embedded Map can be authored. */
@@ -340,7 +365,9 @@ describe('the Map an Open Space Resource draws', () => {
               ],
             },
       );
-      fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Open Resource/ }));
+      fireEvent.click(
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Open Resource/ }),
+      );
       await waitFor(() =>
         expect(spaces.entry(TARGET_ID)?.session.getState().persistence.kind).toBe(kind),
       );
@@ -462,24 +489,18 @@ describe('the Map an Open Space Resource draws', () => {
     });
     await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
-    expect(
-      within(embeddedNode(DRAWN_A)).queryByRole('button', { name: /Edit Resource/ }),
-    ).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_A), /Edit Resource/)).toBeNull();
     const parent = containingNode(SPACE_RESOURCE_ID);
     expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Resource/ })).toBeTruthy();
     beginPortalEdit(parent);
     await waitFor(() =>
       expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
       ).toBeTruthy(),
     );
     expect(within(controlsOf(parent)).getByRole('button', { name: /Done Resource/ })).toBeTruthy();
     fireEvent.click(within(controlsOf(parent)).getByRole('button', { name: /Done Resource/ }));
-    await waitFor(() =>
-      expect(
-        within(embeddedNode(DRAWN_A)).queryByRole('button', { name: /Edit Resource/ }),
-      ).toBeNull(),
-    );
+    await waitFor(() => expect(queryCommand(embeddedNode(DRAWN_A), /Edit Resource/)).toBeNull());
     expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Resource/ })).toBeTruthy();
   });
 
@@ -502,7 +523,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
       ).toBeTruthy(),
     );
     const parent = containingNode(SPACE_RESOURCE_ID);
@@ -547,7 +568,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
       ).toBeTruthy(),
     );
     fireEvent.click(anyPresentControl());
@@ -576,7 +597,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
       ).toBeTruthy(),
     );
     openSpaceMenu('Home');
@@ -633,10 +654,10 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(second);
     await waitFor(() => {
       expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
       ).toBeTruthy();
       expect(
-        within(embeddedNodeOf(HOME_RESOURCE_ID, DRAWN_A)).getByRole('button', {
+        within(controlsOf(embeddedNodeOf(HOME_RESOURCE_ID, DRAWN_A))).getByRole('button', {
           name: /Edit Resource/,
         }),
       ).toBeTruthy();
@@ -686,7 +707,7 @@ describe('the Map an Open Space Resource draws', () => {
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
       expect(
-        within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }),
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
       ).toBeTruthy(),
     );
     fireEvent.wheel(containingNode(SPACE_RESOURCE_ID), { deltaY: -120, bubbles: true });
@@ -722,9 +743,13 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     expect(unavailable(anyPresentControl())).toBe(false);
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
-    fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }));
+    fireEvent.click(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+    );
     await waitFor(() =>
-      expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy(),
+      expect(
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
+      ).toBeTruthy(),
     );
     const parent = document.querySelector(`.react-flow__node[data-id="${SPACE_RESOURCE_ID}"]`);
     if (!(parent instanceof HTMLElement)) throw new Error('Space Resource missing');
@@ -735,12 +760,12 @@ describe('the Map an Open Space Resource draws', () => {
     ).toBe(true);
     const sibling = document.querySelector(`.react-flow__node[data-id="${HOME_RESOURCE_ID}"]`);
     if (!(sibling instanceof HTMLElement)) throw new Error('Containing Markdown Resource missing');
-    expect(within(sibling).queryByRole('button', { name: /Edit Resource/ })).toBeNull();
-    expect(
-      within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Edit Resource/ }),
-    ).toBeNull();
+    expect(queryCommand(sibling, /Edit Resource/)).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
     expect(unavailable(anyPresentControl())).toBe(true);
-    fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Cancel/ }));
+    fireEvent.click(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Cancel/ }),
+    );
     await waitFor(() =>
       expect(
         within(controlsOf(parent)).getByRole('button', { name: /Close Resource/ }),
@@ -776,19 +801,27 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     beginPortalEdit(containingNode(HOME_RESOURCE_ID));
-    fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }));
+    fireEvent.click(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+    );
     await waitFor(() =>
-      expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy(),
+      expect(
+        within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
+      ).toBeTruthy(),
     );
     const duplicate = window.document.querySelector(
       `.react-flow__node[data-id="${embeddedNodeId(HOME_RESOURCE_ID, DRAWN_A)}"]`,
     );
     if (!(duplicate instanceof HTMLElement)) throw new Error('Duplicate embedded Resource missing');
-    expect(within(duplicate).queryByRole('button', { name: /Edit Resource/ })).toBeNull();
-    expect(within(duplicate).queryByRole('button', { name: /Save/ })).toBeNull();
-    fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Cancel/ }));
+    expect(queryCommand(duplicate, /Edit Resource/)).toBeNull();
+    expect(queryCommand(duplicate, /Save/)).toBeNull();
+    fireEvent.click(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Cancel/ }),
+    );
     await waitFor(() =>
-      expect(within(duplicate).getByRole('button', { name: /Edit Resource/ })).toBeTruthy(),
+      expect(
+        within(controlsOf(duplicate)).getByRole('button', { name: /Edit Resource/ }),
+      ).toBeTruthy(),
     );
   });
 
@@ -927,9 +960,7 @@ describe('the Map an Open Space Resource draws', () => {
     });
     await waitFor(() => expect(embeddedNode(DRAWN_B).style.clipPath).not.toBe(previous));
     expect(spaces.entry(TARGET_ID)).toBeUndefined();
-    expect(
-      within(embeddedNode(DRAWN_B)).queryByRole('button', { name: /Edit Resource/ }),
-    ).toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
   });
 
   /**
@@ -1076,24 +1107,22 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
     await waitFor(() =>
-      expect(within(nested()).getByRole('button', { name: /Edit Resource/ })).toBeTruthy(),
+      expect(
+        within(controlsOf(nested())).getByRole('button', { name: /Edit Resource/ }),
+      ).toBeTruthy(),
     );
-    fireEvent.click(within(nested()).getByRole('button', { name: /Edit Resource/ }));
+    fireEvent.click(within(controlsOf(nested())).getByRole('button', { name: /Edit Resource/ }));
     await waitFor(() =>
-      expect(within(nested()).getByRole('button', { name: /Save/ })).toBeTruthy(),
+      expect(within(controlsOf(nested())).getByRole('button', { name: /Save/ })).toBeTruthy(),
     );
-    expect(
-      within(controlsOf(embeddedNode(DRAWN_B))).queryByRole('button', { name: /Close Resource/ }),
-    ).toBeNull();
-    expect(
-      within(controlsOf(embeddedNode(DRAWN_B)))
-        .getByTestId('space-resource-map')
-        .getAttribute('aria-disabled') === 'true',
-    ).toBe(true);
+    // The nested Space Resource is neither selected nor in portal Edit, and the
+    // live edit withdraws selection from the canvases around it, so pressing it
+    // draws no toolbar at all: neither its Close nor its Map choice can be reached.
+    expect(queryControlsOf(embeddedNode(DRAWN_B))).toBeNull();
     const outer = document.querySelector(`.react-flow__node[data-id="${SPACE_RESOURCE_ID}"]`);
     if (!(outer instanceof HTMLElement)) throw new Error('Outer Resource missing');
     expect(within(controlsOf(outer)).queryByRole('button', { name: /Close Resource/ })).toBeNull();
-    fireEvent.click(within(nested()).getByRole('button', { name: /Cancel/ }));
+    fireEvent.click(within(controlsOf(nested())).getByRole('button', { name: /Cancel/ }));
     await waitFor(() =>
       expect(
         within(controlsOf(embeddedNode(DRAWN_B))).getByRole('button', { name: /Close Resource/ }),
@@ -1324,7 +1353,9 @@ describe('the Map an Open Space Resource draws', () => {
     render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
-    fireEvent.click(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Edit Resource/ }));
+    fireEvent.click(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Edit Resource/ }),
+    );
     await waitFor(() =>
       expect(
         spaces
@@ -1334,7 +1365,9 @@ describe('the Map an Open Space Resource draws', () => {
           ?.open,
       ).toBe(true),
     );
-    expect(within(embeddedNode(DRAWN_A)).getByRole('button', { name: /Save/ })).toBeTruthy();
+    expect(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: /Save/ }),
+    ).toBeTruthy();
     expect(initial.session.getState().working).toEqual(value);
     expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
   });
@@ -1418,7 +1451,7 @@ describe('the Map an Open Space Resource draws', () => {
     // the DOM tree. What the DOM does carry is the refusal: no rail, and so no
     // control that could author another Space from this canvas (ADR 0040).
     const drawn = embeddedNode(DRAWN_A);
-    expect(within(drawn).getByRole('button', { name: /Open Resource/ })).toBeTruthy();
+    expect(within(controlsOf(drawn)).getByRole('button', { name: /Open Resource/ })).toBeTruthy();
     // Portal Edit publishes the same connection authoring the host canvas does:
     // `connectionAuthoringEnabled: true` and the eight labelled handles
     // (ADR 0087).
@@ -1456,7 +1489,10 @@ describe('the Map an Open Space Resource draws', () => {
       }),
     );
 
-    await screen.findByTestId('space-resource-map');
+    await waitFor(() => expect(containingNode(SPACE_RESOURCE_ID)).toBeTruthy());
+    expect(
+      within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
+    ).toBeTruthy();
     expect(queryEmbeddedNode(DRAWN_A)).toBeNull();
     expect(queryEmbeddedNode(UNPLACED)).toBeNull();
   });

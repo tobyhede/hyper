@@ -7,12 +7,14 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { beginRename, dock, exitSpaceItem } from './command-dock';
 import { expectMenuGroups } from './menu-assertions';
+import { selectResource } from './resource-selection';
 
 /**
  * Entering a Space Resource from its rail (ADR 0068, ADR 0073).
  *
- * This file mounts `OpenSpacesApplication` and presses the Resource's Enter
- * command. It holds the canvas swap, the selection the Resource seeds — including
+ * This file mounts `OpenSpacesApplication`, selects the Resource — its commands
+ * float in React Flow's `NodeToolbar`, drawn while it is the selected Resource —
+ * and presses its Enter command. It holds the canvas swap, the selection the Resource seeds — including
  * after Open has already embedded the target — an already-open Space keeping
  * its live selection, a failed Enter reported on the Space being left, Escape
  * not exiting, and Exit then Enter seeding from the Resource again.
@@ -176,12 +178,17 @@ async function mount(): Promise<OpenSpaces> {
   });
   const initial = await spaces.open(HOME_ID);
   render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
-  await screen.findByRole('button', { name: 'Actions for Resource Architecture' });
+  await screen.findByRole('article', { name: 'Architecture' });
   return spaces;
 }
 
+async function openArchitectureActions(): Promise<void> {
+  await selectResource('Architecture');
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Architecture' }));
+}
+
 async function enterArchitecture(): Promise<void> {
-  fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Architecture' }));
+  await openArchitectureActions();
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Enter' }));
   await waitFor(() => expect(showingSpace()).toHaveTextContent('Architecture'));
 }
@@ -234,7 +241,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
   it('groups Create Reference, Enter and Open in New Tab, the copy links, then Remove and Delete', async () => {
     await mount();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Architecture' }));
+    await openArchitectureActions();
     const menu = await screen.findByRole('menu');
 
     expectMenuGroups(menu, [
@@ -265,6 +272,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
 
   it('seeds from the Resource after Open, because embed is not a prior Enter', async () => {
     const spaces = await mount();
+    await selectResource('Architecture');
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Architecture' }));
     await waitFor(() => expect(spaces.entry(TARGET_ID)).toBeDefined());
     expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
@@ -296,7 +304,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
 
     await spaces.switchTo(HOME_ID);
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));
-    await screen.findByRole('button', { name: 'Actions for Resource Architecture' });
+    await screen.findByRole('article', { name: 'Architecture' });
 
     await enterArchitecture();
 
@@ -317,7 +325,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
       new Error(`The backend could not load space ${TARGET_ID}`),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Architecture' }));
+    await openArchitectureActions();
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Enter' }));
 
     await waitFor(() => {
@@ -349,7 +357,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     fireEvent.click(exitSpaceItem('Architecture'));
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));
     expect(spaces.entry(TARGET_ID)).toBeUndefined();
-    await screen.findByRole('button', { name: 'Actions for Resource Architecture' });
+    await screen.findByRole('article', { name: 'Architecture' });
 
     await enterArchitecture();
 

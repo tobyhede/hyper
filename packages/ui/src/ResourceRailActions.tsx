@@ -8,9 +8,9 @@ import { cn } from './lib/utils';
 /**
  * The command cluster at a Resource rail's trailing edge, as one toolbar (ADR 0073).
  *
- * The rail itself is `ResourceRail` and stays a plain band: it has a kind at one
- * edge and a slot at the other. This is what a Resource that carries several
- * commands puts in that slot.
+ * The rail itself is `ResourceRail` and stays a plain band with one slot at its
+ * trailing edge. This is what a Resource that carries several commands puts in
+ * that slot, trailed by the Resource's kind glyph.
  *
  * **It is `CommandToolbar`, which is what the Command Dock is** — the one
  * neutral command surface, drawn here over a Resource and there over the canvas
@@ -84,10 +84,10 @@ const GROUP_LAYOUT = 'inline-flex items-center gap-px';
  * tabindex is the toolbar root's and the arrows cross the boundary like any
  * other gap.
  *
- * A Space Resource leads with Map and Graph choices, then entity actions,
- * its Read/Edit (or Done) kind command, and Open/Close, with Enter inside the
- * entity menu. Content-edit commands on other kinds sit between the entity
- * actions and Open/Close. The mounting Resource supplies that order.
+ * The entity actions lead, then a Space Resource's Map and Graph choices, its
+ * Edit (or Done) kind command, and Open/Close last, with Enter inside the entity
+ * menu. Content-edit commands on other kinds sit between the entity actions and
+ * Open/Close. The mounting Resource supplies that order.
  *
  * Either group draws nothing when it holds nothing — a Reference Resource offers one
  * kind command and no shared one — so a rail never carries an empty named

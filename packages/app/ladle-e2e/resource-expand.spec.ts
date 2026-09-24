@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { resourceToolbar, selectResource } from '../e2e/graph';
 
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
@@ -25,9 +26,12 @@ test(
     await expect(reference.getByRole('heading', { name: 'Strategies', exact: true })).toBeVisible();
     await expect(reference.getByText('No strategy is privileged.', { exact: true })).toBeVisible();
     await expect(reference.getByRole('textbox')).toHaveCount(0);
-    await expect(reference.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+    const node = page.locator('.react-flow__node');
+    await selectResource(node);
+    const toolbar = await resourceToolbar(page, node);
+    await expect(toolbar.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
     await expect(
-      reference.getByRole('button', { name: 'Close Resource Strategy overview' }),
+      toolbar.getByRole('button', { name: 'Close Resource Strategy overview' }),
     ).toBeVisible();
     // The Target's content is the Open Resource's top passenger and the Reference Resource Title
     // its bottom one, the same treatment an Open Markdown Resource draws (ADR 0070).
@@ -76,14 +80,16 @@ test(
     };
     const closedBottomInset = await titleBottomInset();
 
-    await resource.hover();
+    const node = specimen.locator('.react-flow__node');
+    await selectResource(node);
+    const toolbar = await resourceToolbar(page, node);
     await expect(specimen.locator('.rf-resource-node__authoring-handle--source').first()).toHaveCSS(
       'opacity',
       '1',
     );
-    await resource.getByRole('button', { name: 'Open Resource Strategies' }).click();
+    await toolbar.getByRole('button', { name: 'Open Resource Strategies' }).click();
     await expect(resource.getByRole('heading', { name: 'Placement is authored' })).toBeVisible();
-    await expect(resource.getByRole('button', { name: 'Close Resource Strategies' })).toBeVisible();
+    await expect(toolbar.getByRole('button', { name: 'Close Resource Strategies' })).toBeVisible();
     await expect(title).toHaveAttribute('class', closedClass ?? '');
     expect(await title.evaluate(titleStyle)).toEqual(closedStyle);
     expect(await titleLeftInset()).toBeCloseTo(closedInset, 0);
@@ -103,12 +109,22 @@ test(
         ? Number.parseFloat(duration)
         : Number.parseFloat(duration) * 1000;
     };
-    const closingSnapshot = await resource
+    const closingSnapshot = await toolbar
       .getByRole('button', { name: 'Close Resource Strategies' })
       .evaluate((button, duration) => {
         const startedAt = performance.now();
+        // The toolbar floats outside the Resource (ADR 0102), so the Resource is
+        // found from the placement the toolbar names rather than as an ancestor.
+        const placement = button
+          .closest<HTMLElement>('[data-resource-rail-for]')
+          ?.getAttribute('data-resource-rail-for');
+        const element =
+          placement === null || placement === undefined
+            ? null
+            : document.querySelector<HTMLElement>(
+                `.react-flow__node[data-id="${placement}"] .canvas-resource`,
+              );
         button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        const element = button.closest<HTMLElement>('.canvas-resource');
         if (element === null) throw new Error('Closing Resource is unavailable');
         const content = element.querySelector<HTMLElement>('.canvas-resource__content');
         const titleElement = element.querySelector<HTMLElement>('.canvas-resource__title');
@@ -167,33 +183,30 @@ test(
       expect(inset).toBeLessThanOrEqual(Math.max(openBottomInset, closedBottomInset) + 1);
     }
 
+    // Deselected, the Resource's Edge handles quiet once the pointer leaves it.
+    await specimen.locator('.react-flow__pane').click({ position: { x: 2, y: 2 } });
     await page.mouse.move(0, 0);
+    await expect(node).not.toHaveClass(/\bselected\b/);
     const sourceHandle = specimen.locator('.rf-resource-node__authoring-handle--source').first();
     await expect(sourceHandle).toHaveCSS('opacity', '0');
     expect(await sourceHandle.evaluate(transitionDuration, 'opacity')).toBe(120);
-    // The rail carries no colour to fade now, so the quieting affects the two elements
-    // that do: the commands and the kind glyph
-    // (`.scratch/command-dock/issues/12`).
-    expect(
-      await resource.getByTestId('canvas-resource-actions').evaluate(transitionDuration, 'opacity'),
-    ).toBe(120);
-    expect(
-      await resource.locator('.resource-rail__kind').evaluate(transitionDuration, 'opacity'),
-    ).toBe(120);
 
     const leavingContent = resource.locator('.canvas-resource__content');
     await expect(leavingContent).toHaveCount(0);
     await expect(resource).toHaveAttribute('data-expanded', 'false');
-    await expect(resource.getByRole('button', { name: 'Open Resource Strategies' })).toBeVisible();
+    await selectResource(node);
+    await expect(toolbar.getByRole('button', { name: 'Open Resource Strategies' })).toBeVisible();
     const longResource = page.getByRole('region', { name: 'Long Markdown Resource' });
     await expect(longResource).toBeVisible();
-    await longResource.getByRole('article', { name: 'Long Markdown' }).hover();
-    await longResource.getByRole('button', { name: 'Close Resource Long Markdown' }).click();
+    const longNode = longResource.locator('.react-flow__node');
+    await selectResource(longNode);
+    const longToolbar = await resourceToolbar(page, longNode);
+    await longToolbar.getByRole('button', { name: 'Close Resource Long Markdown' }).click();
     await expect(longResource.getByRole('heading', { name: 'Placement is authored' })).toHaveCount(
       0,
     );
     await expect(
-      longResource.getByRole('button', { name: 'Open Resource Long Markdown' }),
+      longToolbar.getByRole('button', { name: 'Open Resource Long Markdown' }),
     ).toBeVisible();
   },
 );
@@ -416,10 +429,11 @@ test('the open Resource rail offers its edit action before Close', async ({ page
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
 });
 
-test('hover reveals only the rail Edit and Close actions', async ({ page }) => {
+test('a selected Open Resource offers only Edit and Close, and its body begins the edit', async ({
+  page,
+}) => {
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
-  await resource.hover();
 
   const labels = await resource
     .getByTestId('canvas-resource-actions')
@@ -537,27 +551,40 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeVisible();
 });
 
-/** An Open Resource hides its redundant kind glyph while its commands stay live during an Edit. */
-test('a Resource running an edit is not drawn at rest, however it is left', async ({ page }) => {
+/**
+ * An Open Resource hides its redundant kind glyph while its commands stay live
+ * during an Edit. This story mounts `CanvasResource` without React Flow, so its
+ * toolbar is drawn inline in the rail band rather than in a `NodeToolbar`, and is
+ * drawn whether or not the pointer is on the Resource.
+ */
+test('an Open Resource running an edit keeps its commands drawn, however it is left', async ({
+  page,
+}) => {
   await open(page, markdownStory);
   const resource = page.getByRole('article', { name: 'Strategies' });
   const commands = resource.getByTestId('canvas-resource-actions');
 
   await page.mouse.move(0, 0);
   await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
-  await expect(commands).toHaveCSS('opacity', '0');
+  await expect(commands).toBeVisible();
 
   await page.getByRole('button', { name: 'Focused edit', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of Strategies' })).toBeFocused();
   // Nothing is hovering the Resource and the caret is in its body, so the Edit
   // itself must keep Save, Cancel and Close visible.
   await page.mouse.move(0, 0);
-  await expect(commands).toHaveCSS('opacity', '1');
+  for (const name of [
+    'Save Resource Strategies',
+    'Cancel editing Resource Strategies',
+    'Close Resource Strategies',
+  ]) {
+    await expect(commands.getByRole('button', { name, exact: true })).toBeVisible();
+  }
 
   await resource.getByRole('button', { name: 'Cancel editing Resource Strategies' }).click();
   await page.mouse.move(0, 0);
   await expect(resource.getByRole('button', { name: 'Edit Resource Strategies' })).toBeFocused();
-  await expect(commands).toHaveCSS('opacity', '1');
+  await expect(commands).toBeVisible();
 });
 
 test(
@@ -668,37 +695,78 @@ test('rendered and source modes keep one content column', async ({ page }) => {
 });
 
 test(
-  'Open and Close release pointer-revealed controls while preserving keyboard access',
-  { tag: '@parity:resource-rail-reveal-distinguishes-pointer-and-keyboard' },
+  'Open and Close keep the Resource selected and its toolbar drawn, by pointer or keyboard',
+  { tag: '@parity:resource-toolbar-survives-open-and-close' },
   async ({ page }) => {
     await open(page, openCloseStory);
     const resource = page
       .getByRole('region', { name: 'Interactive Resource' })
       .locator('.react-flow__node');
-    const actions = resource.getByRole('toolbar', { name: 'Resource Strategies', exact: true });
+    await selectResource(resource);
+    const toolbar = await resourceToolbar(page, resource);
+    const actions = toolbar.getByTestId('canvas-resource-actions');
     for (const operation of ['Open', 'Close']) {
-      await resource.hover();
-      await resource
+      await toolbar
         .getByRole('button', { name: `${operation} Resource Strategies`, exact: true })
         .click();
+      // Moving the pointer away changes nothing: hover reveals no command.
       await page.mouse.move(1, 1);
-      await expect(actions).toHaveCSS('opacity', '0');
-      await expect(actions).toHaveCSS('pointer-events', 'none');
+      await expect(resource).toHaveClass(/\bselected\b/);
+      await expect(actions).toBeVisible();
     }
-    // Switch to keyboard modality, then reach and operate the same toolbar.
-    await page.keyboard.press('Tab');
-    const openControl = resource.getByRole('button', {
+    // Keyboard activation operates the same toolbar and keeps focus on the
+    // command across both transitions.
+    const openControl = toolbar.getByRole('button', {
       name: 'Open Resource Strategies',
       exact: true,
     });
     await openControl.focus();
-    await expect(actions).toHaveCSS('opacity', '1');
     await openControl.press('Enter');
-    const close = resource.getByRole('button', { name: 'Close Resource Strategies', exact: true });
+    const close = toolbar.getByRole('button', { name: 'Close Resource Strategies', exact: true });
     await expect(close).toBeFocused();
-    await expect(actions).toHaveCSS('opacity', '1');
+    await expect(resource).toHaveClass(/\bselected\b/);
+    await expect(actions).toBeVisible();
     await close.press('Enter');
     await expect(openControl).toBeFocused();
-    await expect(actions).toHaveCSS('opacity', '1');
+    await expect(resource).toHaveClass(/\bselected\b/);
+    await expect(actions).toBeVisible();
+  },
+);
+
+test(
+  'at rest a Resource draws no toolbar; selected, its commands are drawn with Open last, and its kind glyph stays at its top-right corner',
+  { tag: '@parity:resource-toolbar-draws-on-selection-with-open-last' },
+  async ({ page }) => {
+    await open(page, openCloseStory);
+    const resource = page
+      .getByRole('region', { name: 'Interactive Resource' })
+      .locator('.react-flow__node');
+    const toolbar = await resourceToolbar(page, resource);
+    const glyph = resource.getByRole('img', { name: 'Markdown Resource', exact: true });
+
+    await page.mouse.move(1, 1);
+    await expect(toolbar).toHaveCount(0);
+    await expect(glyph).toBeVisible();
+    // Hover reveals no command either.
+    await resource.hover({ position: { x: 10, y: 10 } });
+    await expect(toolbar).toHaveCount(0);
+
+    await selectResource(resource);
+    const commands = toolbar.getByTestId('canvas-resource-actions');
+    await expect(commands).toBeVisible();
+    const labels = await commands
+      .getByRole('button')
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
+    expect(labels.at(-1)).toBe('Open Resource Strategies');
+    await expect(commands.getByRole('img', { name: 'Markdown Resource' })).toHaveCount(0);
+
+    // The glyph is the Resource's own, in the top-right quarter of its face.
+    const face = await resource.locator('.canvas-resource').boundingBox();
+    const mark = await glyph.boundingBox();
+    if (face === null || mark === null) throw new Error('Resource geometry unavailable');
+    expect(mark.x).toBeGreaterThan(face.x + face.width / 2);
+    expect(mark.x + mark.width).toBeLessThanOrEqual(face.x + face.width);
+    expect(mark.y).toBeGreaterThanOrEqual(face.y);
+    expect(mark.y + mark.height).toBeLessThan(face.y + face.height / 2);
   },
 );

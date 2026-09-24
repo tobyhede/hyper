@@ -6,6 +6,7 @@ import {
   type Edge,
   type EdgeTypes,
   type Node,
+  type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
 import type { ResourceId, GraphId, MapId } from '@project/core';
@@ -159,9 +160,10 @@ export interface StoryCanvasProps {
    * Whether a Resource on this canvas can be moved by a pointer.
    *
    * A story that asks for it hands its nodes over as `defaultNodes`, because
-   * React Flow drops every change — the position, the Selection and the
-   * `dragging` flag alike — when `nodes` is controlled and no `onNodesChange`
-   * answers it, and a story that cannot report a drag cannot be dragged. So an
+   * React Flow drops every change it is not answered for when `nodes` is
+   * controlled — a controlled canvas here answers Selection alone, so the
+   * position and the `dragging` flag go — and a story that cannot report a drag
+   * cannot be dragged. So an
    * uncontrolled canvas is the price of a real gesture, and the cost is that
    * later prop updates no longer reach the flow: a story that drives a node from
    * its own state stays controlled and is not draggable.
@@ -200,12 +202,34 @@ export function StoryCanvas({
   const typeProps: Mutable<Pick<ComponentProps<typeof ReactFlow>, 'nodeTypes' | 'edgeTypes'>> = {};
   if (nodeTypesProp !== undefined) typeProps.nodeTypes = nodeTypesProp;
   if (edgeTypesProp !== undefined) typeProps.edgeTypes = edgeTypesProp;
+  /*
+   * A controlled canvas still answers React Flow's Selection changes, because a
+   * Resource's commands are drawn only while it is selected (ADR 0102). Only Selection is held here: a story that drives its
+   * nodes from its own state keeps every other field, and a node the pointer has
+   * not selected or deselected keeps the `selected` its story gave it.
+   */
+  const [selection, setSelection] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const onNodesChange = (changes: NodeChange[]) => {
+    const selects = changes.filter((change) => change.type === 'select');
+    if (selects.length === 0) return;
+    setSelection((current) => {
+      const next = new Map(current);
+      for (const change of selects) next.set(change.id, change.selected);
+      return next;
+    });
+  };
+  const controlledNodes = nodes.map((node) => {
+    const selected = selection.get(node.id);
+    return selected === undefined ? node : { ...node, selected };
+  });
 
   return (
     <div className={className} style={resourceSizeVars}>
       <ReactFlowProvider>
         <ReactFlow
-          {...(draggable ? { defaultNodes: [...nodes] } : { nodes: [...nodes] })}
+          {...(draggable
+            ? { defaultNodes: [...nodes] }
+            : { nodes: controlledNodes, onNodesChange })}
           edges={[...edges]}
           {...typeProps}
           {...(viewport.fit

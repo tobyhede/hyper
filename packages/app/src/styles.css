@@ -348,18 +348,16 @@ body {
 }
 
 /* Resizing is the Resource's one active authoring gesture. The resize control stays
-   reachable until release, while the rail withdraws so no second operation
-   competes with the pointer or remains visually armed.
+   reachable until release, while the toolbar withdraws so no second operation
+   competes with the pointer or remains visually armed. That withdrawal is
+   `ResourceNode`'s, not this sheet's: it draws no `NodeToolbar` during a resize
+   (`ResourceNode.test.tsx`).
 
    The anchors withdraw through `data-resizing` on the reveal above rather than
    through a rule here. They are `opacity: 0` at rest, so a reveal that cannot
    fire mid-gesture is the whole of the withdrawal — and stating the condition
    where the reveal is decided keeps it out of a specificity race the two rules
    would otherwise run against each other. */
-.react-flow__node .rf-resource-node__inner[data-resizing='true'] .canvas-resource__rail {
-  opacity: 0;
-  pointer-events: none;
-}
 
 /* A Resource is drawn in the Resource's vocabulary, never the chrome's. `--card`,
    `--border` and `--radius-chrome-xl` stood here and made an opened Resource take
@@ -499,10 +497,4 @@ body {
   /* A tint of the Resource's own ink rather than a chrome fill, which is how
      `markdown-resource-body.css` already grounds a code block on a Resource. */
   background: color-mix(in srgb, currentcolor 8%, transparent);
-}
-
-/* React Flow viewport coordinates keep a Space dock above its embedded nodes. */
-.resource-rail-layer {
-  position: absolute;
-  pointer-events: none;
 }

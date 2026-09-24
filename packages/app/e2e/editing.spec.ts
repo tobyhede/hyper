@@ -35,7 +35,6 @@ import {
   openGraphColourPicker,
   settleNewMapName,
   nodeByTitle,
-  openResource,
   positionOf,
   presentControl,
   recolorActiveGraph,
@@ -43,7 +42,9 @@ import {
   selectedCanvas,
   settled,
   spaceName,
-  resourceActions,
+  resourceControls,
+  resourceToolbar,
+  selectResource,
   viewportTransform,
 } from './graph';
 import { seedPositionedMap } from './seed';
@@ -63,6 +64,38 @@ import { seedPositionedMap } from './seed';
 async function quiescent(page: Page): Promise<void> {
   await settled(page);
   await page.waitForTimeout(250);
+}
+
+/**
+ * Everything a Resource offers — its face and its floating toolbar — selecting it
+ * first when the toolbar is not drawn, since a Resource's commands are drawn only
+ * while it is the one selected or an edit is running (ADR 0102).
+ */
+function controls(resource: Locator): Promise<Locator> {
+  return resourceControls(resource.page(), resource);
+}
+
+/**
+ * Open a Resource in place, without beginning content editing (ADR 0064).
+ *
+ * No pointer gesture on a Resource's body opens it (ADR 0036) — its toolbar's
+ * Open does, drawn once the Resource is selected (ADR 0102).
+ */
+async function openResource(node: Locator, title: string): Promise<void> {
+  await (await controls(node)).getByRole('button', { name: `Open Resource ${title}` }).click();
+}
+
+/** Select a placed Resource so its toolbar is drawn, and open its actions menu. */
+async function resourceActions(page: Page, title: string): Promise<Locator> {
+  const resource = nodeByTitle(page, title).first();
+  await (
+    await controls(resource)
+  )
+    .getByRole('button', { name: `Actions for Resource ${title}` })
+    .click({ delay: 120 });
+  const menu = page.getByRole('menu').last();
+  await expect(menu).toBeVisible();
+  return menu;
 }
 
 async function addExistingResource(page: Page, title: string): Promise<void> {
@@ -219,30 +252,28 @@ test(
     await settled(page);
     const before = await allPositions(page);
 
-    const actions = resource.getByTestId('canvas-resource-actions');
-    // Asserted on the container, not on the button: the reveal is
-    // `opacity`/`pointer-events` on `.canvas-resource__actions`, and `opacity` does
-    // not inherit — a computed `opacity` read off the button is `1` whether the
-    // Resource is hovered or not, so the same assertion there cannot fail.
-    await expect(actions).toHaveCSS('opacity', '0');
+    // Hovering reveals no commands: they are drawn, outside the Resource, only
+    // while it is the one selected (ADR 0102) — and unmounted otherwise.
+    const toolbar = await resourceToolbar(page, resource);
     await resource.hover();
-    await expect(actions).toHaveCSS('opacity', '1');
-    const edit = resource.getByRole('button', { name: 'Open Resource A' });
+    await expect(toolbar).toHaveCount(0);
+    await selectResource(resource);
+    await expect(toolbar).toBeVisible();
+    const edit = toolbar.getByRole('button', { name: 'Open Resource A' });
     // The affordance draws a glyph, so nothing about its own content keeps it in
-    // shape or in place. Sized square in CSS and parked in the corner, clear of
-    // the title — a name is what a screen reader gets, and the box is all a
-    // pointer gets.
+    // shape or in place. Sized square in CSS, and floated above the Resource's
+    // top-right corner — a name is what a screen reader gets, and the box is all
+    // a pointer gets.
     const editBox = await boxOf(edit, 'the Resource affordance');
     const resourceBox = await boxOf(resource, 'Resource A');
-    const titleBox = await boxOf(
-      resource.getByRole('heading', { name: 'A' }),
-      "Resource A's title",
-    );
     expect(Math.abs(editBox.width - editBox.height)).toBeLessThanOrEqual(1);
     expect(editBox.x).toBeGreaterThanOrEqual(resourceBox.x);
     expect(editBox.x + editBox.width).toBeLessThanOrEqual(resourceBox.x + resourceBox.width);
-    expect(editBox.y).toBeGreaterThanOrEqual(resourceBox.y);
-    expect(editBox.y + editBox.height).toBeLessThanOrEqual(titleBox.y);
+    expect(editBox.y + editBox.height).toBeLessThanOrEqual(resourceBox.y);
+
+    // Deselected, so the Title's claim below starts from nothing selected.
+    await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } });
+    await expect(toolbar).toHaveCount(0);
 
     // The displayed Title is its own control (ADR 0065): activating it neither
     // selects nor opens the Resource around it.
@@ -261,7 +292,11 @@ test(
     expect(await allPositions(page)).toEqual(before);
 
     await openResource(renamed, 'Renamed A');
-    await renamed.getByRole('button', { name: 'Close Resource Renamed A' }).click();
+    await (
+      await controls(renamed)
+    )
+      .getByRole('button', { name: 'Close Resource Renamed A' })
+      .click();
     await renamed.click();
     await page.keyboard.press('F2');
     const keyboardTitle = page.getByRole('textbox', { name: 'Resource title' });
@@ -342,10 +377,10 @@ test('the Resource affordance opens rendered Markdown and edits it in place', as
   await openResource(resource, 'A');
 
   await expect(resource).toContainText('entry point');
-  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await source.fill('Authored from the graph');
-  await resource.getByRole('button', { name: 'Save Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
@@ -367,11 +402,13 @@ test(
     await expect(bodyTarget).toHaveCSS('opacity', '0');
     await expect(bodyTarget.locator('svg')).toHaveCount(0);
     expect(
-      await resourceA
+      await (
+        await resourceToolbar(page, resourceA)
+      )
         .getByTestId('canvas-resource-actions')
         .getByRole('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
-      // The rail carries the Resource's own actions menu ahead of Edit and Close:
+      // The toolbar carries the Resource's own actions menu ahead of Edit and Close:
       // a Resource's addresses and its deletion belong to the Resource (ADR 0073), and
       // the Space's command surface does not draw them at all (ADR 0082). The
       // list is asserted whole rather than by presence, so a control appearing
@@ -414,11 +451,9 @@ test(
     await expect(source).toHaveCount(0);
     await expect(resourceA).toContainText('entry point');
 
-    // Hovered first: the click on the pane above took the pointer off the Resource,
-    // and a rail nobody is pointing at takes no pointer events — which is what
-    // the reload branch below already spells out.
-    await resourceA.hover();
-    await resourceA.getByRole('button', { name: 'Edit Resource A' }).click();
+    // The click on the pane above deselected the Resource, so its toolbar is
+    // drawn again only once it is selected (ADR 0102).
+    await (await controls(resourceA)).getByRole('button', { name: 'Edit Resource A' }).click();
     const committedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
     await committedSource.fill(exact);
     await committedSource.press(`${PRIMARY_MODIFIER}+Enter`);
@@ -426,8 +461,7 @@ test(
     await page.reload();
     const persisted = nodeByTitle(page, 'A').first();
     await expect(persisted).toContainText('two spaces and code');
-    await persisted.hover();
-    await persisted.getByRole('button', { name: 'Edit Resource A' }).click();
+    await (await controls(persisted)).getByRole('button', { name: 'Edit Resource A' }).click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
       'two spaces and `code`',
     );
@@ -450,14 +484,18 @@ test('the rail Cancel discards edited source', async ({ page }) => {
   await settled(page);
 
   await openResource(resourceA, 'A');
-  await resourceA.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(resourceA)).getByRole('button', { name: 'Edit Resource A' }).click();
   const source = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(source).toContainText('entry point');
   await source.fill('Discarded rewrite');
   expect(await markdownSource(source)).toBe('Discarded rewrite');
-  await resourceA.getByRole('button', { name: 'Cancel editing Resource A' }).click();
+  await (
+    await controls(resourceA)
+  )
+    .getByRole('button', { name: 'Cancel editing Resource A' })
+    .click();
   await expect(resourceA).toContainText('entry point');
-  await resourceA.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(resourceA)).getByRole('button', { name: 'Edit Resource A' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toContainText(
     'entry point',
   );
@@ -481,11 +519,11 @@ test('the Markdown editor code loads only when a Markdown Resource opens', async
   await expect(reference).toContainText('entry point');
   await expect(reference.getByRole('textbox')).toHaveCount(0);
   expect(editorRequests).toEqual([]);
-  await reference.getByRole('button', { name: 'Close Resource A′' }).click();
+  await (await controls(reference)).getByRole('button', { name: 'Close Resource A′' }).click();
 
   await openResource(resource, 'A');
   expect(editorRequests).toEqual([]);
-  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
   expect(editorRequests).toHaveLength(1);
 });
@@ -517,7 +555,7 @@ test('the opened Resource draws Markdown and its editor on the same paper surfac
     'background-color',
     'rgb(255, 250, 240)',
   );
-  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
 
   const source = page.locator('[data-slot="markdown-source-editor"]');
   await expect(source).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -554,21 +592,20 @@ test('opened Markdown editing persists source while expansion displaces and rest
         id !== openedId && JSON.stringify(expanded[id]) !== JSON.stringify(position),
     ),
   ).toBe(true);
-  await resource.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
-  await resource.getByRole('button', { name: 'Save Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
 
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   expect(await allPositions(page)).toEqual(expanded);
 
-  await resource.getByRole('button', { name: 'Close Resource A' }).click();
+  await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
   expect(await allPositions(page)).toEqual(before);
 
   await page.reload();
   const persisted = nodeByTitle(page, 'A').first();
-  await persisted.hover();
-  await persisted.getByRole('button', { name: 'Edit Resource A' }).click();
+  await (await controls(persisted)).getByRole('button', { name: 'Edit Resource A' }).click();
   const persistedSource = page.getByRole('textbox', { name: 'Markdown source of A' });
   await expect(persistedSource).toContainText('# Edited');
   await expect(persistedSource).toContainText('New source');
@@ -618,17 +655,18 @@ test('a dragged resource stays where it is dropped, and nothing else moves', asy
 });
 
 /**
- * Moving a Resource is one gesture, and the affordances that begin the other two
+ * Moving a Resource is one gesture, and the affordances that begin the others
  * are no part of it.
  *
- * The Resource is Opened first so both are on it at once — the four Edge anchors
- * and the one resize control — and the reveal is observed at rest before the
- * drag, so the withdrawal below is evidence of the gesture rather than of a
- * Resource that was never offering anything. Mid-drag the pointer is on the Resource
- * and React Flow has Selected it, which is every condition either reveal reads.
+ * The Resource is Opened first so all of them are on it at once — its toolbar,
+ * the four Edge anchors and the one resize control — and each is observed at
+ * rest before the drag, so the withdrawal below is evidence of the gesture
+ * rather than of a Resource that was never offering anything. Mid-drag the
+ * pointer is on the Resource and React Flow has Selected it, which is every
+ * condition the toolbar (ADR 0102) and either hover reveal reads.
  */
 test(
-  'a Resource being moved reveals neither its Edge handles nor its resize control, and offers both again on release',
+  'a Resource being moved draws neither its toolbar, its Edge handles nor its resize control, and offers them again on release',
   { tag: '@parity:dragged-resource-returns-its-chrome-to-rest' },
   async ({ page }) => {
     await page.goto('/');
@@ -644,32 +682,38 @@ test(
     });
 
     const inner = resource.locator('.rf-resource-node__inner');
+    const toolbar = await resourceToolbar(page, resource);
     const handle = authoringHandle(resource, 'source', 'right');
     const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
 
+    // Opening Selected it, so its toolbar is drawn; hovering reveals the rest.
+    await expect(toolbar).toBeVisible();
     await resource.hover();
     await expect(handle).toHaveCSS('opacity', '1');
     await expect(control).toHaveCSS('opacity', '1');
 
     await dragBy(page, resource, 160, 120, async () => {
       await expect(inner).toHaveAttribute('data-dragging', 'true');
+      await expect(resource).toHaveClass(/\bselected\b/);
+      // Unmounted rather than hidden: `NodeToolbar` draws nothing while the
+      // Resource is dragged, though it is the one selected (ADR 0102).
+      await expect(toolbar).toHaveCount(0);
       await expect(handle).toHaveCSS('opacity', '0');
       await expect(control).toHaveCSS('opacity', '0');
-      // The rail is `CanvasResource`'s own withdrawal, and it predates this: a
-      // dragging Resource renders no actions rather than hiding them.
-      await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
-      // The anchors are not the rail's case — they stay mounted and measurable,
-      // because React Flow measures a handle to place an Edge on it and a
-      // `display: none` one reports 0x0 (ADR 0087).
+      // The anchors are not the toolbar's case — they stay mounted and
+      // measurable, because React Flow measures a handle to place an Edge on it
+      // and a `display: none` one reports 0x0 (ADR 0087).
       await expect(resource.locator('.rf-resource-node__authoring-handle')).toHaveCount(8);
       const anchor = await boxOf(handle, "the dragged Resource's right source anchor");
       expect(anchor.width).toBeGreaterThan(0);
       expect(anchor.height).toBeGreaterThan(0);
     });
 
-    // Released under the same pointer that carried it: hover is true again, and
-    // so is everything hover reveals.
+    // Released under the same pointer that carried it: still the one selected, so
+    // its toolbar is drawn again, and hover is true again, so is everything hover
+    // reveals.
     await expect(inner).toHaveAttribute('data-dragging', 'false');
+    await expect(toolbar).toBeVisible();
     await expect(handle).toHaveCSS('opacity', '1');
     await expect(control).toHaveCSS('opacity', '1');
   },
@@ -769,7 +813,7 @@ test('dragging an Open Resource across a neighbour moves nothing but the dragged
 
   await openResource(subject, SUBJECT.title);
   await expect(
-    subject.getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
+    (await controls(subject)).getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
   ).toBeVisible();
   await settled(page);
 
@@ -831,7 +875,7 @@ test('a closed Resource released inside an Open Resource lands at the drop point
 
   await openResource(subject, SUBJECT.title);
   await expect(
-    subject.getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
+    (await controls(subject)).getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
   ).toBeVisible();
   await settled(page);
 
@@ -891,7 +935,7 @@ test('opening a Resource displaces its neighbours once, and dragging it never di
 
   await openResource(subject, SUBJECT.title);
   await expect(
-    subject.getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
+    (await controls(subject)).getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
   ).toBeVisible();
   await settled(page);
 
@@ -1069,19 +1113,27 @@ test(
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Close Resource A' })).toBeVisible();
+    await expect(
+      (await controls(persisted)).getByRole('button', { name: 'Close Resource A' }),
+    ).toBeVisible();
     const persistedSize = await persisted.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
     await expectResourceFillsNode(persisted);
     expect(persistedSize).toEqual(resized);
-    await persisted.hover();
-    await persisted.getByRole('button', { name: 'Close Resource A', exact: true }).click();
+    await (
+      await controls(persisted)
+    )
+      .getByRole('button', { name: 'Close Resource A', exact: true })
+      .click();
     await expect(persisted).toHaveCSS('width', '260px');
     await expectResourceFillsNode(persisted);
-    await persisted.hover();
-    await persisted.getByRole('button', { name: 'Edit Resource A', exact: true }).click();
+    await (
+      await controls(persisted)
+    )
+      .getByRole('button', { name: 'Edit Resource A', exact: true })
+      .click();
     await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toBeVisible();
     await expectResourceFillsNode(persisted);
     expect(await size()).toEqual(resized);
@@ -1122,10 +1174,19 @@ test(
     // A Closed Resource offers no control at all.
     await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
 
+    // Select an Edge first, which leaves the Resource unselected, so the gesture
+    // below is proven to move both — not merely to arrive with the Resource
+    // already Selected from an earlier click. `openResource` Selected it, to draw
+    // the toolbar its Open is on (ADR 0102), and Selection is also a reveal
+    // condition for the control.
+    await selectAnEdge(page);
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
+    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
+
     // The Open Resource offers exactly one, at its bottom-right corner, and it is
-    // not visible until hovered — the actual reveal mechanism. `openResource` left
-    // keyboard focus on its own control, which is *also* a reveal condition
-    // (Resource focus), so that focus is moved off the Resource first to observe rest.
+    // not visible until hovered — the actual reveal mechanism. Keyboard focus on
+    // the Resource is *also* a reveal condition, so focus is moved off first to
+    // observe rest.
     const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
     await expect(resource.locator('.react-flow__resize-control')).toHaveCount(1);
     await page.evaluate(() => {
@@ -1136,11 +1197,6 @@ test(
     await expect(control).toHaveCSS('opacity', '0');
     await resource.hover();
     await expect(control).toHaveCSS('opacity', '1');
-
-    // Select an Edge first, and leave the Resource unselected, so the gesture below
-    // is proven to move both — not merely to arrive with the Resource already
-    // Selected from an earlier click.
-    await selectAnEdge(page);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
 
@@ -1195,7 +1251,9 @@ test(
     // it: A's handles travel with its rect, so the curve is redrawn from the
     // live draft while B stays exactly where it was authored.
     await expect.poll(async () => edgePath.getAttribute('d')).not.toBe(beforeEdgePath);
-    await expect(resource.locator('.canvas-resource__rail')).toHaveCSS('opacity', '0');
+    // The gesture has Selected the Resource, and still no toolbar is drawn: a
+    // resize owns the pointer while it lasts (ADR 0102).
+    await expect(await resourceToolbar(page, resource)).toHaveCount(0);
     await expect(resource.locator('.rf-resource-node__authoring-handle--source').first()).toHaveCSS(
       'opacity',
       '0',
@@ -1420,7 +1478,9 @@ test.describe('resizing by touch', () => {
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Close Resource A' })).toBeVisible();
+    await expect(
+      (await controls(persisted)).getByRole('button', { name: 'Close Resource A' }),
+    ).toBeVisible();
     await persisted.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
@@ -1592,7 +1652,9 @@ test(
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A').first();
-    await expect(persisted.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+    await expect(
+      (await controls(persisted)).getByRole('button', { name: 'Open Resource A' }),
+    ).toBeVisible();
     await openResource(persisted, 'A');
     await persisted.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -2119,11 +2181,11 @@ test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await presentControl(page).click();
   await expect(page.getByTestId('exit-presenting')).toBeVisible();
 
-  // The rail itself is withdrawn while presenting, so there is no menu to open:
-  // the audience is looking at the Space, not at the tools. Asserted without
-  // hovering the Resource, because the camera has closed in on the presented one and
-  // `B` is off frame — which is the same reason the rail would be unreachable
-  // even if it were drawn.
+  // The toolbar itself is withdrawn while presenting, so there is no menu to
+  // open: the audience is looking at the Space, not at the tools. Asserted
+  // without selecting the Resource again, because the camera has closed in on
+  // the presented one and `B` is off frame — which is the same reason the
+  // toolbar would be unreachable even if it were drawn.
   await expect(page.getByRole('button', { name: 'Actions for Resource B' })).toHaveCount(0);
 });
 
@@ -2137,11 +2199,9 @@ test('Delete Resource is withdrawn while the selected Resource is Open', async (
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await nodeByTitle(page, 'B').first().click();
+  await selectResource(nodeByTitle(page, 'B').first());
   await page.getByRole('button', { name: 'Open Resource B' }).click();
-  await expect(
-    nodeByTitle(page, 'B').getByRole('button', { name: 'Close Resource B' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close Resource B' })).toBeVisible();
 
   await expect(
     (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),

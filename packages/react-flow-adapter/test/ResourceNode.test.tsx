@@ -71,6 +71,21 @@ type MockResizeControlProps = {
   ) => boolean | undefined;
 };
 
+/** The ids of the Resources the stood-in flow store holds selected. */
+const flow = vi.hoisted(() => {
+  const selected: string[] = [];
+  return { selected };
+});
+
+/** The props `ResourceNode` hands React Flow's `NodeToolbar`. */
+type MockNodeToolbarProps = {
+  isVisible?: boolean;
+  position?: string;
+  align?: string;
+  children?: ReactNode;
+  'data-resource-rail-for'?: string;
+};
+
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowReact>();
   return {
@@ -78,6 +93,32 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     useUpdateNodeInternals: () => updateNodeInternals,
     useViewport: () => ({ zoom: 1 }),
     useConnection: <T,>(selector: (state: MockConnectionState) => T): T => selector(connection),
+    /** The flow store, read here only for how many Resources are selected. */
+    useStore: <T,>(
+      selector: (state: { nodes: readonly { id: string; selected: boolean }[] }) => T,
+    ): T => selector({ nodes: flow.selected.map((id) => ({ id, selected: true })) }),
+    /**
+     * React Flow's own node toolbar, which portals into the flow's renderer and
+     * so cannot render outside a provider. Stood in for with what it decides: its
+     * children, drawn only while it is visible, carrying the props it forwards.
+     */
+    NodeToolbar: ({
+      isVisible,
+      position,
+      align,
+      children,
+      'data-resource-rail-for': railFor,
+    }: MockNodeToolbarProps) =>
+      isVisible === true ? (
+        <div
+          className="react-flow__node-toolbar"
+          data-position={position}
+          data-align={align}
+          data-resource-rail-for={railFor}
+        >
+          {children}
+        </div>
+      ) : null,
     /**
      * React Flow's own resize control, which reaches for the flow store and so
      * cannot render outside a provider. Stood in for like every other piece of
@@ -137,6 +178,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 });
 
 beforeEach(() => {
+  flow.selected = [];
   connection.inProgress = false;
   connection.fromHandle.type = 'source';
   delete connection.toNode;
@@ -148,6 +190,7 @@ const resourceId = uuid('00000000-0000-4000-8000-000000000001');
 
 interface Overrides {
   selected?: boolean;
+  selectedForAuthoring?: boolean;
   dragging?: boolean;
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
@@ -167,6 +210,7 @@ interface Overrides {
 
 function props({
   selected = false,
+  selectedForAuthoring = false,
   dragging = false,
   isConnectable = true,
   title = 'A',
@@ -187,7 +231,7 @@ function props({
     title,
     kind,
     active: false,
-    selectedForAuthoring: false,
+    selectedForAuthoring,
     showContent: false,
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
@@ -273,7 +317,16 @@ describe('ResourceNode canvas Resource state adapter', () => {
   });
 
   it('renders a Reference Resource through the shared kind treatment', () => {
-    render(<ResourceNode {...props({ kind: 'reference', title: 'A, again' })} />);
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          title: 'A, again',
+          selected: true,
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
 
     expect(screen.getByRole('article', { name: 'A, again' })).toHaveAttribute(
       'data-kind',
@@ -289,6 +342,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
         {...props({
           kind: 'reference',
           title: 'A, again',
+          selected: true,
           onEditResource,
         })}
       />,
@@ -299,7 +353,9 @@ describe('ResourceNode canvas Resource state adapter', () => {
   });
 
   it('draws a Markdown Resource kind glyph like any other kind', () => {
-    render(<ResourceNode {...props({ kind: 'markdown' })} />);
+    render(
+      <ResourceNode {...props({ kind: 'markdown', selected: true, onEditResource: vi.fn() })} />,
+    );
 
     expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
   });
@@ -324,6 +380,108 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.queryByText('must not render')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open Resource A' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
+  });
+});
+
+describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar", () => {
+  const toolbar = () => screen.queryByRole('toolbar', { name: 'Resource A' });
+
+  it('draws them above the top-right corner while the Resource is the one selected', () => {
+    flow.selected = [resourceId];
+    render(<ResourceNode {...props({ selected: true, onEditResource: vi.fn() })} />);
+
+    const floating = toolbar()?.closest('.react-flow__node-toolbar');
+    expect(floating).toHaveAttribute('data-position', 'top');
+    expect(floating).toHaveAttribute('data-align', 'end');
+    expect(floating).toHaveAttribute('data-resource-rail-for', resourceId);
+  });
+
+  it('draws none on a Resource at rest', () => {
+    render(<ResourceNode {...props({ onEditResource: vi.fn() })} />);
+    expect(toolbar()).toBeNull();
+  });
+
+  it('draws none while several Resources are selected', () => {
+    flow.selected = [resourceId, 'other'];
+    render(<ResourceNode {...props({ selected: true, onEditResource: vi.fn() })} />);
+    expect(toolbar()).toBeNull();
+  });
+
+  it('draws none for the authoring selection while React Flow holds another Resource selected', () => {
+    flow.selected = ['other'];
+    render(<ResourceNode {...props({ selectedForAuthoring: true, onEditResource: vi.fn() })} />);
+    expect(toolbar()).toBeNull();
+  });
+
+  it('draws none while the Resource is dragged', () => {
+    flow.selected = [resourceId];
+    render(
+      <ResourceNode {...props({ selected: true, dragging: true, onEditResource: vi.fn() })} />,
+    );
+    expect(toolbar()).toBeNull();
+  });
+
+  it('draws none while the Resource is resized', () => {
+    flow.selected = [resourceId];
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    render(
+      <ResourceNode
+        {...props({
+          selected: true,
+          expanded: true,
+          body: 'Body',
+          resize,
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
+    expect(toolbar()).not.toBeNull();
+
+    fireEvent.mouseDown(screen.getByTestId('resize-control'));
+    expect(toolbar()).toBeNull();
+  });
+
+  it('returns focus to the Resource when an edit ends on a Resource no longer selected', async () => {
+    const running = props({
+      expanded: true,
+      body: 'Body',
+      onEditResource: vi.fn(),
+      bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+    });
+    const inNode = (node: NodeProps<ResourceFlowNode>) => (
+      <div className="react-flow__node" tabIndex={-1}>
+        <ResourceNode {...node} />
+      </div>
+    );
+    const { container, rerender } = render(inNode(running));
+    await screen.findByRole('button', { name: 'Save Resource A' });
+
+    // Save or Cancel ends the edit, and with it the reason the toolbar was drawn.
+    rerender(inNode(props({ expanded: true, body: 'Body', onEditResource: vi.fn() })));
+
+    expect(toolbar()).toBeNull();
+    expect(container.querySelector('.react-flow__node')).toHaveFocus();
+  });
+
+  it('keeps the exits of a running edit although the Resource is no longer selected', () => {
+    render(
+      <ResourceNode
+        {...props({
+          expanded: true,
+          body: 'Body',
+          onEditResource: vi.fn(),
+          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+        })}
+      />,
+    );
+    expect(toolbar()).not.toBeNull();
   });
 });
 
@@ -880,6 +1038,7 @@ describe('ResourceNode Expanded Resource front', () => {
           title: 'Return',
           expanded: true,
           body: SOURCE,
+          selected: true,
           onEditResource: vi.fn(),
         })}
       />,

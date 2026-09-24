@@ -18,7 +18,7 @@ export const States: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource states"
-      note="The shared CanvasResource presentation contract, drawn statically for rest, selected and dragging. Hover and keyboard reveal are proven live in Hover actions, and title editing in Title editing."
+      note="The shared CanvasResource presentation contract, drawn statically for rest, selected and dragging. Hover and selection are proven live in Hover and selection, and title editing in Title editing."
     >
       <div className="inv-row">
         <Specimen label="resource · rest">
@@ -86,19 +86,20 @@ const FRONTS = [
  * control` are each a slice, and two undecided elements lived on the front for
  * months because the slice that drew them was not the slice anyone reviewed.
  *
- * What every specimen below draws, and all it draws: the kind glyph at the
- * leading edge of the rail, the Resource's border — dotted for a Reference Resource, solid for
- * every other front — and the Resource's Title, as one `.canvas-resource__title-line`
- * per Title Line. Nothing is drawn beneath the Title: a closed Resource's whole
- * content is the Title its author wrote. No specimen is handed an authoring
- * callback, so no rail actions are drawn either; `Hover` and `Actions` are
- * where those live.
+ * What every specimen below draws, and all it draws: the Resource's border —
+ * dotted for a Reference Resource, solid for every other front — and the
+ * Resource's Title, as one `.canvas-resource__title-line` per Title Line. Nothing
+ * is drawn beneath the Title: a closed Resource's whole content is the Title its
+ * author wrote. A closed front draws its kind glyph at its top-right corner,
+ * whether or not it has a toolbar; an Open Resource draws none. No specimen is
+ * handed an authoring callback, so no toolbar is drawn (ADR 0102); `Hover` and
+ * `Actions` are where the commands live.
  */
 export const Front: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource front"
-      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its kind glyph, its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing."
+      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none."
     >
       <div className="inv-row">
         {FRONTS.map((front) => (
@@ -187,11 +188,11 @@ Colours.meta = { iframed: true };
 export const Hover: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
-      title="Hover actions"
-      note="Move the pointer over the real React Flow node to reveal its rail actions and Edge handles together — CanvasResource's own hover CSS drawn alongside the adapter-owned geometry it shares the node with."
+      title="Hover and selection"
+      note="Move the pointer over the real React Flow node to reveal its Edge handles; hovering reveals none of its commands. Select it to draw its commands in React Flow's NodeToolbar, above its top-right corner."
     >
       <div className="inv-row">
-        <Specimen label="hover to show actions and Edge handles">
+        <Specimen label="hover to show Edge handles, select to show commands">
           <CanvasResourceNodeSpecimen />
         </Specimen>
         <Specimen label="selected · hover for combined state">
@@ -207,7 +208,7 @@ export const Hover: Story = () => (
 Hover.meta = { iframed: true };
 
 /**
- * The same reveal, seen from the other side: a Resource being moved has no hover
+ * The same reveal, seen from the other side: a Resource being moved draws no
  * chrome, although a drag satisfies every condition the chrome is revealed by —
  * the pointer stays on the Resource it is carrying, and React Flow Selects it as
  * the gesture begins. So this is a live drag of the real production `ResourceNode`
@@ -218,7 +219,7 @@ export const Drag: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Drag"
-      note="Press the Resource and move it: the rail actions and the Edge handles both return to rest for the gesture, and hovering the Resource after release reveals them again."
+      note="Press the Resource and move it: its toolbar and its Edge handles both return to rest for the gesture. On release the drag has Selected it, so its toolbar is drawn again, and hovering it reveals its handles."
     >
       <div className="inv-row">
         <Specimen label="drag to return the chrome to rest">
@@ -304,7 +305,14 @@ function Instance({
   };
   const front: CanvasResourceFront =
     kind === 'reference'
-      ? { kind: 'reference', target: { kind: 'markdown', source: '' }, open: false }
+      ? // Every kind Opens and Closes through the one operation (ADR 0070), so the
+        // Reference Resource carries it too.
+        {
+          kind: 'reference',
+          target: { kind: 'markdown', source: 'Markdown content' },
+          open,
+          onOpenChange: changeOpen,
+        }
       : open
         ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
         : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen };

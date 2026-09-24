@@ -50,6 +50,7 @@ describe('CanvasResource kind and interaction state', () => {
       'data-kind',
       'markdown',
     );
+    expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -75,7 +76,12 @@ describe('CanvasResource kind and interaction state', () => {
   it('presents a Reference Resource front by its kind alone', () => {
     render(
       <CanvasResource
-        front={{ kind: 'reference', target: { kind: 'markdown', source: '' }, open: false }}
+        front={{
+          kind: 'reference',
+          target: { kind: 'markdown', source: '' },
+          open: false,
+          onOpenChange: vi.fn(() => 'completed' as const),
+        }}
         state="selected"
         title="Opening, again"
         graphColor="#35d6c3"
@@ -252,9 +258,10 @@ describe('CanvasResource Open and Close operation', () => {
     );
 
     const labels = () =>
-      Array.from(screen.getByTestId('canvas-resource-actions').querySelectorAll('button')).map(
-        (button) => button.getAttribute('aria-label'),
-      );
+      // The commands, which are the labelled buttons; the kind glyph trails them.
+      Array.from(
+        screen.getByTestId('canvas-resource-actions').querySelectorAll('button[aria-label]'),
+      ).map((button) => button.getAttribute('aria-label'));
     expect(labels()).toEqual(['Edit Resource A', 'Open Resource A']);
 
     // Collapsed, Edit is the two gestures an author would otherwise make in
@@ -689,7 +696,8 @@ describe('CanvasResource Title ladder', () => {
           onOpenChange: () => 'completed' as const,
           onBeginEdit: () => undefined,
         }}
-        state="rest"
+        // Selected, so the Open body offers its edit target to be named.
+        state="selected"
         title={title}
         graphColor="#ffc53d"
         onBeginTitleEdit={() => undefined}
@@ -1035,7 +1043,7 @@ describe('CanvasResource Space front', () => {
     </>
   );
 
-  it('inserts a provided spaceRail at the head of the Resource rail', () => {
+  it('inserts a provided spaceRail into the Resource rail', () => {
     render(
       <CanvasResource
         front={{ kind: 'space', open: true, spaceRail }}
@@ -1046,7 +1054,7 @@ describe('CanvasResource Space front', () => {
     );
 
     const rail = screen.getByTestId('canvas-resource-actions');
-    expect(screen.getByRole('toolbar')).toBe(rail);
+    expect(screen.getByRole('toolbar')).toContainElement(rail);
     for (const id of ['space-resource-map', 'space-resource-graph']) {
       expect(rail).toContainElement(screen.getByTestId(id));
       expect(screen.getByTestId(id).closest('.canvas-resource__body')).toBeNull();
@@ -1278,7 +1286,7 @@ describe('CanvasResource Space front', () => {
     expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
     const rail = screen.getByTestId('canvas-resource-actions');
-    expect(screen.getByRole('toolbar')).toBe(rail);
+    expect(screen.getByRole('toolbar')).toContainElement(rail);
     for (const id of ['space-resource-map', 'space-resource-graph']) {
       expect(rail).toContainElement(screen.getByTestId(id));
       expect(screen.getByTestId(id).closest('.canvas-resource__body')).toBeNull();
@@ -1463,5 +1471,40 @@ describe('CanvasResource Space front', () => {
       />,
     );
     expect(screen.queryByRole('button', { name: /Enter/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('CanvasResource Open Markdown body', () => {
+  /**
+   * A click on an unselected Resource selects it, as a click on any React Flow
+   * node does; editing its Markdown is the next click, or the Edit command
+   * (ADR 0102). So the body offers its edit target only once the Resource is
+   * selected, and before that the click reaches the node beneath.
+   */
+  const openMarkdown = (state: 'rest' | 'selected', onBeginEdit: () => void) => (
+    <CanvasResource
+      front={{
+        kind: 'markdown',
+        source: 'Body',
+        open: true,
+        onOpenChange: () => 'completed' as const,
+        onBeginEdit,
+      }}
+      state={state}
+      title="A"
+      graphColor="#ffc53d"
+    />
+  );
+
+  it('offers no edit target on a Resource that is not selected', () => {
+    render(openMarkdown('rest', vi.fn()));
+    expect(screen.queryByTestId('markdown-resource-body-edit-target')).toBeNull();
+  });
+
+  it('begins the edit from the body of a selected Resource', () => {
+    const onBeginEdit = vi.fn();
+    render(openMarkdown('selected', onBeginEdit));
+    fireEvent.click(screen.getByTestId('markdown-resource-body-edit-target'));
+    expect(onBeginEdit).toHaveBeenCalledOnce();
   });
 });

@@ -792,17 +792,16 @@ test(
     await expect(strip.getByRole('group', { name: 'Create a Resource' })).toBeAttached();
     const createSpace = strip.getByRole('button', { name: 'Create Space Resource', exact: true });
     await expect(createSpace.locator('[data-icon="space"]')).toBeVisible();
+    // What the press made is read off the Resource's own kind.
+    const spaceResources = page.locator(
+      '.react-flow__node:visible .canvas-resource[data-kind="space"]',
+    );
+    const before = await spaceResources.count();
     await createSpace.click();
     const title = page.getByRole('textbox', { name: 'Resource title' });
     await expect(title).toBeFocused();
     await title.press('Enter');
-    await expect(
-      page
-        .locator('.react-flow__node:visible')
-        .getByRole('img', { name: 'Space Resource', exact: true })
-        .locator('[data-icon="space"]')
-        .last(),
-    ).toBeVisible();
+    await expect(spaceResources).toHaveCount(before + 1);
   },
 );
 
