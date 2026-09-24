@@ -2,11 +2,15 @@
 
 Status: ready-for-human
 
-**What to build:** An optional, one-line, never-minted `title` on an Edge, through the domain: `graphEdgeSchema`, the aggregate and fixtures rolled forward in one change (the repo is the only source of state), intake, persistence on both SQL stores and the memory adapters, and a `titled-edge` (or similarly named) Edit that sets or clears it.
+**What to build:** An optional, one-line, never-minted `title` on an Edge, and an authored `titleHidden: true` beside it, through the domain: `graphEdgeSchema`, the aggregate and fixtures rolled forward in one change (the repo is the only source of state), intake, persistence on both SQL stores and the memory adapters, and a `titled-edge` (or similarly named) Edit that sets or clears it, and an Edit that hides or shows it.
 
 **Why:** Authors need to annotate an Edge; at a fork, a Title is what tells the presenter's choices apart.
 
 - [ ] An ADR records that an Edge's Title is optional and absent by default, one line, never minted, and that an Edge's identity stays `(from, to)` within its Graph — drawing an existing Edge again still changes nothing.
 - [ ] `CONTEXT.md`'s Edge entry says an Edge may carry a Title, and its Selected Edge entry no longer says the controls "reconnect".
-- [ ] Setting a Title to empty clears it; the Edit is `unchanged` when the Title does not change.
-- [ ] Delete-then-draw does not carry a Title over (decided — reconnect is dropped).
+- [ ] The schema refuses a Title containing a line break; there is no length cap; a draft is trimmed.
+- [ ] Setting a Title to empty clears it and `titleHidden` with it; the Edit is `unchanged` when the Title does not change.
+- [ ] `titleHidden` is present only as `true`, and the schema refuses it on an Edge without a `title`. The ADR records why this per-Edge presentation flag is admitted while per-Edge style is out: the Title is the Edge's own content, so whether it shows at rest is the Edge's.
+- [ ] Delete-then-draw does not carry a Title over (decided — reconnect is dropped). The ADR also records that a redrawn Edge is appended, so it moves to the last choice at a fork; fork order is deferred to `08`.
+
+Spec: `.scratch/edge-title/spec.md`.

@@ -1,7 +1,7 @@
 # 06 — A Title that does not fit its Edge
 
-Status: needs-info
+Status: ready-for-agent (build as part of `05`)
 
-**What to build:** Decide what a short Edge draws for a Title longer than it.
+**Decided:** At rest a Title is fitted to its Edge. Below a threshold — a fitted box that cannot hold about three characters and the ellipsis — nothing draws at rest. While the Edge is revealed (hovered, selected, or its Title being edited) the box grows to the whole Title up to the 224px ceiling, centred on the midpoint and raised over the Resources. The threshold is measured in canvas units: there is no zoom rule, and Titles scale with the Map as Resource Titles do.
 
-**Why:** Fitting the Title to the Edge holds it to the 40px floor on a 72px gap, which drew "If th…" — unreadable in every prototype variant. Options seen so far: draw the whole Title as a caption above the line when it does not fit; show the whole Title only on hover; let it overlap the Resources it joins.
+**Why:** Fitting the Title to the Edge held it to a 40px floor on a 72px gap, which drew "If th…" — unreadable in every prototype variant. Any readable Title on a gap that short covers something; revealing is already how an Edge asks for attention, so that is when it may.
