@@ -9,7 +9,7 @@ import {
   type UUID,
 } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { GRAPH_PALETTE } from '../src/colors';
+import { GRAPH_PALETTE, nextGraphColor } from '../src/colors';
 import { composeApp } from '../src/compose-app';
 
 import { mintingIds } from './minting';
@@ -55,6 +55,8 @@ const UNLOADED_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
 const UNLOADED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
 
 const CENTRE = { x: 400, y: 300, open: false };
+
+const BLUE = GRAPH_PALETTE[0];
 
 const MAIN_GRAPH: Graph = {
   id: GRAPH_ID,
@@ -488,7 +490,7 @@ describe('Add Reference Resource', () => {
 });
 
 describe('Add Graph', () => {
-  it('rotates colour by its appended position in the owning Map', () => {
+  it('chooses its colour against the owning Map’s Graphs and no other Map’s', () => {
     const snapshot: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
@@ -503,7 +505,11 @@ describe('Add Graph', () => {
               [RESOURCE_A]: { x: 20, y: 30, open: false },
               [RESOURCE_B]: { x: 310, y: 50, open: false },
             },
-            graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
+            // The colour this Map's Graphs alone would choose, carried by
+            // another Map, so counting it would choose something else.
+            graphs: [
+              { id: OTHER_GRAPH_ID, title: 'Other', color: nextGraphColor([BLUE]), edges: [] },
+            ],
           },
         ],
       },
@@ -515,7 +521,25 @@ describe('Add Graph', () => {
       createdGraphId: MINTED,
     });
 
-    expect(mapOf(session.getState().working, MAP_ID)?.graphs.at(-1)?.color).toBe(GRAPH_PALETTE[1]);
+    expect(mapOf(session.getState().working, MAP_ID)?.graphs.at(-1)?.color).toBe(
+      nextGraphColor([BLUE]),
+    );
+  });
+
+  it('counts a Graph with no stored colour as the colour the Map draws for it', () => {
+    const { authoring, session } = openPositioned();
+
+    expect(authoring.complete({ kind: 'added-graph' })).toEqual({
+      kind: 'completed',
+      createdGraphId: MINTED,
+    });
+
+    // `Main` stores no colour and is drawn in the first slot, so the new Graph
+    // is chosen against blue rather than against nothing.
+    expect(mapOf(session.getState().working, MAP_ID)?.graphs.at(-1)?.color).toBe(
+      nextGraphColor([BLUE]),
+    );
+    expect(nextGraphColor([BLUE])).not.toBe(BLUE);
   });
 
   it('appends, colours and activates one empty Graph without touching the others', () => {
@@ -528,7 +552,7 @@ describe('Add Graph', () => {
 
     expect(graphsOf(session.getState().working)).toEqual([
       MAIN_GRAPH,
-      { id: MINTED, title: 'Graph 1', color: GRAPH_PALETTE[1], edges: [] },
+      { id: MINTED, title: 'Graph 1', color: nextGraphColor([BLUE]), edges: [] },
     ]);
     expect(mapOf(session.getState().working, MAP_ID)?.activeGraph).toBe(MINTED);
     expect(navigation.getState().activeGraphId).toBe(MINTED);

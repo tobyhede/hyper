@@ -1,6 +1,6 @@
 # 01 — A new Graph takes the colour farthest from its Map's other Graphs
 
-Status: ready-for-agent
+Status: done
 
 **What to build:** Adding a Graph — through the Dock's New Graph, or by drawing the first connection in an empty Map, or any other creation gesture — stores the palette colour whose *nearest* colour among that Map's other Graphs is farthest away. Today the next colour is chosen by rotating through the palette by the Map's Graph count, and because the palette is ordered for the two-column swatch grid (each hue's dark then light slot, hues in colour-wheel order), a Map's first two Graphs are blue and blue light, and every neighbour is a near relation.
 
@@ -17,7 +17,7 @@ Decided:
 - Existing Graphs keep their stored colours; nothing is recoloured, and the swatch grid's layout is unchanged.
 - The resolved fallback for an imported Graph with no stored colour is out of scope.
 
-- [ ] Every Graph creation gesture stores a colour chosen by the rule above, and none still rotates by count
-- [ ] Property test: for any set of existing Map colours, no other candidate in the eligible set has a larger minimum distance than the one chosen
-- [ ] Example tests: empty Map → first slot; one blue Graph → a non-blue strong colour; ten strong colours in use → the light slots become eligible; ties resolve by palette order
-- [ ] `CONTEXT.md`'s Graph entry already states the rule (landed with this ticket's filing); the code's doc comments agree with it
+- [x] Every Graph creation gesture stores a colour chosen by the rule above, and none still rotates by count
+- [x] Property test: for any set of existing Map colours, no other candidate in the eligible set has a larger minimum distance than the one chosen
+- [x] Example tests: empty Map → first slot; one blue Graph → a non-blue strong colour; ten strong colours in use → the light slots become eligible; ties resolve by palette order
+- [x] `CONTEXT.md`'s Graph entry already states the rule (landed with this ticket's filing); the code's doc comments agree with it

@@ -6,8 +6,9 @@ import type { Space } from '@project/graph';
  * The twenty hex values are Tableau Classic 20. Order here is for the two-column
  * swatch picker — each hue's dark and light slots share a row, and successive rows
  * follow colour-wheel adjacency (blue → cyan → green → … → grey) so related hues
- * sit near each other vertically. `colors.test.ts` holds the layout; {@link nextGraphColor}
- * rotates through it rather than Tableau's categorical assignment order.
+ * sit near each other vertically. `colors.test.ts` holds the layout. {@link nextGraphColor}
+ * reads the even slots as each hue's dark one, and otherwise chooses by distance, so
+ * the order matters to it only for breaking ties.
  */
 export const GRAPH_PALETTE = [
   '#1f77b4', // blue
@@ -77,21 +78,102 @@ export function activeGraphColor(
   return colorByGraphId[activeGraphId] ?? GRAPH_PALETTE[0];
 }
 
+/** A colour as a point in OKLab, where Euclidean distance approximates perceived difference. */
+interface OklabPoint {
+  readonly l: number;
+  readonly a: number;
+  readonly b: number;
+}
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/** One sRGB channel byte, gamma-decoded to linear light. */
+const linearChannel = (byte: number): number => {
+  const encoded = byte / 255;
+  return encoded <= 0.040_45 ? encoded / 12.92 : ((encoded + 0.055) / 1.055) ** 2.4;
+};
+
 /**
- * The color authoring stores on a graph it creates, rotating through the
- * palette by the Graph's appended position in its owning Map.
+ * `#rrggbb` or `#rgb`, in either case, as an OKLab point (Björn Ottosson's
+ * sRGB → OKLab matrices); `null` for any other CSS colour spelling, which a
+ * stored Graph `color` is free to be.
+ */
+function oklab(color: string): OklabPoint | null {
+  if (!HEX_COLOR.test(color)) return null;
+  const digits = color.slice(1);
+  const full = digits.length === 3 ? digits.replace(/./g, (digit) => digit + digit) : digits;
+  const r = linearChannel(Number.parseInt(full.slice(0, 2), 16));
+  const g = linearChannel(Number.parseInt(full.slice(2, 4), 16));
+  const b = linearChannel(Number.parseInt(full.slice(4, 6), 16));
+  const l = Math.cbrt(0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b);
+  const m = Math.cbrt(0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b);
+  const s = Math.cbrt(0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b);
+  return {
+    l: 0.210_454_255_3 * l + 0.793_617_785 * m - 0.004_072_046_8 * s,
+    a: 1.977_998_495_1 * l - 2.428_592_205 * m + 0.450_593_709_9 * s,
+    b: 0.025_904_037_1 * l + 0.782_771_766_2 * m - 0.808_675_766 * s,
+  };
+}
+
+/**
+ * The perceptual distance between two colours — Euclidean in OKLab — or `null`
+ * when either is not a hex colour {@link nextGraphColor} can read.
+ */
+export function graphColorDistance(first: string, second: string): number | null {
+  const p = oklab(first);
+  const q = oklab(second);
+  if (p === null || q === null) return null;
+  return Math.hypot(p.l - q.l, p.a - q.a, p.b - q.b);
+}
+
+/** Each hue's dark slot: the even slots of {@link GRAPH_PALETTE}'s dark-then-light rows. */
+const GRAPH_PALETTE_DARK_SLOTS = GRAPH_PALETTE.filter((_, index) => index % 2 === 0);
+
+/**
+ * The color authoring stores on a Graph it creates: the palette slot whose
+ * nearest colour among `existing` — the colours the owning Map's other Graphs
+ * carry — is farthest away, by {@link graphColorDistance}.
  *
- * Stored rather than resolved. Every creation gesture rotates by this same
+ * Candidates are the ten dark slots while any of them is not already in
+ * `existing`, and all twenty once every one is: the light slots would win most
+ * distance contests and are the weakest strokes on a light canvas, so they are
+ * reached only when the strong colours run out (an author can still choose one
+ * from Colour…). Ties break by palette order, so an empty Map's first Graph is
+ * the first slot.
+ *
+ * A colour in `existing` that is not `#rrggbb` or `#rgb` is ignored: it neither
+ * pushes candidates away nor marks a slot used. It is the caller's to say what a
+ * Graph with no stored colour counts as; Space Authoring passes the colour the
+ * Map draws for it.
+ *
+ * Stored rather than resolved. Every creation gesture chooses by this same
  * Map-local rule, so a Graph does not get different properties according to
- * whether it was added through Graph management or minted by the first
- * connection drawn in a Map.
+ * whether it was added through Graph management or minted with a new Map.
  *
  * The palette is an authoring constant, not a domain constraint:
  * {@link graphColorsByGraphId} still resolves a fallback for an imported graph that
  * carries no color of its own.
  */
-export const nextGraphColor = (owningMapGraphCount: number): string =>
-  GRAPH_PALETTE[owningMapGraphCount % GRAPH_PALETTE.length] ?? GRAPH_PALETTE[0];
+export function nextGraphColor(existing: readonly string[]): string {
+  const used = new Set(existing.map((color) => color.toLowerCase()));
+  const candidates = GRAPH_PALETTE_DARK_SLOTS.some((slot) => !used.has(slot))
+    ? GRAPH_PALETTE_DARK_SLOTS
+    : GRAPH_PALETTE;
+  let chosen: string = GRAPH_PALETTE[0];
+  let chosenDistance = Number.NEGATIVE_INFINITY;
+  for (const candidate of candidates) {
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const color of existing) {
+      const distance = graphColorDistance(candidate, color);
+      if (distance !== null) nearest = Math.min(nearest, distance);
+    }
+    if (nearest > chosenDistance) {
+      chosen = candidate;
+      chosenDistance = nearest;
+    }
+  }
+  return chosen;
+}
 
 /** Resolve each graph's color: its space `color`, else a palette slot by order. */
 export function graphColorsByGraphId(space: Space): Record<string, string> {
