@@ -561,7 +561,7 @@ describe('Space app failure reporting', () => {
    * The **item's own label** survives on the Resource rail, and only there: that
    * menu is on the canvas, over the Resource, so a reader following it is not
    * looking at the shell's corner. The Dock's Graph menu is chrome beside the
-   * alert and needs no second voice — see `CommandDock.tsx`.
+   * alert and needs no second voice — see `CommandDockMapGraph.tsx`.
    *
    * Asserted through `role="alert"`, because the notice really is in the
    * accessibility tree while either menu is open: Base UI's dropdown menu is

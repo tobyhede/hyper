@@ -68,7 +68,7 @@ export type ContinuationTarget =
  * row swapping its own branch mid-rename, and could only be an attribute query.
  * The Command Dock draws each name once and its editor replaces that one
  * control, so the editor returns focus to itself and there is no second surface
- * to address (`components/CommandDock.tsx`). Renaming it would have been a name
+ * to address (`components/CommandDockParts.tsx`). Renaming it would have been a name
  * for a resource that no longer exists.
  */
 export type ContinuationControl = 'map-name';

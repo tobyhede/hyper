@@ -1,11 +1,11 @@
 /**
  * The two set-trigger treatments, in a module of their own.
  *
- * **They are here and not in `CommandDock.tsx` because that file's other
- * exports are components.** A non-component export beside them costs the module
- * its Fast Refresh boundary, and `RESOURCES_TRIGGER` has to be exported: the Resources
- * surface is the caller's whole component — trigger and panel together — so the
- * treatment has to travel to whoever supplies it (`App.tsx`, and the
+ * **They are here and not in the Dock's component modules because those
+ * modules' other exports are components.** A non-component export beside them
+ * costs the module its Fast Refresh boundary, and `RESOURCES_TRIGGER` has to
+ * be exported: the Resources surface is the caller's whole component —
+ * trigger and panel together — so the treatment has to travel to whoever supplies it (`App.tsx`, and the
  * catalogue's `CommandDockFixture`).
  */
 /**
@@ -40,8 +40,8 @@ export const SET_TRIGGER = {
  * surface.
  *
  * Exported because {@link DockResources.surface} is the caller's whole component —
- * trigger and panel together — and the trigger, which `CommandDock`'s own
- * `ResourcesTrigger` labels, still has to be one of the Dock's four names: the same size, the same classes and
+ * trigger and panel together — and the trigger, which
+ * `CommandDockResources.tsx`'s `ResourcesTrigger` labels, still has to be one of the Dock's four names: the same size, the same classes and
  * the same parts in the same order, so the word lands in the column the other
  * three land in and the vertical dock's grid can place its chevron.
  *
