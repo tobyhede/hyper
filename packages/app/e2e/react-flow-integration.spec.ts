@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { nodeByTitle, selectCanvas, settled } from './graph';
+import { nodeByTitle, resourceControls, selectCanvas, settled } from './graph';
 
 test('a focused Resource opens with Enter and Space', async ({ page }) => {
   await page.goto('/');
@@ -15,8 +15,9 @@ test('a focused Resource opens with Enter and Space', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(resource).toContainText('entry point');
 
-  await resource.hover();
-  await resource.getByRole('button', { name: 'Close Resource A' }).click();
+  // Close is on the Resource's toolbar, drawn while it is selected (ADR 0102).
+  const controls = await resourceControls(page, resource);
+  await controls.getByRole('button', { name: 'Close Resource A' }).click();
   await resource.focus();
   await expect(resource).toBeFocused();
   const scrollBefore = await page.evaluate(() => window.scrollY);

@@ -929,14 +929,21 @@ describe('referencing an existing Space', () => {
     const node = document.querySelector(`.react-flow__node[data-id="${authoredFirst.id}"]`);
     if (!(node instanceof HTMLElement))
       throw new Error('The first Space Resource is not on canvas');
-    fireEvent.click(within(node).getByRole('button', { name: 'Open Resource Other Space' }));
-    const rail = await waitFor(() => {
+    // Its commands float in React Flow's `NodeToolbar`, portalled outside the node
+    // and drawn while it is the selected Resource, so it is selected first and its
+    // toolbar is found by the Resource it is drawn for.
+    fireEvent.click(node);
+    await waitFor(() => expect(node).toHaveClass('selected'));
+    const rail = (): HTMLElement => {
       const found = document.querySelector(`[data-resource-rail-for="${authoredFirst.id}"]`);
       if (!(found instanceof HTMLElement))
         throw new Error('The first Space Resource rail is not drawn');
       return found;
-    });
-    fireEvent.click(within(rail).getByTestId('space-resource-map'));
+    };
+    fireEvent.click(
+      within(await waitFor(rail)).getByRole('button', { name: 'Open Resource Other Space' }),
+    );
+    fireEvent.click(await waitFor(() => within(rail()).getByTestId('space-resource-map')));
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
 
     await waitFor(() =>

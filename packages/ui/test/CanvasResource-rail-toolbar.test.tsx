@@ -39,7 +39,7 @@ describe('the Resource rail is one toolbar', () => {
     openMarkdownResource();
 
     const toolbar = screen.getByRole('toolbar', { name: 'Resource A' });
-    expect(toolbar).toBe(railActions());
+    expect(toolbar).toContainElement(railActions());
     expect(toolbar).toHaveAttribute('aria-orientation', 'horizontal');
   });
 

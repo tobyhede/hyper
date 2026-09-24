@@ -47,7 +47,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/react-flow-adapter/src/ResourceNode.tsx',
     reason:
-      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-resource-hover-reveals-actions-and-handles-together` mounts the real `ResourceNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
+      "A limit of the walk, not a property of the component — the one entry here that is a defect rather than a design fact, and `.scratch/architecture-review/issues/09` owns removing it. A stable story does render this: `canvas-resource-hover-reveals-handles-and-selection-draws-commands` mounts the real `ResourceNode` in a real `ReactFlow`. The checker cannot see it because the story reaches it through `nodeTypes`, which the adapter's index declares as a local `const` rather than re-exporting, so resolving the barrel by the names taken through it finds nothing.",
   },
   {
     module: 'packages/ui/src/Command.tsx',
@@ -94,11 +94,6 @@ export const handRolledStyles = [
     block: 'react-flow',
     reason:
       "React Flow's own classes, restyled where the library's defaults do not suit the canvas. Integration styling by definition — no module here emits these names.",
-  },
-  {
-    block: 'resource-rail-layer',
-    reason:
-      'React Flow viewport placement and pointer routing for the shared Resource rail above embedded nodes.',
   },
   {
     block: 'rf-resource-node',

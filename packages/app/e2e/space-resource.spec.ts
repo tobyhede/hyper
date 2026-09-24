@@ -1,11 +1,11 @@
-import { resourceControls } from './graph';
+import { resourceControls, resourceToolbar, selectResource } from './graph';
 import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
   exercisePortalEditHostCanvas,
   exerciseSpaceResourcePadding,
   exerciseSpaceResourceFooter,
-  exerciseFloatingResourceDock,
+  exerciseResourceToolbarFloats,
   hostGraphEdgeCount,
 } from './space-resource-frame';
 import {
@@ -178,7 +178,13 @@ test(
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-space-id', /.+/);
     await expect(row.locator('[data-icon="space"]')).toBeVisible();
-    await expect(nodeByTitle(page, 'Architecture').locator('[data-icon="space"]')).toBeVisible();
+    // The Resource's kind glyph trails its floating toolbar, drawn while it is
+    // selected (ADR 0102).
+    const architecture = nodeByTitle(page, 'Architecture');
+    await expect(
+      (await resourceControls(page, architecture)).locator('[data-icon="space"]'),
+    ).toBeVisible();
+    await expect(list).toBeVisible();
 
     await expect(
       list
@@ -233,7 +239,6 @@ test(
 
     await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
     const added = nodeByTitle(page, 'Deep dive').nth(before);
-    await expect(added.locator('[data-icon="space"]')).toBeVisible();
     const addedBox = await boxOf(added, 'the placed Space Resource');
     expect(addedBox.x + addedBox.width / 2).toBeCloseTo(dropPoint.x, -1);
     expect(addedBox.y + addedBox.height / 2).toBeCloseTo(dropPoint.y, -1);
@@ -242,6 +247,11 @@ test(
     await expect(list.getByRole('alert')).toHaveCount(0);
     await settled(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    // A Space Resource: its kind glyph trails the toolbar drawn while it is
+    // selected (ADR 0102).
+    await expect(
+      (await resourceControls(page, added)).locator('[data-icon="space"]'),
+    ).toBeVisible();
   },
 );
 
@@ -414,11 +424,12 @@ test(
       resource.locator('.canvas-resource__body').getByRole('button', { name: /^(Map|Graph):/ }),
     ).toHaveCount(0);
     const mapControl = rail.getByTestId('space-resource-map');
-    await mapControl.focus();
-    await mapControl.press('ArrowRight');
-    await expect(rail.getByTestId('space-resource-graph')).toBeFocused();
+    const actionsControl = rail.getByRole('button', { name: /^Actions for Resource/ });
+    await actionsControl.focus();
+    await actionsControl.press('ArrowRight');
+    await expect(mapControl).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(rail.getByRole('button', { name: /^Actions for Resource/ })).toBeFocused();
+    await expect(rail.getByTestId('space-resource-graph')).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(rail.getByRole('button', { name: /^Edit Resource/ })).toBeFocused();
     await page.keyboard.press('ArrowRight');
@@ -666,8 +677,8 @@ test(
       (await resourceControls(page, resource)).getByTestId('space-resource-graph'),
       'Graph selector',
     );
-    // Both named choices share the rail floating over the embedded Map.
-    expect(map.y).toBeGreaterThanOrEqual(outer.y);
+    // Both named choices share the toolbar floating above the Resource (ADR 0102).
+    expect(map.y + map.height).toBeLessThanOrEqual(outer.y);
     expect(graph.y).toBeCloseTo(map.y, 1);
     expect(graph.x).toBeGreaterThanOrEqual(map.x + map.width);
     expect(graph.x + graph.width).toBeLessThan(outer.x + outer.width);
@@ -702,11 +713,19 @@ test(
       'opacity',
       '1',
     );
-    await embedded.getByRole('button', { name: 'Edit Resource Resource 1' }).click();
+    await (
+      await resourceControls(page, embedded)
+    )
+      .getByRole('button', { name: 'Edit Resource Resource 1' })
+      .click();
     const editor = embedded.locator('[contenteditable="true"]');
     await expect(editor).toBeVisible();
     await editor.fill('Written inside the Space Resource');
-    await embedded.getByRole('button', { name: 'Save Resource Resource 1' }).click();
+    await (
+      await resourceToolbar(page, embedded)
+    )
+      .getByRole('button', { name: 'Save Resource Resource 1' })
+      .click();
     await expect(embedded).toContainText('Written inside the Space Resource');
     await switchToSpace(page, 'Space 1');
     await expect(
@@ -764,7 +783,6 @@ test('closing a Space Resource removes the embedded Map it was drawing', async (
   const resource = await openSpaceResourceOnItsMap(page);
   await expect(embeddedNodes(page)).toHaveCount(1);
 
-  await resource.hover();
   await (
     await resourceControls(page, resource)
   )
@@ -801,7 +819,11 @@ test('an embedded Resource can move, open with the keyboard and resize in its ta
   expect(moved.x).toBeGreaterThan(before.x + 30);
   await embedded.focus();
   await embedded.press('Enter');
-  await expect(embedded.getByRole('button', { name: 'Close Resource Resource 1' })).toBeVisible();
+  await expect(
+    (await resourceControls(page, embedded)).getByRole('button', {
+      name: 'Close Resource Resource 1',
+    }),
+  ).toBeVisible();
   await embedded.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
@@ -981,7 +1003,6 @@ test('Enter on a fixture Space Resource adds its target to Open Spaces', async (
   await settled(page);
 
   const resource = nodeByTitle(page, 'Presentation');
-  await resource.hover();
   await (
     await resourceControls(page, resource)
   )
@@ -1023,8 +1044,9 @@ test(
     await settled(page);
 
     const resource = nodeByTitle(page, 'Presentation');
-    await resource.hover();
-    await resource
+    await (
+      await resourceControls(page, resource)
+    )
       .getByRole('button', { name: 'Actions for Resource Presentation' })
       .click({ delay: 120 });
     await expect(page.getByRole('menuitem', { name: /^Copy link to Space/ })).toBeVisible();
@@ -1049,7 +1071,7 @@ test('a Space Resource resizes to Close and remembers its Open Size', async ({ p
   });
   // Move the resize corner clear of the fixed Graph overview overlay.
   await dragBy(page, parent, -400, -150);
-  await parent.hover();
+  await selectResource(parent);
   const open = await boxOf(parent, 'Open Space Resource');
   const control = await boxOf(
     parent.locator('.react-flow__resize-control.handle.bottom.right'),
@@ -1174,11 +1196,11 @@ test(
 );
 
 test(
-  'Resource dock floats eight pixels inside the border above embedded content',
-  { tag: '@parity:resource-dock-floats' },
+  'a selected Resource toolbar floats above its top-right corner at the Dock control size',
+  { tag: '@parity:resource-toolbar-floats-above-its-corner' },
   async ({ page }) => {
     const resource = await openSpaceResourceOnItsMap(page);
-    await exerciseFloatingResourceDock(page, resource);
+    await exerciseResourceToolbarFloats(page, resource);
   },
 );
 
@@ -1212,12 +1234,23 @@ test(
     const rail = (await resourceControls(page, parent)).getByTestId('canvas-resource-actions');
     await rail.getByRole('button', { name: 'Edit Resource Architecture' }).click();
     await expect(rail.getByRole('button', { name: 'Done Resource Architecture' })).toBeVisible();
+    // Portal Edit makes the embedded Resource's own commands reachable: selecting
+    // it draws its toolbar with Edit (ADR 0102).
     await expect(
-      embeddedNodes(page).getByRole('button', { name: 'Edit Resource Resource 1' }),
+      (await resourceControls(page, embeddedNodes(page))).getByRole('button', {
+        name: 'Edit Resource Resource 1',
+      }),
     ).toBeVisible();
     await rail.getByRole('button', { name: 'Done Resource Architecture' }).click();
+    await expect(
+      (await resourceToolbar(page, embeddedNodes(page))).getByRole('button', {
+        name: /Edit Resource/,
+      }),
+    ).toHaveCount(0);
+    // Selecting the embedded Resource moved the selection off the containing one,
+    // whose toolbar the ended portal Edit no longer keeps drawn.
+    await selectResource(parent);
     await expect(rail.getByRole('button', { name: 'Edit Resource Architecture' })).toBeVisible();
-    await expect(embeddedNodes(page).getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
 
     await rail.getByRole('button', { name: 'Edit Resource Architecture' }).focus();
     await page.keyboard.press('Enter');
@@ -1273,11 +1306,9 @@ test(
     expect((await inset('framed after reload')).y).toBeCloseTo(framedInset.y, 0);
 
     const portalBox = await boxOf(parent, 'portal before Enter');
-    await parent.hover({ position: { x: 8, y: 80 } });
-    const id = await parent.getAttribute('data-id');
-    if (id === null) throw new Error('Resource placement id missing');
-    await page
-      .locator(`[data-resource-rail-for="${id}"]`)
+    await (
+      await resourceControls(page, parent)
+    )
       .getByRole('button', { name: 'Actions for Resource Architecture' })
       .click({ delay: 120 });
     await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();

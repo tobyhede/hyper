@@ -134,15 +134,16 @@ export function activeResource(page: Page): Locator {
  * Open a Resource in place, without beginning content editing (ADR 0064).
  *
  * No pointer gesture on a Resource's body opens it (ADR 0036) — the Resource's own
- * control does, and it is revealed by hovering the Resource.
+ * control does, drawn in its floating toolbar once the Resource is selected
+ * (ADR 0102).
  */
 export async function openResource(node: Locator, title: string): Promise<void> {
-  await node.hover();
-  await node.getByRole('button', { name: `Open Resource ${title}` }).click();
+  const controls = await resourceControls(node.page(), node);
+  await controls.getByRole('button', { name: `Open Resource ${title}` }).click();
 }
 
 /**
- * Reveal a placed Resource's own rail and open its actions menu.
+ * Select a placed Resource, so its toolbar is drawn (ADR 0102), and open its actions menu.
  *
  * Shared because three suites drove the identical gesture before this was
  * pulled out — `editing.spec` and `mobile-dock.spec` through the real page
@@ -154,8 +155,10 @@ export async function openResource(node: Locator, title: string): Promise<void> 
  */
 export async function resourceActions(page: Page, title: string): Promise<Locator> {
   const resource = nodeByTitle(page, title).first();
-  await resource.hover();
-  await resource
+  await selectResource(resource);
+  await (
+    await resourceToolbar(page, resource)
+  )
     .getByRole('button', { name: `Actions for Resource ${title}` })
     .click({ delay: 120 });
   const menu = page.getByRole('menu').last();
@@ -643,11 +646,35 @@ export async function connectToEmptyWithAlt(
   }
 }
 
-/** Commands belong to a placement even when its rail is lifted above embedded nodes. */
-export async function resourceControls(page: Page, resource: Locator): Promise<Locator> {
+/**
+ * Select a Resource the way a pointer does, so React Flow draws its toolbar.
+ *
+ * A Resource's commands float in React Flow's `NodeToolbar`, drawn while that
+ * Resource is the one selected (ADR 0102). The press lands just inside the
+ * Resource's top-left corner, in the rail band, which holds no control of its own
+ * on the canvas — the centre can hold the Title, whose control begins a rename.
+ */
+export async function selectResource(resource: Locator): Promise<void> {
+  await resource.click({ position: { x: 10, y: 10 } });
+  await expect(resource).toHaveClass(/\bselected\b/);
+}
+
+/** A Resource's floating toolbar, drawn outside the Resource while it is selected (ADR 0102). */
+export async function resourceToolbar(page: Page, resource: Locator): Promise<Locator> {
   const id = await resource.getAttribute('data-id');
   if (id === null) throw new Error('Resource placement id missing');
-  return resource.or(page.locator(`[data-resource-rail-for="${id}"]`));
+  return page.locator(`[data-resource-rail-for="${id}"]`);
+}
+
+/**
+ * Everything a Resource offers: its own face and its floating toolbar. Selects the
+ * Resource first when its toolbar is not drawn, since the toolbar exists only
+ * while the Resource is selected or an edit is running (ADR 0102).
+ */
+export async function resourceControls(page: Page, resource: Locator): Promise<Locator> {
+  const toolbar = await resourceToolbar(page, resource);
+  if ((await toolbar.count()) === 0) await selectResource(resource);
+  return resource.or(toolbar);
 }
 
 /**

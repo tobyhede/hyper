@@ -294,7 +294,10 @@ describe('a title Edit the graph refused', () => {
   });
 
   it('leaves the rest of the graph working', () => {
-    const { openResource } = refuseTitleEdit('blur');
+    const { openResource, setNodes } = refuseTitleEdit('blur');
+    // B's commands are drawn once B is the selected Resource (`ResourceNode`'s
+    // `toolbarVisible`), so selection moves to B the way React Flow reports it.
+    setNodes([resourceNode('A', RESOURCE_ID), resourceNode('B', OTHER_RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource B' }));
 
@@ -320,7 +323,7 @@ describe('opening a Resource', () => {
   });
 
   it('happens from the Resource affordance', () => {
-    const { openResource } = mountGraph();
+    const { openResource } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
@@ -344,12 +347,16 @@ describe('opening a Resource', () => {
  * React Flow `onKeyDown` branch that ran first and asked nothing about the
  * target, and a window listener that declined for a focused control and never
  * got the chance.
+ *
+ * A Resource's commands float in React Flow's `NodeToolbar`, drawn while that
+ * Resource is the one selected (`ResourceNode`'s `toolbarVisible`), so the
+ * control under the key here is one of the selected Resource's own commands.
  */
 describe('F2 while a control has focus', () => {
-  it('does not rename the selected Resource from a control on a different Resource', () => {
+  it('does not rename the selected Resource from one of its toolbar commands', () => {
     mountGraph([resourceNode('A', RESOURCE_ID, true), resourceNode('B', OTHER_RESOURCE_ID)]);
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Resource B' }), { key: 'F2' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open Resource A' }), { key: 'F2' });
 
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).not.toBeInTheDocument();
   });
@@ -380,7 +387,7 @@ describe.each([
   ['Space', ' ', 'composite'],
 ] as const)('%s on the focused Resource affordance', (_name, key, activation) => {
   it('opens the Resource once through the button rather than the graph', () => {
-    const { openResource } = mountGraph();
+    const { openResource } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
     const button = screen.getByRole('button', { name: 'Open Resource A' });
     button.focus();
 
@@ -436,7 +443,7 @@ describe.each([
 
 describe('the Resource affordance', () => {
   it('opens the Resource rather than renaming its title on the graph', () => {
-    const { openResource } = mountGraph();
+    const { openResource } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 

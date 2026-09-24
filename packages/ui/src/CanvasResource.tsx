@@ -20,7 +20,7 @@ import {
   type CanvasSpaceResourceSelection,
 } from './SpaceResourceSelectors';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
-import { ResourceRail } from './ResourceRail';
+import { ResourceRail, ResourceRailKind } from './ResourceRail';
 import { Card, CardContent, CardTitle } from './components/card';
 import {
   AbandonEditIcon,
@@ -123,10 +123,14 @@ export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
 
 interface CanvasResourceCommonProps {
   readonly front: CanvasResourceFront;
-  /** A canvas adapter may lift the rail above embedded content in its viewport. */
-  readonly renderRail?: (rail: ReactNode) => ReactNode;
-  /** Pointer is over a portalled rail lifted outside this Card subtree. */
-  readonly railHovered?: boolean;
+  /**
+   * Where the Resource's command toolbar is drawn, and when.
+   *
+   * A canvas adapter supplies this to float the toolbar outside the Resource and
+   * show it while the Resource is selected — React Flow's `NodeToolbar`, in
+   * `ResourceNode`. Absent, the toolbar is drawn in the rail, always shown.
+   */
+  readonly renderToolbar?: (toolbar: ReactNode) => ReactNode;
   /** Reports the content-sized title footer in unscaled layout pixels. */
   readonly onBodyHeightChange?: (height: number | null) => void;
   /**
@@ -262,7 +266,6 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  * own visual treatment lives in `canvas-resource.css`, colocated with this module.
  */
 export function CanvasResource(props: CanvasResourceProps) {
-  const [hovered, setHovered] = useState(false);
   const { front, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Resource is called wherever it is *named* rather than drawn.
@@ -341,7 +344,12 @@ export function CanvasResource(props: CanvasResourceProps) {
   const markdownBodyProps: Mutable<
     Pick<MarkdownResourceBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
   > = {};
-  if (onBeginContentEdit !== undefined) markdownBodyProps.onBeginEdit = onBeginContentEdit;
+  // A click on an unselected Resource selects it, as a click on any React Flow node
+  // does; editing its Markdown is the next click, or the Edit command (ADR 0102).
+  // So the body's edit target is offered only once the Resource is selected.
+  if (onBeginContentEdit !== undefined && state === 'selected') {
+    markdownBodyProps.onBeginEdit = onBeginContentEdit;
+  }
   if (!readOnly && front.kind === 'markdown' && front.editor !== undefined) {
     markdownBodyProps.editor = front.editor;
   }
@@ -374,120 +382,110 @@ export function CanvasResource(props: CanvasResourceProps) {
     };
   }, [onBodyHeightChange]);
 
-  const railHovered = props.railHovered === true;
-  const rail = (
-    <ResourceRail
-      kind={visualKind}
-      hideKind={open}
-      revealed={
-        hovered ||
-        railHovered ||
-        state === 'selected' ||
-        state === 'editing' ||
-        visibleContentEdit !== null ||
-        portalEditing
-      }
-      className="canvas-resource__rail"
+  // An Open Resource's front already says what it is, so its kind is not drawn.
+  const kindMark = open ? null : <ResourceRailKind kind={visualKind} />;
+  const toolbar = showActions ? (
+    // ADR 0073. One tab stop for the whole rail, arrows between its
+    // controls: a canvas carries many Resources and a Resource's rail carries
+    // several commands, so a control apiece would put the Resources
+    // themselves out of reach behind their own actions. The keyboard
+    // contract, the shared control treatment and the canvas suppression
+    // every one of these needs are `ResourceRailActions`' and
+    // `ResourceRailAction`'s; what is left here is which commands this Resource
+    // has, and what each one runs.
+    //
+    // The two groups are the answer to "whose command is this?". Editing
+    // this Resource's Markdown is the Markdown front's business and means
+    // nothing on another kind; opening and closing is every Resource's.
+    //
+    // The entity actions lead, then a Space Resource's choices, the content-edit
+    // commands, and Open/Close last.
+    <ResourceRailActions
+      aria-label={`Resource ${name}`}
+      className="canvas-resource__actions"
+      data-testid="canvas-resource-actions"
     >
-      {showActions && (
-        // ADR 0073. One tab stop for the whole rail, arrows between its
-        // controls: a canvas carries many Resources and a Resource's rail carries
-        // several commands, so a control apiece would put the Resources
-        // themselves out of reach behind their own actions. The keyboard
-        // contract, the shared control treatment and the canvas suppression
-        // every one of these needs are `ResourceRailActions`' and
-        // `ResourceRailAction`'s; what is left here is which commands this Resource
-        // has, and what each one runs.
-        //
-        // The two groups are the answer to "whose command is this?". Editing
-        // this Resource's Markdown is the Markdown front's business and means
-        // nothing on another kind; opening and closing is every Resource's.
-        // Space choices lead the rail, followed by entity actions, Open/Close
-        // with Enter in the entity menu. Content-edit commands stay beside it.
-        <ResourceRailActions
-          aria-label={`Resource ${name}`}
-          className="canvas-resource__actions"
-          data-testid="canvas-resource-actions"
-        >
-          {spaceSelection !== undefined && (
-            <SpaceResourceSelectors {...spaceSelection} onReport={setContextNotice} />
-          )}
-          {spaceRail}
-          {actionableEntityActions && (
-            <EntityActionsTrigger
-              groups={entityActions}
-              label={`Actions for Resource ${name}`}
-              icon={<EntityActionsIcon />}
-              render={<ResourceRailAction />}
-            />
-          )}
-          <ResourceRailKindActions kind={visualKind}>
-            {visibleContentEdit !== null ? (
-              <ContentEditActions name={name} edit={visibleContentEdit} />
-            ) : beginContentEdit !== undefined ? (
-              <ResourceRailAction
-                ref={editControl}
-                aria-label={`Edit Resource ${name}`}
-                onClick={beginContentEdit}
-              >
-                <EditIcon data-icon="inline-start" />
-              </ResourceRailAction>
-            ) : portal !== undefined ? (
-              portalEditing ? (
-                <ResourceRailAction
-                  ref={editControl}
-                  aria-label={`Done Resource ${name}`}
-                  onClick={() => portal.onEditingChange(false)}
-                >
-                  <CommitEditIcon data-icon="inline-start" />
-                </ResourceRailAction>
-              ) : (
-                <ResourceRailAction
-                  ref={editControl}
-                  aria-label={`Edit Resource ${name}`}
-                  onClick={() => portal.onEditingChange(true)}
-                >
-                  <EditIcon data-icon="inline-start" />
-                </ResourceRailAction>
-              )
-            ) : null}
-          </ResourceRailKindActions>
-          <ResourceRailSharedActions>
-            {onOpenChange !== undefined && (
-              <ResourceRailAction
-                aria-label={`${open ? 'Close' : 'Open'} Resource ${name}`}
-                // Closing mid-edit would drop the Resource's box out from under a
-                // live caret with a draft in it. The control keeps its slot and
-                // goes unavailable rather than disappearing: the rail's row does
-                // not reshuffle while the author writes, and what is unavailable
-                // says so instead of vanishing.
-                //
-                // A toolbar item stays focusable while disabled (ADR 0073), so
-                // that promise now holds for the keyboard too — the control keeps
-                // its place in the arrow order and announces itself unavailable,
-                // instead of being drawn and unreachable.
-                disabled={visibleContentEdit !== null}
-                onClick={() => {
-                  onOpenChange(!open);
-                }}
-              >
-                {open ? (
-                  <CloseResourceIcon data-icon="inline-start" />
-                ) : (
-                  <OpenResourceIcon data-icon="inline-start" />
-                )}
-              </ResourceRailAction>
-            )}
-          </ResourceRailSharedActions>
-        </ResourceRailActions>
+      {actionableEntityActions && (
+        <EntityActionsTrigger
+          groups={entityActions}
+          label={`Actions for Resource ${name}`}
+          icon={<EntityActionsIcon />}
+          render={<ResourceRailAction />}
+        />
       )}
+      {spaceSelection !== undefined && (
+        <SpaceResourceSelectors {...spaceSelection} onReport={setContextNotice} />
+      )}
+      {spaceRail}
+      <ResourceRailKindActions kind={visualKind}>
+        {visibleContentEdit !== null ? (
+          <ContentEditActions name={name} edit={visibleContentEdit} />
+        ) : beginContentEdit !== undefined ? (
+          <ResourceRailAction
+            ref={editControl}
+            aria-label={`Edit Resource ${name}`}
+            onClick={beginContentEdit}
+          >
+            <EditIcon data-icon="inline-start" />
+          </ResourceRailAction>
+        ) : portal !== undefined ? (
+          portalEditing ? (
+            <ResourceRailAction
+              ref={editControl}
+              aria-label={`Done Resource ${name}`}
+              onClick={() => portal.onEditingChange(false)}
+            >
+              <CommitEditIcon data-icon="inline-start" />
+            </ResourceRailAction>
+          ) : (
+            <ResourceRailAction
+              ref={editControl}
+              aria-label={`Edit Resource ${name}`}
+              onClick={() => portal.onEditingChange(true)}
+            >
+              <EditIcon data-icon="inline-start" />
+            </ResourceRailAction>
+          )
+        ) : null}
+      </ResourceRailKindActions>
+      <ResourceRailSharedActions>
+        {onOpenChange !== undefined && (
+          <ResourceRailAction
+            aria-label={`${open ? 'Close' : 'Open'} Resource ${name}`}
+            // Closing mid-edit would drop the Resource's box out from under a
+            // live caret with a draft in it. The control keeps its slot and
+            // goes unavailable rather than disappearing: the rail's row does
+            // not reshuffle while the author writes, and what is unavailable
+            // says so instead of vanishing.
+            //
+            // A toolbar item stays focusable while disabled (ADR 0073), so
+            // that promise now holds for the keyboard too — the control keeps
+            // its place in the arrow order and announces itself unavailable,
+            // instead of being drawn and unreachable.
+            disabled={visibleContentEdit !== null}
+            onClick={() => {
+              onOpenChange(!open);
+            }}
+          >
+            {open ? (
+              <CloseResourceIcon data-icon="inline-start" />
+            ) : (
+              <OpenResourceIcon data-icon="inline-start" />
+            )}
+          </ResourceRailAction>
+        )}
+      </ResourceRailSharedActions>
+    </ResourceRailActions>
+  ) : null;
+  const rail = (
+    <ResourceRail className="canvas-resource__rail">
+      {props.renderToolbar === undefined ? toolbar : null}
+      {kindMark}
     </ResourceRail>
   );
 
   const resource = (
     <Card
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
       role="article"
       aria-label={name}
       className="canvas-resource"
@@ -512,7 +510,8 @@ export function CanvasResource(props: CanvasResourceProps) {
           colour is still on this Resource — `--canvas-resource-graph` below draws the
           Title's own hover and caret treatment — and still on the handles and
           Edges the adapter draws around it. */}
-      {props.renderRail === undefined ? rail : props.renderRail(rail)}
+      {rail}
+      {props.renderToolbar?.(toolbar)}
       <CardContent ref={bodyControl} className="canvas-resource__body">
         {state === 'editing' && !readOnly ? (
           <InlineTitleEditor

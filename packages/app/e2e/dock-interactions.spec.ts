@@ -5,6 +5,8 @@ import {
   createResource,
   dock,
   nodeByTitle,
+  resourceToolbar,
+  selectResource,
   settled,
   beginRename,
   spaceName,
@@ -195,30 +197,45 @@ test('a secondary-button drag on the grip leaves the Dock in its slot', async ({
 
 /**
  * The handles sit half outside the Resource's own box, so a pointer moving from the
- * Resource onto one leaves `.canvas-resource` without leaving the Resource — and the rail
- * must not drop away under a pointer that is still on the Resource's furniture.
+ * Resource onto one leaves `.canvas-resource` without leaving the Resource — and the
+ * handles the hover revealed must not drop away under a pointer that is still on
+ * the Resource's furniture.
  *
- * Read off the commands and the kind glyph rather than a coloured band: the band
- * is gone and the rail is neutral (`.scratch/command-dock/issues/12`). The
- * handle's own colour is asserted here too, because it is the half of the
- * treatment change that says where the Graph's colour went.
+ * Hover reveals no commands (ADR 0102): a Resource's toolbar is drawn while it is
+ * selected, outside the Resource, so the same move onto a handle must leave a
+ * selected Resource's toolbar, entity actions included, drawn. The handle's own
+ * colour is asserted here too, because it is the half of the treatment change
+ * that says where the Graph's colour went (`.scratch/command-dock/issues/12`).
  */
-test('hovering a Resource handle keeps its rail revealed with entity actions', async ({ page }) => {
+test("hovering a Resource handle keeps its handles revealed and a selected Resource's toolbar drawn", async ({
+  page,
+}) => {
   await page.goto('/');
   const resource = nodeByTitle(page, 'A');
   await expect(resource).toBeVisible();
   await settled(page);
-  await resource.hover();
   const handle = resource.locator('[data-handleid="authoring-source-right"]');
+  const toolbar = await resourceToolbar(page, resource);
+
+  await page.mouse.move(1, 1);
+  await expect(handle).toHaveCSS('opacity', '0');
+  await resource.hover();
+  const box = await boxOf(handle, "Resource A's right source handle");
+  // The outside half is beyond the Resource face but inside the handle hit target.
+  const ontoHandle = () => page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
   const color = await handle.evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(color).not.toBe('rgba(0, 0, 0, 0)');
-  const box = await handle.boundingBox();
-  if (box === null) throw new Error('Resource handle has no box');
-  // The outside half is beyond the Resource face but inside the handle hit target.
-  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
-  await expect(handle).toBeVisible();
-  await expect(resource.locator('.resource-rail__kind')).toHaveCSS('opacity', '1');
-  await expect(resource.getByTestId('canvas-resource-actions')).toHaveCSS('opacity', '1');
+  await ontoHandle();
+  await expect(handle).toHaveCSS('opacity', '1');
+  await expect(toolbar).toHaveCount(0);
+
+  await selectResource(resource);
+  await ontoHandle();
+  await expect(handle).toHaveCSS('opacity', '1');
+  await expect(toolbar.getByTestId('canvas-resource-actions')).toBeVisible();
+  await expect(
+    toolbar.getByRole('button', { name: 'Actions for Resource A', exact: true }),
+  ).toBeVisible();
 });
 
 /**

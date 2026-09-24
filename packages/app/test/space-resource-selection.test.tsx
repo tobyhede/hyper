@@ -19,6 +19,7 @@ import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { selectResource } from './resource-selection';
 
 /**
  * The two selections an Open Space Resource authors.
@@ -265,8 +266,13 @@ const settled = (session: SpaceSession): Promise<void> =>
  * Open is authored on the Map (ADR 0064), so a snapshot may already carry
  * it: the reopening test mounts one that does, and pressing Open there would
  * close the Resource this helper is asked to open.
+ *
+ * The Resource's commands — Open, and the two selectors — float in its toolbar,
+ * which is drawn only while the Resource is the one selected, so the helper
+ * selects it first. The rail it answers is that toolbar.
  */
 async function openSpaceResource(): Promise<HTMLElement> {
+  await selectResource('Elsewhere');
   const control = await screen.findByRole('button', { name: /^(Open|Close) Resource Elsewhere$/ });
   if (control.getAttribute('aria-label') === 'Open Resource Elsewhere') fireEvent.click(control);
   await screen.findByTestId('space-resource-map');

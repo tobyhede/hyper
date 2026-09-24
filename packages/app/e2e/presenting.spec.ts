@@ -9,6 +9,7 @@ import {
   dock,
   nodeByTitle,
   presentControl,
+  resourceControls,
   selectCanvas,
   settled,
   viewportTransform,
@@ -258,8 +259,8 @@ test('returning to the overview restores the space and its gestures', async ({ p
   // Opening works again — through the Resource's own control, which is the only
   // pointer graph to it (ADR 0036, 0037).
   await selectCanvas(page, 'Collection 1');
-  const b = nodeByTitle(page, 'B');
-  await b.hover();
+  // The control is on the Resource's toolbar, drawn while it is selected (ADR 0102).
+  const b = await resourceControls(page, nodeByTitle(page, 'B'));
   await b.getByRole('button', { name: 'Open Resource B' }).click();
   await expect(b.getByRole('button', { name: 'Close Resource B' })).toBeVisible();
 });

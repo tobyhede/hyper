@@ -78,7 +78,7 @@ describe('the shared command surface', () => {
   /**
    * And neither has taken a copy back. The Dock's own sheet still owns its
    * twelve slots, its cap and what a drag does to it; the Resource's still owns
-   * when its commands are revealed. Neither may own the panel.
+   * where its toolbar sits in the band. Neither may own the panel.
    */
   it.each([
     { name: 'the Command Dock', stylesheet: dockSheet, selector: '.command-dock__surface' },
@@ -110,9 +110,9 @@ describe('the Resource rail', () => {
 
   /** And no Resource puts one back behind the strip. */
   it('is not banded by the Resource that mounts it either', () => {
-    const railRules = [...resourceSheet.matchAll(/\.resource-rail[^{]*\{([^}]*)\}/gu)].map(
-      (found) => found[1] ?? '',
-    );
+    const railRules = [
+      ...resourceSheet.matchAll(/\.(?:canvas-)?resource(?:-|__)rail[^{]*\{([^}]*)\}/gu),
+    ].map((found) => found[1] ?? '');
 
     expect(railRules.length).toBeGreaterThan(0);
     for (const declarations of railRules) {

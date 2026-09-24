@@ -19,6 +19,7 @@ import {
   selectedCanvas,
   settled,
   resourceActions,
+  resourceControls,
 } from './graph';
 
 /**
@@ -220,7 +221,6 @@ test('Delete Resource confirms at phone width with the pointer', async ({ page }
   await settled(page);
 
   const resource = nodeByTitle(page, 'B');
-  await resource.click();
   await (
     await resourceActions(page, 'B')
   )
@@ -252,8 +252,11 @@ test('Delete Resource confirms at phone width from the keyboard', async ({ page 
   await settled(page);
 
   const resource = nodeByTitle(page, 'B').first();
-  await resource.click();
-  await resource.getByRole('button', { name: 'Actions for Resource B' }).press('Enter');
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: 'Actions for Resource B' })
+    .press('Enter');
   await expect(page.getByRole('menu')).toBeVisible();
   await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
 
@@ -262,7 +265,11 @@ test('Delete Resource confirms at phone width from the keyboard', async ({ page 
   await confirmation.getByRole('button', { name: 'Cancel' }).press('Enter');
   await expect(resource).toBeVisible();
 
-  await resource.getByRole('button', { name: 'Actions for Resource B' }).press('Enter');
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: 'Actions for Resource B' })
+    .press('Enter');
   await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
   await confirmation.getByRole('button', { name: 'Delete from Space' }).press('Enter');
 

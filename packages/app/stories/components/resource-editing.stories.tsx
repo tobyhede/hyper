@@ -187,7 +187,7 @@ export const Markdown: Story = () => {
         </Button>
       </div>
       <div style={openFrame}>
-        <CanvasResource front={front} state="rest" title="Strategies" graphColor="#ffc53d" />
+        <CanvasResource front={front} state="selected" title="Strategies" graphColor="#ffc53d" />
       </div>
     </div>
   );

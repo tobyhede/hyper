@@ -3,7 +3,7 @@
    Geometry only, and deliberately no colour at all.
 
    **The band used to carry the Active Graph's colour and no longer does**
-   (`.scratch/command-dock/issues/12`). What a Resource reveals on hover is a command
+   (`.scratch/command-dock/issues/12`). What a selected Resource shows is a command
    strip, and a strip of commands is chrome — so it is drawn as the product draws
    chrome everywhere else: the neutral `.command-surface` the Command Dock
    wears, mounted here by `ResourceRailActions`. A coloured band behind it would have
@@ -16,37 +16,17 @@
    the strip's room inside a Resource whose size is authored — it is read by
    `packages/ui/test/canvas-resource-title-ladder.test.ts` and
    `canvas-resource-embedded-map.test.ts`, each of which holds the room left over
-   to something the domain states. A Resource that hides its own strip at rest — the
-   canvas Resource does, revealing it with the Resource itself — says so from its own
-   stylesheet, because when the strip shows is the Resource's state and not the
-   rail's. */
+   to something the domain states. On the canvas the strip itself is floated out
+   of the band by `ResourceNode` (React Flow's `NodeToolbar`); the band keeps its
+   room. */
 .resource-rail {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  /* Exactly the command strip's own height: a 28px control in the shared
-     surface's 4px padding inside its 1px border. The strip is seated in the
-     band rather than floating over the Resource's content, which is what keeps an
-     Open Resource's Markdown clear of it. */
-  height: 38px;
-  min-height: 38px;
+  justify-content: flex-end;
+  /* The kind glyph's own height (`ResourceKindIcon`'s 14px). On the canvas the
+     commands are floated out of the band, so the glyph is all it holds. */
+  height: 14px;
+  min-height: 14px;
   padding: 0 6px;
   border-radius: 0;
-}
-
-.resource-rail__kind {
-  display: flex;
-  align-items: center;
-  color: inherit;
-  transition: opacity var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
-}
-
-.resource-rail__kind [data-resource-kind] {
-  color: currentcolor;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .resource-rail__kind {
-    transition: none;
-  }
 }

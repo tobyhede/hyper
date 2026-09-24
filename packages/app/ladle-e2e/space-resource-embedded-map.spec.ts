@@ -1,11 +1,18 @@
-import { authoringHandle, connectHandles, resourceControls, boxOf } from '../e2e/graph';
+import {
+  authoringHandle,
+  connectHandles,
+  resourceControls,
+  resourceToolbar,
+  selectResource,
+  boxOf,
+} from '../e2e/graph';
 import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
   exercisePortalEditHostCanvas,
   exerciseSpaceResourcePadding,
   exerciseSpaceResourceFooter,
-  exerciseFloatingResourceDock,
+  exerciseResourceToolbarFloats,
   hostGraphEdgeCount,
 } from '../e2e/space-resource-frame';
 import {
@@ -152,11 +159,12 @@ test(
       resource.locator('.canvas-resource__body').getByRole('button', { name: /^(Map|Graph):/ }),
     ).toHaveCount(0);
     const mapControl = rail.getByTestId('space-resource-map');
-    await mapControl.focus();
-    await mapControl.press('ArrowRight');
-    await expect(rail.getByTestId('space-resource-graph')).toBeFocused();
+    const actionsControl = rail.getByRole('button', { name: /^Actions for Resource/ });
+    await actionsControl.focus();
+    await actionsControl.press('ArrowRight');
+    await expect(mapControl).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(rail.getByRole('button', { name: /^Actions for Resource/ })).toBeFocused();
+    await expect(rail.getByTestId('space-resource-graph')).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(rail.getByRole('button', { name: /^Edit Resource/ })).toBeFocused();
     await page.keyboard.press('ArrowRight');
@@ -236,7 +244,13 @@ test(
     // Graph this Space Resource is showing and refuse a cross-Space Edge (ADR 0040).
     await expect(embedded.locator('.rf-resource-node__authoring-handle')).toHaveCount(8);
     await expect(embedded.getByLabel(/^Connect (from|to) /)).toHaveCount(8);
-    await embedded.getByRole('button', { name: 'Edit Resource Intake' }).click();
+    // Its commands are drawn in its own floating toolbar once it is selected (ADR 0102).
+    await selectResource(embedded);
+    await (
+      await resourceToolbar(page, embedded)
+    )
+      .getByRole('button', { name: 'Edit Resource Intake' })
+      .click();
     await embedded
       .getByRole('textbox', { name: 'Markdown source of Intake' })
       .fill('Edited in the embedded Map');
@@ -382,12 +396,30 @@ test(
 );
 
 test(
-  'Resource dock floats eight pixels inside the border above embedded content',
-  { tag: '@parity:resource-dock-floats' },
+  "a selected Resource's toolbar floats above its top-right corner, at the Dock's control size, above embedded content",
+  { tag: '@parity:resource-toolbar-floats-above-its-corner' },
   async ({ page }) => {
     await open(page);
+    // The story's canvas opens at 1:1 where the application's opens below it, and
+    // the shared exercise measures from below 100% to past it, so the camera is
+    // first zoomed out to where the application starts.
     const resource = spaceResource(page);
-    await exerciseFloatingResourceDock(page, resource);
+    const scale = () =>
+      resource.evaluate((node) =>
+        node instanceof HTMLElement ? node.getBoundingClientRect().width / node.offsetWidth : 1,
+      );
+    const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+    await expect
+      .poll(
+        async () => {
+          await zoomOut.click();
+          await page.waitForTimeout(400);
+          return scale();
+        },
+        { timeout: 15_000 },
+      )
+      .toBeLessThan(0.9);
+    await exerciseResourceToolbarFloats(page, resource);
   },
 );
 
@@ -397,8 +429,11 @@ test(
   async ({ page }) => {
     await open(page);
     const parent = spaceResource(page);
-    const embedded = embeddedNodes(page).first();
-    await expect(embedded.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+    const embedded = embeddedNodes(page).filter({
+      has: page.getByRole('heading', { name: 'Intake', exact: true }),
+    });
+    const embeddedEdit = page.getByRole('button', { name: 'Edit Resource Intake' });
+    await expect(embeddedEdit).toHaveCount(0);
     const outerBefore = await boxOf(parent, 'containing Resource');
     const innerBefore = await boxOf(embedded, 'embedded Resource');
     await page.mouse.move(
@@ -420,12 +455,21 @@ test(
     const rail = (await resourceControls(page, parent)).getByTestId('canvas-resource-actions');
     await rail.getByRole('button', { name: 'Edit Resource Elsewhere' }).click();
     await expect(rail.getByRole('button', { name: 'Done Resource Elsewhere' })).toBeVisible();
+    // Edit makes the embedded Resources authorable: selected, one draws its own
+    // commands, while the portal Edit keeps Done drawn on the containing Resource.
+    await selectResource(embedded);
     await expect(
-      embeddedNodes(page).getByRole('button', { name: 'Edit Resource Intake' }),
+      (await resourceToolbar(page, embedded)).getByRole('button', { name: 'Edit Resource Intake' }),
     ).toBeVisible();
+    await expect(rail.getByRole('button', { name: 'Done Resource Elsewhere' })).toBeVisible();
     await rail.getByRole('button', { name: 'Done Resource Elsewhere' }).click();
-    await expect(rail.getByRole('button', { name: 'Edit Resource Elsewhere' })).toBeVisible();
-    await expect(embeddedNodes(page).getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+    await expect(embeddedEdit).toHaveCount(0);
+    await selectResource(parent);
+    await expect(
+      (await resourceToolbar(page, parent)).getByRole('button', {
+        name: 'Edit Resource Elsewhere',
+      }),
+    ).toBeVisible();
   },
 );
 

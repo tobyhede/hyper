@@ -9,6 +9,7 @@ import {
   graphLegendSwatchColor,
   mapChoices,
   openResource,
+  resourceControls,
   selectCanvas,
   selectedCanvas,
   settled,
@@ -85,24 +86,27 @@ test(
     await selectCanvas(page, 'Collection 1');
 
     const reference = nodeByTitle(page, 'A′').first();
-    await expect(reference.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
+    // The kind glyph is drawn on the Resource's toolbar, which a selection draws.
+    await expect(
+      (await resourceControls(page, reference)).getByRole('img', { name: 'Reference Resource' }),
+    ).toBeVisible();
 
     const markdown = nodeByTitle(page, 'A').first();
-    await markdown.click();
-    const open = markdown.getByRole('button', { name: 'Open Resource A' });
+    const controls = await resourceControls(page, markdown);
+    const open = controls.getByRole('button', { name: 'Open Resource A' });
     await open.focus();
     await expect(open).toBeFocused();
     await open.press('Enter');
     await expect(markdown.getByRole('heading', { name: 'A', exact: true })).toBeVisible();
     await expect(markdown.getByText('entry point')).toBeVisible();
-    await markdown.getByRole('button', { name: 'Edit Resource A' }).click();
+    await controls.getByRole('button', { name: 'Edit Resource A' }).click();
     const source = markdown.getByRole('textbox', { name: 'Markdown source of A' });
     await expect(source).toBeFocused();
     await markdown.getByRole('heading', { name: 'A', exact: true }).click();
     await expect(source).toBeVisible();
-    await expect(markdown.getByRole('button', { name: 'Close Resource A' })).toBeDisabled();
+    await expect(controls.getByRole('button', { name: 'Close Resource A' })).toBeDisabled();
     await source.press('Escape');
-    await expect(markdown.getByRole('button', { name: 'Edit Resource A' })).toBeFocused();
+    await expect(controls.getByRole('button', { name: 'Edit Resource A' })).toBeFocused();
   },
 );
 
@@ -127,7 +131,7 @@ test(
     const graphColor = await graphLegendSwatchColor(page, 'Long');
 
     const resource = nodeByTitle(page, 'A').first();
-    await resource.click();
+    const controls = await resourceControls(page, resource);
 
     // No band, at the one state that used to carry the loudest one.
     await expect(resource.locator('.canvas-resource__rail')).toHaveCSS(
@@ -149,8 +153,8 @@ test(
           gap: style.columnGap,
         };
       });
-    const commands = resource.getByTestId('canvas-resource-actions');
-    await expect(commands).toHaveCSS('opacity', '1');
+    const commands = controls.getByTestId('canvas-resource-actions');
+    await expect(commands).toBeVisible();
     expect(await treatment(commands)).toEqual(
       await treatment(page.locator('.command-dock__surface:visible')),
     );
@@ -444,18 +448,16 @@ test('a resource shows its title in the graph, and opens to show rendered Markdo
   const a = nodeByTitle(page, 'A');
   await expect(a).toBeVisible();
   await expect(a).not.toContainText('entry point');
-  await expect(a.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+  const controls = await resourceControls(page, a);
+  await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 
-  // Opening renders the Markdown in the existing Resource and keeps Close reachable.
+  // Opening renders the Markdown in the existing Resource and keeps Close reachable:
+  // the Resource stays selected, so its toolbar stays drawn.
   await openResource(a, 'A');
   await expect(a.getByText('A', { exact: true }).last()).toHaveCSS('font-weight', '700');
 
-  // Hovered again before the press: opening grows the Resource under the pointer, so
-  // the rail the Open left revealed may already have faded by the time Close is
-  // reached — and a faded rail takes no pointer events.
-  await a.hover();
-  await a.getByRole('button', { name: 'Close Resource A' }).click();
-  await expect(a.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+  await controls.getByRole('button', { name: 'Close Resource A' }).click();
+  await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 
 /** The two attributes of a Resource's content as one commit left them. */
@@ -469,6 +471,7 @@ test('the Close action closes an opened resource', async ({ page }) => {
   await selectCanvas(page, 'Collection 1');
   const resource = nodeByTitle(page, 'A').first();
   await openResource(resource, 'A');
+  const controls = await resourceControls(page, resource);
   await expect(resource.locator('.canvas-resource__content')).toHaveAttribute(
     'data-presence',
     'present',
@@ -510,13 +513,13 @@ test('the Close action closes an opened resource', async ({ page }) => {
     return commits;
   });
 
-  await resource.getByRole('button', { name: 'Close Resource A' }).click();
+  await controls.getByRole('button', { name: 'Close Resource A' }).click();
   // The unmount is a fact worth asserting on its own and also the proof that
   // the leaving window has closed, so what the observer caught is read once
   // after it rather than polled for.
   await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
   expect(await leaving.jsonValue()).toEqual([{ presence: 'leaving', inert: '' }]);
-  await expect(resource.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+  await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 
 test('resources are drawn at exactly the size the strategy placed them at', async ({ page }) => {
@@ -560,17 +563,18 @@ test(
     await expect(recap).toBeVisible();
 
     await openResource(recap, 'A′');
+    const controls = await resourceControls(page, recap);
     await expect(recap.getByText('entry point')).toBeVisible();
     await expect(recap.getByRole('heading', { name: 'A′', exact: true })).toBeVisible();
     await expect(recap.getByRole('textbox')).toHaveCount(0);
-    await expect(recap.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+    await expect(controls.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Target' })).toHaveCount(0);
-    await recap.getByRole('button', { name: 'Close Resource A′' }).click();
+    await controls.getByRole('button', { name: 'Close Resource A′' }).click();
 
     await recap.focus();
     await page.keyboard.press('Enter');
-    await expect(recap.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
-    await recap.getByRole('button', { name: 'Close Resource A′' }).click();
+    await expect(controls.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
+    await controls.getByRole('button', { name: 'Close Resource A′' }).click();
 
     await recap.focus();
     await page.keyboard.press('Space');
@@ -618,7 +622,7 @@ test(
     expect(resizedSize.width).toBeGreaterThan(openSize.width);
     expect(resizedSize.height).toBeGreaterThan(openSize.height);
 
-    await recap.getByRole('button', { name: 'Close Resource A′' }).click();
+    await controls.getByRole('button', { name: 'Close Resource A′' }).click();
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 2));
     await openResource(recap, 'A′');
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 3));
@@ -635,7 +639,11 @@ test(
     await selectCanvas(page, 'Collection 1');
     const persisted = nodeByTitle(page, 'A′');
     await expect(persisted.getByText('entry point')).toBeVisible();
-    await expect(persisted.getByRole('button', { name: 'Close Resource A′' })).toBeVisible();
+    await expect(
+      (await resourceControls(page, persisted)).getByRole('button', {
+        name: 'Close Resource A′',
+      }),
+    ).toBeVisible();
     const persistedSize = await persisted.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),

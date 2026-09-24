@@ -793,17 +793,17 @@ test(
     await expect(strip.getByRole('group', { name: 'Create a Resource' })).toBeAttached();
     const createSpace = strip.getByRole('button', { name: 'Create Space Resource', exact: true });
     await expect(createSpace.locator('[data-icon="space"]')).toBeVisible();
+    // The kind glyph is drawn only in a selected Resource's toolbar (ADR 0102), so
+    // what the press made is read off the Resource's own kind instead.
+    const spaceResources = page.locator(
+      '.react-flow__node:visible .canvas-resource[data-kind="space"]',
+    );
+    const before = await spaceResources.count();
     await createSpace.click();
     const title = page.getByRole('textbox', { name: 'Resource title' });
     await expect(title).toBeFocused();
     await title.press('Enter');
-    await expect(
-      page
-        .locator('.react-flow__node:visible')
-        .getByRole('img', { name: 'Space Resource', exact: true })
-        .locator('[data-icon="space"]')
-        .last(),
-    ).toBeVisible();
+    await expect(spaceResources).toHaveCount(before + 1);
   },
 );
 

@@ -129,58 +129,17 @@
   transform: rotate(var(--canvas-resource-drag-tilt));
 }
 
-/* The rail's geometry is `ResourceRail`'s, in `resource-rail.css`, and it has no colour
-   at all: what used to be an Active-Graph band behind the commands is gone, and
-   the commands sit on the shared neutral command surface instead
-   (`.scratch/command-dock/issues/12`). So there is no resting band to quiet
-   here, and the two decisions that are still the canvas Resource's are *when* its
-   commands show and how quiet its kind glyph is at rest.
-
-   The resting case is written as the negation of the same "not resting" set the
-   face uses — a Resource at rest that no pointer is over, that no authoring handle
-   of its own is under, **and that is not running an edit**. Everything else,
-   selection and dragging included, draws the glyph at full strength.
-
-   A running edit belongs in that set because it outlives every other reason the
-   commands are up. The caret is in the body, so no hover, selection or focus of
-   the rail's own is true — and a blur ends nothing (ADR 0064), so deselecting a
-   Resource mid-edit used to quiet the glyph while leaving Save, Cancel and Close lit
-   beside it. The exits stay visible because the ADR says they do; this is what
-   stops them standing alone on a Resource that looks asleep. */
-.canvas-resource .resource-rail__kind {
-  color: var(--canvas-resource-ink);
-}
-
-.canvas-resource[data-state='rest']:not(:hover):not(
-    :has(~ .rf-resource-node__authoring-handle:hover)
-  ):not([data-content-editing='true'])
-  .resource-rail__kind {
-  opacity: 0.28;
-}
-
-/* **Only the reveal is here.** The row, the gap, the padding, the border, the
-   corners, the paper and the shadow are the shared `.command-surface`'s, which
-   `ResourceRailActions` mounts — the same surface the Command Dock wears. What is
-   the Resource's is that a resting Resource on the canvas is quiet and shows its
-   commands with itself. */
+/* The rail's geometry is `ResourceRail`'s, in `resource-rail.css`, and it has no
+   colour at all (`.scratch/command-dock/issues/12`). **When the commands show is
+   not decided here any more.** On the canvas `ResourceNode` floats the toolbar
+   out of the Resource in React Flow's `NodeToolbar`, which draws it while the
+   Resource is selected, or an edit is running, and not otherwise. The row, gap,
+   border, paper and shadow are the shared `.command-surface`'s. What is left is
+   seating the toolbar at the band's trailing edge where no adapter floats it. */
 .canvas-resource__actions {
-  min-width: 0;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
-}
-
-/* Pointer focus survives Open/Close. Only keyboard-visible focus should keep
-   an unhovered, unselected Resource's commands revealed. */
-.canvas-resource:is(
-    :hover,
-    :has(~ .rf-resource-node__authoring-handle:hover),
-    [data-state='selected'],
-    [data-content-editing='true']
-  )
-  .canvas-resource__actions,
-.canvas-resource__actions:has(:focus-visible) {
-  opacity: 1;
+  margin-left: auto;
+  max-width: 100%;
+  flex-shrink: 1;
   pointer-events: auto;
 }
 
@@ -460,7 +419,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .canvas-resource,
-  .canvas-resource__actions,
   .canvas-resource__content {
     transition: none;
   }
@@ -478,13 +436,15 @@
   }
 }
 
-/* A Resource's command surface floats eight pixels inside its paper border,
-   measured from where the surface is drawn rather than from its box: the chrome
-   casts its shadow right and down, and a box-shadow takes no room, so the gaps
-   on those two sides are taken past the shadow. */
+/* The rail sits eight pixels inside the Resource's paper border and holds its kind
+   glyph at the top-right corner; on the canvas the commands float outside the
+   Resource (ADR 0102). The room above the content is the glyph's row: eight pixels,
+   the glyph, eight pixels. An Open Resource draws no glyph, so its Markdown sits as
+   far from the top as from the sides: 12px here and the rendered body's own 10px
+   (`--markdown-resource-content-top`) make its 22px side inset. */
 .canvas-resource__rail {
   position: absolute;
-  inset: 8px calc(8px + var(--shadow-chrome-elevated-offset, 0px)) auto 8px;
+  inset: 8px 8px auto;
   height: auto;
   min-height: 0;
   padding: 0;
@@ -492,18 +452,19 @@
   pointer-events: none;
   gap: 8px;
 }
-.canvas-resource__rail .canvas-resource__actions {
-  margin-left: auto;
-  max-width: 100%;
-  flex-shrink: 1;
-}
-.canvas-resource__rail[data-revealed='true'] .canvas-resource__actions {
-  opacity: 1;
-  pointer-events: auto;
-}
 .canvas-resource__content {
-  padding-top: calc(54px + var(--shadow-chrome-elevated-offset, 0px));
+  padding-top: 12px;
 }
 .canvas-resource[data-expanded='false'] > .canvas-resource__body {
+  padding-top: 30px;
+}
+
+/* Where no adapter floats the toolbar it is drawn in the rail, and the room below
+   it is the command strip's: its 38px, clear of its cast shadow. */
+.canvas-resource:has(> .canvas-resource__rail .canvas-resource__actions) .canvas-resource__content {
+  padding-top: calc(54px + var(--shadow-chrome-elevated-offset, 0px));
+}
+.canvas-resource[data-expanded='false']:has(> .canvas-resource__rail .canvas-resource__actions)
+  > .canvas-resource__body {
   padding-top: 46px;
 }

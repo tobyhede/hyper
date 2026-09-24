@@ -26,6 +26,7 @@ import {
   presentControl,
   unavailable,
 } from './command-dock';
+import { selectResource } from './resource-selection';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -498,8 +499,9 @@ describe('the browser location, from the surface', () => {
   });
 });
 
-/** Open Resource A in place, then put its Markdown body under the caret. */
+/** Select Resource A, open it in place, then put its Markdown body under the caret. */
 async function openEditor(): Promise<void> {
+  await selectResource('A');
   fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A' }));
   await screen.findByTestId('markdown-resource-body-edit-target');
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource A' }));
@@ -572,11 +574,13 @@ describe('authoring an opened Resource', () => {
   it('opens each Reference Resource on resolved Target content without a source editor', async () => {
     const session = mount(twiceReferenced);
 
+    await selectResource('A again');
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A again' }));
     expect(await screen.findByText('A source')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close Resource A again' }));
 
+    await selectResource('A once more');
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A once more' }));
     expect(await screen.findByText('A source')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: /Markdown source/ })).not.toBeInTheDocument();
@@ -779,6 +783,7 @@ describe('the Resource affordance on the graph', () => {
   it('opens the Resource on rendered Markdown in place', async () => {
     const session = mount();
 
+    await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Open Resource A' }));
     expect(await screen.findByText('A source')).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
