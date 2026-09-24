@@ -314,7 +314,18 @@ export class CoordinatedCommit {
       [...this.#participants].flatMap(([id, managed]): [UUID, Baseline][] => {
         if (this.#spaces.isUncommittedCreate(id)) return [];
         const state = managed.session.getState();
-        return [[id, { snapshot: clone(state.working), revision: state.acknowledgedRevision }]];
+        // A participant kept local over a conflict still holds the stored copy
+        // it kept local over, and that, not its working Space, is what storage has.
+        const stored =
+          state.persistence.kind === 'conflicted' ? state.persistence.current : undefined;
+        return [
+          [
+            id,
+            stored === undefined
+              ? { snapshot: clone(state.working), revision: state.acknowledgedRevision }
+              : { snapshot: clone(stored.snapshot), revision: stored.revision },
+          ],
+        ];
       }),
     );
     for (const change of this.#changes) {
@@ -503,7 +514,13 @@ export class CoordinatedCommit {
     this.#recoveringFrom = from;
     const items = this.#changes.flatMap((change): SpaceResourceReplayItem[] => {
       const decision = replayDecision(change, conflicts);
-      if (decision.kind === 'replay') return [decision.item];
+      if (decision.kind === 'replay') {
+        // A created Space the repository already holds is replayed as an update.
+        if (change.kind === 'create' && decision.item.kind === 'update') {
+          this.#spaces.clearUncommittedCreate(change.snapshot.id);
+        }
+        return [decision.item];
+      }
       if (decision.kind === 'deleted') {
         this.#participants.get(decision.spaceId)?.completeCoordinatedDeletion();
         this.#spaces.evict(decision.spaceId);

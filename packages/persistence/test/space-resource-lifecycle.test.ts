@@ -870,6 +870,58 @@ describe('Space Resource lifecycle', () => {
     ]);
   });
 
+  it('restores a colliding created Space to its stored copy when a later conflict is accepted', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    const backend = new MemorySpaceBackend(
+      META_ID,
+      [
+        { snapshot: metaSnapshot, revision: 3n, exportedRevision: null },
+        { snapshot: targetSnapshot, revision: 7n, exportedRevision: null },
+      ],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    const lifecycle = registry.spaceResources(
+      idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
+    );
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      title: 'Replacement',
+      position: { x: 240, y: 80 },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
+    // The replay of the kept Space conflicts on Meta alone.
+    control.queueResult({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: META_ID,
+          current: { snapshot: metaSnapshot, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    const target = registry.session(TARGET_ID);
+    if (target === undefined) throw new Error('target session was not installed');
+    target.resolveConflict(target.getState().working);
+    await vi.waitFor(() => expect(control.requests).toHaveLength(2));
+    await vi.waitFor(() => expect(target.getState().persistence.kind).toBe('conflicted'));
+
+    target.acceptRemote();
+
+    expect(meta.getState()).toMatchObject({
+      working: metaSnapshot,
+      acknowledgedRevision: 9n,
+      persistence: { kind: 'settled' },
+    });
+    expect(registry.session(TARGET_ID)?.getState()).toMatchObject({
+      working: targetSnapshot,
+      acknowledgedRevision: 7n,
+      persistence: { kind: 'settled' },
+    });
+  });
+
   it('keeps a locally updated Space deleted remotely by retrying it as a create', async () => {
     const control = new MemorySpaceBackendTestControl();
     control.queueResult({
