@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   DEFAULT_OPEN_SIZE,
+  EDGE_TITLE_ONE_LINE,
   uuidSchema,
   type Graph,
   type MapId,
@@ -1114,6 +1115,283 @@ describe('Edge lifecycle', () => {
       { id: GRAPH_ID, title: 'Main', edges: [] },
     ]);
     expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
+  });
+});
+
+describe('Edge Title', () => {
+  const AB = { from: RESOURCE_A, to: RESOURCE_B } as const;
+  const BC = { from: RESOURCE_B, to: RESOURCE_C } as const;
+
+  /** A Map of three Resources whose Graph holds `edges`, in that order. */
+  const withEdges = (edges: Graph['edges']): SpaceSnapshot => ({
+    ...positionedSnapshot,
+    resources: [
+      ...positionedSnapshot.resources,
+      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+    ],
+    document: {
+      ...positionedSnapshot.document,
+      maps: [
+        {
+          ...positionedSnapshot.document.maps![0]!,
+          positions: {
+            [RESOURCE_A]: { x: 10, y: 20, open: false },
+            [RESOURCE_B]: { x: 300, y: 40, open: false },
+            [RESOURCE_C]: { x: 600, y: 40, open: false },
+          },
+          graphs: [{ id: GRAPH_ID, title: 'Main', edges }],
+        },
+      ],
+    },
+  });
+
+  const edgesOf = (snapshot: SpaceSnapshot) => graphsOf(snapshot)[0]?.edges;
+
+  describe('titled-edge', () => {
+    it('sets a Title on an untitled Edge', () => {
+      const { authoring, session } = open(withEdges([AB]));
+
+      expect(
+        authoring.complete({
+          kind: 'titled-edge',
+          graphId: GRAPH_ID,
+          edge: AB,
+          title: 'On success',
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(edgesOf(session.getState().working)).toEqual([{ ...AB, title: 'On success' }]);
+    });
+
+    it('renames a titled Edge and keeps its Title hidden', () => {
+      const { authoring, session } = open(
+        withEdges([{ ...AB, title: 'Before', titleHidden: true }]),
+      );
+
+      expect(
+        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: 'After' }),
+      ).toEqual({ kind: 'completed' });
+      expect(edgesOf(session.getState().working)).toEqual([
+        { ...AB, title: 'After', titleHidden: true },
+      ]);
+    });
+
+    it('stores the draft trimmed', () => {
+      const { authoring, session } = open(withEdges([AB]));
+
+      authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: '  Retry \t' });
+      expect(edgesOf(session.getState().working)).toEqual([{ ...AB, title: 'Retry' }]);
+    });
+
+    it.each(['', '   '])(
+      'clears the Title and titleHidden with it when the draft is %j',
+      (title) => {
+        const { authoring, session } = open(
+          withEdges([{ ...AB, title: 'Hidden', titleHidden: true }]),
+        );
+
+        expect(
+          authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title }),
+        ).toEqual({ kind: 'completed' });
+        expect(edgesOf(session.getState().working)).toEqual([AB]);
+      },
+    );
+
+    it('is unchanged when the trimmed draft is the stored Title', () => {
+      const { authoring, session } = open(withEdges([{ ...AB, title: 'Same' }]));
+      const before = session.getState().working;
+
+      expect(
+        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: ' Same ' }),
+      ).toEqual({ kind: 'unchanged' });
+      expect(session.getState().working).toBe(before);
+    });
+
+    it('is unchanged when clearing an Edge that has no Title', () => {
+      const { authoring, session } = open(withEdges([AB]));
+      const before = session.getState().working;
+
+      expect(
+        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: '' }),
+      ).toEqual({ kind: 'unchanged' });
+      expect(session.getState().working).toBe(before);
+    });
+
+    // A trailing break is refused too, rather than trimmed away as whitespace.
+    it.each(['First\nSecond', 'First\rSecond', 'Trailing\n'])(
+      'refuses a draft with a line break rather than folding it: %j',
+      (title) => {
+        const { authoring, session } = open(withEdges([AB]));
+        const before = session.getState().working;
+
+        expect(
+          authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title }),
+        ).toEqual({ kind: 'refused', refusal: { code: EDGE_TITLE_ONE_LINE } });
+        expect(session.getState().working).toBe(before);
+      },
+    );
+
+    it('finds its Edge by endpoints, so a stale Title on the completion still lands', () => {
+      const { authoring, session } = open(withEdges([{ ...AB, title: 'Current' }]));
+
+      expect(
+        authoring.complete({
+          kind: 'titled-edge',
+          graphId: GRAPH_ID,
+          edge: { ...AB, title: 'Stale', titleHidden: true },
+          title: 'Next',
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(edgesOf(session.getState().working)).toEqual([{ ...AB, title: 'Next' }]);
+    });
+
+    it('keeps the Edge where it was in its Graph', () => {
+      const { authoring, session } = open(withEdges([AB, BC]));
+
+      authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: 'First' });
+      expect(edgesOf(session.getState().working)).toEqual([{ ...AB, title: 'First' }, BC]);
+    });
+
+    it('refuses an Edge deleted since the surface held it', () => {
+      const { authoring } = open(withEdges([AB]));
+      authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: AB });
+
+      expect(
+        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: 'Late' }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'edge-not-found' } });
+    });
+
+    it('refuses a Graph this Map does not own', () => {
+      const { authoring } = open(withEdges([AB]));
+
+      expect(
+        authoring.complete({ kind: 'titled-edge', graphId: UNKNOWN_GRAPH, edge: AB, title: 'X' }),
+      ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
+    });
+  });
+
+  describe('hid-edge-title and showed-edge-title', () => {
+    it('hides a titled Edge’s Title', () => {
+      const { authoring, session } = open(withEdges([{ ...AB, title: 'Shown' }, BC]));
+
+      expect(authoring.complete({ kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB })).toEqual({
+        kind: 'completed',
+      });
+      expect(edgesOf(session.getState().working)).toEqual([
+        { ...AB, title: 'Shown', titleHidden: true },
+        BC,
+      ]);
+    });
+
+    it('shows a hidden Title by removing the key, never writing false', () => {
+      const { authoring, session } = open(
+        withEdges([{ ...AB, title: 'Hidden', titleHidden: true }]),
+      );
+
+      expect(
+        authoring.complete({ kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
+      ).toEqual({ kind: 'completed' });
+      const [edge] = edgesOf(session.getState().working) ?? [];
+      expect(edge).toEqual({ ...AB, title: 'Hidden' });
+      expect(edge !== undefined && 'titleHidden' in edge).toBe(false);
+    });
+
+    it('refuses hiding the Title of an Edge that has none', () => {
+      const { authoring } = open(withEdges([AB]));
+
+      expect(authoring.complete({ kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB })).toEqual({
+        kind: 'refused',
+        refusal: { code: 'edge-title-required' },
+      });
+    });
+
+    it('is unchanged hiding a hidden Title or showing a shown one', () => {
+      const hidden = open(withEdges([{ ...AB, title: 'Hidden', titleHidden: true }]));
+      expect(
+        hidden.authoring.complete({ kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB }),
+      ).toEqual({ kind: 'unchanged' });
+
+      const shown = open(withEdges([{ ...AB, title: 'Shown' }]));
+      expect(
+        shown.authoring.complete({ kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
+      ).toEqual({ kind: 'unchanged' });
+
+      // An untitled Edge has nothing hidden, so showing it is already true.
+      const untitled = open(withEdges([AB]));
+      expect(
+        untitled.authoring.complete({ kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
+      ).toEqual({ kind: 'unchanged' });
+    });
+
+    it('reads the stored Edge, not the stale one the completion carries', () => {
+      const { authoring, session } = open(withEdges([{ ...AB, title: 'Current' }]));
+
+      expect(
+        authoring.complete({
+          kind: 'hid-edge-title',
+          graphId: GRAPH_ID,
+          edge: { ...AB, title: 'Stale', titleHidden: true },
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(edgesOf(session.getState().working)).toEqual([
+        { ...AB, title: 'Current', titleHidden: true },
+      ]);
+    });
+
+    it.each(['hid-edge-title', 'showed-edge-title'] as const)(
+      '%s refuses a Graph this Map does not own, and an Edge deleted since',
+      (kind) => {
+        const { authoring } = open(withEdges([{ ...AB, title: 'T' }]));
+
+        expect(authoring.complete({ kind, graphId: UNKNOWN_GRAPH, edge: AB })).toEqual({
+          kind: 'refused',
+          refusal: { code: 'graph-not-owned' },
+        });
+        authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: AB });
+        expect(authoring.complete({ kind, graphId: GRAPH_ID, edge: AB })).toEqual({
+          kind: 'refused',
+          refusal: { code: 'edge-not-found' },
+        });
+      },
+    );
+  });
+
+  describe('Edits that rebuild an Edge keep its Title', () => {
+    it('reconnecting an endpoint keeps the Title and titleHidden', () => {
+      const { authoring, session } = open(
+        withEdges([{ ...AB, title: 'Moved', titleHidden: true }]),
+      );
+
+      expect(
+        authoring.complete({
+          kind: 'reconnected-edge',
+          graphId: GRAPH_ID,
+          edge: AB,
+          endpoint: 'to',
+          resourceId: RESOURCE_C,
+        }),
+      ).toEqual({ kind: 'completed' });
+      expect(edgesOf(session.getState().working)).toEqual([
+        { from: RESOURCE_A, to: RESOURCE_C, title: 'Moved', titleHidden: true },
+      ]);
+    });
+
+    it('removing a Resource from the Map keeps a titled survivor whole', () => {
+      const survivor = { ...BC, title: 'Stays', titleHidden: true } as const;
+      const { authoring, session } = open(withEdges([{ ...AB, title: 'Goes' }, survivor]));
+
+      expect(
+        authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
+      ).toEqual({ kind: 'completed' });
+      expect(edgesOf(session.getState().working)).toEqual([survivor]);
+    });
+
+    it('drawing an existing titled Edge again changes nothing', () => {
+      const titled = { ...AB, title: 'Kept' } as const;
+      const { authoring, session } = open(withEdges([titled]));
+
+      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_B });
+      expect(edgesOf(session.getState().working)).toEqual([titled]);
+    });
   });
 });
 

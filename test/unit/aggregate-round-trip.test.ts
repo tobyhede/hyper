@@ -259,6 +259,34 @@ describe('exporting and importing one complete aggregate', () => {
     expect(meta?.document.maps?.[0]?.activeGraph).toBe(META_GRAPH_ID);
   });
 
+  it("preserves an Edge's Title and titleHidden", async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const edge = {
+      from: MARKDOWN_RESOURCE_ID,
+      to: FIRST_LINK_ID,
+      title: 'Into the target',
+      titleHidden: true,
+    } as const;
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const titled: SpaceSnapshot = {
+      ...meta,
+      document: {
+        ...meta.document,
+        maps: meta.document.maps?.map((map) => ({
+          ...map,
+          graphs: map.graphs.map((graph) => ({ ...graph, edges: [edge] })),
+        })),
+      },
+    };
+
+    await exportTo(repositoryHolding([titled, ...targets]), destination);
+    const reimported = await importFrom(destination);
+
+    const stored = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
+    expect(stored?.document.maps?.[0]?.graphs[0]?.edges).toEqual([edge]);
+  });
+
   it('re-exports over its own output without changing a byte', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const source = repositoryHolding(completeAggregate());

@@ -2,6 +2,7 @@ import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   SPACE_FILE_VERSION,
+  type GraphEdge,
   type SpaceFile,
   type Resource,
   type ResourcePlacement,
@@ -47,6 +48,14 @@ const canonicalPlacement = (point: ResourcePlacement): ResourcePlacement => {
       };
 };
 
+/** Full literals, so the exported key order is fixed and an absent Title writes no key. */
+const canonicalEdge = (edge: GraphEdge): GraphEdge => {
+  if (edge.title === undefined) return { from: edge.from, to: edge.to };
+  return edge.titleHidden === undefined
+    ? { from: edge.from, to: edge.to, title: edge.title }
+    : { from: edge.from, to: edge.to, title: edge.title, titleHidden: edge.titleHidden };
+};
+
 /**
  * A map's graphs, rebuilt key by key and emitted in the order the map
  * holds them.
@@ -70,7 +79,7 @@ const canonicalGraphs = (
   graphs: NonNullable<SpaceFile['maps']>[number]['graphs'],
 ): NonNullable<SpaceFile['maps']>[number]['graphs'] =>
   graphs.map((graph) => {
-    const edges = graph.edges.map(({ from, to }) => ({ from, to }));
+    const edges = graph.edges.map(canonicalEdge);
     // Two full literals rather than a base object with `color` assigned after:
     // `color` sits between `title` and `edges` in the exported key order, and an
     // assignment after construction would insert it last instead.

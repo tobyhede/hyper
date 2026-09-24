@@ -42,6 +42,8 @@ const EVERY_REFUSAL = {
   'edge-already-exists': { code: 'edge-already-exists' },
   'map-active-graph-required': { code: 'map-active-graph-required' },
   'space-resource-deletion-unsupported': { code: 'space-resource-deletion-unsupported' },
+  'edge-title-one-line': { code: 'edge-title-one-line' },
+  'edge-title-required': { code: 'edge-title-required' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
 describe('describeAuthoringRefusal', () => {

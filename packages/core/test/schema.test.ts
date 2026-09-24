@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { resourceFrontmatterSchema, resourceSchema, spaceFileSchema } from '../src/index';
+import type { ZodIssue } from 'zod';
+import {
+  EDGE_TITLE_ONE_LINE,
+  graphEdgeSchema,
+  resourceFrontmatterSchema,
+  resourceSchema,
+  spaceFileSchema,
+} from '../src/index';
 
 const MAIN = {
   id: '00000000-0000-4000-8000-000000000004',
@@ -607,5 +614,85 @@ describe('space file maps', () => {
     expect(spaceFileSchema.safeParse({ ...validSpaceFile, defaultMap: 'flow' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('an Edge Title', () => {
+  const ENDPOINTS = {
+    from: '00000000-0000-4000-8000-000000000002',
+    to: '00000000-0000-4000-8000-000000000003',
+  };
+
+  /** Whether a refusal carries the domain's identity for a Title with a line break. */
+  const refusesLineBreak = (issues: readonly ZodIssue[]): boolean =>
+    issues.some(
+      (issue) => issue.code === 'custom' && issue.params?.['code'] === EDGE_TITLE_ONE_LINE,
+    );
+
+  it('accepts an untitled Edge — a Title is absent unless authored', () => {
+    expect(graphEdgeSchema.parse(ENDPOINTS)).toEqual(ENDPOINTS);
+  });
+
+  it('accepts a titled Edge, and a titled Edge whose Title is hidden', () => {
+    const titled = { ...ENDPOINTS, title: 'Only on success' };
+    expect(graphEdgeSchema.parse(titled)).toEqual(titled);
+    const hidden = { ...titled, titleHidden: true };
+    expect(graphEdgeSchema.parse(hidden)).toEqual(hidden);
+  });
+
+  it('refuses an empty Title — an Edit clears the key rather than storing nothing', () => {
+    expect(graphEdgeSchema.safeParse({ ...ENDPOINTS, title: '' }).success).toBe(false);
+  });
+
+  it.each([' Why ', 'Why ', ' Why'])('refuses a Title that is not stored trimmed: %j', (title) => {
+    expect(graphEdgeSchema.safeParse({ ...ENDPOINTS, title }).success).toBe(false);
+  });
+
+  it('accepts a trimmed Title', () => {
+    expect(graphEdgeSchema.safeParse({ ...ENDPOINTS, title: 'Why' }).success).toBe(true);
+  });
+
+  it.each(['First\nSecond', 'First\rSecond', 'First\r\nSecond', 'Trailing\n'])(
+    'refuses a Title with a line break, naming the one-line rule: %j',
+    (title) => {
+      const result = graphEdgeSchema.safeParse({ ...ENDPOINTS, title });
+      expect(result.success).toBe(false);
+      expect(refusesLineBreak(result.error?.issues ?? [])).toBe(true);
+    },
+  );
+
+  it('puts no cap on how long a Title may be', () => {
+    const title = 'x'.repeat(10_000);
+    expect(graphEdgeSchema.safeParse({ ...ENDPOINTS, title }).success).toBe(true);
+  });
+
+  it('refuses titleHidden on an Edge without a Title', () => {
+    expect(graphEdgeSchema.safeParse({ ...ENDPOINTS, titleHidden: true }).success).toBe(false);
+  });
+
+  it('refuses titleHidden: false — a shown Title stores no key at all', () => {
+    expect(
+      graphEdgeSchema.safeParse({ ...ENDPOINTS, title: 'Shown', titleHidden: false }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a key the Edge does not declare, rather than stripping it', () => {
+    // A misspelt `titlehidden` would otherwise vanish on the next save.
+    expect(
+      graphEdgeSchema.safeParse({ ...ENDPOINTS, title: 'Shown', titlehidden: true }).success,
+    ).toBe(false);
+  });
+
+  it('refuses an Edge carrying an undeclared key inside a space file', () => {
+    const result = spaceFileSchema.safeParse(
+      withGraphs([
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [{ ...ENDPOINTS, label: 'Not the word' }],
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
   });
 });

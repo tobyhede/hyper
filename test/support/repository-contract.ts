@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { uuidSchema, type GraphEdge, type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
@@ -863,6 +863,43 @@ export const spaceRepositoryContract = (
         deletedSpaceIds: [],
       });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
+    });
+  });
+
+  it(`${name} keeps an Edge's Title and hidden flag through initialization, commit and load`, async () => {
+    await withHarness(async (repository) => {
+      const withEdge = (edge: GraphEdge): SpaceSnapshot => {
+        const base = graphedSpace(SPACE_ID, 'Titled', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+        return {
+          ...base,
+          document: {
+            ...base.document,
+            maps: (base.document.maps ?? []).map((map) => ({
+              ...map,
+              graphs: map.graphs.map((graph) => ({ ...graph, edges: [edge] })),
+            })),
+          },
+        };
+      };
+      const hidden = withEdge({
+        from: RESOURCE_ID,
+        to: SECOND_RESOURCE_ID,
+        title: 'On success',
+        titleHidden: true,
+      });
+
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [hidden] });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(hidden, 0n, null));
+
+      const shown = withEdge({ from: RESOURCE_ID, to: SECOND_RESOURCE_ID, title: 'On failure' });
+      await expect(commitUpdate(repository, shown, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(shown, 1n, null));
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(shown, 1n, null)] },
+      });
     });
   });
 

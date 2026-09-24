@@ -7,6 +7,8 @@ import {
   type Map,
   type MapId,
   type MapPosition,
+  EDGE_TITLE_ONE_LINE,
+  isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
@@ -198,7 +200,21 @@ export type AuthoringCompletion =
       readonly endpoint: EdgeEndpoint;
       readonly resourceId: ResourceId;
     }
-  | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge };
+  | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge }
+  /**
+   * Set or clear an Edge's Title. The Edge is found by its endpoints; any Title
+   * `edge` carries may be stale and is never read. `title` is the untrimmed
+   * draft; empty clears the Title and `titleHidden`.
+   */
+  | {
+      readonly kind: 'titled-edge';
+      readonly graphId: GraphId;
+      readonly edge: GraphEdge;
+      readonly title: string;
+    }
+  /** Hide or show an Edge's Title at rest. */
+  | { readonly kind: 'hid-edge-title'; readonly graphId: GraphId; readonly edge: GraphEdge }
+  | { readonly kind: 'showed-edge-title'; readonly graphId: GraphId; readonly edge: GraphEdge };
 
 /**
  * What a semantic operation answers: the three outcomes every one of them
@@ -238,6 +254,9 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'deleted-graph' }
   | { readonly kind: 'reconnected-edge' }
   | { readonly kind: 'deleted-edge' }
+  | { readonly kind: 'titled-edge' }
+  | { readonly kind: 'hid-edge-title' }
+  | { readonly kind: 'showed-edge-title' }
 >['kind'];
 
 /**
@@ -292,7 +311,11 @@ export type AuthoringRefusal =
   | { readonly code: 'edge-not-found' }
   | { readonly code: 'edge-resource-outside-map' }
   | { readonly code: 'edge-already-exists' }
-  | { readonly code: 'map-active-graph-required' };
+  | { readonly code: 'map-active-graph-required' }
+  // Spelt from `@project/core`'s constant, which the Edge schema raises too.
+  | { readonly code: typeof EDGE_TITLE_ONE_LINE }
+  /** Hide a Title the Edge does not have. */
+  | { readonly code: 'edge-title-required' };
 
 /**
  * The published state: what the collaborators say, plus the one fact only
@@ -565,16 +588,20 @@ const reconnectOutcome = (
   if (graph === undefined) {
     return { kind: 'refused', refusal: { code: 'graph-not-owned' } };
   }
-  if (indexOfEdge(graph.edges, proposal.edge) === -1) {
+  const stored = graph.edges.find((edge) => sameEdge(edge, proposal.edge));
+  if (stored === undefined) {
     return {
       kind: 'refused',
       refusal: { code: 'edge-not-found' },
     };
   }
+  // From the stored Edge rather than the proposal's, so its Title and
+  // `titleHidden` survive the move — and survive as stored, not as a surface
+  // last saw them (ADR 0104).
   const reconnected: GraphEdge =
     proposal.endpoint === 'from'
-      ? { from: proposal.resourceId, to: proposal.edge.to }
-      : { from: proposal.edge.from, to: proposal.resourceId };
+      ? { ...stored, from: proposal.resourceId }
+      : { ...stored, to: proposal.resourceId };
   if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
   // Checked together and after `unchanged`, so an endpoint returned to its own
   // Resource is still eligible on a Map that has not finished arranging.
@@ -585,6 +612,50 @@ const reconnectOutcome = (
     return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
   }
   return { kind: 'edge', edge: reconnected };
+};
+
+/** The Edits that write an Edge's Title or whether it shows. */
+type EdgeTitleCompletion = Extract<
+  AuthoringCompletion,
+  { readonly kind: 'titled-edge' | 'hid-edge-title' | 'showed-edge-title' }
+>;
+
+/** What an Edge Title Edit settles the stored Edge to, before anything has been written. */
+type EdgeTitleOutcome =
+  | { readonly kind: 'edge'; readonly edge: GraphEdge }
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
+
+/**
+ * Reads `stored`, never the completion's possibly stale `edge`. Answers are built
+ * from the endpoints so a cleared key is absent, not `undefined` or `false`.
+ */
+const edgeTitleOutcome = (stored: GraphEdge, completion: EdgeTitleCompletion): EdgeTitleOutcome => {
+  const untitled: GraphEdge = { from: stored.from, to: stored.to };
+  if (completion.kind === 'hid-edge-title') {
+    if (stored.title === undefined) {
+      return { kind: 'refused', refusal: { code: 'edge-title-required' } };
+    }
+    if (stored.titleHidden === true) return UNCHANGED;
+    return { kind: 'edge', edge: { ...untitled, title: stored.title, titleHidden: true } };
+  }
+  if (completion.kind === 'showed-edge-title') {
+    if (stored.title === undefined || stored.titleHidden === undefined) return UNCHANGED;
+    return { kind: 'edge', edge: { ...untitled, title: stored.title } };
+  }
+  // Before the trim, so a line break at either end is refused, not trimmed.
+  if (!isOneLineEdgeTitle(completion.title)) {
+    return { kind: 'refused', refusal: { code: EDGE_TITLE_ONE_LINE } };
+  }
+  const title = trimmedNonBlankTitle(completion.title);
+  // Clearing drops `titleHidden` too: the schema refuses it without a Title.
+  if (title === null) {
+    return stored.title === undefined ? UNCHANGED : { kind: 'edge', edge: untitled };
+  }
+  if (title === stored.title) return UNCHANGED;
+  const titled: GraphEdge = { ...untitled, title };
+  if (stored.titleHidden === true) titled.titleHidden = true;
+  return { kind: 'edge', edge: titled };
 };
 
 /**
@@ -1390,7 +1461,10 @@ export function createSpaceAuthoring({
       completion.kind === 'recolored-graph' ||
       completion.kind === 'deleted-graph' ||
       completion.kind === 'reconnected-edge' ||
-      completion.kind === 'deleted-edge'
+      completion.kind === 'deleted-edge' ||
+      completion.kind === 'titled-edge' ||
+      completion.kind === 'hid-edge-title' ||
+      completion.kind === 'showed-edge-title'
     ) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === completion.graphId);
       const graph = ownedGraphs[graphIndex];
@@ -1433,6 +1507,25 @@ export function createSpaceAuthoring({
           replacing({
             ...graph,
             edges: graph.edges.filter((_, index) => index !== edgeIndex),
+          }),
+        );
+      } else if (
+        completion.kind === 'titled-edge' ||
+        completion.kind === 'hid-edge-title' ||
+        completion.kind === 'showed-edge-title'
+      ) {
+        const edgeIndex = indexOfEdge(graph.edges, completion.edge);
+        const stored = graph.edges[edgeIndex];
+        if (stored === undefined) {
+          return refuse({ code: 'edge-not-found' });
+        }
+        const outcome = edgeTitleOutcome(stored, completion);
+        if (outcome.kind !== 'edge') return outcome;
+        // In place: Graph order is what a fork's choices are offered in (ADR 0024).
+        writeGraphs(
+          replacing({
+            ...graph,
+            edges: graph.edges.map((edge, index) => (index === edgeIndex ? outcome.edge : edge)),
           }),
         );
       } else {

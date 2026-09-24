@@ -94,6 +94,10 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'These Resources are already connected in this Graph.';
     case 'map-active-graph-required':
       return 'This Map has no active Graph for the connection to join.';
+    case 'edge-title-one-line':
+      return 'An Edge title must be one line.';
+    case 'edge-title-required':
+      return 'Give this Edge a title before hiding it.';
   }
 };
 
@@ -142,6 +146,8 @@ const correctableByResourceChoice = {
   'edge-resource-outside-map': true,
   'edge-already-exists': true,
   'map-active-graph-required': false,
+  'edge-title-one-line': false,
+  'edge-title-required': false,
 } as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
 
 export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;

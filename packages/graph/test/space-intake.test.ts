@@ -106,7 +106,15 @@ const spaceResource = (id: string, spaceId: string): Resource => ({
   graph: TARGET_GRAPH,
 });
 
-const graph = (id: string, title: string, edges: { from: string; to: string }[] = []) => ({
+/** An Edge as a space file writes it. */
+interface EdgeInput {
+  readonly from: string;
+  readonly to: string;
+  readonly title?: string;
+  readonly titleHidden?: true;
+}
+
+const graph = (id: string, title: string, edges: readonly EdgeInput[] = []) => ({
   id,
   title,
   edges,
@@ -327,6 +335,40 @@ describe.each([
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'duplicate-graph-edge', ref: `${A} → ${B}` }),
       );
+    });
+
+    it('keys an Edge on its endpoints, so two with different Titles are still a duplicate', () => {
+      const errors = refused(
+        load({
+          resources: [markdown(A, 'A'), markdown(B, 'B')],
+          maps: [
+            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
+              graph(MAIN, 'Main', [
+                { from: A, to: B, title: 'On success' },
+                { from: A, to: B, title: 'On failure' },
+              ]),
+            ]),
+          ],
+        }),
+      );
+      expect(errors).toContainEqual(
+        expect.objectContaining({ kind: 'duplicate-graph-edge', ref: `${A} → ${B}` }),
+      );
+    });
+
+    it('keeps a titled, hidden Edge whole through intake', () => {
+      const edge = { from: A, to: B, title: 'On success', titleHidden: true } as const;
+      const space = loaded(
+        load({
+          resources: [markdown(A, 'A'), markdown(B, 'B')],
+          maps: [
+            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
+              graph(MAIN, 'Main', [edge]),
+            ]),
+          ],
+        }),
+      );
+      expect(space.lookup.graph(MAIN)?.graph.edges).toEqual([edge]);
     });
 
     it('refuses an endpoint naming a resource the space does not hold, and says only that', () => {
