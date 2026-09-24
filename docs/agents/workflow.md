@@ -111,6 +111,95 @@ A comment may only assert what its writer has checked. Ticket 14 shipped three t
 
 None of these is lintable. They hold in review, so a review of this repo should ask of any comment in the diff whether the code supports what it says.
 
+## What a comment may carry
+
+A comment states what the code does, why, and the invariant it keeps, in the present tense and about the code as it stands. It does not narrate lineage. An ADR or ticket citation stays only where the constraint it names cannot be seen in the code itself. This covers every comment in a tracked code file (`.ts`, `.tsx`, `.css`, `.prisma`), tests and stories included. Apply it one sentence at a time, in this order:
+
+1. **Is the sentence lineage?** Ask: _would it still be true, and still worth saying, if the code had been written this way from the start?_ If not, it is lineage. Lineage covers what the code replaced, what was retired, deleted or renamed, what this code or another module "used to" do or "was once", what a surface that has gone did, which ticket or ADR introduced it, and an alternative that was tried or considered and then rejected. The usual signal words are _replaces/replaced, retired, no longer, used to, was once, previously, formerly, the old, went with, is gone, now_ (when it contrasts with a before). **The words alone decide nothing.** They are lineage when their subject is the source code or the design. They are behaviour when their subject is runtime state. "An outcome about a replaced Space is discarded" describes Space replacement, which happens while the program runs, so it stays. "`SpaceCanvas` used to pass only `minZoom`" describes an earlier version of the file, so it goes.
+2. **Remove lineage, but keep the invariant it was protecting.** If the history was there to stop someone undoing something, rewrite it as a present-tense constraint that says what breaks: "Do not X: X causes Y." A rejected alternative may appear only as the thing the constraint forbids, never as the story of how it came to be rejected. If no invariant is left once the history is gone, delete the sentence.
+3. **Keep a citation (`ADR NNNN`, `.scratch/…`, a ticket number) only if both of these hold:** the sentence states a constraint a reader could not recover from the code in front of them, and the cited document is where the reasoning for that constraint lives. Most often this is a decision forbidding a change that looks obvious: adding memory, deriving something that is stored, collapsing two things that are separate on purpose. Remove the citation when it only records which ADR or ticket produced the code, when the code already shows the rule it names, or when it points at a resolved ticket as provenance. A `.scratch/` citation stays only while that ticket is open **and** the comment states the limitation the ticket tracks. Once the ticket resolves, the citation goes, and so does the limitation if it has been fixed.
+4. **The four rules above still apply** to whatever is left: no negative result, no measurement, a cross-module claim names its test, and anything called load-bearing has something that fails when it is reversed.
+
+**Where lineage goes instead.** What changed and why belongs in the **commit message**, which is the default home and is always one `git log -L` or `git blame` away. A decision and the alternatives it rejected belong in an **ADR**: [When to write an ADR](#when-to-write-an-adr) already asks for the rejected alternative and the cost accepted. A negative result, a measurement, or an open follow-up belongs in a **ticket** under `.scratch/<feature>/`. None of these goes stale in the source, because none of them is in the source.
+
+**What the rule does not touch.** Tool directives (`eslint-disable…`, `@ts-expect-error`, `prettier-ignore`) keep their syntax, and only their free-text reason is held to the rule. Two kinds of comment are **required** by a gate, so shortening one must leave what the gate reads. A `SAFETY:` comment before a type assertion is enforced by oxlint's `anti-slop/require-safety-comment-for-type-assertion`. The comment inside an intentionally empty block is what satisfies ESLint's `no-empty`. Finally, a few comments are text that a repository-scanning test asserts is still present, such as the retirement notice on `core`'s space-file schema. Those are listed in `.scratch/code-quality/issues/01-write-the-source-comment-rule.md`, and changing one means changing its test in the same commit.
+
+### Lineage: before and after
+
+`packages/app/src/components/CommandDock.tsx`, closing the module's doc comment:
+
+```ts
+// Before
+ * It replaces `SpaceSidebar` and `OpenSpaceSidebars`, which ADR 0082 retired
+ * along with the gutter they stood in
+ * (`.scratch/command-dock/issues/07-promote-the-dock-and-retire-the-space-sidebar.md`).
+ */
+
+// After: the paragraph is deleted. It is pure lineage, and the ticket it cites
+// is resolved. What the Dock *is* is already stated by the paragraphs above it.
+ */
+```
+
+`packages/app/src/camera.ts`, on `PRESENTING_DURATION`:
+
+```ts
+// Before
+/**
+ * How long the move onto the presented resource takes.
+ *
+ * One duration, because there is one move (ADR 0044). It replaced a 400ms pan
+ * plus a 300ms close-in and was set to sit between the two totals.
+ */
+
+// After: the replaced pan and close-in are history. "One move" is the
+// constraint, and it can be seen in the single constant, so the citation goes too.
+/** How long the move onto the presented resource takes: one duration, because there is one move. */
+```
+
+`packages/app/src/components/ChromeContinuation.tsx`, on `elementOf`. The before text is the paragraph that begins "It used to own a `sidebar-row` kind beside this one". It explains a lookup that no longer exists and a surface that has gone. The after text is nothing: once that story is removed, the sentence has no invariant left to keep.
+
+### Lineage reduced to its invariant
+
+`packages/graph/src/placement.ts`, on `roomAxis`:
+
+```ts
+// Before
+ * **One axis, and `x` first**, because the half-plane rule ADR 0084 stated —
+ * any Resource strictly past the subject's origin on an axis takes that axis's
+ * growth — moved a Resource beside the subject by the whole height growth for
+ * being one unit lower than it. …
+
+// After: the story of the earlier rule goes. The trap it guarded stays, as a constraint.
+ * **One axis, and `x` first.** A Resource clear on `x` is clear of the grown
+ * rect after taking the width alone. Do not also move it on `y`: a Resource
+ * beside the subject and one unit lower would take the whole height growth.
+```
+
+### A citation that stays, and one that goes
+
+This one stays. In `displace` in `packages/graph/src/placement.ts`:
+
+```ts
+ * repaired — clamping it, or remembering which Resources a particular Open pushed,
+ * is the per-Resource history ADR 0084 rejected for making two identical Maps
+ * behave differently.
+```
+
+The constraint is that Open and Close are memoryless and must not record who was pushed. That is something the code cannot show, because absence of state is invisible, and the obvious "fix" for the stated asymmetry is exactly the thing forbidden. ADR 0084 is where the reasoning lives. Keep it. (The sentence would read better as the constraint first — "Do not remember which Resources an Open pushed: two identical Maps would then behave differently (ADR 0084)" — but the citation earns its place either way.)
+
+This one goes. In `packages/graph/src/snapshot-edits.ts`, the module summary:
+
+```ts
+// Before
+ * a Resource joins, grows, shrinks or leaves a Map — Add, Open, Close, Resize,
+ * Remove from Map, Delete from Space (ADR 0084, ADR 0086).
+
+// After: the list of Edits is the code's own exports, and the ADRs only record
+// where those Edits were decided.
+ * a Resource joins, grows, shrinks or leaves a Map — Add, Open, Close, Resize,
+ * Remove from Map, Delete from Space.
+```
+
 ## Skills
 
 Vendored skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.
