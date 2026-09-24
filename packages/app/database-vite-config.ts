@@ -50,6 +50,6 @@ export const databaseViteConfig = (target: ViteDatabaseTarget, { mode }: ConfigE
   return {
     resolve: { alias: workspaceAliases() },
     plugins: [react(), tailwindcss(), spaceHttpPlugin(spaceHttpOptions)],
-    server: { port: target.port, strictPort: true },
+    server: { port: target.port },
   };
 };
