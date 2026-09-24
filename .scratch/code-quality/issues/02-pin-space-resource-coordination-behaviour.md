@@ -1,6 +1,6 @@
 # 02: Pin Space Resource coordination behaviour
 
-**What to build:** A characterisation of the session registry's coordinated Space Resource lifecycle, complete enough that 03 and 04 can move the code freely and any change in behaviour fails a test. Cover create, update and delete; recovery through retry and keep-local; unwinding after a participant or commit throws; provisional creates being dropped; and the persistence barrier.
+**What to build:** A characterisation of the session registry's coordinated Space Resource lifecycle, complete enough that 03 and 04 can move the code freely and any change in behaviour fails a test. Cover create, link, update and delete, including `link`'s own refusals when the target Space cannot be read (`space-resource-target-unavailable`, `persistence-read-failed`) and its behaviour while a commit is in flight; recovery through retry and keep-local; unwinding after a participant or commit throws; provisional creates being dropped; and the persistence barrier.
 
 **Blocked by:** None (can start immediately)
 

@@ -1,6 +1,6 @@
 # 06: Move the Dock's Spaces cluster into its own module
 
-**What to build:** The Command Dock's Spaces cluster — the Space menu, the Opener and Open Spaces tree, and the exit report — in its own module. The Dock composes it.
+**What to build:** The Command Dock's Spaces cluster — the Space menu, the Opener and Open Spaces tree, and the exit report (`DockSpace.exitReport`, drawn by `ExitReport`) — in its own module. The Dock composes it. `PersistenceReport` is not part of the cluster: it stays Dock-owned, in the Dock's generic `report` slot.
 
 **Blocked by:** 05
 
