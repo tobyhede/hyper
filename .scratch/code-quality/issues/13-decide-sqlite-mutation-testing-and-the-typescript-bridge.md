@@ -64,7 +64,7 @@ A middle option exists: keep SQLite but cut the integration suite's time, for ex
 
 **The single fact to decide on:** is a file-backed, no-Docker, single-host deployment a planned product target? If not, SQLite is about 240s of CI runner time per push (the longest job in 3 of 4 recent runs) and 44 commits in its first 14 days, with no consumer.
 
-Decision:
+Decision: **Keep** (Toby Hede, 2026-09-24). SQLite is important for portability: it is the file-backed, no-Docker runtime. Whether to shorten its integration suite's CI time is a separate question, not decided here.
 
 ### 2. StrykerJS mutation testing
 
