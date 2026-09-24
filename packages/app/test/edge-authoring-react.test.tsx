@@ -371,6 +371,7 @@ function CanvasHarness({
         newResourceTitle="Resource 4"
         onAddResource={() => undefined}
         onAddExistingResource={() => undefined}
+        onPlaceSpace={() => undefined}
         nameOnCreation={null}
         authoring={authoring}
         spaceSession={session}

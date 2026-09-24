@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
+import type { SettlePlacement } from '../resources-drag';
 import {
   Button,
   Alert,
@@ -33,6 +34,11 @@ import {
 import './resources-popover.css';
 
 export const RESOURCE_DRAG_TYPE = 'application/x-hyper-resource-id';
+/**
+ * A Space row's drag carries the Space's id under its own type, so the canvas
+ * can tell which source a drop came from before it reads the id.
+ */
+export const SPACE_DRAG_TYPE = 'application/x-hyper-space-id';
 
 type Activation = 'keyboard' | 'pointer';
 
@@ -187,6 +193,17 @@ export interface ResourcesPopoverProps {
    * or `null`.
    */
   readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
+  /**
+   * A Space row has left the list on a drag.
+   *
+   * `settle` is where the drop's answer comes back: it is the settlement a
+   * press on the same row spends, bound to the opening the drag started from,
+   * so a refusal lands on the list that asked for it — see
+   * {@link StandingRefusal}. Without this a Space row is pressed only, and draws
+   * no grip.
+   */
+  readonly onSpaceDragStart?:
+    ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;
 }
 
 /**
@@ -282,6 +299,10 @@ function RowGrip() {
  * A counter rather than the open flag, because the list can be reopened while
  * an Edit is still in flight, and that opening did not ask for it either.
  *
+ * A Space row dragged onto the canvas asks from the opening it left: the
+ * settlement handed out at its dragstart is bound to that opening, so the drop
+ * reports exactly as a press made at that moment would.
+ *
  * The Resource arm needs none of this: `onAdd` answers synchronously, so its
  * refusal is installed by the press that caused it.
  */
@@ -345,6 +366,7 @@ export function ResourcesPopover({
   spaceTitleById,
   spaces = NO_SPACES,
   onAddSpace,
+  onSpaceDragStart,
 }: ResourcesPopoverProps) {
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState<readonly ResourcesFilter[]>(ALL_FILTERS);
@@ -506,10 +528,32 @@ export function ResourcesPopover({
       return said;
     };
 
+  /**
+   * The one way a Space placement's answer reaches this list, whether a press
+   * or a drop asked for it: a standing sentence goes as the placement is asked
+   * for, and whatever it answers is drawn on the opening `asked` names.
+   */
+  const settlementFor =
+    (asked: number): SettlePlacement =>
+    (answer) => {
+      showSettlement(asked)(null);
+      void answer.then(showSettlement(asked), showBreak(asked));
+    };
+
   const beginDrag = (event: DragEvent<HTMLButtonElement>, resourceId: ResourceId): void => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(RESOURCE_DRAG_TYPE, resourceId);
     onDragStart(resourceId);
+  };
+
+  const beginSpaceDrag = (
+    event: DragEvent<HTMLButtonElement>,
+    space: ResourcesPopoverSpace,
+    started: (space: ResourcesPopoverSpace, settle: SettlePlacement) => void,
+  ): void => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(SPACE_DRAG_TYPE, space.id);
+    started(space, settlementFor(standing.opening));
   };
 
   return (
@@ -649,12 +693,12 @@ export function ResourcesPopover({
 
                     **One row shape over two sources.** A Resource joins the Map;
                     a Space joins it by authoring the Space Resource that frames it.
-                    What differs is the glyph and which completion the press
-                    spends — not the control, the label or the gesture, because
-                    to the reader both are "put this on the canvas". */}
+                    What differs is the glyph and which completion the press or
+                    the drop spends — not the control, the label or the gestures,
+                    because to the reader both are "put this on the canvas". */}
                 <Button
                   variant="ghost"
-                  draggable={row.kind === 'resource'}
+                  draggable={row.kind === 'resource' || onSpaceDragStart !== undefined}
                   data-resource-id={row.kind === 'resource' ? row.resource.id : undefined}
                   data-space-id={row.kind === 'space' ? row.space.id : undefined}
                   aria-current={
@@ -667,14 +711,18 @@ export function ResourcesPopover({
                   title={
                     row.kind === 'resource'
                       ? 'Add to Map, or drag it onto the canvas'
-                      : 'Add a Space Resource for this Space to the Map'
+                      : onSpaceDragStart === undefined
+                        ? 'Add a Space Resource for this Space to the Map'
+                        : 'Add a Space Resource for this Space to the Map, or drag it onto the canvas'
                   }
                   onDragStart={
                     row.kind === 'resource'
                       ? (event) => beginDrag(event, row.resource.id)
-                      : undefined
+                      : onSpaceDragStart === undefined
+                        ? undefined
+                        : (event) => beginSpaceDrag(event, row.space, onSpaceDragStart)
                   }
-                  onDragEnd={row.kind === 'resource' ? onDragEnd : undefined}
+                  onDragEnd={onDragEnd}
                   onClick={(event) => {
                     // `detail === 0` is the platform's own answer for a press
                     // that came from Enter or Space rather than a pointer.
@@ -698,24 +746,27 @@ export function ResourcesPopover({
                     //
                     // A refusal still arrives here either way, on the list that
                     // asked for it.
-                    setRefusal(null);
-                    // A rejection arm as well as a resolution one: a caller
-                    // that breaks rather than refusing would otherwise leave
-                    // this row having visibly done nothing, with the only trace
-                    // an unhandled rejection nobody reads. `App` reports the
-                    // same break on its own channel; this is what the reader
-                    // who pressed the row sees — as long as they are still
-                    // reading the list they asked from, which the opening this
-                    // press was made on is what decides.
-                    const asked = standing.opening;
-                    void onAddSpace?.(row.space).then(showSettlement(asked), showBreak(asked));
+                    //
+                    // `settlementFor` takes a rejection arm as well as a
+                    // resolution one: a caller that breaks rather than refusing
+                    // would otherwise leave this row having visibly done
+                    // nothing, with the only trace an unhandled rejection nobody
+                    // reads. `App` reports the same break on its own channel;
+                    // this is what the reader who pressed the row sees — as long
+                    // as they are still reading the list they asked from, which
+                    // the opening this press was made on is what decides. A drop
+                    // spends the same settlement, bound at its dragstart.
+                    if (onAddSpace === undefined) {
+                      setRefusal(null);
+                      return;
+                    }
+                    settlementFor(standing.opening)(onAddSpace(row.space));
                   }}
                 >
-                  {/* Only where a drag actually starts. A Space is placed by
-                      authoring the Space Resource that frames it, which is a press
-                      and not a drop, so a grip here would promise a gesture
+                  {/* Only where a drag actually starts: a grip on a row with
+                      no `onSpaceDragStart` behind it would promise a gesture
                       that fires no `dragstart` and answers with nothing. */}
-                  {row.kind === 'resource' ? <RowGrip /> : null}
+                  {row.kind === 'resource' || onSpaceDragStart !== undefined ? <RowGrip /> : null}
                   {row.kind === 'resource' ? (
                     <ResourceKindIcon kind={row.resource.kind} />
                   ) : (

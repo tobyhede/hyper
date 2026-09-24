@@ -42,7 +42,7 @@ import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
-import { completesResourceDrop, type ResourcesDrag } from './resources-drag';
+import { completedSpaceDrag, completesResourceDrop, type ResourcesDrag } from './resources-drag';
 import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
@@ -1204,6 +1204,23 @@ export const createApp = (
     );
 
     /**
+     * A Space dropped from the Resources list: the same placement a press
+     * spends, at the drop point, with its answer settled on the list that
+     * started the drag. `addSpaceResourceFor` answers rather than rejects and
+     * reports a break on the operational channel itself, so the settlement is
+     * all that is left to do here.
+     */
+    const dropSpace = useCallback(
+      (spaceId: UUID, anchor: MapPosition): void => {
+        const drag = completedSpaceDrag(resourcesDrag.current, spaceId, selectedMapId);
+        resourcesDrag.current = null;
+        if (drag === null) return;
+        drag.settle(addSpaceResourceFor(drag.space, anchor));
+      },
+      [addSpaceResourceFor, selectedMapId],
+    );
+
+    /**
      * Add Resource: one completed Edit, and then the naming continuation.
      *
      * **This is the one operation whose refusal no surface shows, and that is a
@@ -1616,6 +1633,9 @@ export const createApp = (
                 onDragStart: (resourceId) => {
                   resourcesDrag.current = { kind: 'resource', resourceId, mapId: selectedMapId };
                 },
+                onSpaceDragStart: (space, settle) => {
+                  resourcesDrag.current = { kind: 'space', space, mapId: selectedMapId, settle };
+                },
                 onDragEnd: () => {
                   resourcesDrag.current = null;
                 },
@@ -1800,6 +1820,7 @@ export const createApp = (
                 newResourceTitle={newResourceTitle}
                 onAddResource={addResource}
                 onAddExistingResource={dropExistingResource}
+                onPlaceSpace={dropSpace}
                 nameOnCreation={nameOnCreation}
                 authoring={authoring}
                 spaceSession={spaceSession}

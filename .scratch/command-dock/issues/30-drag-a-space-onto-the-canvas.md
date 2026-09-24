@@ -1,6 +1,6 @@
 # 30 — A Space in the Resources list can be dragged onto the canvas
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 29.
 
 **What to build:** A Space row in the Resources list (the Spaces-in-this-Meta-Space source) carries the grip and starts a drag, like a Resource row. Dropping it on the canvas authors the Space Resource that frames that Space at the drop point, in the selected Map. Pressing the row still places it at the centre — the drag is the shortcut, never the only way (ADR 0082).

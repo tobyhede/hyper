@@ -228,6 +228,7 @@ describe('opening framing on a mounted canvas', () => {
               newResourceTitle="Resource 2"
               onAddResource={() => undefined}
               onAddExistingResource={() => undefined}
+              onPlaceSpace={() => undefined}
               nameOnCreation={null}
               authoring={app.authoring}
               spaceSession={spaceSession}
@@ -361,6 +362,7 @@ describe('opening framing on a mounted canvas', () => {
             newResourceTitle="Resource 2"
             onAddResource={() => undefined}
             onAddExistingResource={() => undefined}
+            onPlaceSpace={() => undefined}
             nameOnCreation={null}
             authoring={app.authoring}
             spaceSession={spaceSession}

@@ -198,6 +198,53 @@ test(
 );
 
 /**
+ * A Space row drags onto the canvas as a Resource row does.
+ *
+ * The drop authors the Space Resource that frames the Space, titled with the
+ * Space's own title, where the pointer let go — and the list the drag left
+ * stays open, which is where a refusal would be drawn.
+ */
+test(
+  'dragging a Space from the Resources list places its Space Resource at the drop point',
+  { tag: '@parity:resources-popover-drags-a-space-onto-the-canvas' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const before = await nodeByTitle(page, 'Deep dive').count();
+    const nodes = await page.locator('.react-flow__node').count();
+
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const list = page.getByRole('dialog', { name: 'Resources' });
+    // The Space's row, not the unplaced Space Resource beside it that shares
+    // its title.
+    const source = list
+      .getByRole('button', { name: 'Add Deep dive to Map' })
+      .and(list.locator('[data-space-id]'));
+    await expect(source).toHaveAttribute('draggable', 'true');
+    await expect(source).toHaveAttribute('title', /or drag it onto the canvas$/);
+
+    const pane = page.locator('.react-flow__pane');
+    const paneBox = await boxOf(pane, 'the React Flow pane');
+    const targetPosition = { x: paneBox.width * 0.5, y: paneBox.height * 0.8 };
+    const dropPoint = { x: paneBox.x + targetPosition.x, y: paneBox.y + targetPosition.y };
+    await source.dragTo(pane, { targetPosition });
+
+    await expect(page.locator('.react-flow__node')).toHaveCount(nodes + 1);
+    const added = nodeByTitle(page, 'Deep dive').nth(before);
+    await expect(added.locator('[data-icon="space"]')).toBeVisible();
+    const addedBox = await boxOf(added, 'the placed Space Resource');
+    expect(addedBox.x + addedBox.width / 2).toBeCloseTo(dropPoint.x, -1);
+    expect(addedBox.y + addedBox.height / 2).toBeCloseTo(dropPoint.y, -1);
+
+    await expect(list).toBeVisible();
+    await expect(list.getByRole('alert')).toHaveCount(0);
+    await settled(page);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  },
+);
+
+/**
  * Destroying a Space takes it out of the list that offers it.
  *
  * The Spaces source is read once and re-read on an epoch, and creating a Space

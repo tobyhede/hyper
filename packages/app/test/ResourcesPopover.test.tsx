@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { resourceSchema, uuidSchema, type Resource, type UUID } from '@project/core';
-import { ResourcesPopover, RESOURCE_DRAG_TYPE } from '../src/components/ResourcesPopover';
+import {
+  ResourcesPopover,
+  RESOURCE_DRAG_TYPE,
+  SPACE_DRAG_TYPE,
+} from '../src/components/ResourcesPopover';
+import type { SettlePlacement } from '../src/resources-drag';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
@@ -24,6 +29,11 @@ const RESOURCES: readonly Resource[] = [
     target: id('000000000003'),
   },
 ];
+
+type SpaceDragStart = (
+  space: { readonly id: UUID; readonly title: string },
+  settle: SettlePlacement,
+) => void;
 
 /** No target Space read yet, which is what a Space Resource meets on the first render. */
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
@@ -47,6 +57,7 @@ function Fixture({
   spaceTitleById = NO_SPACE_TITLES,
   spaces,
   onAddSpace,
+  onSpaceDragStart,
 }: {
   readonly resources?: readonly Resource[];
   readonly allResources?: readonly Resource[];
@@ -59,6 +70,7 @@ function Fixture({
     readonly id: UUID;
     readonly title: string;
   }) => Promise<string | null>;
+  readonly onSpaceDragStart?: SpaceDragStart;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -75,6 +87,7 @@ function Fixture({
         spaceTitleById={spaceTitleById}
         spaces={spaces}
         onAddSpace={onAddSpace}
+        onSpaceDragStart={onSpaceDragStart}
       />
     </>
   );
@@ -94,6 +107,7 @@ function ControlledFixture({
   onAdd = vi.fn(),
   spaces,
   onAddSpace,
+  onSpaceDragStart,
 }: {
   readonly open: boolean;
   readonly onAdd?: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
@@ -102,6 +116,7 @@ function ControlledFixture({
     readonly id: UUID;
     readonly title: string;
   }) => Promise<string | null>;
+  readonly onSpaceDragStart?: SpaceDragStart;
 }) {
   return (
     <ResourcesPopover
@@ -113,6 +128,7 @@ function ControlledFixture({
       onDragStart={vi.fn()}
       spaces={spaces}
       onAddSpace={onAddSpace}
+      onSpaceDragStart={onSpaceDragStart}
     />
   );
 }
@@ -718,19 +734,15 @@ describe('ResourcesPopover', () => {
   });
 
   /**
-   * The grip says "drag me", so it is drawn only where a drag starts.
-   *
-   * A Space row is not `draggable`: placing a Space authors a Space Resource
-   * through a coordinated Edit, which is a press and not a drop. Drawn on one
-   * anyway, the grip and the grab cursor promise a gesture that fires no
-   * `dragstart` and gives no feedback of any kind — the opposite of what the
-   * grip's own rationale says it is for.
+   * Both sources are dragged by the same grip, because both are "put this on
+   * the canvas" to the reader — and the tooltip names both gestures on each.
    */
-  it('draws the drag grip only on the rows that can be dragged', async () => {
+  it('draws the drag grip on every row, and names both gestures on each', async () => {
     render(
       <Fixture
-        spaces={[{ id: id('000000000020'), title: 'Blueprint' }]}
+        spaces={[BLUEPRINT]}
         onAddSpace={() => Promise.resolve(null)}
+        onSpaceDragStart={vi.fn()}
       />,
     );
     await openList();
@@ -738,10 +750,132 @@ describe('ResourcesPopover', () => {
     const resourceRow = screen.getByRole('button', { name: 'Add Zulu to Map' });
     const spaceRow = screen.getByRole('button', { name: 'Add Blueprint to Map' });
 
-    expect(resourceRow).toHaveAttribute('draggable', 'true');
-    expect(resourceRow.querySelector('.resources-popover__row-grip')).not.toBeNull();
-    expect(spaceRow).not.toHaveAttribute('draggable', 'true');
-    expect(spaceRow.querySelector('.resources-popover__row-grip')).toBeNull();
+    for (const row of [resourceRow, spaceRow]) {
+      expect(row).toHaveAttribute('draggable', 'true');
+      expect(row.querySelector('.resources-popover__row-grip')).not.toBeNull();
+      expect(row.getAttribute('title')).toMatch(/or drag it onto the canvas$/);
+    }
+  });
+
+  it('carries the Space on the drag it starts, under its own type', async () => {
+    const onSpaceDragStart = vi.fn<SpaceDragStart>();
+    render(<Fixture spaces={[BLUEPRINT]} onSpaceDragStart={onSpaceDragStart} />);
+    await openList();
+
+    const setData = vi.fn();
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+      dataTransfer: { setData, effectAllowed: 'none' },
+    });
+
+    expect(setData).toHaveBeenCalledWith(SPACE_DRAG_TYPE, BLUEPRINT.id);
+    expect(setData).not.toHaveBeenCalledWith(RESOURCE_DRAG_TYPE, expect.anything());
+    expect(onSpaceDragStart).toHaveBeenCalledWith(BLUEPRINT, expect.any(Function));
+  });
+
+  it('draws a dropped Space’s refusal on the list that started the drag', async () => {
+    let settle: SettlePlacement | null = null;
+    render(
+      <Fixture
+        spaces={[BLUEPRINT]}
+        onSpaceDragStart={(_space, given) => {
+          settle = given;
+        }}
+      />,
+    );
+    await openList();
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+      dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
+    });
+
+    act(() => {
+      settle?.(Promise.resolve('This Space is no longer stored.'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This Space is no longer stored.');
+  });
+
+  it('words a broken Space drop on the list that started the drag', async () => {
+    let settle: SettlePlacement | null = null;
+    render(
+      <Fixture
+        spaces={[BLUEPRINT]}
+        onSpaceDragStart={(_space, given) => {
+          settle = given;
+        }}
+      />,
+    );
+    await openList();
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+      dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
+    });
+
+    act(() => {
+      settle?.(Promise.reject(new Error('Map not found')));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This Space Resource was not added: Map not found',
+    );
+  });
+
+  it('clears a standing refusal when a Space drop completes', async () => {
+    let settle: SettlePlacement | null = null;
+    render(
+      <Fixture
+        onAdd={() => 'This Resource is no longer available.'}
+        spaces={[BLUEPRINT]}
+        onSpaceDragStart={(_space, given) => {
+          settle = given;
+        }}
+      />,
+    );
+    await openList();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Map' }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+      dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
+    });
+    await act(async () => {
+      settle?.(Promise.resolve(null));
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  /**
+   * The drop's answer is held to the opening that started the drag, exactly as
+   * a press's is: the list being closed before the answer arrives is the one
+   * case the sentence is dropped.
+   */
+  it('drops a Space drop’s answer that settles after the list has closed', async () => {
+    let settle: SettlePlacement | null = null;
+    const onSpaceDragStart: SpaceDragStart = (_space, given) => {
+      settle = given;
+    };
+    const view = render(
+      <ControlledFixture open spaces={[BLUEPRINT]} onSpaceDragStart={onSpaceDragStart} />,
+    );
+    await screen.findByRole('dialog', { name: 'Resources' });
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Blueprint to Map' }), {
+      dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
+    });
+
+    view.rerender(
+      <ControlledFixture open={false} spaces={[BLUEPRINT]} onSpaceDragStart={onSpaceDragStart} />,
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await act(async () => {
+      settle?.(Promise.resolve('This Space is no longer stored.'));
+      await Promise.resolve();
+    });
+
+    view.rerender(
+      <ControlledFixture open spaces={[BLUEPRINT]} onSpaceDragStart={onSpaceDragStart} />,
+    );
+    await screen.findByRole('dialog', { name: 'Resources' });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   /**

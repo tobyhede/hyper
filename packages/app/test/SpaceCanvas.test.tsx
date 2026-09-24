@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, type RenderResult } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import { RESOURCE_DRAG_TYPE } from '../src/components/ResourcesPopover';
+import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
@@ -79,6 +79,10 @@ interface Harness {
   readonly view: RenderResult;
   readonly openResource: ReturnType<typeof vi.fn>;
   readonly addResource: ReturnType<typeof vi.fn>;
+  /** What an external Resource drop from the Resources list asked for. */
+  readonly addExistingResource: ReturnType<typeof vi.fn>;
+  /** What an external Space drop from the Resources list asked for. */
+  readonly placeSpace: ReturnType<typeof vi.fn>;
   /** Re-render with Resource authoring on or off, everything else unchanged. */
   readonly setTitleEditing: (enabled: boolean) => void;
   /** Re-render with nothing changed at all, the way a parent's render does. */
@@ -136,6 +140,8 @@ function mountGraph(
 ): Harness {
   const openResource = vi.fn();
   const addResource = vi.fn();
+  const addExistingResource = vi.fn();
+  const placeSpace = vi.fn();
   const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
   let nodes = initialNodes;
@@ -186,7 +192,8 @@ function mountGraph(
         placedResources={[]}
         newResourceTitle="Resource 2"
         onAddResource={addResource}
-        onAddExistingResource={() => undefined}
+        onAddExistingResource={addExistingResource}
+        onPlaceSpace={placeSpace}
         nameOnCreation={null}
         authoring={testedAuthoring}
         spaceSession={spaceSession}
@@ -207,6 +214,8 @@ function mountGraph(
     view,
     openResource,
     addResource,
+    addExistingResource,
+    placeSpace,
     titleEditingChanged,
     nodesChanged,
     setNodes: (next) => {
@@ -880,5 +889,74 @@ describe('dragging a Resource from the Resources list over canvas chrome', () =>
     fireEvent.dragOver(zoomIn, { dataTransfer });
 
     expect(dataTransfer.dropEffect).toBe('none');
+  });
+});
+
+describe('dropping a Space from the Resources list', () => {
+  const SPACE_ID = '3f2e1d0c-9b8a-4f7e-8d6c-5b4a3f2e1d0c';
+  const carrying = (type: string) => ({
+    types: [type],
+    dropEffect: 'none',
+    setData: () => undefined,
+    getData: (asked: string) => (asked === type ? SPACE_ID : ''),
+  });
+  const pane = (): HTMLElement => {
+    const found = document.querySelector<HTMLElement>('.react-flow__pane');
+    if (found === null) throw new Error('No pane is drawn.');
+    return found;
+  };
+
+  it('offers a Space drop on the pane, and places that Space at the drop point', () => {
+    const harness = mountGraph();
+    const dataTransfer = carrying(SPACE_DRAG_TYPE);
+
+    fireEvent.dragOver(pane(), { dataTransfer });
+    expect(dataTransfer.dropEffect).toBe('move');
+    // jsdom has no `DragEvent`, so the pointer a real drop carries is given to
+    // the plain event it builds instead.
+    const drop = createEvent.drop(pane(), { dataTransfer });
+    Object.defineProperties(drop, { clientX: { value: 300 }, clientY: { value: 200 } });
+    fireEvent(pane(), drop);
+
+    expect(harness.placeSpace).toHaveBeenCalledTimes(1);
+    // A top-left anchor, the Resource centred on the pointer — the same anchor a
+    // Resource drop authors.
+    expect(harness.placeSpace).toHaveBeenCalledWith(SPACE_ID, {
+      x: 300 - RESOURCE_SIZE.width / 2,
+      y: 200 - RESOURCE_SIZE.height / 2,
+    });
+    expect(harness.addExistingResource).not.toHaveBeenCalled();
+  });
+
+  it('never reads a Space drop as a Resource drop, nor a Resource drop as a Space one', () => {
+    const harness = mountGraph();
+
+    fireEvent.drop(pane(), { dataTransfer: carrying(RESOURCE_DRAG_TYPE) });
+
+    expect(harness.addExistingResource).toHaveBeenCalledWith(SPACE_ID, expect.anything());
+    expect(harness.placeSpace).not.toHaveBeenCalled();
+  });
+
+  it('does not offer a Space drop over canvas chrome', () => {
+    const harness = mountGraph();
+    const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+    const dataTransfer = carrying(SPACE_DRAG_TYPE);
+
+    fireEvent.dragOver(zoomIn, { dataTransfer });
+    fireEvent.drop(zoomIn, { dataTransfer });
+
+    expect(dataTransfer.dropEffect).toBe('none');
+    expect(harness.placeSpace).not.toHaveBeenCalled();
+  });
+
+  it('places nothing while the canvas is not authorable', () => {
+    const harness = mountGraph(undefined, undefined, undefined, false);
+    const dataTransfer = carrying(SPACE_DRAG_TYPE);
+
+    fireEvent.dragOver(pane(), { dataTransfer });
+    fireEvent.drop(pane(), { dataTransfer });
+
+    expect(dataTransfer.dropEffect).toBe('none');
+    expect(harness.placeSpace).not.toHaveBeenCalled();
   });
 });

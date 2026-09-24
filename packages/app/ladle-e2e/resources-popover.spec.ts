@@ -70,6 +70,26 @@ test(
 );
 
 test(
+  'a Space row drags onto the canvas as a Resource row does, and the list stays open',
+  { tag: '@parity:resources-popover-drags-a-space-onto-the-canvas' },
+  async ({ page }) => {
+    await page.goto(story('meta-spaces'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    const spaceRow = page.getByRole('button', { name: 'Add Blueprint to Map' });
+    await expect(spaceRow).toHaveAttribute('draggable', 'true');
+    await expect(spaceRow.locator('.resources-popover__row-grip')).toBeAttached();
+    await expect(spaceRow).toHaveAttribute('title', /or drag it onto the canvas$/);
+
+    await spaceRow.dragTo(page.getByRole('button', { name: 'The canvas behind it' }));
+
+    await expect(page.getByText('Added: Blueprint')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  },
+);
+
+test(
   'the filter counts what each switch contributes under the current search',
   { tag: '@parity:resources-popover-counts-what-each-filter-contributes' },
   async ({ page }) => {

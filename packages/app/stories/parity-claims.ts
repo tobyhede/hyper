@@ -79,6 +79,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'The Resources list offers the Meta Space’s Spaces interleaved with this Space’s Resources, each row carrying the glyph that says which it is, and the Spaces toggle takes them away without touching the Resources.',
   },
   {
+    id: 'resources-popover-drags-a-space-onto-the-canvas',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'MetaSpaces',
+    claim:
+      'A Space row carries the drag grip and a tooltip naming both gestures, and dropping it on the canvas places that Space — authoring the Space Resource that frames it at the drop point — while the list that started the drag stays open to take its answer.',
+  },
+  {
     id: 'resources-popover-counts-what-each-filter-contributes',
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'AvailableResources',
