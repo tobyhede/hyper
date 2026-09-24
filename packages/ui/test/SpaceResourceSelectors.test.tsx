@@ -298,7 +298,7 @@ describe('SpaceResourceSelectors', () => {
     expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
   });
 
-  it('groups the Graph menu into Colour…, New Graph, Rename with Copy link, then Delete', () => {
+  it('groups the Graph menu into New Graph, Colour… with Rename and Copy link, then Delete', () => {
     mount(
       clusters({
         graphCommands: {
@@ -324,13 +324,11 @@ describe('SpaceResourceSelectors', () => {
       'group',
       'separator',
       'group',
-      'separator',
-      'group',
     ]);
     expect(menuItemLabels(menu)).toEqual([
       'Long',
-      'Colour…',
       'New Graph',
+      'Colour…',
       'Rename',
       'Copy link to Graph',
       'Delete Long',

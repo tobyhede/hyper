@@ -55,16 +55,15 @@ export async function exerciseSpaceResourceContextMenus(
   const mapLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
 
-  // Same grammar, with Colour… standing alone immediately after the list —
+  // Same grammar, with Colour… heading the commands on this Graph —
   // and no permanent address offered any more.
   await openMenu('graph');
   const graphMenu = page.getByRole('menu');
   await expect(graphMenu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
   await expectMenuGroups(graphMenu, [
     await graphMenu.getByRole('menuitemradio').allInnerTexts(),
-    ['Colour…'],
     ['New Graph'],
-    ['Rename', 'Copy link to Graph'],
+    ['Colour…', 'Rename', 'Copy link to Graph'],
     [/^Delete /],
   ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();

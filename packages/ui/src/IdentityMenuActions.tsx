@@ -98,12 +98,12 @@ export interface GraphMenuActionsProps {
  * Graph commands use the same palette and menu order wherever a Graph is
  * named.
  *
- * The same grouping grammar as {@link MapMenuActions}, with one group
- * ahead of it: Colour… stands alone immediately after the selection list,
- * because it is the one command a Graph carries that a Map does not.
- * Copy link to Graph copies the within-Map address; this menu offers no
- * separate permanent address for the Graph itself
- * (`.scratch/dock-menu-reorganisation/issues/01`).
+ * The same grouping grammar as {@link MapMenuActions} — make one, this one,
+ * remove this one — with Colour… heading the group of commands on the Graph
+ * you are on, the one command a Graph carries that a Map does not
+ * (`.scratch/graph-colour/issues/03`). Copy link to Graph copies the
+ * within-Map address; this menu offers no separate permanent address for the
+ * Graph itself (`.scratch/dock-menu-reorganisation/issues/01`).
  */
 export function GraphMenuActions({
   title,
@@ -120,6 +120,13 @@ export function GraphMenuActions({
   return (
     <>
       <DropdownMenuGroup>
+        <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>
+          <PlusIcon />
+          New Graph
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
             <GraphIcon color={color} size={14} />
@@ -135,16 +142,6 @@ export function GraphMenuActions({
             />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>
-          <PlusIcon />
-          New Graph
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
         {renameItem}
         <DropdownMenuItem className="gap-2" onClick={onCopyLink}>
           <CopyIcon />
