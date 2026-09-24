@@ -42,7 +42,12 @@ import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
-import { completedSpaceDrag, completesResourceDrop, type ResourcesDrag } from './resources-drag';
+import {
+  completedResourceDrag,
+  completedSpaceDrag,
+  type ResourcesDrag,
+  type ResourcesPopoverSpace,
+} from './resources-drag';
 import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
@@ -415,26 +420,24 @@ export const createApp = (
     /**
      * Placing a Space: the Space Resource that frames it, authored in this Map.
      *
-     * The same `link` the creation pane spends, from the surface that offers
-     * the Space — so a reader who found it in the list never meets a second
-     * picker asking which Space they meant. The Title defaults to the Space's
-     * own, which is the name they just read on the row; renaming it afterwards
-     * is the ordinary inline Title edit every Resource has (ADR 0083).
+     * Spent from the surface that offers the Space — so a reader who found it
+     * in the list never meets a picker asking which Space they meant. The
+     * Title defaults to the Space's own, which is the name they just read on
+     * the row; renaming it afterwards is the ordinary inline Title edit every
+     * Resource has (ADR 0083).
      *
      * The anchor is the caller's, as `addExistingResource`'s is: a press
-     * passes the visible centre, read at the press.
+     * passes the visible centre, read at the press, and a drop (`dropSpace`)
+     * passes the anchor the canvas read from where it landed.
      */
     const addSpaceResourceFor = useCallback(
-      async (
-        space: { readonly id: UUID; readonly title: string },
-        anchor: MapPosition,
-      ): Promise<string | null> => {
+      async (space: ResourcesPopoverSpace, anchor: MapPosition): Promise<string | null> => {
         // Answers rather than rejects, for `readReferenceableSpaces`'s reason
-        // and one more: the list spends this on a press, so a rejection left to
-        // travel is a row that visibly does nothing. `resolveMap` is inside
-        // the `try` because it is the likeliest break on this path — the list
-        // has been open across renders and the Map it resolves is the one
-        // drawing now.
+        // and one more: the list spends this on a press or a drop of one of
+        // its rows, so a rejection left to travel is a row that visibly does
+        // nothing. `resolveMap` is inside the `try` because it is the
+        // likeliest break on this path — the list has been open across renders
+        // and the Map it resolves is the one drawing now.
         try {
           const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
           const result = await spaceResources.link({
@@ -1191,9 +1194,9 @@ export const createApp = (
 
     const dropExistingResource = useCallback(
       (resourceId: ResourceId, anchor: MapPosition): void => {
-        const drag = resourcesDrag.current;
+        const drag = completedResourceDrag(resourcesDrag.current, resourceId, selectedMapId);
         resourcesDrag.current = null;
-        if (!completesResourceDrop(drag, resourceId, selectedMapId)) return;
+        if (drag === null) return;
         drag.settle(addExistingResource(resourceId, anchor, false));
       },
       [addExistingResource, selectedMapId],

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   completedSpaceDrag,
-  completesResourceDrop,
+  completedResourceDrag,
   type ResourcesDrag,
 } from '../src/resources-drag';
 
@@ -15,27 +15,27 @@ const blueprint = {
   title: 'Blueprint',
 };
 
-describe('completesResourceDrop', () => {
-  it('completes a drop of the Resource the drag carried, over the Map it started over', () => {
+describe('completedResourceDrag', () => {
+  it('answers the Resource drag a drop of its Resource completes, over the Map it started over', () => {
     const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
-    expect(completesResourceDrop(drag, resourceId, mapId)).toBe(true);
+    expect(completedResourceDrag(drag, resourceId, mapId)).toBe(drag);
   });
 
   it('completes nothing when no drag began in the Resources list', () => {
-    expect(completesResourceDrop(null, resourceId, mapId)).toBe(false);
+    expect(completedResourceDrag(null, resourceId, mapId)).toBeNull();
   });
 
   it('refuses a drop naming a different Resource from the one the drag carried', () => {
     const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
-    expect(completesResourceDrop(drag, otherResourceId, mapId)).toBe(false);
+    expect(completedResourceDrag(drag, otherResourceId, mapId)).toBeNull();
   });
 
   it('refuses a drop over a Map other than the one the drag started over', () => {
     const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
-    expect(completesResourceDrop(drag, resourceId, otherMapId)).toBe(false);
+    expect(completedResourceDrag(drag, resourceId, otherMapId)).toBeNull();
   });
 
   it('never reads a Space drag as a Resource drop, even when the ids coincide', () => {
@@ -46,7 +46,7 @@ describe('completesResourceDrop', () => {
       settle: vi.fn(),
     };
 
-    expect(completesResourceDrop(drag, resourceId, mapId)).toBe(false);
+    expect(completedResourceDrag(drag, resourceId, mapId)).toBeNull();
   });
 });
 

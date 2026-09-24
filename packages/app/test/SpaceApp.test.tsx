@@ -1600,3 +1600,70 @@ describe('Space app Resources list', () => {
     expect(await screen.findByRole('button', { name: 'Add Resource to Map' })).toBeVisible();
   });
 });
+
+/**
+ * **A drop answers on the list the drag left, through `App`'s own wiring.**
+ *
+ * `ResourcesPopover.test.tsx` holds that a settlement handed out at dragstart
+ * draws its sentence, and `SpaceCanvas.test.tsx` that a drop on the pane
+ * reaches the drop callback; neither mounts the `App` that joins the two. This
+ * is the join: a refused drop whose answer `App` discarded would pass both.
+ */
+describe('Space app Resources list drop', () => {
+  it('shows a refused Resource drop on the list the drag started from', async () => {
+    const base = snapshot('Space', 'Resource', 10, 20);
+    const local: SpaceSnapshot = {
+      ...base,
+      resources: [
+        ...base.resources,
+        {
+          id: OUTSIDE_RESOURCE_ID,
+          document: { title: 'Outside resource', kind: 'markdown', body: '' },
+        },
+      ],
+    };
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceResources } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    const app = composeApp({ spaceSession: session, selection: MAP_ID });
+    mountSpace({ id: runtime(local).id, session, app, spaceResources }, (view) => render(view));
+    await waitFor(() => expect(unavailable(createResourceControl())).toBe(false));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
+    const list = screen.getByRole('dialog', { name: 'Resources' });
+    const carried = new Map<string, string>();
+    const types: string[] = [];
+    const dataTransfer = {
+      types,
+      dropEffect: 'none',
+      effectAllowed: 'none',
+      setData: (type: string, value: string) => {
+        carried.set(type, value);
+        types.push(type);
+      },
+      getData: (type: string) => carried.get(type) ?? '',
+    };
+    fireEvent.dragStart(within(list).getByRole('button', { name: 'Add Outside resource to Map' }), {
+      dataTransfer,
+    });
+
+    // The Resource joins the Map while the drag is in flight — another tab, a
+    // press elsewhere — so the drop is refused as already placed.
+    act(() => {
+      app.authoring.complete({
+        kind: 'added-resource-to-map',
+        resourceId: OUTSIDE_RESOURCE_ID,
+        anchor: { x: 400, y: 20 },
+      });
+    });
+    const pane = document.querySelector<HTMLElement>('.react-flow__pane');
+    if (pane === null) throw new Error('No pane is drawn.');
+    fireEvent.drop(pane, { dataTransfer });
+
+    const alert = await within(list).findByRole('alert');
+    expect(alert).toHaveTextContent('Resource not added');
+    expect(alert).toHaveTextContent('This Resource is already in this Map.');
+  });
+});

@@ -1130,8 +1130,10 @@ export function SpaceCanvas({
       const spaceId = uuidSchema.safeParse(event.dataTransfer.getData(SPACE_DRAG_TYPE));
       if (!resourceId.success && !spaceId.success) return;
       event.preventDefault();
-      // A collapsed Resource centred on the pointer, for either source:
-      // `RESOURCE_SIZE` is `COLLAPSED_RESOURCE_SIZE`, which no kind overrides.
+      // A collapsed Resource centred on the pointer, for either source. That a
+      // dropped Space Resource is drawn at this size too, so the anchor centres
+      // it, is held by `e2e/space-resource.spec.ts` ("dragging a Space from
+      // the Resources list places its Space Resource at the drop point").
       const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const anchor = {
         x: point.x - RESOURCE_SIZE.width / 2,

@@ -106,7 +106,7 @@ import {
 import type { Resource, ResourceId, Graph, GraphId, Map, MapId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
-import type { SettlePlacement, SettleResource } from '../resources-drag';
+import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
@@ -133,7 +133,7 @@ import {
   SPACES_LABEL,
 } from '../dock-model';
 import { RESOURCES_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
-import { ResourcesPopover, type ResourcesPopoverSpace } from './ResourcesPopover';
+import { ResourcesPopover } from './ResourcesPopover';
 import './command-dock.css';
 
 /**

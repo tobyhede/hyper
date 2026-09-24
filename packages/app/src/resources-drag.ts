@@ -26,8 +26,11 @@ export interface ResourceDrag {
   readonly settle: SettleResource;
 }
 
-/** A Space the Resources list offers, as a drag carries it. */
-export interface DraggedSpace {
+/**
+ * One Space this Meta Space holds, as the Resources list offers it — the row a
+ * press places and a drag carries.
+ */
+export interface ResourcesPopoverSpace {
   readonly id: UUID;
   readonly title: string;
 }
@@ -36,7 +39,7 @@ export interface DraggedSpace {
 export interface SpaceDrag {
   readonly kind: 'space';
   /** The whole row rather than its id: placing it titles the Space Resource with the Space's title. */
-  readonly space: DraggedSpace;
+  readonly space: ResourcesPopoverSpace;
   readonly mapId: MapId;
   /** Where the drop's answer goes — see {@link SettlePlacement}. */
   readonly settle: SettlePlacement;
@@ -54,25 +57,30 @@ export interface SpaceDrag {
 export type ResourcesDrag = ResourceDrag | SpaceDrag;
 
 /**
- * Whether a canvas drop of `resourceId`, over `mapId`, completes `drag`.
+ * The Resource drag a canvas drop of `resourceId`, over `mapId`, completes, or
+ * `null`.
  *
  * The drop has to be the one the list started: the same Resource, over the Map
  * that was selected when it left the list. Anything else — no drag, a Space
  * drag, another Resource, a Map changed mid-drag — completes nothing.
+ *
+ * It answers the drag rather than a type predicate over it, because the check
+ * reads the id and the Map as well as the kind: a predicate's `false` would
+ * narrow a Resource drag that merely named another Resource out of being one.
  */
-export const completesResourceDrop = (
+export const completedResourceDrag = (
   drag: ResourcesDrag | null,
   resourceId: ResourceId,
   mapId: MapId,
-): drag is ResourceDrag =>
-  drag?.kind === 'resource' && drag.resourceId === resourceId && drag.mapId === mapId;
+): ResourceDrag | null =>
+  drag?.kind === 'resource' && drag.resourceId === resourceId && drag.mapId === mapId ? drag : null;
 
 /**
  * The Space drag a canvas drop of `spaceId`, over `mapId`, completes, or `null`.
  *
- * The same check as {@link completesResourceDrop}, answering the drag itself
- * because the drop spends what it carries: the Space's title and the
- * settlement bound to the list that started it.
+ * The same check as {@link completedResourceDrag}, for a Space: the drop spends
+ * what the drag carries, the Space's title and the settlement bound to the list
+ * that started it.
  */
 export const completedSpaceDrag = (
   drag: ResourcesDrag | null,
