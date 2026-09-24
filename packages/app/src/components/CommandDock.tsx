@@ -63,8 +63,6 @@ import {
   DropdownMenuRadioItem,
   ToolbarButton,
 } from '@project/ui';
-import type { SpaceSessionState } from '@project/persistence';
-import type { StoredSpaceRefusal } from '../space-authoring';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import {
   alongLabel,
@@ -94,106 +92,13 @@ import {
   type DockRenaming,
 } from './command-dock-shared';
 import { Divider } from './CommandDockParts';
-import { SpacesControl, type DockSpace } from './CommandDockSpaces';
-import { GraphControls, MapControls, type DockCanvas, type DockGraph } from './CommandDockMapGraph';
-import { ResourcesControl, type DockResources } from './CommandDockResources';
+import type { DockChrome, DockPersistence } from './command-dock-chrome';
+import { SpacesControl } from './CommandDockSpaces';
+import { GraphControls, MapControls } from './CommandDockMapGraph';
+import { ResourcesControl } from './CommandDockResources';
 import './command-dock.css';
 
 /* ------------------------------------------------------------------ state */
-
-/**
- * **What the Dock is given, in the groups the surface it replaced was given
- * them in.**
- *
- * It was one flat `Chrome` of thirty-three members, threaded whole into ten
- * components — so `PresentingExit`, which reads four of them, was declared to
- * take every command in the surface, and no signature in the file said what any
- * component actually used. `SpaceSidebar` did not do that: it took `canvas`,
- * `graph`, `addResource`, `createMap`, `persistence`, `selectedResource`,
- * `entityActions` and `titleEdit`, and each of its own pieces took the group it
- * drew.
- *
- * The groups here are named after it wherever there is a counterpart —
- * `canvas` is the Maps and the one that is drawing, `graph` is the Graphs
- * and Present, `persistence` is the report and its recoveries — which is what
- * made promoting this surface a move rather than a translation.
- *
- * Two composition points take the whole of it, and that is the shape rather
- * than a leftover: `App` stands where the application mounts the surface and
- * {@link CommandDock} stands where the surface distributes to its own clusters.
- * Everything below them takes a group.
- */
-export interface DockChrome {
-  /**
-   * That a name in the bar is being renamed right now.
-   *
-   * **One fact under the whole bar, reported rather than owned.** The editor is
-   * `InlineTitleEditor` and which name is open is the bar's own slot
-   * ({@link useDockRenaming}) — which is the whole reason the shared draft the
-   * Sidebar needed is gone. But the *application* still has to know one is
-   * running: a live chrome rename withdraws Create Resource, Present, Delete Resource
-   * and the canvas's own title editing, because each of those would re-derive
-   * the canvas or take the caret from under it (`authoring-availability.ts`).
-   *
-   * So the text, the refusal and the focus return stay in the component and only
-   * the fact crosses the seam. It is `DockChrome`'s rather than `canvas`'s or
-   * `graph`'s because there is one answer for the bar — and because there is one
-   * answer, there is one writer: the slot, not each name in turn.
-   */
-  readonly onRenamingChange: (renaming: boolean) => void;
-  /**
-   * How many times the Space under this bar has been **replaced** — ADR 0042's
-   * epoch, counted by Space Authoring and handed down unchanged.
-   *
-   * **The one fact that ends a rename which no identity in the bar can see
-   * coming.** Every other ending is visible from here: the author presses Enter
-   * or Escape, moves to another Map, or the rename stops being available. A
-   * replacement is none of those — accepting the stored Space installs a
-   * different Space's document under the same ids, so the slot names the same
-   * Map, `chromeTitleEdit` is unchanged once placement resolves, and an
-   * editor left open goes on standing over a Space that is gone, reseeded from
-   * the accepted title. Completing it then writes a name the author typed
-   * against a Map they never saw.
-   *
-   * It is a counter and not a `replaced` flag for the reason `replacementEpoch`
-   * is one everywhere else: two replacements in a row are two facts, and a
-   * boolean that has to be lowered again is a second message this seam would
-   * have to carry. A number the component compares against its own is total.
-   *
-   * `DockChrome`'s rather than a group's, for the same reason
-   * {@link onRenamingChange} is: it is one answer under the whole bar, and the
-   * slot that holds the rename is where it is spent.
-   */
-  readonly replacementEpoch: number;
-  readonly space: DockSpace;
-  readonly canvas: DockCanvas;
-  readonly graph: DockGraph;
-  readonly resources: DockResources;
-  readonly persistence: DockPersistence;
-}
-
-/** What went wrong, which is the only report persistence ever gives. */
-export interface DockPersistence {
-  /** How this Space's last commit went. `settled` and `pending` draw nothing. */
-  readonly state: SpaceSessionState['persistence'];
-  /**
-   * Whether this Space is the one on the canvas.
-   *
-   * A session mounts one Dock per open Space and shows one of them, and both
-   * decision surfaces below are portalled `AlertDialog`s that own the viewport —
-   * so a hidden Space's conflict would block the Space the reader is actually
-   * working in, about a commit made somewhere else. What that Space is owed
-   * instead is the mark on its row in the Open Spaces menu, which is where ADR
-   * 0082's *"it names which open Space is unwell"* is met.
-   */
-  readonly active: boolean;
-  /** Try the failed commit again, which is the one recovery that is not a decision. */
-  readonly onRetry: () => void;
-  /** Take the stored Space over the local one, ending a conflict. */
-  readonly onAcceptRemote: () => StoredSpaceRefusal | null;
-  /** Keep the local Space and commit it again, ending a conflict. */
-  readonly onKeepLocal: () => void;
-}
 
 /** The one identity being renamed, and which entity it named when the rename began. */
 interface RenamingSubject {

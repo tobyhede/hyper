@@ -35,7 +35,6 @@ import {
   ToolbarGroup,
 } from '@project/ui';
 import type { UUID } from '@project/core';
-import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import {
   exitReportSentence,
   openCount,
@@ -43,7 +42,6 @@ import {
   SPACES_LABEL,
   unwellElsewhere,
   unwellReport,
-  type ExitOutcome,
 } from '../dock-model';
 import type { MenuSide } from '../dock-placement';
 import { SET_TRIGGER } from './command-dock-triggers';
@@ -55,6 +53,7 @@ import {
   useIdentityCaret,
   type IdentityDisclosure,
 } from './command-dock-shared';
+import type { DockSpace } from './command-dock-chrome';
 import { Divider, IdentitySurface, SetTrigger } from './CommandDockParts';
 
 /**
@@ -93,115 +92,6 @@ import { Divider, IdentitySurface, SetTrigger } from './CommandDockParts';
  * claimed.
  */
 const SpaceItem = DropdownMenuRadioItem<UUID>;
-
-/**
- * The Space you are in, the one you came from, and the set open beside them.
- *
- * One group rather than two because the bar draws them as one region: the
- * Opener control and the Open Spaces menu are how you leave this Space, and the name and
- * its menu are what you can do while you are in it.
- */
-export interface DockSpace {
-  /**
-   * This Space's own name — `document.title` of the session the Dock is drawing.
-   *
-   * **Not the Title of a Space Resource that points here.** The two agree only at
-   * creation, which writes one string into both, and either may be renamed
-   * afterwards without the other (`CONTEXT.md`); ADR 0083 keeps the target's
-   * name off the Resource's front, so nothing propagates in either direction.
-   */
-  readonly title: string;
-  /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
-  readonly currentSpaceId: UUID;
-  /** The Space this one was entered from, and the only Space the bar names. Null at the root. */
-  readonly opener: NamedSpace | null;
-  /**
-   * Every row the Open Spaces menu draws, Meta first whether or not it is
-   * open (`OpenSpaces.listing`) — `[]` only where the App is drawn outside
-   * Open Spaces, which is what knows Meta.
-   */
-  readonly listing: readonly ListingRow[];
-  /**
-   * Rename this Space, or `null` while no chrome rename may run.
-   *
-   * **From inside the Space, and only from inside it.** `renamed-space` writes
-   * `document.title` of the session it is completed on and nothing else: no Space
-   * Resource pointing at this Space changes with it, because a Space's name and the
-   * Title of a Resource that references it are two stored values that agree only at
-   * creation, and ADR 0083 keeps the target's name off that Resource's front. So
-   * there is nothing here for this surface to keep in step — the Open Spaces
-   * rows and the Opener control each read their own session's title and redraw on
-   * its publication (`open-spaces.ts`). Renaming *another* Space, from a Space
-   * Resource or from a row of that menu, is a `SpaceResourceLifecycle` operation over
-   * a second session (ADR 0076) and is deliberately not this.
-   *
-   * Nullable rather than optional so both callers state it, and `null` now means
-   * the one guarantee it makes for {@link DockCanvas.onRename} and
-   * {@link DockGraph.onRename}: the application has withdrawn chrome title
-   * editing — a live Resource title editor or content edit owns the caret, or the
-   * canvas has no placement to edit against — and all three names go together.
-   */
-  readonly onRename: ((title: string) => string | null) | null;
-  /** Copy this Space's own address — the one link a Space offers (`entity-actions.tsx`). */
-  readonly onCopyLink: () => void;
-  /**
-   * Choose a row of the listing: move to an open Space, closing nothing, or to
-   * the Meta Space, which is opened if it is not open yet. The Opener control
-   * and the Open Spaces menu both spend this.
-   *
-   * `title` travels with the choice rather than being looked up again once the
-   * command answers — `OpenSpaces.select`'s own refusal carries none, being
-   * only ever a race the reader cannot see coming, and by the time a thrown
-   * failure is caught the row that was chosen may no longer be in
-   * {@link listing} at all. The Dock already holds the title of the row it
-   * drew and the reader chose, so it hands it over rather than making the
-   * caller keep a last-known one (`.scratch/command-dock/issues/28`, decision
-   * 10).
-   */
-  readonly onSelect: (spaceId: UUID, title: string) => void;
-  /**
-   * Exit this Space — one Space, never a second (ADR 0068). Never the root.
-   *
-   * The confirmation is production's `RejectedExitConfirmation` and is how the
-   * warning arm is spent: the surface asks, and the answer comes back in as the
-   * same token `openSpaces.exit` takes, rather than as a second command that
-   * means "and I mean it".
-   */
-  readonly onExit: (spaceId: UUID, confirmation?: RejectedExitConfirmation) => void;
-  /**
-   * Whether this Space can be left at all, which is one question and not two.
-   *
-   * The meta Space is permanent (`open-spaces.ts`), and every other open Space
-   * can be exited. This read {@link opener} instead — "is there a Space I was
-   * opened from" — which answers `null` for every Space reached by its own
-   * address as well, and so withheld Exit from a pasted link. The two happen to
-   * agree while the reader arrived by pressing Space Resources, which is what hid
-   * it.
-   */
-  readonly exitDisabled: boolean;
-  /** The exit that did not happen, which is the only kind there is anything to draw about. */
-  readonly exitReport: SpaceExitReport | null;
-  readonly onDismissExitReport: () => void;
-}
-
-/**
- * What an exit that was refused or warned about has to say, and about which
- * Space.
- *
- * The title is carried rather than read back off the session, because by the
- * time the report is drawn the Space it names may no longer be the one on the
- * canvas — and ADR 0082 binds the surface to name which open Space is unwell,
- * not to describe wherever the reader has since ended up.
- *
- * The Id travels for the same reason: answering the warning re-calls the exit,
- * and it must re-call it on the Space the warning was about rather than on
- * whichever one is current when the answer arrives.
- */
-export interface SpaceExitReport {
-  readonly spaceId: UUID;
-  readonly title: string;
-  readonly outcome: ExitOutcome;
-}
 
 /**
  * The Space's chevron: an ordinary menu, the same one Map and Graph carry.
@@ -417,7 +307,7 @@ function OpenerAndOpenSpaces({
    */
   const unwell = unwellElsewhere(space.listing, space.currentSpaceId);
   /**
-   * Meta's own row, whichever arm of {@link ListingRow} it is — `listing`
+   * Meta's own row, whichever arm of `ListingRow` it is — `listing`
    * draws it first whether or not it is open (`open-spaces.ts`), so the first
    * row is always Meta's and nothing here has to ask which Space it names.
    * `null` only for the empty listing `SpaceApp`'s isolated mount draws.

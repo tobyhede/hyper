@@ -15,7 +15,7 @@ import {
   ToolbarGroup,
   graphColor,
 } from '@project/ui';
-import type { Graph, GraphId, Map, MapId } from '@project/core';
+import type { GraphId, MapId } from '@project/core';
 import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { MenuSide } from '../dock-placement';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
@@ -26,123 +26,8 @@ import {
   useIdentityCaret,
   type IdentityDisclosure,
 } from './command-dock-shared';
+import type { DockCanvas, DockGraph } from './command-dock-chrome';
 import { IdentitySurface } from './CommandDockParts';
-
-/**
- * The canvas's one exclusive choice: which authored Map is drawing (ADR
- * 0079, ADR 0082).
- *
- * Named `canvas` after the group the Space Sidebar carried for the same purpose,
- * and carrying `selected` as the Map rather than as an id for the same reason
- * that one did — the title belongs to the Map, so a cluster naming what is
- * drawing reads it off the Map instead of deriving a second title.
- */
-export interface DockCanvas {
-  /** The Space's authored Maps, in the order it declares them. */
-  readonly maps: readonly Map[];
-  /** The Map that is drawing. */
-  readonly selected: Map;
-  readonly onSelect: (mapId: MapId) => void;
-  /**
-   * Rename the drawing Map. Absent while no chrome rename may begin —
-   * {@link DockSpace.onRename}'s second arm.
-   */
-  readonly onRename: ((title: string) => string | null) | null;
-  /**
-   * Create an empty Map and select it, or `null` while New Map may not run.
-   *
-   * One field, so the row's unavailable treatment and its press are the one
-   * answer Map authoring's capability gave (`map-authoring-commands.ts`,
-   * `offered`). Among that answer's terms is one beyond Create Resource's:
-   * creating a Map **selects** it, and the created Map is empty — so the
-   * canvas re-derives with no nodes and a Resource holding a live title draft
-   * unmounts, taking the draft, the announced reason and the caret with it. A
-   * valid draft is safe, because pressing the control blurs the input and a
-   * valid blur completes the Title (ADR 0065); a refused one is re-focused
-   * instead and the press lands anyway.
-   */
-  readonly onCreate: (() => void) | null;
-  /**
-   * Whether New Map's rename continuation landed — read when the menu closes.
-   *
-   * **The answer is the point.** New Map continues in the new Map's name,
-   * so this cluster's menu must not take the caret back on close — but only once
-   * the rename editor has actually opened. Asking at press time races the
-   * post-selection window where rename is withdrawn; reading here keeps the two
-   * halves of that decision in one place rather than one per module.
-   */
-  readonly didCreateMoveCaret: () => boolean;
-  /**
-   * Delete the drawing Map, or `null` while Delete may not run.
-   *
-   * One field for the same reason as {@link DockCanvas.onCreate}. The answer
-   * holds two rules, and neither is derivable here without restating it: the
-   * last Map cannot be deleted (ADR 0079), and every entity Edit is withdrawn
-   * while a title editor or a live content edit owns the caret
-   * (`authoring-availability.ts`). A row that read only the first used to
-   * press cleanly, run nothing, and report nothing.
-   */
-  readonly onDelete: (() => void) | null;
-  /**
-   * Copy the drawing Map's address — the one form a Map has.
-   *
-   * A Map offers no permanent link because it has no second address to be
-   * permanent *against*: its own address is the only one there is
-   * (`entity-actions.tsx`), where a Graph and a Resource each have a within-Map
-   * form as well.
-   */
-  readonly onCopyLink: () => void;
-}
-
-/** The Graphs the selected Map owns, the Active one, and Present. */
-export interface DockGraph {
-  /** The Graphs the selected Map owns, which are the only ones it draws. */
-  readonly graphs: readonly Graph[];
-  readonly active: Graph;
-  /** Every visible Graph's resolved colour, derived by the production palette. */
-  readonly colorByGraphId: Readonly<Record<string, string>>;
-  /** The Active Graph's colour, which several controls carry as its identity. */
-  readonly activeColor: string;
-  readonly onActivate: (graphId: GraphId) => void;
-  /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
-  readonly onRename: ((graphId: GraphId, title: string) => string | null) | null;
-  /** A Graph's stored colour, which the canvas draws its Edges in. */
-  readonly onRecolor: (graphId: GraphId, color: string) => void;
-  readonly onCreate: () => void;
-  readonly onDelete: (graphId: GraphId) => void;
-  /**
-   * Whether this cluster's lifecycle commands may run at all.
-   *
-   * One term for the three of them, because they are withdrawn by one rule and
-   * not by three: New Graph, Colour and Delete are entity Edits, and no entity
-   * Edit runs while a title editor or a live content edit owns the caret
-   * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
-   * this one, read off `graphs` here; the Map cluster splits create from
-   * delete because creating a Map **selects** it and so has a second reason
-   * of its own, which no Graph command has.
-   */
-  readonly editsDisabled: boolean;
-  /**
-   * Copy this Graph's within-Map address — "Copy link to Graph" reproduces
-   * what is on screen, so a recipient lands where the sender was.
-   *
-   * A Map **owns** its Graphs (ADR 0040) and a Graph also has its own
-   * permanent address, but the Graph menu offers only this one
-   * (`.scratch/dock-menu-reorganisation/issues/01`).
-   */
-  readonly onCopyLink: () => void;
-  readonly presenting: boolean;
-  readonly onPresent: () => void;
-  /**
-   * Whether Present may begin a traversal.
-   *
-   * An empty Graph is legal and ordinary — creating a Map mints one — and it
-   * has nothing to traverse, so `present()` would return having changed nothing
-   * and an enabled control would swallow the press. Unavailable rather than
-   * absent: a control that disappears teaches nothing about why.
-   */
-  readonly presentDisabled: boolean;
-}
 
 /**
  * Map: `[name v]`. Graph: `[name v][>]`.
