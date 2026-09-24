@@ -1,0 +1,82 @@
+/* An Edge's Title: a box on the Edge's midpoint whose border is the Edge's own
+   stroke, set in the Resource Title's type at caption size.
+
+   Unlayered so it wins over `Button`'s utilities: a revealed Title is drawn as
+   the Title, not as a chrome button. */
+
+.edge-title {
+  /* 18px x 0.67, stated: `--canvas-resource-title-size` is scoped to
+     `.canvas-resource`, and an Edge is not inside one. */
+  --edge-title-size: 12px;
+  --edge-title-leading: 1.25;
+  --edge-title-weight: 600;
+  --edge-title-radius: 0;
+  /* `EDGE_TITLE_CEILING` in `edge-title-room.ts`; `EdgeTitle.test.tsx` holds them equal. */
+  --edge-title-ceiling: 224px;
+  --edge-title-underline-hover: inset 0 -2px 0 var(--edge-title-stroke);
+  --edge-title-underline-editing: inset 0 -3px 0 var(--edge-title-stroke);
+
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: max-content;
+  max-width: var(--edge-title-ceiling);
+  height: auto;
+  min-height: 0;
+  padding: 4px 10px;
+  /* The stroke width arrives unitless, as React Flow's `strokeWidth` takes it. */
+  border: calc(var(--edge-title-stroke-width) * 1px) solid var(--edge-title-stroke);
+  border-radius: var(--edge-title-radius);
+  background: var(--canvas-resource-face-rest);
+  color: var(--canvas-resource-title-color);
+  font: inherit;
+  font-size: var(--edge-title-size);
+  font-weight: var(--edge-title-weight);
+  line-height: var(--edge-title-leading);
+  white-space: nowrap;
+  pointer-events: all;
+}
+
+/* Ellipsed; the whole Title is in the tooltip and the field. */
+.edge-title__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A hidden Title is dimmed while revealed, so the author can find it. */
+.edge-title[data-hidden='true'] {
+  opacity: 0.55;
+}
+
+/* A revealed Title is a one-activation control with the Resource Title's hover. */
+.edge-title--control {
+  cursor: default;
+}
+
+.edge-title--control:hover {
+  background: var(--canvas-resource-face-active);
+  color: var(--canvas-resource-title-color);
+  box-shadow: var(--edge-title-underline-hover);
+}
+
+.edge-title--control:focus-visible {
+  outline: 2px solid var(--edge-title-stroke);
+  outline-offset: 2px;
+}
+
+/* Being written: the Resource's editing mark. The field bounds its own text,
+   so the box grows round it rather than capping it again. */
+.edge-title--editing {
+  /* The Edge toolbar's height (a `size-7` button plus `command-surface.css`'s
+     4px padding and 1px border each side), held by `ladle-e2e/edge-toolbar.spec.ts`. */
+  --edge-title-editing-height: calc(1.75rem + 2 * 4px + 2 * 1px);
+
+  max-width: none;
+  min-height: var(--edge-title-editing-height);
+  padding: 4px 14px;
+  background: var(--canvas-resource-face-active);
+  box-shadow: var(--edge-title-underline-editing);
+}

@@ -314,11 +314,8 @@ body {
 }
 
 /* Idle, a Resource offers where an Edge may start; mid-drag, a Resource that is both
-   near the pointer and eligible for the release offers whichever end the drag
-   is looking for — a target for an ordinary connection, and a source for a
-   reconnection that has taken hold of an Edge's `from` end. Far or refused
-   Resources stay quiet. The role is read off the drag rather than assumed, so the
-   second gesture has somewhere to land.
+   near the pointer and eligible for the release offers a target. Far or
+   refused Resources stay quiet.
 
    Every rule below is conditioned on `data-connection-authoring`, because the
    four sides are **anchors** before they are affordances and they render on
@@ -330,19 +327,15 @@ body {
    The two idle arms are gated on `data-dragging` as well, because a Resource being
    moved has one gesture and offering the start of another is not part of it: a
    drag keeps the pointer on the Resource and Selects it, so both idle reveals would
-   otherwise fire for the    whole of it. The two seeking arms are deliberately
-   ungated: they are what a *neighbour* offers the drag that is drawing an Edge,
-   which is a different gesture from carrying a Resource, and nothing about it
-   changes here. */
+   otherwise fire for the    whole of it. The seeking arm is ungated: it is what
+   a *neighbour* offers a drag drawing an Edge. */
 .react-flow__node:hover
   .rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-connection-in-progress='false']
   .rf-resource-node__authoring-handle--source,
 .rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-dragging='false'][data-selected='true'][data-connection-in-progress='false']
   .rf-resource-node__authoring-handle--source,
 .rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='target']
-  .rf-resource-node__authoring-handle--target,
-.rf-resource-node__inner[data-connection-authoring='true'][data-resizing='false'][data-connection-seeking='source']
-  .rf-resource-node__authoring-handle--source {
+  .rf-resource-node__authoring-handle--target {
   opacity: 1;
   pointer-events: auto;
 }
@@ -386,14 +379,18 @@ body {
   outline: 2px solid var(--canvas-resource-ink-color);
 }
 
-/* Where a selected Edge's controls are placed, and nothing about how they look.
-   They are portalled into React Flow's own `EdgeLabelRenderer` layer so they pan
-   and zoom with the canvas; `pointer-events` is off on that layer by default and
-   has to be restored per control. Their own presentation belongs to
-   `SelectedEdgeControls`, which composes it from the shared primitives. */
+/* Placement only for an Edge's Title and toolbar, portalled into React Flow's
+   `EdgeLabelRenderer` layer so they pan and zoom with the canvas. That layer
+   turns `pointer-events` off, so each control restores it. */
 .edge-control-layer {
   position: absolute;
   pointer-events: all;
+}
+
+/* The label layer sits beneath the Resources; a revealed Edge's chrome is raised
+   above them, including a selected Resource (which React Flow lifts by 1000). */
+.edge-control-layer[data-revealed='true'] {
+  z-index: 2000;
 }
 
 /* The sentence a pointer gesture's refusal leaves behind. Screen-fixed at the

@@ -44,8 +44,7 @@ const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
  * Everything below asserts that a popup or a row is **mounted** rather than
  * visible. Base UI's Positioner holds a popup at `opacity: 0` until it has
  * measured its anchor, and jsdom answers every measurement with zeroes, so
- * `toBeVisible` cannot pass for any popover in this tree — `SelectedEdgeControls`
- * reads the same way. The visibility half of this evidence is
+ * `toBeVisible` cannot pass for any popover in this tree. The visibility half of this evidence is
  * `ladle-e2e/resources-popover.spec.ts`, which runs in a real browser.
  */
 function Fixture({

@@ -6,6 +6,8 @@ import {
   Copy,
   Ellipsis,
   ExternalLink,
+  Eye,
+  EyeOff,
   LayoutGrid,
   Link,
   LogIn,
@@ -360,6 +362,15 @@ export const EntityActionsIcon = (props: ResourceActionIconProps) => (
 
 /** Put an address on the clipboard. */
 export const CopyIcon = (props: ResourceActionIconProps) => <Copy size={14} {...props} />;
+
+/**
+ * An Edge's Title is shown at rest. The glyph draws the state; the control is
+ * named for its action (`Hide Title`).
+ */
+export const ShowTitleIcon = (props: ResourceActionIconProps) => <Eye size={14} {...props} />;
+
+/** An Edge's Title is hidden at rest. */
+export const HideTitleIcon = (props: ResourceActionIconProps) => <EyeOff size={14} {...props} />;
 
 /** Remove the entity the surrounding command names. */
 export const DeleteIcon = (props: ResourceActionIconProps) => <Trash2 size={14} {...props} />;

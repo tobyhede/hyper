@@ -11,6 +11,8 @@ import {
   CloseResourceIcon,
   EditIcon,
   EnterSpaceIcon,
+  HideTitleIcon,
+  ShowTitleIcon,
   OpenIndependentlyIcon,
   FitViewIcon,
   GraphIcon,
@@ -120,6 +122,12 @@ describe('the public icon facade', () => {
         <span data-testid="fit-view">
           <FitViewIcon />
         </span>
+        <span data-testid="show-title">
+          <ShowTitleIcon />
+        </span>
+        <span data-testid="hide-title">
+          <HideTitleIcon />
+        </span>
       </div>,
     );
 
@@ -143,6 +151,8 @@ describe('the public icon facade', () => {
       'zoom-in': 'plus',
       'zoom-out': 'minus',
       'fit-view': 'maximize',
+      'show-title': 'eye',
+      'hide-title': 'eye-off',
     } as const;
 
     for (const [icon, lucideName] of Object.entries(expectedLucideName)) {

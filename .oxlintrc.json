@@ -443,19 +443,6 @@
       }
     },
     {
-      // `onReconnectStart`/`onReconnectEnd`'s `event`/`_type` parameters are
-      // this file's own prop contract wired straight through to `<ReactFlow>`
-      // (see `reactFlowProps.onReconnectStart` below), carrying whatever
-      // internal event/handle-type value React Flow's reconnect gesture
-      // passes — not part of React Flow's own published types, so there is no
-      // named type to import for it. Both are unused at the one call site
-      // that reads them (`_event`, `_type`), consistent with that.
-      "files": ["packages/app/src/edge-authoring-react.tsx"],
-      "rules": {
-        "anti-slop/no-unknown-parameters": "off"
-      }
-    },
-    {
       // `Middleware`'s `next(error?: unknown)` mirrors Node/Connect
       // middleware's own `next(err?)` contract exactly. `vite-space-http-
       // plugin.test.ts`'s `record`'s `reason: unknown` mirrors Node's own

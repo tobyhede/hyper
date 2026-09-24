@@ -1,6 +1,6 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type { SpaceSessionState } from '@project/persistence';
-import type { AuthoringRefusal, EdgeEndpoint, StoredSpaceRefusal } from './space-authoring';
+import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
   SpaceResourceRefusal,
   SpaceResourceTargetUnavailableReason,
@@ -100,104 +100,6 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'Give this Edge a title before hiding it.';
   }
 };
-
-type AuthoringRefusalCode = AuthoringRefusal['code'];
-
-type AuthoringRefusalErrors<Field extends string> = {
-  readonly fields: Partial<Readonly<Record<Field, string>>>;
-  readonly form?: string;
-};
-
-/**
- * Whether choosing another Resource would answer this refusal.
- *
- * A picker refusal is *correctable* exactly when it is about the choice: the
- * Resource lies outside this Map, or the Edge it would produce is one the Graph
- * already holds. Everything else — a placement still resolving, a Map or
- * Graph the Space no longer holds, an Edge that has gone — describes the
- * subject rather than the choice, and no row in either list would fix it.
- *
- * Endpoint editing names two Resources and cannot correct a stale subject. The
- * record is exhaustive over the codes rather than a list of the two that are
- * true, so a new refusal has to be decided here before it will compile.
- */
-const correctableByResourceChoice = {
-  'map-not-found': false,
-  'map-required': false,
-  'resource-not-found': false,
-  'resource-kind-immutable': false,
-  'reference-target-immutable': false,
-  'space-resource-target-immutable': false,
-  'space-resource-deletion-unsupported': false,
-  'resource-title-required': false,
-  'map-title-required': false,
-  'space-title-required': false,
-  'space-must-keep-map': false,
-  'reference-target-not-found': false,
-  'reference-target-must-own-content': false,
-  'resource-already-in-map': false,
-  'resource-not-in-map': false,
-  'resource-not-expanded': false,
-  'resource-has-references': false,
-  'graph-title-required': false,
-  'map-must-keep-graph': false,
-  'graph-not-owned': false,
-  'edge-not-found': false,
-  'edge-resource-outside-map': true,
-  'edge-already-exists': true,
-  'map-active-graph-required': false,
-  'edge-title-one-line': false,
-  'edge-title-required': false,
-} as const satisfies Readonly<Record<AuthoringRefusalCode, boolean>>;
-
-export type EdgeEndpointRefusalErrors = AuthoringRefusalErrors<EdgeEndpoint>;
-
-/**
- * A refused Delete, which owns a form channel and no field.
- *
- * `form` is required rather than optional, and that is the surface's contract
- * rather than a convenience: Delete offers nothing to correct, so every code
- * reaches the form and the controls always have a sentence to draw.
- */
-export interface EdgeDeletionRefusalErrors {
-  readonly fields: Readonly<Record<never, string>>;
-  readonly form: string;
-}
-
-/** The channel a refusal takes when no field on the surface could answer it. */
-const formChannel = <Field extends string>(
-  refusal: AuthoringRefusal,
-): AuthoringRefusalErrors<Field> => ({ fields: {}, form: describeAuthoringRefusal(refusal) });
-
-/**
- * Error placement for endpoint editing, which owns From and To.
- *
- * **Only the endpoint the author attempted is marked invalid.** The other one
- * names a Resource the Edit never questioned, and marking it would ask for a
- * correction to a value nothing refused.
- */
-export const presentEdgeEndpointRefusal = (
-  refusal: AuthoringRefusal,
-  endpoint: EdgeEndpoint,
-): EdgeEndpointRefusalErrors =>
-  correctableByResourceChoice[refusal.code]
-    ? { fields: { [endpoint]: describeAuthoringRefusal(refusal) } }
-    : formChannel(refusal);
-
-/**
- * Error placement for a refused Delete, which stays on the controls that asked.
- *
- * Total by construction rather than by an exhaustive record: a surface with no
- * field has nowhere else for a code to go, so a second twenty-two-line table
- * saying `form` twenty-two times would be a burden to keep in step and never a
- * resource to decide.
- */
-export const presentEdgeDeletionRefusal = (
-  refusal: AuthoringRefusal,
-): EdgeDeletionRefusalErrors => ({
-  fields: {},
-  form: describeAuthoringRefusal(refusal),
-});
 
 /**
  * What each aggregate refusal means, in the author's terms rather than the

@@ -417,6 +417,8 @@ export function projectGraphEdges(
       laneReach: lane.reach,
       endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
     };
+    if (edge.title !== undefined) data.title = edge.title;
+    if (edge.titleHidden === true) data.titleHidden = true;
 
     const flowEdge: RoutedFlowEdge = {
       id: edge.id,

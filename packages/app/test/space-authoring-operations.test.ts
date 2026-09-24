@@ -960,132 +960,6 @@ describe('Delete Graph', () => {
 });
 
 describe('Edge lifecycle', () => {
-  it('replaces exactly one endpoint and keeps the Edge in its Graph', () => {
-    const { authoring, session } = open({
-      ...positionedSnapshot,
-      resources: [
-        ...positionedSnapshot.resources,
-        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      ],
-      document: {
-        ...positionedSnapshot.document,
-        maps: [
-          {
-            ...positionedSnapshot.document.maps![0]!,
-            positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: false },
-              [RESOURCE_B]: { x: 300, y: 40, open: false },
-              [RESOURCE_C]: { x: 600, y: 40, open: false },
-            },
-          },
-        ],
-      },
-    });
-
-    expect(
-      authoring.complete({
-        kind: 'reconnected-edge',
-        graphId: GRAPH_ID,
-        edge: { from: RESOURCE_A, to: RESOURCE_B },
-        endpoint: 'to',
-        resourceId: RESOURCE_C,
-      }),
-    ).toEqual({ kind: 'completed' });
-
-    expect(graphsOf(session.getState().working)).toEqual([
-      { id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_C }] },
-    ]);
-  });
-
-  it('accepts a reconnection that makes a self-Edge', () => {
-    const { authoring, session } = openPositioned();
-
-    expect(
-      authoring.complete({
-        kind: 'reconnected-edge',
-        graphId: GRAPH_ID,
-        edge: { from: RESOURCE_A, to: RESOURCE_B },
-        endpoint: 'from',
-        resourceId: RESOURCE_B,
-      }),
-    ).toEqual({ kind: 'completed' });
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
-      { from: RESOURCE_B, to: RESOURCE_B },
-    ]);
-  });
-
-  it('treats returning an endpoint to where it came from as unchanged', () => {
-    const { authoring, session } = openPositioned();
-    const before = session.getState().working;
-
-    expect(
-      authoring.complete({
-        kind: 'reconnected-edge',
-        graphId: GRAPH_ID,
-        edge: { from: RESOURCE_A, to: RESOURCE_B },
-        endpoint: 'to',
-        resourceId: RESOURCE_B,
-      }),
-    ).toEqual({ kind: 'unchanged' });
-    expect(session.getState().working).toBe(before);
-  });
-
-  it('refuses a reconnection that would duplicate an Edge already in the Graph', () => {
-    const both: SpaceSnapshot = {
-      ...positionedSnapshot,
-      document: {
-        ...positionedSnapshot.document,
-        maps: [
-          {
-            ...positionedSnapshot.document.maps![0]!,
-            graphs: [
-              {
-                id: GRAPH_ID,
-                title: 'Main',
-                edges: [
-                  { from: RESOURCE_A, to: RESOURCE_B },
-                  { from: RESOURCE_B, to: RESOURCE_B },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    };
-    const { authoring } = open(both);
-
-    expect(
-      authoring.complete({
-        kind: 'reconnected-edge',
-        graphId: GRAPH_ID,
-        edge: { from: RESOURCE_A, to: RESOURCE_B },
-        endpoint: 'from',
-        resourceId: RESOURCE_B,
-      }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
-  });
-
-  it('refuses a reconnection onto a Resource this Map does not hold', () => {
-    const sparse: SpaceSnapshot = {
-      ...positionedSnapshot,
-      resources: [
-        ...positionedSnapshot.resources,
-        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      ],
-    };
-    const { authoring } = open(sparse);
-
-    expect(
-      authoring.complete({
-        kind: 'reconnected-edge',
-        graphId: GRAPH_ID,
-        edge: { from: RESOURCE_A, to: RESOURCE_B },
-        endpoint: 'to',
-        resourceId: RESOURCE_C,
-      }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'edge-resource-outside-map' } });
-  });
-
   it('refuses an Edge the Graph no longer holds', () => {
     const { authoring } = openPositioned();
 
@@ -1356,25 +1230,6 @@ describe('Edge Title', () => {
   });
 
   describe('Edits that rebuild an Edge keep its Title', () => {
-    it('reconnecting an endpoint keeps the Title and titleHidden', () => {
-      const { authoring, session } = open(
-        withEdges([{ ...AB, title: 'Moved', titleHidden: true }]),
-      );
-
-      expect(
-        authoring.complete({
-          kind: 'reconnected-edge',
-          graphId: GRAPH_ID,
-          edge: AB,
-          endpoint: 'to',
-          resourceId: RESOURCE_C,
-        }),
-      ).toEqual({ kind: 'completed' });
-      expect(edgesOf(session.getState().working)).toEqual([
-        { from: RESOURCE_A, to: RESOURCE_C, title: 'Moved', titleHidden: true },
-      ]);
-    });
-
     it('removing a Resource from the Map keeps a titled survivor whole', () => {
       const survivor = { ...BC, title: 'Stays', titleHidden: true } as const;
       const { authoring, session } = open(withEdges([{ ...AB, title: 'Goes' }, survivor]));
@@ -1405,13 +1260,6 @@ describe('Edge Title', () => {
  * surface shows.
  */
 describe('Edge eligibility', () => {
-  const RECONNECT = {
-    kind: 'reconnect',
-    graphId: GRAPH_ID,
-    edge: { from: RESOURCE_A, to: RESOURCE_B },
-    endpoint: 'to',
-  } as const;
-
   it('offers a connection the completion accepts', () => {
     const { authoring } = openPositioned();
 
@@ -1490,71 +1338,6 @@ describe('Edge eligibility', () => {
     expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: RESOURCE_A })).toEqual({
       kind: 'eligible',
     });
-  });
-
-  /**
-   * **Returning an endpoint to the Resource it already names is eligible**, and
-   * completes as `unchanged`. Eligibility answers what the author may still do,
-   * not what the Edit will turn out to have changed — a picker that disabled the
-   * current value would show it as the one forbidden choice.
-   */
-  it('offers a reconnection back to the endpoint it came from, which completes unchanged', () => {
-    const { authoring } = openPositioned();
-
-    expect(authoring.edgeEligibility({ ...RECONNECT, resourceId: RESOURCE_B })).toEqual({
-      kind: 'eligible',
-    });
-    expect(
-      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', resourceId: RESOURCE_B }),
-    ).toEqual({
-      kind: 'unchanged',
-    });
-  });
-
-  it('refuses a reconnection onto a Resource outside this Map, and completes the same way', () => {
-    const sparse: SpaceSnapshot = {
-      ...positionedSnapshot,
-      resources: [
-        ...positionedSnapshot.resources,
-        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
-      ],
-    };
-    const { authoring } = open(sparse);
-
-    const refusal = { kind: 'refused', refusal: { code: 'edge-resource-outside-map' } };
-    expect(authoring.edgeEligibility({ ...RECONNECT, resourceId: RESOURCE_C })).toEqual(refusal);
-    expect(
-      authoring.complete({ ...RECONNECT, kind: 'reconnected-edge', resourceId: RESOURCE_C }),
-    ).toEqual(refusal);
-  });
-
-  it('refuses a reconnection naming a Graph this Map does not own', () => {
-    const { authoring } = openPositioned();
-
-    expect(
-      authoring.edgeEligibility({ ...RECONNECT, graphId: UNKNOWN_GRAPH, resourceId: RESOURCE_A }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
-  });
-
-  /**
-   * The completion has to re-ask the rule, and this is the case where dropping
-   * it would go unnoticed: an Edge the Graph no longer holds indexes at `-1`, so
-   * the `map` that writes the reconnection replaces nothing and the Edit answers
-   * as though it had — `unchanged` when the snapshot is otherwise untouched,
-   * `completed` when writing the Map back settles something else, and the
-   * refusal the author is owed never said either way.
-   */
-  it('refuses an Edge the Graph no longer holds, and completes the same way', () => {
-    const { authoring } = openPositioned();
-    const absent = {
-      ...RECONNECT,
-      edge: { from: RESOURCE_B, to: RESOURCE_A },
-      resourceId: RESOURCE_A,
-    } as const;
-
-    const refusal = { kind: 'refused', refusal: { code: 'edge-not-found' } };
-    expect(authoring.edgeEligibility(absent)).toEqual(refusal);
-    expect(authoring.complete({ ...absent, kind: 'reconnected-edge' })).toEqual(refusal);
   });
 });
 

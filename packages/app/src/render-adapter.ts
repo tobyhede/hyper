@@ -59,7 +59,7 @@ export interface ResourceResize {
  * One Edge, named the way everything that acts on an Edge has to name it.
  *
  * A Graph and an Edge travel together through every Edge operation — selecting,
- * reconnecting, deleting, opening an editor, offering endpoint choices — because
+ * titling, hiding its Title, deleting — because
  * neither identifies an Edge alone: an Edge is `{ from, to }` and says nothing
  * about which Graph draws it, and a Graph holds many. Passing them as two
  * arguments meant every callee re-paired what its caller had just split.

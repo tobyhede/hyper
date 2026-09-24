@@ -27,6 +27,7 @@ const railSheet = read('packages/ui/src/resource-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
 const canvasCommandToolbar = read('packages/ui/src/CanvasCommandToolbar.tsx');
 const resourceRailActions = read('packages/ui/src/ResourceRailActions.tsx');
+const edgeToolbar = read('packages/ui/src/EdgeToolbar.tsx');
 const spaceResourceSelectors = read('packages/ui/src/SpaceResourceSelectors.tsx');
 const spaceResourceRail = read('packages/app/src/build-space-resource-rail.tsx');
 const canvasResource = read('packages/ui/src/CanvasResource.tsx');
@@ -101,7 +102,10 @@ describe('a toolbar drawn on the canvas', () => {
    * Every toolbar over the canvas mounts `CanvasCommandToolbar`, not the bare
    * surface: without its keydown stop, arrow keys reach React Flow.
    */
-  const CANVAS_TOOLBARS = [{ name: 'a Resource rail', source: resourceRailActions }] as const;
+  const CANVAS_TOOLBARS = [
+    { name: 'a Resource rail', source: resourceRailActions },
+    { name: "an Edge's toolbar", source: edgeToolbar },
+  ] as const;
 
   it.each(CANVAS_TOOLBARS)('is what $name mounts', ({ source }) => {
     expect(source).toContain('<CanvasCommandToolbar');

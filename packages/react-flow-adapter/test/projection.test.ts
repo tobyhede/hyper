@@ -323,6 +323,24 @@ describe('projectGraphEdges', () => {
     });
   });
 
+  it('carries an Edge Title and its hiding into the data the Edge draws from', () => {
+    const [main, alt] = graphRenderEdges;
+    const edges = projectGraphEdges(
+      [
+        { ...main!, title: 'depends on' },
+        { ...alt!, title: 'then', titleHidden: true },
+      ],
+      colors,
+    );
+
+    expect(edges.find((e) => e.id === main!.id)!.data).toMatchObject({ title: 'depends on' });
+    expect(edges.find((e) => e.id === main!.id)!.data).not.toHaveProperty('titleHidden');
+    expect(edges.find((e) => e.id === alt!.id)!.data).toMatchObject({
+      title: 'then',
+      titleHidden: true,
+    });
+  });
+
   it('draws every graph the same when nothing is emphasised', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors, {});
     expect(edges.every((e) => e.style?.opacity === 1)).toBe(true);
@@ -340,6 +358,10 @@ describe('projectGraphEdges', () => {
     expect(main.style?.opacity).toBe(1);
     // Emphasis is never motion: the Active Graph's line is still.
     expect(main.animated).toBe(false);
+    // Drawn wider; `EDGE_TITLE_BOX_CHROME` in `@project/ui` reckons with this
+    // 3, since a Title's border is its Edge's stroke.
+    expect(main.style?.strokeWidth).toBe(3);
+    expect(alt.style?.strokeWidth).toBe(2);
 
     // The others recede but are still drawn, and none are dropped.
     expect(alt.style?.opacity).toBe(OTHER_GRAPH_OPACITY);

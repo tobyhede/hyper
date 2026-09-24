@@ -34,6 +34,9 @@ export interface GraphRenderEdge {
   graphId: GraphId;
   source: ResourceId;
   target: ResourceId;
+  /** As the Graph stores them. Content, not identity: never part of `id`. */
+  title?: string;
+  titleHidden?: true;
 }
 
 /**
@@ -94,38 +97,32 @@ export function graphResourceIds(space: Space, graphId: GraphId): ResourceId[] {
  *
  * **The id names the same triple the render layer identifies an Edge by** — the
  * graph and the two endpoints — and a graph cannot hold the same pair twice
- * (ADR 0032), so it names exactly one edge. That agreement is the point: the
- * render layer's Edge subject is `{ graphId, edge }` compared by those three
- * fields (`sameEdgeSubject`), and while the id was keyed on the edge's
- * *position* in its graph the two disagreed about what an Edge is. A removed or
- * replaced edge slid every later id down one, so a surviving edge inherited an
- * id that had named its neighbour, and the element React Flow had already drawn
- * for the departed edge answered a query for whichever edge took its slot —
- * which is how a completed reconnection ended up focused on a stale element
- * that put the replaced Edge back on the selection.
+ * (ADR 0032), so it names exactly one edge. Do not key it on the edge's
+ * position in its graph: removing an edge would shift every later id, and the
+ * element React Flow drew for a departed edge would answer for its successor.
  *
  * The id is opaque to every consumer: nothing parses it.
  *
- * **What holds the uniqueness up is `duplicate-graph-edge`**, not this function.
- * The position-keyed id was collision-proof by construction; this one leans on
- * the intake rule, so a graph that carried the same pair twice would mint the
- * same id twice — a React key collision, and one Edge's selection changes
- * resolving to the other. `validateReferences` refuses such a document and
- * `edge-already-exists` refuses the connect and the reconnect that would author
- * one, so nothing reaches here holding two; that is the invariant to protect if
- * either rule is ever relaxed.
+ * **What holds the uniqueness up is `duplicate-graph-edge`**, not this function:
+ * a graph carrying the same pair twice would mint the same id twice, a React
+ * key collision. `validateReferences` refuses such a document and
+ * `edge-already-exists` refuses the connect that would author one; that is the
+ * invariant to protect if either rule is ever relaxed.
  */
 export function buildGraphRenderEdges(space: Space): GraphRenderEdge[] {
   const edges: GraphRenderEdge[] = [];
 
   for (const graph of space.graphs) {
     for (const edge of graph.edges) {
-      edges.push({
+      const rendered: GraphRenderEdge = {
         id: graphRenderEdgeId(graph.id, edge),
         graphId: graph.id,
         source: edge.from,
         target: edge.to,
-      });
+      };
+      if (edge.title !== undefined) rendered.title = edge.title;
+      if (edge.titleHidden === true) rendered.titleHidden = true;
+      edges.push(rendered);
     }
   }
 

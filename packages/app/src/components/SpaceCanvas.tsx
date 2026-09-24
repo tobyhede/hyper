@@ -1047,10 +1047,9 @@ export function SpaceCanvas({
     onConnectStart,
     onConnectEnd,
     isValidConnection,
-    onReconnectStart,
-    onReconnect,
-    onReconnectEnd,
     onMouseMove,
+    onEdgeMouseEnter,
+    onEdgeMouseLeave,
     edgesReconnectable,
     edgesFocusable,
     deleteKeyCode,
@@ -1173,10 +1172,9 @@ export function SpaceCanvas({
       onConnectStart={onEmbeddedConnectStart}
       onConnectEnd={onEmbeddedConnectEnd}
       isValidConnection={isEmbeddedConnectionValid}
-      onReconnectStart={onReconnectStart}
-      onReconnect={onReconnect}
-      onReconnectEnd={onReconnectEnd}
       onMouseMove={onMouseMove}
+      onEdgeMouseEnter={onEdgeMouseEnter}
+      onEdgeMouseLeave={onEdgeMouseLeave}
       onDragOver={onExternalDragOver}
       onDrop={onExternalDrop}
       edgesReconnectable={edgesReconnectable}

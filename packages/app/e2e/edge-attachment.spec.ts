@@ -260,14 +260,14 @@ test('a selected Edge draws its controls on the geometry it moved to', async ({ 
   await page.mouse.click(middle.x, middle.y);
   await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
 
-  await expect(page.getByTestId('edge-edit')).toBeVisible();
-  // The *layer* is what `labelX`/`labelY` place, and it is placed by its own
-  // middle — `translate(-50%, -50%)` in `AuthorableEdge`. A button inside it
-  // sits beside its siblings and so is offset from that middle by half its own
-  // width, which is why measuring one of them needs a tolerance wide enough to
-  // swallow a real displacement. Measuring the layer costs nothing and lets both
-  // axes hold to the same few pixels.
-  const box = (await page.locator('.edge-control-layer').boundingBox())!;
+  // The chrome layer is what `labelX`/`labelY` place: a zero-size anchor at
+  // the Edge's middle, with an untitled Edge's toolbar centred on it.
+  const layer = (await page.locator(`[data-edge-chrome="${A_TO_B}"]`).boundingBox())!;
+  expect(Math.abs(layer.x - middle.x)).toBeLessThan(8);
+  expect(Math.abs(layer.y - middle.y)).toBeLessThan(8);
+  const toolbar = page.getByRole('toolbar', { name: 'Edge A → B', exact: true });
+  await expect(toolbar).toBeVisible();
+  const box = (await toolbar.boundingBox())!;
   expect(Math.abs(box.x + box.width / 2 - middle.x)).toBeLessThan(8);
   expect(Math.abs(box.y + box.height / 2 - middle.y)).toBeLessThan(8);
 });

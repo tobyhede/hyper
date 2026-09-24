@@ -19,7 +19,6 @@ import {
   authoringHandle,
   boxOf,
   connectHandles,
-  connectToEmptyWithAlt,
   createResource,
   createResourceControl,
   dock,
@@ -48,6 +47,17 @@ import {
   viewportTransform,
 } from './graph';
 import { seedPositionedMap } from './seed';
+import {
+  canvasZoom,
+  edgeChrome,
+  edgeNamed,
+  edgeSpan,
+  edgeToolbar,
+  isEllipsed,
+  pointOnEdge,
+  restingTitle,
+  topmostIsWithin,
+} from './edge-chrome';
 
 /**
  * The barrier a *negative* assertion needs.
@@ -134,78 +144,6 @@ async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
   expect(clear, 'the chosen point is over a Resource rather than empty canvas').toBe(true);
   return point;
 }
-
-/**
- * Drag one endpoint of a selected Edge to a screen point.
- *
- * The anchors are transparent circles React Flow draws only on a reconnectable
- * Edge, so the press is asserted to land on one — a Resource handle drawn over it
- * would otherwise read as a reconnection that silently never began. React Flow
- * starts the connection on the first move after mousedown and can swallow a
- * single jump, which is why the move is stepped, as in `connectHandles`.
- */
-async function dragEndpointTo(
-  page: Page,
-  edge: Locator,
-  end: 'source' | 'target',
-  to: { x: number; y: number },
-): Promise<void> {
-  const anchor = await boxOf(edge.locator(`.react-flow__edgeupdater-${end}`), `the ${end} anchor`);
-  const from = { x: anchor.x + anchor.width / 2, y: anchor.y + anchor.height / 2 };
-  const onAnchor = await page.evaluate((at) => {
-    const hit = document.elementFromPoint(at.x, at.y);
-    return hit !== null && hit.closest('.react-flow__edgeupdater') !== null;
-  }, from);
-  expect(onAnchor, `the ${end} reconnect anchor is covered at its own centre`).toBe(true);
-
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  try {
-    await page.mouse.move(from.x + 12, from.y, { steps: 3 });
-    await page.mouse.move(to.x, to.y, { steps: 6 });
-  } finally {
-    await page.mouse.up();
-  }
-}
-
-/** Drag one endpoint onto a Resource's seeking-end authoring handle. */
-async function reconnectOnto(
-  page: Page,
-  edge: Locator,
-  end: 'source' | 'target',
-  targetHandle: Locator,
-): Promise<void> {
-  const anchor = await boxOf(edge.locator(`.react-flow__edgeupdater-${end}`), `the ${end} anchor`);
-  const from = { x: anchor.x + anchor.width / 2, y: anchor.y + anchor.height / 2 };
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  try {
-    await page.mouse.move(from.x + 12, from.y, { steps: 3 });
-    // Eligibility arms `connectableend` once the reconnect drag has begun;
-    // seeking-end *visibility* waits until the pointer is within product
-    // proximity of the Resource (connection-handle-proximity/01). Hidden handles
-    // keep `pointer-events: none`, so Playwright `hover` cannot arm them —
-    // move by coordinates onto the drop handle first (same as `connectHandles`).
-    await expect(targetHandle).toHaveClass(/connectableend/);
-    const drop = await boxOf(targetHandle, 'the reconnect drop handle');
-    await page.mouse.move(drop.x + drop.width / 2, drop.y + drop.height / 2, { steps: 6 });
-    await expect(targetHandle).toHaveCSS('opacity', '1');
-    expect(await targetHandle.evaluate((element) => element.matches(':hover'))).toBe(true);
-  } finally {
-    await page.mouse.up();
-  }
-}
-
-/** Resolve a theme token the way the page paints it, not the way the recipe names it. */
-const resolveToken = (locator: Locator, token: string): Promise<string> =>
-  locator.evaluate((element, name) => {
-    const probe = document.createElement('span');
-    probe.style.color = `var(${name})`;
-    element.after(probe);
-    const value = getComputedStyle(probe).color;
-    probe.remove();
-    return value;
-  }, token);
 
 /**
  * Click one focusable Edge, and answer the accessible name it carries.
@@ -2989,407 +2927,257 @@ test('Escape on a focused Edge leaves focus on the canvas rather than the docume
 });
 
 /**
- * The controls a selected Edge draws for itself, and the two commands on them.
- *
- * `SelectedEdgeControls` is rendered through `EdgeLabelRenderer`, so it is
- * ordinary DOM over the canvas rather than SVG, and it appears on the selected
- * Edge alone. This is the spatial half of the story evidence: the catalogue
- * proves the control semantics, and this proves they arrive over the real routed
- * Edge, gated on selection, and that a completion redraws from the Space.
+ * An Active Graph Edge's Title and toolbar over the tracked fixture: drawn over
+ * the real routed Edge, gated on selection, hover and the Active Graph, and
+ * every command a persisted Edit redrawn from the Space.
  */
+const AB = 'Edge from A to B in Long';
+
+/** Open Collection 1 on the Long Graph and settle the camera. */
+async function openLong(page: Page): Promise<void> {
+  await page.goto('/');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await selectCanvas(page, 'Collection 1');
+  await activateGraph(page, 'Long');
+  await settled(page);
+}
+
+/** Press empty canvas, clearing the selection and leaving every Edge at rest. */
+async function deselect(page: Page): Promise<void> {
+  const clear = await emptyCanvasPoint(page);
+  await page.mouse.click(clear.x, clear.y);
+  await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
+}
+
+/** Write an Edge's Title from its toolbar, and wait for the caret to return to it. */
+async function titleEdge(page: Page, label: string, name: string, title: string): Promise<void> {
+  await edgeNamed(page, label).focus();
+  await edgeToolbar(page, name)
+    .getByRole('button', { name: `Edit Edge ${name}` })
+    .click();
+  const field = page.getByRole('textbox', { name: 'Edge Title' });
+  await field.fill(title);
+  await field.press('Enter');
+  await expect(page.getByRole('button', { name: `Edit Title ${title}` })).toBeFocused();
+}
+
 test(
-  'a selected Edge offers controls that delete it and open its endpoint editor',
-  { tag: '@parity:selected-edge-controls-offer-edit-and-delete' },
+  'a selected Edge reveals its toolbar over its midpoint, and Delete removes the Edge',
+  { tag: '@parity:edge-toolbar-offers-edit-title-and-delete' },
   async ({ page }) => {
-    await page.goto('/');
-    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await selectCanvas(page, 'Collection 1');
-    await settled(page);
+    await openLong(page);
     const drawn = await page.locator('.react-flow__edge').count();
-    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
+    await expect(edgeToolbar(page, 'A → B')).toHaveCount(0);
 
-    await selectAnEdge(page);
-    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
+    await edgeNamed(page, AB).focus();
 
-    // The endpoints, as the keyboard reaches them: two pickers over this Map's
-    // Resources, each showing the Resource the Edge currently names.
-    await page.getByRole('button', { name: 'Edit this Edge' }).click();
-    await expect(page.getByRole('combobox', { name: 'From' })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'To' })).toBeVisible();
-    await page.keyboard.press('Escape');
+    const toolbar = edgeToolbar(page, 'A → B');
+    const group = toolbar.getByRole('group', { name: 'Edge commands' });
+    await expect(group.getByRole('button')).toHaveCount(3);
+    await expect(group.getByRole('button').nth(0)).toHaveAccessibleName('Edit Edge A → B');
+    await expect(group.getByRole('button').nth(1)).toHaveAccessibleName('Hide Title A → B');
+    await expect(group.getByRole('button').nth(2)).toHaveAccessibleName('Delete Edge A → B');
 
-    // **Where they are drawn**, not merely that they exist: the controls are
-    // portalled into `EdgeLabelRenderer` at the point `routedEdgeGeometry`
-    // calls the routed polyline's middle, so they pan and zoom with the canvas
-    // and sit on the Edge they act on. Read off the drawn path rather than
-    // recomputed, which is the disagreement the shared geometry exists to stop.
-    const middle = await page
-      .locator('.react-flow__edge.selected .react-flow__edge-path')
-      .evaluate((path) => {
-        // SAFETY: `.react-flow__edge-path` only ever matches the `<path>`
-        // React Flow's SVG edge renderer draws.
-        const geometry = path as SVGPathElement;
-        const transform = geometry.getScreenCTM();
-        if (transform === null) throw new Error('The selected Edge has no screen transform.');
-        const at = geometry
-          .getPointAtLength(geometry.getTotalLength() / 2)
-          .matrixTransform(transform);
-        return { x: at.x, y: at.y };
-      });
-    const controls = await boxOf(page.getByTestId('edge-edit'), 'the Edit control');
-    expect(Math.abs(controls.y + controls.height / 2 - middle.y)).toBeLessThan(8);
-    expect(Math.abs(controls.x + controls.width / 2 - middle.x)).toBeLessThan(controls.width + 8);
+    // An untitled Edge's toolbar is centred on the drawn path's middle.
+    const middle = await pointOnEdge(edgeNamed(page, AB), 0.5);
+    const box = await boxOf(toolbar, 'the Edge toolbar');
+    expect(Math.abs(box.x + box.width / 2 - middle.x)).toBeLessThan(8);
+    expect(Math.abs(box.y + box.height / 2 - middle.y)).toBeLessThan(8);
 
     // **Gated on the Active Graph, not on selection alone.** Activating another
     // Graph is not an Edit and moves no Edge, but an Edge outside the Active
-    // Graph cannot remain selected (CONTEXT.md) — so the controls go with it,
-    // rather than leaving Delete live on an Edge the canvas has stopped
-    // offering.
+    // Graph cannot remain selected (CONTEXT.md) — so the toolbar goes with it.
     await activateGraph(page, 'Mid');
-    await expect(page.getByRole('button', { name: 'Delete this Edge' })).toHaveCount(0);
+    await expect(edgeToolbar(page, 'A → B')).toHaveCount(0);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     await activateGraph(page, 'Long');
 
-    await selectAnEdge(page);
-    await page.getByRole('button', { name: 'Delete this Edge' }).click();
+    await edgeNamed(page, AB).focus();
+    await edgeToolbar(page, 'A → B').getByRole('button', { name: 'Delete Edge A → B' }).click();
 
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
+    await expect(edgeNamed(page, AB)).toHaveCount(0);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
     await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   },
 );
 
 test(
-  "a selected Edge's Edit trigger reads as open while its editor is",
-  { tag: '@parity:selected-edge-edit-trigger-reads-as-open' },
+  "hovering an Edge's line reveals its toolbar until a moment after the pointer leaves",
+  { tag: '@parity:edge-toolbar-reveals-on-hover' },
   async ({ page }) => {
-    await page.goto('/');
-    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-    await selectCanvas(page, 'Collection 1');
-    await settled(page);
+    await openLong(page);
+    const edge = edgeNamed(page, 'Edge from B to C in Long');
+    const toolbar = edgeToolbar(page, 'B → C');
 
-    await selectAnEdge(page);
-    const edit = page.getByRole('button', { name: 'Edit this Edge' });
-    const del = page.getByRole('button', { name: 'Delete this Edge' });
-    const restingFill = await resolveToken(edit, '--secondary');
-    await expect(edit).toHaveAttribute('aria-expanded', 'false');
-    await expect(edit).not.toHaveCSS('background-color', restingFill);
+    const onLine = await pointOnEdge(edge, 0.3);
+    await page.mouse.move(onLine.x, onLine.y);
+    await expect(toolbar).toBeVisible();
 
-    await edit.click();
-    await expect(page.getByTestId('edge-editor')).toBeVisible();
-    await expect(edit).toHaveAttribute('aria-expanded', 'true');
-    // Leave Edit before reading fill: the quiet recipe also paints hover, and
-    // click leaves the pointer over the trigger (@parity:selected-edge-edit-trigger-reads-as-open).
+    // Across onto the toolbar on the line's middle: still there.
+    const box = await boxOf(toolbar, 'the Edge toolbar');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+    await page.waitForTimeout(400);
+    await expect(toolbar).toBeVisible();
+
+    await page.mouse.move(onLine.x, onLine.y + 200);
+    await expect(toolbar).toHaveCount(0);
+    // Hover is not selection: nothing was authored or selected on the way.
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+  },
+);
+
+test(
+  "an Edge's Title is written in place, persists, and hands focus back to the Title",
+  { tag: '@parity:edge-title-is-written-in-place' },
+  async ({ page }) => {
+    await openLong(page);
+
+    await titleEdge(page, AB, 'A → B', 'depends on');
+
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await expect(edgeToolbar(page, 'depends on')).toBeVisible();
+
+    // The Title itself begins the next edit; Escape cancels and returns to it.
+    await page.getByRole('button', { name: 'Edit Title depends on' }).click();
+    const field = page.getByRole('textbox', { name: 'Edge Title' });
+    await expect(field).toHaveValue('depends on');
+    await field.fill('never written');
+    await field.press('Escape');
+    await expect(page.getByRole('button', { name: 'Edit Title depends on' })).toBeFocused();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+    // Stored: a reload draws it at rest. The pointer leaves the canvas first,
+    // since one still over the Edge after the reload would reveal it.
     await page.mouse.move(0, 0);
-    expect(await edit.evaluate((element) => element.matches(':hover'))).toBe(false);
-    const openFill = await resolveToken(edit, '--secondary');
-    await expect(edit).toHaveCSS('background-color', openFill);
-    await expect(del).not.toHaveCSS('background-color', openFill);
-  },
-);
-
-/**
- * Moving an endpoint from the keyboard, through the same picker the pointer drag
- * has no use for.
- *
- * The completion is Space Authoring's and the Edge keeps its Graph — what this
- * proves is that the picker reaches it and the projection redraws from the
- * completed Space rather than from a local React Flow change.
- */
-test(
-  'the Edge editor moves an endpoint and keeps the Edge in its Graph',
-  { tag: '@parity:selected-edge-editor-shows-both-endpoints' },
-  async ({ page }) => {
-    await page.goto('/');
+    await page.reload();
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await selectCanvas(page, 'Collection 1');
-    await settled(page);
-    const drawn = await page.locator('.react-flow__edge').count();
-
-    const selected = await selectAnEdge(page);
-    await page.getByRole('button', { name: 'Edit this Edge' }).click();
-    await page.getByRole('combobox', { name: 'To' }).press('ArrowDown');
-    //
-    // Here the filter excludes nothing, and that is the fixture rather than the
-    // rule: every Graph in it is a line, so no endpoint this list offers would
-    // duplicate an existing Edge, and self-Edges, cycles and the endpoint the Edge
-    // already names are all eligible (ADR 0032, ADR 0042). It is load-bearing at
-    // the endpoint picker below, where B is disabled as a duplicate.
-    const option = page.locator('[role="option"]:not([data-disabled])');
-    // Read before the click, because the list goes with the completion: this is
-    // the only moment the chosen Resource's title is on screen to be observed rather
-    // than derived from the code under test.
-    const chosen = (await option.last().innerText()).trim();
-    await option.last().click();
-
-    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-    // Replaced, not removed: the Graph still draws as many Edges as before.
-    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-    await expect(page.getByLabel(selected, { exact: true })).toHaveCount(0);
-
-    // **Focus after the reprojection**, which is a move nothing else supplies:
-    // the popover that held focus unmounts with the Edge the completion
-    // replaced, and React Flow moves focus only for elements it still draws.
-    // Edge Authoring's focus request names the Edge by domain subject, and the
-    // projection carrying it arrives a strategy later — so the request has to
-    // outlive the render that made it, and this is what proves it does.
-    const focusedEdgeLabel = () =>
-      page.evaluate(() => {
-        const active = document.activeElement;
-        return active instanceof Element
-          ? (active.closest('.react-flow__edge')?.getAttribute('aria-label') ?? null)
-          : null;
-      });
-    // **The reconnected Edge by name, not merely "some other Edge".** A
-    // Map overview draws every Graph at once, so "focus moved" is satisfied
-    // by any of a dozen Edges — including one with these very endpoints in
-    // another Graph. The decorated label carries all three facts the request is
-    // made of (`edge-authoring-react.tsx`: `Edge from X to Y in G`), so naming
-    // the expected one pins the unmoved endpoint, the chosen Resource and the Graph
-    // together. `selected` and `chosen` are both read off the page, so this
-    // asserts against observed values rather than recomputed ones.
-    const reconnected = selected.replace(/ to .* in /, ` to ${chosen} in `);
-    expect(reconnected).not.toBe(selected);
-    await expect.poll(focusedEdgeLabel).toBe(reconnected);
+    await activateGraph(page, 'Long');
+    const chrome = await edgeChrome(page, edgeNamed(page, AB));
+    await expect(restingTitle(chrome, 'depends on')).toBeVisible();
   },
 );
 
-/**
- * A selected Edge's reconnect anchors sit over the Resource's four authoring handles
- * where they overlap, and the anchors have to win.
- *
- * Reconnection is per-Edge and narrowed to the *selected* one for exactly this
- * reason: `edgesReconnectable` left globally true would put two transparent
- * anchors permanently live on every Edge, over every Resource's handles.
- */
-test('reconnect anchors exist only on the selected Edge', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const anchors = page.locator('.react-flow__edgeupdater');
-  await expect(anchors).toHaveCount(0);
+test(
+  'the eye hides a Title at rest, dims it while revealed, and shows it again',
+  { tag: '@parity:edge-title-hides-at-rest' },
+  async ({ page }) => {
+    await openLong(page);
+    await titleEdge(page, AB, 'A → B', 'depends on');
+    const chrome = await edgeChrome(page, edgeNamed(page, AB));
 
-  await selectAnEdge(page);
+    await page.getByRole('button', { name: 'Hide Title depends on' }).click();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+    const control = page.getByRole('button', { name: 'Edit Title depends on' });
+    await expect(control).toHaveCSS('opacity', '0.55');
 
-  // Two per Edge, source and target, and on one Edge only.
-  await expect(anchors).toHaveCount(2);
-});
+    // At rest, a hidden Title draws nothing at all.
+    await deselect(page);
+    await expect(edgeToolbar(page, 'depends on')).toHaveCount(0);
+    await expect(chrome.locator('.edge-title')).toHaveCount(0);
 
-/**
- * Pointer reconnection, end to end through all three native callbacks.
- *
- * The unit tests drive `beginPointerReconnect` directly, so nothing there sees
- * what React Flow actually does around a reconnect drag: it calls
- * `onReconnectStart` and then the *store's* `onConnectStart`, and on release the
- * store's `onConnectEnd` before `onReconnectEnd`. Only a real drag proves the
- * Edge lifecycle survives being handed those pairs.
- *
- * `Long` is A→B→C→D→A′, so moving A→B's target onto D makes A→D, which is no
- * duplicate.
- */
-test('dragging an endpoint onto another Resource moves it and keeps the Edge in its Graph', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '0');
+    await edgeNamed(page, AB).focus();
+    await page.getByRole('button', { name: 'Show Title depends on' }).click();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+    await expect(control).toHaveCSS('opacity', '1');
 
-  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
-  await edge.focus();
-  await expect(edge).toHaveClass(/selected/);
+    // An untitled Edge has nothing to hide.
+    await edgeNamed(page, 'Edge from B to C in Long').focus();
+    await expect(page.getByRole('button', { name: 'Hide Title B → C' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
 
-  await reconnectOnto(
-    page,
-    edge,
-    'target',
-    authoringHandle(nodeByTitle(page, 'D').first(), 'target', 'left'),
-  );
+    // Nor does a titled Edge while its Title is written: the eye draws the
+    // Title last projected, not the draft, and pressing it keeps the caret.
+    await edgeNamed(page, AB).focus();
+    await page.getByRole('button', { name: 'Edit Edge depends on' }).click();
+    const field = page.getByRole('textbox', { name: 'Edge Title' });
+    await field.fill('');
+    const eye = page.getByRole('button', { name: 'Hide Title depends on' });
+    await expect(eye).toHaveAttribute('aria-disabled', 'true');
+    // `force`: a pointer can press a disabled control, and this asks what that does.
+    await eye.click({ force: true });
+    await expect(field).toBeFocused();
+    await field.press('Escape');
+    await expect(control).toBeFocused();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
+  },
+);
 
-  await expect(
-    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
-  ).toHaveCount(0);
-  await expect(
-    page.locator('.react-flow__edge[aria-label="Edge from A to D in Long"]'),
-  ).toHaveCount(1);
-  // Replaced, not added or dropped: the Graph draws exactly as many Edges.
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-  await expect(persistence).toHaveAttribute('data-revision', '1');
-  await expect(persistence).toHaveText('Persisted');
-});
+test(
+  'a Title fits its Edge at rest, draws whole and raised while revealed, and belongs to the Active Graph',
+  { tag: '@parity:edge-title-fits-its-edge' },
+  async ({ page }) => {
+    await openLong(page);
+    const title = 'depends on the pilot having run';
+    await titleEdge(page, AB, 'A → B', title);
+    await deselect(page);
+    const edge = edgeNamed(page, AB);
+    const chrome = await edgeChrome(page, edge);
 
-/**
- * The gestures that follow a reconnection, which one-gesture tests cannot see.
- *
- * React Flow drives a reconnect drag through the connection callbacks too, so
- * Edge Authoring stands them down for its duration — and a flag left raised
- * disables the Alt empty-drop and the continue-at-the-target selection for as
- * long as the canvas is mounted. **A plain connection is the wrong probe**:
- * `onConnect` is not among the handlers stood down, so an Edge still authors
- * and the damage hides. The empty-drop is the one that goes dark, because it
- * needs the preview state the stood-down handlers maintain.
- */
-test('an Alt empty-drop still works after a reconnection', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
+    // At rest: inside its Edge, ellipsed, whole in its tooltip.
+    const resting = restingTitle(chrome, title);
+    await expect(resting).toBeVisible();
+    expect(await isEllipsed(resting.locator('.edge-title__text'))).toBe(true);
+    const zoom = await canvasZoom(page);
+    const rest = await boxOf(resting, 'the resting Title');
+    expect(rest.width / zoom).toBeLessThan(await edgeSpan(page, edge));
+    await expect(chrome).not.toHaveCSS('z-index', '2000');
 
-  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
-  await edge.focus();
-  await reconnectOnto(
-    page,
-    edge,
-    'target',
-    authoringHandle(nodeByTitle(page, 'D').first(), 'target', 'left'),
-  );
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await settled(page);
+    // Revealed: the whole Title, wider than it rested, raised over the Resources.
+    await edge.focus();
+    const whole = page.getByRole('button', { name: `Edit Title ${title}` });
+    expect(await isEllipsed(whole.locator('.edge-title__text'))).toBe(false);
+    expect((await boxOf(whole, 'the revealed Title')).width).toBeGreaterThan(rest.width);
+    await expect(chrome).toHaveCSS('z-index', '2000');
 
-  // `connectToEmptyWithAlt` gates on the preview appearing, which is exactly the
-  // state a raised flag starves — so a leak fails inside the helper rather than
-  // as a Resource that mysteriously never arrived.
-  const source = nodeByTitle(page, 'B').first();
-  await source.hover();
-  await connectToEmptyWithAlt(page, authoringHandle(source, 'source', 'right'));
+    // Too short to hold one: B dragged up against A leaves the Title nothing at
+    // rest, and it is still drawn whole when revealed.
+    await deselect(page);
+    await dragBy(page, nodeByTitle(page, 'B').first(), -130, 0);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+    await expect(chrome.locator('.edge-title')).toHaveCount(0);
+    await edge.focus();
+    await expect(whole).toBeVisible();
+    expect(
+      await topmostIsWithin(page, page.getByRole('button', { name: `Delete Edge ${title}` })),
+    ).toBe(true);
 
-  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
-  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-});
+    // Only the Active Graph's Edges draw Titles.
+    await deselect(page);
+    await activateGraph(page, 'Mid');
+    await expect(page.getByTitle(title)).toHaveCount(0);
+  },
+);
 
-/**
- * The *source* anchor, which React Flow reports through the **opposite** handle's
- * type — so a mapping read straight off `handleType` names the wrong endpoint.
- *
- * `Short` is A→B→C, so moving A→B's source onto C makes C→B, which is no
- * duplicate of anything Short holds.
- */
-test('dragging the source endpoint moves the end the author took hold of', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await activateGraph(page, 'Short');
-  await settled(page);
+test(
+  'Enter moves from a focused Edge into its toolbar, and Escape and Tab move on from it',
+  { tag: '@parity:edge-toolbar-keyboard' },
+  async ({ page }) => {
+    await openLong(page);
+    const edge = edgeNamed(page, AB);
+    await edge.focus();
 
-  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Short"]');
-  await edge.focus();
-  await expect(edge).toHaveClass(/selected/);
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'Edit Edge A → B' })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('button', { name: 'Hide Title A → B' })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('button', { name: 'Delete Edge A → B' })).toBeFocused();
 
-  // A source-endpoint drag anchors at the Edge's target and looks for a new
-  // *source*, so the Resource offers its source handles for this gesture alone.
-  await reconnectOnto(
-    page,
-    edge,
-    'source',
-    authoringHandle(nodeByTitle(page, 'C').first(), 'source', 'right'),
-  );
+    await page.keyboard.press('Escape');
+    await expect(edge).toBeFocused();
 
-  await expect(
-    page.locator('.react-flow__edge[aria-label="Edge from C to B in Short"]'),
-  ).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-});
-
-/**
- * An endpoint dragged back where it came from is offered, not marked invalid.
- *
- * React Flow consults its one global validator during a reconnect too, so a
- * validator that always asks the connect rule reads this as the duplicate Edge
- * it textually is — the anchor shows invalid for the whole drag even though the
- * Edit would accept it as `unchanged`. Asserted live, mid-drag, because that is
- * where the wrong answer is visible; the release then changes nothing.
- */
-test('an endpoint dropped back where it came from stays valid throughout', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-
-  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
-  await edge.focus();
-  const anchor = await boxOf(edge.locator('.react-flow__edgeupdater-target'), 'the target anchor');
-  const back = authoringHandle(nodeByTitle(page, 'B').first(), 'target', 'left');
-
-  await page.mouse.move(anchor.x + anchor.width / 2, anchor.y + anchor.height / 2);
-  await page.mouse.down();
-  try {
-    await page.mouse.move(anchor.x + anchor.width / 2 + 12, anchor.y + anchor.height / 2, {
-      steps: 3,
-    });
-    await expect(back).toHaveCSS('opacity', '1');
-    await back.hover();
-    // React Flow marks the handle it is over, then whether the drop is allowed.
-    // Waiting for the first is what stops the second passing vacuously.
-    await expect(back).toHaveClass(/connectingto/);
-    await expect(back).toHaveClass(/valid/);
-  } finally {
-    await page.mouse.up();
-  }
-
-  await quiescent(page);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-  await expect(
-    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
-  ).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
-
-/**
- * The one pointer gesture that deletes an Edge: an endpoint released on empty
- * canvas. A release that merely *missed* a handle cancels instead, which is what
- * the off-canvas case below is for.
- */
-test('dragging an endpoint onto empty canvas deletes the Edge', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-
-  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
-  await edge.focus();
-  await dragEndpointTo(page, edge, 'target', await emptyCanvasPoint(page));
-
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
-  await expect(
-    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
-  ).toHaveCount(0);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-});
-
-test('dragging an endpoint off the canvas restores the Edge', async ({ page }) => {
-  await page.goto('/');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const drawn = await page.locator('.react-flow__edge').count();
-
-  const edge = page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]');
-  await edge.focus();
-  // Chrome, not canvas: the header that used to stand outside the flow went
-  // with the Sidebar (ADR 0082), and the Command Dock is the surface over the
-  // canvas now — a DOM sibling of the flow container, so a release on it is the
-  // same "no target at all" classification the header gave.
-  const chrome = await boxOf(page.getByTestId('command-dock'), 'the Command Dock');
-  await dragEndpointTo(page, edge, 'target', {
-    x: chrome.x + chrome.width / 2,
-    y: chrome.y + chrome.height / 2,
-  });
-
-  await quiescent(page);
-  await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
-  await expect(
-    page.locator('.react-flow__edge[aria-label="Edge from A to B in Long"]'),
-  ).toHaveCount(1);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
-});
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.react-flow__edge[tabindex]:focus')).toHaveCount(1);
+    await expect(edge).not.toBeFocused();
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
+  },
+);
 
 /**
  * The third `DropTarget` classification, and the reason the DOM half of the

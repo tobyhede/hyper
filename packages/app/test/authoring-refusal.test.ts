@@ -5,8 +5,6 @@ import {
   describePersistenceFailure,
   describeStoredSpaceRefusal,
   type PersistenceFailure,
-  presentEdgeDeletionRefusal,
-  presentEdgeEndpointRefusal,
 } from '../src/authoring-refusal';
 import type { AuthoringRefusal } from '../src/space-authoring';
 
@@ -55,54 +53,13 @@ describe('describeAuthoringRefusal', () => {
       }),
     ).toBe('This view could not place its Resources: No position for Resource A');
   });
-});
 
-/**
- * The three Edge surfaces, and the one rule that separates their channels.
- *
- * A refusal a different endpoint or target could correct belongs on the field
- * that names it; a stale Map, Graph or Edge belongs on the form, because no
- * choice in the picker would answer it (ADR 0057).
- */
-const CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE = [
-  'edge-resource-outside-map',
-  'edge-already-exists',
-] as const;
-
-/** The same list, widened once so the loops below can ask it about any code. */
-const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE);
-
-describe('presentEdgeEndpointRefusal', () => {
-  it.each(['from', 'to'] as const)('marks only the attempted %s Field invalid', (endpoint) => {
-    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE) {
-      const refusal = EVERY_REFUSAL[code];
-      expect(presentEdgeEndpointRefusal(refusal, endpoint)).toEqual({
-        fields: { [endpoint]: describeAuthoringRefusal(refusal) },
-      });
-    }
-  });
-
-  it.each(['from', 'to'] as const)(
-    'leaves both Fields valid for a refusal no endpoint can correct, from %s',
-    (endpoint) => {
-      for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
-        if (correctable.has(code)) continue;
-        const errors = presentEdgeEndpointRefusal(refusal, endpoint);
-        expect(errors.fields).toEqual({});
-        expect(errors.form).toBe(describeAuthoringRefusal(refusal));
-      }
-    },
-  );
-});
-
-describe('presentEdgeDeletionRefusal', () => {
-  it('owns a form channel and no field, because Delete names no field to correct', () => {
-    for (const refusal of Object.values(EVERY_REFUSAL)) {
-      expect(presentEdgeDeletionRefusal(refusal)).toEqual({
-        fields: {},
-        form: describeAuthoringRefusal(refusal),
-      });
-    }
+  /** The Edge toolbar's one alert region has no field to fall back on. */
+  it('writes one distinct sentence for every refusal', () => {
+    const sentences = Object.values(EVERY_REFUSAL).map(describeAuthoringRefusal);
+    for (const sentence of sentences) expect(sentence).toMatch(/\S/u);
+    // `map-required` is sampled once, so its per-operation wording cannot collide.
+    expect(new Set(sentences).size).toBe(sentences.length);
   });
 });
 

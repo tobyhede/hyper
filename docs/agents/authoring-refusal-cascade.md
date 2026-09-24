@@ -73,7 +73,6 @@ that has not been decided.
 | --- | --- |
 | `create-and-connect` | `edge-resource-outside-map` → `map-active-graph-required` → completed |
 | `connected-resources` | `graph-not-owned` → `edge-resource-outside-map` → `map-active-graph-required` → `edge-already-exists` → completed |
-| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Resource ⇒ `unchanged`) → `edge-resource-outside-map` → `edge-already-exists` → completed |
 | `deleted-edge` | `graph-not-owned` → `edge-not-found` → completed |
 | `titled-edge` | `graph-not-owned` → `edge-not-found` → `edge-title-one-line` → (trimmed draft is the stored Title, or empty on an untitled Edge ⇒ `unchanged`) → completed |
 | `hid-edge-title` | `graph-not-owned` → `edge-not-found` → `edge-title-required` → (already hidden ⇒ `unchanged`) → completed |
@@ -145,11 +144,9 @@ one row. `edge-title-one-line` is spelt from `@project/core`'s
 `EDGE_TITLE_ONE_LINE`, as `resource-title-required` is from
 `RESOURCE_TITLE_REQUIRED`: the Edge schema raises the same code.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
-code gets its copy, and the exhaustive placement records beside it are the one
-place each surface's field mapping lives: the domain names the code, the
-application owns the sentence. Five surfaces map it today — Markdown Resource
-editing (`title`), Reference Resource editing and Reference Resource creation (`title` / `target`),
-Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
-deletion (form only). Every record is
-`Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each
-surface has said where it goes.
+code gets its copy: the domain names the code, the application owns the
+sentence. Its switch is exhaustive, so a new code fails to compile until it has
+one. An Edge's toolbar draws whichever of its three commands was refused in one
+alert region, with no field of its own to mark — the placement record that used
+to route an Edge endpoint refusal to its From or To field went with
+reconnection (`.scratch/edge-toolbar/issues/05`).

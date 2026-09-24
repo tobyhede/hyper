@@ -81,16 +81,11 @@ export function ResourceNode({
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
    *
-   * A connection drawn from a source handle seeks a target — the ordinary case,
-   * and the whole of what this used to answer. A **source-endpoint
-   * reconnection** inverts it: React Flow anchors the drag at the Edge's
-   * *target* and looks for a new source, so a Resource that went on offering only
-   * its target handles left that gesture with nowhere to land. Reading the
-   * anchored end's type is what tells the two apart, and it changes nothing for
-   * an ordinary connection, whose `fromHandle` is a source.
+   * Always a target while a drag is live: a drag begins only at a source handle
+   * (`isConnectableStart` below), and an Edge's ends cannot be dragged.
    */
   const seeking = useConnection((connection) =>
-    connection.inProgress ? (connection.fromHandle.type === 'target' ? 'source' : 'target') : null,
+    connection.inProgress ? ('target' as const) : null,
   );
   const connectionInProgress = seeking !== null;
   /**

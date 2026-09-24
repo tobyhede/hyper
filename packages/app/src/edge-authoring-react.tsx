@@ -5,21 +5,21 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
 import {
   useReactFlow,
   type Edge,
+  type EdgeMouseHandler,
   type EdgeTypes,
-  type FinalConnectionState,
   type IsValidConnection,
   type OnConnect,
   type OnConnectEnd,
   type OnConnectStart,
-  type OnReconnect,
 } from '@xyflow/react';
-import type { Resource, ResourceId, Graph, GraphEdge, GraphId } from '@project/core';
+import type { Resource, ResourceId, Graph, GraphId } from '@project/core';
 import { titleName, uuidSchema } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
@@ -27,9 +27,7 @@ import {
   ConnectionTargetProximityProvider,
   ROUTED_EDGE_TYPE,
 } from '@project/react-flow-adapter';
-import type { ResourceChoice } from '@project/ui';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import { resourceChoiceOf } from './resource-choice';
 import {
   dropTarget,
   newResourceDrop,
@@ -42,9 +40,11 @@ import {
   type CanvasSelection,
   type EdgeSubject,
 } from './render-adapter';
-import type { EdgeEndpoint } from './space-authoring';
 import { AuthorableEdge } from './components/AuthorableEdge';
-import { EdgeAuthoringContext } from './components/edge-authoring-context';
+import {
+  EdgeAuthoringContext,
+  type EdgeAuthoringCommands,
+} from './components/edge-authoring-context';
 import { NewResourcePreview } from './components/NewResourcePreview';
 
 /**
@@ -59,18 +59,13 @@ export interface EdgeOwnedReactFlowProps {
   readonly onConnectStart: OnConnectStart;
   readonly onConnectEnd: OnConnectEnd;
   readonly isValidConnection: IsValidConnection;
-  readonly onReconnectStart: (event: unknown, edge: Edge, handleType: 'source' | 'target') => void;
-  readonly onReconnect: OnReconnect;
-  readonly onReconnectEnd: (
-    event: MouseEvent | TouchEvent,
-    edge: Edge,
-    handleType: 'source' | 'target',
-    connectionState: FinalConnectionState,
-  ) => void;
   readonly onMouseMove: (event: ReactMouseEvent<HTMLDivElement>) => void;
-  /** Reconnection is per-Edge, and only the selected Active Graph Edge gets it. */
+  /** Hover on an Edge's line reveals its commands. */
+  readonly onEdgeMouseEnter: EdgeMouseHandler;
+  readonly onEdgeMouseLeave: EdgeMouseHandler;
+  /** An Edge's ends cannot be moved; changing one is Delete and draw again. */
   readonly edgesReconnectable: false;
-  /** Focusability is per-Edge too: only the Active Graph's Edges are tab stops. */
+  /** Focusability is per-Edge: only the Active Graph's Edges are tab stops. */
   readonly edgesFocusable: false;
   /** The app owns deletion; React Flow must install no document listener. */
   readonly deleteKeyCode: null;
@@ -154,30 +149,18 @@ function elementDropTargetOf(target: EventTarget | null): ElementDropTarget {
 }
 
 /**
- * Which end of a drafted Edge a proposed connection moves, and to which Resource.
- *
- * **`source` and `target` here are already domain-ordered.** React Flow anchors
- * a reconnect drag at the *opposite* end and `isValidHandle` normalises the pair
- * before reporting it, so both anchors produce `{ source: from, target: to }` —
- * which is why the end that moved is read off the pair rather than off the
- * `handleType` the drag started with. A `source` equal to the drafted Edge's
- * `from` therefore names the *target* as the end that changed, however the
- * gesture began, and an endpoint dropped back where it started reads as
- * unchanged on the end that did not move.
- *
- * One helper because the live validator and the completion must agree: a
- * disagreement would mark a drop invalid that the Edit would have accepted, or
- * the reverse.
+ * An Edge's toolbar, found from the flow: the chrome is portalled into React
+ * Flow's label layer, not inside the Edge.
  */
-interface MovedEndpoint {
-  readonly endpoint: EdgeEndpoint;
-  readonly resourceId: ResourceId;
-}
+const toolbarOf = (from: Element, edgeId: string): Element | null =>
+  from.closest('.react-flow')?.querySelector(`[data-edge-chrome="${edgeId}"] [role="toolbar"]`) ??
+  null;
 
-function movedEndpoint(edge: GraphEdge, source: ResourceId, target: ResourceId): MovedEndpoint {
-  const endpoint: EdgeEndpoint = source === edge.from ? 'to' : 'from';
-  return { endpoint, resourceId: endpoint === 'from' ? source : target };
-}
+/**
+ * How long an Edge's commands outlast the pointer, so crossing the gap from the
+ * line to the toolbar does not hide them.
+ */
+const HOVER_RELEASE_MS = 150;
 
 export function useEdgeAuthoring({
   authoring,
@@ -248,79 +231,19 @@ export function useEdgeAuthoring({
   const mayOfferConnectionEnd = useCallback((resourceId: ResourceId): boolean => {
     if (latest.current.mayOfferAlso?.(resourceId) === true) return true;
     const { draft } = latest.current.authoring.getState();
-    if (draft?.kind === 'pointer-connect') {
-      return latest.current.authoring.accepts({
-        kind: 'connect',
-        from: draft.from,
-        to: resourceId,
-      });
-    }
-    if (draft?.kind === 'pointer-reconnect') {
-      return latest.current.authoring.accepts({
-        kind: 'reconnect',
-        graphId: draft.graphId,
-        edge: draft.edge,
-        endpoint: draft.endpoint,
-        resourceId,
-      });
-    }
-    return false;
+    if (draft?.kind !== 'pointer-connect') return false;
+    return latest.current.authoring.accepts({ kind: 'connect', from: draft.from, to: resourceId });
   }, []);
 
-  /**
-   * Whether the drag currently under the pointer may be released here.
-   *
-   * **React Flow has one global validator and consults it during a reconnect
-   * too**, so asking the ordinary connect rule is asking the wrong question
-   * whenever an endpoint is in flight. The case that shows it is an endpoint
-   * dropped back on the Resource it came from: as a *connect* proposal that is the
-   * duplicate rule and reads invalid for the whole drag, while as a *reconnect*
-   * proposal it is the endpoint returning to where it started, which
-   * `reconnectOutcome` settles as `unchanged` before the duplicate check is ever
-   * reached. Eligibility already called it offerable; this was the one place
-   * still saying otherwise.
-   *
-   * The endpoint is derived from the proposed connection through the same
-   * helper the completion uses, so the preview and the Edit cannot drift.
-   */
+  /** Whether the drag currently under the pointer may be released here. */
   const isValidConnection = useCallback<IsValidConnection>((connection) => {
     const from = uuidSchema.safeParse(connection.source);
     const to = uuidSchema.safeParse(connection.target);
     if (!from.success || !to.success) return false;
-    const { draft } = latest.current.authoring.getState();
-    if (draft?.kind === 'pointer-reconnect') {
-      const moved = movedEndpoint(draft.edge, from.data, to.data);
-      return latest.current.authoring.accepts({
-        kind: 'reconnect',
-        graphId: draft.graphId,
-        edge: draft.edge,
-        ...moved,
-      });
-    }
     return latest.current.authoring.accepts({ kind: 'connect', from: from.data, to: to.data });
   }, []);
 
-  /**
-   * **React Flow drives a reconnect drag through the connection callbacks too**,
-   * and the pair below is what keeps that from eating the reconnection.
-   *
-   * `EdgeUpdateAnchors` calls `onReconnectStart` and then the store's
-   * `onConnectStart`, and on release the store's `onConnectEnd` before
-   * `onReconnectEnd`. So a reconnect drag arrives here as a *connection*
-   * starting from the endpoint that stays put: without this flag
-   * `beginPointerConnect` replaces the reconnect draft the line before had
-   * installed, `reconnect()` then finds no drafted Edge and silently authors
-   * nothing — and an Alt-held release would author a Resource and an Edge from the
-   * wrong end. The reconnect callbacks own the whole gesture; these two stand
-   * down for its duration.
-   *
-   * A ref rather than state because both reads happen inside React Flow's own
-   * event, before any render could deliver a new value.
-   */
-  const reconnecting = useRef(false);
-
   const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
-    if (reconnecting.current) return;
     connecting.current = true;
     setPointerOver('off-canvas');
     setModifierHeld('altKey' in event && event.altKey);
@@ -337,8 +260,6 @@ export function useEdgeAuthoring({
 
   const handleConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
-      // A reconnect release reaches here first; `onReconnectEnd` owns it.
-      if (reconnecting.current) return;
       const drop =
         connection.fromNode === null || !('altKey' in event) || !('clientX' in event)
           ? null
@@ -395,107 +316,6 @@ export function useEdgeAuthoring({
     if (over === 'empty-canvas') setModifierHeld(event.altKey);
   }, []);
 
-  /**
-   * **`handleType` names the endpoint that stays, not the one being dragged.**
-   *
-   * React Flow hands `onReconnectStart` the *opposite* handle's type: taking
-   * hold of the source anchor reports `'target'`, because the target is the end
-   * the connection is now anchored at. So `'target'` means the author is moving
-   * `from`, and `'source'` means they are moving `to` — the inverse of how it
-   * reads. Only the draft depends on this; `handleReconnect` recomputes the
-   * endpoint from the proposed connection, which is why getting it wrong here
-   * showed up as a cancelled drag returning focus to the wrong Resource rather than
-   * as a wrong Edit.
-   */
-  const handleReconnectStart = useCallback(
-    (_event: unknown, edge: Edge, handleType: 'source' | 'target') => {
-      reconnecting.current = true;
-      const subject = edgeSelectionOf(edge);
-      if (subject === null) return;
-      latest.current.authoring.beginPointerReconnect(
-        subject,
-        handleType === 'target' ? 'from' : 'to',
-      );
-    },
-    [],
-  );
-
-  /**
-   * React Flow's `reconnectEdge` helper is deliberately not called. Hyper applies
-   * no local change: the next controlled projection carries the completed Space,
-   * and until it arrives React Flow re-renders the original Edge.
-   *
-   * The endpoint comes from `movedEndpoint`, the same derivation the live
-   * validator uses — so a drop the anchor showed as valid is one this completes.
-   */
-  const proposedReconnection = useRef(false);
-  const handleReconnect = useCallback<OnReconnect>((oldEdge, connection) => {
-    const subject = edgeSelectionOf(oldEdge);
-    if (subject === null) return;
-    proposedReconnection.current = true;
-    const source = uuidSchema.safeParse(connection.source);
-    const target = uuidSchema.safeParse(connection.target);
-    if (!source.success || !target.success) return;
-    const { endpoint, resourceId } = movedEndpoint(subject.edge, source.data, target.data);
-    latest.current.authoring.reconnect(endpoint, resourceId);
-  }, []);
-
-  /**
-   * The end of a reconnect drag, and the one gesture that deletes an Edge with a
-   * pointer alone: **dragging an endpoint onto empty canvas removes it.**
-   *
-   * `onReconnect` fires first whenever the release was aimed at a Resource, so a
-   * proposal already made — completed, unchanged or refused — is never a
-   * deletion. What is left is a release that proposed nothing, and the same
-   * precedence the connect path uses decides it: a connection target in range
-   * outranks the element underneath, so a drop that merely *missed* a handle
-   * cancels rather than deleting.
-   *
-   * **There is no Escape to confuse this with, because React Flow has no
-   * Escape path for a drag at all.** In the pinned 12.11.2 the only consumers of
-   * that key are the focusable node and edge wrappers, which blur and unselect;
-   * the reconnect anchor is a bare `<circle>` and takes no focus. `XYHandle`
-   * installs `mousemove`/`mouseup` on the document and removes them only from
-   * its own `onPointerUp`, and `cancelConnection` is reached from there or from
-   * the whole flow unmounting — nowhere else. So reaching here means the author
-   * released the pointer somewhere deliberate, and this handler is the only way
-   * a drag can end.
-   *
-   * That is also what makes the guard below safe: the listeners are plain DOM
-   * ones with no React cleanup, so even an Edge that leaves the projection
-   * mid-drag still ends through here.
-   */
-  const handleReconnectEnd = useCallback(
-    (event: MouseEvent | TouchEvent, edge: Edge, _type: unknown, state: FinalConnectionState) => {
-      const proposed = proposedReconnection.current;
-      proposedReconnection.current = false;
-      const subject = edgeSelectionOf(edge);
-      if (!proposed && subject !== null && 'clientX' in event && 'clientY' in event) {
-        const over = dropTarget({
-          connectionTarget: state.toNode !== null,
-          // From the point, not `event.target` — see the connect release above.
-          element: elementDropTargetOf(document.elementFromPoint(event.clientX, event.clientY)),
-        });
-        if (over === 'empty-canvas') latest.current.authoring.deleteEdge(subject);
-      }
-      // Whatever it produced, the drag is over: the draft goes and a refusal's
-      // sentence stays, exactly as a connection drag ends.
-      latest.current.authoring.endPointerDrag();
-      // **Last, and unconditionally.** The connection handlers are stood down
-      // for the drag, not for the session — they are the same handlers an
-      // ordinary connection uses, so a flag left raised disables the Alt
-      // empty-drop and the continue-at-the-target selection for as long as the
-      // canvas is mounted. `onConnect` is *not* among them, so an Edge still
-      // authors and the damage hides; the empty-drop is what goes dark.
-      //
-      // Cleared after the work above so nothing between here and
-      // `onReconnectStart` can be read as a connection, and outside every guard
-      // because this runs even when the Edge names no Graph.
-      reconnecting.current = false;
-    },
-    [],
-  );
-
   const deleteEdges = useCallback((requested: readonly Edge[]) => {
     for (const edge of requested) {
       const subject = edgeSelectionOf(edge);
@@ -511,6 +331,18 @@ export function useEdgeAuthoring({
    * defined graph focus. Deferred past React Flow's own handling, and applied
    * only when nothing else has taken focus in the meantime.
    */
+  const enterToolbar = useCallback(
+    (edgeId: string) =>
+      (event: ReactKeyboardEvent<SVGGElement>): void => {
+        if (event.key !== 'Enter' || event.target !== event.currentTarget) return;
+        const first = toolbarOf(event.currentTarget, edgeId)?.querySelector('button');
+        if (first === null || first === undefined) return;
+        event.preventDefault();
+        first.focus();
+      },
+    [],
+  );
+
   const repairFocus = useCallback(() => {
     requestAnimationFrame(() => {
       if (document.activeElement !== document.body) return;
@@ -532,12 +364,10 @@ export function useEdgeAuthoring({
   /**
    * Decorate the projected Edges with the authoring facts React Flow reads.
    *
-   * Only the Active Graph's Edges are selectable, focusable and reconnectable;
-   * an Edge belonging to another Graph the Map draws is there to be seen, and
-   * putting it in the tab order would place inert stops between a keyboard
-   * author and the Edges they can act on. Reconnection narrows further to the
-   * *selected* Edge, so both transparent endpoint anchors are not permanently
-   * live over every Resource's authoring handles.
+   * Only the Active Graph's Edges are selectable and focusable; an Edge
+   * belonging to another Graph the Map draws is there to be seen, and putting it
+   * in the tab order would place inert stops between a keyboard author and the
+   * Edges they can act on. An Edge's toolbar is entered with Enter, not Tab.
    */
   const decorated = useMemo(
     () =>
@@ -566,7 +396,6 @@ export function useEdgeAuthoring({
           selected,
           selectable: interactive,
           focusable: interactive,
-          reconnectable: interactive && selected,
           deletable: interactive,
           ariaLabel: `Edge from ${resourceTitles.get(subject.edge.from) ?? subject.edge.from} to ${
             resourceTitles.get(subject.edge.to) ?? subject.edge.to
@@ -579,6 +408,9 @@ export function useEdgeAuthoring({
               if (interactive) onSelectEdge(subject);
             },
             onBlur: repairFocus,
+            // Captured so React Flow's handler keeps its other keys (Escape
+            // deselects); its Enter would only re-select the Edge.
+            onKeyDownCapture: interactive ? enterToolbar(edge.id) : undefined,
           },
         };
       }),
@@ -591,34 +423,61 @@ export function useEdgeAuthoring({
       graphTitles,
       onSelectEdge,
       repairFocus,
+      enterToolbar,
     ],
   );
 
   /**
-   * Which Resources an endpoint may move to, and why each cannot.
-   *
-   * One eligibility answer per Resource, from the same query the completion re-asks:
-   * a picker cannot offer a Resource the Edit would refuse, and a Resource it refuses is
-   * shown disabled with its reason rather than dropped from the list.
+   * Which Edge the pointer is over, released {@link HOVER_RELEASE_MS} after it
+   * leaves. One value for the canvas, because the line reports through React
+   * Flow's canvas-level `onEdgeMouseEnter` and the Title and toolbar through the
+   * Edge's own layer, and both must move the same fact.
    */
-  const endpointChoices = useCallback(
-    // Destructured rather than spread: the caller holds an `EdgeSelection`,
-    // whose own `kind` would overwrite the proposal's and ask a different
-    // question of eligibility entirely.
-    ({ graphId, edge }: EdgeSubject, endpoint: EdgeEndpoint): ResourceChoice[] =>
-      placedResources.map((resource) =>
-        resourceChoiceOf(
-          resource,
-          latest.current.authoring.eligibility({
-            kind: 'reconnect',
-            graphId,
-            edge,
-            endpoint,
-            resourceId: resource.id,
-          }),
-        ),
-      ),
-    [placedResources],
+  const [hovered, setHovered] = useState<string | null>(null);
+  const hoverRelease = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdHover = useCallback(() => {
+    if (hoverRelease.current !== null) clearTimeout(hoverRelease.current);
+    hoverRelease.current = null;
+  }, []);
+  useEffect(() => holdHover, [holdHover]);
+  const hover = useCallback(
+    (edgeId: string) => {
+      holdHover();
+      setHovered(edgeId);
+    },
+    [holdHover],
+  );
+  const unhover = useCallback(
+    (edgeId: string) => {
+      holdHover();
+      hoverRelease.current = setTimeout(() => {
+        hoverRelease.current = null;
+        setHovered((current) => (current === edgeId ? null : current));
+      }, HOVER_RELEASE_MS);
+    },
+    [holdHover],
+  );
+  const handleEdgeMouseEnter = useCallback<EdgeMouseHandler>((_, edge) => hover(edge.id), [hover]);
+  const handleEdgeMouseLeave = useCallback<EdgeMouseHandler>(
+    (_, edge) => unhover(edge.id),
+    [unhover],
+  );
+
+  const resourceName = useCallback(
+    (resourceId: ResourceId): string => resourceTitles.get(resourceId) ?? resourceId,
+    [resourceTitles],
+  );
+
+  /**
+   * The sentence comes from the same retained refusal the Edge's alert region
+   * draws, so the field and the region cannot disagree.
+   */
+  const completeTitle = useCallback(
+    (title: string): string | null => {
+      const refusal = authoring.completeTitle(title);
+      return refusal === null ? null : describeAuthoringRefusal(refusal);
+    },
+    [authoring],
   );
 
   // **Every Edge surface is gated on `enabled`, not on the draft alone.** The
@@ -626,21 +485,40 @@ export function useEdgeAuthoring({
   // a notification and this renders before it.
   const draft = enabled ? state.draft : null;
 
-  // `editing` is derived *inside* the memo rather than beside it: as a plain
-  // render computation it would be a fresh object on every render, so the memo
-  // it feeds would never hold and every Edge would re-render with it.
-  const commands = useMemo(
+  // `editingTitle` is derived *inside* the memo: outside it, a fresh object each
+  // render would defeat the memo and re-render every Edge. `hovered` is gated on
+  // `enabled` for the reason the draft is.
+  const commands = useMemo<EdgeAuthoringCommands>(
     () => ({
-      editing:
-        draft?.kind === 'keyboard-reconnect' ? { graphId: draft.graphId, edge: draft.edge } : null,
+      activeGraphId,
+      editingTitle: draft?.kind === 'title' ? { graphId: draft.graphId, edge: draft.edge } : null,
       refusal: state.refusal,
-      openEditor: authoring.openEdgeEditor,
-      closeEditor: authoring.cancelDraft,
-      reconnect: authoring.reconnect,
-      deleteEdge: authoring.deleteEdge,
-      endpointChoices,
+      hovered: enabled ? hovered : null,
+      hover,
+      unhover,
+      resourceName,
+      beginTitleEdit: authoring.beginTitleEdit,
+      completeTitle,
+      cancelTitleEdit: authoring.cancelDraft,
+      setTitleHidden: (subject, hidden) => {
+        authoring.setTitleHidden(subject, hidden);
+      },
+      deleteEdge: (subject) => {
+        authoring.deleteEdge(subject);
+      },
     }),
-    [draft, state.refusal, authoring, endpointChoices],
+    [
+      activeGraphId,
+      draft,
+      state.refusal,
+      enabled,
+      hovered,
+      hover,
+      unhover,
+      resourceName,
+      authoring,
+      completeTitle,
+    ],
   );
 
   const layer = (
@@ -655,7 +533,7 @@ export function useEdgeAuthoring({
         The canvas announcement channel: the one refusal with no surface left.
 
         Every other channel is owned by a surface that is still on screen — the
-        Edge's endpoint editor and the selected Edge's own controls. A
+        Edge's toolbar, which reports its commands' refusals itself. A
         **completed pointer gesture** has none: the drag is over,
         its draft is gone, and this sentence is the whole of what the author is
         told. Which channel a refusal is on is Edge Authoring's answer, so this
@@ -675,10 +553,9 @@ export function useEdgeAuthoring({
       onConnectStart: handleConnectStart,
       onConnectEnd: handleConnectEnd,
       isValidConnection,
-      onReconnectStart: handleReconnectStart,
-      onReconnect: handleReconnect,
-      onReconnectEnd: handleReconnectEnd,
       onMouseMove: handleMouseMove,
+      onEdgeMouseEnter: handleEdgeMouseEnter,
+      onEdgeMouseLeave: handleEdgeMouseLeave,
       edgesReconnectable: false,
       edgesFocusable: false,
       deleteKeyCode: null,
@@ -691,10 +568,9 @@ export function useEdgeAuthoring({
       handleConnectStart,
       handleConnectEnd,
       isValidConnection,
-      handleReconnectStart,
-      handleReconnect,
-      handleReconnectEnd,
       handleMouseMove,
+      handleEdgeMouseEnter,
+      handleEdgeMouseLeave,
     ],
   );
 

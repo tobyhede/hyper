@@ -183,7 +183,7 @@ describe('invalidation', () => {
 describe('the wait policy', () => {
   it.each([
     ['a created or added Resource', { kind: 'resource', resourceId: RESOURCE_A } as const],
-    ['a reconnected Edge', { kind: 'edge', graphId: GRAPH_ID, edge: EDGE } as const],
+    ['a new Edge', { kind: 'edge', graphId: GRAPH_ID, edge: EDGE } as const],
   ])('keeps %s owed until it is drawn', (_name, target) => {
     expect(staysOwed({ target, select: false, then: 'focus' })).toBe(true);
   });

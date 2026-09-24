@@ -46,6 +46,11 @@ interface InlineTitleEditorBase {
    * its content, `Shift+Enter` inserts a line, and `Enter` still completes.
    */
   readonly multiline?: boolean;
+  /**
+   * The id of an element outside the editor that shows a refusal. Given it, the
+   * editor draws no reason of its own and describes its field by that element.
+   */
+  readonly errorShownBy?: string;
   readonly onComplete: (title: string) => string | null;
   readonly onCancel: () => void;
   readonly onReturnFocus: () => void;
@@ -98,12 +103,11 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  *   component's to decide and `Shift` is what it decides on.
  * - Custom behavior: only that lifecycle, in the two shapes {@link InlineTitleEditorBase.multiline}
  *   selects; product identity and authorship stay in the caller.
- * - Tests: `InlineTitleEditor.test.tsx` (the `edge` variant's only test until an Edge mounts
- *   it), `CanvasResource.test.tsx` for the `resource` variant and
- *   `SpaceApp.test.tsx` for the `header` one, which is where the Command Dock renames a
- *   Map and a Graph now that ADR 0082 has retired the Sidebar that used to; application
+ * - Tests: `InlineTitleEditor.test.tsx`; `EdgeTitle.test.tsx` and the app's
+ *   `edge-authoring-react.test.tsx` for `edge`; `CanvasResource.test.tsx` for `resource`;
+ *   `SpaceApp.test.tsx` for `header`; application
  *   Playwright in `e2e/editing.spec.ts` and Ladle Playwright in
- *   `ladle-e2e/command-dock.spec.ts`.
+ *   `ladle-e2e/command-dock.spec.ts` and `ladle-e2e/edge-toolbar.spec.ts`.
  */
 export function InlineTitleEditor({
   title,
@@ -111,6 +115,7 @@ export function InlineTitleEditor({
   variant,
   className,
   multiline = false,
+  errorShownBy,
   draft: controlledDraft,
   error: controlledError,
   onDraftChange,
@@ -166,7 +171,7 @@ export function InlineTitleEditor({
   const shared = {
     'aria-label': label,
     'aria-invalid': error !== null,
-    'aria-describedby': error === null ? undefined : errorId,
+    'aria-describedby': error === null ? undefined : (errorShownBy ?? errorId),
     value: draft,
     onChange: (event: ChangeEvent<TitleField>) => {
       setDraft(event.currentTarget.value);
@@ -225,7 +230,7 @@ export function InlineTitleEditor({
     return (
       <div className={cn('resource__title-editor nodrag nopan nowheel min-w-0', className)}>
         {control}
-        {error !== null && (
+        {error !== null && errorShownBy === undefined && (
           <span id={errorId} role="alert" className="resource__field-error">
             {error}
           </span>
@@ -243,9 +248,11 @@ export function InlineTitleEditor({
       )}
     >
       {control}
-      <FieldError id={errorId} className="text-xs">
-        {error}
-      </FieldError>
+      {errorShownBy === undefined && (
+        <FieldError id={errorId} className="text-xs">
+          {error}
+        </FieldError>
+      )}
     </Field>
   );
 }

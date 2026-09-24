@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraphRenderEdges, loadSpace, graphResourceIds, type Space } from '../src/index';
+import {
+  buildGraphRenderEdges,
+  graphRenderEdgeId,
+  loadSpace,
+  graphResourceIds,
+  type Space,
+} from '../src/index';
 // Internal to the package, so not reachable through what it offers.
 import { resourceIdsForGraphs } from '../src/graph-rendering';
 import { resourceFile, uuid } from './resource-files';
@@ -207,6 +213,61 @@ describe('buildGraphRenderEdges', () => {
       source: uuid('00000000-0000-4000-8000-000000000002'),
       target: uuid('00000000-0000-4000-8000-000000000005'),
     });
+  });
+
+  it('carries an Edge Title and its hiding, and leaves the id to the endpoints', () => {
+    const a = uuid('00000000-0000-4000-8000-000000000002');
+    const b = uuid('00000000-0000-4000-8000-000000000003');
+    const c = uuid('00000000-0000-4000-8000-000000000005');
+    const graphId = uuid('00000000-0000-4000-8000-000000000004');
+    const titled = loadSpace(
+      {
+        version: 1,
+        id: uuid('00000000-0000-4000-8000-000000000001'),
+        title: 'Test',
+        maps: [
+          {
+            id: uuid('00000000-0000-4000-8000-000000000022'),
+            title: 'Working',
+            positions: {
+              [a]: { x: 0, y: 0, open: false },
+              [b]: { x: 320, y: 0, open: false },
+              [c]: { x: 640, y: 0, open: false },
+            },
+            graphs: [
+              {
+                id: graphId,
+                title: 'Main',
+                edges: [
+                  { from: a, to: b, title: 'depends on' },
+                  { from: b, to: c, title: 'then', titleHidden: true },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      [resourceFile(a), resourceFile(b), resourceFile(c)],
+    );
+    if (!titled.ok) throw new Error('fixture should load');
+
+    expect(buildGraphRenderEdges(titled.space)).toEqual([
+      {
+        id: graphRenderEdgeId(graphId, { from: a, to: b }),
+        graphId,
+        source: a,
+        target: b,
+        title: 'depends on',
+      },
+      {
+        id: graphRenderEdgeId(graphId, { from: b, to: c }),
+        graphId,
+        source: b,
+        target: c,
+        title: 'then',
+        titleHidden: true,
+      },
+    ]);
   });
 
   /**

@@ -51,6 +51,9 @@ export type RoutedEdgeData = {
    * stops short.
    */
   endTrim: number;
+  /** The Edge's Title and whether it is hidden at rest; drawn by the application, not here. */
+  title?: string;
+  titleHidden?: true;
 };
 
 /**
@@ -67,11 +70,13 @@ export const ROUTED_EDGE_TYPE = 'routed';
  */
 export type RoutedFlowEdge = Edge<RoutedEdgeData, typeof ROUTED_EDGE_TYPE>;
 
-/** An Edge's drawn path and the point a label or toolbar sits at. */
+/** An Edge's drawn path, the point a label or toolbar sits at, and how far it reaches. */
 export interface RoutedEdgeGeometry {
   readonly path: string;
   readonly labelX: number;
   readonly labelY: number;
+  /** See `LaneGeometry.span`. */
+  readonly span: number;
 }
 
 /**

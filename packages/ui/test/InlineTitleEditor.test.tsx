@@ -257,6 +257,35 @@ describe('InlineTitleEditor edge variant', () => {
     expect(onReturnFocus).not.toHaveBeenCalled();
   });
 
+  it('leaves the reason to a region the surface names, and is described by it', () => {
+    const onReturnFocus = vi.fn();
+    render(
+      <>
+        <InlineTitleEditor
+          title="depends on"
+          label="Edge Title"
+          variant="edge"
+          errorShownBy="edge-refusal"
+          onComplete={() => 'An Edge title must be one line.'}
+          onCancel={() => undefined}
+          onReturnFocus={onReturnFocus}
+        />
+        <p id="edge-refusal" role="alert">
+          An Edge title must be one line.
+        </p>
+      </>,
+    );
+    const field = titleField('Edge Title');
+
+    fireEvent.keyDown(field, { key: 'Enter' });
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAttribute('aria-describedby', 'edge-refusal');
+    expect(field).toHaveAccessibleDescription('An Edge title must be one line.');
+    expect(onReturnFocus).not.toHaveBeenCalled();
+  });
+
   /**
    * jsdom lays nothing out, so this reads the stylesheet. The weight is held to
    * the Resource Title's token so the two cannot drift apart.
