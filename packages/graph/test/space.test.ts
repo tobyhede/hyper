@@ -45,6 +45,9 @@ const validInput = {
 /** The same input with no Maps, and so no Graphs (ADR 0015). */
 const noStructure = { ...validInput, maps: [] };
 
+/** The same, declaring no version at all. */
+const { version: _version, ...versionless } = noStructure;
+
 const validResources = [
   resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
   resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
@@ -232,6 +235,26 @@ describe('loadSpace', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors.every((error) => error.kind === 'invalid-shape')).toBe(true);
-    expect(result.errors.some((error) => error.message.includes('graphs'))).toBe(true);
+    // Located by the dotted path of the failing key, so a reader can follow it
+    // down the document.
+    expect(result.errors.map(({ message }) => message)).toContainEqual(
+      expect.stringMatching(/^maps\.0\.graphs\.0: \S/),
+    );
+  });
+
+  /**
+   * A version this build cannot read at all is the shape check's to answer.
+   * `unsupported-version` tells an author the document came from another build;
+   * a document that forgot its version, or wrote it as text, has a wrong key.
+   */
+  it.each([
+    ['no version', versionless],
+    ['a version that is not a number', { ...versionless, version: '2' }],
+  ])('answers a document with %s by its shape, not by its version', (_label, input) => {
+    const result = loadSpace(input, validResources);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-shape']);
+    expect(result.errors[0]?.message).toMatch(/^version: \S/);
   });
 });
