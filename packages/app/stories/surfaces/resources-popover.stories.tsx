@@ -6,6 +6,7 @@ import { ResourcesPopover, SPACE_DRAG_TYPE } from '#components/ResourcesPopover'
 import { PersistenceNotice } from '#components/PersistenceControl';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { composeApp } from '#src/compose-app';
+import { resourcesOutsideMap } from '#src/map-resolution';
 import type { SpaceDrag } from '#src/resources-drag';
 import { sparseAuthoredSnapshot } from '../support/spaces';
 
@@ -135,10 +136,7 @@ function RefusedAdd() {
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
   const map = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;
-  const resources =
-    map === undefined
-      ? []
-      : space.resources.filter((resource) => map.positions[resource.id] === undefined);
+  const resources = map === undefined ? [] : resourcesOutsideMap(space, map);
   const [open, setOpen] = useState(false);
 
   return (
