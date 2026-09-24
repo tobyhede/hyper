@@ -539,7 +539,8 @@ export interface DockResourcesList {
   readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
   /** Returns a refusal that stays on the list, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
-  readonly onDragStart: (resourceId: ResourceId) => void;
+  /** A Resource row left the list on a drag; `settle` takes the drop's answer back to that list. */
+  readonly onDragStart: (resourceId: ResourceId, settle: SettlePlacement) => void;
   /** A Space row left the list on a drag; `settle` takes the drop's answer back to that list. */
   readonly onSpaceDragStart?:
     ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;

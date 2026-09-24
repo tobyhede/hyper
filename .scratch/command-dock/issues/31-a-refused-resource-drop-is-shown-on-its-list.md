@@ -1,6 +1,6 @@
 # 31 — A refused Resource drop is shown on the list that started it
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 30.
 
 **What to build:** Dropping an existing Resource onto the canvas shows a refusal in the Resources list's "Resource not added" alert, as pressing the row already does. Today the drop discards the sentence.

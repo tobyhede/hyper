@@ -63,7 +63,7 @@ function Fixture({
   readonly allResources?: readonly Resource[];
   readonly disabled?: boolean;
   readonly onAdd?: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
-  readonly onDragStart?: (resourceId: Resource['id']) => void;
+  readonly onDragStart?: (resourceId: Resource['id'], settle: SettlePlacement) => void;
   readonly spaceTitleById?: ReadonlyMap<UUID, string>;
   readonly spaces?: readonly { readonly id: UUID; readonly title: string }[];
   readonly onAddSpace?: (space: {
@@ -352,7 +352,53 @@ describe('ResourcesPopover', () => {
     });
 
     expect(setData).toHaveBeenCalledWith(RESOURCE_DRAG_TYPE, RESOURCES[0]?.id);
-    expect(onDragStart).toHaveBeenCalledWith(RESOURCES[0]?.id);
+    expect(onDragStart).toHaveBeenCalledWith(RESOURCES[0]?.id, expect.any(Function));
+  });
+
+  it('draws a dropped Resource’s refusal on the list that started the drag', async () => {
+    let settle: SettlePlacement | null = null;
+    render(
+      <Fixture
+        onDragStart={(_resourceId, given) => {
+          settle = given;
+        }}
+      />,
+    );
+    await openList();
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Zulu to Map' }), {
+      dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
+    });
+
+    // A Resource's answer is synchronous, so it is drawn as the drop settles.
+    act(() => {
+      settle?.('This Resource is no longer available.');
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('This Resource is no longer available.');
+  });
+
+  it('clears a standing refusal when a Resource drop completes', async () => {
+    let settle: SettlePlacement | null = null;
+    render(
+      <Fixture
+        onAdd={() => 'This Resource is no longer available.'}
+        onDragStart={(_resourceId, given) => {
+          settle = given;
+        }}
+      />,
+    );
+    await openList();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Zulu to Map' }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    fireEvent.dragStart(screen.getByRole('button', { name: 'Add Constraints to Map' }), {
+      dataTransfer: { setData: vi.fn(), effectAllowed: 'none' },
+    });
+    act(() => {
+      settle?.(null);
+    });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('keeps focus leaving it from dismissing it, which a drag out of it is', async () => {

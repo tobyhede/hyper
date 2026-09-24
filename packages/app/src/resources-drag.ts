@@ -7,8 +7,21 @@ import type { MapId, ResourceId, UUID } from '@project/core';
  * Built by the list at dragstart and bound to the opening that started the
  * drag, so an answer arriving after that opening has closed is dropped exactly
  * as a press's would be (`StandingRefusal` in `ResourcesPopover`).
+ *
+ * A Resource's answer is synchronous and is taken as it is, so it settles
+ * immediately; a Space's is a promise, because placing a Space is a
+ * coordinated Edit across Spaces.
  */
-export type SettlePlacement = (answer: Promise<string | null>) => void;
+export type SettlePlacement = (answer: string | null | Promise<string | null>) => void;
+
+/** A Resource being dragged out of the Resources list. */
+export interface ResourceDrag {
+  readonly kind: 'resource';
+  readonly resourceId: ResourceId;
+  readonly mapId: MapId;
+  /** Where the drop's answer goes — see {@link SettlePlacement}. */
+  readonly settle: SettlePlacement;
+}
 
 /** A Space the Resources list offers, as a drag carries it. */
 export interface DraggedSpace {
@@ -35,8 +48,7 @@ export interface SpaceDrag {
  * record holding a bare id could not say which the id names, so a Space drag
  * would be read as a Resource one.
  */
-export type ResourcesDrag =
-  { readonly kind: 'resource'; readonly resourceId: ResourceId; readonly mapId: MapId } | SpaceDrag;
+export type ResourcesDrag = ResourceDrag | SpaceDrag;
 
 /**
  * Whether a canvas drop of `resourceId`, over `mapId`, completes `drag`.
@@ -49,7 +61,8 @@ export const completesResourceDrop = (
   drag: ResourcesDrag | null,
   resourceId: ResourceId,
   mapId: MapId,
-): boolean => drag?.kind === 'resource' && drag.resourceId === resourceId && drag.mapId === mapId;
+): drag is ResourceDrag =>
+  drag?.kind === 'resource' && drag.resourceId === resourceId && drag.mapId === mapId;
 
 /**
  * The Space drag a canvas drop of `spaceId`, over `mapId`, completes, or `null`.

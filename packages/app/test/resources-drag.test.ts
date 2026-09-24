@@ -17,7 +17,7 @@ const blueprint = {
 
 describe('completesResourceDrop', () => {
   it('completes a drop of the Resource the drag carried, over the Map it started over', () => {
-    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId };
+    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
     expect(completesResourceDrop(drag, resourceId, mapId)).toBe(true);
   });
@@ -27,13 +27,13 @@ describe('completesResourceDrop', () => {
   });
 
   it('refuses a drop naming a different Resource from the one the drag carried', () => {
-    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId };
+    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
     expect(completesResourceDrop(drag, otherResourceId, mapId)).toBe(false);
   });
 
   it('refuses a drop over a Map other than the one the drag started over', () => {
-    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId };
+    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
     expect(completesResourceDrop(drag, resourceId, otherMapId)).toBe(false);
   });
@@ -74,7 +74,7 @@ describe('completedSpaceDrag', () => {
   });
 
   it('never reads a Resource drag as a Space drop, even when the ids coincide', () => {
-    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId };
+    const drag: ResourcesDrag = { kind: 'resource', resourceId, mapId, settle: vi.fn() };
 
     expect(completedSpaceDrag(drag, resourceId, mapId)).toBeNull();
   });

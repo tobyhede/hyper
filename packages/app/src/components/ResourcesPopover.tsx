@@ -162,7 +162,13 @@ export interface ResourcesPopoverProps {
   readonly triggerLabel?: ReactNode | undefined;
   /** Returns a refusal that remains on this surface, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: Activation) => string | null;
-  readonly onDragStart: (resourceId: ResourceId) => void;
+  /**
+   * A Resource row has left the list on a drag.
+   *
+   * `settle` is where the drop's answer comes back, bound to the opening the
+   * drag started from, as {@link onSpaceDragStart}'s is.
+   */
+  readonly onDragStart: (resourceId: ResourceId, settle: SettlePlacement) => void;
   readonly onDragEnd?: (() => void) | undefined;
   readonly revealedResourceId?: ResourceId | null | undefined;
   /**
@@ -299,12 +305,11 @@ function RowGrip() {
  * A counter rather than the open flag, because the list can be reopened while
  * an Edit is still in flight, and that opening did not ask for it either.
  *
- * A Space row dragged onto the canvas asks from the opening it left: the
+ * A row dragged onto the canvas asks from the opening it left: the
  * settlement handed out at its dragstart is bound to that opening, so the drop
- * reports exactly as a press made at that moment would.
- *
- * The Resource arm needs none of this: `onAdd` answers synchronously, so its
- * refusal is installed by the press that caused it.
+ * reports exactly as a press made at that moment would. That holds for a
+ * Resource row too, although its answer is synchronous: the drop lands after
+ * the drag, and the list it left may have closed by then.
  */
 interface StandingRefusal {
   readonly opening: number;
@@ -529,13 +534,18 @@ export function ResourcesPopover({
     };
 
   /**
-   * The one way a Space placement's answer reaches this list, whether a press
-   * or a drop asked for it: a standing sentence goes as the placement is asked
-   * for, and whatever it answers is drawn on the opening `asked` names.
+   * The one way a drop's answer, or a Space press's, reaches this list: a
+   * standing sentence goes as the placement is asked for, and whatever it
+   * answers is drawn on the opening `asked` names — at once when the answer is
+   * synchronous, as a Resource's is.
    */
   const settlementFor =
     (asked: number): SettlePlacement =>
     (answer) => {
+      if (answer === null || typeof answer === 'string') {
+        showSettlement(asked)(answer);
+        return;
+      }
       showSettlement(asked)(null);
       void answer.then(showSettlement(asked), showBreak(asked));
     };
@@ -543,7 +553,7 @@ export function ResourcesPopover({
   const beginDrag = (event: DragEvent<HTMLButtonElement>, resourceId: ResourceId): void => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(RESOURCE_DRAG_TYPE, resourceId);
-    onDragStart(resourceId);
+    onDragStart(resourceId, settlementFor(standing.opening));
   };
 
   const beginSpaceDrag = (

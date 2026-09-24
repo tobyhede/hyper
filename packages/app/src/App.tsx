@@ -1167,10 +1167,6 @@ export const createApp = (
      * `resourcesOutsideSelectedMap`, so the row the reader activated is already
      * gone. The Resources list is still on screen though, and it is the surface
      * that asked — so it keeps the sentence, in the `Alert` above its list.
-     *
-     * `dropExistingResource` below discards the same string on purpose: a drop
-     * ends on the canvas, and by then the list that named the Resource may be
-     * dismissed, leaving nowhere the sentence belongs.
      */
     const addExistingResource = useCallback(
       (resourceId: ResourceId, anchor: MapPosition, focus: boolean): string | null => {
@@ -1198,7 +1194,7 @@ export const createApp = (
         const drag = resourcesDrag.current;
         resourcesDrag.current = null;
         if (!completesResourceDrop(drag, resourceId, selectedMapId)) return;
-        addExistingResource(resourceId, anchor, false);
+        drag.settle(addExistingResource(resourceId, anchor, false));
       },
       [addExistingResource, selectedMapId],
     );
@@ -1630,8 +1626,13 @@ export const createApp = (
                    (`ResourcesPopover`). Escape is the way out to the canvas, and
                    it returns focus to the trigger the list hangs off. */
                 onAdd: (resource) => addExistingResource(resource.id, centreAnchor(), false),
-                onDragStart: (resourceId) => {
-                  resourcesDrag.current = { kind: 'resource', resourceId, mapId: selectedMapId };
+                onDragStart: (resourceId, settle) => {
+                  resourcesDrag.current = {
+                    kind: 'resource',
+                    resourceId,
+                    mapId: selectedMapId,
+                    settle,
+                  };
                 },
                 onSpaceDragStart: (space, settle) => {
                   resourcesDrag.current = { kind: 'space', space, mapId: selectedMapId, settle };
