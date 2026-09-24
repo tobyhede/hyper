@@ -66,15 +66,17 @@ export function useReferenceableSpaces(
         } catch (failure) {
           // Reported rather than drawn: the list's own empty state says what it
           // has, and a Spaces read that failed is not a refusal of anything the
-          // reader asked for.
+          // reader asked for. An overtaken read is still reported, because it
+          // still failed, but it changes nothing a later read answered.
           reportBreak(failure);
+          if (latestRead.current !== token) return;
           // The epoch goes back, so this Space's next showing retries rather
           // than standing on an empty list until the Space set changes. While
           // it stays shown nothing retries; Meta's row does not depend on it
           // (`space-set-freshness.test.tsx`, "lists a closed Meta by its title
           // when the Space list read fails").
           readEpoch.current = null;
-          if (latestRead.current === token) setSpaces([]);
+          setSpaces([]);
         }
       })();
     };

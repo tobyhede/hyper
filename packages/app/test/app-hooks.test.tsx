@@ -219,6 +219,92 @@ describe('useReferenceableSpaces', () => {
     expect(result.current).toEqual([]);
     expect(source.referenceableSpaces).toHaveBeenCalledTimes(1);
   });
+
+  /** Two reads the test answers itself, in whichever order it chooses. */
+  const controlledReads = () => {
+    const pending: PromiseWithResolvers<readonly SpaceSummary[]>[] = [];
+    const referenceableSpaces = vi.fn((_containing: UUID) => {
+      const read = Promise.withResolvers<readonly SpaceSummary[]>();
+      pending.push(read);
+      return read.promise;
+    });
+    const spaceSet = observable(0);
+    const source = { spaceSet, referenceableSpaces };
+    const reportBreak = vi.fn();
+    const containingSpaceId = () => SPACE_ID;
+    const hook = renderHook(
+      ({ active }: { readonly active: boolean }) =>
+        useReferenceableSpaces(active, source, containingSpaceId, reportBreak),
+      { initialProps: { active: true } },
+    );
+    act(() => spaceSet.publish(1));
+    const [older, newer] = pending;
+    if (older === undefined || newer === undefined) throw new Error('Two reads were not started.');
+    return { ...hook, spaceSet, pending, older, newer, referenceableSpaces, reportBreak };
+  };
+
+  /** Answers one read and lets the hook's continuation run inside `act`. */
+  const answer = (
+    read: PromiseWithResolvers<readonly SpaceSummary[]>,
+    answered: readonly SpaceSummary[],
+  ) =>
+    act(async () => {
+      read.resolve(answered);
+      await read.promise;
+    });
+
+  /** Fails one read and lets the hook's continuation run inside `act`. */
+  const fail = (read: PromiseWithResolvers<readonly SpaceSummary[]>, failure: Error) =>
+    act(async () => {
+      read.reject(failure);
+      await read.promise.catch(() => undefined);
+    });
+
+  it('keeps a newer answer when an older read fails after it', async () => {
+    const failure = new Error('stale');
+    const { result, rerender, older, newer, referenceableSpaces, reportBreak } = controlledReads();
+    await answer(newer, newerSummaries);
+    await fail(older, failure);
+
+    expect(result.current).toEqual(newerSummaries);
+    expect(reportBreak).toHaveBeenCalledWith(failure);
+    rerender({ active: false });
+    rerender({ active: true });
+    expect(referenceableSpaces).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual(newerSummaries);
+  });
+
+  it('keeps a newer answer when an older read succeeds after it', async () => {
+    const { result, rerender, older, newer, referenceableSpaces } = controlledReads();
+    await answer(newer, newerSummaries);
+    await answer(older, summaries);
+
+    expect(result.current).toEqual(newerSummaries);
+    rerender({ active: false });
+    rerender({ active: true });
+    expect(referenceableSpaces).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries the latest failed read on the next showing, and not before', async () => {
+    const failure = new Error('unreachable');
+    const { result, rerender, spaceSet, pending, older, newer, referenceableSpaces, reportBreak } =
+      controlledReads();
+    await answer(older, summaries);
+    await fail(newer, failure);
+
+    expect(reportBreak).toHaveBeenCalledWith(failure);
+    expect(result.current).toEqual([]);
+    expect(referenceableSpaces).toHaveBeenCalledTimes(2);
+    rerender({ active: false });
+    act(() => spaceSet.publish(2));
+    expect(referenceableSpaces).toHaveBeenCalledTimes(2);
+    rerender({ active: true });
+    expect(referenceableSpaces).toHaveBeenCalledTimes(3);
+    const retry = pending[2];
+    if (retry === undefined) throw new Error('The next showing did not retry.');
+    await answer(retry, summaries);
+    expect(result.current).toEqual(summaries);
+  });
 });
 
 describe('useResourcePlacement', () => {
