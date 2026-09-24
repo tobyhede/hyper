@@ -284,19 +284,16 @@ test(
     const choices = await graphChoices(page);
     expect(await legendItems.allInnerTexts()).toEqual(await choices.allInnerTexts());
 
-    // Colours. Lucide paints the menu row's glyph by `stroke`, the HUD paints
-    // its stripe as a background — two properties, one resolved value each.
-    // The Graph glyph and nothing else: a checked radio row also draws the
-    // menu's own tick, and Lucide leaves that one on `currentColor` while
-    // `GraphIcon` is given the Graph's resolved colour.
-    const dockColors = await choices
-      .locator('svg:not([stroke="currentColor"])')
-      .evaluateAll((els: readonly Element[]) => els.map((el) => getComputedStyle(el).stroke));
-    const hudColors = await legendItems
-      .locator('[aria-hidden="true"]')
-      .evaluateAll((els: readonly Element[]) =>
-        els.map((el) => getComputedStyle(el).backgroundColor),
-      );
+    // Colours. Both surfaces draw the one `GraphColorLine` mark, so one
+    // property reads both: each resolved value, in the same order.
+    const lineColors = (rows: Locator) =>
+      rows
+        .locator('[data-slot="graph-color-line"]')
+        .evaluateAll((els: readonly Element[]) =>
+          els.map((el) => getComputedStyle(el).backgroundColor),
+        );
+    const dockColors = await lineColors(choices);
+    const hudColors = await lineColors(legendItems);
     expect(hudColors).toEqual(dockColors);
     expect(new Set(hudColors).size).toBe(3);
 
@@ -321,6 +318,52 @@ test(
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(emphasised).toHaveText('Mid');
     await expect(legendItems).toHaveCount(3);
+  },
+);
+
+/**
+ * A Graph row in the Dock's list is the HUD key's row: the same line, the same
+ * box, the same colour, and no Graph glyph (`.scratch/graph-colour/issues/02`).
+ * The Graph identity and Colour… keep the coloured glyph, which says what kind
+ * of entity the colour belongs to; the Map list, drawn by the same component,
+ * carries no mark.
+ */
+test(
+  'the Dock’s Graph rows draw the HUD key’s colour line rather than a Graph glyph',
+  { tag: '@parity:graph-choice-rows-draw-the-graph-colour-line' },
+  async ({ page }) => {
+    await page.goto('/');
+    const marks = (rows: Locator) =>
+      rows.locator('[data-slot="graph-color-line"]').evaluateAll((els: readonly Element[]) =>
+        els.map((el) => {
+          const style = getComputedStyle(el);
+          return { color: style.backgroundColor, width: style.width, height: style.height };
+        }),
+      );
+    const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
+    await expect(legendItems).toHaveCount(3);
+    const key = await marks(legendItems);
+
+    const identityStroke = await activeGraph(page)
+      .locator('svg')
+      .first()
+      .evaluate((el) => getComputedStyle(el).stroke);
+    const choices = await graphChoices(page);
+    expect(await marks(choices)).toEqual(key);
+    expect(key.every((line) => line.width === '14px' && line.height === '3px')).toBe(true);
+    await expect(choices.and(page.locator('[aria-checked="false"]')).locator('svg')).toHaveCount(0);
+    await expect(
+      choices.and(page.locator('[aria-checked="true"]')).locator('[data-slot="graph-color-line"]'),
+    ).toHaveCSS('background-color', identityStroke);
+    await expect(page.getByRole('menuitem', { name: 'Colour…' }).locator('svg').first()).toHaveCSS(
+      'stroke',
+      identityStroke,
+    );
+
+    await page.keyboard.press('Escape');
+    const maps = await mapChoices(page);
+    await expect(maps.first()).toBeVisible();
+    await expect(maps.locator('[data-slot="graph-color-line"]')).toHaveCount(0);
   },
 );
 

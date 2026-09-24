@@ -6,6 +6,7 @@ import {
   MemorySpaceBackendTestControl,
   type ObserverErrorReporter,
 } from '@project/persistence';
+import { GRAPH_PALETTE } from '../src/colors';
 import { createSpaceResourceLifecycle } from '../src/space-resource-lifecycle';
 
 /*
@@ -139,7 +140,7 @@ describe('what a Space Resource may reference', () => {
             kind: 'positioned',
             positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false } },
             graphs: [
-              { id: SECOND_GRAPH_ID, title: 'Graph 2', edges: [] },
+              { id: SECOND_GRAPH_ID, title: 'Graph 2', color: '#ff7f0e', edges: [] },
               { id: THIRD_GRAPH_ID, title: 'Graph 3', edges: [] },
             ],
           },
@@ -165,7 +166,10 @@ describe('what a Space Resource may reference', () => {
         {
           id: TARGET_MAP_ID,
           title: 'Map 1',
-          graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1' }],
+          // Each Graph carries the colour its Edges are drawn in, resolved as
+          // the canvas resolves it: the stored colour where the Graph has one,
+          // the palette's fallback where it has none.
+          graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', color: GRAPH_PALETTE[0] }],
           // Carried where the Map authored one, because it is what a Resource
           // pointed at this Map seeds its Graph from (ADR 0026). `Map 2`
           // below authored none and so carries none.
@@ -175,8 +179,8 @@ describe('what a Space Resource may reference', () => {
           id: SECOND_MAP_ID,
           title: 'Map 2',
           graphs: [
-            { id: SECOND_GRAPH_ID, title: 'Graph 2' },
-            { id: THIRD_GRAPH_ID, title: 'Graph 3' },
+            { id: SECOND_GRAPH_ID, title: 'Graph 2', color: '#ff7f0e' },
+            { id: THIRD_GRAPH_ID, title: 'Graph 3', color: GRAPH_PALETTE[2] },
           ],
         },
       ],

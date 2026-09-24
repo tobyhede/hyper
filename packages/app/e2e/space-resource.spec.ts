@@ -367,7 +367,10 @@ test('a second Space Resource may reference the Space the first one created', as
 test(
   'an Open Space Resource shows the selections it was created with',
   {
-    tag: '@parity:open-space-resource-chooses-its-context-on-the-shared-controls',
+    tag: [
+      '@parity:open-space-resource-chooses-its-context-on-the-shared-controls',
+      '@parity:open-space-resource-graph-rows-draw-the-graph-colour-line',
+    ],
   },
   async ({ page }) => {
     await page.goto('/');
@@ -463,6 +466,21 @@ test(
         name: 'Edit Resource Architecture',
       }),
     ).toBeVisible();
+
+    // The Graph list marks its one row with the target Graph's colour line —
+    // the created Space's first Graph takes the palette's first slot — and
+    // the Map list beside it carries no mark (`.scratch/graph-colour/issues/02`).
+    await (await resourceControls(page, resource)).getByTestId('space-resource-graph').click();
+    const graphRow = page.getByRole('menuitemradio', { name: 'Graph 1' });
+    await expect(graphRow.locator('[data-slot="graph-color-line"]')).toHaveCSS(
+      'background-color',
+      'rgb(31, 119, 180)',
+    );
+    await page.keyboard.press('Escape');
+    await (await resourceControls(page, resource)).getByTestId('space-resource-map').click();
+    await expect(page.getByRole('menuitemradio', { name: 'Map 1' })).toBeVisible();
+    await expect(page.getByRole('menu').locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+    await page.keyboard.press('Escape');
   },
 );
 

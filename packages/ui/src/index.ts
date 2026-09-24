@@ -22,6 +22,7 @@ export type {
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export type {
   CanvasSpaceResourceChoice,
+  CanvasSpaceResourceGraphChoice,
   CanvasSpaceResourceMapCommands,
   CanvasSpaceResourceGraphCommands,
   CanvasSpaceResourceSelection,
@@ -87,6 +88,8 @@ export type {
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';
 export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
+export { GraphColorLine } from './GraphColorLine';
+export type { GraphColorLineProps } from './GraphColorLine';
 export {
   PaletteColorPicker,
   PaletteColorSwatchGrid,

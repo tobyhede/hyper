@@ -498,3 +498,42 @@ test(
     expect(enteredPane.width).toBeGreaterThan(portal.width + 20);
   },
 );
+
+/**
+ * An Open Space Resource's Graph list marks each row with the line the canvas
+ * HUD's key draws, in the colour the target draws that Graph's Edges in — read
+ * off the embedded Edge on screen — and its Map list carries no mark
+ * (`.scratch/graph-colour/issues/02`).
+ */
+test(
+  "an Open Space Resource's Graph rows draw the Graph's colour line",
+  { tag: '@parity:open-space-resource-graph-rows-draw-the-graph-colour-line' },
+  async ({ page }) => {
+    await open(page);
+    const edgeStroke = await page
+      .locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"] path')
+      .first()
+      .evaluate((el) => getComputedStyle(el).stroke);
+
+    // Opened from the keyboard, as `exerciseSpaceResourceContextMenus` opens
+    // these lists: the rail can sit under the Dock at this viewport.
+    const openList = async (kind: 'map' | 'graph') => {
+      const trigger = (await resourceControls(page, spaceResource(page))).getByTestId(
+        `space-resource-${kind}`,
+      );
+      await trigger.focus();
+      await trigger.press('Enter');
+    };
+    await openList('graph');
+    const row = page.getByRole('menuitemradio', { name: 'Overview' });
+    await expect(row.locator('[data-slot="graph-color-line"]')).toHaveCSS(
+      'background-color',
+      edgeStroke,
+    );
+    await page.keyboard.press('Escape');
+
+    await openList('map');
+    await expect(page.getByRole('menuitemradio', { name: 'Collection 2' })).toBeVisible();
+    await expect(page.getByRole('menu').locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+  },
+);
