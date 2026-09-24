@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { titleName, type Resource } from '@project/core';
 import {
   AlertDialog,
@@ -9,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@project/ui';
+import type { ResourceDeletion } from '../resource-deletion';
 
 /**
  * What deleting a Resource destroys, said before it happens.
@@ -85,5 +87,28 @@ export function DeleteResourceConfirmation({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+/** The confirmation standing over the Resource a rail has armed for deletion, if any. */
+export function ArmedResourceDeletion({
+  resourceDeletion,
+}: {
+  readonly resourceDeletion: Pick<
+    ResourceDeletion,
+    'getState' | 'subscribe' | 'confirm' | 'cancel'
+  >;
+}) {
+  const { pending, deleting } = useSyncExternalStore(
+    resourceDeletion.subscribe,
+    resourceDeletion.getState,
+  );
+  return pending === null ? null : (
+    <DeleteResourceConfirmation
+      resource={pending}
+      deleting={deleting}
+      onConfirm={resourceDeletion.confirm}
+      onDismiss={resourceDeletion.cancel}
+    />
   );
 }

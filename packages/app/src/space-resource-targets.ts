@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Resource, UUID } from '@project/core';
-import { spaceResourceTarget, type SpaceResourceTarget } from './space-resource-lifecycle';
+import {
+  spaceResourceTarget,
+  type SpaceResourceAuthoring,
+  type SpaceResourceTarget,
+} from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 
 const NO_ENTRIES = [] as const;
@@ -157,4 +161,30 @@ export const useSpaceResourceTargets = (
     }
     return live;
   }, [targets, entries, resources]);
+};
+
+/** The Title of each referenced Space, by its id. */
+export const spaceTitlesById = (targets: SpaceResourceTargets): ReadonlyMap<UUID, string> =>
+  new Map([...targets].map(([id, target]) => [id, target.title]));
+
+export interface SpaceResourceTargetTitles {
+  readonly targets: SpaceResourceTargets;
+  readonly titleById: ReadonlyMap<UUID, string>;
+}
+
+/**
+ * The targets of one Space's Space Resources, read through its lifecycle, and
+ * their Titles.
+ *
+ * One read per set of referenced Spaces, shared by the canvas and the Resources
+ * list, so a Space Resource names the same Space wherever it is drawn.
+ */
+export const useSpaceResourceTargetTitles = (
+  source: Pick<SpaceResourceAuthoring, 'target'>,
+  resources: readonly Resource[],
+): SpaceResourceTargetTitles => {
+  const read = useCallback((spaceId: UUID) => source.target(spaceId), [source]);
+  const targets = useSpaceResourceTargets(resources, read);
+  const titleById = useMemo(() => spaceTitlesById(targets), [targets]);
+  return { targets, titleById };
 };

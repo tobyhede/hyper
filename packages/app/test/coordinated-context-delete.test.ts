@@ -87,13 +87,16 @@ describe('coordinated Graph delete', () => {
  * `spaceResources.deleteGraph({` would be a second orchestration path beside
  * it. Map deletion left the wrapper for Map authoring
  * (`.scratch/command-outcomes/issues/08`), which owns its coordination; a
- * direct `spaceResources.deleteMap` in App would be a second path beside that.
+ * direct `spaceResources.deleteMap` in the Dock's chrome would be a second path
+ * beside that.
  */
 describe('Dock delete wiring', () => {
-  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), { encoding: 'utf8' });
+  const app = readFileSync(new URL('../src/dock-chrome.ts', import.meta.url), {
+    encoding: 'utf8',
+  });
 
   it('sends Map delete through Map authoring rather than the lifecycle', () => {
-    expect(app).toMatch(/offered\(\s*mapAuthoring\.map\(selectedMap\.map\.id\)\.delete,/u);
+    expect(app).toMatch(/offered\(\s*mapAuthoring\.map\(map\.id\)\.delete,/u);
     expect(app).toMatch(
       /commandOutcomes\.run\('map-delete',\s*remove,\s*\{\s*completionMovesMap:\s*true\s*\}\)/u,
     );

@@ -524,7 +524,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     const positions = session.getState().working.document.maps?.[0]?.positions;
     // Three quarters of a Resource on each axis, not half: at half the new Reference Resource's
     // centre lands exactly on the Target's bottom-right corner and the Target
-    // takes every pointer event aimed at it (`REFERENCE_OFFSET_RATIO` in `App.tsx`).
+    // takes every pointer event aimed at it (`REFERENCE_OFFSET_RATIO` in `resource-placement.ts`).
     expect(positions?.[reference]).toMatchObject({
       x: Math.round(RESOURCE_WIDTH * 0.75),
       y: Math.round(RESOURCE_HEIGHT * 0.75),

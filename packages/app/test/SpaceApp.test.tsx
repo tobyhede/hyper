@@ -340,7 +340,7 @@ describe('Space app conflict recovery', () => {
   };
 
   /**
-   * `acceptRemote` is an `onClick` handler (`App.tsx`), and React error
+   * `acceptRemote` is an `onClick` handler (`dock-chrome.ts`), and React error
    * boundaries do not catch throws from event handlers — so a throw here escapes
    * to the window rather than reaching `SpaceAppFailure`, and the session has
    * *already* published the unloadable snapshot as settled working state. The

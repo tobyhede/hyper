@@ -268,7 +268,7 @@ describe('PersistenceControl', () => {
   /**
    * A dismissal is spent by the next failure, not by leaving the Space.
    *
-   * `active` is false for every open Space but the one on screen (`App.tsx`),
+   * `active` is false for every open Space but the one on screen (`open-spaces-context.ts`),
    * and every managed Space stays mounted behind it
    * (`OpenSpacesApplication.tsx`). So switching away and back is not a
    * republication and must not re-raise a dialog the author already answered.

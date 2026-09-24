@@ -44,7 +44,7 @@ import { selectResource } from './resource-selection';
  * against three deliberate breakages, and what follows is what was measured
  * rather than what was reasoned:
  *
- * - **K** — delete `key={authoringState.replacementEpoch}` from `App.tsx`.
+ * - **K** — delete `key={replacementEpoch}` from `App.tsx`.
  * - **R** — stop the render adapter's epoch subscriber clearing
  *   `projection`/`dragOrigins`/`selection` (`render-adapter.ts`).
  * - **N** — make `navigation.openFresh` retain the previous Space's navigation.

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import {
   Alert,
   AlertAction,
@@ -8,6 +8,7 @@ import {
   Button,
   CloseIcon,
 } from '@project/ui';
+import { COMMAND_CHANNELS, type CommandOutcomes } from '../command-outcomes';
 
 /**
  * One standing report over the canvas, and the way to put it away.
@@ -58,5 +59,30 @@ export function ShellNotice({
         </Button>
       </AlertAction>
     </Alert>
+  );
+}
+
+/** The standing notice on each command channel that has one, in channel order. */
+export function CommandNotices({
+  commandOutcomes,
+}: {
+  readonly commandOutcomes: Pick<CommandOutcomes, 'getState' | 'subscribe' | 'dismiss'>;
+}) {
+  const { notices } = useSyncExternalStore(commandOutcomes.subscribe, commandOutcomes.getState);
+  return (
+    <>
+      {COMMAND_CHANNELS.map((channel) => {
+        const notice = notices.get(channel);
+        return notice === undefined ? null : (
+          <ShellNotice
+            key={channel}
+            title={notice.title}
+            onDismiss={() => commandOutcomes.dismiss(channel)}
+          >
+            {notice.message}
+          </ShellNotice>
+        );
+      })}
+    </>
   );
 }
