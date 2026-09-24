@@ -389,6 +389,71 @@ describe('space file maps', () => {
     });
   });
 
+  describe('non-finite geometry', () => {
+    const A = '00000000-0000-4000-8000-000000000002';
+    interface Placement {
+      x: number;
+      y: number;
+      open: boolean;
+      openSize?: { width: number; height: number };
+    }
+    const parsePlacement = (placement: Placement) =>
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        maps: [{ ...working, positions: { ...working.positions, [A]: placement } }],
+      }).success;
+
+    it.each([Infinity, -Infinity, NaN])('rejects a coordinate of %s', (value) => {
+      expect(parsePlacement({ x: value, y: 0, open: false })).toBe(false);
+      expect(parsePlacement({ x: 0, y: value, open: false })).toBe(false);
+    });
+
+    it.each([Infinity, NaN])('rejects an Open Size dimension of %s', (value) => {
+      expect(
+        parsePlacement({ x: 0, y: 0, open: true, openSize: { width: value, height: 146 } }),
+      ).toBe(false);
+      expect(
+        parsePlacement({ x: 0, y: 0, open: true, openSize: { width: 260, height: value } }),
+      ).toBe(false);
+      expect(
+        parsePlacement({ x: 0, y: 0, open: false, openSize: { width: value, height: value } }),
+      ).toBe(false);
+    });
+
+    it('rejects the infinity a numeric overflow in JSON decodes to', () => {
+      const encoded = JSON.stringify({ ...validSpaceFile, maps: [working] }).replace(
+        '"x":320',
+        '"x":1e400',
+      );
+      expect(encoded).toContain('1e400');
+      const decoded: unknown = JSON.parse(encoded);
+      expect(spaceFileSchema.safeParse(decoded).success).toBe(false);
+    });
+
+    it('keeps negative coordinates and the minimum Open Size', () => {
+      expect(
+        parsePlacement({ x: -1e6, y: -0.5, open: true, openSize: { width: 260, height: 146 } }),
+      ).toBe(true);
+    });
+
+    it('round-trips accepted finite geometry through JSON', () => {
+      const file = spaceFileSchema.parse({
+        ...validSpaceFile,
+        maps: [
+          {
+            ...working,
+            positions: {
+              ...working.positions,
+              [A]: { x: -12.5, y: 1e300, open: true, openSize: { width: 260, height: 146 } },
+            },
+          },
+        ],
+      });
+      const decoded: unknown = JSON.parse(JSON.stringify(file));
+      expect(spaceFileSchema.parse(decoded)).toEqual(file);
+    });
+  });
+
   it('requires an Expanded Resource to be at least the Closed Resource size', () => {
     const positions = (width: number, height: number) => ({
       '00000000-0000-4000-8000-000000000002': {

@@ -52,6 +52,41 @@ describe('loadSpaceSnapshot', () => {
     expect(result.errors[0]?.kind).toBe('retired-space-graphs');
   });
 
+  it('refuses the infinite geometry a JSON numeric overflow decodes to', () => {
+    const encoded = JSON.stringify(snapshot).replace('"x":320', '"x":1e400');
+    expect(encoded).toContain('1e400');
+    const result = loadSpaceSnapshot(JSON.parse(encoded));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors[0]?.kind).toBe('invalid-shape');
+    expect(result.errors[0]?.message).toContain(`positions.${RESOURCE_B}.x`);
+  });
+
+  it('refuses an infinite remembered Open Size', () => {
+    const map = snapshot.document.maps?.[0];
+    if (map === undefined) throw new Error('fixture has a Map');
+    const result = loadSpaceSnapshot({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: [
+          {
+            ...map,
+            positions: {
+              ...map.positions,
+              [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: Infinity, height: 146 } },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors[0]?.kind).toBe('invalid-shape');
+  });
+
   it('reports an invalid persistence shape without constructing a Space', () => {
     const result = loadSpaceSnapshot({ ...snapshot, id: 'space' });
     expect(result.ok).toBe(false);
