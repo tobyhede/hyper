@@ -1,8 +1,13 @@
 import { Children, forwardRef, type ComponentProps } from 'react';
 import type { Resource } from '@project/core';
 import { resourceKindName } from './ResourceKindIcon';
-import { CommandToolbar } from './CommandSurface';
-import { ToolbarButton, ToolbarGroup, type ToolbarButtonProps } from './components/toolbar';
+import {
+  CanvasCommand,
+  CanvasCommandToolbar,
+  type CanvasCommandProps,
+  type CanvasCommandToolbarProps,
+} from './CanvasCommandToolbar';
+import { ToolbarGroup } from './components/toolbar';
 import { cn } from './lib/utils';
 
 /**
@@ -12,40 +17,17 @@ import { cn } from './lib/utils';
  * trailing edge. This is what a Resource that carries several commands puts in
  * that slot, trailed by the Resource's kind glyph.
  *
- * **It is `CommandToolbar`, which is what the Command Dock is** — the one
- * neutral command surface, drawn here over a Resource and there over the canvas
- * (`.scratch/command-dock/issues/12`). A Resource's commands and a Space's commands
- * are both chrome, so sharing the component is what makes them one language
- * rather than two stylesheets that agree today. The Resource used to draw its own
- * box on a Graph-coloured band; both are gone.
+ * It is `CanvasCommandToolbar`, the Command Dock's surface, so a Resource's
+ * commands read as the same chrome as the Dock's and an Edge's.
  *
- * The keydown stop lives here rather than on each control. React Flow
- * subscribes its own keys on `document`, and an arrow pressed on the rail must
- * not also reach the canvas — but a control that stopped propagation itself
- * would stop the event before the toolbar root, which is where the roving
- * handler sits, so the arrows would move nothing. Base UI merges its handler
- * with this one, so the composite still sees the key first.
- *
- * The row, the gap, the border and the paper are the shared surface's; **when**
- * the cluster is revealed is the mounting Resource's, which is why `className`
- * arrives from the caller and reaches the surface to be merged rather than
- * replaced.
+ * The mounting Resource decides when the cluster is revealed, so `className` is
+ * merged into the surface rather than replacing it.
  */
-export type ResourceRailActionsProps = ComponentProps<typeof CommandToolbar>;
+export type ResourceRailActionsProps = CanvasCommandToolbarProps;
 
 export const ResourceRailActions = forwardRef<HTMLDivElement, ResourceRailActionsProps>(
-  function ResourceRailActions({ onKeyDown, ...props }, ref) {
-    return (
-      <CommandToolbar
-        ref={ref}
-        data-slot="resource-rail-actions"
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          onKeyDown?.(event);
-        }}
-        {...props}
-      />
-    );
+  function ResourceRailActions(props, ref) {
+    return <CanvasCommandToolbar ref={ref} data-slot="resource-rail-actions" {...props} />;
   },
 );
 
@@ -147,64 +129,22 @@ export const ResourceRailSharedActions = forwardRef<HTMLDivElement, ResourceRail
  * One command on a Resource rail: the same box, the same glyph treatment and the
  * same trailing cluster, whatever the command is (ADR 0073).
  *
- * `variant` and `size` are deliberately not offered. One rail, one control
- * treatment — a command that carried its own box would read as a different kind
- * of resource to the ones it sits beside — and the treatment is `ToolbarButton`'s
- * own default, which is the quiet icon button every command in the Command Dock
- * is drawn as. The Resource used to override it with a hand-drawn 22px box in
- * `canvas-resource.css`, inked from the Resource's own paper because it sat on a
- * Graph-coloured band; the band is gone and so is the override, so "the Resource's
- * commands look like the Dock's" is now one recipe rather than two
- * (`.scratch/command-dock/issues/12`).
+ * It is `CanvasCommand`, which owns the canvas command treatment and stops.
+ * `holdFocus` matters here: the caret may sit in the Resource's content, and
+ * pressing a rail control must not take it.
  *
  * `resource__rail-action` survives as the canvas hook this component needs and not
  * as a second appearance.
- *
- * It also owns the three responsibilities every rail control has to sit on a
- * canvas, so no call site restates them:
- *
- * - `nodrag nopan` keep a press on the control off React Flow's pan and drag.
- * - The click and pointer-down stops keep the same press from reaching the
- *   Resource beneath and selecting it.
- * - `holdFocus` suppresses the pointer default so the press does not take the
- *   caret with it. A rail control sits on the Resource's band while the caret sits
- *   in its content, so activating one mid-edit is also a focus leaving the
- *   writing surface — taking the author's selection with it, for a control
- *   that may well be Cancel.
- *
- * A caller's own handler still runs, after the stop.
  */
-export type ResourceRailActionProps = Omit<
-  ToolbarButtonProps,
-  'variant' | 'size' | 'className' | 'render'
-> & {
-  readonly className?: string;
-  /** Keep the caret where it is when this control is pressed with the pointer. */
-  readonly holdFocus?: boolean;
-};
+export type ResourceRailActionProps = CanvasCommandProps;
 
 export const ResourceRailAction = forwardRef<HTMLButtonElement, ResourceRailActionProps>(
-  function ResourceRailAction(
-    { className, holdFocus = false, onClick, onMouseDown, onPointerDown, ...props },
-    ref,
-  ) {
+  function ResourceRailAction({ className, ...props }, ref) {
     return (
-      <ToolbarButton
+      <CanvasCommand
         ref={ref}
         data-slot="resource-rail-action"
-        className={cn('resource__rail-action nodrag nopan', className)}
-        onClick={(event) => {
-          event.stopPropagation();
-          onClick?.(event);
-        }}
-        onMouseDown={(event) => {
-          if (holdFocus) event.preventDefault();
-          onMouseDown?.(event);
-        }}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onPointerDown?.(event);
-        }}
+        className={cn('resource__rail-action', className)}
         {...props}
       />
     );

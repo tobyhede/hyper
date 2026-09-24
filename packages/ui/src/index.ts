@@ -44,6 +44,8 @@ export type {
   ResourceRailKindActionsProps,
   ResourceRailSharedActionsProps,
 } from './ResourceRailActions';
+export { CanvasCommand, CanvasCommandToolbar } from './CanvasCommandToolbar';
+export type { CanvasCommandProps, CanvasCommandToolbarProps } from './CanvasCommandToolbar';
 export { CommandName, CommandSurface, CommandToolbar } from './CommandSurface';
 export type {
   CommandNameProps,
