@@ -882,7 +882,8 @@ describe('openSpaceSession', () => {
   it('reports a throwing commit as a failure and returns to idle', async () => {
     const control = new MemorySpaceBackendTestControl();
     const backend = new MemorySpaceBackend(SPACE_ID, [loaded], control);
-    const session = openSpaceSession(backend, loaded);
+    const managed = openManagedSpaceSession(backend, loaded);
+    const { session } = managed;
     control.throwNext(new Error('backend exploded'));
 
     session.submit(changedTitle('Typed'));
@@ -902,6 +903,7 @@ describe('openSpaceSession', () => {
 
     // The whole point: the session is idle again, so the registry's barrier and
     // an ordinary retry both get past it.
+    expect(managed.isIdle()).toBe(true);
     control.queueResult({
       kind: 'committed',
       revisions: [{ spaceId: SPACE_ID, revision: 4n }],

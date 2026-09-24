@@ -136,6 +136,19 @@ export const openManagedSpaceSession = (
     changedSinceExport: hasChangedSinceExport(loaded.revision, exportedRevision),
     persistence: { kind: 'settled' },
   };
+  /**
+   * Whether a commit `startCommit` began is awaiting its answer.
+   *
+   * **While it holds, the persistence state is never `failed` or `conflicted`.**
+   * `startCommit` is the only place that sets it, and publishes `pending` in
+   * the same step; the answer clears it before publishing anything. The only
+   * other writers of those two kinds, `failCoordinatedCommit` and
+   * `conflictCoordinatedCommit`, settle the coordination in progress, which
+   * `prepareCoordinatedCommit` refuses to begin while this holds, and no
+   * commit starts while one is in progress. So `failed` and `conflicted` each
+   * imply that nothing is in flight, which is why the guards in `retry` and
+   * `resolveConflict` do not name it.
+   */
   let inFlight = false;
   let coordinating = false;
   let persistencePaused = false;
@@ -353,8 +366,8 @@ export const openManagedSpaceSession = (
         coordinatedRecovery.retry();
         return;
       }
-      if (state.persistence.kind !== 'failed' || inFlight || coordinating || persistencePaused)
-        return;
+      // `failed` implies nothing is in flight: see `inFlight`.
+      if (state.persistence.kind !== 'failed' || coordinating || persistencePaused) return;
       startCommit(state.working, state.acknowledgedRevision);
     },
     acceptRemote: () => {
@@ -389,8 +402,8 @@ export const openManagedSpaceSession = (
         coordinatedRecovery.keepLocal();
         return;
       }
-      if (state.persistence.kind !== 'conflicted' || inFlight || coordinating || persistencePaused)
-        return;
+      // `conflicted` implies nothing is in flight: see `inFlight`.
+      if (state.persistence.kind !== 'conflicted' || coordinating || persistencePaused) return;
       const { current, baseline } = state.persistence;
       const revision = current?.revision ?? state.acknowledgedRevision;
       if (current !== undefined) exportedRevision = current.exportedRevision;
