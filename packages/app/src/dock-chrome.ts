@@ -7,12 +7,8 @@ import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { BrowserLocation } from './browser-location';
 import type { PendingCanvasProjection } from './canvas-projection';
-import type {
-  DockChrome,
-  DockResourceKind,
-  DockResourcesList,
-  SpaceExitReport,
-} from './components/CommandDock';
+import type { DockChrome, DockResourceKind, DockResourcesList } from './components/CommandDock';
+import type { SpaceExitReport } from './components/CommandDockSpaces';
 import { coordinatedGraphDelete } from './coordinated-context-delete';
 import {
   COPY_LINK_ACTION_ID,
