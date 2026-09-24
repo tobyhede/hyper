@@ -7,7 +7,7 @@
 **Status:** resolved
 
 - [x] For each: what it costs (CI jobs and time, code, config) and what it has caught or enabled, with evidence
-- [x] Each has a recorded decision. A removal comes with an ADR superseding the one that adopted it, and a removal ticket
+- [x] Each has a recorded decision. Every removal comes with a removal ticket, and with an ADR superseding the one that adopted it where an ADR did
 
 ## Evidence (gathered 2026-09-24 on `origin/main` at `bde05042`)
 
