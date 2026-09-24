@@ -409,11 +409,12 @@ export function projectGraphEdges(
     const color = colors[edge.graphId] ?? FALLBACK_COLOR;
     const isActiveGraph = edge.graphId === activeGraphId;
     const emphasized = isActiveGraph || activeGraphId === null;
-    const lane = lanes.get(edge.id) ?? { offset: 0, connects: true };
+    const lane = lanes.get(edge.id) ?? { offset: 0, reach: 0, connects: true };
 
     const data: RoutedEdgeData = {
       graphId: edge.graphId,
       laneOffset: lane.offset,
+      laneReach: lane.reach,
       endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
     };
 

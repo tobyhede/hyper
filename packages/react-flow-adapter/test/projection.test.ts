@@ -300,7 +300,8 @@ describe('projectGraphEdges', () => {
   it('carries the Graph it belongs to and no geometry of its own', () => {
     const edges = projectGraphEdges(graphRenderEdges, colors);
 
-    // The Edge data is the Graph id, its lane and its end trim, and no geometry
+    // The Edge data is the Graph id, its lane, how far out its pair's lanes
+    // reach, and its end trim, and no geometry
     // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
     // direction: with nothing active the first keeps the centre and Alt takes
     // the lane below it. Nothing is active, so both connect. It carried an
@@ -311,11 +312,13 @@ describe('projectGraphEdges', () => {
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
       laneOffset: 0,
+      laneReach: GRAPH_LANE_SPACING,
       endTrim: 0,
     });
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
       laneOffset: GRAPH_LANE_SPACING,
+      laneReach: GRAPH_LANE_SPACING,
       endTrim: 0,
     });
   });
