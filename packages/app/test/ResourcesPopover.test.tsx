@@ -783,7 +783,7 @@ describe('ResourcesPopover', () => {
    * Both sources are dragged by the same grip, because both are "put this on
    * the canvas" to the reader — and the tooltip names both gestures on each.
    */
-  it('draws the drag grip on every row, and names both gestures on each', async () => {
+  it('draws the drag grip on every row', async () => {
     render(
       <Fixture
         spaces={[BLUEPRINT]}
@@ -799,7 +799,6 @@ describe('ResourcesPopover', () => {
     for (const row of [resourceRow, spaceRow]) {
       expect(row).toHaveAttribute('draggable', 'true');
       expect(row.querySelector('.resources-popover__row-grip')).not.toBeNull();
-      expect(row.getAttribute('title')).toMatch(/or drag it onto the canvas$/);
     }
   });
 
@@ -984,5 +983,178 @@ describe('ResourcesPopover', () => {
     await openList();
 
     expect(screen.getByRole('button', { name: 'Add Stray to Map' })).toHaveTextContent('Stray');
+  });
+});
+
+describe('ResourcesPopover membership capsules', () => {
+  const OVERVIEW = id('000000000030');
+  const DEEP_DIVE = id('000000000031');
+  const memberships = new Map([
+    [
+      id('000000000001'),
+      [
+        {
+          mapId: OVERVIEW,
+          mapTitle: 'Overview',
+          graphs: [
+            { id: id('000000000032'), title: 'Main', color: '#1f77b4' },
+            { id: id('000000000033'), title: 'Security', color: '#d62728' },
+          ],
+        },
+        { mapId: DEEP_DIVE, mapTitle: 'Deep dive', graphs: [] },
+      ],
+    ],
+  ]);
+
+  const renderOpen = () =>
+    render(
+      <ResourcesPopover
+        resources={RESOURCES}
+        allResources={RESOURCES}
+        open
+        onOpenChange={vi.fn()}
+        onAdd={vi.fn()}
+        onDragStart={vi.fn()}
+        memberships={memberships}
+      />,
+    );
+
+  it('draws one capsule per other Map, holding that Map’s own Graphs', async () => {
+    renderOpen();
+    const row = await screen.findByRole('button', { name: 'Add Zulu to Map' });
+
+    const overview = row.querySelector(`[data-map-id="${OVERVIEW}"]`);
+    const deepDive = row.querySelector(`[data-map-id="${DEEP_DIVE}"]`);
+    expect(overview?.querySelectorAll('[data-graph-id]')).toHaveLength(2);
+    expect(deepDive?.querySelectorAll('[data-graph-id]')).toHaveLength(0);
+  });
+
+  it('says the same membership in words as the row’s description', async () => {
+    renderOpen();
+    const row = await screen.findByRole('button', { name: 'Add Zulu to Map' });
+
+    expect(row).toHaveAccessibleDescription(
+      'Also in Overview: Main, Security; Deep dive: on no Graph',
+    );
+  });
+
+  it('names each Map in the tooltip in the very words of the row’s description', async () => {
+    renderOpen();
+    const row = await screen.findByRole('button', { name: 'Add Zulu to Map' });
+
+    act(() => row.focus());
+    const tooltip = await waitFor(
+      () => {
+        const content = document.querySelector('[data-slot="tooltip-content"]');
+        expect(content).not.toBeNull();
+        return content;
+      },
+      { timeout: 2000 },
+    );
+    expect(tooltip).toHaveTextContent('Overview: Main, Security');
+    expect(tooltip).toHaveTextContent('Deep dive: on no Graph');
+  });
+
+  it('draws at most three capsules and counts the rest, while the description names every Map', async () => {
+    const maps = ['A', 'B', 'C', 'D', 'E'].map((title, index) => ({
+      mapId: id(`00000000004${index}`),
+      mapTitle: title,
+      graphs: [],
+    }));
+    render(
+      <ResourcesPopover
+        resources={RESOURCES}
+        allResources={RESOURCES}
+        open
+        onOpenChange={vi.fn()}
+        onAdd={vi.fn()}
+        onDragStart={vi.fn()}
+        memberships={new Map([[id('000000000001'), maps]])}
+      />,
+    );
+    const row = await screen.findByRole('button', { name: 'Add Zulu to Map' });
+
+    expect(row.querySelectorAll('[data-map-id]')).toHaveLength(3);
+    expect(row.querySelector('[data-more-maps]')).toHaveTextContent('+2');
+    expect(row).toHaveAccessibleDescription(
+      'Also in A: on no Graph; B: on no Graph; C: on no Graph; D: on no Graph; E: on no Graph',
+    );
+  });
+
+  it('draws at most three dots in a capsule and counts the rest, while the description names every Graph', async () => {
+    const graphs = ['G1', 'G2', 'G3', 'G4', 'G5'].map((title, index) => ({
+      id: id(`00000000005${index}`),
+      title,
+      color: '#123456',
+    }));
+    const mapId = id('000000000060');
+    render(
+      <ResourcesPopover
+        resources={RESOURCES}
+        allResources={RESOURCES}
+        open
+        onOpenChange={vi.fn()}
+        onAdd={vi.fn()}
+        onDragStart={vi.fn()}
+        memberships={new Map([[id('000000000001'), [{ mapId, mapTitle: 'A', graphs }]]])}
+      />,
+    );
+    const row = await screen.findByRole('button', { name: 'Add Zulu to Map' });
+
+    const capsule = row.querySelector(`[data-map-id="${mapId}"]`);
+    expect(capsule?.querySelectorAll('[data-graph-id]')).toHaveLength(3);
+    expect(capsule?.querySelector('[data-more-graphs]')).toHaveTextContent('+2');
+    expect(row).toHaveAccessibleDescription('Also in A: G1, G2, G3, G4, G5');
+  });
+
+  it('draws a hollow ring in the capsule of a Map that places the Resource on no Graph', async () => {
+    renderOpen();
+    const row = await screen.findByRole('button', { name: 'Add Zulu to Map' });
+
+    const deepDive = row.querySelector(`[data-map-id="${DEEP_DIVE}"]`);
+    const overview = row.querySelector(`[data-map-id="${OVERVIEW}"]`);
+    expect(deepDive?.querySelectorAll('[data-no-graph]')).toHaveLength(1);
+    expect(overview?.querySelectorAll('[data-no-graph]')).toHaveLength(0);
+  });
+
+  it('draws nothing extra on a Resource no other Map places', async () => {
+    renderOpen();
+    const row = await screen.findByRole('button', { name: 'Add Constraints to Map' });
+
+    expect(row.querySelector('[data-map-id]')).toBeNull();
+    expect(row).not.toHaveAttribute('aria-describedby');
+  });
+});
+
+describe('ResourcesPopover row hint', () => {
+  const hintOf = async (name: string) => {
+    const row = await screen.findByRole('button', { name });
+    act(() => row.focus());
+    return waitFor(
+      () => {
+        const content = document.querySelector('[data-slot="tooltip-content"]');
+        expect(content).not.toBeNull();
+        return content;
+      },
+      { timeout: 2000 },
+    );
+  };
+
+  it.each(['Add Zulu to Map', 'Add Blueprint to Map'])(
+    'says where %s lands, one hint for every row that drags',
+    async (name) => {
+      render(<Fixture spaces={[BLUEPRINT]} onAddSpace={vi.fn()} onSpaceDragStart={vi.fn()} />);
+      await openList();
+      expect(await hintOf(name)).toHaveTextContent(
+        /^Add to Map: click to centre on canvas, drag to place$/,
+      );
+    },
+  );
+
+  it('names no drag on a Space row nothing takes the drag of', async () => {
+    render(<ControlledFixture open spaces={[BLUEPRINT]} onAddSpace={vi.fn()} />);
+    expect(await hintOf('Add Blueprint to Map')).toHaveTextContent(
+      /^Add to Map: click to centre on canvas$/,
+    );
   });
 });

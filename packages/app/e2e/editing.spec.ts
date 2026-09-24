@@ -1886,6 +1886,28 @@ test(
 );
 
 test(
+  'a Resource placed in another Map carries that Map’s capsule in the Resources list',
+  { tag: '@parity:resources-popover-marks-where-else-a-resource-is-placed' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await page.getByRole('button', { name: 'Resources' }).click();
+    // E is outside Collection 1 and placed in Collection 2, on its one Graph.
+    const row = page.getByRole('button', { name: 'Add E to Map' });
+    await expect(row.locator('[data-map-id]')).toHaveCount(1);
+    await expect(row.locator('[data-graph-id]')).toHaveCount(1);
+    await expect(row).toHaveAccessibleDescription('Also in Collection 2: Echo');
+
+    await row.hover();
+    const tooltip = page.locator('[data-slot="tooltip-content"]');
+    await expect(tooltip).toContainText('Collection 2');
+    await expect(tooltip).toContainText('Echo');
+  },
+);
+
+test(
   'a long Resources list scrolls independently on a narrow screen',
   { tag: '@parity:resources-popover-scrolls-a-long-list-on-a-narrow-screen' },
   async ({ page }) => {

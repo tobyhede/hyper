@@ -61,3 +61,15 @@ export function mapResources(space: Space, map: Map): readonly Resource[] {
   const members = Placement.fromMap(map);
   return space.resources.filter((resource) => members.has(resource.id));
 }
+
+/**
+ * The Resources a Map leaves out: the Space's own `Resource` objects whose ids
+ * are not among the Map's position keys, in `space.resources` order.
+ *
+ * The complement of `mapResources`, read off the same membership, so what one
+ * places and the other omits partition the Space's Resources.
+ */
+export function resourcesOutsideMap(space: Space, map: Map): readonly Resource[] {
+  const members = Placement.fromMap(map);
+  return space.resources.filter((resource) => !members.has(resource.id));
+}

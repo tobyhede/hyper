@@ -59,7 +59,8 @@ import {
 } from './entity-actions';
 import { usePresentingKeys } from './presenting-keys';
 import { nextSpaceTitle, nextResourceTitle } from './titles';
-import { mapResources, resolveMap } from './map-resolution';
+import { mapResources, resolveMap, resourcesOutsideMap } from './map-resolution';
+import { otherMapMemberships } from './map-memberships';
 import type { DestinationOpening } from './destination-opening';
 import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre, type VisibleCentre } from './components/CanvasCentre';
@@ -578,11 +579,12 @@ export const createApp = (
     const selectedResourceId = selectedResourceOf(selection);
 
     const resourcesOutsideSelectedMap = useMemo(
-      () =>
-        renderedSpace.resources.filter(
-          (resource) => selectedMap.map.positions[resource.id] === undefined,
-        ),
-      [selectedMap, renderedSpace.resources],
+      () => resourcesOutsideMap(renderedSpace, selectedMap.map),
+      [selectedMap, renderedSpace],
+    );
+    const membershipsOutsideSelectedMap = useMemo(
+      () => otherMapMemberships(renderedSpace, selectedMap.map.id),
+      [renderedSpace, selectedMap],
     );
     const liveProjection = useRenderAdapter((s) => s.projection);
     // Reported by the canvas, which is the only place it can be seen: an
@@ -1618,6 +1620,7 @@ export const createApp = (
                 spaceTitleById,
                 spaces: metaSpaces,
                 onAddSpace: (space) => addSpaceResourceFor(space, centreAnchor()),
+                memberships: membershipsOutsideSelectedMap,
                 disabled: !availability.resourcesView,
                 disclose: discloseResources,
                 revealedResourceId: addressedResourceId,

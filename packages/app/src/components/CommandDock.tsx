@@ -111,6 +111,7 @@ import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import { GRAPH_PALETTE_ENTRIES } from '../colors';
+import type { MapMemberships } from '../map-memberships';
 import {
   DOCK_ALONGS,
   DOCK_EDGES,
@@ -537,6 +538,8 @@ export interface DockResourcesList {
   readonly spaces?: readonly ResourcesPopoverSpace[] | undefined;
   /** Place a Space by authoring the Space Resource that frames it, or answer with a refusal. */
   readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
+  /** Where each listed Resource is placed outside this Map, drawn as a capsule per Map. */
+  readonly memberships?: MapMemberships | undefined;
   /** Returns a refusal that stays on the list, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
   /** A Resource row left the list on a drag; `settle` takes the drop's answer back to that list. */
@@ -1546,6 +1549,7 @@ function ResourcesList({
       spaceTitleById={list.spaceTitleById}
       spaces={list.spaces}
       onAddSpace={list.onAddSpace}
+      memberships={list.memberships}
       onAdd={list.onAdd}
       onDragStart={list.onDragStart}
       onSpaceDragStart={list.onSpaceDragStart}

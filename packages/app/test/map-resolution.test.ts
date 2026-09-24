@@ -6,6 +6,7 @@ import {
   MapNotFoundError,
   requireDefaultMap,
   resolveMap,
+  resourcesOutsideMap,
 } from '../src/map-resolution';
 import { resourceFile } from './resource-files';
 
@@ -86,5 +87,18 @@ describe('mapResources', () => {
     expect(resources.map(({ id }) => id)).toEqual([PLACED, ALSO_PLACED]);
     expect(resources[0]).toBe(space.lookup.resource(PLACED));
     expect(resources[1]).toBe(space.lookup.resource(ALSO_PLACED));
+  });
+});
+
+describe('resourcesOutsideMap', () => {
+  it("answers the Space's own Resources the Map does not place, and no others", () => {
+    const map = resolveMap(space).map;
+    const outside = resourcesOutsideMap(space, map);
+
+    expect(outside.map(({ id }) => id)).toEqual([OMITTED]);
+    expect(outside[0]).toBe(space.lookup.resource(OMITTED));
+    expect([...mapResources(space, map), ...outside].map(({ id }) => id).sort()).toEqual(
+      space.resources.map(({ id }) => id).sort(),
+    );
   });
 });

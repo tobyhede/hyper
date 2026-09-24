@@ -1,4 +1,5 @@
 import {
+  useId,
   useMemo,
   useRef,
   useState,
@@ -11,8 +12,17 @@ import { titleName, type Resource, type ResourceId, type UUID } from '@project/c
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import {
+  describeMembership,
+  ON_NO_GRAPH,
+  membershipsOf,
+  type MembershipGraph,
+  type MapMembership,
+  type MapMemberships,
+} from '../map-memberships';
+import {
   Button,
   Alert,
+  Badge,
   AlertDescription,
   AlertTitle,
   ReferenceIcon,
@@ -30,6 +40,9 @@ import {
   SpaceIcon,
   ToggleGroup,
   ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@project/ui';
 import './resources-popover.css';
 
@@ -204,6 +217,11 @@ export interface ResourcesPopoverProps {
    */
   readonly onSpaceDragStart?:
     ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;
+  /**
+   * Where each Resource is placed outside this Map (`otherMapMemberships`).
+   * Absent, every row draws as placed nowhere else.
+   */
+  readonly memberships?: MapMemberships | undefined;
 }
 
 /**
@@ -223,6 +241,111 @@ const targetTitle = (resource: Resource, titleById: ReadonlyMap<ResourceId, stri
 
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
+const NO_MEMBERSHIPS: MapMemberships = new Map();
+
+/** Long enough that scanning down the list does not flash a tooltip per row. */
+const ROW_TOOLTIP_DELAY_MS = 500;
+
+/** A Graph's colour at row scale, the one mark both the capsule and the tooltip draw. */
+function GraphDot({ graph }: { readonly graph: MembershipGraph }) {
+  return (
+    <span
+      className="size-2 shrink-0 rounded-full ring-1 ring-foreground/20"
+      data-graph-id={graph.id}
+      style={{ background: graph.color }}
+    />
+  );
+}
+
+/** How many capsules a row draws, and how many dots a capsule draws, before a `+N` counts the rest. */
+const MAX_MARKS = 3;
+
+/**
+ * One capsule per other Map that places the Resource, holding the dots of that
+ * Map's Graphs with an Edge at it; a hollow ring where it is on none of them.
+ *
+ * **The capsule is the point, not the dots.** A Graph's colour does not name
+ * it — two Maps' Graphs can share one (`MapMembership` says how) — so a
+ * colour is only readable inside the Map that owns it, and the capsule is that
+ * boundary. Decorative: the row's accessible description carries the same
+ * facts in words (`describeMembership`), and the tooltip names them for a
+ * pointer.
+ * `.scratch/resource-context/issues/01-mark-where-else-a-resource-is-placed.md` holds the comparison that chose it.
+ *
+ * At most `MAX_MARKS` capsules are drawn and a `+N` count stands for the
+ * rest, and likewise at most `MAX_MARKS` dots inside each capsule, so the title
+ * keeps its room however many Maps place the Resource and however many Graphs
+ * stop at it; the tooltip and the description still name every Map and Graph.
+ */
+function MembershipCapsules({ memberships }: { readonly memberships: readonly MapMembership[] }) {
+  if (memberships.length === 0) return null;
+  const hidden = memberships.length - MAX_MARKS;
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1" aria-hidden="true">
+      {memberships.slice(0, MAX_MARKS).map((membership) => (
+        <Badge
+          key={membership.mapId}
+          variant="outline"
+          className="h-4 gap-0.5 bg-card px-1"
+          data-map-id={membership.mapId}
+        >
+          {membership.graphs.length === 0 ? (
+            <span
+              className="size-2 shrink-0 rounded-full ring-1 ring-muted-foreground ring-inset"
+              data-no-graph=""
+            />
+          ) : (
+            <>
+              {membership.graphs.slice(0, MAX_MARKS).map((graph) => (
+                <GraphDot key={graph.id} graph={graph} />
+              ))}
+              {membership.graphs.length > MAX_MARKS ? (
+                <span data-more-graphs="">+{membership.graphs.length - MAX_MARKS}</span>
+              ) : null}
+            </>
+          )}
+        </Badge>
+      ))}
+      {hidden > 0 ? (
+        <Badge variant="outline" className="h-4 bg-card px-1" data-more-maps="">
+          +{hidden}
+        </Badge>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * The same membership in words, Map by Map, with each Graph's own colour beside
+ * its name. Each line's text is `describeMembership`'s sentence for that Map —
+ * the separators are text nodes the flex gap spaces visually — which
+ * `ResourcesPopover.test.tsx` ("names each Map in the tooltip in the very words
+ * of the row’s description") holds. A Map's line wraps, so a Resource on many
+ * Graphs stays inside the tooltip's width; `ladle-e2e/resources-popover.spec.ts`
+ * ("…named on focus and wrapped inside the tooltip") holds that.
+ */
+function MembershipDetail({ memberships }: { readonly memberships: readonly MapMembership[] }) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      {memberships.map((membership) => (
+        <span key={membership.mapId} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span>
+            <strong>{membership.mapTitle}</strong>:
+          </span>{' '}
+          {membership.graphs.length === 0
+            ? ON_NO_GRAPH
+            : membership.graphs.map((graph, index) => (
+                <span key={graph.id} className="flex items-center gap-1">
+                  {index === 0 ? null : ' '}
+                  <GraphDot graph={graph} />
+                  {index === membership.graphs.length - 1 ? graph.title : `${graph.title},`}
+                </span>
+              ))}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 /**
  * The Resource's own Title plus the Title of whatever it refers to, so a reader who
@@ -367,7 +490,9 @@ export function ResourcesPopover({
   spaces = NO_SPACES,
   onAddSpace,
   onSpaceDragStart,
+  memberships = NO_MEMBERSHIPS,
 }: ResourcesPopoverProps) {
+  const describedBy = useId();
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState<readonly ResourcesFilter[]>(ALL_FILTERS);
   const [standing, setStanding] = useState<StandingRefusal>(NOTHING_REFUSED);
@@ -681,7 +806,7 @@ export function ResourcesPopover({
             {visible.map(({ key, name, row }) => {
               // Whether this row drags is decided once, here: a Resource row
               // always does, a Space row only when something takes its drag.
-              // Everything drag-shaped below — `draggable`, the title, both
+              // Everything drag-shaped below — `draggable`, the hint, both
               // drag handlers and the grip — reads this one answer.
               const startDrag =
                 row.kind === 'resource'
@@ -690,6 +815,9 @@ export function ResourcesPopover({
                     ? undefined
                     : (event: DragEvent<HTMLButtonElement>) =>
                         beginSpaceDrag(event, row.space, onSpaceDragStart);
+              const placed =
+                row.kind === 'resource' ? membershipsOf(memberships, row.resource.id) : [];
+              const description = `${describedBy}-${key}`;
               return (
                 <li key={key}>
                   {/* **A row is a button, and the drag is the shortcut.** ADR 0082
@@ -709,84 +837,105 @@ export function ResourcesPopover({
                       What differs is the glyph and which completion the press or
                       the drop spends — not the control, the label or the gestures,
                       because to the reader both are "put this on the canvas". */}
-                  <Button
-                    variant="ghost"
-                    draggable={startDrag !== undefined}
-                    data-resource-id={row.kind === 'resource' ? row.resource.id : undefined}
-                    data-space-id={row.kind === 'space' ? row.space.id : undefined}
-                    aria-current={
-                      row.kind === 'resource' && row.resource.id === revealedResourceId
-                        ? 'true'
-                        : undefined
-                    }
-                    className="resources-popover__row w-full justify-start"
-                    aria-label={`Add ${name} to Map`}
-                    title={
-                      row.kind === 'resource'
-                        ? 'Add to Map, or drag it onto the canvas'
-                        : startDrag === undefined
-                          ? 'Add a Space Resource for this Space to the Map'
-                          : 'Add a Space Resource for this Space to the Map, or drag it onto the canvas'
-                    }
-                    onDragStart={startDrag}
-                    onDragEnd={startDrag === undefined ? undefined : onDragEnd}
-                    onClick={(event) => {
-                      // `detail === 0` is the platform's own answer for a press
-                      // that came from Enter or Space rather than a pointer.
-                      const activation = event.detail === 0 ? 'keyboard' : 'pointer';
-                      if (row.kind === 'resource') {
-                        const next = onAdd(row.resource, activation);
-                        if (next === null && activation === 'keyboard')
-                          filterField.current?.focus();
-                        setRefusal(next);
-                        return;
+                  {/* **Every row names its gesture in a tooltip, and a placed
+                      Resource names where else it lives.** Base UI's tooltip
+                      opens on keyboard focus as well as hover, so the Map and
+                      Graph names reach the reader who cannot hover; it is not
+                      announced, so the same words are the row's description. */}
+                  <Tooltip>
+                    <TooltipTrigger
+                      delay={ROW_TOOLTIP_DELAY_MS}
+                      render={
+                        <Button
+                          variant="ghost"
+                          draggable={startDrag !== undefined}
+                          data-resource-id={row.kind === 'resource' ? row.resource.id : undefined}
+                          data-space-id={row.kind === 'space' ? row.space.id : undefined}
+                          aria-current={
+                            row.kind === 'resource' && row.resource.id === revealedResourceId
+                              ? 'true'
+                              : undefined
+                          }
+                          className="resources-popover__row w-full justify-start"
+                          aria-label={`Add ${name} to Map`}
+                          aria-describedby={placed.length === 0 ? undefined : description}
+                          onDragStart={startDrag}
+                          onDragEnd={startDrag === undefined ? undefined : onDragEnd}
+                          onClick={(event) => {
+                            // `detail === 0` is the platform's own answer for a press
+                            // that came from Enter or Space rather than a pointer.
+                            const activation = event.detail === 0 ? 'keyboard' : 'pointer';
+                            if (row.kind === 'resource') {
+                              const next = onAdd(row.resource, activation);
+                              if (next === null && activation === 'keyboard')
+                                filterField.current?.focus();
+                              setRefusal(next);
+                              return;
+                            }
+                            // **The caret stays put here, where a Resource Add moves it.**
+                            // The rule is the one written above `filterField`, not an
+                            // exception to it: the caret moves because a completed Add
+                            // takes its own row away, and a Space row is not taken
+                            // away. `referenceableSpaces` withholds only the containing
+                            // Space, so a Space stays offered however many Space Resources
+                            // frame it — ADR 0074's convergence, which is why two Resources
+                            // may reference one Space. Moving the caret off a row that
+                            // is still there costs the reader their place in the list
+                            // and claims a completion the surface cannot see.
+                            //
+                            // A refusal still arrives here either way, on the list that
+                            // asked for it.
+                            //
+                            // `settlementFor` takes a rejection arm as well as a
+                            // resolution one: a caller that breaks rather than refusing
+                            // would otherwise leave this row having visibly done
+                            // nothing, with the only trace an unhandled rejection nobody
+                            // reads. `App` reports the same break on its own channel;
+                            // this is what the reader who pressed the row sees — as long
+                            // as they are still reading the list they asked from, which
+                            // the opening this press was made on is what decides. A drop
+                            // spends the same settlement, bound at its dragstart.
+                            if (onAddSpace === undefined) {
+                              setRefusal(null);
+                              return;
+                            }
+                            settlementFor(standing.opening)(onAddSpace(row.space));
+                          }}
+                        />
                       }
-                      // **The caret stays put here, where a Resource Add moves it.**
-                      // The rule is the one written above `filterField`, not an
-                      // exception to it: the caret moves because a completed Add
-                      // takes its own row away, and a Space row is not taken
-                      // away. `referenceableSpaces` withholds only the containing
-                      // Space, so a Space stays offered however many Space Resources
-                      // frame it — ADR 0074's convergence, which is why two Resources
-                      // may reference one Space. Moving the caret off a row that
-                      // is still there costs the reader their place in the list
-                      // and claims a completion the surface cannot see.
-                      //
-                      // A refusal still arrives here either way, on the list that
-                      // asked for it.
-                      //
-                      // `settlementFor` takes a rejection arm as well as a
-                      // resolution one: a caller that breaks rather than refusing
-                      // would otherwise leave this row having visibly done
-                      // nothing, with the only trace an unhandled rejection nobody
-                      // reads. `App` reports the same break on its own channel;
-                      // this is what the reader who pressed the row sees — as long
-                      // as they are still reading the list they asked from, which
-                      // the opening this press was made on is what decides. A drop
-                      // spends the same settlement, bound at its dragstart.
-                      if (onAddSpace === undefined) {
-                        setRefusal(null);
-                        return;
-                      }
-                      settlementFor(standing.opening)(onAddSpace(row.space));
-                    }}
-                  >
-                    {/* Only where a drag actually starts: a grip on a row with
-                        no `onSpaceDragStart` behind it would promise a gesture
-                        that fires no `dragstart` and answers with nothing. */}
-                    {startDrag === undefined ? null : <RowGrip />}
-                    {row.kind === 'resource' ? (
-                      <ResourceKindIcon kind={row.resource.kind} />
-                    ) : (
-                      <SpaceIcon />
-                    )}
-                    {/* The name, not the whole Title: this is a row in a list
-                        being scanned down, and ADR 0083 puts the ladder on the
-                        Resource front rather than on every surface that names one. A
-                        Space's own title is one line under that ADR, so there the
-                        Title and the name are the same string. */}
-                    <span className="resources-popover__row-title">{name}</span>
-                  </Button>
+                    >
+                      {/* Only where a drag actually starts: a grip on a row with
+                          no `onSpaceDragStart` behind it would promise a gesture
+                          that fires no `dragstart` and answers with nothing. */}
+                      {startDrag === undefined ? null : <RowGrip />}
+                      {row.kind === 'resource' ? (
+                        <ResourceKindIcon kind={row.resource.kind} />
+                      ) : (
+                        <SpaceIcon />
+                      )}
+                      {/* The name, not the whole Title: this is a row in a list
+                          being scanned down, and ADR 0083 puts the ladder on the
+                          Resource front rather than on every surface that names one. A
+                          Space's own title is one line under that ADR, so there the
+                          Title and the name are the same string. */}
+                      <span className="resources-popover__row-title">{name}</span>
+                      <MembershipCapsules memberships={placed} />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="flex-col items-start">
+                      {placed.length === 0 ? null : <MembershipDetail memberships={placed} />}
+                      {/* The drag is named only where one starts, for the grip's reason. */}
+                      <span>
+                        {startDrag === undefined
+                          ? 'Add to Map: click to centre on canvas'
+                          : 'Add to Map: click to centre on canvas, drag to place'}
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                  {placed.length === 0 ? null : (
+                    <span id={description} className="sr-only">
+                      {`Also in ${placed.map(describeMembership).join('; ')}`}
+                    </span>
+                  )}
                 </li>
               );
             })}

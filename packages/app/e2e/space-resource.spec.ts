@@ -222,7 +222,8 @@ test(
       .getByRole('button', { name: 'Add Deep dive to Map' })
       .and(list.locator('[data-space-id]'));
     await expect(source).toHaveAttribute('draggable', 'true');
-    await expect(source).toHaveAttribute('title', /or drag it onto the canvas$/);
+    await source.hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('drag to place');
 
     const pane = page.locator('.react-flow__pane');
     const paneBox = await boxOf(pane, 'the React Flow pane');
