@@ -42,6 +42,7 @@ import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
+import { completesResourceDrop, type ResourcesDrag } from './resources-drag';
 import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
@@ -108,12 +109,6 @@ const REFERENCE_OFFSET_RATIO = 0.75;
 /** A request that the Dock disclose its Resources list, naming the addressed Resource that asked. */
 interface ResourcesDisclosure {
   readonly resourceId: ResourceId;
-}
-
-/** A Resource being dragged from the Resources list, and the Map selected when the drag began. */
-interface ResourcesDrag {
-  readonly resourceId: ResourceId;
-  readonly mapId: MapId;
 }
 
 /** The Map and Resource an address last revealed the Resources list for. */
@@ -425,9 +420,15 @@ export const createApp = (
      * picker asking which Space they meant. The Title defaults to the Space's
      * own, which is the name they just read on the row; renaming it afterwards
      * is the ordinary inline Title edit every Resource has (ADR 0083).
+     *
+     * The anchor is the caller's, as `addExistingResource`'s is: a press
+     * passes the visible centre, read at the press.
      */
     const addSpaceResourceFor = useCallback(
-      async (space: { readonly id: UUID; readonly title: string }): Promise<string | null> => {
+      async (
+        space: { readonly id: UUID; readonly title: string },
+        anchor: MapPosition,
+      ): Promise<string | null> => {
         // Answers rather than rejects, for `readReferenceableSpaces`'s reason
         // and one more: the list spends this on a press, so a rejection left to
         // travel is a row that visibly does nothing. `resolveMap` is inside
@@ -440,7 +441,7 @@ export const createApp = (
             containingSpaceId: currentSpace().id,
             mapId: resolved.map.id,
             title: space.title,
-            position: centreAnchor(),
+            position: anchor,
             targetSpaceId: space.id,
           });
           return result.kind === 'refused' ? describeSpaceResourceRefusal(result.refusal) : null;
@@ -451,7 +452,7 @@ export const createApp = (
           return describeSpaceResourceBreak(failure);
         }
       },
-      [centreAnchor],
+      [],
     );
 
     const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
@@ -1196,7 +1197,7 @@ export const createApp = (
       (resourceId: ResourceId, anchor: MapPosition): void => {
         const drag = resourcesDrag.current;
         resourcesDrag.current = null;
-        if (drag?.resourceId !== resourceId || drag.mapId !== selectedMapId) return;
+        if (!completesResourceDrop(drag, resourceId, selectedMapId)) return;
         addExistingResource(resourceId, anchor, false);
       },
       [addExistingResource, selectedMapId],
@@ -1600,7 +1601,7 @@ export const createApp = (
                 allResources: renderedSpace.resources,
                 spaceTitleById,
                 spaces: metaSpaces,
-                onAddSpace: addSpaceResourceFor,
+                onAddSpace: (space) => addSpaceResourceFor(space, centreAnchor()),
                 disabled: !availability.resourcesView,
                 disclose: discloseResources,
                 revealedResourceId: addressedResourceId,
@@ -1613,7 +1614,7 @@ export const createApp = (
                    it returns focus to the trigger the list hangs off. */
                 onAdd: (resource) => addExistingResource(resource.id, centreAnchor(), false),
                 onDragStart: (resourceId) => {
-                  resourcesDrag.current = { resourceId, mapId: selectedMapId };
+                  resourcesDrag.current = { kind: 'resource', resourceId, mapId: selectedMapId };
                 },
                 onDragEnd: () => {
                   resourcesDrag.current = null;

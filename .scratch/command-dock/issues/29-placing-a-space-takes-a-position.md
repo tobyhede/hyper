@@ -1,6 +1,6 @@
 # 29 — Placing a Space takes a position, and a Resources drag says what it carries
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: None.
 
 **What to build:** A prefactor with no behaviour change, so ticket 30 is the easy change. Two seams move:
