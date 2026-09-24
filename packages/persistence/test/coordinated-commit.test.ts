@@ -63,7 +63,7 @@ const setUp = () => {
       replays.push(items);
     },
   );
-  return { commit, managed, replays, evicted };
+  return { commit, managed, replays, evicted, spaces };
 };
 
 describe('CoordinatedCommit', () => {
@@ -116,7 +116,7 @@ describe('CoordinatedCommit', () => {
     }).toThrow('cannot move from enlisted to failed');
   });
 
-  it('unwinds a throw in one move, leaving the participant recoverable once', () => {
+  it('unwinds a throw in one move, leaving the participant one pending recovery at a time', () => {
     const { commit, managed, replays } = setUp();
     commit.enlist();
     commit.prepare();
@@ -135,8 +135,40 @@ describe('CoordinatedCommit', () => {
 
     managed.session.submit(managed.session.getState().working);
     managed.session.submit(managed.session.getState().working);
-    expect(commit.phase).toBe('recovered');
+    expect(commit.phase).toBe('recovering');
     expect(replays).toEqual([[{ kind: 'update', spaceId: SPACE_ID }]]);
+
+    // The replay ended without enlisting, so the same recovery is usable again.
+    commit.resumeRecovery();
+    expect(commit.phase).toBe('unwound');
+    expect(managed.session.getState().persistence.kind).toBe('rejected');
+    managed.session.submit(managed.session.getState().working);
+    expect(replays).toHaveLength(2);
+  });
+
+  it('hands recovery over to the replay that prepares, which then ignores resuming', () => {
+    const { commit, managed, replays, spaces } = setUp();
+    commit.enlist();
+    commit.prepare();
+    commit.publish();
+    commit.settle({ kind: 'retryable-failure', code: 'network' });
+    const successor = new CoordinatedCommit(
+      [{ kind: 'update', spaceId: SPACE_ID, snapshot: renamed }],
+      spaces,
+      () => undefined,
+      commit,
+    );
+
+    managed.session.retry();
+    expect(commit.phase).toBe('recovering');
+    successor.enlist();
+    expect(commit.phase).toBe('recovering');
+    successor.prepare();
+    expect(commit.phase).toBe('recovered');
+    commit.resumeRecovery();
+    expect(commit.phase).toBe('recovered');
+    managed.session.retry();
+    expect(replays).toHaveLength(1);
   });
 
   it('accepts the stored side of a conflict by restoring the Space it names', () => {

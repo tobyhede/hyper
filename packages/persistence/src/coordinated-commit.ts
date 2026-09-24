@@ -7,7 +7,12 @@
  * planned ─enlist→ enlisted ─prepare→ prepared ─publish→ published ─settle→ committed
  *                     │                  │                   │     └─settle→ conflicted ─┐
  *                     │                  │                   │     └─settle→ failed ─────┤
- *                     └──────────────────┴─────unwind────────┴──→ unwound ───────────────┴─recover→ recovered
+ *                     └──────────────────┴─────unwind────────┴──→ unwound ───────────────┤
+ *                                                                                        │
+ *                  ┌──────────────────────────────────acceptRemote───────────────────────┤
+ *                  ↓                                                                     │
+ *              recovered ←─handed over─ recovering ←─retry, keepLocal────────────────────┤
+ *                                           └──────resumeRecovery (never prepared)───────┘
  * ```
  *
  * `enlist` opens a session for each created Space and records every other
@@ -16,7 +21,12 @@
  * the backend's answer; `unwind` answers a throw anywhere between `enlist` and
  * `settle`. From `conflicted`, `failed` or `unwound`, the first of a
  * participant's `retry`, `keepLocal` or `acceptRemote` recovers the commit for
- * every participant, and later ones are ignored. Any other move is refused.
+ * every participant. Accepting the stored side completes at once. A replay is
+ * `recovering` until its own commit has prepared every participant, which
+ * hands the participants' recovery over to it; a replay that ends before that
+ * — a refused read, a throw — returns this commit to the phase it recovered from, so the same
+ * recovery can be asked for again. Requests made while `recovering` or once
+ * `recovered` are ignored. Any other move is refused.
  */
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, ProtocolFault, SpaceChange } from './backend';
@@ -38,6 +48,7 @@ export type CoordinatedCommitPhase =
   | 'conflicted'
   | 'failed'
   | 'unwound'
+  | 'recovering'
   | 'recovered';
 
 const TRANSITIONS = {
@@ -46,9 +57,10 @@ const TRANSITIONS = {
   prepared: ['published', 'unwound'],
   published: ['committed', 'conflicted', 'failed', 'unwound'],
   committed: [],
-  conflicted: ['recovered'],
-  failed: ['recovered'],
-  unwound: ['recovered'],
+  conflicted: ['recovering', 'recovered'],
+  failed: ['recovering', 'recovered'],
+  unwound: ['recovering', 'recovered'],
+  recovering: ['recovered'],
   recovered: [],
 } as const satisfies Record<CoordinatedCommitPhase, readonly CoordinatedCommitPhase[]>;
 
@@ -201,6 +213,21 @@ const protocolFailure = (
 
 const clone = <T>(value: T): T => structuredClone(value);
 
+/** The phases a recovery may begin from, and a replay that never prepared returns to. */
+type RecoverablePhase = 'conflicted' | 'failed' | 'unwound';
+
+const isRecoverable = (phase: CoordinatedCommitPhase): phase is RecoverablePhase =>
+  phase === 'conflicted' || phase === 'failed' || phase === 'unwound';
+
+/**
+ * Ask the registry to replay `items` as a new coordination on behalf of
+ * `predecessor`, whose recovery that coordination takes over once it prepares.
+ */
+export type SpaceResourceReplay = (
+  items: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]],
+  predecessor: CoordinatedCommit,
+) => void;
+
 export class CoordinatedCommit {
   /**
    * The exact request this commit sends, built once before any participant
@@ -212,9 +239,8 @@ export class CoordinatedCommit {
   readonly request: readonly [SpaceChange, ...SpaceChange[]];
   readonly #changes: SpaceResourceChanges;
   readonly #spaces: CoordinationSpaces;
-  readonly #replay: (
-    items: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]],
-  ) => void;
+  readonly #replay: SpaceResourceReplay;
+  readonly #predecessor: CoordinatedCommit | undefined;
   readonly #participants: Map<UUID, ManagedSpaceSession>;
   readonly #begun: ManagedSpaceSession[] = [];
   readonly #recovery: CoordinatedRecovery = {
@@ -231,11 +257,18 @@ export class CoordinatedCommit {
   #phase: CoordinatedCommitPhase = 'planned';
   #baselines: ReadonlyMap<UUID, Baseline> = new Map();
   #conflicts: Conflicts = new Map();
+  /** The phase a pending replay's recovery began from. */
+  #recoveringFrom: RecoverablePhase | undefined;
 
+  /**
+   * `predecessor` is the commit whose recovery this one replays, if any; this
+   * commit takes that recovery over once it has prepared every participant.
+   */
   constructor(
     changes: SpaceResourceChanges,
     spaces: CoordinationSpaces,
-    replay: (items: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]]) => void,
+    replay: SpaceResourceReplay,
+    predecessor?: CoordinatedCommit,
   ) {
     const ids = changes.map(changedSpaceId);
     if (new Set(ids).size !== ids.length) {
@@ -244,6 +277,7 @@ export class CoordinatedCommit {
     this.#changes = changes;
     this.#spaces = spaces;
     this.#replay = replay;
+    this.#predecessor = predecessor;
     this.#participants = new Map(
       changes.flatMap((change): [UUID, ManagedSpaceSession][] => {
         const id = changedSpaceId(change);
@@ -302,6 +336,7 @@ export class CoordinatedCommit {
       );
       this.#begun.push(managed);
     }
+    if (this.#predecessor !== undefined) this.#predecessor.#handOver();
     this.#move('prepared');
   }
 
@@ -345,6 +380,27 @@ export class CoordinatedCommit {
       this.#begun,
       'unwound',
     );
+  }
+
+  /**
+   * The replay this commit's recovery asked for has ended. If it never
+   * prepared, recovery is usable again from the phase it began in; if it did,
+   * the replay owns recovery and this is a no-op.
+   */
+  resumeRecovery(): void {
+    if (this.#phase === 'recovered') return;
+    this.#require('recovering');
+    const from = this.#recoveringFrom;
+    if (from === undefined) throw new Error('A recovering commit lost the phase it began in');
+    this.#recoveringFrom = undefined;
+    // A return to where recovery began, not a move the table orders.
+    this.#phase = from;
+  }
+
+  #handOver(): void {
+    this.#require('recovering');
+    this.#recoveringFrom = undefined;
+    this.#move('recovered');
   }
 
   #move(to: CoordinatedCommitPhase): void {
@@ -440,15 +496,11 @@ export class CoordinatedCommit {
     for (const managed of participants) managed.notifyCoordinatedCommit();
   }
 
-  /** Whether recovery may begin now; the first recovery moves the commit to `recovered`. */
-  #beginRecovery(): boolean {
-    if (!TRANSITIONS[this.#phase].some((next) => next === 'recovered')) return false;
-    this.#move('recovered');
-    return true;
-  }
-
   #recoverByReplay(conflicts: Conflicts): void {
-    if (!this.#beginRecovery()) return;
+    const from = this.#phase;
+    if (!isRecoverable(from)) return;
+    this.#move('recovering');
+    this.#recoveringFrom = from;
     const items = this.#changes.flatMap((change): SpaceResourceReplayItem[] => {
       const decision = replayDecision(change, conflicts);
       if (decision.kind === 'replay') return [decision.item];
@@ -466,11 +518,17 @@ export class CoordinatedCommit {
       ];
     });
     const [first, ...rest] = items;
-    if (first !== undefined) this.#replay([first, ...rest]);
+    if (first === undefined) {
+      this.#recoveringFrom = undefined;
+      this.#move('recovered');
+      return;
+    }
+    this.#replay([first, ...rest], this);
   }
 
   #recoverByAcceptingRemote(): void {
-    if (!this.#beginRecovery()) return;
+    if (!isRecoverable(this.#phase)) return;
+    this.#move('recovered');
     for (const [id, managed] of this.#participants) {
       const accepted = acceptedRemote(id, this.#conflicts, this.#baselines.get(id));
       if (accepted === undefined) {

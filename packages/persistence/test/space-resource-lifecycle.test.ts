@@ -2707,3 +2707,216 @@ describe('Space Resource coordination paths', () => {
     expect(control.requests[1]?.changes).toHaveLength(1);
   });
 });
+
+/** A memory backend whose next aggregate reads can be held or refused. */
+class ScriptedAggregateBackend extends MemorySpaceBackend {
+  loadAggregateCalls = 0;
+  readonly #failures: Error[] = [];
+  readonly #gates: Promise<void>[] = [];
+
+  failNextLoad(error: Error): void {
+    this.#failures.push(error);
+  }
+
+  deferNextLoad(): () => void {
+    const gate = Promise.withResolvers<undefined>();
+    this.#gates.push(gate.promise.then(() => undefined));
+    return () => {
+      gate.resolve(undefined);
+    };
+  }
+
+  override async loadAggregate(): ReturnType<MemorySpaceBackend['loadAggregate']> {
+    this.loadAggregateCalls += 1;
+    await this.#gates.shift();
+    const failure = this.#failures.shift();
+    if (failure !== undefined) throw failure;
+    return super.loadAggregate();
+  }
+}
+
+describe('Space Resource recovery after a replay that never installed', () => {
+  const createInput = {
+    containingSpaceId: META_ID,
+    mapId: META_MAP_ID,
+    title: 'Architecture',
+    position: { x: 240, y: 80 },
+  };
+  const committedBoth = {
+    kind: 'committed',
+    revisions: [
+      { spaceId: META_ID, revision: 4n },
+      { spaceId: TARGET_ID, revision: 0n },
+    ],
+    deletedSpaceIds: [],
+  } as const;
+
+  /** A created Space Resource whose coordinated commit answered `first`. */
+  const failedCreate = async (
+    first: Parameters<MemorySpaceBackendTestControl['queueResult']>[0],
+  ) => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult(first);
+    const backend = new ScriptedAggregateBackend(
+      META_ID,
+      [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+      control,
+    );
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: metaSnapshot, revision: 3n, exportedRevision: null });
+    await registry
+      .spaceResources(
+        idSource([
+          TARGET_ID,
+          TARGET_RESOURCE_ID,
+          TARGET_MAP_ID,
+          TARGET_GRAPH_ID,
+          SPACE_RESOURCE_ID,
+        ]),
+      )
+      .create(createInput);
+    await registry.waitUntilRetirable(META_ID);
+    const target = registry.session(TARGET_ID);
+    if (target === undefined) throw new Error('target session was not installed');
+    return { control, backend, registry, meta, target };
+  };
+
+  it('retries every participant together once the backend is back, after a replay read failed', async () => {
+    const { control, backend, registry, meta, target } = await failedCreate({
+      kind: 'retryable-failure',
+      code: 'network',
+    });
+    expect(meta.getState().persistence.kind).toBe('failed');
+
+    backend.failNextLoad(new Error('aggregate read refused'));
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(1);
+    expect(meta.getState().persistence.kind).toBe('failed');
+    expect(target.getState().persistence.kind).toBe('failed');
+    expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Later local title' },
+    });
+    control.queueResult(committedBoth);
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(3);
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, snapshot: { document: { title: 'Later local title' } } },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    expect(meta.getState()).toMatchObject({
+      acknowledgedRevision: 4n,
+      persistence: { kind: 'settled' },
+    });
+    expect(target.getState().persistence.kind).toBe('settled');
+    expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
+  });
+
+  it('keeps local work across every participant once the backend is back, after a replay read failed', async () => {
+    const { control, backend, registry, meta, target } = await failedCreate({
+      kind: 'conflict',
+      conflicts: [
+        {
+          spaceId: META_ID,
+          current: { snapshot: metaSnapshot, revision: 9n, exportedRevision: null },
+        },
+      ],
+    });
+    expect(meta.getState().persistence.kind).toBe('conflicted');
+
+    backend.failNextLoad(new Error('aggregate read refused'));
+    target.resolveConflict(target.getState().working);
+    await registry.waitUntilRetirable(TARGET_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(1);
+    expect(meta.getState().persistence.kind).toBe('conflicted');
+    expect(target.getState().persistence.kind).toBe('conflicted');
+
+    control.queueResult({
+      kind: 'committed',
+      revisions: [
+        { spaceId: META_ID, revision: 10n },
+        { spaceId: TARGET_ID, revision: 0n },
+      ],
+      deletedSpaceIds: [],
+    });
+    target.resolveConflict(target.getState().working);
+    await registry.waitUntilRetirable(TARGET_ID);
+
+    expect(control.requests).toHaveLength(2);
+    expect(control.requests[1]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID, expectedRevision: 9n },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    expect(meta.getState()).toMatchObject({
+      acknowledgedRevision: 10n,
+      persistence: { kind: 'settled' },
+    });
+    expect(target.getState().persistence.kind).toBe('settled');
+  });
+
+  it('replays once for recovery requests pressed while a replay is still reading', async () => {
+    const { control, backend, registry, meta, target } = await failedCreate({
+      kind: 'retryable-failure',
+      code: 'network',
+    });
+    const releaseRead = backend.deferNextLoad();
+    control.queueResult(committedBoth);
+
+    meta.retry();
+    meta.retry();
+    target.retry();
+    releaseRead();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState().persistence.kind).toBe('settled');
+    expect(target.getState().persistence.kind).toBe('settled');
+  });
+
+  it('answers a replay that throws before installing by leaving recovery usable and the barrier down', async () => {
+    const { control, backend, registry, target } = await failedCreate({
+      kind: 'retryable-failure',
+      code: 'network',
+    });
+    // A failed participant is idle, so its owner may retire it; the replay
+    // then names a Space with no live session and throws before enlisting.
+    expect(registry.release(META_ID)).toBe(true);
+
+    target.retry();
+    await registry.waitUntilRetirable(TARGET_ID);
+
+    expect(backend.loadAggregateCalls).toBe(2);
+    expect(control.requests).toHaveLength(1);
+    expect(target.getState().persistence.kind).toBe('failed');
+
+    // The barrier is down: an ordinary Space opened now commits on its own.
+    const reopened = registry.open({
+      snapshot: metaSnapshot,
+      revision: 3n,
+      exportedRevision: null,
+    });
+    reopened.submit({
+      ...metaSnapshot,
+      document: { ...metaSnapshot.document, title: 'After the thrown replay' },
+    });
+    await registry.waitUntilRetirable(META_ID);
+    expect(reopened.getState().persistence.kind).toBe('settled');
+    expect(control.requests).toHaveLength(2);
+
+    // And the stranded participant's recovery is asked for again, not ignored.
+    target.retry();
+    await registry.waitUntilRetirable(TARGET_ID);
+    expect(backend.loadAggregateCalls).toBe(3);
+  });
+});

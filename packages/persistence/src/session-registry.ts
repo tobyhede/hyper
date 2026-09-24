@@ -4,6 +4,7 @@ import {
   CoordinatedCommit,
   planReplay,
   type CoordinationSpaces,
+  type SpaceResourceReplay,
   type SpaceResourceReplayItem,
 } from './coordinated-commit';
 import { createWorkingSpaceLoader } from './working-space';
@@ -296,6 +297,7 @@ class LiveSpaces implements CoordinationSpaces {
 
   evict(spaceId: UUID): void {
     this.#sessions.delete(spaceId);
+    this.#uncommittedCreates.delete(spaceId);
   }
 }
 
@@ -346,9 +348,7 @@ interface Coordinator {
   readonly backend: SpaceBackend;
   readonly spaces: LiveSpaces;
   readonly turns: CoordinationTurns;
-  readonly replay: (
-    items: readonly [SpaceResourceReplayItem, ...SpaceResourceReplayItem[]],
-  ) => void;
+  readonly replay: SpaceResourceReplay;
 }
 
 /**
@@ -414,11 +414,17 @@ const commitPlan = async <C>(
   aggregate: LoadedAggregate,
   planned: Extract<SpaceResourcePlanOutcome<C>, { kind: 'changes' }>,
   installed: (result: SpaceResourceCoordinationResult<C>) => void,
-  isRetry: boolean,
+  predecessor: CoordinatedCommit | undefined,
 ): Promise<void> => {
   for (const space of planned.open) coordinator.spaces.open(space);
-  const commit = new CoordinatedCommit(planned.changes, coordinator.spaces, coordinator.replay);
-  const refusal = isRetry ? undefined : precheckRefusal(commit.request, aggregate);
+  const commit = new CoordinatedCommit(
+    planned.changes,
+    coordinator.spaces,
+    coordinator.replay,
+    predecessor,
+  );
+  const refusal =
+    predecessor === undefined ? precheckRefusal(commit.request, aggregate) : undefined;
   if (refusal !== undefined) {
     installed(refusal);
     return;
@@ -441,9 +447,13 @@ const commitPlan = async <C>(
  * One coordination turn: wait for the turn, raise the barrier and wait for
  * whatever is already in flight, then prepare, read, plan and commit.
  *
- * `isRetry` marks a recovery replaying a change set an earlier turn already
- * decided and pre-checked. It still reads the aggregate — the barrier still
- * waits, and a read failure still refuses — but skips the pre-check: against
+ * `predecessor` marks a recovery replaying a change set an earlier turn
+ * already decided and pre-checked. Its commit takes the predecessor's
+ * recovery over once it prepares; a turn that ends before that — a refused
+ * read, a throw — resumes the predecessor's recovery before the turn is
+ * finished, so the participants can ask for it again. It still reads the
+ * aggregate — the barrier still waits, and a read failure still refuses — but
+ * skips the pre-check: against
  * `MemorySpaceBackend`'s test double a queued `conflict` or failure installs
  * the acknowledged revision onto the session but not into the stored copy, so
  * the pre-check would answer a conflict of its own. The repository
@@ -453,7 +463,7 @@ const runCoordination = async <P, C>(
   coordinator: Coordinator,
   operation: SpaceResourceCoordinatedOperation<P, C>,
   installed: (result: SpaceResourceCoordinationResult<C>) => void,
-  isRetry: boolean,
+  predecessor: CoordinatedCommit | undefined,
 ): Promise<void> => {
   const turn = coordinator.turns.claim();
   await turn.ready;
@@ -482,11 +492,15 @@ const runCoordination = async <P, C>(
       installed(planned);
       return;
     }
-    await commitPlan(coordinator, read.aggregate, planned, installed, isRetry);
+    await commitPlan(coordinator, read.aggregate, planned, installed, predecessor);
   } finally {
-    turn.finish(() => {
-      coordinator.spaces.lowerBarrier();
-    });
+    try {
+      predecessor?.resumeRecovery();
+    } finally {
+      turn.finish(() => {
+        coordinator.spaces.lowerBarrier();
+      });
+    }
   }
 };
 
@@ -498,10 +512,10 @@ const runCoordination = async <P, C>(
 const coordinate = async <P, C>(
   coordinator: Coordinator,
   operation: SpaceResourceCoordinatedOperation<P, C>,
-  isRetry = false,
+  predecessor?: CoordinatedCommit,
 ): Promise<SpaceResourceCoordinationResult<C>> => {
   const installation = Promise.withResolvers<SpaceResourceCoordinationResult<C>>();
-  void runCoordination(coordinator, operation, installation.resolve, isRetry).catch(
+  void runCoordination(coordinator, operation, installation.resolve, predecessor).catch(
     installation.reject,
   );
   return installation.promise;
@@ -670,8 +684,11 @@ export function createSpaceSessionRegistry(
     backend,
     spaces,
     turns,
-    replay: (items) => {
-      void coordinate(coordinator, replayOperation(items), true);
+    // A replay's answer has no caller to reach: its participants' own states
+    // carry the outcome, and one that never installed has resumed the
+    // predecessor's recovery, so a rejection is settled here.
+    replay: (items, predecessor) => {
+      void coordinate(coordinator, replayOperation(items), predecessor).catch(() => undefined);
     },
   };
 
