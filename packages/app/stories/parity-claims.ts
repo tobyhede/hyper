@@ -564,74 +564,76 @@ export const parityClaims: readonly ParityClaim[] = [
       'The positioned strategy settles before Playwright can deterministically observe the pending frame. Covered by packages/app/test/placement-rendering.test.tsx.',
   },
   {
-    id: 'selected-edge-controls-offer-edit-and-delete',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'Closed',
-    claim: 'A selected Edge offers Edit and Delete, and only Edit opens the endpoint editor.',
-  },
-  {
-    id: 'selected-edge-edit-trigger-reads-as-open',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'EndpointEditor',
+    id: 'edge-toolbar-offers-edit-title-and-delete',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
     claim:
-      "A selected Edge's Edit trigger reads as open — the quiet secondary fill — while its editor is open.",
+      'Selecting an Active Graph Edge reveals one toolbar named for the Edge — its Title, or From → To — holding Edit, the Title eye and Delete as one `Edge commands` group; Delete removes the Edge from its Graph.',
   },
   {
-    id: 'selected-edge-editor-shows-both-endpoints',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'EndpointEditor',
+    id: 'edge-toolbar-reveals-on-hover',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
     claim:
-      'The endpoint editor names both endpoints, completes on the Resource chosen, and dismisses its list then itself on Escape.',
+      "Hovering an Active Graph Edge's line reveals its toolbar, which stays while the pointer crosses onto it and goes a moment after the pointer leaves.",
   },
   {
-    id: 'selected-edge-endpoint-refusal-disables-its-choice',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'DisabledChoice',
-    claim: 'An endpoint the Edit would refuse stays listed, disabled, with its reason.',
-    applicationEvidence:
-      'The fixture Graphs are lines, so no endpoint choice reachable in E2E is refused. Covered instead by packages/app/test/SelectedEdgeControls.test.tsx.',
+    id: 'edge-title-is-written-in-place',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "An Edge's Title is written in a field drawn where it stands, begun from Edit or by pressing the revealed Title; Enter completes and Escape cancels, each returning focus to the Title.",
   },
   {
-    id: 'selected-edge-from-refusal-is-field-local',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'FromRefusal',
-    claim: 'A refused From endpoint marks only that Field and carries its own description.',
-    // A reconnection refusal is only reachable once the Space has moved under an
-    // *open* editor: eligibility disables every ineligible row when the editor
-    // opens, and Base UI will not let a disabled row be chosen, so no browser
-    // gesture can propose one. Producing the race through the app would mean
-    // driving a second writer against the same session mid-interaction, which
-    // no `packages/app/e2e` fixture exposes and which would prove the harness
-    // rather than the surface. The *mapping* it exercises is covered in the node
-    // environment by `packages/app/test/authoring-refusal.test.ts`, exhaustively
-    // over all eighteen codes, and the surface's own placement by
-    // `packages/app/test/SelectedEdgeControls.test.tsx`.
-    applicationEvidence:
-      'Unreachable through any browser gesture — the editor snapshots eligibility on opening and disables every refusable row, so a refused reconnection needs the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts (the exhaustive placement) and packages/app/test/SelectedEdgeControls.test.tsx (the Field it lands on).',
+    id: 'edge-title-hides-at-rest',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "The eye hides an Edge's Title at rest and shows it again: a hidden Title draws nothing at rest and is drawn dimmed while its Edge is revealed, and the eye is disabled on an Edge with no Title and while a Title is being written, where pressing it leaves the caret in the field.",
   },
   {
-    id: 'selected-edge-to-refusal-is-field-local',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'ToRefusal',
-    claim: 'A refused To endpoint marks only that Field, leaving From valid.',
-    applicationEvidence:
-      'Unreachable for the same reason as the From refusal above — a refused reconnection needs the Space to change under an open editor, which no browser gesture produces. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
+    id: 'edge-title-fits-its-edge',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'At rest a Title is fitted inside its Edge and ellipsed, with the whole Title in its tooltip, and draws nothing on an Edge too short to hold one; while its Edge is revealed it is drawn whole up to the ceiling, raised over the Resources. Only the Active Graph draws Titles.',
   },
   {
-    id: 'selected-edge-stale-reconnection-uses-the-form-channel',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'ReconnectionRefusal',
-    claim: 'A stale Map, Graph or Edge reports on the form channel and marks neither Field.',
-    applicationEvidence:
-      'The remaining stale conditions need the Space to change under an open editor. Covered instead by packages/app/test/authoring-refusal.test.ts and packages/app/test/SelectedEdgeControls.test.tsx.',
+    id: 'edge-toolbar-keyboard',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Enter on a focused Active Graph Edge moves focus into its toolbar, the arrows rove within it and Escape returns to the Edge; Tab from the Edge goes to the next Edge.',
   },
   {
-    id: 'selected-edge-deletion-refusal-stays-on-its-controls',
-    storyFile: 'components/selected-edge-controls.stories.tsx',
-    storyExport: 'DeletionRefusal',
-    claim: 'A refused Delete stays on the surviving selected-Edge controls.',
+    id: 'edge-toolbar-reports-refusals',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Refused',
+    claim:
+      "A refused Edge command is reported in one alert region under the Edge's toolbar, and goes when the selection moves.",
     applicationEvidence:
-      'The stale deletion refusal requires the Space to change under an open control. Covered instead by packages/app/test/SelectedEdgeControls.test.tsx.',
+      'Unreachable through any browser gesture — the eye is disabled without a Title, a single-line field cannot hold a line break, and a stale Edge needs the Space to change under a drawn toolbar. Covered instead by packages/app/test/edge-authoring-react.test.tsx (the region, its placement and its clearing) and packages/app/test/edge-authoring.test.ts (the retained refusal).',
+  },
+  {
+    id: 'resource-connect-draws-an-edge-from-the-keyboard',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "Connect to Resource in a Resource's Actions menu opens the Resources list over the Map's placed Resources bar this one, with its search and kind filters and no Spaces source; choosing one by keyboard draws an Edge in the Active Graph and lands focus on it, selected, so Enter reaches its toolbar.",
+  },
+  {
+    id: 'resource-connect-keeps-refused-targets',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'A Resource the Edge could not be drawn to stays in the Connect list, unavailable and reachable, with the reason the pointer gesture would meet; Escape closes the list back to the Resource’s Actions trigger.',
+  },
+  {
+    id: 'resource-connect-creates-a-new-resource',
+    storyFile: 'space/edge-toolbar.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "The Connect list's last row creates a Markdown Resource beside this one and draws the Edge to it, landing focus on that Edge.",
   },
   {
     id: 'canvas-zoom-control-operates-the-real-viewport',

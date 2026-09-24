@@ -143,7 +143,18 @@ describe('laneBezier', () => {
 
   it('is React Flow’s own bezier for a lone Edge', () => {
     const [path, labelX, labelY] = getBezierPath(level);
-    expect(laneBezier(level, 0)).toEqual({ path, labelX, labelY });
+    expect(laneBezier(level, 0)).toEqual({ path, labelX, labelY, span: 300 });
+  });
+
+  /** A midpoint Title is fitted against the span, so it must be the line as drawn. */
+  it('spans the drawn line end to end, after the lane and the trim', () => {
+    expect(laneBezier(level, GRAPH_LANE_SPACING).span).toBeCloseTo(300);
+    expect(laneBezier(stacked, 0).span).toBeCloseTo(Math.hypot(40, 200));
+
+    const [x1, y1, , , , , x2, y2] = numbers(laneBezier(level, 8, DETACHED_END_TRIM).path);
+    expect(laneBezier(level, 8, DETACHED_END_TRIM).span).toBeCloseTo(
+      Math.hypot(x2! - x1!, y2! - y1!),
+    );
   });
 
   /**

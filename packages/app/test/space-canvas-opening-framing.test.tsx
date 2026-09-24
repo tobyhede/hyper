@@ -50,16 +50,17 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     subscribe: () => () => undefined,
     eligibility: () => ({
       kind: 'refused',
-      refusal: { code: 'map-required', operation: 'reconnected-edge' },
+      refusal: { code: 'map-required', operation: 'deleted-edge' },
     }),
     accepts: () => false,
     beginPointerConnect: () => undefined,
     connect: () => undefined,
     createConnectedResource: () => undefined,
+    connectTo: () => ({ kind: 'unavailable' }),
     endPointerDrag: () => undefined,
-    beginPointerReconnect: () => undefined,
-    openEdgeEditor: () => undefined,
-    reconnect: () => false,
+    beginTitleEdit: () => undefined,
+    completeTitle: () => null,
+    setTitleHidden: () => false,
     deleteEdge: () => false,
     cancelDraft: () => undefined,
     dispose: () => undefined,
@@ -242,6 +243,7 @@ describe('opening framing on a mounted canvas', () => {
               }}
               reportEmbeddedMapEditing={() => undefined}
               spaceTitle="Test Space"
+              mapId={MAP_ID}
               mapTitle="Test Map"
               graphs={[]}
               colorByGraphId={{}}
@@ -376,6 +378,7 @@ describe('opening framing on a mounted canvas', () => {
             }}
             reportEmbeddedMapEditing={() => undefined}
             spaceTitle="Test Space"
+            mapId={MAP_ID}
             mapTitle="Test Map"
             graphs={[]}
             colorByGraphId={{}}

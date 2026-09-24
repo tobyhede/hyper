@@ -129,7 +129,7 @@ const NONE: ContinuationState = { pending: null };
  * A canvas subject stays owed. A continuation is published synchronously with
  * the Edit that produced it, and the projection carrying that Edit's result
  * arrives a strategy later — so a Resource just created, just added to the Map
- * or an Edge just reconnected resolves to nothing *yet*, and spending it on
+ * or an Edge just drawn resolves to nothing *yet*, and spending it on
  * the canvas fallback lands focus anywhere but the resource the author made.
  * A chrome control and the canvas itself fall through: both are drawn already,
  * so unresolvable means gone, and a wait with no end is worse than a fallback.

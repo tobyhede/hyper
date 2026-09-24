@@ -7,6 +7,10 @@ import {
   type Map,
   type MapId,
   type MapPosition,
+  type ResourcePlacement,
+  COLLAPSED_RESOURCE_SIZE,
+  EDGE_TITLE_ONE_LINE,
+  isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
   type SpaceSnapshot,
@@ -37,47 +41,47 @@ import { updatePositionedMap } from './snapshot';
 import { nextResourceTitle, nextGraphTitle, nextMapTitle } from './titles';
 import { requireDefaultMap, resolveMap } from './map-resolution';
 
-/** Which end of an Edge a reconnection replaces. */
-export type EdgeEndpoint = 'from' | 'to';
-
 /**
  * An Edge gesture stated in domain terms, before anything has been authored.
  *
  * The shape both halves of an Edge interaction are asked in: the live preview
  * asks {@link SpaceAuthoring.edgeEligibility} and the release asks `complete`,
  * over one value the surface built once. A gesture the canvas offers therefore
- * cannot be one the Edit silently drops — and, because a proposal carries
- * reconnect's *original* Edge and the endpoint being replaced, returning that
- * endpoint to the Resource it came from is eligible rather than looking like an
- * Edge that already exists.
+ * cannot be one the Edit silently drops.
  *
  * `create-and-connect` names no target because the Option/Alt empty drop has
  * none yet (ADR 0033); the Resource it would author is minted by the Edit.
  */
 export type EdgeProposal =
   | { readonly kind: 'connect'; readonly from: ResourceId; readonly to: ResourceId }
-  | { readonly kind: 'create-and-connect'; readonly from: ResourceId }
-  | {
-      readonly kind: 'reconnect';
-      readonly graphId: GraphId;
-      readonly edge: GraphEdge;
-      readonly endpoint: EdgeEndpoint;
-      readonly resourceId: ResourceId;
-    };
+  | { readonly kind: 'create-and-connect'; readonly from: ResourceId };
 
-/**
- * Whether a proposal may be offered, and why not.
- *
- * Two states rather than three: a reconnect returning an endpoint to its
- * original Resource is **eligible**, and settles as `unchanged` when it completes.
- * Eligibility answers what the author may still do, not what the Edit will
- * turn out to have changed — a picker that greyed out the Resource an endpoint
- * already names would show the current value as the one forbidden choice.
- */
+/** Whether a proposal may be offered, and why not. */
 export type EdgeEligibility =
   { readonly kind: 'eligible' } | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
 
 const ELIGIBLE = { kind: 'eligible' } as const;
+
+/**
+ * The room left between a Resource and one created beside it: half a collapsed
+ * width, so the Edge joining them is long enough to carry a Title.
+ */
+const BESIDE_GAP = COLLAPSED_RESOURCE_SIZE.width / 2;
+
+/**
+ * Right of the source, tops level: past its drawn rect so an Open source does
+ * not cover it, and past the collapsed right edge so Closing the source
+ * reclaims width only (ADR 0093).
+ */
+const besideSource = (at: ResourcePlacement): MapPosition => ({
+  x:
+    at.x +
+    (at.open
+      ? Math.max(COLLAPSED_RESOURCE_SIZE.width, at.openSize.width)
+      : COLLAPSED_RESOURCE_SIZE.width) +
+    BESIDE_GAP,
+  y: at.y,
+});
 
 const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
   const loaded = loadSpaceSnapshot(snapshot);
@@ -139,7 +143,8 @@ export type AuthoringCompletion =
   | {
       readonly kind: 'create-and-connect';
       readonly from: ResourceId;
-      readonly position: MapPosition;
+      /** An Option/Alt drop point, kept exactly, or `beside-source` for the Connect list's New Resource row. */
+      readonly position: MapPosition | 'beside-source';
     }
   /** Add Resource: a detached Markdown Resource at the visible centre, neutrally titled. */
   | { readonly kind: 'created-resource'; readonly anchor: MapPosition }
@@ -191,14 +196,21 @@ export type AuthoringCompletion =
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
   | { readonly kind: 'deleted-graph'; readonly graphId: GraphId }
+  | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge }
+  /**
+   * Set or clear an Edge's Title. The Edge is found by its endpoints; any Title
+   * `edge` carries may be stale and is never read. `title` is the untrimmed
+   * draft; empty clears the Title and `titleHidden`.
+   */
   | {
-      readonly kind: 'reconnected-edge';
+      readonly kind: 'titled-edge';
       readonly graphId: GraphId;
       readonly edge: GraphEdge;
-      readonly endpoint: EdgeEndpoint;
-      readonly resourceId: ResourceId;
+      readonly title: string;
     }
-  | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge };
+  /** Hide or show an Edge's Title at rest. */
+  | { readonly kind: 'hid-edge-title'; readonly graphId: GraphId; readonly edge: GraphEdge }
+  | { readonly kind: 'showed-edge-title'; readonly graphId: GraphId; readonly edge: GraphEdge };
 
 /**
  * What a semantic operation answers: the three outcomes every one of them
@@ -236,8 +248,10 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
   | { readonly kind: 'deleted-graph' }
-  | { readonly kind: 'reconnected-edge' }
   | { readonly kind: 'deleted-edge' }
+  | { readonly kind: 'titled-edge' }
+  | { readonly kind: 'hid-edge-title' }
+  | { readonly kind: 'showed-edge-title' }
 >['kind'];
 
 /**
@@ -292,7 +306,11 @@ export type AuthoringRefusal =
   | { readonly code: 'edge-not-found' }
   | { readonly code: 'edge-resource-outside-map' }
   | { readonly code: 'edge-already-exists' }
-  | { readonly code: 'map-active-graph-required' };
+  | { readonly code: 'map-active-graph-required' }
+  // Spelt from `@project/core`'s constant, which the Edge schema raises too.
+  | { readonly code: typeof EDGE_TITLE_ONE_LINE }
+  /** Hide a Title the Edge does not have. */
+  | { readonly code: 'edge-title-required' };
 
 /**
  * The published state: what the collaborators say, plus the one fact only
@@ -334,11 +352,9 @@ export interface SpaceAuthoring {
   /**
    * Whether an Edge gesture may be offered as resources stand, and why not.
    *
-   * The one eligibility query for every Edge path — connect, create-and-connect
-   * and reconnect — asked by the live preview, by React Flow's
-   * `isValidConnection` during a drag, and by a picker deciding which Resources to
-   * disable. Completion validates the same proposal again, because the Space can
-   * change while a preview or a picker is open.
+   * The one eligibility query for both Edge paths, asked by the live preview and
+   * by React Flow's `isValidConnection`. Completion validates again, because the
+   * Space can change while a preview or a picker is open.
    */
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
@@ -524,67 +540,48 @@ const sameEdge = (left: GraphEdge, right: GraphEdge): boolean =>
 const indexOfEdge = (edges: readonly GraphEdge[], edge: GraphEdge): number =>
   edges.findIndex((candidate) => sameEdge(candidate, edge));
 
-/** What a reconnected endpoint settles to, before anything has been written. */
-type ReconnectOutcome =
+/** The Edits that write an Edge's Title or whether it shows. */
+type EdgeTitleCompletion = Extract<
+  AuthoringCompletion,
+  { readonly kind: 'titled-edge' | 'hid-edge-title' | 'showed-edge-title' }
+>;
+
+/** What an Edge Title Edit settles the stored Edge to, before anything has been written. */
+type EdgeTitleOutcome =
   | { readonly kind: 'edge'; readonly edge: GraphEdge }
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'refused'; readonly refusal: AuthoringRefusal };
 
 /**
- * The one reconnection rule, asked by eligibility and again by the Edit.
- *
- * Both callers need the same four answers and one of them needs the resulting
- * Edge, so this returns it rather than a boolean the completion would have to
- * recompute. The order is deliberate: **unchanged is decided before
- * membership**, because a Resource that is already this Edge's endpoint is by
- * definition in this Map, and asking the placement first would refuse a
- * dragged endpoint dropped back where it started on a Map still arranging.
+ * Reads `stored`, never the completion's possibly stale `edge`. Answers are built
+ * from the endpoints so a cleared key is absent, not `undefined` or `false`.
  */
-const reconnectOutcome = (
-  graph: Graph | undefined,
-  proposal: {
-    readonly graphId: GraphId;
-    readonly edge: GraphEdge;
-    readonly endpoint: EdgeEndpoint;
-    readonly resourceId: ResourceId;
-  },
-  placement: Placement,
-  /**
-   * Whether the Space still holds the Resource, which the placement does not answer.
-   *
-   * The same second condition `connectable` applies to a connection, and the
-   * asymmetry was a latent trap rather than a nicety: an Edge naming a Resource the
-   * Space has lost derives a snapshot intake rejects, and this derivation answers
-   * an unloadable Space by *throwing* — putting a defect in front of the author
-   * as their own mistake. A picker open across such a deletion is the way there.
-   */
-  holdsResource: (resourceId: ResourceId) => boolean,
-): ReconnectOutcome => {
-  // Ownership, not existence: a Graph a *second* Map owns exists and is
-  // still not one this Edit may write (ADR 0040).
-  if (graph === undefined) {
-    return { kind: 'refused', refusal: { code: 'graph-not-owned' } };
+const edgeTitleOutcome = (stored: GraphEdge, completion: EdgeTitleCompletion): EdgeTitleOutcome => {
+  const untitled: GraphEdge = { from: stored.from, to: stored.to };
+  if (completion.kind === 'hid-edge-title') {
+    if (stored.title === undefined) {
+      return { kind: 'refused', refusal: { code: 'edge-title-required' } };
+    }
+    if (stored.titleHidden === true) return UNCHANGED;
+    return { kind: 'edge', edge: { ...untitled, title: stored.title, titleHidden: true } };
   }
-  if (indexOfEdge(graph.edges, proposal.edge) === -1) {
-    return {
-      kind: 'refused',
-      refusal: { code: 'edge-not-found' },
-    };
+  if (completion.kind === 'showed-edge-title') {
+    if (stored.title === undefined || stored.titleHidden === undefined) return UNCHANGED;
+    return { kind: 'edge', edge: { ...untitled, title: stored.title } };
   }
-  const reconnected: GraphEdge =
-    proposal.endpoint === 'from'
-      ? { from: proposal.resourceId, to: proposal.edge.to }
-      : { from: proposal.edge.from, to: proposal.resourceId };
-  if (sameEdge(proposal.edge, reconnected)) return UNCHANGED;
-  // Checked together and after `unchanged`, so an endpoint returned to its own
-  // Resource is still eligible on a Map that has not finished arranging.
-  if (!placement.has(proposal.resourceId) || !holdsResource(proposal.resourceId)) {
-    return { kind: 'refused', refusal: { code: 'edge-resource-outside-map' } };
+  // Before the trim, so a line break at either end is refused, not trimmed.
+  if (!isOneLineEdgeTitle(completion.title)) {
+    return { kind: 'refused', refusal: { code: EDGE_TITLE_ONE_LINE } };
   }
-  if (indexOfEdge(graph.edges, reconnected) !== -1) {
-    return { kind: 'refused', refusal: { code: 'edge-already-exists' } };
+  const title = trimmedNonBlankTitle(completion.title);
+  // Clearing drops `titleHidden` too: the schema refuses it without a Title.
+  if (title === null) {
+    return stored.title === undefined ? UNCHANGED : { kind: 'edge', edge: untitled };
   }
-  return { kind: 'edge', edge: reconnected };
+  if (title === stored.title) return UNCHANGED;
+  const titled: GraphEdge = { ...untitled, title };
+  if (stored.titleHidden === true) titled.titleHidden = true;
+  return { kind: 'edge', edge: titled };
 };
 
 /**
@@ -897,33 +894,16 @@ export function createSpaceAuthoring({
   /**
    * The one eligibility answer for every Edge gesture.
    *
-   * Each branch asks exactly the rule its completion asks — `connectRefusal`
-   * for the two connecting gestures, `reconnectOutcome` for the third — so the
-   * preview and the Edit cannot drift apart. Nothing here mints, installs or
-   * publishes: it is a question about the Space as it stands, and the Space can
-   * still change before the completion asks again.
+   * Asks `connectRefusal`, the completion's own rule, so preview and Edit
+   * cannot drift. Pure: it mints, installs and publishes nothing.
    */
   const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
-    // The selected Map's own placement, read fresh — both branches ask
-    // about a Graph `ownedGraph`/`targetGraph` already scope to that Map,
-    // so this is the one Map either question could mean.
-    const members = mapPlacement();
-    if (proposal.kind !== 'reconnect') {
-      const refusal = connectRefusal(
-        proposal.from,
-        proposal.kind === 'connect' ? proposal.to : null,
-        members,
-      );
-      return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
-    }
-    const outcome = reconnectOutcome(
-      ownedGraph(proposal.graphId),
-      proposal,
-      members,
-      (resourceId) =>
-        session.getState().working.resources.some((resource) => resource.id === resourceId),
+    const refusal = connectRefusal(
+      proposal.from,
+      proposal.kind === 'connect' ? proposal.to : null,
+      mapPlacement(),
     );
-    return outcome.kind === 'refused' ? outcome : ELIGIBLE;
+    return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
   };
 
   /**
@@ -1275,14 +1255,20 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'create-and-connect') {
       const refusal = connectRefusal(completion.from, null, placement);
       if (refusal !== null) return refuse(refusal);
-      // The drop point is aimed at, so it is kept exactly: the gesture only
-      // offers an empty-canvas release, and stepping off it would move the Resource
-      // away from where the author watched the preview sit.
-      const created = createResource(
-        { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
-        completion.position,
-        'exact',
-      );
+      // A drop point is kept exactly, where the preview sat; beside-source has
+      // no aimed point, so it avoids overlap. `connectRefusal` already proved the
+      // source placed; the refusal below only satisfies the compiler.
+      const source = placement.get(completion.from);
+      if (source === undefined) return refuse({ code: 'edge-resource-outside-map' });
+      const newResource: ResourceDocument = {
+        title: nextResourceTitle(snapshot),
+        kind: 'markdown',
+        body: '',
+      };
+      const created =
+        completion.position === 'beside-source'
+          ? createResource(newResource, besideSource(source), 'avoidingOverlap')
+          : createResource(newResource, completion.position, 'exact');
       if ('kind' in created) return created;
       createdResourceId = created.id;
       connection = { from: completion.from, to: created.id };
@@ -1389,8 +1375,10 @@ export function createSpaceAuthoring({
       completion.kind === 'renamed-graph' ||
       completion.kind === 'recolored-graph' ||
       completion.kind === 'deleted-graph' ||
-      completion.kind === 'reconnected-edge' ||
-      completion.kind === 'deleted-edge'
+      completion.kind === 'deleted-edge' ||
+      completion.kind === 'titled-edge' ||
+      completion.kind === 'hid-edge-title' ||
+      completion.kind === 'showed-edge-title'
     ) {
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === completion.graphId);
       const graph = ownedGraphs[graphIndex];
@@ -1436,16 +1424,14 @@ export function createSpaceAuthoring({
           }),
         );
       } else {
-        // The same rule `edgeEligibility` offered the gesture under, asked again
-        // because the Space can have changed since — and answering with the
-        // resulting Edge rather than a boolean, so there is nothing to rederive.
-        const outcome = reconnectOutcome(graph, completion, placement, (resourceId) =>
-          snapshot.resources.some((resource) => resource.id === resourceId),
-        );
-        if (outcome.kind !== 'edge') return outcome;
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
-        // In place, so reconnecting does not reorder a Graph's Edges — that order
-        // is what a branching Resource's moves are offered in (ADR 0024).
+        const stored = graph.edges[edgeIndex];
+        if (stored === undefined) {
+          return refuse({ code: 'edge-not-found' });
+        }
+        const outcome = edgeTitleOutcome(stored, completion);
+        if (outcome.kind !== 'edge') return outcome;
+        // In place: Graph order is what a fork's choices are offered in (ADR 0024).
         writeGraphs(
           replacing({
             ...graph,

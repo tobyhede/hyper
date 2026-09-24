@@ -803,8 +803,7 @@ describe('Space app failure reporting', () => {
  * The Resources list is a Popover, so these assert that it is *mounted* rather than
  * that it is visible: Base UI's Positioner holds a popup at `opacity: 0` until
  * it has measured its anchor, and jsdom answers every measurement with zeroes,
- * so `toBeVisible` can never pass here for any popover in the tree
- * (`SelectedEdgeControls`' own tests read the same way). The visibility half of
+ * so `toBeVisible` can never pass here for any popover in the tree. The visibility half of
  * this evidence is the Ladle behaviour test, which runs in a real browser.
  */
 describe('Space app Resources list', () => {

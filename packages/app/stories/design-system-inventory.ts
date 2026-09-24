@@ -60,9 +60,19 @@ export const uncataloguedComponents = [
       'Without a consumer since ADR 0089 retired the two Resource creation panes: `ResourcePane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Resource deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
   },
   {
+    module: 'packages/ui/src/ResourceSearchCombobox.tsx',
+    reason:
+      "Without a consumer since `.scratch/edge-toolbar/issues/05` removed reconnection: the selected Edge's endpoint editor was its only caller, and moving an Edge's end is now Delete and draw again. `issues/07` chose a Connect target on `ResourcesPopover` instead, and the note `CLAUDE.md` keeps about this component now says it has no consumer and that `ResourcesPopover` is how a Resource is chosen; whether to retire it is a foundation decision rather than a surface one.",
+  },
+  {
+    module: 'packages/ui/src/components/combobox.tsx',
+    reason:
+      'The shadcn registry primitive `ResourceSearchCombobox` composes, and without a consumer for the same reason, since that component has none.',
+  },
+  {
     module: 'packages/ui/src/Select.tsx',
     reason:
-      'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Resource or a Space is `ResourceSearchCombobox`\'s and `ChoiceMenu`\'s everywhere that remains.',
+      'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Map or a Graph is `ChoiceMenu`\'s and choosing a Resource is the Resources list\'s everywhere that remains.',
   },
   {
     module: 'packages/ui/src/components/empty.tsx',
@@ -138,7 +148,7 @@ export const handRolledStyles = [
   {
     block: 'edge-control-layer',
     reason:
-      "Placement and pointer-events for React Flow's `EdgeLabelRenderer` portal, whose layer disables pointer events by default. `SelectedEdgeControls` owns how those controls look.",
+      "Placement, pointer-events and the raised stacking of an Active Graph Edge's Title and toolbar in React Flow's `EdgeLabelRenderer` portal, whose layer disables pointer events by default and is drawn beneath the Resources. `EdgeTitle` and `EdgeToolbar` own how the chrome looks.",
   },
   {
     block: 'canvas-refusal',

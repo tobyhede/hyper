@@ -5,6 +5,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { composeApp } from '../src/compose-app';
 import {
+  connectChoices,
   dropTarget,
   newResourceDrop,
   type ConnectionGesture,
@@ -116,20 +117,11 @@ describe('the one Edge interaction draft', () => {
     edges.beginPointerConnect(RESOURCE_A);
     expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: RESOURCE_A });
 
-    edges.openEdgeEditor(SUBJECT);
-    expect(edges.getState().draft).toEqual({
-      kind: 'keyboard-reconnect',
-      graphId: GRAPH_ID,
-      edge: EDGE,
-    });
+    edges.beginTitleEdit(SUBJECT);
+    expect(edges.getState().draft).toEqual({ kind: 'title', graphId: GRAPH_ID, edge: EDGE });
 
-    edges.beginPointerReconnect(SUBJECT, 'to');
-    expect(edges.getState().draft).toEqual({
-      kind: 'pointer-reconnect',
-      graphId: GRAPH_ID,
-      edge: EDGE,
-      endpoint: 'to',
-    });
+    edges.beginPointerConnect(RESOURCE_B);
+    expect(edges.getState().draft).toEqual({ kind: 'pointer-connect', from: RESOURCE_B });
   });
 
   it('cancels the draft and asks for focus back at the Resource the author was on', () => {
@@ -150,17 +142,15 @@ describe('the one Edge interaction draft', () => {
     expect(continuation.getState().pending).toBeNull();
   });
 
-  it('returns focus to the unmoved endpoint when a reconnection is cancelled', () => {
+  /** The Title field returns focus itself; a continuation would then steal it. */
+  it('cancels a Title draft without asking for focus anywhere', () => {
     const { edges, continuation } = open();
-    edges.beginPointerReconnect(SUBJECT, 'to');
+    edges.beginTitleEdit(SUBJECT);
 
     edges.cancelDraft();
 
-    expect(continuation.getState().pending).toEqual({
-      target: { kind: 'resource', resourceId: RESOURCE_A },
-      select: false,
-      then: 'focus',
-    });
+    expect(edges.getState().draft).toBeNull();
+    expect(continuation.getState().pending).toBeNull();
   });
 });
 
@@ -169,97 +159,96 @@ describe('the one Edge interaction draft', () => {
  * the author can correct what they aimed at, rather than being returned to the
  * start of the gesture with a sentence and nothing to act on.
  */
-describe('a refused proposal', () => {
-  it('keeps the draft, and retains the refusal on the endpoint editor channel', () => {
-    const { edges } = open();
-    edges.openEdgeEditor(SUBJECT);
+describe('writing an Edge Title', () => {
+  it('selects the Edge it begins on, because the draft stands only while it is selected', () => {
+    const { edges, adapter } = open();
 
-    // A Resource outside this Map, so the rule is Authoring's rather than this
-    // module's — which is the point: the identity comes from where the rule is,
-    // and the endpoint beside it is the only context presentation needs to mark
-    // one Field and not the other.
-    expect(edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'))).toBe(
-      false,
-    );
+    edges.beginTitleEdit(SUBJECT);
 
-    expect(edges.getState().draft).toEqual({
-      kind: 'keyboard-reconnect',
-      graphId: GRAPH_ID,
-      edge: EDGE,
-    });
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
+    expect(edges.getState().draft).toEqual({ kind: 'title', ...SUBJECT });
+  });
+
+  it('titles the Edge in place and settles the draft', () => {
+    const { edges, session } = open();
+    edges.beginTitleEdit(SUBJECT);
+
+    expect(edges.completeTitle('  depends on ')).toBeNull();
+
+    expect(edges.getState().draft).toBeNull();
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { ...EDGE, title: 'depends on' },
+    ]);
+  });
+
+  /**
+   * A refusal is not a cancellation. The draft and its refusal stand together so
+   * the field stays open with its reason, rather than closing on a sentence the
+   * author has nothing left to act on.
+   */
+  it('keeps the draft on a refused Title and retains the refusal for its Edge', () => {
+    const { edges, session } = open();
+    const before = session.getState().working;
+    edges.beginTitleEdit(SUBJECT);
+
+    expect(edges.completeTitle('two\nlines')).toEqual({ code: 'edge-title-one-line' });
+
+    expect(session.getState().working).toBe(before);
+    expect(edges.getState().draft).toEqual({ kind: 'title', ...SUBJECT });
     expect(edges.getState().refusal).toEqual({
-      kind: 'reconnection',
-      endpoint: 'to',
-      refusal: { code: 'edge-resource-outside-map' },
+      kind: 'command',
+      ...SUBJECT,
+      refusal: { code: 'edge-title-one-line' },
     });
   });
 
   it('clears the refusal when the next draft begins', () => {
     const { edges } = open();
-    edges.openEdgeEditor(SUBJECT);
-    edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
+    edges.beginTitleEdit(SUBJECT);
+    edges.completeTitle('two\nlines');
 
     edges.beginPointerConnect(RESOURCE_A);
 
     expect(edges.getState().refusal).toBeNull();
   });
 
-  it('settles the draft when a reconnection completes', () => {
+  it('completes nothing when no Title is being written', () => {
     const { edges, session } = open();
-    edges.openEdgeEditor(SUBJECT);
+    const before = session.getState().working;
 
-    expect(edges.reconnect('to', RESOURCE_C)).toBe(true);
+    expect(edges.completeTitle('depends on')).toBeNull();
 
-    expect(edges.getState().draft).toBeNull();
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('hides and shows a Title, selecting the Edge it acts on', () => {
+    const { edges, session, adapter } = open();
+    edges.beginTitleEdit(SUBJECT);
+    edges.completeTitle('depends on');
+    adapter.getState().clearSelection();
+
+    expect(edges.setTitleHidden(SUBJECT, true)).toBe(true);
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
-      { from: RESOURCE_A, to: RESOURCE_C },
+      { ...EDGE, title: 'depends on', titleHidden: true },
+    ]);
+
+    expect(edges.setTitleHidden(SUBJECT, false)).toBe(true);
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { ...EDGE, title: 'depends on' },
     ]);
   });
 
-  /**
-   * The matrix's focus for a completed Reconnect is the **edited Edge**, and
-   * nothing else can supply it: the selection still names the *old* `{from,to}`,
-   * so the reconnected Edge draws unselected and the surface that held focus —
-   * the popover, on the keyboard path — unmounts with it, leaving focus on
-   * `body`. Re-selecting is what keeps the author on the Edge they just edited.
-   */
-  it('keeps the reconnected Edge selected and asks for focus on it', () => {
-    const { edges, adapter, continuation } = open();
-    adapter.getState().selectEdge(SUBJECT);
-    edges.openEdgeEditor(SUBJECT);
+  it('retains a refused hide for the Edge that was asked', () => {
+    const { edges } = open();
 
-    expect(edges.reconnect('to', RESOURCE_C)).toBe(true);
+    expect(edges.setTitleHidden(SUBJECT, true)).toBe(false);
 
-    const reconnected = { graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: RESOURCE_C } };
-    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...reconnected });
-    expect(continuation.getState().pending).toEqual({
-      target: { kind: 'edge', ...reconnected },
-      select: false,
-      then: 'focus',
+    expect(edges.getState().refusal).toEqual({
+      kind: 'command',
+      ...SUBJECT,
+      refusal: { code: 'edge-title-required' },
     });
-  });
-
-  /** An endpoint dragged back where it started edited nothing, so nothing moves. */
-  it('leaves the selection alone when a reconnection changes nothing', () => {
-    const { edges, adapter } = open();
-    adapter.getState().selectEdge(SUBJECT);
-    edges.openEdgeEditor(SUBJECT);
-
-    expect(edges.reconnect('to', RESOURCE_B)).toBe(true);
-
-    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
-  });
-
-  /** An endpoint dragged back where it started is the author's ordinary close. */
-  it('settles the draft when a reconnection is unchanged', () => {
-    const { edges, session } = open();
-    const before = session.getState().working;
-    edges.openEdgeEditor(SUBJECT);
-
-    expect(edges.reconnect('to', RESOURCE_B)).toBe(true);
-
-    expect(edges.getState().draft).toBeNull();
-    expect(session.getState().working).toBe(before);
   });
 });
 
@@ -277,26 +266,28 @@ describe('deleting an Edge', () => {
     });
   });
 
-  it('keeps the Edge and retains the refusal on the selected-Edge channel', () => {
+  it("keeps the Edge and retains the refusal on its toolbar's channel", () => {
     const { edges, session } = open();
     const before = session.getState().working;
 
     expect(edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE })).toBe(false);
 
     expect(session.getState().working).toBe(before);
-    // Deletion's own channel, not the canvas announcement: the Edge survives its
-    // refusal, so the controls that asked are still on screen.
+    // The toolbar's own channel, not the canvas announcement: the Edge survives
+    // its refusal, so the toolbar that asked is still on screen.
     expect(edges.getState().refusal).toEqual({
-      kind: 'deletion',
+      kind: 'command',
+      graphId: UNKNOWN_GRAPH,
+      edge: EDGE,
       refusal: { code: 'graph-not-owned' },
     });
   });
 
   /**
-   * A refused Delete is about the Edge that was selected when it was made, and
-   * the controls that carry it are drawn from the *current* selection.
+   * A refused command is about the Edge that was selected when it was made, and
+   * the toolbar that carries it is revealed by the *current* selection.
    */
-  it('drops a retained deletion refusal when the selection moves to another Edge', () => {
+  it('drops a retained command refusal when the selection moves to another Edge', () => {
     const { edges, adapter } = open();
     edges.deleteEdge({ graphId: UNKNOWN_GRAPH, edge: EDGE });
     expect(edges.getState().refusal).not.toBeNull();
@@ -325,7 +316,7 @@ describe('draft invalidation', () => {
 
   it('cancels the draft when the Active Graph changes', () => {
     const { edges, navigation } = open();
-    edges.openEdgeEditor(SUBJECT);
+    edges.beginTitleEdit(SUBJECT);
 
     navigation.activateGraph(OTHER_GRAPH_ID);
 
@@ -334,7 +325,7 @@ describe('draft invalidation', () => {
 
   it('cancels the draft when the Edge it is about disappears', () => {
     const { edges, authoring } = open();
-    edges.openEdgeEditor(SUBJECT);
+    edges.beginTitleEdit(SUBJECT);
 
     authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
 
@@ -357,7 +348,7 @@ describe('draft invalidation', () => {
       spaceSession: session,
       selection: MAP_ID,
     });
-    edges.openEdgeEditor(SUBJECT);
+    edges.beginTitleEdit(SUBJECT);
     // Force the conflict the accept resolves.
     authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
@@ -413,20 +404,26 @@ describe('draft invalidation', () => {
 
   it('leaves the draft standing through an unrelated completed Edit', () => {
     const { edges, authoring } = open();
-    edges.openEdgeEditor(SUBJECT);
+    edges.beginTitleEdit(SUBJECT);
 
     authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
 
-    expect(edges.getState().draft).toEqual({
-      kind: 'keyboard-reconnect',
-      graphId: GRAPH_ID,
-      edge: EDGE,
-    });
+    expect(edges.getState().draft).toEqual({ kind: 'title', graphId: GRAPH_ID, edge: EDGE });
+  });
+
+  /** The Title draft stands on the Selected Edge, so clearing the selection ends it too. */
+  it('cancels a Title draft when the selection is cleared', () => {
+    const { edges, adapter } = open();
+    edges.beginTitleEdit(SUBJECT);
+
+    adapter.getState().clearSelection();
+
+    expect(edges.getState().draft).toBeNull();
   });
 
   it('cancels the draft when the canvas selects a different Edge', () => {
     const { edges, adapter } = open();
-    edges.openEdgeEditor(SUBJECT);
+    edges.beginTitleEdit(SUBJECT);
 
     adapter.getState().selectEdge({ graphId: OTHER_GRAPH_ID, edge: EDGE });
 
@@ -555,33 +552,170 @@ describe('completing a pointer connection', () => {
 
   /**
    * A refusal normally retains its draft so the author can correct the proposal.
-   * A finished drag is the exception, and it applies to both pointer drafts: the
-   * gesture is over, there is no surface left to correct, and the sentence is the
-   * whole of what the author is told — so the draft goes and the message stays.
+   * A finished drag is the exception: the gesture is over, there is no surface
+   * left to correct, and the sentence is the whole of what the author is told —
+   * so the draft goes and the message stays.
    */
-  it.each([
-    [
-      'a connection',
-      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerConnect(RESOURCE_A),
-    ],
-    [
-      'a reconnection',
-      (edges: ReturnType<typeof open>['edges']) => edges.beginPointerReconnect(SUBJECT, 'to'),
-    ],
-  ])('keeps a refusal %s produced after the drag ends', (_name, begin) => {
+  it('keeps a refusal a connection produced after the drag ends', () => {
     const { edges } = open();
-    begin(edges);
-    // Both refuse for a reason Space Authoring owns: A→B already exists in this
-    // Graph, and this Resource is not in this Map.
-    if (edges.getState().draft?.kind === 'pointer-connect')
-      edges.connect(RESOURCE_A, RESOURCE_B, null);
-    else edges.reconnect('to', uuidSchema.parse('00000000-0000-4000-8000-0000000000aa'));
+    edges.beginPointerConnect(RESOURCE_A);
+    // A→B already exists in this Graph, a rule Space Authoring owns.
+    edges.connect(RESOURCE_A, RESOURCE_B, null);
     expect(edges.getState().refusal).not.toBeNull();
 
     edges.endPointerDrag();
 
     expect(edges.getState().draft).toBeNull();
     expect(edges.getState().refusal).not.toBeNull();
+  });
+});
+
+describe('what the Connect list offers', () => {
+  const placed = [{ id: RESOURCE_A }, { id: RESOURCE_B }, { id: RESOURCE_C }];
+
+  it('offers every placed Resource bar the source, asking each the pointer rule', () => {
+    const { edges } = open();
+
+    expect(connectChoices(RESOURCE_A, placed, edges.eligibility)).toEqual({
+      // A→B is already in the Active Graph: kept, with its reason.
+      resources: [
+        { resource: { id: RESOURCE_B }, refusal: { code: 'edge-already-exists' } },
+        { resource: { id: RESOURCE_C }, refusal: null },
+      ],
+      newResource: null,
+    });
+  });
+
+  it('refuses every row, New Resource included, from a source the Map does not place', () => {
+    const { edges } = open(positionedSnapshot, OTHER_MAP_ID);
+
+    const choices = connectChoices(RESOURCE_A, placed, edges.eligibility);
+
+    expect(choices.newResource).toEqual({ code: 'edge-resource-outside-map' });
+    for (const { refusal } of choices.resources) {
+      expect(refusal).toEqual({ code: 'edge-resource-outside-map' });
+    }
+  });
+
+  it('answers the same eligibility a drag asks, row for row', () => {
+    const { edges } = open();
+    const ids = fc.constantFrom(RESOURCE_A, RESOURCE_B, RESOURCE_C);
+    fc.assert(
+      fc.property(ids, (from) => {
+        const choices = connectChoices(from, placed, edges.eligibility);
+        expect(choices.resources.map(({ resource }) => resource.id)).not.toContain(from);
+        for (const { resource, refusal } of choices.resources) {
+          expect(refusal === null).toBe(edges.accepts({ kind: 'connect', from, to: resource.id }));
+        }
+        expect(choices.newResource === null).toBe(
+          edges.accepts({ kind: 'create-and-connect', from }),
+        );
+      }),
+    );
+  });
+});
+
+describe('connecting from the Connect list', () => {
+  it('draws the Edge in the Active Graph and continues at it, selected and focused', () => {
+    const { edges, session, continuation } = open();
+
+    expect(
+      edges.connectTo(RESOURCE_B, { kind: 'resource', resourceId: RESOURCE_C }, PROJECTED),
+    ).toEqual({ kind: 'completed', resourceId: RESOURCE_C });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      EDGE,
+      { from: RESOURCE_B, to: RESOURCE_C },
+    ]);
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'edge', graphId: GRAPH_ID, edge: { from: RESOURCE_B, to: RESOURCE_C } },
+      select: true,
+      then: 'focus',
+    });
+  });
+
+  it('answers a refusal to the list that asked, and leaves nothing on the canvas', () => {
+    const { edges, session, continuation } = open();
+    const before = session.getState().working;
+
+    expect(
+      edges.connectTo(RESOURCE_A, { kind: 'resource', resourceId: RESOURCE_B }, PROJECTED),
+    ).toEqual({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
+
+    expect(session.getState().working).toBe(before);
+    expect(continuation.getState().pending).toBeNull();
+    // The list owns the sentence; the canvas announcement is a finished drag's.
+    expect(edges.getState().refusal).toBeNull();
+  });
+
+  it('authors a Markdown Resource beside the source and continues at the Edge to it', () => {
+    const { edges, session, continuation } = open();
+
+    expect(edges.connectTo(RESOURCE_A, { kind: 'new-resource' }, PROJECTED)).toEqual({
+      kind: 'completed',
+      resourceId: MINTED,
+    });
+
+    const working = session.getState().working;
+    expect(working.resources.find((resource) => resource.id === MINTED)?.document.kind).toBe(
+      'markdown',
+    );
+    expect(graphsOf(working)[0]?.edges).toEqual([EDGE, { from: RESOURCE_A, to: MINTED }]);
+    // Right of the source, past its collapsed width and half as much again,
+    // top edges level.
+    expect(working.document.maps?.[0]?.positions[MINTED]).toEqual({
+      x: 10 + RESOURCE_SIZE.width * 1.5,
+      y: 20,
+      open: false,
+    });
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'edge', graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: MINTED } },
+      select: true,
+      then: 'focus',
+    });
+  });
+
+  it('places the new Resource past an Open source, where its Close reclaims the width alone', () => {
+    const openSource: SpaceSnapshot = {
+      ...positionedSnapshot,
+      document: {
+        ...positionedSnapshot.document,
+        maps: (positionedSnapshot.document.maps ?? []).map((map) =>
+          map.id === MAP_ID
+            ? {
+                ...map,
+                positions: {
+                  ...map.positions,
+                  [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+                },
+              }
+            : map,
+        ),
+      },
+    };
+    const { edges, session } = open(openSource);
+
+    edges.connectTo(RESOURCE_A, { kind: 'new-resource' }, PROJECTED);
+
+    expect(session.getState().working.document.maps?.[0]?.positions[MINTED]).toEqual({
+      x: 10 + 560 + RESOURCE_SIZE.width / 2,
+      y: 20,
+      open: false,
+    });
+  });
+
+  it('draws into whichever Graph is Active and continues at the Edge there', () => {
+    const { edges, session, navigation, continuation } = open();
+    navigation.activateGraph(OTHER_GRAPH_ID);
+
+    edges.connectTo(RESOURCE_A, { kind: 'resource', resourceId: RESOURCE_B }, PROJECTED);
+
+    expect(graphsOf(session.getState().working)[1]?.edges).toEqual([EDGE]);
+    expect(continuation.getState().pending?.target).toEqual({
+      kind: 'edge',
+      graphId: OTHER_GRAPH_ID,
+      edge: EDGE,
+    });
   });
 });
 

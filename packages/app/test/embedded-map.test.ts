@@ -410,7 +410,6 @@ describe('an embedded production projection', () => {
       source: embeddedNodeId(PARENT, A),
       target: embeddedNodeId(PARENT, B),
       selectable: false,
-      reconnectable: false,
     });
     expect(drawn.nodes[0]?.handles).toEqual(projected.nodes[0]?.handles);
     expect(drawn.edges[0]?.sourceHandle).toBe(projected.edges[0]?.sourceHandle);

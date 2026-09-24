@@ -232,7 +232,7 @@ export function useDockChrome(
     void entityActions(entity)
       .flat()
       .find((action) => action.id === id)
-      ?.onSelect();
+      ?.onSelect(null);
   };
   /** A Graph Edit from the cluster, reported on `graph-edit`. */
   const runGraphEdit = (operation: () => AuthoringResult): void => {

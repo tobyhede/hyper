@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   describeAuthoringRefusal,
+  describeConnectChoice,
   describePersistenceFailure,
   describeStoredSpaceRefusal,
   type PersistenceFailure,
-  presentEdgeDeletionRefusal,
-  presentEdgeEndpointRefusal,
 } from '../src/authoring-refusal';
 import type { AuthoringRefusal } from '../src/space-authoring';
 
@@ -42,6 +41,8 @@ const EVERY_REFUSAL = {
   'edge-already-exists': { code: 'edge-already-exists' },
   'map-active-graph-required': { code: 'map-active-graph-required' },
   'space-resource-deletion-unsupported': { code: 'space-resource-deletion-unsupported' },
+  'edge-title-one-line': { code: 'edge-title-one-line' },
+  'edge-title-required': { code: 'edge-title-required' },
 } as const satisfies Readonly<Record<AuthoringRefusal['code'], AuthoringRefusal>>;
 
 describe('describeAuthoringRefusal', () => {
@@ -53,54 +54,13 @@ describe('describeAuthoringRefusal', () => {
       }),
     ).toBe('This view could not place its Resources: No position for Resource A');
   });
-});
 
-/**
- * The three Edge surfaces, and the one rule that separates their channels.
- *
- * A refusal a different endpoint or target could correct belongs on the field
- * that names it; a stale Map, Graph or Edge belongs on the form, because no
- * choice in the picker would answer it (ADR 0057).
- */
-const CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE = [
-  'edge-resource-outside-map',
-  'edge-already-exists',
-] as const;
-
-/** The same list, widened once so the loops below can ask it about any code. */
-const correctable: ReadonlySet<string> = new Set(CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE);
-
-describe('presentEdgeEndpointRefusal', () => {
-  it.each(['from', 'to'] as const)('marks only the attempted %s Field invalid', (endpoint) => {
-    for (const code of CORRECTABLE_BY_CHOOSING_ANOTHER_RESOURCE) {
-      const refusal = EVERY_REFUSAL[code];
-      expect(presentEdgeEndpointRefusal(refusal, endpoint)).toEqual({
-        fields: { [endpoint]: describeAuthoringRefusal(refusal) },
-      });
-    }
-  });
-
-  it.each(['from', 'to'] as const)(
-    'leaves both Fields valid for a refusal no endpoint can correct, from %s',
-    (endpoint) => {
-      for (const [code, refusal] of Object.entries(EVERY_REFUSAL)) {
-        if (correctable.has(code)) continue;
-        const errors = presentEdgeEndpointRefusal(refusal, endpoint);
-        expect(errors.fields).toEqual({});
-        expect(errors.form).toBe(describeAuthoringRefusal(refusal));
-      }
-    },
-  );
-});
-
-describe('presentEdgeDeletionRefusal', () => {
-  it('owns a form channel and no field, because Delete names no field to correct', () => {
-    for (const refusal of Object.values(EVERY_REFUSAL)) {
-      expect(presentEdgeDeletionRefusal(refusal)).toEqual({
-        fields: {},
-        form: describeAuthoringRefusal(refusal),
-      });
-    }
+  /** The Edge toolbar's one alert region has no field to fall back on. */
+  it('writes one distinct sentence for every refusal', () => {
+    const sentences = Object.values(EVERY_REFUSAL).map(describeAuthoringRefusal);
+    for (const sentence of sentences) expect(sentence).toMatch(/\S/u);
+    // `map-required` is sampled once, so its per-operation wording cannot collide.
+    expect(new Set(sentences).size).toBe(sentences.length);
   });
 });
 
@@ -244,5 +204,26 @@ describe('describeStoredSpaceRefusal', () => {
     expect(description).toContain('The remote space is invalid and was not accepted');
     expect(description).toContain(MISSING_RESOURCE_ID);
     expect(description).not.toContain('graph edge references unknown resource');
+  });
+});
+
+/**
+ * The Connect list closes on `null`, so every result that drew nothing, including
+ * `unavailable`, must answer a sentence.
+ */
+describe('describeConnectChoice', () => {
+  it('answers null only for a drawn Edge', () => {
+    expect(describeConnectChoice({ kind: 'completed', resourceId: TARGET_ID })).toBeNull();
+  });
+
+  it('keeps the list open with the refusal’s own sentence', () => {
+    const refusal: AuthoringRefusal = { code: 'edge-already-exists' };
+    expect(describeConnectChoice({ kind: 'refused', refusal })).toBe(
+      describeAuthoringRefusal(refusal),
+    );
+  });
+
+  it('keeps the list open when the canvas cannot take the Edit yet', () => {
+    expect(describeConnectChoice({ kind: 'unavailable' })).toEqual(expect.any(String));
   });
 });

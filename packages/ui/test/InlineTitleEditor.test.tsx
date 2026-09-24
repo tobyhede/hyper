@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -37,7 +40,7 @@ describe('InlineTitleEditor multiline capability', () => {
     expect(titleField()).toBeInstanceOf(HTMLTextAreaElement);
     unmount();
 
-    for (const variant of ['resource', 'header'] as const) {
+    for (const variant of ['resource', 'header', 'edge'] as const) {
       const single = render(
         <InlineTitleEditor
           title="Auth"
@@ -182,5 +185,135 @@ describe('InlineTitleEditor multiline capability', () => {
 
     fireEvent.keyDown(field, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+/** The declarations of the one rule whose selector is exactly `selector`. */
+const ruleIn = (stylesheet: string, selector: string): string => {
+  // A path, not a URL: jsdom's `URL` is not one `node:fs` recognises.
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../src', stylesheet),
+    'utf8',
+  );
+  const escaped = selector.replaceAll(/[.[\]^$*+?()|{}\\]/gu, '\\$&');
+  const found = new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'mu').exec(source);
+  if (found?.[1] === undefined) throw new Error(`${stylesheet} has no rule for ${selector}`);
+  return found[1];
+};
+
+/** The value the one declaration of `property` in `declarations` gives it. */
+const declared = (declarations: string, property: string): string | undefined =>
+  new RegExp(`(?:^|[\\s;])${property}:\\s*([^;]+);`, 'u').exec(declarations)?.[1]?.trim();
+
+describe('InlineTitleEditor edge variant', () => {
+  const renderEdge = (onComplete: (title: string) => string | null = () => null) => {
+    const onCancel = vi.fn();
+    const onReturnFocus = vi.fn();
+    render(
+      <InlineTitleEditor
+        title="depends on"
+        label="Edge Title"
+        variant="edge"
+        onComplete={onComplete}
+        onCancel={onCancel}
+        onReturnFocus={onReturnFocus}
+      />,
+    );
+    return { field: titleField('Edge Title'), onCancel, onReturnFocus };
+  };
+
+  it('is a single-line field drawn by the edge treatment, not the Resource one', () => {
+    const { field } = renderEdge();
+
+    expect(field).toBeInstanceOf(HTMLInputElement);
+    expect(field).toHaveClass('inline-title-editor__edge-field');
+    expect(field).not.toHaveClass('resource__title-input');
+    expect(field).toHaveFocus();
+    expect(field.selectionStart).toBe(0);
+    expect(field.selectionEnd).toBe('depends on'.length);
+  });
+
+  it('completes on Enter and cancels on Escape, returning focus each time', () => {
+    const onComplete = vi.fn(() => null);
+    const { field, onCancel, onReturnFocus } = renderEdge(onComplete);
+
+    fireEvent.change(field, { target: { value: 'blocks' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(onComplete).toHaveBeenCalledWith('blocks');
+    expect(onReturnFocus).toHaveBeenCalledOnce();
+
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onReturnFocus).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a refused draft open with its reason', () => {
+    const { field, onReturnFocus } = renderEdge(() => 'An Edge Title is one line.');
+
+    fireEvent.keyDown(field, { key: 'Enter' });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('An Edge Title is one line.');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(onReturnFocus).not.toHaveBeenCalled();
+  });
+
+  it('leaves the reason to a region the surface names, and is described by it', () => {
+    const onReturnFocus = vi.fn();
+    render(
+      <>
+        <InlineTitleEditor
+          title="depends on"
+          label="Edge Title"
+          variant="edge"
+          errorShownBy="edge-refusal"
+          onComplete={() => 'An Edge title must be one line.'}
+          onCancel={() => undefined}
+          onReturnFocus={onReturnFocus}
+        />
+        <p id="edge-refusal" role="alert">
+          An Edge title must be one line.
+        </p>
+      </>,
+    );
+    const field = titleField('Edge Title');
+
+    fireEvent.keyDown(field, { key: 'Enter' });
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAttribute('aria-describedby', 'edge-refusal');
+    expect(field).toHaveAccessibleDescription('An Edge title must be one line.');
+    expect(onReturnFocus).not.toHaveBeenCalled();
+  });
+
+  /**
+   * jsdom lays nothing out, so this reads the stylesheet. The weight is held to
+   * the Resource Title's token so the two cannot drift apart.
+   */
+  it('is drawn with no box, centred, content-sized and in the Resource Title type', () => {
+    const field = ruleIn('inline-title-editor.css', '.inline-title-editor__edge-field');
+    const token = (name: string): string | undefined => declared(field, `--${name}`);
+
+    expect(declared(field, 'border')).toBe('0');
+    expect(declared(field, 'background')).toBe('transparent');
+    expect(declared(field, 'box-shadow')).toBe('none');
+    expect(declared(field, 'padding')).toBe('0');
+    expect(declared(field, 'text-align')).toBe('center');
+    expect(declared(field, 'field-sizing')).toBe('content');
+    expect(declared(field, 'min-width')).toBe('var(--inline-title-editor-edge-floor)');
+    expect(declared(field, 'max-width')).toBe('var(--inline-title-editor-edge-ceiling)');
+    expect(token('inline-title-editor-edge-ceiling')).toBe('14rem');
+    expect(declared(field, 'font-size')).toBe('var(--inline-title-editor-edge-size)');
+    expect(token('inline-title-editor-edge-size')).toBe('12px');
+    expect(declared(field, 'color')).toBe('var(--canvas-resource-title-color)');
+
+    const resource = ruleIn('canvas-resource.css', '.canvas-resource');
+    expect(declared(field, 'font-weight')).toBe('var(--inline-title-editor-edge-weight)');
+    expect(token('inline-title-editor-edge-weight')).toBe(
+      declared(resource, '--canvas-resource-title-weight'),
+    );
+    expect(declared(resource, '--canvas-resource-title')).toBe(
+      'var(--canvas-resource-title-color)',
+    );
   });
 });

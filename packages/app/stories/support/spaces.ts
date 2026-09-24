@@ -849,3 +849,102 @@ export const metaSnapshot: SpaceSnapshot = {
 };
 
 export const metaSpace: Space = loaded(loadSpaceSnapshot(metaSnapshot));
+
+/* -------------------------------------------------------------------------- */
+/* Edge toolbar                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** Where the Edge toolbar fixture's identities live: `0x200`..`0x20f`. */
+const EDGE_ID_BASE = 0x200;
+
+const edgeId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(EDGE_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+const EDGE_MAP = edgeId(0);
+const EDGE_GRAPH = edgeId(1);
+const EDGE_ASIDE_GRAPH = edgeId(2);
+const EDGE_R1 = edgeId(3);
+const EDGE_R2 = edgeId(4);
+const EDGE_R3 = edgeId(5);
+const EDGE_R4 = edgeId(6);
+const EDGE_R5 = edgeId(7);
+const EDGE_R6 = edgeId(8);
+
+/**
+ * Gaps between two Resources, in canvas units: one too short to hold a Title at
+ * rest, and one long enough for the widest Title.
+ */
+export const EDGE_SHORT_GAP = 72;
+export const EDGE_LONG_GAP = 440;
+
+export const EDGE_TITLES = {
+  short: 'Why',
+  fits: 'Then',
+  long: 'Only once the pilot has shown the savings we promised',
+  hidden: 'Hidden at rest',
+  aside: 'Another Graph’s Title',
+} as const;
+
+/**
+ * A Space whose Active Graph crosses both gaps with titled and untitled Edges.
+ *
+ * Two rows, left to right, so every Edge runs between facing sides:
+ *
+ *   R1 ─short─ R2 ────long──── R3
+ *   │  "Why"        "Then"
+ *   │ (untitled)
+ *   R4 ────long──── R5 ────long──── R6
+ *        long Title     hidden Title
+ *
+ * The `Aside` Graph titles one Edge to show that only the Active Graph draws
+ * Titles.
+ */
+export const edgeToolbarSnapshot: SpaceSnapshot = {
+  id: edgeId(0xf),
+  document: {
+    version: 1,
+    title: 'Edges',
+    defaultMap: EDGE_MAP,
+    maps: [
+      {
+        id: EDGE_MAP,
+        title: 'Titled Edges',
+        kind: 'positioned',
+        positions: {
+          [EDGE_R1]: { x: 0, y: 0, open: false },
+          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0, open: false },
+          [EDGE_R3]: { x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP, y: 0, open: false },
+          [EDGE_R4]: { x: 0, y: 420, open: false },
+          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420, open: false },
+          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420, open: false },
+        },
+        graphs: [
+          {
+            id: EDGE_GRAPH,
+            title: 'Pitch',
+            edges: [
+              { from: EDGE_R1, to: EDGE_R2, title: EDGE_TITLES.short },
+              { from: EDGE_R2, to: EDGE_R3, title: EDGE_TITLES.fits },
+              { from: EDGE_R1, to: EDGE_R4 },
+              { from: EDGE_R4, to: EDGE_R5, title: EDGE_TITLES.long },
+              { from: EDGE_R5, to: EDGE_R6, title: EDGE_TITLES.hidden, titleHidden: true },
+            ],
+          },
+          {
+            id: EDGE_ASIDE_GRAPH,
+            title: 'Aside',
+            edges: [{ from: EDGE_R1, to: EDGE_R2, title: EDGE_TITLES.aside }],
+          },
+        ],
+      },
+    ],
+  },
+  resources: [EDGE_R1, EDGE_R2, EDGE_R3, EDGE_R4, EDGE_R5, EDGE_R6].map((id, index) => ({
+    id,
+    document: { title: `Resource ${index + 1}`, kind: 'markdown', body: '' },
+  })),
+};
+
+export const edgeToolbarSpace: Space = loaded(loadSpaceSnapshot(edgeToolbarSnapshot));

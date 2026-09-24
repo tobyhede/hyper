@@ -327,6 +327,7 @@ export const createApp = (
                 resourceResize={canvasRendering.resourceResize}
                 reportEmbeddedMapEditing={canvasRendering.reportEmbeddedMapEditing}
                 spaceTitle={renderedSpace.title}
+                mapId={selectedMapId}
                 mapTitle={selectedMap.map.title}
                 graphs={projection.visibleGraphs}
                 colorByGraphId={projection.colors}

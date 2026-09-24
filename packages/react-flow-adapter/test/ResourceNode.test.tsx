@@ -18,24 +18,15 @@ import { uuid } from './uuid';
  * longer calls it, so that re-introducing the call is caught here rather than
  * only in a browser.
  */
-/**
- * The live connection React Flow reports, so a test can put a drag in flight.
- *
- * `fromHandle` is the end the drag is anchored at, and React Flow always
- * supplies it while `inProgress` — it is what says whether the drag is looking
- * for a target (an ordinary connection, anchored at a source) or for a source
- * (a reconnection that took hold of an Edge's `from` end).
- */
+/** The live connection React Flow reports, so a test can put a drag in flight. */
 interface MockConnectionState {
   inProgress: boolean;
-  fromHandle: { type: 'source' | 'target' };
   toNode?: { id: string };
 }
 
 const { updateNodeInternals, connection, proximity } = vi.hoisted(() => {
   const connection: MockConnectionState = {
     inProgress: false,
-    fromHandle: { type: 'source' },
   };
   return {
     updateNodeInternals: vi.fn(),
@@ -180,7 +171,6 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 beforeEach(() => {
   flow.selected = [];
   connection.inProgress = false;
-  connection.fromHandle.type = 'source';
   delete connection.toNode;
   proximity.near = true;
 });
@@ -818,62 +808,6 @@ describe('ResourceNode graph authoring', () => {
       'none',
     );
     expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
-  });
-
-  /**
-   * A reconnection that took hold of an Edge's `from` end is anchored at the
-   * Edge's *target*, so it is looking for a new **source**. Offering only target
-   * handles left that gesture with nowhere to land — which is why the role is
-   * read off the drag rather than assumed to be `target`.
-   *
-   * Near + eligible is the same reveal gate as an ordinary connect, with the
-   * seeking role inverted: source ends show, target ends stay quiet.
-   */
-  it('offers source seeking ends when near and eligible during a source-endpoint move', () => {
-    connection.inProgress = true;
-    connection.fromHandle.type = 'target';
-
-    render(<ResourceNode {...props({ selected: true })} />);
-
-    expect(document.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-connection-seeking',
-      'source',
-    );
-    expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
-    expect(connectable('Connect to', 'end')).toEqual([false, false, false, false]);
-  });
-
-  it('withholds source seeking reveal when the pointer is not near during a source-endpoint move', () => {
-    connection.inProgress = true;
-    connection.fromHandle.type = 'target';
-    proximity.near = false;
-
-    render(<ResourceNode {...props({ selected: true })} />);
-
-    expect(document.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-connection-seeking',
-      'none',
-    );
-    // Snap may still land once the pointer enters the magnet; eligibility alone
-    // gates connectable-end, and with no provider every Resource stays eligible.
-    expect(connectable('Connect from', 'end')).toEqual([true, true, true, true]);
-  });
-
-  it('withholds source seeking ends when eligibility refuses during a source-endpoint move', () => {
-    connection.inProgress = true;
-    connection.fromHandle.type = 'target';
-
-    render(
-      <ConnectionEndEligibilityContext.Provider value={{ mayOffer: () => false }}>
-        <ResourceNode {...props({ selected: true })} />
-      </ConnectionEndEligibilityContext.Provider>,
-    );
-
-    expect(document.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-connection-seeking',
-      'none',
-    );
-    expect(connectable('Connect from', 'end')).toEqual([false, false, false, false]);
   });
 
   /**

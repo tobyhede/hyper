@@ -336,7 +336,7 @@ describe('render adapter', () => {
    * deselection reported for an id this projection no longer draws names no
    * subject at all, and must not clear a selection the author has since made —
    * which is reachable whenever the previous projection held an Edge this one
-   * does not, a removed Edge and a reconnected one alike.
+   * does not, as a removed Edge is.
    */
   it('ignores a selection change for an Edge this projection does not draw', () => {
     const store = adapter();

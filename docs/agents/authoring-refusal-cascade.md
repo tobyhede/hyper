@@ -73,8 +73,16 @@ that has not been decided.
 | --- | --- |
 | `create-and-connect` | `edge-resource-outside-map` → `map-active-graph-required` → completed |
 | `connected-resources` | `graph-not-owned` → `edge-resource-outside-map` → `map-active-graph-required` → `edge-already-exists` → completed |
-| `reconnected-edge` | `graph-not-owned` → `edge-not-found` → (dropped back to its own Resource ⇒ `unchanged`) → `edge-resource-outside-map` → `edge-already-exists` → completed |
 | `deleted-edge` | `graph-not-owned` → `edge-not-found` → completed |
+| `titled-edge` | `graph-not-owned` → `edge-not-found` → `edge-title-one-line` → (trimmed draft is the stored Title, or empty on an untitled Edge ⇒ `unchanged`) → completed |
+| `hid-edge-title` | `graph-not-owned` → `edge-not-found` → `edge-title-required` → (already hidden ⇒ `unchanged`) → completed |
+| `showed-edge-title` | `graph-not-owned` → `edge-not-found` → (already shown, or no Title ⇒ `unchanged`) → completed |
+
+The three Edge Title Edits find the Edge by its endpoints and read only the
+stored Edge, never the `edge` the completion carries (ADR 0104).
+`edge-title-one-line` is asked of the raw draft, before the trim, so a line
+break at either end is refused rather than trimmed away. An empty draft clears
+the Title and `titleHidden` with it.
 
 ### Graph edits
 
@@ -123,22 +131,22 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 24 codes
+## The 26 codes
 
-1 contextual (`map-not-found`) plus 23 action-specific —
-none is produced anywhere else. 22 of those 23 are tabulated above;
+1 contextual (`map-not-found`) plus 25 action-specific —
+none is produced anywhere else. 24 of those 25 are tabulated above;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row.
 Count the codes, not the cells: several serve more than one action —
-`resource-not-found`, `resource-not-in-map`, `graph-not-owned`,
+`resource-not-found`, `resource-not-in-map`, `graph-not-owned`, `edge-not-found`,
 `edge-resource-outside-map` and the two `reference-target-*` each appear in more than
-one row.
+one row. `edge-title-one-line` is spelt from `@project/core`'s
+`EDGE_TITLE_ONE_LINE`, as `resource-title-required` is from
+`RESOURCE_TITLE_REQUIRED`: the Edge schema raises the same code.
 `describeAuthoringRefusal` in `authoring-refusal.ts` is the one place every
-code gets its copy, and the exhaustive placement records beside it are the one
-place each surface's field mapping lives: the domain names the code, the
-application owns the sentence. Five surfaces map it today — Markdown Resource
-editing (`title`), Reference Resource editing and Reference Resource creation (`title` / `target`),
-Edge endpoint editing (the attempted `from` or `to`, never both) and Edge
-deletion (form only). Every record is
-`Record<AuthoringRefusalCode, …>`, so a new code fails to compile until each
-surface has said where it goes.
+code gets its copy: the domain names the code, the application owns the
+sentence. Its switch is exhaustive, so a new code fails to compile until it has
+one. An Edge's toolbar draws whichever of its three commands was refused in one
+alert region, with no field of its own to mark — the placement record that used
+to route an Edge endpoint refusal to its From or To field went with
+reconnection (`.scratch/edge-toolbar/issues/05`).

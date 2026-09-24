@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type MapId, type Resource, type ResourceId, type UUID } from '@project/core';
 import type { SpaceSessionState, SpaceSummary } from '@project/persistence';
+import type { EntityActionGroup } from '@project/ui';
 import { useAddressedResource } from '../src/addressed-resource';
 import { authoringAvailability } from '../src/authoring-availability';
 import type { BrowserLocationState } from '../src/browser-location';
@@ -501,26 +502,33 @@ describe('useResourceRailActions', () => {
       }),
     );
   };
+  const connect: EntityActionGroup = [
+    { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
+  ];
   const ids = (groups: ReturnType<ReturnType<typeof railFor>['result']['current']>) =>
     groups.map((group) => group.map(({ id }) => id));
 
   it('offers no commands for a Resource the Space no longer has', () => {
     const { result } = railFor(openDerivationSpace(), true);
-    expect(result.current(CREATED)).toEqual([]);
+    expect(result.current(CREATED, connect)).toEqual([]);
   });
 
   it('offers what availability allows, and Remove from Map removes', async () => {
     const opened = openDerivationSpace();
-    expect(ids(railFor(opened, false).result.current(PLACED_A))).toEqual([['copy-link']]);
+    expect(ids(railFor(opened, false).result.current(PLACED_A, connect))).toEqual([
+      ['connect-resource'],
+      ['copy-link'],
+    ]);
 
-    const groups = railFor(opened, true).result.current(PLACED_A);
+    const groups = railFor(opened, true).result.current(PLACED_A, connect);
     expect(ids(groups)).toEqual([
       ['create-reference'],
+      ['connect-resource'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
     act(() => {
-      void groups[2]?.[0]?.onSelect();
+      void groups[3]?.[0]?.onSelect(null);
     });
     await waitFor(() => expect(placedIds(opened)).not.toContain(PLACED_A));
   });

@@ -185,6 +185,26 @@ export const resourceSchema = z.discriminatedUnion('kind', [
   spaceResourceSchema,
 ]);
 
+/** The refusal code for a multi-line Edge Title; the application owns the wording. */
+export const EDGE_TITLE_ONE_LINE = 'edge-title-one-line';
+
+/** The one statement of `EDGE_TITLE_ONE_LINE`; the Edit asks it before trimming. */
+export const isOneLineEdgeTitle = (title: string): boolean => !/[\r\n]/u.test(title);
+
+/**
+ * An Edge's Title: one line, non-empty, trimmed, uncapped. A line break is
+ * refused rather than folded, because folding would store something the author
+ * did not see.
+ */
+const edgeTitleSchema = z
+  .string()
+  .min(1)
+  .refine((title) => title === title.trim(), { message: 'An Edge Title is stored trimmed' })
+  .refine(isOneLineEdgeTitle, {
+    message: 'An Edge Title must be one line',
+    params: { code: EDGE_TITLE_ONE_LINE },
+  });
+
 /**
  * One edge of a graph: a directed connection from one resource to another (ADR
  * 0032). This is the element an author draws, and the graph is the set of them.
@@ -192,12 +212,26 @@ export const resourceSchema = z.discriminatedUnion('kind', [
  * Shape only, as everywhere in this file. Whether both ids name real resources,
  * whether they name resources of the map that owns this graph, and whether an
  * exact edge occurs more than once need the whole Graph/Space in view and are
- * checked in `@project/graph`.
+ * checked in `@project/graph`. An Edge's identity is `(from, to)` within its
+ * Graph; its Title takes no part in it.
  */
-export const graphEdgeSchema = z.object({
-  from: idSchema,
-  to: idSchema,
-});
+export const graphEdgeSchema = z
+  .object({
+    from: idSchema,
+    to: idSchema,
+    title: edgeTitleSchema.optional(),
+    /**
+     * Authored and persisted, not view state (ADR 0104). Only `true` is stored,
+     * and only beside a Title, so each state has one spelling.
+     */
+    titleHidden: z.literal(true).optional(),
+  })
+  // Strict so a misspelt optional key fails intake rather than being stripped.
+  .strict()
+  .refine((edge) => edge.titleHidden === undefined || edge.title !== undefined, {
+    message: 'An Edge can hide only a Title it has',
+    path: ['titleHidden'],
+  });
 
 export const graphSchema = z.object({
   id: idSchema,

@@ -117,6 +117,33 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.spaceRail).toBeUndefined();
   });
 
+  /** The menu carries Connect, so this gate also gates drawing an Edge from the keyboard. */
+  it('asks for entity actions only where authoring is on and the Resource is the working Space’s', () => {
+    const groups = [[]];
+    const resourceEntityActions = vi.fn(() => groups);
+
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(RESOURCE_ID, 'markdown'),
+        context({ resourceEntityActions }),
+      ).entityActions,
+    ).toBe(groups);
+    expect(resourceEntityActions).toHaveBeenCalledWith(RESOURCE_ID);
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(RESOURCE_ID, 'markdown'),
+        context({ resourceEntityActions, authorOnCanvas: false }),
+      ).entityActions,
+    ).toBeUndefined();
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(MISSING_RESOURCE_ID, 'markdown'),
+        context({ resourceEntityActions }),
+      ).entityActions,
+    ).toBeUndefined();
+    expect(resourceEntityActions).toHaveBeenCalledOnce();
+  });
+
   it('withholds competing title controls while a body caret is live', () => {
     const patch = decorateSharedResourceNode(
       projectionNode(RESOURCE_ID, 'markdown', true),

@@ -44,6 +44,14 @@ export type {
   ResourceRailKindActionsProps,
   ResourceRailSharedActionsProps,
 } from './ResourceRailActions';
+export { CanvasCommand, CanvasCommandToolbar } from './CanvasCommandToolbar';
+export type { CanvasCommandProps, CanvasCommandToolbarProps } from './CanvasCommandToolbar';
+export { EdgeToolbar } from './EdgeToolbar';
+export type { EdgeTitleState, EdgeToolbarProps } from './EdgeToolbar';
+export { EdgeTitle } from './EdgeTitle';
+export type { EdgeTitleEditor, EdgeTitleProps } from './EdgeTitle';
+export { EDGE_TITLE_CEILING, edgeTitleRoom } from './edge-title-room';
+export type { EdgeTitleRoom } from './edge-title-room';
 export { CommandName, CommandSurface, CommandToolbar } from './CommandSurface';
 export type {
   CommandNameProps,
@@ -114,6 +122,8 @@ export {
   DeleteIcon,
   EditIcon,
   EnterSpaceIcon,
+  HideTitleIcon,
+  ShowTitleIcon,
   EntityActionsIcon,
   FitViewIcon,
   GraphIcon,

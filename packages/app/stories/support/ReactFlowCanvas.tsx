@@ -253,11 +253,8 @@ export function StoryCanvas({
 /**
  * The bordered, padded box a canvas-hosting story mounts `StoryCanvas` inside.
  *
- * The height is the one value that legitimately varies per story — the HUD's
- * minimap needs less room than the selected-Edge controls do to show a routed
- * Edge clearly — so it stays a caller-supplied Tailwind height class rather
- * than a second enum this module would have to keep in step with content it
- * cannot see.
+ * The height varies per story with its content, so it is a caller-supplied
+ * Tailwind height class.
  */
 export function StoryCanvasFrame({
   height,

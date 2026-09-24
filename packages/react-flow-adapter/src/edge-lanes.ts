@@ -101,11 +101,17 @@ export function graphLanes(
 const pairKey = ({ source, target }: LaneEdge): string =>
   source <= target ? `${source}|${target}` : `${target}|${source}`;
 
-/** An Edge's drawn path and the point a label or toolbar sits at. */
+/** An Edge's drawn path, the point a label or toolbar sits at, and how far it reaches. */
 export interface LaneGeometry {
   readonly path: string;
   readonly labelX: number;
   readonly labelY: number;
+  /**
+   * Straight distance between the drawn line's ends, after lane offset and
+   * trim, excluding the arrowhead marker. A midpoint Title's room is measured
+   * against it.
+   */
+  readonly span: number;
 }
 
 /**
@@ -177,11 +183,22 @@ export function laneBezier(
   const lane = laneCurve(attachment, offset, reach);
   if (lane === undefined) {
     const [path, labelX, labelY] = getBezierPath(attachment);
-    return { path, labelX, labelY };
+    const span = Math.hypot(
+      attachment.targetX - attachment.sourceX,
+      attachment.targetY - attachment.sourceY,
+    );
+    return { path, labelX, labelY, span };
   }
   const { pieces, label } = lane;
   const drawn = endTrim > 0 ? trimmed(pieces, endTrim) : pieces;
-  return { path: pathOf(drawn), labelX: label[0], labelY: label[1] };
+  const start = drawn[0]?.[0] ?? label;
+  const end = drawn[drawn.length - 1]?.[3] ?? label;
+  return {
+    path: pathOf(drawn),
+    labelX: label[0],
+    labelY: label[1],
+    span: Math.hypot(end[0] - start[0], end[1] - start[1]),
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { maskedTsSource, scannedTsFiles } from '../support/structural-scan';
 
 /**
  * The Command Dock and a Resource's own commands are **one surface drawn twice**.
@@ -24,7 +25,9 @@ const dockSheet = read('packages/app/src/components/command-dock.css');
 const resourceSheet = read('packages/ui/src/canvas-resource.css');
 const railSheet = read('packages/ui/src/resource-rail.css');
 const dock = read('packages/app/src/components/CommandDock.tsx');
+const canvasCommandToolbar = read('packages/ui/src/CanvasCommandToolbar.tsx');
 const resourceRailActions = read('packages/ui/src/ResourceRailActions.tsx');
+const edgeToolbar = read('packages/ui/src/EdgeToolbar.tsx');
 const spaceResourceSelectors = read('packages/ui/src/SpaceResourceSelectors.tsx');
 const spaceResourceRail = read('packages/app/src/build-space-resource-rail.tsx');
 const canvasResource = read('packages/ui/src/CanvasResource.tsx');
@@ -70,9 +73,9 @@ describe('the shared command surface', () => {
    * later gets the treatment by mounting the resource rather than by remembering a
    * string.
    */
-  it('is mounted by both the Command Dock and a Resource rail', () => {
+  it('is mounted by both the Command Dock and the canvas command toolbar', () => {
     expect(dock).toContain('<CommandToolbar');
-    expect(resourceRailActions).toContain('<CommandToolbar');
+    expect(canvasCommandToolbar).toContain('<CommandToolbar');
   });
 
   /**
@@ -91,6 +94,34 @@ describe('the shared command surface', () => {
         new RegExp(String.raw`(?<![\w-])${property}:`, 'u'),
       );
     }
+  });
+});
+
+describe('a toolbar drawn on the canvas', () => {
+  /**
+   * Every toolbar over the canvas mounts `CanvasCommandToolbar`, not the bare
+   * surface: without its keydown stop, arrow keys reach React Flow.
+   */
+  const CANVAS_TOOLBARS = [
+    { name: 'a Resource rail', source: resourceRailActions },
+    { name: "an Edge's toolbar", source: edgeToolbar },
+  ] as const;
+
+  it.each(CANVAS_TOOLBARS)('is what $name mounts', ({ source }) => {
+    expect(source).toContain('<CanvasCommandToolbar');
+    expect(source).not.toContain('<CommandToolbar');
+  });
+
+  /** The Dock floats beside the canvas, not on it, so it alone may mount the surface directly. */
+  it('is the only way onto the shared surface besides the Command Dock', () => {
+    const mounting = scannedTsFiles().filter((file) =>
+      maskedTsSource(file).includes('<CommandToolbar'),
+    );
+
+    expect(mounting).toEqual([
+      'packages/app/src/components/CommandDock.tsx',
+      'packages/ui/src/CanvasCommandToolbar.tsx',
+    ]);
   });
 });
 

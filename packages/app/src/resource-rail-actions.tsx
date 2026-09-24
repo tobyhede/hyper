@@ -37,13 +37,15 @@ export interface ResourceRailCommands {
  * the commands that are the Resource's own: creating a Reference Resource from
  * it, removing it from the Map, and deleting it.
  *
- * Create Reference leads, then the addresses, then the two commands that leave
- * the Resource behind sharing the trailing destructive group. A Space
+ * Create Reference leads, then Connect to Resource, then the addresses, then
+ * the two commands that leave the Resource behind sharing the trailing
+ * destructive group. A Space
  * Resource's menu pairs Enter with Open in New Tab ahead of its copy links.
  */
 export function resourceRailGroups(
   resource: Resource,
   addresses: readonly EntityActionGroup[],
+  connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
   const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
@@ -130,12 +132,13 @@ export function resourceRailGroups(
           ];
     return [
       reference.flat(),
+      connect,
       [...entering, ...links.filter((action) => action.id === OPEN_INDEPENDENTLY_ACTION_ID)],
       links.filter((action) => action.id !== OPEN_INDEPENDENTLY_ACTION_ID),
       leaving,
     ];
   }
-  return [...reference, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
+  return [...reference, connect, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
 }
 
 export interface ResourceRailInput {
@@ -171,37 +174,47 @@ export function useResourceRailActions(
     createReferenceFrom,
     spaces,
   }: ResourceRailInput,
-): (resourceId: ResourceId) => readonly EntityActionGroup[] {
+): (resourceId: ResourceId, connect: EntityActionGroup) => readonly EntityActionGroup[] {
   const { addResource, authorOnCanvas, deleteResource } = availability;
   return useCallback(
-    (resourceId: ResourceId): readonly EntityActionGroup[] => {
+    (resourceId: ResourceId, connect: EntityActionGroup): readonly EntityActionGroup[] => {
       const resource = space.lookup.resource(resourceId);
       // A node the projection is still drawing for a Resource the working Space
       // no longer has: no commands rather than commands that name nothing.
       if (resource === undefined) return [];
-      return resourceRailGroups(resource, entityActions({ kind: 'resource', resource, map }), {
-        createReference: addResource ? () => createReferenceFrom(resource) : null,
-        removeFromMap:
-          authorOnCanvas && !editingResourceBody
-            ? () => {
-                commandOutcomes.run('resource-remove', () =>
-                  authoring.complete({ kind: 'removed-resource-from-map', resourceId }),
-                );
-              }
-            : null,
-        deleteFromSpace: deleteResource ? () => resourceDeletion.arm(resource) : null,
-        enter:
-          spaces === null || resource.kind !== 'space'
-            ? null
-            : () => {
-                void commandOutcomes.run(
-                  'space-enter',
-                  async () =>
-                    spaces.enter(resource.spaceId, resource.map, resource.graph, resource.framing),
-                  { subject: titleName(resource.title) },
-                );
-              },
-      });
+      return resourceRailGroups(
+        resource,
+        entityActions({ kind: 'resource', resource, map }),
+        connect,
+        {
+          createReference: addResource ? () => createReferenceFrom(resource) : null,
+          removeFromMap:
+            authorOnCanvas && !editingResourceBody
+              ? () => {
+                  commandOutcomes.run('resource-remove', () =>
+                    authoring.complete({ kind: 'removed-resource-from-map', resourceId }),
+                  );
+                }
+              : null,
+          deleteFromSpace: deleteResource ? () => resourceDeletion.arm(resource) : null,
+          enter:
+            spaces === null || resource.kind !== 'space'
+              ? null
+              : () => {
+                  void commandOutcomes.run(
+                    'space-enter',
+                    async () =>
+                      spaces.enter(
+                        resource.spaceId,
+                        resource.map,
+                        resource.graph,
+                        resource.framing,
+                      ),
+                    { subject: titleName(resource.title) },
+                  );
+                },
+        },
+      );
     },
     [
       space,

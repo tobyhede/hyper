@@ -80,6 +80,22 @@
   white-space: nowrap;
 }
 
+/* A Connect row's name, with any refusal reason under it. The reason wraps:
+   an ellipsed sentence says nothing. */
+.resources-popover__row-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: start;
+}
+
+.resources-popover__row-reason {
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: normal;
+}
+
 /* The affordance is drawn and never moves. The grip is the dock's own dotted
    field at row scale, so the resource you drag a Resource by and the resource you drag
    the dock by are one mark. */
@@ -96,7 +112,9 @@
 /* The hover is a *pointer report*, not a selection. It used to swap in
    `--secondary` when that was beige, which painted a warm block the eye read
    as a chosen row rather than the one the pointer happens to be over. */
-.resources-popover__row:hover,
+/* An unavailable Connect row stays focusable so its reason can be reached;
+   it takes the focus ring, never the hover fill. */
+.resources-popover__row:not([aria-disabled='true']):hover,
 .resources-popover__row:focus-visible {
   border-color: var(--border);
   background: var(--accent);

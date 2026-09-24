@@ -1,13 +1,15 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
-import { useContext, useLayoutEffect, type ReactNode } from 'react';
 import {
-  Position,
-  ReactFlowProvider,
-  type Edge,
-  type FinalConnectionState,
-  type InternalNode,
-} from '@xyflow/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { useLayoutEffect, type ReactNode } from 'react';
+import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
@@ -16,12 +18,10 @@ import { Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
-import { edgeSelectionOf } from '../src/render-adapter';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
-import { EdgeAuthoringContext } from '../src/components/edge-authoring-context';
 import { RESOURCE_SIZE } from '../src/resource';
 
 /**
@@ -167,6 +167,14 @@ const EDGES = [
   flowEdge(OTHER_GRAPH_ID, RESOURCE_B, RESOURCE_C),
 ];
 
+/** The projection with the Active Graph's Edge titled. */
+const titled = (edges: readonly Edge[], title: string, hidden = false): Edge[] =>
+  edges.map((edge, index) => {
+    if (index !== 0) return edge;
+    const data = { ...edge.data, title };
+    return { ...edge, data: hidden ? { ...data, titleHidden: true } : data };
+  });
+
 /**
  * The composition every canvas test runs on.
  *
@@ -210,26 +218,10 @@ const graphsOf = (working: SpaceSnapshot) =>
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
 
-/** A release that resolved no handle — React Flow's shape for "dropped nowhere". */
-const FINISHED_CONNECTION = {
-  pointer: null,
-  isValid: null,
-  from: null,
-  fromHandle: null,
-  fromPosition: null,
-  fromNode: null,
-  to: null,
-  toHandle: null,
-  toPosition: null,
-  toNode: null,
-} as const;
-
 beforeAll(() => {
-  // jsdom implements no hit-testing, and the reconnect release asks for one.
+  // jsdom implements no hit-testing, and a connection release asks for one.
   // Answering `null` is what a release over nothing really produces, which
-  // `elementDropTargetOf` reads as off-canvas — so every test that leaves this
-  // stub alone exercises the cancelling path. `what a reconnect release decides`
-  // answers it with a real mounted element instead, and drives the other paths.
+  // `elementDropTargetOf` reads as off-canvas.
   document.elementFromPoint = () => null;
   vi.stubGlobal(
     'ResizeObserver',
@@ -383,6 +375,7 @@ function CanvasHarness({
         }}
         reportEmbeddedMapEditing={() => undefined}
         spaceTitle="Test Space"
+        mapId={MAP_ID}
         mapTitle="Test Map"
         graphs={currentSpace().graphs}
         colorByGraphId={{}}
@@ -441,21 +434,41 @@ describe('decorated Edges', () => {
   });
 });
 
+const toolbarOf = (name: string): HTMLElement =>
+  screen.getByRole('toolbar', { name: `Edge ${name}` });
+
 describe('the Edge toolbar', () => {
-  it('appears only on the selected Edge', () => {
+  it('appears on the selected Edge alone, named for its endpoints while it has no Title', () => {
     const { adapter } = mountCanvas();
-    expect(screen.queryByRole('button', { name: 'Delete this Edge' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Edge A → B' })).not.toBeInTheDocument();
 
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    expect(screen.getByRole('button', { name: 'Delete this Edge' })).toBeVisible();
+    expect(toolbarOf('A → B')).toBeVisible();
+    expect(screen.queryByRole('toolbar', { name: 'Edge B → C' })).not.toBeInTheDocument();
+  });
+
+  it('offers Edit, the Title eye and Delete as one named group, the eye disabled with no Title', () => {
+    const { adapter } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    const group = within(toolbarOf('A → B')).getByRole('group', { name: 'Edge commands' });
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual(['Edit Edge A → B', 'Hide Title A → B', 'Delete Edge A → B']);
+    expect(within(group).getByRole('button', { name: 'Hide Title A → B' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('deletes the Edge from its Graph and leaves the Graph standing', () => {
     const { adapter, session } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete this Edge' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Edge A → B' }));
 
     expect(graphsOf(session.getState().working)).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
@@ -463,73 +476,216 @@ describe('the Edge toolbar', () => {
     ]);
   });
 
-  it('opens the endpoint editor from its own button', async () => {
-    const { adapter, edgeAuthoring } = mountCanvas();
+  it('writes the Title from Edit, completes on Enter, and returns focus to the Title', async () => {
+    const { adapter, session } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit this Edge' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
+    const field = screen.getByRole('textbox', { name: 'Edge Title' });
+    expect(field).toHaveFocus();
+    fireEvent.change(field, { target: { value: 'depends on' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
 
-    expect(edgeAuthoring.getState().draft).toEqual({
-      kind: 'keyboard-reconnect',
-      graphId: GRAPH_ID,
-      edge: EDGE,
-    });
-    // Base UI mounts its portalled Positioner after the controlled Root opens.
-    // The author-visible contract is still that both endpoint fields stand when
-    // the command completes; `waitFor` observes that contract rather than its
-    // scheduling implementation.
-    await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: 'From' })).toBeVisible();
-      expect(screen.getByRole('combobox', { name: 'To' })).toBeVisible();
-    });
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { ...EDGE, title: 'depends on' },
+    ]);
+    // The projection lags the Edit by a publication.
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Edit Title depends on' })).toHaveFocus(),
+    );
+    expect(toolbarOf('depends on')).toBeVisible();
+  });
+
+  it('cancels on Escape, writing nothing, and returns focus to the Edge it had no Title for', async () => {
+    const { adapter, session, edgeAuthoring } = mountCanvas();
+    const before = session.getState().working;
+    act(() => adapter.getState().selectEdge(SUBJECT));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Edge Title' }), { key: 'Escape' });
+
+    expect(session.getState().working).toBe(before);
+    expect(edgeAuthoring.getState().draft).toBeNull();
+    await waitFor(() => expect(edgeElement(EDGES[0]!.id)).toHaveFocus());
+  });
+
+  it('completes on blur without taking focus back to the Title', () => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
+    const field = screen.getByRole('textbox', { name: 'Edge Title' });
+    fireEvent.change(field, { target: { value: 'depends on' } });
+
+    fireEvent.blur(field);
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { ...EDGE, title: 'depends on' },
+    ]);
+    expect(screen.getByRole('button', { name: 'Edit Title depends on' })).not.toHaveFocus();
   });
 
   /**
-   * The picker's disabled rows are eligibility's answer, so they say whether the
-   * right *question* was asked.
-   *
-   * `Main` holds A→B, so every Resource of this Map is a legal `to` for it: B is
-   * unchanged, C is a new Edge, and A is a self-Edge, which is valid authored
-   * structure (ADR 0032). The subject handed in is an `EdgeSelection`, which is
-   * what the callbacks really hold and which carries a `kind` of its own —
-   * spread into the proposal it silently asks a *connect* question instead, and
-   * every row comes back disabled while two pickers still render.
+   * The eye reads the projected Title, which lags the draft: a press that
+   * blurred an emptied field would complete the clear, then hide a Title the
+   * Edge no longer has.
    */
-  it('asks eligibility the reconnect question, whatever shape the subject arrives in', () => {
-    const composed = compose();
-    // Read through the same context an authorable Edge reads, so what is
-    // asserted is the value the Edge really gets rather than a copy of it.
-    function Provider({ children }: { children: ReactNode }) {
-      const surface = useEdgeAuthoring({
-        authoring: composed.edgeAuthoring,
-        edges: EDGES,
-        projectedNodes: null,
-        selection: { kind: 'edge', ...SUBJECT },
-        activeGraphId: GRAPH_ID,
-        graphs: composed.currentSpace().graphs,
-        placedResources: composed.currentSpace().resources,
-        newResourceTitle: 'Resource 4',
-        enabled: true,
-        onSelectEdge: NO_OP,
-      });
-      return <>{surface.provide(children)}</>;
-    }
-    const { result } = renderHook(() => useContext(EdgeAuthoringContext), {
-      wrapper: ({ children }) => (
-        <ReactFlowProvider>
-          <Provider>{children}</Provider>
-        </ReactFlowProvider>
-      ),
+  it('makes the eye unavailable while the Title is being written, keeping the caret', () => {
+    const { adapter, session, authoring } = mountCanvas();
+    authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
+    act(() => adapter.getState().selectEdge(SUBJECT));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Edge depends on' }));
+    const field = screen.getByRole('textbox', { name: 'Edge Title' });
+    fireEvent.change(field, { target: { value: '' } });
+
+    const eye = screen.getByRole('button', { name: 'Hide Title depends on' });
+    expect(eye).toHaveAttribute('aria-disabled', 'true');
+    // `ladle-e2e/edge-toolbar.spec.ts` holds the caret staying in a browser.
+    expect(fireEvent.pointerDown(eye)).toBe(false);
+    fireEvent.click(eye);
+
+    expect(field).toBeInTheDocument();
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { ...EDGE, title: 'depends on' },
+    ]);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('begins writing from the revealed Title itself', () => {
+    const { adapter, edgeAuthoring } = mountCanvas();
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title depends on' }));
+
+    expect(edgeAuthoring.getState().draft).toEqual({ kind: 'title', ...SUBJECT });
+    expect(screen.getByRole('textbox', { name: 'Edge Title' })).toHaveValue('depends on');
+  });
+
+  it('draws a Title at rest, fitted to its Edge, with the whole Title in its tooltip', () => {
+    const { adapter } = mountCanvas();
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
+
+    const title = screen.getByTitle('depends on');
+    expect(title).toHaveTextContent('depends on');
+    // Not a control until the Edge is revealed.
+    expect(screen.queryByRole('button', { name: 'Edit Title depends on' })).toBeNull();
+    expect(title.style.maxWidth).toMatch(/px$/u);
+  });
+
+  it("draws only the Active Graph's Titles", () => {
+    const { adapter } = mountCanvas();
+    act(() =>
+      adapter
+        .getState()
+        .syncProjection(NODES, [
+          EDGES[0]!,
+          { ...EDGES[1]!, data: { ...EDGES[1]!.data, title: 'aside' } },
+        ]),
+    );
+
+    expect(screen.queryByTitle('aside')).toBeNull();
+  });
+
+  it('hides a Title at rest from the eye, and dims it while the Edge is revealed', () => {
+    const { adapter, session, authoring } = mountCanvas();
+    authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Title depends on' }));
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([
+      { ...EDGE, title: 'depends on', titleHidden: true },
+    ]);
+    act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on', true)));
+    expect(screen.getByRole('button', { name: 'Show Title depends on' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit Title depends on' })).toHaveAttribute(
+      'data-hidden',
+      'true',
+    );
+
+    act(() => adapter.getState().clearSelection());
+    expect(screen.queryByTitle('depends on')).toBeNull();
+  });
+
+  /**
+   * Hiding a missing Title is unreachable from the disabled eye, so it is asked
+   * of Edge Authoring directly, as a stale toolbar would.
+   */
+  it('reports a refused command in one alert region under the toolbar, until the selection moves', () => {
+    const { adapter, edgeAuthoring } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    act(() => {
+      edgeAuthoring.setTitleHidden(SUBJECT, true);
     });
 
-    const subject = edgeSelectionOf(EDGES[0]!);
-    const choices = result.current!.endpointChoices(subject!, 'to');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Give this Edge a title before hiding it.');
+    expect(toolbarOf('A → B').parentElement).toContainElement(alert);
 
-    expect(choices.map((choice) => ({ title: choice.title, refusal: choice.refusal }))).toEqual([
-      { title: 'A', refusal: undefined },
-      { title: 'B', refusal: undefined },
-      { title: 'C', refusal: undefined },
-    ]);
+    act(() => adapter.getState().clearSelection());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps a refused Title open with its reason in that same region', () => {
+    const { adapter, edgeAuthoring } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
+    const field = screen.getByRole('textbox', { name: 'Edge Title' });
+
+    // A text field strips line breaks, so the one-line rule is reached directly.
+    act(() => {
+      edgeAuthoring.completeTitle('two\nlines');
+    });
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('An Edge title must be one line.');
+    expect(field).toBeInTheDocument();
+  });
+
+  it('moves focus from the Edge into its toolbar on Enter, and back on Escape', () => {
+    mountCanvas();
+    const edge = edgeElement(EDGES[0]!.id);
+    act(() => edge.focus());
+
+    fireEvent.keyDown(edge, { key: 'Enter' });
+    const edit = screen.getByRole('button', { name: 'Edit Edge A → B' });
+    expect(edit).toHaveFocus();
+
+    fireEvent.keyDown(edit, { key: 'Escape' });
+    expect(edge).toHaveFocus();
+  });
+
+  /** The delay lets the pointer cross from the line to the toolbar. */
+  it('reveals the toolbar on hover and releases it a moment after the pointer leaves', () => {
+    vi.useFakeTimers();
+    try {
+      mountCanvas();
+      const edge = edgeElement(EDGES[0]!.id);
+
+      fireEvent.mouseEnter(edge);
+      expect(toolbarOf('A → B')).toBeVisible();
+
+      fireEvent.mouseLeave(edge);
+      expect(toolbarOf('A → B')).toBeVisible();
+      fireEvent.pointerEnter(toolbarOf('A → B'));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(toolbarOf('A → B')).toBeVisible();
+
+      fireEvent.pointerLeave(toolbarOf('A → B'));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(screen.queryByRole('toolbar', { name: 'Edge A → B' })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -650,16 +806,21 @@ describe("the app's canvas delete key", () => {
     },
   );
 
-  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its own editor', (key) => {
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its Title field', (key) => {
     const { adapter, session } = mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
-    fireEvent.click(screen.getByRole('button', { name: 'Edit this Edge' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
 
-    // The endpoint trigger — where Radix's focus scope lands as the popover
-    // opens, and a `button role="combobox"`, so neither an input tag nor
-    // `contenteditable` excludes it. Named rather than left to that autofocus,
-    // so this does not turn on `FocusScope` timing.
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'From' }), { key });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Edge Title' }), { key });
+
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+  });
+
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its toolbar', (key) => {
+    const { adapter, session } = mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Edge A → B' }), { key });
 
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
@@ -849,368 +1010,6 @@ describe('a pane covering the graph', () => {
 });
 
 /**
- * React Flow drives a reconnect drag through the *connection* callbacks as well
- * as the reconnect ones, in an order these tests pin because nothing else can.
- *
- * `EdgeUpdateAnchors` calls `onReconnectStart` and then the store's
- * `onConnectStart`; on release it calls the store's `onConnectEnd` before
- * `onReconnectEnd`. A reconnect drag therefore arrives as a *connection* from
- * the endpoint that stays put, and the module has to stand its connection
- * handlers down for the duration or it eats its own gesture.
- */
-/** The hook over a composed Space, with the drafted Edge selected. */
-const surface = (composed: ReturnType<typeof compose>) =>
-  renderHook(
-    () =>
-      useEdgeAuthoring({
-        authoring: composed.edgeAuthoring,
-        edges: EDGES,
-        projectedNodes: null,
-        selection: { kind: 'edge', ...SUBJECT },
-        activeGraphId: GRAPH_ID,
-        graphs: composed.currentSpace().graphs,
-        placedResources: composed.currentSpace().resources,
-        newResourceTitle: 'Resource 4',
-        enabled: true,
-        onSelectEdge: NO_OP,
-      }),
-    { wrapper: ({ children }) => <ReactFlowProvider>{children}</ReactFlowProvider> },
-  );
-
-describe("React Flow's reconnect callback order", () => {
-  const startDrag = (props: ReturnType<typeof surface>['result']['current'], edge: Edge) => {
-    // The order React Flow uses, verbatim.
-    props.reactFlowProps.onReconnectStart(null, edge, 'target');
-    props.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-      nodeId: RESOURCE_B,
-      handleId: null,
-      handleType: 'target',
-    });
-  };
-
-  it('keeps the reconnect draft when the connection callback follows it', () => {
-    const composed = compose();
-    const { result } = surface(composed);
-
-    act(() => startDrag(result.current, EDGES[0]!));
-
-    expect(composed.edgeAuthoring.getState().draft).toEqual({
-      kind: 'pointer-reconnect',
-      ...SUBJECT,
-      endpoint: 'from',
-    });
-  });
-
-  /**
-   * **React Flow consults the one global validator during a reconnect too**, so
-   * it has to be asked the reconnect question or the anchor reads invalid for
-   * the whole drag.
-   *
-   * Dropping either end of A→B back on its own Resource is the case that exposes
-   * it: as a *connect* proposal that is the duplicate rule, and as a *reconnect*
-   * proposal it is the endpoint returning to where it came from, which
-   * `reconnectOutcome` answers `unchanged` before it ever reaches the duplicate
-   * check. Eligibility already treats it as offerable; the validator was the one
-   * place still saying otherwise.
-   */
-  const connectionTo = (source: string, target: string) => ({
-    source,
-    target,
-    sourceHandle: null,
-    targetHandle: null,
-  });
-
-  it.each([
-    ['the source anchor', 'target' as const],
-    ['the target anchor', 'source' as const],
-  ])('accepts an endpoint dropped back where it came from, from %s', (_name, handleType) => {
-    const composed = compose();
-    const { result } = surface(composed);
-    act(() => {
-      result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, handleType);
-      result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-        nodeId: RESOURCE_B,
-        handleId: null,
-        handleType: 'target',
-      });
-    });
-
-    expect(
-      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_B)),
-    ).toBe(true);
-  });
-
-  /**
-   * A result that really would duplicate another Edge is still refused — the
-   * half of the rule the reconnect proposal must not lose.
-   *
-   * It needs a Graph holding *two* Edges to be reachable at all: with one, every
-   * drop is either the unchanged case or a new pair. So Main gains A→C through
-   * the ordinary connect path first, and moving A→B's `to` onto C is then the
-   * duplicate.
-   */
-  it('refuses a reconnection that would duplicate another Edge in the Graph', () => {
-    const composed = compose();
-    act(() => {
-      composed.edgeAuthoring.beginPointerConnect(RESOURCE_A);
-      composed.edgeAuthoring.connect(RESOURCE_A, RESOURCE_C, null);
-      composed.edgeAuthoring.endPointerDrag();
-    });
-    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
-      EDGE,
-      { from: RESOURCE_A, to: RESOURCE_C },
-    ]);
-
-    const { result } = surface(composed);
-    act(() => result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, 'target'));
-
-    expect(
-      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_C)),
-    ).toBe(false);
-    // And the endpoint's own Resource is still offered, so the refusal is the
-    // duplicate rule rather than the reconnect branch refusing everything.
-    expect(
-      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_B)),
-    ).toBe(true);
-  });
-
-  /** With no reconnect draft open, the ordinary connect rule still answers. */
-  it('asks the connect rule when no reconnect drag is in flight', () => {
-    const composed = compose();
-    const { result } = surface(composed);
-
-    // A→B already exists in Main, so as a plain connection it is a duplicate.
-    expect(
-      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_A, RESOURCE_B)),
-    ).toBe(false);
-    expect(
-      result.current.reactFlowProps.isValidConnection(connectionTo(RESOURCE_B, RESOURCE_C)),
-    ).toBe(true);
-  });
-
-  it('completes the reconnection rather than silently authoring nothing', () => {
-    const composed = compose();
-    const { result } = surface(composed);
-    act(() => startDrag(result.current, EDGES[0]!));
-
-    act(() => {
-      result.current.reactFlowProps.onReconnect(EDGES[0]!, {
-        source: RESOURCE_A,
-        target: RESOURCE_C,
-        sourceHandle: null,
-        targetHandle: null,
-      });
-    });
-
-    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([
-      { from: RESOURCE_A, to: RESOURCE_C },
-    ]);
-  });
-
-  /**
-   * `handleType` names the endpoint that **stays**: taking hold of the source
-   * anchor reports `'target'`, because the target is where the drag is now
-   * anchored. Read straight off, it names the wrong end — and the draft's
-   * endpoint is what a cancelled drag returns focus to.
-   */
-  it.each([
-    ['the source anchor', 'target' as const, 'from' as const],
-    ['the target anchor', 'source' as const, 'to' as const],
-  ])('records %s as moving the end the author took hold of', (_name, handleType, endpoint) => {
-    const composed = compose();
-    const { result } = surface(composed);
-
-    act(() => result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, handleType));
-
-    expect(composed.edgeAuthoring.getState().draft).toEqual({
-      kind: 'pointer-reconnect',
-      ...SUBJECT,
-      endpoint,
-    });
-  });
-
-  /**
-   * **Standing the connection handlers down is for the drag, not for the
-   * session.** They are the same handlers an ordinary connection uses, so a flag
-   * left raised silently disables every later pointer connection and the Alt
-   * empty-drop for the life of the canvas — and `onConnect` is unguarded, so a
-   * plain Resource-to-Resource drag still authors and hides it.
-   */
-  it('takes its connection handlers back once the reconnect drag ends', () => {
-    const composed = compose();
-    const { result } = surface(composed);
-    act(() => startDrag(result.current, EDGES[0]!));
-
-    act(() => {
-      result.current.reactFlowProps.onReconnectEnd(
-        new MouseEvent('mouseup'),
-        EDGES[0]!,
-        'target',
-        FINISHED_CONNECTION,
-      );
-      result.current.reactFlowProps.onConnectStart(new MouseEvent('mousedown'), {
-        nodeId: RESOURCE_C,
-        handleId: null,
-        handleType: 'source',
-      });
-    });
-
-    expect(composed.edgeAuthoring.getState().draft).toEqual({
-      kind: 'pointer-connect',
-      from: RESOURCE_C,
-    });
-  });
-
-  /**
-   * The connection release arrives first and must author nothing: with Alt held
-   * it would otherwise create a Resource and an Edge from the anchored end, and then
-   * `onReconnectEnd` would delete the Edge — one gesture, two Edits.
-   */
-  it('authors no Resource when an Alt-held reconnect release reaches the connection callback', () => {
-    const composed = compose();
-    const { result } = surface(composed);
-    const before = composed.session.getState().working;
-    act(() => startDrag(result.current, EDGES[0]!));
-
-    act(() => {
-      result.current.reactFlowProps.onConnectEnd(
-        new MouseEvent('mouseup', { altKey: true, clientX: 10, clientY: 10 }),
-        FINISHED_CONNECTION,
-      );
-    });
-
-    expect(composed.session.getState().working).toBe(before);
-  });
-});
-
-/**
- * What a reconnect release decides, and the precedence it decides it by.
- *
- * This is the third site of the rule `docs/agents/rendering.md` states in its
- * *"Neither React Flow's `toNode` nor the DOM alone answers"* bullet, and
- * the one that is easiest to miss: it composes React Flow's answer with the
- * DOM's exactly as the connect path does, and then asks a different question of
- * the result — delete this Edge, rather than author a Resource. Nothing but
- * `editing.spec.ts` used to cover it.
- *
- * jsdom performs no hit-testing, so `elementFromPoint` is answered with a
- * **real mounted element** rather than a fabricated verdict: `closest` then
- * walks the tree for real, which is the half of the rule under test. Both class
- * names are React Flow's published theming API.
- */
-describe('what a reconnect release decides', () => {
-  const mountFlowDom = () => {
-    const renderer = document.createElement('div');
-    renderer.className = 'react-flow__renderer';
-    const resource = document.createElement('div');
-    resource.className = 'react-flow__node';
-    renderer.append(resource);
-    document.body.append(renderer);
-    mounted = renderer;
-    return { renderer, resource };
-  };
-
-  /** The node `mountFlowDom` put in the document, so cleanup removes that one. */
-  let mounted: Element | null = null;
-
-  const internalNode = (id: string): InternalNode => {
-    const userNode = { id, position: { x: 0, y: 0 }, data: {} };
-    return {
-      ...userNode,
-      measured: { width: RESOURCE_SIZE.width, height: RESOURCE_SIZE.height },
-      internals: { positionAbsolute: { x: 0, y: 0 }, z: 0, userNode },
-    };
-  };
-
-  /**
-   * A release React Flow resolved a target for and **refused** — the only shape
-   * that reaches the precedence with a non-null `toNode`.
-   *
-   * `isValid: true` would be unreachable here: `onReconnect` fires for a valid
-   * release and sets `proposedReconnection`, so `handleReconnectEnd` returns at
-   * its `!proposed` guard before the precedence is consulted. What is left is a
-   * handle in range whose connection the validator refused — the author aimed at
-   * a handle and missed the rule, not the handle.
-   *
-   * Written out in full because the type requires the whole in-progress branch,
-   * not because the handler reads more than `toNode`.
-   */
-  const RESOLVED_CONNECTION = {
-    isValid: false,
-    from: { x: 0, y: 0 },
-    fromHandle: {
-      id: null,
-      nodeId: RESOURCE_A,
-      type: 'source',
-      position: Position.Right,
-      x: 0,
-      y: 0,
-      width: 6,
-      height: 6,
-    },
-    fromPosition: Position.Right,
-    fromNode: internalNode(RESOURCE_A),
-    to: { x: 400, y: 0 },
-    toHandle: null,
-    toPosition: Position.Left,
-    toNode: internalNode(RESOURCE_B),
-    pointer: { x: 400, y: 0 },
-  } satisfies FinalConnectionState;
-
-  const release = (
-    composed: ReturnType<typeof compose>,
-    at: Element,
-    state: FinalConnectionState,
-  ) => {
-    const { result } = surface(composed);
-    document.elementFromPoint = () => at;
-    act(() => {
-      result.current.reactFlowProps.onReconnectStart(null, EDGES[0]!, 'target');
-      result.current.reactFlowProps.onReconnectEnd(
-        new MouseEvent('mouseup', { clientX: 10, clientY: 10 }),
-        EDGES[0]!,
-        'target',
-        state,
-      );
-    });
-  };
-
-  afterEach(() => {
-    mounted?.remove();
-    mounted = null;
-    // Restores what `beforeAll` installed for every other block in this file.
-    document.elementFromPoint = () => null;
-  });
-
-  it('deletes the Edge when the release lands on empty canvas', () => {
-    const composed = compose();
-    release(composed, mountFlowDom().renderer, FINISHED_CONNECTION);
-
-    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([]);
-  });
-
-  it('keeps the Edge when the release lands on a Resource body', () => {
-    const composed = compose();
-    release(composed, mountFlowDom().resource, FINISHED_CONNECTION);
-
-    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([EDGE]);
-  });
-
-  /**
-   * **The precedence itself.** The DOM says empty canvas — the same fact that
-   * deletes in the first case — and React Flow says a handle is in range. A drag
-   * that merely *missed* a handle cancels rather than deleting, so the Edge
-   * survives.
-   */
-  it('keeps the Edge when a connection target in range outranks the empty canvas underneath', () => {
-    const composed = compose();
-    release(composed, mountFlowDom().renderer, RESOLVED_CONNECTION);
-
-    expect(graphsOf(composed.session.getState().working)[0]?.edges).toEqual([EDGE]);
-  });
-});
-
-/**
  * The one claim the canvas adapter owns: it calls `.focus()` on the element the
  * pending continuation resolves to, once that element is drawn.
  *
@@ -1218,82 +1017,66 @@ describe('what a reconnect release decides', () => {
  * environment. What only a tree can show is the resolution itself — a domain
  * subject becoming a React Flow element — and the timing that makes it worth
  * having: an Edge continuation is published synchronously with the Edit, but
- * the projection carrying the reconnected Edge arrives a strategy later, so an
- * adapter that spent it on the render that received it would land focus
- * anywhere but the "Edited Edge" the matrix names.
+ * the projection carrying a new Edge arrives a strategy later, so an adapter
+ * that spent it on the render that received it would land focus anywhere but
+ * the Edge the Edit produced.
  */
 describe('spending a continuation on the canvas', () => {
-  const RECONNECTED = { graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: RESOURCE_C } } as const;
-  const reconnectedFlowEdge = flowEdge(GRAPH_ID, RESOURCE_A, RESOURCE_C);
+  const DRAWN = { graphId: GRAPH_ID, edge: { from: RESOURCE_A, to: RESOURCE_C } } as const;
+  const drawnFlowEdge = flowEdge(GRAPH_ID, RESOURCE_A, RESOURCE_C);
+  const focusDrawn = { target: { kind: 'edge', ...DRAWN }, select: false, then: 'focus' } as const;
 
   it('focuses the Edge on the projection that draws it, not the one before', () => {
     // The real canvas, because resolving the continuation is a DOM lookup: the
     // element only exists once React Flow has drawn the Edge.
-    const { edgeAuthoring, adapter, continuation } = mountCanvas();
+    const { authoring, adapter, continuation } = mountCanvas();
     document.body.focus();
 
     act(() => {
-      edgeAuthoring.openEdgeEditor(SUBJECT);
-      edgeAuthoring.reconnect('to', RESOURCE_C);
+      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
+      continuation.request(focusDrawn);
     });
 
-    // The Edit has completed, but the projection still holds the Edge as it
-    // was — so the continuation is still owed rather than spent on the canvas.
-    expect(continuation.getState().pending).toEqual({
-      target: { kind: 'edge', ...RECONNECTED },
-      select: false,
-      then: 'focus',
-    });
+    // The Edit has completed, but the projection does not hold the Edge yet —
+    // so the continuation is still owed rather than spent on the canvas.
+    expect(continuation.getState().pending).toEqual(focusDrawn);
 
-    // One publication, and the reconnected Edge is an element React Flow has
+    // One publication, and the new Edge is an element React Flow has
     // never drawn — it draws that a commit later, from a store it syncs in an
     // effect of its own. `CanvasContinuation` subscribes to those drawn Edges
     // for exactly this reason, so the spend does not wait on an unrelated
     // render to come along.
-    act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
+    act(() => adapter.getState().syncProjection(NODES, [...EDGES, drawnFlowEdge]));
 
     expect(continuation.getState().pending).toBeNull();
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__edge[data-id="${reconnectedFlowEdge.id}"]`),
+      document.querySelector(`.react-flow__edge[data-id="${drawnFlowEdge.id}"]`),
     );
   });
 
   /**
-   * **The selection survives the focus the continuation spends on it.**
-   *
-   * Landing focus is not the same claim as keeping the selection, and the two
-   * came apart: `reconnect` installs the reconnected subject and *then* asks for
-   * focus, and focus lands on an Edge element whose `onFocus` bridge writes
-   * whatever subject that element is currently drawing back into the union
-   * (`decorated`, above). While a React Flow Edge id named the Edge's *position*
-   * in its Graph, a replaced Edge inherited the previous one's id — so the
-   * element the previous Edge had already drawn answered the query for the
-   * reconnected one, and its still-stale `onFocus` put the Edge the Space no
-   * longer holds back on the union. Nothing then drew selected. Keyed on the
-   * endpoints, the reconnected Edge is a different element, drawn by the
-   * projection that names it, and the bridge writes the subject already stored.
+   * **The selection survives the focus the continuation spends on it.** Focus
+   * lands on an Edge element whose `onFocus` writes the subject it draws back
+   * into the selection, so the element must be the new Edge's own, not one a
+   * departed Edge left behind.
    */
-  it('leaves the reconnected Edge selected, not only focused', () => {
-    const { edgeAuthoring, adapter, continuation } = mountCanvas();
+  it('leaves the Edge it focuses selected, not only focused', () => {
+    const { authoring, adapter, continuation } = mountCanvas();
     document.body.focus();
 
     act(() => {
-      edgeAuthoring.openEdgeEditor(SUBJECT);
-      edgeAuthoring.reconnect('to', RESOURCE_C);
+      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
+      adapter.getState().selectEdge(DRAWN);
+      continuation.request(focusDrawn);
     });
-    act(() => adapter.getState().syncProjection(NODES, [reconnectedFlowEdge, EDGES[1]!]));
+    act(() => adapter.getState().syncProjection(NODES, [...EDGES, drawnFlowEdge]));
 
-    // Asserted after the continuation has been spent, because focus landing is
-    // the event that could take the selection with it.
+    // After the spend, because focus landing could take the selection with it.
     expect(continuation.getState().pending).toBeNull();
-    // Both halves, because "not only focused" is a claim about the pair: the
-    // defect this pins had the focus half true on its own, and a test that
-    // leaves that half to a sibling stops naming what it holds the moment the
-    // sibling moves.
     expect(document.activeElement).toBe(
-      document.querySelector(`.react-flow__edge[data-id="${reconnectedFlowEdge.id}"]`),
+      document.querySelector(`.react-flow__edge[data-id="${drawnFlowEdge.id}"]`),
     );
-    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...RECONNECTED });
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...DRAWN });
   });
 
   /**
@@ -1435,8 +1218,7 @@ describe('the React Flow properties', () => {
       // `null`, not a key pair: deletion is the app's command, answered once by
       // `SpaceCanvas`, so React Flow subscribes no delete key at all.
       deleteKeyCode: null,
-      // Reconnection and focusability are per-Edge, narrowed to the Active
-      // Graph — and, for reconnection, to the selected Edge.
+      // No Edge's end can be moved; focusability is per-Edge, Active Graph only.
       edgesReconnectable: false,
       edgesFocusable: false,
       // Version 1 authors one element at a time.
@@ -1446,7 +1228,7 @@ describe('the React Flow properties', () => {
     });
   });
 
-  it('offers reconnection on the selected Active Graph Edge alone', () => {
+  it('selects and focuses the Active Graph Edge alone, and reconnects none', () => {
     const composed = compose();
     const { result } = renderHook(
       () =>
@@ -1473,8 +1255,8 @@ describe('the React Flow properties', () => {
         reconnectable: edge.reconnectable,
       })),
     ).toEqual([
-      { id: EDGES[0]!.id, selected: true, focusable: true, reconnectable: true },
-      { id: EDGES[1]!.id, selected: false, focusable: false, reconnectable: false },
+      { id: EDGES[0]!.id, selected: true, focusable: true, reconnectable: undefined },
+      { id: EDGES[1]!.id, selected: false, focusable: false, reconnectable: undefined },
     ]);
   });
 

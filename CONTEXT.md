@@ -74,7 +74,9 @@ _Avoid_: route, path, track, tour, journey, sequence, rail, step.
 
 **Edge**:
 A directed connection from one Resource to another, and the element a Graph is made of. An author draws one and the Graph records it. An exact Edge appears at most once in a Graph; drawing it again changes nothing. An Edge belongs to one Graph, so two Graphs crossing the same pair of Resources hold two Edges.
-_Avoid_: link, connection, transition, arrow, step, relationship.
+
+An Edge may carry a one-line **Title**, absent unless an author writes one — nothing mints it. The Title is the Edge's content, not its identity: an Edge is still the one from this Resource to that in its Graph, whatever it is titled. An author may hide an Edge's Title, so it does not draw at rest; that choice is authored and kept, like the Title itself.
+_Avoid_: link, connection, transition, arrow, step, relationship; label for the Edge's Title.
 
 **Active Graph**:
 The one Graph selected in the current Map — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Map may name which Graph opens active; failing that it is the Map's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading.
@@ -201,7 +203,7 @@ Selecting a Resource clears any Selected Edge, and selecting an Edge clears the 
 _Avoid_: focus (that is the browser's, and a Resource may be selected without it), highlight, current Resource, Active Resource (that belongs to Graph navigation or Presenting).
 
 **Selected Edge**:
-The one Edge an authoring gesture will act on in the Active Graph. Selecting it reveals the controls that reconnect or delete that Edge; it does not author the Edge, activate its Graph, or move keyboard focus by itself. An Edge outside the Active Graph cannot remain selected. Selecting an Edge clears the Selected Resource, and selecting a Resource clears the Selected Edge: authoring has one selected subject, never a multi-selection.
+The one Edge an authoring gesture will act on in the Active Graph. Selecting it reveals the controls that act on that Edge; it does not author the Edge, activate its Graph, or move keyboard focus by itself. An Edge outside the Active Graph cannot remain selected. Selecting an Edge clears the Selected Resource, and selecting a Resource clears the Selected Edge: authoring has one selected subject, never a multi-selection.
 _Avoid_: Active Edge (Active belongs to the Graph and Resource used by Graph navigation or Presenting), focused Edge (focus is the browser's), highlighted Edge.
 
 **Active Resource**:

@@ -44,8 +44,7 @@ const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
  * Everything below asserts that a popup or a row is **mounted** rather than
  * visible. Base UI's Positioner holds a popup at `opacity: 0` until it has
  * measured its anchor, and jsdom answers every measurement with zeroes, so
- * `toBeVisible` cannot pass for any popover in this tree — `SelectedEdgeControls`
- * reads the same way. The visibility half of this evidence is
+ * `toBeVisible` cannot pass for any popover in this tree. The visibility half of this evidence is
  * `ladle-e2e/resources-popover.spec.ts`, which runs in a real browser.
  */
 function Fixture({
@@ -983,6 +982,204 @@ describe('ResourcesPopover', () => {
     await openList();
 
     expect(screen.getByRole('button', { name: 'Add Stray to Map' })).toHaveTextContent('Stray');
+  });
+});
+
+/** A Resource's Connect list: the Map's placed Resources bar the source. */
+function ConnectFixture({
+  resources = RESOURCES,
+  refusalOf = () => null,
+  onConnect = () => null,
+  newResource = { refusal: null, onConnect: () => null },
+  onAncestorKeyDown = vi.fn(),
+}: {
+  readonly resources?: readonly Resource[];
+  readonly refusalOf?: (resource: Resource) => string | null;
+  readonly onConnect?: (resource: Resource) => string | null;
+  readonly newResource?: {
+    readonly refusal: string | null;
+    readonly onConnect: () => string | null;
+  };
+  readonly onAncestorKeyDown?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  return (
+    // Stands in for the canvas, a React ancestor of the list.
+    <div onKeyDown={onAncestorKeyDown}>
+      {/* Stands in for the Actions menu trigger the list hangs from. */}
+      <button type="button" ref={setAnchor} onClick={() => setOpen(true)}>
+        Actions for Source
+      </button>
+      <ResourcesPopover
+        purpose="connect"
+        from="Source"
+        resources={resources}
+        allResources={RESOURCES}
+        open={open}
+        onOpenChange={setOpen}
+        anchor={anchor}
+        refusalOf={refusalOf}
+        onConnect={onConnect}
+        newResource={newResource}
+      />
+    </div>
+  );
+}
+
+const openConnectList = async () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Actions for Source' }));
+  return await screen.findByRole('dialog', { name: 'Connect Source' });
+};
+
+describe('ResourcesPopover as a Connect list', () => {
+  it('offers each Resource as a choice to connect to, with no drag and no Spaces source', async () => {
+    render(<ConnectFixture />);
+    await openConnectList();
+
+    const rows = screen.getAllByRole('button', { name: /^Connect to (?!a new)/ });
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'Connect to Alpha',
+      'Connect to Alpha',
+      'Connect to Constraints',
+      'Connect to Zulu',
+    ]);
+    for (const row of rows) {
+      expect(row).not.toHaveAttribute('draggable', 'true');
+      expect(row.querySelector('.resources-popover__row-grip')).toBeNull();
+    }
+    // One toggle per kind, and none for the Spaces an Edge cannot end at.
+    const toggles = screen
+      .getAllByRole('button', { pressed: true })
+      .map((toggle) => toggle.getAttribute('title'));
+    expect(toggles).toHaveLength(resourceSchema.optionsMap.size);
+    expect(toggles).not.toContain('Spaces in this Meta Space');
+  });
+
+  it('keeps a refused Resource listed, unavailable and reachable, with its reason', async () => {
+    const onConnect = vi.fn(() => null);
+    render(
+      <ConnectFixture
+        refusalOf={(resource) => (resource.title === 'Zulu' ? 'This Edge already exists.' : null)}
+        onConnect={onConnect}
+      />,
+    );
+    await openConnectList();
+
+    const zulu = screen.getByRole('button', { name: 'Connect to Zulu' });
+    expect(zulu).toHaveAttribute('aria-disabled', 'true');
+    expect(zulu).toHaveAccessibleDescription('This Edge already exists.');
+    act(() => zulu.focus());
+    expect(zulu).toHaveFocus();
+
+    fireEvent.click(zulu);
+
+    expect(onConnect).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Connect to Constraints' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('draws the Edge to the chosen Resource and closes without taking the caret back', async () => {
+    const onConnect = vi.fn(() => null);
+    render(<ConnectFixture onConnect={onConnect} />);
+    const anchor = screen.getByRole('button', { name: 'Actions for Source' });
+    await openConnectList();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect to Zulu' }));
+
+    expect(onConnect).toHaveBeenCalledWith(RESOURCES[0]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // The new Edge is where the author continues, not the Actions trigger.
+    expect(anchor).not.toHaveFocus();
+  });
+
+  it('keeps the list open with the reason when drawing the Edge is refused', async () => {
+    render(<ConnectFixture onConnect={() => 'This Edge already exists.'} />);
+    await openConnectList();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect to Zulu' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Edge not drawn');
+    expect(screen.getByRole('alert')).toHaveTextContent('This Edge already exists.');
+    expect(screen.getByRole('dialog', { name: 'Connect Source' })).toBeInTheDocument();
+  });
+
+  it('narrows by kind and search, and keeps New Resource last whatever matches', async () => {
+    const created = vi.fn(() => null);
+    render(<ConnectFixture newResource={{ refusal: null, onConnect: created }} />);
+    await openConnectList();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Reference Resources, \d+$/ }));
+    expect(
+      screen.queryByRole('button', { name: 'Connect to Constraints' }),
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search resources' }), {
+      target: { value: 'nothing like it' },
+    });
+    expect(screen.getByText('No matching Resources.')).toBeInTheDocument();
+
+    const buttons = screen.getAllByRole('button');
+    const last = buttons[buttons.length - 1];
+    expect(last).toHaveAccessibleName('Connect to a new Resource');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect to a new Resource' }));
+
+    expect(created).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('draws New Resource unavailable with its reason when it is refused', async () => {
+    render(
+      <ConnectFixture
+        newResource={{ refusal: 'This Resource is not in this Map.', onConnect: () => null }}
+      />,
+    );
+    await openConnectList();
+
+    const row = screen.getByRole('button', { name: 'Connect to a new Resource' });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(row).toHaveAccessibleDescription('This Resource is not in this Map.');
+  });
+
+  it('says so when the Map holds nothing else to connect to', async () => {
+    render(<ConnectFixture resources={[]} />);
+    await openConnectList();
+
+    expect(screen.getByText('No other Resources in this Map.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect to a new Resource' })).toBeInTheDocument();
+  });
+
+  it('has no trigger of its own', () => {
+    render(<ConnectFixture />);
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Actions for Source',
+    ]);
+  });
+
+  it('closes on Escape and returns focus to the control it hangs from', async () => {
+    render(<ConnectFixture />);
+    const anchor = screen.getByRole('button', { name: 'Actions for Source' });
+    const popup = await openConnectList();
+
+    fireEvent.keyDown(popup, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(anchor).toHaveFocus());
+  });
+
+  it('keeps keys typed in it from the canvas it is drawn in', async () => {
+    const onAncestorKeyDown = vi.fn();
+    render(<ConnectFixture onAncestorKeyDown={onAncestorKeyDown} />);
+    await openConnectList();
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search resources' }), {
+      key: 'ArrowRight',
+    });
+
+    expect(onAncestorKeyDown).not.toHaveBeenCalled();
   });
 });
 

@@ -210,6 +210,9 @@ describe('resourceRailGroups', () => {
   const addresses: readonly EntityActionGroup[] = [
     [{ id: 'copy-link', label: 'Copy link', onSelect: () => 'done' }],
   ];
+  const connect: EntityActionGroup = [
+    { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
+  ];
   const everything = {
     createReference: (): EntityActionOutcome => 'done',
     removeFromMap: () => undefined,
@@ -220,24 +223,25 @@ describe('resourceRailGroups', () => {
     groups.map((group) => group.map(({ id }) => id));
 
   it('leads with Create Reference and ends with the commands that leave the Resource', () => {
-    expect(ids(resourceRailGroups(resource(PLACED_A), addresses, everything))).toEqual([
+    expect(ids(resourceRailGroups(resource(PLACED_A), addresses, connect, everything))).toEqual([
       ['create-reference'],
+      ['connect-resource'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
   });
 
-  it('draws only the addresses while nothing else is available', () => {
+  it('draws only Connect to Resource and the addresses while nothing else is available', () => {
     expect(
       ids(
-        resourceRailGroups(resource(PLACED_A), addresses, {
+        resourceRailGroups(resource(PLACED_A), addresses, connect, {
           createReference: null,
           removeFromMap: null,
           deleteFromSpace: null,
           enter: null,
         }),
       ),
-    ).toEqual([['copy-link']]);
+    ).toEqual([['connect-resource'], ['copy-link']]);
   });
 
   it('draws Create Reference unavailable on a Reference Resource', () => {
@@ -247,7 +251,7 @@ describe('resourceRailGroups', () => {
       kind: 'reference',
       target: PLACED_A,
     };
-    const row = resourceRailGroups(reference, addresses, everything)[0]?.[0];
+    const row = resourceRailGroups(reference, addresses, connect, everything)[0]?.[0];
     expect(row).toMatchObject({ id: 'create-reference', disabled: true });
     expect(row?.description).toBe(REFERENCE_TERMINAL);
   });

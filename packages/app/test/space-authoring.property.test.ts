@@ -147,11 +147,10 @@ const operation = fc.oneof(
   fc.record({ op: fc.constant('deleted-graph' as const), graph: index }),
   fc.record({ op: fc.constant('deleted-edge' as const), graph: index, edge: index }),
   fc.record({
-    op: fc.constant('reconnected-edge' as const),
+    op: fc.constant('titled-edge' as const),
     graph: index,
     edge: index,
-    endpoint: fc.constantFrom('from' as const, 'to' as const),
-    resource: index,
+    title: fc.oneof(fc.constant(''), fc.constant('two\nlines'), fc.string({ maxLength: 8 })),
   }),
 );
 
@@ -334,13 +333,12 @@ function resolve(
         graphId,
         edge: pick(graph?.edges ?? [], generated.edge) ?? { from: NOTHING, to: NOTHING },
       };
-    case 'reconnected-edge':
+    case 'titled-edge':
       return {
-        kind: 'reconnected-edge',
+        kind: 'titled-edge',
         graphId,
         edge: pick(graph?.edges ?? [], generated.edge) ?? { from: NOTHING, to: NOTHING },
-        endpoint: generated.endpoint,
-        resourceId,
+        title: generated.title,
       };
   }
 }

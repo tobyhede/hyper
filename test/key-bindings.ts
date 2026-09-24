@@ -180,11 +180,19 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'modify an empty drop into a new Resource connection',
   },
   {
-    module: 'packages/app/src/components/SelectedEdgeControls.tsx',
+    module: 'packages/app/src/edge-authoring-react.tsx',
+    sourceKey: 'Enter',
+    occurrence: 1,
+    key: 'Enter',
+    surface: 'Edge',
+    behaviour: "move focus from the focused Active Graph Edge into its toolbar's first command",
+  },
+  {
+    module: 'packages/app/src/components/AuthorableEdge.tsx',
     sourceKey: 'Escape',
     occurrence: 1,
     key: 'Escape',
-    surface: 'Selected Edge controls',
-    behaviour: 'close endpoint editing when no nested picker is expanded',
+    surface: 'Edge toolbar and Title',
+    behaviour: 'return focus from the Edge chrome to the Edge',
   },
 ];
