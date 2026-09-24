@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
+import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import {
   Button,
   Alert,
@@ -33,6 +34,11 @@ import {
 import './resources-popover.css';
 
 export const RESOURCE_DRAG_TYPE = 'application/x-hyper-resource-id';
+/**
+ * A Space row's drag carries the Space's id under its own type, so the canvas
+ * can tell which source a drop came from before it reads the id.
+ */
+export const SPACE_DRAG_TYPE = 'application/x-hyper-space-id';
 
 type Activation = 'keyboard' | 'pointer';
 
@@ -77,12 +83,6 @@ const FILTERS = everyFilter(['markdown', 'reference', 'space', 'spaces']);
  * it, which is the gesture a reader reaches for when a kind is in the way.
  */
 const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
-
-/** One Space this Meta Space holds, as the list offers it. */
-export interface ResourcesPopoverSpace {
-  readonly id: UUID;
-  readonly title: string;
-}
 
 const FILTER_NAMES = {
   markdown: 'Markdown Resources',
@@ -156,7 +156,13 @@ export interface ResourcesPopoverProps {
   readonly triggerLabel?: ReactNode | undefined;
   /** Returns a refusal that remains on this surface, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: Activation) => string | null;
-  readonly onDragStart: (resourceId: ResourceId) => void;
+  /**
+   * A Resource row has left the list on a drag.
+   *
+   * `settle` is where the drop's answer comes back, bound to the opening the
+   * drag started from, as {@link onSpaceDragStart}'s is.
+   */
+  readonly onDragStart: (resourceId: ResourceId, settle: SettleResource) => void;
   readonly onDragEnd?: (() => void) | undefined;
   readonly revealedResourceId?: ResourceId | null | undefined;
   /**
@@ -187,6 +193,17 @@ export interface ResourcesPopoverProps {
    * or `null`.
    */
   readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
+  /**
+   * A Space row has left the list on a drag.
+   *
+   * `settle` is where the drop's answer comes back: it is the settlement a
+   * press on the same row spends, bound to the opening the drag started from,
+   * so a refusal lands on the list that asked for it — see
+   * {@link StandingRefusal}. Without this a Space row is pressed only, and draws
+   * no grip.
+   */
+  readonly onSpaceDragStart?:
+    ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;
 }
 
 /**
@@ -266,13 +283,16 @@ function RowGrip() {
  * The sentence standing on the list, and which opening of it asked for one.
  *
  * **The reset cannot clear a refusal that has not arrived yet.** Only the popup
- * unmounts, so the component and this state outlive every close, and
- * `onAddSpace` is a coordinated cross-Space Edit that settles arbitrarily
- * later: press a Space row, press Escape, and the answer lands *behind* the
- * reset that was supposed to forget it. The next open would then draw a red
- * alert with no gesture behind it — precisely the state the reset exists to
- * make unreachable. So a placement carries the opening it was asked from, and a
- * settlement is applied only where that opening is still the one on screen.
+ * unmounts, so the component and this state outlive every close, and an answer
+ * can arrive after one. Placing a Space is a coordinated cross-Space Edit that
+ * settles arbitrarily later, whether its row was pressed or dropped; and any
+ * row, of either kind, dropped on the canvas answers when the drop lands, which
+ * is after the drag and possibly after Escape. Either way the answer lands
+ * *behind* the reset that was supposed to forget it. The next open would then
+ * draw a red alert with no gesture behind it — precisely the state the reset
+ * exists to make unreachable. So a placement carries the opening it was asked
+ * from, and a settlement is applied only where that opening is still the one
+ * on screen.
  *
  * **The counter rides on the same state as the sentence** rather than on a ref,
  * which is what lets a late settlement be dropped in the updater — comparing
@@ -282,8 +302,9 @@ function RowGrip() {
  * A counter rather than the open flag, because the list can be reopened while
  * an Edit is still in flight, and that opening did not ask for it either.
  *
- * The Resource arm needs none of this: `onAdd` answers synchronously, so its
- * refusal is installed by the press that caused it.
+ * A row dragged onto the canvas asks from the opening it left: the
+ * settlement handed out at its dragstart is bound to that opening, so the drop
+ * reports exactly as a press made at that moment would.
  */
 interface StandingRefusal {
   readonly opening: number;
@@ -345,6 +366,7 @@ export function ResourcesPopover({
   spaceTitleById,
   spaces = NO_SPACES,
   onAddSpace,
+  onSpaceDragStart,
 }: ResourcesPopoverProps) {
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState<readonly ResourcesFilter[]>(ALL_FILTERS);
@@ -485,8 +507,8 @@ export function ResourcesPopover({
   }, [titleById, spaceTitles, resources, spaces, shown, needle]);
 
   /**
-   * What a Space placement answered, drawn only on the opening that asked for
-   * it — see {@link StandingRefusal}.
+   * What a Space placement or a dropped Resource answered, drawn only on the
+   * opening that asked for it — see {@link StandingRefusal}.
    */
   const showSettlement =
     (asked: number) =>
@@ -494,9 +516,10 @@ export function ResourcesPopover({
       setStanding((current) => (current.opening === asked ? { ...current, said } : current));
     };
   /**
-   * The rejection arm of a Space placement, hoisted so the caught value takes
-   * its type from {@link SpaceResourceBreak} rather than from an annotation written
-   * at the `then`.
+   * The rejection arm of a Space placement, pressed or dropped — see
+   * {@link settlementFor} — hoisted so the caught value takes its type from
+   * {@link SpaceResourceBreak} rather than from an annotation written at the
+   * `then`.
    */
   const showBreak =
     (asked: number): SpaceResourceBreak =>
@@ -506,10 +529,32 @@ export function ResourcesPopover({
       return said;
     };
 
+  /**
+   * The one way a Space placement's answer — a drop's or a press's — reaches
+   * this list: a standing sentence goes as the placement is asked for, and
+   * whatever it answers is drawn on the opening `asked` names.
+   */
+  const settlementFor =
+    (asked: number): SettlePlacement =>
+    (answer) => {
+      showSettlement(asked)(null);
+      void answer.then(showSettlement(asked), showBreak(asked));
+    };
+
   const beginDrag = (event: DragEvent<HTMLButtonElement>, resourceId: ResourceId): void => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(RESOURCE_DRAG_TYPE, resourceId);
-    onDragStart(resourceId);
+    onDragStart(resourceId, showSettlement(standing.opening));
+  };
+
+  const beginSpaceDrag = (
+    event: DragEvent<HTMLButtonElement>,
+    space: ResourcesPopoverSpace,
+    started: (space: ResourcesPopoverSpace, settle: SettlePlacement) => void,
+  ): void => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(SPACE_DRAG_TYPE, space.id);
+    started(space, settlementFor(standing.opening));
   };
 
   return (
@@ -633,103 +678,118 @@ export function ResourcesPopover({
           </p>
         ) : (
           <ul className="resources-popover__list">
-            {visible.map(({ key, name, row }) => (
-              <li key={key}>
-                {/* **A row is a button, and the drag is the shortcut.** ADR 0082
-                    binds that everything the surface offers is operable from the
-                    keyboard alone, and names this case: a drag may be *a* way to
-                    place a Resource into a Map and is never the only one.
+            {visible.map(({ key, name, row }) => {
+              // Whether this row drags is decided once, here: a Resource row
+              // always does, a Space row only when something takes its drag.
+              // Everything drag-shaped below — `draggable`, the title, both
+              // drag handlers and the grip — reads this one answer.
+              const startDrag =
+                row.kind === 'resource'
+                  ? (event: DragEvent<HTMLButtonElement>) => beginDrag(event, row.resource.id)
+                  : onSpaceDragStart === undefined
+                    ? undefined
+                    : (event: DragEvent<HTMLButtonElement>) =>
+                        beginSpaceDrag(event, row.space, onSpaceDragStart);
+              return (
+                <li key={key}>
+                  {/* **A row is a button, and the drag is the shortcut.** ADR 0082
+                      binds that everything the surface offers is operable from the
+                      keyboard alone, and names this case: a drag may be *a* way to
+                      place a Resource into a Map and is never the only one.
 
-                    A native button rather than a `div` with a role and a
-                    `tabIndex`: Enter and Space activating a control is the
-                    platform's, and the three attributes it would take to
-                    reproduce that are three chances to reproduce it wrong. The
-                    list stays open either way, so adding several Resources costs one
-                    disclosure.
+                      A native button rather than a `div` with a role and a
+                      `tabIndex`: Enter and Space activating a control is the
+                      platform's, and the three attributes it would take to
+                      reproduce that are three chances to reproduce it wrong. The
+                      list stays open either way, so adding several Resources costs one
+                      disclosure.
 
-                    **One row shape over two sources.** A Resource joins the Map;
-                    a Space joins it by authoring the Space Resource that frames it.
-                    What differs is the glyph and which completion the press
-                    spends — not the control, the label or the gesture, because
-                    to the reader both are "put this on the canvas". */}
-                <Button
-                  variant="ghost"
-                  draggable={row.kind === 'resource'}
-                  data-resource-id={row.kind === 'resource' ? row.resource.id : undefined}
-                  data-space-id={row.kind === 'space' ? row.space.id : undefined}
-                  aria-current={
-                    row.kind === 'resource' && row.resource.id === revealedResourceId
-                      ? 'true'
-                      : undefined
-                  }
-                  className="resources-popover__row w-full justify-start"
-                  aria-label={`Add ${name} to Map`}
-                  title={
-                    row.kind === 'resource'
-                      ? 'Add to Map, or drag it onto the canvas'
-                      : 'Add a Space Resource for this Space to the Map'
-                  }
-                  onDragStart={
-                    row.kind === 'resource'
-                      ? (event) => beginDrag(event, row.resource.id)
-                      : undefined
-                  }
-                  onDragEnd={row.kind === 'resource' ? onDragEnd : undefined}
-                  onClick={(event) => {
-                    // `detail === 0` is the platform's own answer for a press
-                    // that came from Enter or Space rather than a pointer.
-                    const activation = event.detail === 0 ? 'keyboard' : 'pointer';
-                    if (row.kind === 'resource') {
-                      const next = onAdd(row.resource, activation);
-                      if (next === null && activation === 'keyboard') filterField.current?.focus();
-                      setRefusal(next);
-                      return;
+                      **One row shape over two sources.** A Resource joins the Map;
+                      a Space joins it by authoring the Space Resource that frames it.
+                      What differs is the glyph and which completion the press or
+                      the drop spends — not the control, the label or the gestures,
+                      because to the reader both are "put this on the canvas". */}
+                  <Button
+                    variant="ghost"
+                    draggable={startDrag !== undefined}
+                    data-resource-id={row.kind === 'resource' ? row.resource.id : undefined}
+                    data-space-id={row.kind === 'space' ? row.space.id : undefined}
+                    aria-current={
+                      row.kind === 'resource' && row.resource.id === revealedResourceId
+                        ? 'true'
+                        : undefined
                     }
-                    // **The caret stays put here, where a Resource Add moves it.**
-                    // The rule is the one written above `filterField`, not an
-                    // exception to it: the caret moves because a completed Add
-                    // takes its own row away, and a Space row is not taken
-                    // away. `referenceableSpaces` withholds only the containing
-                    // Space, so a Space stays offered however many Space Resources
-                    // frame it — ADR 0074's convergence, which is why two Resources
-                    // may reference one Space. Moving the caret off a row that
-                    // is still there costs the reader their place in the list
-                    // and claims a completion the surface cannot see.
-                    //
-                    // A refusal still arrives here either way, on the list that
-                    // asked for it.
-                    setRefusal(null);
-                    // A rejection arm as well as a resolution one: a caller
-                    // that breaks rather than refusing would otherwise leave
-                    // this row having visibly done nothing, with the only trace
-                    // an unhandled rejection nobody reads. `App` reports the
-                    // same break on its own channel; this is what the reader
-                    // who pressed the row sees — as long as they are still
-                    // reading the list they asked from, which the opening this
-                    // press was made on is what decides.
-                    const asked = standing.opening;
-                    void onAddSpace?.(row.space).then(showSettlement(asked), showBreak(asked));
-                  }}
-                >
-                  {/* Only where a drag actually starts. A Space is placed by
-                      authoring the Space Resource that frames it, which is a press
-                      and not a drop, so a grip here would promise a gesture
-                      that fires no `dragstart` and answers with nothing. */}
-                  {row.kind === 'resource' ? <RowGrip /> : null}
-                  {row.kind === 'resource' ? (
-                    <ResourceKindIcon kind={row.resource.kind} />
-                  ) : (
-                    <SpaceIcon />
-                  )}
-                  {/* The name, not the whole Title: this is a row in a list
-                      being scanned down, and ADR 0083 puts the ladder on the
-                      Resource front rather than on every surface that names one. A
-                      Space's own title is one line under that ADR, so there the
-                      Title and the name are the same string. */}
-                  <span className="resources-popover__row-title">{name}</span>
-                </Button>
-              </li>
-            ))}
+                    className="resources-popover__row w-full justify-start"
+                    aria-label={`Add ${name} to Map`}
+                    title={
+                      row.kind === 'resource'
+                        ? 'Add to Map, or drag it onto the canvas'
+                        : startDrag === undefined
+                          ? 'Add a Space Resource for this Space to the Map'
+                          : 'Add a Space Resource for this Space to the Map, or drag it onto the canvas'
+                    }
+                    onDragStart={startDrag}
+                    onDragEnd={startDrag === undefined ? undefined : onDragEnd}
+                    onClick={(event) => {
+                      // `detail === 0` is the platform's own answer for a press
+                      // that came from Enter or Space rather than a pointer.
+                      const activation = event.detail === 0 ? 'keyboard' : 'pointer';
+                      if (row.kind === 'resource') {
+                        const next = onAdd(row.resource, activation);
+                        if (next === null && activation === 'keyboard')
+                          filterField.current?.focus();
+                        setRefusal(next);
+                        return;
+                      }
+                      // **The caret stays put here, where a Resource Add moves it.**
+                      // The rule is the one written above `filterField`, not an
+                      // exception to it: the caret moves because a completed Add
+                      // takes its own row away, and a Space row is not taken
+                      // away. `referenceableSpaces` withholds only the containing
+                      // Space, so a Space stays offered however many Space Resources
+                      // frame it — ADR 0074's convergence, which is why two Resources
+                      // may reference one Space. Moving the caret off a row that
+                      // is still there costs the reader their place in the list
+                      // and claims a completion the surface cannot see.
+                      //
+                      // A refusal still arrives here either way, on the list that
+                      // asked for it.
+                      //
+                      // `settlementFor` takes a rejection arm as well as a
+                      // resolution one: a caller that breaks rather than refusing
+                      // would otherwise leave this row having visibly done
+                      // nothing, with the only trace an unhandled rejection nobody
+                      // reads. `App` reports the same break on its own channel;
+                      // this is what the reader who pressed the row sees — as long
+                      // as they are still reading the list they asked from, which
+                      // the opening this press was made on is what decides. A drop
+                      // spends the same settlement, bound at its dragstart.
+                      if (onAddSpace === undefined) {
+                        setRefusal(null);
+                        return;
+                      }
+                      settlementFor(standing.opening)(onAddSpace(row.space));
+                    }}
+                  >
+                    {/* Only where a drag actually starts: a grip on a row with
+                        no `onSpaceDragStart` behind it would promise a gesture
+                        that fires no `dragstart` and answers with nothing. */}
+                    {startDrag === undefined ? null : <RowGrip />}
+                    {row.kind === 'resource' ? (
+                      <ResourceKindIcon kind={row.resource.kind} />
+                    ) : (
+                      <SpaceIcon />
+                    )}
+                    {/* The name, not the whole Title: this is a row in a list
+                        being scanned down, and ADR 0083 puts the ladder on the
+                        Resource front rather than on every surface that names one. A
+                        Space's own title is one line under that ADR, so there the
+                        Title and the name are the same string. */}
+                    <span className="resources-popover__row-title">{name}</span>
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </PopoverContent>

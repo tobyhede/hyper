@@ -42,6 +42,12 @@ import { useSpaceResourceTargets } from './space-resource-targets';
 import { usePlacementRendering } from './placement-rendering';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH, resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
+import {
+  completedResourceDrag,
+  completedSpaceDrag,
+  type ResourcesDrag,
+  type ResourcesPopoverSpace,
+} from './resources-drag';
 import { copyLink } from './clipboard';
 import { openIndependently } from './open-independently';
 import {
@@ -108,12 +114,6 @@ const REFERENCE_OFFSET_RATIO = 0.75;
 /** A request that the Dock disclose its Resources list, naming the addressed Resource that asked. */
 interface ResourcesDisclosure {
   readonly resourceId: ResourceId;
-}
-
-/** A Resource being dragged from the Resources list, and the Map selected when the drag began. */
-interface ResourcesDrag {
-  readonly resourceId: ResourceId;
-  readonly mapId: MapId;
 }
 
 /** The Map and Resource an address last revealed the Resources list for. */
@@ -420,27 +420,31 @@ export const createApp = (
     /**
      * Placing a Space: the Space Resource that frames it, authored in this Map.
      *
-     * The same `link` the creation pane spends, from the surface that offers
-     * the Space — so a reader who found it in the list never meets a second
-     * picker asking which Space they meant. The Title defaults to the Space's
-     * own, which is the name they just read on the row; renaming it afterwards
-     * is the ordinary inline Title edit every Resource has (ADR 0083).
+     * Spent from the surface that offers the Space — so a reader who found it
+     * in the list never meets a picker asking which Space they meant. The
+     * Title defaults to the Space's own, which is the name they just read on
+     * the row; renaming it afterwards is the ordinary inline Title edit every
+     * Resource has (ADR 0083).
+     *
+     * The anchor is the caller's, as `addExistingResource`'s is: a press
+     * passes the visible centre, read at the press, and a drop (`dropSpace`)
+     * passes the anchor the canvas read from where it landed.
      */
     const addSpaceResourceFor = useCallback(
-      async (space: { readonly id: UUID; readonly title: string }): Promise<string | null> => {
+      async (space: ResourcesPopoverSpace, anchor: MapPosition): Promise<string | null> => {
         // Answers rather than rejects, for `readReferenceableSpaces`'s reason
-        // and one more: the list spends this on a press, so a rejection left to
-        // travel is a row that visibly does nothing. `resolveMap` is inside
-        // the `try` because it is the likeliest break on this path — the list
-        // has been open across renders and the Map it resolves is the one
-        // drawing now.
+        // and one more: the list spends this on a press or a drop of one of
+        // its rows, so a rejection left to travel is a row that visibly does
+        // nothing. `resolveMap` is inside the `try` because it is the
+        // likeliest break on this path — the list has been open across renders
+        // and the Map it resolves is the one drawing now.
         try {
           const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
           const result = await spaceResources.link({
             containingSpaceId: currentSpace().id,
             mapId: resolved.map.id,
             title: space.title,
-            position: centreAnchor(),
+            position: anchor,
             targetSpaceId: space.id,
           });
           return result.kind === 'refused' ? describeSpaceResourceRefusal(result.refusal) : null;
@@ -451,7 +455,7 @@ export const createApp = (
           return describeSpaceResourceBreak(failure);
         }
       },
-      [centreAnchor],
+      [],
     );
 
     const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
@@ -1166,10 +1170,6 @@ export const createApp = (
      * `resourcesOutsideSelectedMap`, so the row the reader activated is already
      * gone. The Resources list is still on screen though, and it is the surface
      * that asked — so it keeps the sentence, in the `Alert` above its list.
-     *
-     * `dropExistingResource` below discards the same string on purpose: a drop
-     * ends on the canvas, and by then the list that named the Resource may be
-     * dismissed, leaving nowhere the sentence belongs.
      */
     const addExistingResource = useCallback(
       (resourceId: ResourceId, anchor: MapPosition, focus: boolean): string | null => {
@@ -1194,12 +1194,29 @@ export const createApp = (
 
     const dropExistingResource = useCallback(
       (resourceId: ResourceId, anchor: MapPosition): void => {
-        const drag = resourcesDrag.current;
+        const drag = completedResourceDrag(resourcesDrag.current, resourceId, selectedMapId);
         resourcesDrag.current = null;
-        if (drag?.resourceId !== resourceId || drag.mapId !== selectedMapId) return;
-        addExistingResource(resourceId, anchor, false);
+        if (drag === null) return;
+        drag.settle(addExistingResource(resourceId, anchor, false));
       },
       [addExistingResource, selectedMapId],
+    );
+
+    /**
+     * A Space dropped from the Resources list: the same placement a press
+     * spends, at the drop point, with its answer settled on the list that
+     * started the drag. `addSpaceResourceFor` answers rather than rejects and
+     * reports a break on the operational channel itself, so the settlement is
+     * all that is left to do here.
+     */
+    const dropSpace = useCallback(
+      (spaceId: UUID, anchor: MapPosition): void => {
+        const drag = completedSpaceDrag(resourcesDrag.current, spaceId, selectedMapId);
+        resourcesDrag.current = null;
+        if (drag === null) return;
+        drag.settle(addSpaceResourceFor(drag.space, anchor));
+      },
+      [addSpaceResourceFor, selectedMapId],
     );
 
     /**
@@ -1600,7 +1617,7 @@ export const createApp = (
                 allResources: renderedSpace.resources,
                 spaceTitleById,
                 spaces: metaSpaces,
-                onAddSpace: addSpaceResourceFor,
+                onAddSpace: (space) => addSpaceResourceFor(space, centreAnchor()),
                 disabled: !availability.resourcesView,
                 disclose: discloseResources,
                 revealedResourceId: addressedResourceId,
@@ -1612,8 +1629,16 @@ export const createApp = (
                    (`ResourcesPopover`). Escape is the way out to the canvas, and
                    it returns focus to the trigger the list hangs off. */
                 onAdd: (resource) => addExistingResource(resource.id, centreAnchor(), false),
-                onDragStart: (resourceId) => {
-                  resourcesDrag.current = { resourceId, mapId: selectedMapId };
+                onDragStart: (resourceId, settle) => {
+                  resourcesDrag.current = {
+                    kind: 'resource',
+                    resourceId,
+                    mapId: selectedMapId,
+                    settle,
+                  };
+                },
+                onSpaceDragStart: (space, settle) => {
+                  resourcesDrag.current = { kind: 'space', space, mapId: selectedMapId, settle };
                 },
                 onDragEnd: () => {
                   resourcesDrag.current = null;
@@ -1799,6 +1824,7 @@ export const createApp = (
                 newResourceTitle={newResourceTitle}
                 onAddResource={addResource}
                 onAddExistingResource={dropExistingResource}
+                onPlaceSpace={dropSpace}
                 nameOnCreation={nameOnCreation}
                 authoring={authoring}
                 spaceSession={spaceSession}

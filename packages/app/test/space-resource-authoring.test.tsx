@@ -980,3 +980,55 @@ describe('referencing an existing Space', () => {
     await settled(session);
   });
 });
+
+/**
+ * **A Space dropped from the list answers exactly as a pressed one does.**
+ *
+ * `ResourcesPopover.test.tsx` holds the list's half and `SpaceCanvas.test.tsx`
+ * the pane's; this is `App` joining them, which neither mounts. A drop whose
+ * answer `App` never settled would pass both and leave the row having visibly
+ * done nothing.
+ */
+describe('dropping an existing Space onto the canvas', () => {
+  it('shows a broken drop on the list it left, and reports the break', async () => {
+    const reported = vi.fn();
+    const { session } = mount(
+      other,
+      { link: () => Promise.reject(new Error('the coordination lost a session')) },
+      reported,
+    );
+    await readyToAuthor();
+    const list = await openResourcesList();
+    const carried = new Map<string, string>();
+    const types: string[] = [];
+    const dataTransfer = {
+      types,
+      dropEffect: 'none',
+      effectAllowed: 'none',
+      setData: (type: string, value: string) => {
+        carried.set(type, value);
+        types.push(type);
+      },
+      getData: (type: string) => carried.get(type) ?? '',
+    };
+
+    fireEvent.dragStart(within(list).getByRole('button', { name: 'Add Other Space to Map' }), {
+      dataTransfer,
+    });
+    const pane = document.querySelector<HTMLElement>('.react-flow__pane');
+    if (pane === null) throw new Error('No pane is drawn.');
+    await act(async () => {
+      fireEvent.drop(pane, { dataTransfer });
+      await Promise.resolve();
+    });
+
+    const alert = await within(list).findByRole('alert');
+    expect(alert).toHaveTextContent('Resource not added');
+    expect(alert).toHaveTextContent(
+      'This Space Resource was not added: the coordination lost a session',
+    );
+    expect(reported).toHaveBeenCalled();
+    expect(spaceResourcesOf(session)).toEqual([]);
+    await settled(session);
+  });
+});

@@ -106,6 +106,7 @@ import {
 import type { Resource, ResourceId, Graph, GraphId, Map, MapId, UUID } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { StoredSpaceRefusal } from '../space-authoring';
+import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
@@ -132,7 +133,7 @@ import {
   SPACES_LABEL,
 } from '../dock-model';
 import { RESOURCES_TRIGGER, SET_TRIGGER } from './command-dock-triggers';
-import { ResourcesPopover, type ResourcesPopoverSpace } from './ResourcesPopover';
+import { ResourcesPopover } from './ResourcesPopover';
 import './command-dock.css';
 
 /**
@@ -538,7 +539,11 @@ export interface DockResourcesList {
   readonly onAddSpace?: ((space: ResourcesPopoverSpace) => Promise<string | null>) | undefined;
   /** Returns a refusal that stays on the list, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
-  readonly onDragStart: (resourceId: ResourceId) => void;
+  /** A Resource row left the list on a drag; `settle` takes the drop's answer back to that list. */
+  readonly onDragStart: (resourceId: ResourceId, settle: SettleResource) => void;
+  /** A Space row left the list on a drag; `settle` takes the drop's answer back to that list. */
+  readonly onSpaceDragStart?:
+    ((space: ResourcesPopoverSpace, settle: SettlePlacement) => void) | undefined;
   readonly onDragEnd?: (() => void) | undefined;
   /** The row an addressed Resource marks as current, drawn whether or not it opened the list. */
   readonly revealedResourceId?: ResourceId | null | undefined;
@@ -1543,6 +1548,7 @@ function ResourcesList({
       onAddSpace={list.onAddSpace}
       onAdd={list.onAdd}
       onDragStart={list.onDragStart}
+      onSpaceDragStart={list.onSpaceDragStart}
       onDragEnd={list.onDragEnd}
       revealedResourceId={list.revealedResourceId}
     />

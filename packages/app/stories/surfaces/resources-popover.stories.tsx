@@ -1,11 +1,12 @@
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Story } from '@ladle/react';
 import { uuidSchema, type Resource, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { ResourcesPopover } from '#components/ResourcesPopover';
+import { ResourcesPopover, SPACE_DRAG_TYPE } from '#components/ResourcesPopover';
 import { PersistenceNotice } from '#components/PersistenceControl';
 import { describeAuthoringRefusal } from '#src/authoring-refusal';
 import { composeApp } from '#src/compose-app';
+import type { SpaceDrag } from '#src/resources-drag';
 import { sparseAuthoredSnapshot } from '../support/spaces';
 
 export default { title: 'Surfaces/Resources Popover' };
@@ -68,6 +69,13 @@ function ResourcesPopoverFixture({
   // screen and still able to keep focus itself.
   const [placed, setPlaced] = useState<readonly string[]>([]);
   const outside = resources.filter((resource) => !placed.includes(resource.id));
+  // The Space drag the list started, held the way the application holds it:
+  // the row and the settlement bound to the opening it left, spent on the drop.
+  const spaceDrag = useRef<Omit<SpaceDrag, 'mapId'> | null>(null);
+  const placeSpace = (space: { readonly id: UUID; readonly title: string }) => {
+    setAdded((titles) => [...titles, space.title]);
+    return Promise.resolve(null);
+  };
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-2 border-b p-2">
@@ -85,9 +93,12 @@ function ResourcesPopoverFixture({
           }}
           onDragStart={() => undefined}
           spaces={spaces}
-          onAddSpace={(space) => {
-            setAdded((titles) => [...titles, space.title]);
-            return Promise.resolve(null);
+          onAddSpace={placeSpace}
+          onSpaceDragStart={(space, settle) => {
+            spaceDrag.current = { kind: 'space', space, settle };
+          }}
+          onDragEnd={() => {
+            spaceDrag.current = null;
           }}
         />
       </header>
@@ -96,6 +107,16 @@ function ResourcesPopoverFixture({
         type="button"
         className="flex-1 text-sm text-muted-foreground"
         onClick={() => setAdded((titles) => [...titles, 'canvas'])}
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes(SPACE_DRAG_TYPE)) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          const drag = spaceDrag.current;
+          spaceDrag.current = null;
+          if (drag?.space.id !== event.dataTransfer.getData(SPACE_DRAG_TYPE)) return;
+          event.preventDefault();
+          drag.settle(placeSpace(drag.space));
+        }}
       >
         The canvas behind it
       </button>
@@ -165,6 +186,9 @@ AvailableResources.meta = { iframed: true };
  * at it (ADR 0074). The rows interleave by name because the reader is looking
  * for a name, and each carries the glyph that says which it is — the same pair
  * the filter draws.
+ *
+ * A Space row drags as a Resource row does: the stand-in canvas behind the
+ * list takes the drop and settles its answer through the list that started it.
  */
 export const MetaSpaces: Story = () => <ResourcesPopoverFixture spaces={SPACES} />;
 MetaSpaces.meta = { iframed: true };

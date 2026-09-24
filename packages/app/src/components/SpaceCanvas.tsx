@@ -30,6 +30,7 @@ import {
   type ResourceId,
   type Graph,
   type GraphId,
+  type UUID,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, type EntityActionGroup } from '@project/ui';
@@ -51,7 +52,7 @@ import type { CanvasSelection, ResourceResize, EdgeSubject } from '../render-ada
 import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { RESOURCE_SIZE } from '../resource';
-import { RESOURCE_DRAG_TYPE } from './ResourcesPopover';
+import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from './ResourcesPopover';
 import { OverviewCamera, PresentingCamera, OpeningFramingCamera } from './cameras';
 import {
   canvasNodeConnection,
@@ -237,6 +238,11 @@ export interface SpaceCanvasProps {
     anchor: { readonly x: number; readonly y: number },
   ) => void;
   /**
+   * Complete an external Resources View drop of a Space at an authored top-left
+   * anchor — authoring the Space Resource that frames it.
+   */
+  onPlaceSpace: (spaceId: UUID, anchor: { readonly x: number; readonly y: number }) => void;
+  /**
    * The Resource a completed creation asks to be named, or `null`.
    *
    * The identity, not a flag: each creation mints a fresh one, so a *change* is
@@ -323,6 +329,7 @@ export function SpaceCanvas({
   newResourceTitle,
   onAddResource,
   onAddExistingResource,
+  onPlaceSpace,
   nameOnCreation,
   authoring,
   spaceSession,
@@ -1099,7 +1106,11 @@ export function SpaceCanvas({
 
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
-      if (!availability.authorOnCanvas || !event.dataTransfer.types.includes(RESOURCE_DRAG_TYPE))
+      const { types } = event.dataTransfer;
+      if (
+        !availability.authorOnCanvas ||
+        !(types.includes(RESOURCE_DRAG_TYPE) || types.includes(SPACE_DRAG_TYPE))
+      )
         return;
       if (!(event.target instanceof Element) || event.target.closest('.react-flow__pane') === null)
         return;
@@ -1113,16 +1124,25 @@ export function SpaceCanvas({
     (event: ReactDragEvent<HTMLDivElement>) => {
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.target.closest('.react-flow__pane') === null) return;
+      // Each source under its own type, so a drop is read as what the list
+      // said it carried and never as the other source's id.
       const resourceId = uuidSchema.safeParse(event.dataTransfer.getData(RESOURCE_DRAG_TYPE));
-      if (!resourceId.success) return;
+      const spaceId = uuidSchema.safeParse(event.dataTransfer.getData(SPACE_DRAG_TYPE));
+      if (!resourceId.success && !spaceId.success) return;
       event.preventDefault();
+      // A collapsed Resource centred on the pointer, for either source. That a
+      // dropped Space Resource is drawn at this size too, so the anchor centres
+      // it, is held by `e2e/space-resource.spec.ts` ("dragging a Space from
+      // the Resources list places its Space Resource at the drop point").
       const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      onAddExistingResource(resourceId.data, {
+      const anchor = {
         x: point.x - RESOURCE_SIZE.width / 2,
         y: point.y - RESOURCE_SIZE.height / 2,
-      });
+      };
+      if (resourceId.success) onAddExistingResource(resourceId.data, anchor);
+      else if (spaceId.success) onPlaceSpace(spaceId.data, anchor);
     },
-    [availability.authorOnCanvas, onAddExistingResource, screenToFlowPosition],
+    [availability.authorOnCanvas, onAddExistingResource, onPlaceSpace, screenToFlowPosition],
   );
 
   const embeddedEvents = useMemo(() => {
