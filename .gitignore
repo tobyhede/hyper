@@ -28,6 +28,10 @@ test-results/
 !.agents/skills/
 .claude/*
 !.claude/skills/
+# The PreToolUse hook that refuses a Co-Authored-By trailer is shared, and
+# settings.json is what registers it.
+!.claude/hooks/
+!.claude/settings.json
 .serena/
 .worktrees/
 
