@@ -1,27 +1,20 @@
-# 24: Say why a refused replay did not save
+# 24 — Explain blocked saves and offer explicit Retry
 
-**Status:** needs-triage
+**What to build:** When a coordinated save cannot replay, show the current reason, identify any Space whose conflict blocks it, and provide a way to reach that Space. Preserve unsaved Edits and offer explicit Retry after the blocker is resolved. Resolving the blocker does not automatically replay the save.
 
-**Blocked by:** None; follows 23
+**Blocked by:** None — can start immediately. Recovery correctness prerequisites 14 and 23 are merged.
 
-**Problem:** A coordinated recovery's replay can now be refused before it reaches the backend: `planReplay` answers `persistence-recovery-required` when one of its participants needs recovery under another coordination (23). `createSpaceSessionRegistry`'s `replay` discards that answer (`void coordinate(...).catch(() => undefined)` in `session-registry.ts`), so nothing tells the author why their Edit did not save.
+**Status:** ready-for-agent
 
-## Sequence
+**Priority:** P2
 
-1. C0 creates a Space Resource for TARGET in Meta and is answered `permanent-failure`. Meta and TARGET are `rejected` and hold C0's recovery.
-2. C1 creates a Space Resource for CHILD in TARGET and is answered `conflict`. TARGET and CHILD are `conflicted` under C1.
-3. The author edits Meta. `submit` installs the Edit in `working` and calls C0's `retry`. The replay is refused because TARGET needs C1's recovery. C0 returns to its earlier phase.
+**Decision confirmed:** Use explicit Retry. A refused replay must be visible and recoverable without requiring another Edit. Automatic replay after another coordination resolves is outside this ticket.
 
-**Observed:** Meta still shows C0's original `forbidden` rejection. Its newest `working` is unsaved, and nothing names TARGET as the Space to resolve first. Resolving C1 does not re-run Meta's replay, so Meta's Edits are persisted only after one more Edit.
+**Reproduction:** A coordinated Space Resource creation leaves Meta and TARGET rejected under recovery C0. A later creation leaves TARGET and CHILD conflicted under C1. Editing Meta attempts C0's replay, which refuses because TARGET needs C1's recovery. Previously, Meta retained its original rejection without explaining that TARGET now blocks saving; resolving C1 alone did not save Meta's Edits.
 
-A replay refused by a failed aggregate read is also dropped this way (14). After 23, an ordinary sequence can reach this path too.
-
-## To decide
-
-- Whether the refusal becomes part of the requesting participant's persistence state, for example a `refused` carrying `persistence-recovery-required` and the blocking Space, or is reported some other way.
-- Whether resolving the blocking coordination should re-run a replay that was refused.
-
-## Acceptance
-
-- A test drives the sequence above and asserts that Meta's state names TARGET as the Space that must recover first.
-- The chosen answer to re-running is written down and tested.
+- [ ] Drive that sequence and assert that Meta's persistence feedback identifies TARGET as the Space requiring recovery, instead of retaining only the original rejection.
+- [ ] The application provides a way to reach the blocking Space and resolve its conflict while preserving all unsaved Edits.
+- [ ] Resolving the blocking coordination does not automatically replay the requesting save; an explicit Retry saves the latest working Edits without requiring another Edit.
+- [ ] A failed replay read or another refused Retry updates the displayed reason and leaves Retry available with unsaved Edits intact.
+- [ ] Retry continues to respect participant ownership and duplicate-attempt protection established by the merged recovery fixes; it cannot overwrite a newer recovery.
+- [ ] Persistence tests cover refusal, blocker resolution and deliberate retry, and application tests prove actionable feedback and the Retry flow.
