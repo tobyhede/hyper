@@ -4,9 +4,9 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The cluster's module exports one component the Dock mounts. Any context it shares with other clusters lives in a shared Dock module, not in the Dock file
-- [ ] No change in behaviour or appearance: stories, Ladle proofs and e2e unchanged
-- [ ] UI catalog check passes with no new inventory entries
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` green
+- [x] The cluster's module exports one component the Dock mounts. Any context it shares with other clusters lives in a shared Dock module, not in the Dock file (`CommandDockSpaces.tsx` exports `SpacesControl`; the Dock chrome types it consumes live in `command-dock-chrome.ts`; contexts, hooks and constants in `command-dock-shared.ts`; shared pieces — `Divider`, `IdentitySurface`, `SetTrigger` — in `CommandDockParts.tsx`)
+- [ ] No change in behaviour or appearance: stories, Ladle proofs and e2e unchanged — pending coordinator e2e run; no story, Ladle proof or e2e file was edited
+- [x] UI catalog check passes with no new inventory entries
+- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` green — `pnpm verify` run on the finished branch; e2e and Ladle pending coordinator e2e run

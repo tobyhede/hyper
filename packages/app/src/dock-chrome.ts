@@ -12,7 +12,7 @@ import type {
   DockResourceKind,
   DockResourcesList,
   SpaceExitReport,
-} from './components/CommandDock';
+} from './components/command-dock-chrome';
 import { coordinatedGraphDelete } from './coordinated-context-delete';
 import {
   COPY_LINK_ACTION_ID,

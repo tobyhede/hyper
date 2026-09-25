@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_ALONGS, DOCK_EDGES, dockSlot, slotValue } from '../src/dock-model';
+import { DOCK_ALONGS, DOCK_EDGES, dockSlot, slotValue } from '../src/dock-placement';
 
 /**
  * The slots the Command Dock's grip offers, and the round trip through the menu.
