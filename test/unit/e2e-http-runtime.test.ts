@@ -89,6 +89,6 @@ describe('e2e HTTP runtime', () => {
 
     const spaces = await backend.listSpaces();
     expect(spaces).toHaveLength(1);
-    expect(spaces[0]?.title).toBe('New space');
+    expect(spaces[0]?.title).toBe('Space');
   });
 });

@@ -110,7 +110,7 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
         // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
         JSON.parse(await response.text()) as unknown,
       );
-      expect(summaries).toEqual([expect.objectContaining({ title: 'New space' })]);
+      expect(summaries).toEqual([expect.objectContaining({ title: 'Space' })]);
       const metaId = summaries[0]?.id;
       if (metaId === undefined) throw new Error('Expected a Space summary');
       const loaded = await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
@@ -121,7 +121,7 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
       );
       expect(body).toMatchObject({
         revision: 0n,
-        snapshot: { id: metaId, document: { title: 'New space' } },
+        snapshot: { id: metaId, document: { title: 'Space' } },
       });
     } finally {
       await opened.close();
@@ -165,7 +165,7 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
           // SAFETY: JSON.parse is the HTTP boundary; decodeSpaceSummaries validates next.
           JSON.parse(await response.text()) as unknown,
         ),
-      ).toEqual([expect.objectContaining({ title: 'New space' })]);
+      ).toEqual([expect.objectContaining({ title: 'Space' })]);
       expect(reports).toEqual([expect.objectContaining({ message: 'temporarily unavailable' })]);
     } finally {
       await opened.close();

@@ -16,16 +16,17 @@ import {
 import { seedPositionedMap, type HttpLoadedSpace } from './seed';
 
 /**
- * Opening the app with nothing to open gives a new space: one resource (ADR 0018).
+ * Opening an empty catalog gives Default Content: one Open Markdown Resource
+ * showing the product logo (ADR 0077).
  *
- * This project drives its own empty HTTP repository. Server-side database
- * startup creates the one-resource Space once, and reloads reopen that durable UUID.
+ * This project drives its own empty HTTP repository. Server-side startup
+ * creates that Space once, and reloads reopen that durable UUID.
  */
 
 const seedNewSpaceMap = (page: Page) =>
   seedPositionedMap(page, 'Authored Map', (snapshot) => {
     const resourceId = snapshot.resources[0]?.id;
-    if (resourceId === undefined) throw new Error('The new Space must hold Resource 1.');
+    if (resourceId === undefined) throw new Error('The new Space must hold its first Resource.');
     return { [resourceId]: { x: 0, y: 0, open: false } };
   });
 
@@ -76,7 +77,7 @@ test('centres its first resource without animating it in from the canvas origin'
   });
 
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
   await settled(page);
 
   // SAFETY: `__hyperOverviewTransforms` is a debug array this same spec sets
@@ -95,16 +96,27 @@ test('centres its first resource without animating it in from the canvas origin'
 test('shows one resource, and it is the only resource on screen', async ({ page }) => {
   await page.goto('/');
 
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   // No graphs means no edges to draw.
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 });
 
+test('opens that Resource on the product logo', async ({ page }) => {
+  await page.goto('/');
+
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
+  await expect(resource).toBeVisible();
+  await expect(resource.locator('.canvas-resource')).toHaveAttribute('data-expanded', 'true');
+  const logo = resource.getByRole('img', { name: 'Infinity Cube' });
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute('src', '/infinity-cube-logo.svg');
+});
+
 test('starts in a complete authored Map with its first empty Active Graph', async ({ page }) => {
   await page.goto('/');
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
   await resource.hover();
@@ -118,12 +130,12 @@ test('starts in a complete authored Map with its first empty Active Graph', asyn
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('Alt toggles a transient Resource 2 preview during an empty connection drag', async ({
+test('Alt toggles a transient Resource 1 preview during an empty connection drag', async ({
   page,
 }) => {
   await page.goto('/');
   await createMap(page);
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
   await resource.hover();
@@ -138,12 +150,12 @@ test('Alt toggles a transient Resource 2 preview during an empty connection drag
 
   await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 1');
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await page.keyboard.up('Alt');
   await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 1');
   await page.keyboard.up('Alt');
   await expect(page.getByTestId('new-resource-preview')).toHaveCount(0);
   await page.mouse.up();
@@ -152,12 +164,12 @@ test('Alt toggles a transient Resource 2 preview during an empty connection drag
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });
 
-test('Alt empty-drop creates, connects and selects Resource 2 at the previewed position', async ({
+test('Alt empty-drop creates, connects and selects Resource 1 at the previewed position', async ({
   page,
 }) => {
   await page.goto('/');
   await createMap(page);
-  const sourceResource = nodeByTitle(page, 'Resource 1');
+  const sourceResource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(sourceResource).toBeVisible();
   await settled(page);
   await sourceResource.hover();
@@ -178,14 +190,14 @@ test('Alt empty-drop creates, connects and selects Resource 2 at the previewed p
   await page.mouse.move(dropPoint.x, dropPoint.y, { steps: 4 });
   await page.keyboard.down('Alt');
   const preview = page.getByTestId('new-resource-preview');
-  await expect(preview).toContainText('Resource 2');
+  await expect(preview).toContainText('Resource 1');
   const previewBox = (await preview.boundingBox())!;
   expect(previewBox.x + previewBox.width / 2).toBeCloseTo(dropPoint.x, 0);
   expect(previewBox.y + previewBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await page.mouse.up();
   await page.keyboard.up('Alt');
 
-  const created = nodeByTitle(page, 'Resource 2');
+  const created = nodeByTitle(page, 'Resource 1');
   await expect(created).toBeVisible();
   const createdBox = (await created.boundingBox())!;
   expect(createdBox.x + createdBox.width / 2).toBeCloseTo(dropPoint.x, 0);
@@ -196,7 +208,7 @@ test('Alt empty-drop creates, connects and selects Resource 2 at the previewed p
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await expect(authoringHandle(created, 'source', 'left')).toHaveCSS('opacity', '1');
-  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+  await expect(created.locator('.canvas-resource')).toHaveAttribute('data-expanded', 'false');
 
   await settled(page);
   await created.hover();
@@ -221,7 +233,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Map owns',
   const persistedRevision = String(BigInt(seeded.revision) + 1n);
   await page.goto('/');
 
-  const sourceResource = nodeByTitle(page, 'Resource 1');
+  const sourceResource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(sourceResource).toBeVisible();
   await expect(selectedCanvas(page)).toContainText('Authored Map');
   await expect(activeGraph(page)).toHaveText('Graph 1');
@@ -231,7 +243,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Map owns',
 
   await connectToEmptyWithAlt(page, authoringHandle(sourceResource, 'source', 'right'));
 
-  await expect(nodeByTitle(page, 'Resource 2')).toBeVisible();
+  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(page.getByTestId('graph-legend')).toContainText('Graph 1');
@@ -243,8 +255,8 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Map owns',
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   await page.reload();
-  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
-  await expect(nodeByTitle(page, 'Resource 2')).toBeVisible();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   await expect(activeGraph(page)).toHaveText('Graph 1');
   await expect(selectedCanvas(page)).toContainText('Authored Map');
@@ -257,7 +269,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Map owns',
 test('an Alt-drop released off the canvas creates no Resource', async ({ page }) => {
   await page.goto('/');
   await createMap(page);
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
   await resource.hover();
@@ -270,7 +282,7 @@ test('an Alt-drop released off the canvas creates no Resource', async ({ page })
     steps: 4,
   });
   await page.keyboard.down('Alt');
-  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 1');
 
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
@@ -284,11 +296,11 @@ test('an Alt-drop released off the canvas creates no Resource', async ({ page })
   // screen over a point that would author nothing. Without this the test would
   // pass just as well if the preview correctly vanished, and the disagreement
   // the two suppliers are priced against would go unmeasured.
-  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 2');
+  await expect(page.getByTestId('new-resource-preview')).toContainText('Resource 1');
   await page.mouse.up();
   await page.keyboard.up('Alt');
 
-  await expect(nodeByTitle(page, 'Resource 2')).toHaveCount(0);
+  await expect(nodeByTitle(page, 'Resource 1')).toHaveCount(0);
   await expect(page.locator('.react-flow__node')).toHaveCount(1);
   await expect(page.locator('.react-flow__edge')).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
@@ -297,7 +309,7 @@ test('an Alt-drop released off the canvas creates no Resource', async ({ page })
 test('the first self-connection authors into the Graph the explicit Map owns', async ({ page }) => {
   await page.goto('/');
   await createMap(page);
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
   const before = await positionOf(resource);
@@ -323,7 +335,7 @@ test('the first self-connection authors into the Graph the explicit Map owns', a
 test('the Graph the explicit Map owns can be self-connected and presented', async ({ page }) => {
   await page.goto('/');
   await createMap(page);
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
   const resourceId = await resource.getAttribute('data-id');
@@ -346,7 +358,7 @@ test('the Graph the explicit Map owns can be self-connected and presented', asyn
   await expect(activeResource(page)).toHaveAttribute('data-id', resourceId!);
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveCount(1);
-  await expect(moves).toHaveText('Resource 1');
+  await expect(moves).toHaveText('Welcome to Infinity Cube');
 });
 
 test(
@@ -354,7 +366,7 @@ test(
   { tag: '@parity:command-dock-names-a-new-spaces-initial-map-and-graph' },
   async ({ page }) => {
     await page.goto('/');
-    await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
+    await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
 
     await expect(activeGraph(page)).toHaveText('Graph 1');
     await expect(selectedCanvas(page)).toContainText('Map 1');
@@ -369,7 +381,7 @@ test('its one centered authored Resource is draggable', async ({ page }) => {
   await page.goto('/');
   await createMap(page);
 
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
 
@@ -382,7 +394,7 @@ test('its one centered authored Resource is draggable', async ({ page }) => {
 
 test('renders at natural size rather than filling the screen', async ({ page }) => {
   await page.goto('/');
-  await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
+  await expect(nodeByTitle(page, 'Welcome to Infinity Cube')).toBeVisible();
   await settled(page);
 
   // The overview fit caps at `maxZoom: 1`. Without the cap React Flow's default
@@ -400,7 +412,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
   await page.goto('/');
   await createMap(page);
 
-  const resource = nodeByTitle(page, 'Resource 1');
+  const resource = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(resource).toBeVisible();
   await settled(page);
   const before = await positionOf(resource);
@@ -412,7 +424,7 @@ test('persists a completed edit through the backend session', async ({ page }) =
 test('a completed edit and space identity survive reload', async ({ page }) => {
   await page.goto('/');
   await createMap(page);
-  const first = nodeByTitle(page, 'Resource 1');
+  const first = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(first).toBeVisible();
   const firstId = await first.getAttribute('data-id');
   // Without this, two missing attributes compare equal after the reload and the
@@ -425,7 +437,7 @@ test('a completed edit and space identity survive reload', async ({ page }) => {
 
   await page.reload();
 
-  const second = nodeByTitle(page, 'Resource 1');
+  const second = nodeByTitle(page, 'Welcome to Infinity Cube');
   await expect(second).toBeVisible();
   await settled(page);
   expect(await second.getAttribute('data-id')).toBe(firstId);
@@ -462,7 +474,7 @@ test(
     // codebase, not third-party JSON.
     const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
     const resourceId = loaded.snapshot.resources[0]?.id;
-    if (resourceId === undefined) throw new Error('The new Space must hold Resource 1.');
+    if (resourceId === undefined) throw new Error('The new Space must hold its first Resource.');
 
     const mapId = '00000000-0000-4000-8000-0000000000fe';
     const graphId = '00000000-0000-4000-8000-0000000000fd';

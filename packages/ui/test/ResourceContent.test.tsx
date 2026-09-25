@@ -18,6 +18,17 @@ describe('ResourceContent', () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });
 
+  it('renders a Markdown image', () => {
+    const { container } = render(
+      <ResourceContent title="T" markdown={'![Infinity Cube](/infinity-cube-logo.svg)'} />,
+    );
+
+    const img = container.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('alt')).toBe('Infinity Cube');
+    expect(img?.getAttribute('src')).toBe('/infinity-cube-logo.svg');
+  });
+
   /**
    * The Title ladder is the Resource front's and nothing else's (ADR 0083). A
    * presented Resource is a different surface with a different frame around it, so
