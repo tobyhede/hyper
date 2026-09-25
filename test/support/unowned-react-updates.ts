@@ -31,11 +31,16 @@ export const watchUnownedReactUpdates = (target: ErrorConsole): UnownedReactUpda
   const unowned: string[] = [];
   const write = target.error.bind(target);
   target.error = (...args: unknown[]) => {
-    const [message, component] = args.map(String);
-    if (message !== undefined && UNOWNED_UPDATE.test(message)) {
+    // Only a string is read: React's reports are strings, and converting any
+    // other argument could throw inside a call that was only logging.
+    const [message, component] = args;
+    if (typeof message === 'string' && UNOWNED_UPDATE.test(message)) {
       // React formats the warning with `%s` for the component and its stack;
       // the name is enough to find the update, and the stack is in the output.
-      const named = message.replace('%s', component ?? 'a component');
+      const named = message.replace(
+        '%s',
+        typeof component === 'string' ? component : 'a component',
+      );
       unowned.push(named.replaceAll('%s', '').split('\n')[0] ?? named);
     }
     write(...args);

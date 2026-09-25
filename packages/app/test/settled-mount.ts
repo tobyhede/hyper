@@ -10,7 +10,9 @@ import { act, render, type RenderResult } from '@testing-library/react';
  * into slider state. `render` flushes synchronously, so that microtask lands
  * after the render's `act` has closed, as an update no test boundary owns.
  * Rendering inside an asynchronous `act` holds the boundary open until the
- * mount's queued work has run.
+ * mount's queued work has run. The unowned-update guard `vitest.setup.ts`
+ * installs is what holds this: a canvas test that mounts with a bare `render`
+ * fails on the slider's report.
  */
 export const mountSettled = async (ui: ReactElement): Promise<RenderResult> => {
   let view: RenderResult | undefined;

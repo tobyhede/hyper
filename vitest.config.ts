@@ -57,6 +57,12 @@ export default defineConfig({
      * theirs inside a test, so restoring between tests takes nothing away.
      */
     restoreMocks: true,
+    /*
+     * After-hooks run in reverse order of registration, so the unowned-update
+     * guard `vitest.setup.ts` registers runs after Testing Library's cleanup
+     * and charges a report raised while unmounting to the test that mounted.
+     */
+    sequence: { hooks: 'stack' },
     environmentMatchGlobs: [['packages/*/test/**/*.tsx', 'jsdom']],
     setupFiles: ['./vitest.setup.ts'],
     include: ['packages/*/test/**/*.{test,spec}.{ts,tsx}', 'test/unit/**/*.{test,spec}.{ts,tsx}'],

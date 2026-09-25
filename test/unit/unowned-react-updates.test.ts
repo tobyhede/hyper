@@ -66,6 +66,17 @@ describe('watching for unowned React updates', () => {
     expect(() => watch.failIfAny()).not.toThrow();
   });
 
+  it('writes through a call whose arguments have no string form', () => {
+    const target = recordingConsole();
+    watchUnownedReactUpdates(target);
+    const bare: unknown = Object.create(null);
+
+    expect(() => {
+      target.error('failed', bare);
+    }).not.toThrow();
+    expect(target.written).toEqual([['failed', bare]]);
+  });
+
   it('forgets what it reported, so one leak fails one test', () => {
     const target = recordingConsole();
     const watch = watchUnownedReactUpdates(target);
