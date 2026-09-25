@@ -128,16 +128,34 @@ type TopologyPreservingDecision =
   | { readonly kind: 'aggregate-path' };
 
 /**
- * Whether a proposed snapshot keeps the boundary the fast path is allowed to
- * skip a complete-aggregate read for: the same default Map, the same
+ * What another Space's Space Resource can select in this one: each Map id,
+ * and each Graph id beside the id of the Map that owns it, in one sorted list
+ * so two documents compare element by element. Titles, colours, positions,
+ * Open state, Open Size, Edges, `activeGraph` and order are left out, because
+ * no aggregate check reads them.
+ */
+const selectableStructure = (document: SpaceSnapshot['document']): readonly string[] =>
+  (document.maps ?? [])
+    .flatMap((map) => [map.id, ...map.graphs.map((graph) => `${map.id}/${graph.id}`)])
+    .sort();
+
+const sameStrings = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+/**
+ * Whether a proposed snapshot keeps every fact complete aggregate intake reads
+ * across Spaces, which is what lets the fast path skip reading the others: the
+ * same default Map, the same Map ids, the same Graph ids owned by the same
  * Maps, the same Resources by id and kind, and -- for a Space Resource -- the
- * same selection. Absorbed unchanged (ticket 24) from the now-deleted
- * `topology-preserving-update.ts`, which both SQL adapters imported one copy
- * of until this repository replaced them.
+ * same selection. Everything else in a Space is checked by that Space's own
+ * intake. `defaultMap` is read by no aggregate check and is kept here only to
+ * leave a change of opening Map on the complete-aggregate path.
+ *
+ * `test/unit/sql-fast-path-decision.test.ts` holds this against `decideCommit`.
  */
 const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot): boolean => {
   if (current.document.defaultMap !== next.document.defaultMap) return false;
-  if (JSON.stringify(current.document.maps ?? []) !== JSON.stringify(next.document.maps ?? [])) {
+  if (!sameStrings(selectableStructure(current.document), selectableStructure(next.document))) {
     return false;
   }
   if (current.resources.length !== next.resources.length) return false;
@@ -187,22 +205,22 @@ const topologyPreservingCandidate = (request: SpaceCommit): UpdateChange | undef
 
 /**
  * Decide a single update against the stored Space it names. A snapshot that
- * fails intake, or one that moves the snapshot boundary -- structure,
- * membership, a Resource's kind, or a Space Resource's selection -- goes to the
+ * fails intake, or one that moves the snapshot boundary -- Map or Graph
+ * identity, Graph ownership, the default Map, Resource membership, a
+ * Resource's kind, or a Space Resource's selection -- goes to the
  * complete-aggregate decision, which alone can say where in the aggregate a
  * refusal sits.
  *
  * It is an optimisation of `decideCommit` and never a second set of rules, so
  * it answers only what the complete-aggregate decision would answer the same
  * way -- a revision conflict, or a write that moves no snapshot boundary --
- * and hands everything else to that decision. `#commitTopologyPreservingUpdate`
- * runs this before `#lockMetaIdentity` is ever called, deliberately: the fast
- * path holds no singleton lock. A `write` it answers is then gated on one
- * unlocked existence read of the Meta identity, because without that identity
- * `decideCommit` would refuse every otherwise-writable update (ticket 29); an
+ * and hands everything else to that decision
+ * (`test/unit/sql-fast-path-decision.test.ts`). A `write` it answers is then
+ * gated on one existence read of the Meta identity, because without that
+ * identity `decideCommit` would refuse every otherwise-writable update; an
  * `answer` or `aggregate-path` never reaches that read.
  */
-const decideTopologyPreservingUpdate = (
+export const decideTopologyPreservingUpdate = (
   change: UpdateChange,
   current: LoadedSpace | undefined,
 ): TopologyPreservingDecision => {
@@ -479,11 +497,25 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     }
   }
 
-  #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
+  /**
+   * The fast path in a transaction of its own, then, when it hands the commit
+   * on, the complete-aggregate decision in a second one. They cannot share a
+   * transaction: the fast path holds the aggregate lock in shared mode, and a
+   * transaction asking for the exclusive mode while holding the shared one
+   * waits for every other shared holder -- two such commits would each wait
+   * for the other. Nothing is written before the hand-off, and the second
+   * transaction reads everything afresh.
+   */
+  async #commitInTransaction(request: SpaceCommit): Promise<RepositoryCommitResult> {
+    const candidate = topologyPreservingCandidate(request);
+    if (candidate !== undefined) {
+      const topologyPreserving = await this.#store.transaction((handle) =>
+        this.#commitTopologyPreservingUpdate(handle, candidate),
+      );
+      if (topologyPreserving !== undefined) return topologyPreserving;
+    }
     return this.#store.transaction(async (handle) => {
       const tables = this.#store.tables(handle);
-      const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
-      if (topologyPreserving !== undefined) return topologyPreserving;
       const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
       const decision = decideCommit(request, metaSpaceId, await this.#loadEverySpace(tables));
       if (decision.kind === 'answer') return decision.result;
@@ -509,33 +541,34 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * `commit`'s fast path (ADR 0095, absorbed from the now-deleted
-   * `topology-preserving-update.ts`): a single update decided against the one
+   * `commit`'s fast path (ADR 0095): a single update decided against the one
    * stored Space it names, never reading the complete aggregate.
-   * `decideTopologyPreservingUpdate`'s own doc comment explains why this never
-   * calls `#lockMetaIdentity`. The unlocked read below is a one-way eligibility
-   * check inside this transaction: absence sends the candidate to the complete
-   * decision, while presence grants no new write authority. It uses the same
-   * transaction handle as the candidate read, which matters on SQLite: opening
-   * a separate runtime here can contend with the transaction it is deciding.
    *
-   * It is read last, gating only the `write` branch, because that is the only
-   * branch the identity bears on: a conflict and a boundary-moving snapshot
-   * are both answered without it, `#lockMetaIdentity`'s own doc comment saying
-   * revision conflicts are answerable with no Meta Space at all. So a stale
-   * revision -- the case the fast path exists to make cheap -- costs the same
-   * statements it did before ticket 29.
+   * It first takes the aggregate lock in shared mode, before its read. Every
+   * replacement, initialization, aggregate commit and deletion holds that lock
+   * exclusively, so none of them can commit between this read and the
+   * row-lock write in `#writeUpdate`: the Space cannot be deleted, or
+   * recreated at the revision this read saw, underneath a decision made
+   * against it. Fast paths share the lock, so edits to different Spaces do
+   * not wait for each other, and never wait on the Meta row. Two fast paths on
+   * one Space meet at the row lock and its revision comparison.
+   *
+   * The Meta identity is read last, without its row lock, gating only the
+   * `write` branch, because that is the only branch the identity bears on: a
+   * conflict and a boundary-moving snapshot are both answered without it.
+   * Absence sends the candidate to the complete decision, while presence
+   * grants no new write authority. It is read through this transaction's own
+   * handle, as the Space is: on SQLite a separate runtime would contend with
+   * the transaction it is deciding.
    */
   async #commitTopologyPreservingUpdate(
-    tables: SqlTables<Order>,
-    request: SpaceCommit,
+    handle: Handle,
+    change: UpdateChange,
   ): Promise<RepositoryCommitResult | undefined> {
-    const change = topologyPreservingCandidate(request);
-    if (change === undefined) return undefined;
-    const decision = decideTopologyPreservingUpdate(
-      change,
-      await this.#loadStoredSpaceRowForCommit(tables, change.spaceId),
-    );
+    await this.#store.lockAggregateShared(handle);
+    const tables = this.#store.tables(handle);
+    const current = await this.#loadStoredSpaceRowForCommit(tables, change.spaceId);
+    const decision = decideTopologyPreservingUpdate(change, current);
     if (decision.kind === 'aggregate-path') return undefined;
     if (decision.kind === 'answer') return decision.result;
     if ((await tables.RepositoryState.read()) === null) return undefined;
@@ -566,10 +599,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * writes rather than one.
    *
    * The revision is re-established under the row lock rather than trusted
-   * from an earlier read: the fast path deliberately holds no singleton lock,
-   * so another commit -- fast or slow -- can move the row in between, and the
-   * conflict this then throws rolls the whole transaction back before any
-   * Resource is written.
+   * from an earlier read: fast paths share the aggregate lock, so another fast
+   * path can move the row in between, and the conflict this then throws rolls
+   * the whole transaction back before any Resource is written.
    *
    * Only the Resources `changedResources` names are written, judged against
    * the Space's Resource rows read again once the revision holds, under the
@@ -579,7 +611,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * replaced would leave the recreated row, or no row, where the snapshot
    * names one. Every Resource the Space does not hold -- a new id, or one
    * moving here from another Space -- is new to it, and goes through
-   * `#upsertResources`'s ownership check.
+   * `#upsertResources`'s ownership check. Both commit paths also hold the
+   * aggregate lock, which keeps this repository's own replacements and
+   * deletions out of that window; the re-read is what holds for a row
+   * changed by anything that does not take it.
    */
   async #writeUpdate(
     tables: SqlTables<Order>,
@@ -880,11 +915,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         if (metaSpaceId !== expectedMetaSpaceId) {
           return { kind: 'conflict', currentMetaSpaceId: metaSpaceId };
         }
-        // The baseline read is lock-free so topology-preserving commits
-        // retain their fast path. Re-lock each row and compare its revision
-        // again -- a row that does not parse locks too, since `relock` never
-        // reads `document` -- so a commit that won in between must conflict
-        // rather than be overwritten.
+        // The baseline read takes no row locks. Re-lock each row and compare
+        // its revision again -- a row that does not parse locks too, since
+        // `relock` never reads `document` -- so a write that landed in between
+        // without the aggregate lock must conflict rather than be overwritten.
         for (const row of storedRows) {
           const currentRevision = await tables.Space.relock(row.id);
           if (currentRevision === undefined || currentRevision !== row.revision) {
