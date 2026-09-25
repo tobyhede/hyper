@@ -371,8 +371,13 @@ export default tseslint.config(
       ],
       'no-restricted-globals': [
         'error',
-        { name: 'document', message: MAP_AUTHORING_MESSAGE },
-        { name: 'window', message: MAP_AUTHORING_MESSAGE },
+        {
+          globals: [
+            { name: 'document', message: MAP_AUTHORING_MESSAGE },
+            { name: 'window', message: MAP_AUTHORING_MESSAGE },
+          ],
+          checkGlobalObject: true,
+        },
       ],
     },
   },
