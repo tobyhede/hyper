@@ -391,6 +391,15 @@ export function useDockChrome(
       state: persistence,
       active,
       onRetry: authoring.retryPersistence,
+      // Entered, so the Opener leads back here to Retry once it is resolved.
+      onOpenSpace:
+        spaces === null
+          ? null
+          : (spaceId, title) => {
+              void commandOutcomes.run('space-enter', async () => spaces.enter(spaceId), {
+                subject: title,
+              });
+            },
       onAcceptRemote: authoring.acceptStoredSpace,
       onKeepLocal: authoring.keepLocalWork,
     },

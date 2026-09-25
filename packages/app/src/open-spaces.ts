@@ -507,9 +507,11 @@ export function createOpenSpaces({
     followActiveSpace();
   };
 
-  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: MapId): OpenSpace => {
-    const spaceId = loaded.snapshot.id;
-    const session = registry.open(loaded);
+  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: MapId): OpenSpace =>
+    buildSession(registry.open(loaded), selection);
+
+  const buildSession = (session: SpaceSession, selection?: MapId): OpenSpace => {
+    const spaceId = session.getState().working.id;
     // Every identity and every observer failure in a composed Space comes from
     // the seams Open Spaces was given (ADR 0016). Leaving either off here lets
     // `composeApp` fall back to the ambient generator and to `console.error`,
@@ -553,15 +555,22 @@ export function createOpenSpaces({
     await exiting.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
-    const opening = loadWorkingSpace(spaceId).then((loaded) => {
-      if (loaded === undefined) throw new Error(`The backend could not load space ${spaceId}`);
-      return buildLoaded(validateLoadedSpace(loaded), selection);
-    });
+    // A live session is already working, so it is what the Space opens on:
+    // that is how a created Space no commit has stored yet is reached, such
+    // as one whose recovery blocks another Space's save.
+    const live = registry.session(spaceId);
+    const opening =
+      live === undefined
+        ? loadWorkingSpace(spaceId).then((loaded) => {
+            if (loaded === undefined)
+              throw new Error(`The backend could not load space ${spaceId}`);
+            return buildLoaded(validateLoadedSpace(loaded), selection);
+          })
+        : Promise.resolve().then(() => buildSession(live, selection));
     compositions.set(spaceId, opening);
     void opening.catch(() => compositions.delete(spaceId));
     return opening;
   };
-
   const activateAfterLeavingSettles = async (
     target: OpenSpace,
     request: number,

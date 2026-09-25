@@ -920,6 +920,39 @@ test(
 );
 
 /**
+ * A save another Space blocks (code-quality ticket 24): the standing notice,
+ * not the rejection dialog, because the author has to leave for the Space it
+ * names and come back to Retry.
+ */
+test(
+  'a save another Space blocks names that Space, reaches it, and saves on Retry',
+  { tag: '@parity:command-dock-names-the-space-blocking-a-save' },
+  async ({ page }) => {
+    await page.goto(story('save-blocked'));
+
+    const failure = page.getByTestId('persistence-failure').filter({ visible: true });
+    await expect(failure).toContainText(
+      'Blocking Space has a conflict to resolve before these changes can be saved.',
+    );
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+
+    await failure.getByRole('button', { name: 'Open Blocking Space' }).click();
+    const conflict = page.getByRole('alertdialog', { name: 'Changes conflict' });
+    await expect(conflict).toBeVisible();
+    await conflict.getByRole('button', { name: 'Reload' }).click();
+    await expect(conflict).toBeHidden();
+    await expect(page.getByTestId('persistence-failure').filter({ visible: true })).toHaveCount(0);
+
+    await surface(page)
+      .getByRole('button', { name: /^Go to / })
+      .click();
+    await expect(failure).toBeVisible();
+    await failure.getByRole('button', { name: 'Retry' }).click();
+    await expect(failure).toBeHidden();
+  },
+);
+
+/**
  * A rejection and a conflict, both `PersistenceControl`'s own `AlertDialog`
  * mounted unchanged.
  *

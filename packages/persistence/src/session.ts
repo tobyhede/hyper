@@ -81,6 +81,13 @@ export interface SpaceSessionState {
 
 type Persistence = SpaceSessionState['persistence'];
 
+/** A persistence state `retry()` acts on (see {@link canRetry}). */
+export type RetryablePersistence =
+  | Extract<Persistence, { kind: 'failed' }>
+  | (Extract<Persistence, { kind: 'rejected' } | { kind: 'refused' }> & {
+      readonly blocked: SaveBlock;
+    });
+
 /**
  * Whether `retry()` acts on this state: an explicit attempt to save the latest
  * working Space again, with no further Edit.
@@ -90,7 +97,7 @@ type Persistence = SpaceSessionState['persistence'];
  * standing in the way, and the blocker can be resolved elsewhere without an
  * Edit here. Otherwise a rejection or refusal waits for an authored correction.
  */
-export const canRetry = (persistence: Persistence): boolean =>
+export const canRetry = (persistence: Persistence): persistence is RetryablePersistence =>
   persistence.kind === 'failed' ||
   ((persistence.kind === 'rejected' || persistence.kind === 'refused') &&
     persistence.blocked !== undefined);

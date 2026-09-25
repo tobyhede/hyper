@@ -97,8 +97,13 @@ export interface DockPersistence {
    * 0082's *"it names which open Space is unwell"* is met.
    */
   readonly active: boolean;
-  /** Try the failed commit again, which is the one recovery that is not a decision. */
+  /** Save the latest working Space again, for any state `canRetry` admits. */
   readonly onRetry: () => void;
+  /**
+   * Go to the Space whose recovery blocks this one's save, or `null` with no
+   * open set to go through.
+   */
+  readonly onOpenSpace: ((spaceId: UUID, title: string) => void) | null;
   /** Take the stored Space over the local one, ending a conflict. */
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   /** Keep the local Space and commit it again, ending a conflict. */

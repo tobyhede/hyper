@@ -25,6 +25,7 @@ export type DockScenario =
   | 'save-rejected'
   | 'save-refused'
   | 'save-conflict'
+  | 'save-blocked'
   | 'save-failed-elsewhere';
 
 /** The persistence state each failure scenario is arranged to reach. */
@@ -86,6 +87,79 @@ const quiesced = async (spaces: OpenSpaces): Promise<void> => {
   );
 };
 
+/**
+ * Code-quality ticket 24's sequence, through the real lifecycle: a Space
+ * Resource created in `rendering` is rejected (C0), a second created inside
+ * its target conflicts there (C1), and an Edit in `rendering` asks C0's
+ * recovery to replay, which the target, now held by C1, refuses.
+ */
+const blockSave = async (
+  spaces: OpenSpaces,
+  control: MemorySpaceBackendTestControl,
+  rendering: OpenSpace,
+): Promise<void> => {
+  const containingMap = rendering.session.getState().working.document.defaultMap;
+  if (containingMap === undefined) throw new Error('The blocked scenario needs a Map.');
+  control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
+  const created = await spaces.spaceResources.create({
+    containingSpaceId: rendering.id,
+    mapId: containingMap,
+    title: 'Blocking Space',
+    position: { x: 640, y: 0 },
+  });
+  if (created.kind !== 'completed') throw new Error('The blocked scenario created nothing.');
+  await reaches(rendering.session, 'rejected');
+  const resource = rendering.session
+    .getState()
+    .working.resources.find(({ id }) => id === created.resourceId);
+  if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
+  const target = await spaces.embed(resource.document.spaceId);
+  const stored = target.session.getState().working;
+  const targetMap = stored.document.defaultMap;
+  if (targetMap === undefined) throw new Error('The blocking Space has no Map.');
+  control.queueResult({
+    kind: 'conflict',
+    conflicts: [
+      {
+        spaceId: target.id,
+        current: { snapshot: stored, revision: 0n, exportedRevision: null },
+      },
+    ],
+  });
+  await spaces.spaceResources.create({
+    containingSpaceId: target.id,
+    mapId: targetMap,
+    title: 'Child',
+    position: { x: 320, y: 0 },
+  });
+  await reaches(target.session, 'conflicted');
+
+  const notes = rendering.session.getState().working.resources[0];
+  if (notes === undefined) throw new Error('The blocked scenario needs an editable Resource.');
+  const edited = rendering.app.authoring.complete({
+    kind: 'edited-resource',
+    resourceId: notes.id,
+    document: { ...notes.document, title: `${notes.document.title} edited` },
+  });
+  if (edited.kind !== 'completed')
+    throw new Error('The blocked scenario did not complete an Edit.');
+  await new Promise<void>((resolve) => {
+    const blocked = () => {
+      const { persistence } = rendering.session.getState();
+      return persistence.kind === 'rejected' && persistence.blocked !== undefined;
+    };
+    if (blocked()) {
+      resolve();
+      return;
+    }
+    const unsubscribe = rendering.session.subscribe(() => {
+      if (!blocked()) return;
+      unsubscribe();
+      resolve();
+    });
+  });
+};
+
 /** Open the authored crossing chain through the real session owner. */
 export async function openDockStory(scenario: DockScenario) {
   const control = new MemorySpaceBackendTestControl();
@@ -127,6 +201,10 @@ export async function openDockStory(scenario: DockScenario) {
   await spaces.switchTo(rendering.id);
 
   if (scenario === 'presenting') rendering.app.navigation.present();
+  if (scenario === 'save-blocked') {
+    await quiesced(spaces);
+    await blockSave(spaces, control, rendering);
+  }
   if (isUnwell(scenario)) {
     const target =
       scenario === 'save-failed-elsewhere' ? spaces.entry(designSystemSnapshot.id) : rendering;

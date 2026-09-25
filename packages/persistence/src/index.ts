@@ -71,6 +71,12 @@ export { ascendingById, readInIdOrder } from './read-order';
  * application in `@project/http` and the PostgreSQL adapter under `src/`. */
 export * from './repository';
 export { canRetry, openSpaceSession } from './session';
-export type { SaveBlock, SpaceSession, SpaceSessionOptions, SpaceSessionState } from './session';
+export type {
+  RetryablePersistence,
+  SaveBlock,
+  SpaceSession,
+  SpaceSessionOptions,
+  SpaceSessionState,
+} from './session';
 export * from './session-registry';
 export * from './working-space';

@@ -1,5 +1,5 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
-import type { SpaceSessionState } from '@project/persistence';
+import type { SaveBlock, SpaceSessionState } from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
@@ -304,6 +304,22 @@ const PERSISTENCE_FAILURE_REASONS = {
 /** Application-owned copy for a stable persistence failure identity. */
 export const describePersistenceFailure = (failure: PersistenceFailure): string =>
   PERSISTENCE_FAILURE_REASONS[failure.code];
+
+/**
+ * Why the save that would recover these changes never reached the server.
+ *
+ * Drawn under "Changes not saved" beside Retry, so each sentence says what
+ * stands in the way and where it is resolved, and leaves the retry to the
+ * button. A blocking Space is named because the author has to go there.
+ */
+export const describeSaveBlock = (block: SaveBlock): string => {
+  if (block.code === 'persistence-read-failed') {
+    return 'The stored Spaces could not be read, so these changes were not sent.';
+  }
+  return block.recovery === 'resolve-conflict'
+    ? `${block.title} has a conflict to resolve before these changes can be saved. Resolve it there, then retry here.`
+    : `${block.title} has a failed save to retry before these changes can be saved. Retry it there, then retry here.`;
+};
 
 /**
  * Why the Space a new Space Resource was pointed at could not supply a selection.

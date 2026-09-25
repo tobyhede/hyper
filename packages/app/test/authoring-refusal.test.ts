@@ -4,6 +4,7 @@ import {
   describeAuthoringRefusal,
   describeConnectChoice,
   describePersistenceFailure,
+  describeSaveBlock,
   describeStoredSpaceRefusal,
   type PersistenceFailure,
 } from '../src/authoring-refusal';
@@ -225,5 +226,27 @@ describe('describeConnectChoice', () => {
 
   it('keeps the list open when the canvas cannot take the Edit yet', () => {
     expect(describeConnectChoice({ kind: 'unavailable' })).toEqual(expect.any(String));
+  });
+});
+
+describe('describeSaveBlock', () => {
+  it('sends the author to the blocking Space for the recovery it needs, by name', () => {
+    const block = {
+      code: 'persistence-recovery-required',
+      spaceId: TARGET_ID,
+      title: 'Target',
+    } as const;
+    expect(describeSaveBlock({ ...block, recovery: 'resolve-conflict' })).toBe(
+      'Target has a conflict to resolve before these changes can be saved. Resolve it there, then retry here.',
+    );
+    expect(describeSaveBlock({ ...block, recovery: 'retry' })).toBe(
+      'Target has a failed save to retry before these changes can be saved. Retry it there, then retry here.',
+    );
+  });
+
+  it('names no Space when the read a recovery validates against failed', () => {
+    expect(describeSaveBlock({ code: 'persistence-read-failed' })).toBe(
+      'The stored Spaces could not be read, so these changes were not sent.',
+    );
   });
 });

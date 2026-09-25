@@ -471,6 +471,15 @@ export const parityClaims: readonly ParityClaim[] = [
       'A refused aggregate — a distinct persistence state from permanent rejection — explains the reason as one sentence and can be acknowledged, with no retry offered.',
   },
   {
+    id: 'command-dock-names-the-space-blocking-a-save',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'SaveBlocked',
+    claim:
+      'A save whose recovery another Space blocks names that Space and opens it, keeps the unsaved Edits, sends nothing when the blocker is resolved, and saves them on Retry.',
+    applicationEvidence:
+      'Reaching the state in a browser needs a coordinated Space Resource creation rejected and a second one inside its target answered with a conflict, which no browser-driven e2e can script against the memory host: its repository answers from what it stores rather than from a queue. `packages/app/test/blocked-save-retry.test.tsx` drives that sequence through `createOpenSpaces` and the rendered `OpenSpacesApplication`, from the notice through Open, Reload and Go to, to Retry.',
+  },
+  {
     id: 'command-dock-resolves-conflict',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveConflict',
