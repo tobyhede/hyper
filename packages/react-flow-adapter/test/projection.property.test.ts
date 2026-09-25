@@ -29,12 +29,12 @@ import { resourceFile } from './resource-files';
  * that kind, so a Resource missing either kind is an Edge that silently vanishes.
  *
  * Properties rather than examples because the failure mode is multi-graph: the
- * generated Spaces overlap on Resources, which is the shape that can put several
- * same-side handles on one node.
+ * generated Spaces overlap on Resources, which is the shape that would put
+ * several same-side handles on one node if anchors were minted per Edge.
  */
 
 /** Ids from a shared pool, so generated graphs overlap on resources — the case that
- *  puts several same-side handles on one node. */
+ *  would put several same-side handles on one node. */
 const resourceIdPool = fc
   .uniqueArray(fc.integer({ min: 0, max: 25 }), { minLength: 2, maxLength: 8 })
   .map((ns) => ns.map(uuidFrom));

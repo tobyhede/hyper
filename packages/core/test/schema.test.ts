@@ -101,9 +101,9 @@ describe('space file schema', () => {
   });
 
   it('rejects an undeclared key rather than opening on a Map its author did not name', () => {
-    // Stripped rather than refused, a file naming its opening Map under a key
-    // the schema does not declare reaches `workingSpace`, which adopts
-    // `maps[0]` and commits it — the author's stated Map silently
+    // If the schema stripped rather than refused, a file naming its opening Map
+    // under a key the schema does not declare would reach `workingSpace`, which
+    // adopts `maps[0]` and commits it — the author's stated Map silently
     // replaced and then written back.
     //
     // The key below is arbitrary on purpose. Rejection is by policy and not by

@@ -459,7 +459,7 @@ it('takes the adopted Map’s own Active Graph over the one that was emphasised'
  * intake rejects outright.
  *
  * Constructible against a real Space rather than a hand-built Map:
- * `GRAPH_ONE` exists and is drawn by the Flow view, and `MAP` simply does not
+ * `GRAPH_ONE` exists and is owned by `MAP`, and `FIRST_MAP` simply does not
  * own it. Edit completion cannot reach it, because the pair it passes is the one
  * it wrote into the snapshot a line earlier.
  */
@@ -478,7 +478,7 @@ it('refuses to adopt a Map that does not draw the Graph handed with it', () => {
 /**
  * The same refusal from the other side. Activating is never an Edit (ADR 0028),
  * so it cannot mint the Graph it is handed — nor move it into the selected Map.
- * `GraphSelector` is fed the visible Graphs, so this is a caller's mistake
+ * The Dock's Graph list is fed the selected Map's Graphs, so this is a caller's mistake
  * rather than an author's.
  */
 it('refuses to activate a Graph the selected Map does not own', () => {
