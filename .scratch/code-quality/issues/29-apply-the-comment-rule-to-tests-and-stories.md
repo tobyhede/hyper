@@ -4,7 +4,7 @@
 
 **Blocked by:** 10 (the rule and its application to source).
 
-**Status:** needs-triage
+**Status:** resolved — delivered by PR #300 (merged 2026-09-25), as ticket 10's status line records.
 
 **Priority:** P3
 
