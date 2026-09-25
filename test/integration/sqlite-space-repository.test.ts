@@ -17,6 +17,7 @@ import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { retryMetaSpaceEstablishment } from '../../src/startup/database-startup';
 import { captureError } from '../support/capture-error';
 import { spaceRepositoryContract } from '../support/repository-contract';
+import { recordResourceWrites } from '../support/record-resource-writes';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
 // Ticket 24: `SqlSpaceRepository` now owns `commit` too, so the whole
@@ -26,8 +27,10 @@ import { openSqliteRepository } from '../support/sqlite-harness';
 // each covered separately.
 spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
   const harness = await openSqliteRepository();
+  const recording = recordResourceWrites(sqliteSqlStore(harness.database));
   return {
-    repository: harness.repository,
+    repository: new SqlSpaceRepository(recording.store),
+    takeResourceWrites: recording.takeResourceWrites,
     close: harness.close,
     reopenRepository: harness.reopenRepository,
     arrangeBrokenState: async (kind, ids) => {
@@ -750,6 +753,66 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       revision: 0n,
     });
   });
+
+  // Ticket 20. A commit writes only the Resources it changed, judged against
+  // the Space it read before taking the row lock, so the revision it finds
+  // under that lock has to refuse the commit before any Resource is written.
+  // Both paths: a changed Resource alone stays on the fast path, and a new one
+  // moves the snapshot boundary onto the complete-aggregate path.
+  it.each([
+    ['fast', [RESOURCE_ID]],
+    ['complete-aggregate', [RESOURCE_ID, SECOND_RESOURCE_ID]],
+  ] as const)(
+    'refuses a %s-path commit whose row moved before the lock, writing no Resource',
+    async (_path, resourceIds) => {
+      const { repository, database } = await opened();
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [first] });
+      const upserted: string[] = [];
+      const racing = withTables(database, (tables, inTransaction) =>
+        inTransaction
+          ? {
+              ...tables,
+              // A rival commit moved the row between the read and the lock.
+              Space: { ...tables.Space, writeDocumentUnderLock: () => Promise.resolve('7') },
+              Resource: {
+                ...tables.Resource,
+                upsert: (input) => {
+                  upserted.push(input.id);
+                  return tables.Resource.upsert(input);
+                },
+              },
+            }
+          : tables,
+      );
+
+      await expect(
+        racing.commit({
+          changes: [
+            {
+              kind: 'update',
+              spaceId: SPACE_ID,
+              snapshot: {
+                ...first,
+                resources: resourceIds.map((id) => resource(id, 'Never stored')),
+              },
+              expectedRevision: 0n,
+            },
+          ],
+        }),
+      ).resolves.toEqual({
+        kind: 'conflict',
+        conflicts: [
+          { spaceId: SPACE_ID, current: { snapshot: first, revision: 0n, exportedRevision: null } },
+        ],
+      });
+      expect(upserted).toEqual([]);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+        snapshot: first,
+        revision: 0n,
+      });
+    },
+  );
 
   // The same for the Meta identity a replacement reads after a stored Space
   // moved under its per-row relock.

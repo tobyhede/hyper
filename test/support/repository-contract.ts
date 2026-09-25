@@ -238,6 +238,13 @@ export interface RepositoryHarness {
     readonly revision: string;
     readonly exportedRevision?: string | null;
   }) => Promise<void>;
+  /**
+   * Every Resource id the repository has written a row for since the last
+   * call, in the order written, and forget them (`test/support/record-resource-writes.ts`).
+   * `undefined` on a harness with no rows to rewrite (the memory double, which
+   * replaces a Space's snapshot whole).
+   */
+  takeResourceWrites?: () => readonly string[];
 }
 
 const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revision: bigint) =>
@@ -350,6 +357,25 @@ export const spaceRepositoryContract = (
         return;
       }
       await body(harness.repository, harness.arrangeBrokenState);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  const withResourceWritesHarness = async (
+    context: SkippableTestContext,
+    body: (
+      repository: SpaceRepository,
+      takeResourceWrites: () => readonly string[],
+    ) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.takeResourceWrites === undefined) {
+        context.skip();
+        return;
+      }
+      await body(harness.repository, harness.takeResourceWrites);
     } finally {
       await harness.close();
     }
@@ -1667,6 +1693,172 @@ export const spaceRepositoryContract = (
       await expect(commitUpdate(repository, retitled(first, 'Changed'), 0n)).rejects.toThrow(
         AggregateInvariantError,
       );
+    });
+  });
+
+  /*
+   * Ticket 20. A commit writes the Resources it adds and the Resources whose
+   * document it changes, and leaves every other Resource row as it stands, on
+   * either commit path. A rename of one Resource is the fast path; adding a
+   * Resource and placing it on the Map moves the snapshot boundary, so the
+   * second commit is the complete-aggregate path.
+   */
+  it(`${name} writes only the Resource a topology-preserving commit changed`, async (context) => {
+    await withResourceWritesHarness(context, async (repository, takeResourceWrites) => {
+      const first = space(SPACE_ID, 'Three resources', [
+        RESOURCE_ID,
+        SECOND_RESOURCE_ID,
+        OTHER_RESOURCE_ID,
+      ]);
+      await seed(repository, first);
+      expect(takeResourceWrites()).toEqual([RESOURCE_ID, SECOND_RESOURCE_ID, OTHER_RESOURCE_ID]);
+
+      const renamed: SpaceSnapshot = {
+        ...first,
+        resources: first.resources.map((entry) =>
+          entry.id === SECOND_RESOURCE_ID ? resource(SECOND_RESOURCE_ID, 'Renamed') : entry,
+        ),
+      };
+      await expect(commitUpdate(repository, renamed, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      expect(takeResourceWrites()).toEqual([SECOND_RESOURCE_ID]);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(renamed, 1n, null));
+
+      // The document alone changes: the Space's title, and no Resource.
+      await expect(
+        commitUpdate(repository, retitled(renamed, 'Retitled'), 1n),
+      ).resolves.toMatchObject({ kind: 'committed' });
+      expect(takeResourceWrites()).toEqual([]);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(
+        stored(retitled(renamed, 'Retitled'), 2n, null),
+      );
+    });
+  });
+
+  it(`${name} writes only the new and changed Resources on the complete-aggregate path`, async (context) => {
+    await withResourceWritesHarness(context, async (repository, takeResourceWrites) => {
+      const first = graphedSpace(SPACE_ID, 'Graphed', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+      await seed(repository, first);
+      takeResourceWrites();
+
+      const [map] = first.document.maps ?? [];
+      if (map === undefined) throw new Error('Expected the graphed Space to own a Map');
+      const grown: SpaceSnapshot = {
+        ...first,
+        document: {
+          ...first.document,
+          maps: [
+            {
+              ...map,
+              positions: {
+                ...map.positions,
+                [RESOURCE_ID]: { x: 40, y: 40, open: false },
+                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false },
+              },
+            },
+          ],
+        },
+        resources: [
+          resource(RESOURCE_ID, 'From'),
+          resource(SECOND_RESOURCE_ID, 'To, renamed'),
+          resource(OTHER_RESOURCE_ID, 'Added'),
+        ],
+      };
+      await expect(commitUpdate(repository, grown, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      expect(takeResourceWrites()).toEqual([SECOND_RESOURCE_ID, OTHER_RESOURCE_ID]);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(grown, 1n, null));
+    });
+  });
+
+  it(`${name} writes no Resource for a commit at a stale revision`, async (context) => {
+    await withResourceWritesHarness(context, async (repository, takeResourceWrites) => {
+      const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
+      await seed(repository, first);
+      const committed = retitled(first, 'Committed');
+      await commitUpdate(repository, committed, 0n);
+      takeResourceWrites();
+
+      const stale: SpaceSnapshot = { ...first, resources: [resource(RESOURCE_ID, 'Stale')] };
+      await expect(commitUpdate(repository, stale, 0n)).resolves.toMatchObject({
+        kind: 'conflict',
+      });
+      expect(takeResourceWrites()).toEqual([]);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(committed, 1n, null));
+    });
+  });
+
+  /*
+   * A Resource moving from one Space to another is new to the Space it moves
+   * into, so it is written there through the ownership-checked upsert. The
+   * Space releasing it comes first in the change set, so its row is already
+   * gone when the receiving Space writes it.
+   */
+  const movingResource = () => {
+    const releasing: SpaceSnapshot = {
+      ...space(SPACE_ID, 'Releasing', [RESOURCE_ID]),
+      resources: [
+        resource(RESOURCE_ID, 'Moving'),
+        spaceResource(LINK_RESOURCE_ID, OTHER_SPACE_ID, { map: MAP_ID, graph: GRAPH_ID }),
+      ],
+    };
+    const receiving = targetSpace(OTHER_SPACE_ID, 'Receiving', [OTHER_RESOURCE_ID]);
+    const released: SpaceSnapshot = {
+      ...releasing,
+      resources: releasing.resources.filter((entry) => entry.id !== RESOURCE_ID),
+    };
+    const received: SpaceSnapshot = {
+      ...receiving,
+      // Ahead of the Receiving Space's own Resource: every read answers them in id order.
+      resources: [resource(RESOURCE_ID, 'Moving'), ...receiving.resources],
+    };
+    const update = (snapshot: SpaceSnapshot) => ({
+      kind: 'update' as const,
+      spaceId: snapshot.id,
+      snapshot,
+      expectedRevision: 0n,
+    });
+    return { releasing, receiving, released, received, update };
+  };
+
+  it(`${name} moves an unchanged Resource between Spaces in one commit`, async () => {
+    await withHarness(async (repository) => {
+      const { releasing, receiving, released, received, update } = movingResource();
+      await seed(repository, releasing, receiving);
+
+      await expect(
+        repository.commit({ changes: [update(released), update(received)] }),
+      ).resolves.toMatchObject({ kind: 'committed' });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(released, 1n, null));
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(
+        stored(received, 1n, null),
+      );
+    });
+  });
+
+  it(`${name} writes a moved Resource through the ownership check, which refuses it before its Space releases it`, async (context) => {
+    await withResourceWritesHarness(context, async (repository, takeResourceWrites) => {
+      const { releasing, receiving, released, received, update } = movingResource();
+      await seed(repository, releasing, receiving);
+      takeResourceWrites();
+
+      // Receiving first: the row still belongs to the releasing Space when the
+      // receiving Space writes it, and the whole commit rolls back.
+      await expect(
+        repository.commit({ changes: [update(received), update(released)] }),
+      ).resolves.toMatchObject({ kind: 'rejected', code: 'invalid-commit' });
+      expect(takeResourceWrites()).toEqual([RESOURCE_ID]);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(releasing, 0n, null));
+      await expect(repository.loadSpace(OTHER_SPACE_ID)).resolves.toEqual(
+        stored(receiving, 0n, null),
+      );
+
+      await expect(
+        repository.commit({ changes: [update(released), update(received)] }),
+      ).resolves.toMatchObject({ kind: 'committed' });
+      expect(takeResourceWrites()).toEqual([RESOURCE_ID]);
     });
   });
 };

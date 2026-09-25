@@ -18,6 +18,7 @@ import {
   type SpaceCommit,
   type SpaceSummary,
 } from '@project/persistence';
+import { isDeepStrictEqual } from 'node:util';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
 import type {
   AggregateInput,
@@ -150,6 +151,31 @@ const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot):
       previous.document.map === resource.document.map &&
       previous.document.graph === resource.document.graph
     );
+  });
+};
+
+type SnapshotResource = SpaceSnapshot['resources'][number];
+
+/**
+ * The Resources of `next` an update has to write: each one `stored` does not
+ * hold, and each one whose document differs from the stored document. The
+ * rest are already stored exactly as `next` has them, so rewriting them would
+ * change no row.
+ *
+ * `stored` is what the commit read of the Space before writing, parsed by the
+ * same intake every reader parses a stored Resource through, so a Resource
+ * left out here reads back exactly as `next` proposes it. A document that
+ * compares unequal only in shape -- a property present as `undefined` on one
+ * side -- is written, which costs a statement and changes nothing.
+ */
+const changedResources = (
+  stored: readonly SnapshotResource[],
+  next: SpaceSnapshot,
+): readonly SnapshotResource[] => {
+  const storedDocuments = new Map(stored.map((resource) => [resource.id, resource.document]));
+  return next.resources.filter((resource) => {
+    const previous = storedDocuments.get(resource.id);
+    return previous === undefined || !isDeepStrictEqual(previous, resource.document);
   });
 };
 
@@ -459,8 +485,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
       const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
-      const decision = decideCommit(request, metaSpaceId, await this.#loadEverySpace(tables));
+      const storedSpaces = await this.#loadEverySpace(tables);
+      const decision = decideCommit(request, metaSpaceId, storedSpaces);
       if (decision.kind === 'answer') return decision.result;
+      const storedById = new Map(storedSpaces.map((stored) => [stored.snapshot.id, stored]));
 
       for (const change of request.changes) {
         if (change.kind === 'delete') {
@@ -470,8 +498,11 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         } else if (change.kind === 'create') {
           await this.#createStoredSpace(tables, change.snapshot);
         } else {
+          // `decideCommit` has matched this update's revision against the
+          // stored Space, so it is in `storedById`.
           await this.#writeUpdate(
             tables,
+            storedById.get(change.spaceId)?.snapshot.resources ?? [],
             change.snapshot,
             change.expectedRevision,
             committedRevision(change),
@@ -506,10 +537,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   ): Promise<RepositoryCommitResult | undefined> {
     const change = topologyPreservingCandidate(request);
     if (change === undefined) return undefined;
-    const decision = decideTopologyPreservingUpdate(
-      change,
-      await this.#loadStoredSpaceRowForCommit(tables, change.spaceId),
-    );
+    const current = await this.#loadStoredSpaceRowForCommit(tables, change.spaceId);
+    const decision = decideTopologyPreservingUpdate(change, current);
     if (decision.kind === 'aggregate-path') return undefined;
     if (decision.kind === 'answer') return decision.result;
     if ((await tables.RepositoryState.read()) === null) return undefined;
@@ -519,6 +548,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     // written nothing.
     await this.#writeUpdate(
       tables,
+      current?.snapshot.resources ?? [],
       change.snapshot,
       change.expectedRevision,
       committedRevision(change),
@@ -542,10 +572,26 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * The revision is re-established under the row lock rather than trusted
    * from an earlier read: the fast path deliberately holds no singleton lock,
    * so another commit -- fast or slow -- can move the row in between, and the
-   * conflict this then throws rolls the whole transaction back.
+   * conflict this then throws rolls the whole transaction back before any
+   * Resource is written.
+   *
+   * Only the Resources `changedResources` names are written. `storedResources`
+   * is the Space's Resources as this commit read them, before this lock. The
+   * revision still being `expectedRevision` under the lock says no update has
+   * written this Space since that read, because each update advances it, so
+   * the Space's own Resource rows are still as read. That comparison cannot
+   * see a Space deleted and recreated at the same revision in between. The
+   * complete-aggregate path read under the store's aggregate lock, which every
+   * replacement, creation and deletion also takes, so that cannot happen
+   * there; the fast path read without it, and rests on this comparison for
+   * its Resources as it already does for its document (ticket 20's Answer).
+   * Every Resource the Space did not hold -- a new id, or one moving here from
+   * another Space -- is new to it, and goes through `#upsertResources`'s
+   * ownership check.
    */
   async #writeUpdate(
     tables: SqlTables<Order>,
+    storedResources: readonly SnapshotResource[],
     snapshot: SpaceSnapshot,
     expectedRevision: bigint,
     newRevision: bigint,
@@ -561,7 +607,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       snapshot.id,
       encodeNextRevisionReclassified(snapshot.id, newRevision),
     );
-    await this.#upsertResources(tables, snapshot);
+    await this.#upsertResources(tables, snapshot.id, changedResources(storedResources, snapshot));
     await tables.Resource.deleteExcept(
       snapshot.id,
       snapshot.resources.map((resource) => resource.id),
@@ -574,16 +620,20 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * An update's row already exists, so ownership is read back off the upsert
    * instead (`SqlTables.Resource.upsert`'s own doc comment).
    */
-  async #upsertResources(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
-    for (const resource of snapshot.resources) {
+  async #upsertResources(
+    tables: SqlTables<Order>,
+    spaceId: UUID,
+    resources: readonly SnapshotResource[],
+  ): Promise<void> {
+    for (const resource of resources) {
       const stored = await tables.Resource.upsert({
         id: resource.id,
-        spaceId: snapshot.id,
+        spaceId,
         document: resource.document,
       });
-      if (stored.spaceId !== snapshot.id) {
+      if (stored.spaceId !== spaceId) {
         throw new ResourceOwnershipError(
-          `Resource ${resource.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+          `Resource ${resource.id} belongs to space ${stored.spaceId}, not ${spaceId}`,
         );
       }
     }
