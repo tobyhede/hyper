@@ -4,7 +4,7 @@
 
 **Blocked by:** 01, 04, 06, 07, 08, 09 (runs after the splits, so moved code is edited only once)
 
-**Status:** ready-for-human — implementation comments delivered in PR #297 (merged 2026-09-25); test, e2e, Ladle and story comments in draft PR #300. Mark this ticket resolved when #300 merges.
+**Status:** resolved — implementation comments delivered in PR #297, test, e2e, Ladle and story comments in PR #300 (both merged 2026-09-25).
 
 - [x] Lineage phrasing ("replaces", "retired", "no longer", "used to", "was once") no longer appears in source comments, except where a comment states a live constraint. #297 covers `packages/*/src`, `src/` and `scripts/`, leaving `scripts/persistence-cost/**` to ticket 17. #300 covers `test/**`, `packages/*/test`, `packages/app/e2e`, `packages/app/ladle-e2e` and `packages/app/stories` (181 files; comment-stripped emit identical to `main` for each, directive grep unchanged, `pnpm verify` green). Two strings outside the comment scope still carry lineage and are left for a follow-up: the `applicationEvidence` string in `packages/app/stories/parity-claims.ts` and the "(ticket 02, item N)" `describe` titles in `packages/app/test/authoring-placement-copy.test.ts`
 - [x] No comment on a public export loses its statement of contract or invariant
