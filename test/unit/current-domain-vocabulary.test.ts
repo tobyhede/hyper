@@ -30,17 +30,14 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  */
 const ENTITY = ['R', 'oute'].join('');
 const TRAVERSAL = ['W', 'alk'].join('');
-// Separated by a space *or a hyphen*: the retired terms were also written as
-// compound adjectives, and a guard that knew only the spaced form left the
-// hyphenated one as the spelling the sweep could hide in — which is exactly
-// where one survived, in a parity claim, until this line widened.
+// Separated by a space *or a hyphen*: the retired terms can be written as
+// compound adjectives, and a guard that knew only the spaced form would leave
+// the hyphenated one as the spelling the sweep could hide in.
 // A hyphen, a space — or a line break with the comment's own leading `*`, which
-// is the separator a wrapped doc comment writes and the one this guard could
-// not see. `hits` reads line by line, so a two-word term the wrap split was
-// invisible to it in either half — and two really were: the second of the three
-// terms below survived a wrap in `packages/graph/src/placement.ts` and another
-// in `packages/app/test/navigation.test.ts`. The scan below uses `spanningHits`
-// for this reason, as the callback arm above already does. The terms stay
+// is the separator a wrapped doc comment writes. `hits` reads line by line, so
+// a two-word term the wrap split would be invisible to it in either half. The
+// scan below uses `spanningHits` for this reason, as the callback arm above
+// already does. The terms stay
 // composed rather than spelled here, as everything retired in this file does,
 // because this comment sits inside what the scan reads.
 const RETIRED_TERM_GAP = '[ -]|\\s*\\n\\s*\\*?\\s*';
@@ -68,8 +65,7 @@ const upper = ENTITY.toUpperCase();
  * The `Routed*` geometry AGENTS.md carves out falls out of the shape rather
  * than needing an exception: the retired name followed by a *lowercase* letter
  * is a different word, so that component and the bare English one never match.
- * The carve-out is the *shape*, not the dependency — it outlived elkjs (ADR
- * 0086) and survives whatever routes next.
+ * The carve-out is the *shape*, not any dependency.
  */
 const RETIRED_COMPOUND = new RegExp(
   [
@@ -105,9 +101,8 @@ const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
 /**
  * The retired name's *initial*, bound over a Graph collection. A single-letter
  * callback binding is below what the two patterns above can read — they need a
- * compound or a whole word — so `space.graphs.map((r) => r.id)` survived the
- * rename in three places with the guard green, and the last of them sat twelve
- * lines from the first.
+ * compound or a whole word — so `space.graphs.map((r) => r.id)` would survive a
+ * rename with the guard green.
  *
  * A bare ban on the letter is what makes this look unaffordable: `r` is
  * legitimately a result, a row, a request or a repository, and the deny-list
@@ -115,16 +110,15 @@ const RETIRED_BARE = new RegExp(`\\b(?:${ENTITY}|${TRAVERSAL})\\b`);
  * same line is what removes that cost entirely — the repo's convention is the
  * domain initial (`(r)` for Resource, `(m)` for Map, `(e)` for Edge), so a
  * binding introduced over `graphs` has exactly one correct letter and the
- * retired name's is not it. This is the answer to the open question in
- * `.scratch/graph-rename/issues/03-...`: worth reading, once scoped this way.
+ * retired name's is not it.
  *
  * The collection has to be the **receiver of the callback**, with nothing
- * between them. An earlier draft allowed any gap, and matched a correct
+ * between them. Allowing any gap would match a correct
  * `space.graphs.map((graph) => …)` followed on the same line by
  * `rows.map((r) => …)`, where the letter is bound by something this guard does
- * not govern. It also read one line at a time and required parentheses, so the
- * two forms Prettier actually produces — an unparenthesized single parameter,
- * and a callback broken across lines — were both invisible.
+ * not govern. It reads across lines and does not require parentheses, because
+ * those are the two forms Prettier actually produces — an unparenthesized
+ * single parameter, and a callback broken across lines.
  */
 const RETIRED_INITIAL_BINDING = new RegExp(
   [
@@ -149,7 +143,7 @@ const HISTORICAL_TREES = ['docs/adr/', 'docs/superpowers/', '.scratch/'] as cons
 
 /**
  * Live files speaking a different library's routing vocabulary belong here.
- * The list is empty now that no routing library owns product navigation.
+ * The list is empty: no routing library owns product navigation.
  */
 const QUALIFIED_FILES = [] as const;
 
@@ -485,18 +479,15 @@ describe('the vocabulary that guard reads', () => {
  * and the header that showed which one won — so every new presentation invited
  * a fourth.
  *
- * ADR 0079 then settled the noun itself: an authored **Map** is the only
- * entity that draws the canvas, and the render-layer word that stood between a
- * Map id and the Map it names went with the module it named. Its identity
- * is `MapId` in `@project/core` now, resolution is `resolveMap`, and the
- * Sidebar takes the Space's Maps rather than a row type derived for it.
- * Every spelling that indirection was written in is retired below, so it cannot
- * grow back under a name a reader would have to follow to recognise.
+ * ADR 0079 settles the noun itself: an authored **Map** is the only entity
+ * that draws the canvas, its identity is `MapId` in `@project/core`, and
+ * resolution is `resolveMap`. Every spelling of a render-layer indirection
+ * between a Map id and the Map it names is retired below, so it cannot grow
+ * back under a name a reader would have to follow to recognise.
  *
- * The persisted key that moved with them is deliberately **not** read here.
- * ADR 0054 rolls the unreleased prototype forward, and issue `04` foreclosed
- * every back-compat path for that key by name — so there is no live source this
- * scan would be protecting.
+ * The persisted key is deliberately **not** read here. ADR 0054 rolls the
+ * unreleased prototype forward with no back-compat path for that key, so there
+ * is no live source this scan would be protecting.
  *
  * The names below have no qualified sense anywhere, unlike ADR 0041's, so this
  * scan carries no exemption list beyond the historical trees.
@@ -541,14 +532,8 @@ const RETIRED_RENDERER_NAMES = [
 ].map((parts) => parts.join(''));
 
 /**
- * The header component's name, retired twice over.
- *
- * It was read as a **whole identifier** while the longer name that extended it
- * was current: the component kept this prefix and gained the render-layer noun,
- * so a prefix read would have reported its own replacement. ADR 0079 retired
- * that longer name too — the header takes a Map and is named for one — so
- * the whole-identifier rule goes with it and this is read as a prefix like
- * every other name above. That is what now makes one entry cover both.
+ * The header component's retired name, read as a prefix like every other name
+ * above, so one entry covers it and every longer name built on it.
  *
  * Joined here rather than written out, in this file's established idiom, and the
  * prose above says which names these are without spelling one: no retired name
@@ -586,13 +571,8 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
   });
 
   /**
-   * The indirection ADR 0079 removed, in the shapes it was written in.
-   *
-   * These lines were the *silent* half of this block until that work landed:
-   * they were the current names, and what they proved was that the entries above
-   * them did not over-match their own replacements. Retiring them inverts them,
-   * which is the whole change — the same fixture text, asserted the other way.
-   * A rename that leaves a line in the silent arm has retired nothing.
+   * The indirection ADR 0079 removes, in the shapes it was written in. A rename
+   * that leaves a line in the silent arm has retired nothing.
    *
    * Composed from the two constants where one exists, for this file's usual
    * reason; the rest are assembled here rather than written out, so this file
@@ -640,19 +620,18 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
 
 /**
  * `CONTEXT.md` lists the retired chrome word under Space's `_Avoid_` for two
- * readings — the loaded Space itself, and the app chrome around it — and the
- * code drifted from that entry for months with nothing reading for it. Issue
- * 08 closed the drift. This is what stops it reopening, and the word is the
- * one most likely to try: unlike the names above, it is what every other tool
+ * readings — the loaded Space itself, and the app chrome around it. This is
+ * what keeps the code from drifting from that entry, and the word is the one
+ * most likely to drift back: unlike the names above, it is what every other tool
  * in the ecosystem calls this shape of resource, so an agent reaches for it
  * unprompted.
  *
  * Neither block above transfers. ADR 0041's trick was that a *compound* is
  * unambiguous while the bare English word is fine, and here that is inverted —
  * pnpm's sense is written in compounds too, so no shape rule separates the two
- * senses in code. A bare-word scan over the whole tree reports 25 files and
- * ~131 occurrences, every one of them pnpm's, which is the ever-growing
- * exception list ADR 0041's own comment rejects.
+ * senses in code. A bare-word scan over the whole tree reports pnpm's sense
+ * everywhere, which is the ever-growing exception list ADR 0041's own comment
+ * rejects.
  *
  * So the senses are separated by **where they can live** rather than by how
  * they are spelled. The bare word is read over the source the repo authors —
@@ -662,11 +641,8 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
  * files are each written in some tool's vocabulary and hold no domain name.
  * That falls outside by construction rather than by exemption.
  *
- * The first draft stopped at `packages/**` and `src/**`, which is what the
- * ticket measured. It was wrong: issue 08's rename also had to clean
- * `vitest.setup.ts` and four files under `test/unit/`, so the guard could not
- * see the places the drift had actually reached. Widening cost two exemptions,
- * both pnpm's toolchain check and its test.
+ * The scope reaches `test/**`, `scripts/**` and the root configs because the
+ * drift reaches them too, not only `packages/**` and `src/**`.
  */
 const RETIRED_LOOSE_NAME = ['work', 'space'].join('');
 const RETIRED_LOOSE_NAME_CAPITAL = ['Work', 'space'].join('');
@@ -697,7 +673,7 @@ const isAuthoredSource = (file: string): boolean =>
  * exemption.
  * Composed from the fragment above for the same reason every retired name in
  * this file is — written out, this file would hold the word it bans, and it
- * is scanned now that `test/` is in scope.
+ * is scanned.
  */
 const MONOREPO_VOCABULARY: readonly string[] = [
   `packages/app/${RETIRED_LOOSE_NAME}-aliases.ts`,
@@ -778,7 +754,7 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
 /**
  * The pattern above is only as sharp as what it matches, and one that
  * silently stopped matching would pass every file forever. Read it against
- * the names issue 08 retired, and against pnpm's.
+ * the retired names, and against pnpm's.
  *
  * The bare word matches pnpm's spellings too — it is *where* they sit that
  * keeps them silent — so pnpm's half of this reads the exemption predicate
@@ -851,9 +827,8 @@ describe('the vocabulary the loose-name guard reads', () => {
  *
  * `CONTEXT.md` names Open Spaces as both the set and the surface that draws it.
  * The retired word named the set after `switchTo`, the operation that spends
- * it, which is an implementation name promoted to a product one. It was never
- * in `CONTEXT.md` or any ADR — it entered in a commit comment and was copied
- * across a prototype until it read as settled vocabulary. ADR 0082 leaves what
+ * it, which is an implementation name promoted to a product one. It is in
+ * neither `CONTEXT.md` nor any ADR. ADR 0082 leaves what
  * the surface is *called* to stories and tests, which is why this is a scan
  * rather than a decision record: nothing above it was ever going to catch it.
  */
@@ -894,10 +869,10 @@ describe('the retired name for the surface over the open set is gone', () => {
  * parent's — which is a trail's word for a history `CONTEXT.md` defines as a
  * record, not a path. Built from fragments for the reason the block above is.
  *
- * Read spanning lines, because prose wraps the two words apart: the one site a
- * line-by-line grep missed when this was retired was exactly that.
+ * Read spanning lines, because prose wraps the two words apart, and a
+ * line-by-line grep would miss exactly that.
  *
- * The identifiers went in a commit of their own, and their shapes are here too:
+ * The identifier shapes are here too:
  * the component and the prop that drew the Opener, and the type that named it
  * and every Open Spaces row as a step. The camelCase and kebab-case arms close
  * on any letter rather than a lowercase one, because the aggregate differential
@@ -987,8 +962,7 @@ describe('the Opener is named once', () => {
  * ADR 0085 makes Map the first-public name for the entity that was a
  * Layout, and states the same completion criterion ADR 0041 did: a repository
  * scan finds the retired name only in historical records and in qualified
- * layout-strategy prose. This is the first of that ADR's two changes; the
- * second retires the other noun and gains its own block here.
+ * layout-strategy prose. The ADR's other noun has its own block below.
  *
  * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
  * bare English word is legitimate — a strategy lays resources out, the Command Dock
@@ -997,11 +971,10 @@ describe('the Opener is named once', () => {
  * collection or the retired opening field by accident.
  *
  * The gerund is described rather than written out, because the suffix arm below
- * reports it and only `CITED_PATH` forgives the URL it appears in. That arm is
- * the one this file learned late. An English suffix gives no capital, no
- * boundary and no hyphen, so the retired spelling of `mapless` — the
- * adjective this codebase writes about a Space with no Map — passed every
- * other arm, went green through `verify` and was caught by a human reviewer.
+ * reports it and only `CITED_PATH` forgives the URL it appears in. An English
+ * suffix gives no capital, no boundary and no hyphen, so the retired spelling
+ * of `mapless` — the adjective this codebase writes about a Space with no Map —
+ * passes every other arm.
  *
  * **Two carve-outs are shape rather than exception**, in the `Routed*` idiom
  * this file already uses:
@@ -1034,9 +1007,8 @@ const RETIRED_MAP_NAME = new RegExp(
     `(?<!use)${RETIRED_MAP}(?!Strategy)[A-Z]`,
     // Compounds ending in it: the selected one, the default one, the resolved one.
     // `s?` because a lowercase plural ends the word without a boundary landing
-    // after the retired name, so every compound that ended in its plural — the
-    // `with`, `stored` and `Arb` ones this rename actually carried — was
-    // invisible to this arm until it was there.
+    // after the retired name, so every compound that ends in its plural would
+    // be invisible to this arm without it.
     `[A-Za-z]${RETIRED_MAP}s?\\b`,
     // camelCase compounds opening with it: its id, its resources, its title.
     `\\b${retiredMapLower}(?!Strategy)[A-Z]`,
@@ -1047,8 +1019,7 @@ const RETIRED_MAP_NAME = new RegExp(
     // was written in — the retired word between two underscores — goes unseen.
     `${RETIRED_MAP_UPPER}_[A-Z]`,
     // The retired field, singular and plural, in a document or an object
-    // literal. The singular is the Space Resource frontmatter key, which ADR 0079's
-    // still-open Ticket 04 is the next work to touch.
+    // literal.
     // `(?<!-)` because a hyphen makes it a different word, and prose about
     // re-running a strategy ends the clause with a colon exactly as a key does.
     `(?<!-)\\b${retiredMapLower}s?["']?\\s*[:=]`,
@@ -1064,26 +1035,24 @@ const RETIRED_MAP_NAME = new RegExp(
     `${retiredMapLower}-[a-z]`,
     // `(?![a-z])` rather than `\\b`: an underscore is a word character, so no
     // boundary lands after the retired word in a BEM block and `.canvas-x__rail`
-    // would read as clean. Nothing in the tree hides behind it today — this
-    // closes the gap the sibling block below found rather than fixing a site.
+    // would read as clean.
     `[a-z]-${retiredMapLower}s?(?![a-z])`,
-    // The optional field. The key arm above cannot cross the `?`, and this is
-    // the declared shape of the Space Resource frontmatter key ADR 0079 still owes.
+    // The optional field. The key arm above cannot cross the `?`.
     `\\b${retiredMapLower}s?\\?\\s*:`,
     // The callback binding this repo's own convention writes, where the retired
     // word is the whole parameter and no capital follows it to end a compound.
     `\\(\\s*${retiredMapLower}\\s*\\)\\s*=>`,
     // The screaming constant with no trailing segment. The underscore arm above
-    // needs a following capital, so a bare `DEFAULT_` prefix went unseen behind
-    // it, an underscore being a word character. The lookbehind is the
+    // needs a following capital, so a bare `DEFAULT_` prefix would go unseen
+    // behind it, an underscore being a word character. The lookbehind is the
     // verb in the one screaming-case shape that keeps it, a CSS class group,
     // in the same idiom `(?<!use)` separates React's hook above.
     `(?<!GROUP)_${RETIRED_MAP_UPPER}\\b`,
     // The retired word carrying a lowercase suffix that makes it a different
     // word. Every arm above needs a capital after it, a boundary after it or a
     // hyphen joined to it, and an English suffix offers none of the three — so
-    // the adjective this codebase actually writes, `mapless`, went unseen
-    // in its retired spelling and reached review rather than the build. The
+    // the adjective this codebase writes, `mapless`, would go unseen in its
+    // retired spelling. The
     // plural is ruled out by name: `s` followed by a boundary is the compound
     // arms' business, and claiming it here would report every `${retiredMapLower}s`
     // twice.
@@ -1100,12 +1069,7 @@ const RETIRED_MAP_NAME = new RegExp(
  */
 const RETIRED_MAP_BARE = new RegExp(`\\b${RETIRED_MAP}\\b`);
 
-/**
- * The one foreign spelling the exemption below forgives: Lucide's grid glyph.
- * elkjs's three — its options bag on the type and on the element field, and the
- * screaming case our own default for that bag was declared in — went with the
- * dependency (ADR 0086).
- */
+/** The one foreign spelling the exemption below forgives: Lucide's grid glyph. */
 const FOREIGN_MAP_SPELLINGS = new RegExp(`${RETIRED_MAP}Grid`);
 
 /**
@@ -1120,7 +1084,7 @@ const withoutForeignSpellings = (source: string): string =>
 /**
  * A retired name quoted as **history** rather than used as vocabulary: the
  * continuation control value that went with the retired gutter (ADR 0082),
- * which the test that pinned its removal still names as gone.
+ * which `packages/app/test/SpaceApp.test.tsx` still names as absent.
  *
  * Masked rather than exempted by file, in the idiom directly above, and
  * asserted below to still be present, so a test that stops telling the story
@@ -1145,8 +1109,7 @@ const withoutHistoricalQuotations = (source: string): string =>
  *  - **A path is not vocabulary.** `.scratch/` and `docs/adr/` are trees this
  *    rename does not rewrite, so a current-state document that cites one cites
  *    it under the name it has on disk. Renaming a citation does not update a
- *    record, it breaks a link — the failure this repository's own guards record
- *    as having already happened twice. Masked by shape, as any run of
+ *    record, it breaks a link. Masked by shape, as any run of
  *    non-whitespace carrying a `/`, plus the `NNNN-` filename form an ADR row
  *    and the roadmap generator both write bare.
  *  - **A foreign glyph arrives with a dependency.** Lucide spells its grid
@@ -1191,8 +1154,7 @@ const withoutQualifiedSpellings = (source: string): string =>
  *
  * It is scoped to the module that owns the dependency — `icons.tsx` is the only
  * module allowed to import Lucide at all — so a foreign name cannot spread
- * behind it. The three elkjs modules that used to sit beside it left with the
- * dependency (ADR 0086).
+ * behind it.
  */
 const FOREIGN_MAP_FILES: readonly string[] = ['packages/ui/src/icons.tsx'];
 
@@ -1363,25 +1325,21 @@ describe('a Map is named once (ADR 0085)', () => {
  * ADR 0085 makes Resource the first-public name for the entity that was a Card,
  * and states the same completion criterion ADR 0041 did: a repository scan
  * finds the retired name only in historical records and in the vendored
- * registry carve-out. This is the second of that ADR's two changes; the Map
- * block above is the first.
+ * registry carve-out. The Map block above is the ADR's other noun.
  *
- * **This block is the whole reason the name is Resource and not Object.** The ADR
- * rejected the better-pedigreed word on one ground — that a scan for
- * `Object[A-Z]`, `[A-Za-z]Object`, `object[A-Z]` and `OBJECTS?` already matches
- * 287 sites (`RefObject`, `toMatchObject`, oxlint's `ObjectExpression`), and a
- * domain word whose guard needs 287 exceptions has no guard. The same scan for
- * Resource matched zero. So a rename of this size was accepted *because* this file
- * could hold it, and the acceptance is only cashed here.
+ * **This block is why the name is Resource and not Object.** A scan for
+ * `Object[A-Z]`, `[A-Za-z]Object`, `object[A-Z]` and `OBJECTS?` matches
+ * hundreds of foreign sites (`RefObject`, `toMatchObject`, oxlint's
+ * `ObjectExpression`), and a domain word whose guard needs hundreds of
+ * exceptions has no guard. The same scan for Resource matches none, so the name
+ * holds only while this file holds it.
  *
- * **The English words need no exemption, which is worth stating because the
- * reconnaissance expected otherwise.** `cardinality` (67), `discard` (148) and
- * `wildcard` (4) are all invisible to every arm below, and not by luck: each
- * arm requires either a capital after the retired word, a word boundary before
- * it, or a key's colon after it, and none of the three offers any. What did
- * need protecting was the *codemod*, which substitutes plain substrings.
+ * **The English words need no exemption.** `cardinality`, `discard` and
+ * `wildcard` are all invisible to every arm below, and not by luck: each arm
+ * requires either a capital after the retired word, a word boundary before it,
+ * or a key's colon after it, and none of the three offers any.
  *
- * **`migrations/` is excluded here and nowhere else.** The 21 files it
+ * **`migrations/` is excluded here and nowhere else.** The files it
  * contributes are `start-contract` / `end-contract` snapshots of a schema that
  * really did have a Card model, and ADR 0085 says migration snapshots are
  * history and are not rewritten. It is scoped to this block rather than added
@@ -1391,11 +1349,11 @@ describe('a Map is named once (ADR 0085)', () => {
  * two emitted artifacts beside it are regenerated from it, so a retired model
  * name there is a live defect rather than a record.
  *
- * What needs a **file** exemption is what ADR 0085 predicted, and it is the one
- * carve-out: the vendored shadcn registry. `packages/ui/src/components/card.tsx`
+ * What needs a **file** exemption is the one carve-out: the vendored shadcn
+ * registry. `packages/ui/src/components/card.tsx`
  * exports seven components under the retired name, and four other modules import
- * them — a barrel, two components and a baseline test. A foreign name with no shape to read, exactly
- * as Lucide's glyph is for Route and elkjs's options bag is for Layout.
+ * them — a barrel, two components and a baseline test. A foreign name with no
+ * shape to read, exactly as Lucide's glyph is for Route.
  *
  * The registry's Tailwind tokens and custom properties need **nothing**, and
  * the collection-key arm's `(?<!-)` and the qualified masker between them cover
@@ -1437,8 +1395,7 @@ const RETIRED_RESOURCE_NAME = new RegExp(
     // scan silent.
     `["']${retiredResourceLower}s?["']`,
     // The kebab-case compounds, which are the shape most of this rename was
-    // written in and which review of change one found the Map block blind
-    // to: refusal codes, completion kinds, test ids, CSS blocks and every
+    // written in: refusal codes, completion kinds, test ids, CSS blocks and every
     // `data-` attribute. A hyphen is not a word character, so `\\b` lands either
     // side of the retired word and every arm above reads straight past
     // `resource-not-found`, `edited-resource` and `.canvas-resource`. The registry's own
@@ -1455,10 +1412,10 @@ const RETIRED_RESOURCE_NAME = new RegExp(
     `\\b${retiredResourceLower}s?\\?\\s*:`,
     // The binding written as a whole parameter, where no capital follows the
     // retired word to end a compound. The terminator is `,` as well as `)`,
-    // because a binding that takes the index too is the same blind spot this
-    // arm was written for, and the arrow is gone from it, because a `function`
-    // expression binds the word without one — and an argument passed under the
-    // retired name is a survivor of the same sweep either way. The comment
+    // because a binding that takes the index too is the same blind spot, and
+    // no arrow is required, because a `function` expression binds the word
+    // without one — and an argument passed under the retired name is the same
+    // leftover either way. The comment
     // cannot spell any of the three, for the reason the fixtures below are
     // composed rather than written out: this scan reads its own source.
     `\\(\\s*${retiredResourceLower}s?\\s*[,)]`,
@@ -1490,8 +1447,7 @@ const RETIRED_RESOURCE_BARE = new RegExp(`\\b${RETIRED_RESOURCE}\\b`);
  * `data-slot` values, which are read in six modules outside the vendored one
  * and are not ours to sweep (ADR 0047, ADR 0050). And `CITED_PATH`, shared with the block above,
  * for every citation that does carry a prefix: a renamed citation into a tree
- * this rename does not rewrite is a broken link, which is the failure this
- * file's own comments record as having happened twice.
+ * this rename does not rewrite is a broken link.
  */
 const QUALIFIED_RESOURCE_SPELLINGS = [
   `text-${retiredResourceLower}-foreground`,
@@ -1579,11 +1535,9 @@ const FOREIGN_BARE_RESOURCE_FILES: readonly string[] = [
  * the reason its comment records: the convention is the domain initial
  * (`(r)` for Resource, `(m)` for Map, `(e)` for Edge), so a binding introduced
  * over the Resource collection has exactly one correct letter and the retired
- * name's is not it. Twenty-five sites carried `(c)` over a Resource collection
- * through this rename and a text sweep could not see any of them, because
+ * name's is not it. A text sweep cannot see such a binding, because
  * substituting the collection's own name leaves the callback's parameter
- * untouched — the same drift, in the same shape, that the Route arm was
- * written after.
+ * untouched.
  *
  * The collection has to be the **receiver**, with nothing between them, which is
  * what keeps a `count`, a `cell` or a `colour` bound by something this guard
@@ -1804,8 +1758,8 @@ describe('a Resource is named once (ADR 0085)', () => {
 
 /**
  * ADR 0101 gives Map and Resource their final first-public names. These two
- * scans retire the nouns they replaced, using every identifier shape the four
- * earlier vocabulary guards accumulated. The migration trees are history and
+ * scans retire the nouns they replaced, using every identifier shape the
+ * vocabulary guards above read. The migration trees are history and
  * are excluded here only: their snapshots must continue to describe the schema
  * that existed when each migration was generated.
  */
@@ -1839,8 +1793,8 @@ const retiredIdentifierPattern = (retired: string): RegExp => {
       // kebab-case, with the retired noun on either side. The closing arm ends
       // on a lookahead rather than `\b`, because `_` is a word character and a
       // BEM element suffix — `canvas-<retired>__rail` — therefore offers no
-      // boundary after the word. Written as the Map block above writes its own
-      // kebab arm, which closed this gap there for this reason. A following
+      // boundary after the word, as in the Map block above's own kebab arm. A
+      // following
       // lowercase letter is a longer word and stays with the English-suffix arm
       // below, which reads it.
       `\\b${lowercase}-[a-z]`,
@@ -2426,8 +2380,8 @@ describe('a Space is named once (ADR 0010)', () => {
  * **snapshot**, and the stored Meta identity is a **row**.
  *
  * **This block is not shaped like the ones above, and the difference is the
- * point.** Those retire a word, so they ban it. Sense 1 keeps this word — 1300
- * occurrences across 61 identifier spellings — so there is nothing to ban, and
+ * point.** Those retire a word, so they ban it. Sense 1 keeps this word, and
+ * widely, so there is nothing to ban, and
  * no regex separates two senses of one spelling. What is bannable is the two
  * **phrases** the retired senses were written in, and the import alias that
  * existed only to dodge the collision between sense 1 and sense 2.
@@ -2439,10 +2393,10 @@ describe('a Space is named once (ADR 0010)', () => {
  *    snapshot's.
  *  - The root phrase, likewise. It named the `RepositoryState` row, and in DDD
  *    that phrase names an entity rather than the row that names one.
- *  - The import alias, which was load-bearing and read as a stylistic choice
- *    rather than as the collision-avoidance it was. Its absence is the
- *    completion criterion for the rename: the name it dodged is free, and
- *    `@project/graph`'s function is imported under it.
+ *  - The import alias that exists only to dodge the collision between sense 1
+ *    and sense 2. Its absence is the completion criterion for the rename: the
+ *    name it dodged is free, and `@project/graph`'s function is imported under
+ *    it.
  *
  * **The verb phrase is untouched and is sense 1 saying what it means.** The
  * aggregate *rooted at* the Meta Space is the rooting rule in words; the verb
@@ -2559,7 +2513,7 @@ describe('aggregate has one meaning (ADR 0088)', () => {
 
   it('stays silent on the sense that keeps the word, and on the names that replaced the two it lost', () => {
     const kept = [
-      // Sense 1, which is what the word means now. The verb phrase is the
+      // Sense 1, the word's one meaning. The verb phrase is the
       // rooting rule in words, and no arm reaches it.
       `Exported the ${keptAggregate} ${RETIRED_ROOT}ed at \${metaSpaceId} to \${destination}`,
       `it('loads the complete ${keptAggregate} ${RETIRED_ROOT}ed at the explicit Meta Space', () => {`,
@@ -2611,17 +2565,16 @@ describe('aggregate has one meaning (ADR 0088)', () => {
  * block are written in, and the verb phrases none of these arms reach —
  * declaration and whole-parameter bindings.
  *
- * **One arm is new here and was not needed for Card.** This rename is a
- * product-vocabulary change, not a code-only one, and authors read the
- * retired word as a bare capitalised noun far more than they ever wrote
- * `Card` that way — in running prose, in an accessible name, in a fixture
- * Title. So this block's compound regex also reads the word capitalised as a
- * noun, in the idiom the Space block already uses for the same reason (a
- * `package.json`'s foreign sense forced it there; here it is the prose
- * itself). The English word is still unambiguous without it: nothing this
- * rename governs writes the retired word bare and lowercase except a
- * genuinely foreign sense (below), and the capitalised arm only ever fires on
- * the retired proper noun.
+ * **One arm is here that the Card block does not have.** This rename is a
+ * product-vocabulary change, not a code-only one, and authors write the retired
+ * word as a bare capitalised noun — in running prose, in an accessible name, in
+ * a fixture Title. So this block's compound regex also reads the word
+ * capitalised as a noun, in the idiom the Space block already uses for the same
+ * reason (a `package.json`'s foreign sense forced it there; here it is the
+ * prose itself). The English word is still unambiguous without it: nothing this
+ * rename governs writes the retired word bare and lowercase except a genuinely
+ * foreign sense (below), and the capitalised arm only ever fires on the retired
+ * proper noun.
  *
  * **What needs a file exemption is what this ADR's own body predicts.** The
  * retired word already collides with ordinary English for pointing, and with
@@ -2647,16 +2600,6 @@ describe('aggregate has one meaning (ADR 0088)', () => {
  * alias at all" — needs no exemption at all: every arm below requires either
  * a capital, a hyphen, an underscore or a trailing colon/equals, and bare
  * lowercase prose bounded by spaces offers none of the four.
- *
- * This file's own guard block is exempted from the codemod that performs the
- * rename, for the same reason its own text has to keep saying the retired
- * word (this comment) and the reason above already gives (the bare
- * capitalised arm this block adds): a blind sweep cannot tell a rename's own
- * explanation from a leftover instance, and this file also carries the
- * retired word, as ordinary English for an unrelated import rename, in one
- * block above. Its own remaining `describe` block, immediately below, is
- * exactly that usage — read it for what the word means when it is not this
- * kind.
  */
 const RETIRED_ALIAS = ['A', 'lias'].join('');
 const retiredAliasLower = RETIRED_ALIAS.toLowerCase();

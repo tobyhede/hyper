@@ -65,12 +65,12 @@ for (const delay of [0, 120]) {
 }
 
 /**
- * Ticket `18` could not obtain a reproduction. The Open command is not on the
- * Dock name: a pointer Open is the Resource's own control (ADR 0036), and a
- * keyboard Open sits on React Flow's wrapper and declines a `button` or
- * textbox (`SpaceCanvas` `NOT_A_CANVAS_COMMAND`). These are the gestures `11`
- * never tried — no menu, a Resource already selected, Enter completing the
- * rename, and activating the name from the keyboard.
+ * The Open command is not on the Dock name: a pointer Open is the Resource's
+ * own control (ADR 0036), and a keyboard Open sits on React Flow's wrapper and
+ * declines a `button` or textbox (`SpaceCanvas` `NOT_A_CANVAS_COMMAND`). These
+ * are the rename gestures that could reach it — no menu, a Resource already
+ * selected, Enter completing the rename, and activating the name from the
+ * keyboard.
  */
 test('renaming a Space, Map or Graph from the Dock does not Open a selected Resource', async ({
   page,
@@ -118,8 +118,8 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A')).toBeVisible();
-    // The same gate every other test in this file opens with, and the one this
-    // test was missing. A visible node says the projection arrived, not that
+    // The same gate every other test in this file opens with. A visible node
+    // says the projection arrived, not that
     // the opening camera animation has stopped — and animation frames still
     // being spent on the canvas are what stretch a menu's own exit animation in
     // wall-clock time, which is the gap the press below has to clear.
@@ -204,8 +204,8 @@ test('a secondary-button drag on the grip leaves the Dock in its slot', async ({
  * Hover reveals no commands (ADR 0102): a Resource's toolbar is drawn while it is
  * selected, outside the Resource, so the same move onto a handle must leave a
  * selected Resource's toolbar, entity actions included, drawn. The handle's own
- * colour is asserted here too, because it is the half of the treatment change
- * that says where the Graph's colour went (`.scratch/command-dock/issues/12`).
+ * colour is asserted here too, because the handles carry the Active Graph's
+ * colour while the toolbar stays neutral.
  */
 test("hovering a Resource handle keeps its handles revealed and a selected Resource's toolbar drawn", async ({
   page,
@@ -333,12 +333,9 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
  * catalogue cannot: an application Edit, on the real Space, against the real
  * Authoring composition.
  *
- * **The press count is the obligation, and it is now the same count for both.**
- * ADR 0089 retired the panes that stood between a press and a creation: each
- * kind completes its Edit on activation and continues in the Resource's own Title
- * editor, so neither owes a second decision. The asymmetry that killed the
- * disclosure — one kind completing on the press while two collected a value
- * first — is gone rather than merely unmeasured.
+ * **The press count is the obligation, and it is the same count for both.**
+ * Each kind completes its Edit on activation and continues in the Resource's
+ * own Title editor, so neither owes a second decision (ADR 0089).
  */
 test(
   'each Resource kind is created in one press from the Dock',

@@ -177,7 +177,7 @@ describe('confirmation', () => {
 
   /**
    * A thrown deletion is a defect: it keeps `failureMessage`'s sentence on the
-   * channel and now reaches the reporter as well, where it used to be swallowed.
+   * channel and reaches the reporter as well.
    */
   it('reports a thrown Markdown Resource deletion and publishes its sentence', async () => {
     const opened = open();

@@ -34,8 +34,8 @@ describe('ResourceContent', () => {
 
   /**
    * The HTML goes in through `dangerouslySetInnerHTML`, so what `marked` emits
-   * reaches the DOM. `marked` has had no `sanitize` option since v5 and passes
-   * inline HTML through verbatim, which made every one of these live.
+   * reaches the DOM. `marked` has no `sanitize` option and passes inline HTML
+   * through verbatim, so unsanitised, every one of these would be live.
    *
    * These are asserted on the rendered DOM rather than on a sanitiser call,
    * because the property that matters is "no executable attribute survives into

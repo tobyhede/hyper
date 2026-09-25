@@ -10,8 +10,8 @@ import {
 } from '../support/structural-scan';
 
 /**
- * Arm 1 of ticket 08's structural scan (`test/support/structural-scan.ts`
- * reads the source and states what every arm shares): a structural Tailwind
+ * Arm 1 of the structural scan (`test/support/structural-scan.ts` reads the
+ * source and states what every arm shares): a structural Tailwind
  * arbitrary value (`rounded-[6px]`, `text-[12px]`, `border-[3px]`,
  * `shadow-[…]`, `drop-shadow-[…]`) in `.ts`/`.tsx` source.
  */
@@ -30,7 +30,7 @@ const LENGTH_LIKE = /^(?:length:.*|(?:calc|clamp|min|max)\(.*\)|-?\d*\.?\d+(?:[a
  * Tailwind also spends on colour (`text-[color-mix(…)]`, `border-[var(--accent)]`
  * — a bare `var()` reads as a colour), so their content decides whether they
  * are this scan's business: a length is type size or border width, anything
- * else is a colour question ticket 11 owns. `font-[…]` is shared the same way
+ * else is a colour question outside this scan. `font-[…]` is shared the same way
  * between weight and family, and Tailwind disambiguates it with a
  * `family-name:` type hint, so that hint is what puts one outside this scan.
  * `rounded`, `shadow` and `drop-shadow` carry no second reading, so every

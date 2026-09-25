@@ -427,11 +427,10 @@ describe('Open Spaces', () => {
   });
 
   /**
-   * `v1-release/17`: a refused aggregate warns before exit exactly as a
-   * permanent rejection does — both leave nothing stored to lose, and both
-   * recover only through a further Edit rather than this Space's own
-   * persistence surface — even though the two are now distinct
-   * `SpaceSessionState['persistence']` kinds.
+   * A refused aggregate warns before exit exactly as a permanent rejection
+   * does — both leave nothing stored to lose, and both recover only through a
+   * further Edit rather than this Space's own persistence surface — even
+   * though the two are distinct `SpaceSessionState['persistence']` kinds.
    */
   it('warns before exiting refused work and permits an explicit exit', async () => {
     const control = new MemorySpaceBackendTestControl();
@@ -892,8 +891,6 @@ describe('Open Spaces', () => {
    *
    * The open set is drawn as the tree that *crossing* makes, each Space under
    * the one it was entered from — the **Opener** CONTEXT.md gives the open set.
-   * Production recorded no such crossing before this, so a surface indenting
-   * anything was indenting a fact nothing held.
    *
    * It is display-only, and these tests are about the record rather than about
    * any behaviour hanging off it: Exit closes one Space whether or not something
@@ -998,7 +995,7 @@ describe('Open Spaces', () => {
     expect(await openSpaces.exit(OTHER_ID)).toEqual({ kind: 'exited' });
 
     // Still open, and still reachable in the list that is the only way back to
-    // it. Walking up lazily could not answer this: the exited entry is gone and
+    // it. Walking up lazily cannot answer this: the exited entry is gone and
     // its own opener with it, so there is no chain left to follow.
     const { entries, openedFrom } = openSpaces.getState();
     expect(entries.map(({ id }) => id)).toContain(THIRD_ID);
@@ -1122,12 +1119,11 @@ describe('Open Spaces', () => {
   });
 
   /**
-   * What the tree the Open Spaces menu draws is a picture of, ported from the
-   * deleted `dock-open-tree.test.ts` through `listing()` rather than through the
-   * private `openTree` helper it used to test directly.
+   * What the tree the Open Spaces menu draws is a picture of, read through
+   * `listing()`.
    *
-   * The one case that file held and this does not is a row whose opener is
-   * absent: `listing()`'s only producer, `openedFrom`, cannot produce one — every
+   * A row whose opener is absent is not among the cases: `listing()`'s only
+   * producer, `openedFrom`, cannot produce one — every
    * entry begins with a real opener and `retireOpenSpace` re-homes what an exit
    * would otherwise strand — so there is no way to reach it through the public
    * seam.
@@ -1179,8 +1175,7 @@ describe('Open Spaces', () => {
   });
 
   /**
-   * The Meta-row rule cases moved from `space-set-freshness.test.tsx`
-   * (`.scratch/command-dock/issues/28`, decision 11): Meta's row does not
+   * The Meta-row rule: Meta's row does not
    * depend on the Space list read, and a failure to open it names Meta by the
    * title the menu drew rather than by a placeholder.
    */

@@ -286,9 +286,9 @@ test(
 
     // The hit target, asserted as a size rather than left to the drag below.
     // React Flow's own `.react-flow__resize-control.handle` declares a 5px box
-    // and outranks a rule naming one class, so this passed while the control
-    // was too small for a pointer to find — Playwright hits 5px exactly and a
-    // hand does not. The mark stays smaller than the target it sits in.
+    // and outranks a rule naming one class, so a drag alone would pass with a
+    // control too small for a pointer to find — Playwright hits 5px exactly and
+    // a hand does not. The mark stays smaller than the target it sits in.
     expect(box.width).toBe(48);
     expect(box.height).toBe(48);
     const markLocator = openRegion.locator('.rf-resource-node__resize-mark');
@@ -520,14 +520,14 @@ test('an unavailable rail command keeps its place under the arrows', async ({ pa
   const close = resource.getByRole('button', { name: 'Close Resource Strategies' });
 
   // Unavailable through `aria-disabled`, so it is still there to arrow to. The
-  // native property drew the control and took it off the keyboard, which made
+  // native property would draw the control and take it off the keyboard, making
   // ADR 0064's "keeps its slot" a promise to the eye only.
   await expect(close).toHaveAttribute('aria-disabled', 'true');
 
   // **And it says so, which is the half an attribute assertion cannot make.**
-  // `disabled:` utilities never match a toolbar item, so an unavailable command
-  // was drawn at full ink and still took the hover fill — operable to the eye and
-  // inert to the press. Both are read here: quieter than the command beside it,
+  // `disabled:` utilities never match a toolbar item, so without its own rule an
+  // unavailable command draws at full ink and still takes the hover fill —
+  // operable to the eye and inert to the press. Both are read here: quieter than the command beside it,
   // and unmoved by a pointer that cannot use it (`Button.tsx`).
   const ink = (locator: typeof close) =>
     locator.evaluate((element) => {

@@ -31,11 +31,10 @@ afterAll(() => vi.unstubAllGlobals());
 
 describe('PopoverContent', () => {
   /**
-   * The shadow is the theme's, not a value written in numbers. It was
-   * `shadow-[0_12px_40px_rgba(0,0,0,0.5)]` — half the black there is, chosen
-   * against a dark face — and a popover that lands on a light one then reads as
-   * a smudge, with no way to reach it but a stylesheet outranking the utility
-   * from outside.
+   * The shadow is the theme's, not a value written in numbers. An arbitrary
+   * shadow chosen against a dark face makes a popover that lands on a light one
+   * read as a smudge, with no way to reach it but a stylesheet outranking the
+   * utility from outside.
    */
   it('spends a theme shadow rather than an arbitrary one', () => {
     render(

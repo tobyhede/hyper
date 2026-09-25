@@ -45,7 +45,7 @@ const cyclicChain = (): Error => {
 };
 
 /*
- * Tickets 31 and 38. Each database's store answers whether a failure is
+ * Each database's store answers whether a failure is
  * evidence the database is not answering for now, and `SqlSpaceRepository`
  * asks it rather than reading driver fields itself. `postgresSqlStore` is
  * built over a runtime that is never connected: answering touches no
@@ -127,7 +127,7 @@ describe('postgresSqlStore.isUnavailable', () => {
   });
 
   // Authentication and a missing database are the configuration or the
-  // server refusing this client, which no wait cures (ticket 36).
+  // server refusing this client, which no wait cures.
   it.each([
     ['28P01', 'password authentication failed for user "hyper"'],
     ['28000', 'no pg_hba.conf entry for host'],
@@ -193,9 +193,9 @@ describe('postgresSqlStore.isUnavailable', () => {
 });
 
 /*
- * Ticket 38. SQLite's store recognises what its driver normalises — BUSY and
- * LOCKED arrive as `SqlConnectionError` (ticket 18), and ticket 18's two BUSY
- * shapes (immediate and exhausted) stay one answer without being told apart —
+ * SQLite's store recognises what its driver normalises — BUSY and LOCKED
+ * arrive as `SqlConnectionError`, and the two BUSY shapes (immediate and
+ * exhausted) stay one answer without being told apart —
  * and, as a contained compatibility check, the one failure the pinned runtime
  * raises for a client that has been closed, which carries nothing but its
  * message.

@@ -80,10 +80,8 @@ describe('readSingleSpace', () => {
       document: { version: 1, title: 'Talk' },
       resources: [
         // Sorted globally by relative path, so the two files inside the
-        // inventory directory precede `root.md`: ADR 0101 renamed the directory,
-        // and `resources/` sorts before `root` where the former inventory name
-        // sorted after it.
-        // The rule under test is unchanged.
+        // inventory directory precede `root.md`: `resources/` sorts before
+        // `root`.
         { document: { title: 'A', kind: 'markdown', body: 'A body\n' } },
         { document: { title: 'Detail', kind: 'markdown', body: 'Detail body\n' } },
         { document: { title: 'Z', kind: 'markdown', body: 'Z body\n' } },
@@ -301,7 +299,7 @@ describe('readSingleSpace', () => {
 
   it('refuses a retired space-level graphs key rather than stripping it', async () => {
     // `importSpaceFileSchema` is strict, so an undeclared key is already
-    // refused rather than dropped. This check survives that to *name* the one
+    // refused rather than dropped. This check runs ahead of it to *name* the one
     // that matters: a space-level `graphs` carried the whole topology
     // (ADR 0040), and a generic unrecognized-key refusal does not say so.
     const temporaryDirectory = await makeTemporaryDirectory();
@@ -325,8 +323,8 @@ describe('readSingleSpace', () => {
   // them survive a *third* pre-parse refusal being added at intake: a document
   // intake refuses before parsing is refused here in the same words. The two
   // doors ask one composed `documentRefusal`, so neither can come to know about
-  // a refusal the other does not — which is exactly how the retired `graphs`
-  // key came to be stripped here while intake rejected it.
+  // a refusal the other does not — otherwise the retired `graphs` key could be
+  // stripped here while intake rejected it.
   it.each([
     ['a version it cannot read', versionTwoDocument],
     ['a retired space-level graphs key', retiredGraphsDocument],

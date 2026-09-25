@@ -3,18 +3,15 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 /**
  * How a test reaches the application's command surface.
  *
- * Every one of these was a single control on the Space Sidebar and is a
- * disclosure on the Command Dock: the Sidebar had room for a permanent `Add
- * Resource`, a permanent `Add Map` and a Present button because it was a column
- * sixteen rem wide, and the Dock is a strip over the canvas that finds room by
- * disclosure instead (ADR 0082). So a test that used to press one button now
- * opens a menu and presses a row.
+ * The Command Dock is a strip over the canvas that finds room by disclosure
+ * (ADR 0082), so reaching one of these commands means opening a menu and
+ * pressing a row.
  *
- * They live here rather than in each suite because the *surface* changed and the
- * claims did not: twenty tests across six files assert what happens after Add
- * Resource, and none of them is about how Add Resource is reached. One module is what
- * stops the next change to the Dock being a change to twenty files — and what
- * stops six of them quietly settling on six different ways to press it.
+ * They live here rather than in each suite because the suites assert what
+ * happens after a command, and none of them is about how the command is
+ * reached. One module is what stops a change to the Dock being a change to
+ * every suite — and what stops the suites settling on different ways to press
+ * it.
  *
  * None of this is a harness. Every control below is the production one the
  * application draws, addressed the way a reader reaches it.
@@ -34,11 +31,10 @@ export const unavailable = (control: HTMLElement): boolean =>
 /**
  * Begin the inline rename of a Dock identity, once it may begin.
  *
- * All three names are renameable now — `renamed-space` joined `renamed-map`
- * and `renamed-graph` — and all three are withdrawn together, by the one
+ * All three names are renameable — `renamed-space`, `renamed-map` and
+ * `renamed-graph` — and all three are withdrawn together, by the one
  * `chromeTitleEdit` guard. The name itself is the identity's disclosure, so a
- * test that used to press the word now opens that list and chooses Rename
- * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+ * test opens that list and chooses Rename.
  *
  * The wait is on the Rename row rather than the trigger: switching stays
  * reachable while a chrome title edit is withdrawn, and only the command that
@@ -186,11 +182,10 @@ export const anyPresentControl = (): HTMLElement =>
 /**
  * The open Spaces, and the mark on the one that is unwell.
  *
- * The Sidebar drew the set as a strip of vertical tabs beside it; the Dock
- * discloses the same set from the bar, as the tree the Opener makes (ADR 0082
- * leaves which surface draws it as treatment). The row still says *which* Space
- * needs a decision and says it in `openSpaceStatusLabel`'s words, so a Space
- * that went wrong while the reader was elsewhere is still distinguishable from
+ * The Dock discloses the set from the bar, as the tree the Opener makes
+ * (ADR 0082 leaves which surface draws it as treatment). The row says *which*
+ * Space needs a decision and says it in `openSpaceStatusLabel`'s words, so a
+ * Space that went wrong while the reader was elsewhere is distinguishable from
  * one that is fine.
  */
 export const openSpacesMenu = (): void => {

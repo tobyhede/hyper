@@ -377,9 +377,9 @@ describe('draft invalidation', () => {
   /**
    * A refusal names Resources and Graphs of the Space it was made against, so the
    * context that invalidates a draft invalidates the sentence too — and a
-   * *pointer* refusal has no draft left to be cancelled with it. The handoff's
-   * shared case 7 is the hard one: accepting the stored Space "cancels all
-   * target-bound transients", and a sentence naming the replaced Space is one.
+   * *pointer* refusal has no draft left to be cancelled with it. Accepting the
+   * stored Space is the hard case: it cancels all target-bound transients, and
+   * a sentence naming the replaced Space is one.
    */
   it.each([
     [
@@ -810,9 +810,9 @@ describe('composing the two answers to a drop target', () => {
    * The mapped type demands each member as a key **and** as its own value, so a
    * member added to the union cannot be answered with an existing one; and the
    * list both tables run over is derived from it, so the enumeration and the
-   * union cannot fall out of step. A `Record<ElementDropTarget, …>` over a
-   * separate tuple checked only the keys — `toolbar: 'resource'` compiled, and the
-   * new member went untested.
+   * union cannot fall out of step. Do not reduce it to a
+   * `Record<ElementDropTarget, …>` over a separate tuple: that checks only the
+   * keys, so `toolbar: 'resource'` compiles and a new member goes untested.
    */
   const EVERY_ELEMENT = Object.values({
     resource: 'resource',

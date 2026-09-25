@@ -630,7 +630,7 @@ describe('laneBezier keeps its distance', () => {
       Array.from({ length: count }, (_, lane) => (lane - (split ? 1 / 2 : 0)) * GRAPH_LANE_SPACING),
     );
 
-  /** A lane as ADR 0100 drew it: `getBezierPath` over both anchors moved along their sides. */
+  /** The baseline a lane is held against: `getBezierPath` over both anchors moved along their sides. */
   const movedWhole = (attachment: EdgeAttachment, offset: number): string => {
     const horizontal =
       attachment.sourcePosition === Position.Left || attachment.sourcePosition === Position.Right;

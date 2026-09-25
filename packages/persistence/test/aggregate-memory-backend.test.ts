@@ -132,7 +132,7 @@ describe('MemorySpaceBackend aggregate persistence', () => {
 
   /*
    * A conflict's `current` is a stored Space too, and every other read answers
-   * its Resources ascending by id (ADR 0078) — the SQL adapters read `current` off
+   * its Resources ascending by id (ADR 0078) — the SQL repository reads `current` off
    * the same `orderBy(resource.id.asc())` query as every other read, so a conflict
    * is not a second, unsorted path to the same Space.
    */

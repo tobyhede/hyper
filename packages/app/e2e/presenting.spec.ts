@@ -39,11 +39,10 @@ async function camera(page: Page): Promise<{ x: number; y: number; zoom: number 
  * Present the fixture and wait until the camera has arrived.
  *
  * The chrome appearing is not arrival — it renders as soon as presenting starts,
- * while the camera is still moving. Every caller here assumes the destination,
- * and one of them acted on the way there: at the overview zoom the whole space is
- * on screen, at the presenting zoom one resource fills it, so a click aimed at any
- * other resource hit or missed depending on how far the animation had run. That
- * failed about half the time.
+ * while the camera is still moving. Every caller here assumes the destination:
+ * at the overview zoom the whole space is on screen, at the presenting zoom one
+ * resource fills it, so a click aimed at any other resource on the way there
+ * hits or misses depending on how far the animation has run.
  */
 async function present(page: Page): Promise<void> {
   await page.goto('/');
@@ -166,8 +165,7 @@ test(
   async ({ page }) => {
     await present(page);
     // **The whole surface goes, rather than its commands one at a time.** The
-    // Sidebar withdrew authoring item by item and this test named which items
-    // left a Map row's menu; the Dock is furniture over the paper, so
+    // Dock is furniture over the paper, so
     // presenting removes the furniture and there is no menu left to withdraw
     // anything from. What the audience is left with is the canvas and
     // `PresentingChrome`, which carries the way out.
@@ -231,9 +229,8 @@ test(
  * dispatched straight to the element, past `pointer-events` and past the
  * viewport requirement a real click has, and still nothing opens. Both Resources
  * get it, because at the presenting zoom the active one fills the screen and
- * every other one is far outside it — which was the flake, not a detail: this
- * test used to aim a forced click at a Resource that was only in the viewport while
- * the camera was still moving, and failed about half the time.
+ * every other one is far outside it — so a click that needs the viewport could
+ * reach another Resource only while the camera was still moving.
  */
 test('clicking a resource while presenting does not open it', async ({ page }) => {
   await present(page);
@@ -305,8 +302,8 @@ test(
  * Space activates whatever has focus, so where focus lands on entering decides
  * what the first press does. The control that entered cannot keep it: the Dock's
  * Present button carries a fixed `Present <Graph>` label rather than relabelling
- * to Stop, and presenting removes the whole Dock
- * (`.command-dock[data-presenting='true'] { display: none }`), so the button
+ * to Stop, and presenting hides the Dock's whole surface
+ * (`.command-dock[data-presenting='true'] .command-dock__surface`), so the button
  * that was clicked is gone rather than merely renamed. The chrome claims focus
  * as it mounts, so the press reaches the move it is aimed at rather than
  * deferring to a control that happened to hold focus.
@@ -468,16 +465,10 @@ test.describe('at a phone width', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   /**
-   * **The Sheet this described is gone (ADR 0082).**
-   *
-   * The Sidebar's phone branch was a modal over the canvas whose trigger
-   * survived into a presentation, so it could be reopened mid-traversal and had
-   * to own the keys pressed inside it — one Escape dismissed the sheet and left
-   * the traversal where it was. The Dock has no Sheet and no trigger that
-   * outlives the surface: presenting removes the entire surface, so there is
-   * nothing to reopen and no key to arbitrate. What replaced the obligation is
-   * `mobile-dock.spec.ts`, which holds the surface to fitting rather than to
-   * dismissing.
+   * Presenting hides the entire command surface (ADR 0082), so at a phone width
+   * there is nothing to reopen mid-traversal and no key to arbitrate: the
+   * traversal keys, Escape included, reach the presentation.
+   * `mobile-dock.spec.ts` holds the surface itself to fitting at this width.
    */
   test('presenting leaves no command surface to reopen at a phone width', async ({ page }) => {
     await page.goto('/');
@@ -491,7 +482,7 @@ test.describe('at a phone width', () => {
 
     // The traversal keys reach the canvas rather than a surface over it: there
     // is nothing left at this width to own a keypress before the presentation
-    // gets it, which is the whole of what the Sheet's arbitration was for.
+    // gets it.
     await page.keyboard.press('ArrowRight');
     await expect(page.getByTestId('presenting-chrome')).toBeVisible();
     await expect(activeResource(page)).toHaveAttribute(

@@ -7,10 +7,9 @@ import { resourceFile, uuid } from './resource-files';
  * The aggregate properties of intake, stated over generated documents and
  * proved through the one public entry point.
  *
- * They were once stated over `validateReferences`, which is internal and takes a
- * shape no caller holds. Through `loadSpace` they say something stronger: not
- * merely that the check answers, but that what comes out the far side — the
- * flatten, the lookup, the resolved Active Graph — agrees with what went in.
+ * Through `loadSpace` they say more than that the reference check answers:
+ * what comes out the far side — the flatten, the lookup, the resolved Active
+ * Graph — agrees with what went in.
  */
 
 const resourceId = (value: number) =>
@@ -204,7 +203,7 @@ describe('what intake refuses, over generated documents', () => {
   });
 
   it('detects an endpoint the owning map does not hold, and says it is a space resource', () => {
-    // The closure rule ADR 0040 adds, and the reason it cannot be checked
+    // The closure rule (ADR 0040), and the reason it cannot be checked
     // against the space: every id here names a real resource, so the only fault is
     // *where* it is. Dropping any one resource's position drops it from the
     // map's membership, and every edge that touched it is then unclosed.

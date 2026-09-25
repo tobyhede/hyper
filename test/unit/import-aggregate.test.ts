@@ -194,11 +194,11 @@ describe('importAggregate', () => {
   });
 
   it('refuses a retired space-level graphs key rather than importing what survives it', async () => {
-    // The regression this exists for is not a bad diagnostic — it is a
-    // successful import. `importSpaceFileSchema` was a plain Zod object then, so
-    // it dropped the retired key and handed the repository a Space missing its
-    // whole topology, reported as imported (issue `10`). Refusing is what the
-    // test above proves; what this adds is that nothing reaches the repository.
+    // The failure this guards against is not a bad diagnostic — it is a
+    // successful import. A schema that dropped the retired key would hand the
+    // repository a Space missing its whole topology, reported as imported.
+    // Refusing is what the test above proves; what this adds is that nothing
+    // reaches the repository.
     const root = await writeAggregate(META_SPACE_ID, [
       {
         name: META_SPACE_ID,

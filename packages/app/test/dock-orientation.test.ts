@@ -14,11 +14,11 @@ import { orientationOf } from '../src/dock-placement';
  *
  * **That an edge cannot fall through is not asserted here, because it cannot
  * be.** A missing edge is a missing key in a total record, so it never reaches
- * a test run — `tsc` rejects it first, which is the whole reason the ternary
- * became a record. A run-time assertion for it would have to compare against
- * `undefined`, a value the return type does not admit; the first draft of this
- * test did exactly that and lint called it what it was, a condition whose types
- * have no overlap. Coverage is the compiler's; these four are the answers.
+ * a test run — `tsc` rejects it first, which is why the mapping is a record.
+ * A run-time assertion for it would have to compare against `undefined`, a
+ * value the return type does not admit, which lint reports as a condition whose
+ * types have no overlap. Coverage is the compiler's; these four are the
+ * answers.
  */
 describe('the axis of a docked edge', () => {
   it('is named for every edge, and the two axes are the two pairs', () => {

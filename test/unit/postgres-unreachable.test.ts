@@ -50,7 +50,7 @@ afterAll(async () => {
 });
 
 /*
- * Tickets 31 and 38. PostgreSQL being down is the case the unavailable arm
+ * PostgreSQL being down is the case the unavailable arm
  * exists for, and it does not always reach the repository as the driver's own
  * `SqlConnectionError`: `@prisma-next/driver-postgres` acquires a connection
  * with a bare `pool.connect()` and normalises nothing it raises, so on that
@@ -96,7 +96,7 @@ describe('SqlSpaceRepository (PostgreSQL) against a server that refuses connecti
   });
 
   /*
-   * Ticket 38. A read outside a transaction meets the same refused connection,
+   * A read outside a transaction meets the same refused connection,
    * and on some paths the driver normalises it and on others it escapes as
    * Node's own error. Either way it is the store that recognises it, so every
    * operation answers the same arm whatever path it took.
@@ -115,7 +115,7 @@ describe('SqlSpaceRepository (PostgreSQL) against a server that refuses connecti
 });
 
 /*
- * Ticket 37. `@prisma-next/sql-runtime` memoises its contract-marker read
+ * `@prisma-next/sql-runtime` memoises its contract-marker read
  * (`verifyMarkerPromise`) and never resets it on rejection, so with the check
  * left on, a runtime whose first statement meets an outage answers every
  * later read with that same cached failure, without touching the network, for
@@ -159,7 +159,7 @@ describe('SqlSpaceRepository (PostgreSQL) after a first read meets an outage', (
 });
 
 /*
- * Ticket 38 (and ticket 36). A server that answers the startup handshake by
+ * A server that answers the startup handshake by
  * refusing this client raises `pg`'s own `DatabaseError` from `pool.connect()`,
  * before any transaction callback runs, on every path. Whether that is an
  * outage is a fact about the SQLSTATE it carries — never about where it
@@ -221,7 +221,7 @@ describe('SqlSpaceRepository (PostgreSQL) against a server that refuses this cli
 });
 
 /*
- * Ticket 38. The HTTP answer for a direct read follows the classification the
+ * The HTTP answer for a direct read follows the classification the
  * repository gives it: an outage is 503 `persistence-unavailable`, which tells
  * a client to try again, and a configuration failure is 500 `internal-error`,
  * which does not.

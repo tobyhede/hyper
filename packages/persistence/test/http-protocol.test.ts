@@ -96,10 +96,9 @@ describe('aggregate wire protocol', () => {
 
   it('names the field in every malformed-UUID decoder error', () => {
     // Zod's own `parse` message reports its issue list rather than the field,
-    // so a decoder that fell back to it answered a wire error with prose the
-    // reader could not trace to a key. Every UUID on the response and refusal
-    // side now goes through the same `<label> must be a UUID` shape the request
-    // decoder already used.
+    // so a decoder that fell back to it would answer a wire error with prose
+    // the reader could not trace to a key. Every UUID on the request, response
+    // and refusal sides goes through the same `<label> must be a UUID` shape.
     expect(() =>
       decodeLoadedAggregate({
         kind: 'loaded',

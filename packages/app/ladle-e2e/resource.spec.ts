@@ -69,9 +69,8 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  * The whole of what a Resource front draws, and the whole of what it does not.
  *
  * This is the one place that states it. Every other Resource story is a slice —
- * states, kinds, hover, colours, opening, resizing — and two undecided elements
- * lived on the front for months because the slice that drew them was not the
- * slice anyone reviewed. So the assertions below are deliberately exhaustive
+ * states, kinds, hover, colours, opening, resizing — and an element drawn only
+ * by a slice nobody reviews goes unnoticed. So the assertions below are deliberately exhaustive
  * over the Resource's own box: the border, one element per Title Line at the
  * role the domain gave it, its kind glyph, and **nothing beneath the Title** — no
  * second line the application writes on the author's behalf, and no text on the
@@ -222,13 +221,12 @@ test(
 );
 
 /**
- * **The inverse of the claim this story used to carry, across the same palette.**
+ * **The rail stays neutral across the whole palette.**
  *
- * It proved the rail painted the exact colour its label advertised. The rail is
- * neutral now and the commands on it are the Command Dock's own surface
- * (`.scratch/command-dock/issues/12`), so what has to hold at every colour is
- * that the strip does *not* move — and that the colour is still on the Resource,
- * which is the half a "the band is gone" assertion on its own would not say.
+ * The commands on the rail are the Command Dock's own surface, so what has to
+ * hold at every colour is that the strip does *not* move — and that the colour
+ * is still on the Resource, which is the half a "the band is gone" assertion on
+ * its own would not say.
  *
  * Every specimen is the real `ResourceNode`, drawn selected, so the commands and the
  * authoring handles are both up without a pointer.
@@ -468,8 +466,8 @@ test(
     // The nesting, proved where accessible names are real (ADR 0065, ADR 0083).
     // The control wraps the heading, so the control keeps the short action name
     // and the heading is named by the Title Lines it draws. With the heading
-    // outside, its name became the control's and the Title Lines were reachable
-    // through nothing. jsdom computes this differently from a browser, so this
+    // outside, its name would become the control's and the Title Lines would be
+    // reachable through nothing. jsdom computes this differently from a browser, so this
     // is the assertion that holds it.
     //
     // On the **laddered** specimen, because a single-line Title cannot tell the
@@ -568,11 +566,11 @@ test(
  * ADR 0083), and the field an author types it into is not exempt from that.
  *
  * The field grows with its content, which is the whole point of it, inside a
- * Resource whose height is authored. Uncapped, the fifth line took the Resource's own
+ * Resource whose height is authored. Uncapped, the fifth line would take the Resource's own
  * rail with it: the body is bottom-pinned, so it grows *upward*, and the rail
- * above it was pushed out of the top of the Resource and clipped away by the Resource's
+ * above it would be pushed out of the top of the Resource and clipped away by the Resource's
  * `overflow: hidden` — the kind glyph, the Actions menu and Open all gone while
- * the author was still typing the name.
+ * the author is still typing the name.
  *
  * A browser test and not a stylesheet one, because what is being asserted is
  * where the boxes end up rather than which declaration put them there; the
@@ -615,9 +613,9 @@ test('a Title being written on more lines than fit does not push the rail out of
   const atCeiling = await geometry();
   expect(atCeiling.railAboveResource).toBe(false);
 
-  // The sixth line is where the field used to take the rail with it. It stops
-  // at the same height instead, and the lines past the ceiling are reachable by
-  // scrolling rather than lost.
+  // Past the ceiling the field stops at the same height rather than taking the
+  // rail with it, and the lines past the ceiling are reachable by scrolling
+  // rather than lost.
   await field.fill(
     'Auth\nhow tokens are minted\ndraft, 2026\nand a fourth\nand a fifth\nand a sixth',
   );

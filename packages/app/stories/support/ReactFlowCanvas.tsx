@@ -36,7 +36,7 @@ import { resourceIds, graphIds, mapId, space } from './fixture';
 /**
  * Which authored Map of which Space a fixture draws.
  *
- * A parameter rather than a module constant because the catalogue now draws
+ * A parameter rather than a module constant because the catalogue draws
  * more than one Space: the inventory's own fixture answers most stories, and
  * the Command Dock's prototype needs a Space with two Maps and three Graphs
  * over one of them. Both go through the same derivation, so a story cannot draw
@@ -274,11 +274,11 @@ export function StoryCanvasFrame({
  * The camera is carried whole rather than as a `zoom` this rebuilds around.
  *
  * Taking `zoom?: number` and writing `{ fit: false, x: 0, y: 0, zoom }` here
- * meant a caller holding a full {@link StoryCanvasViewport} had nowhere to put
- * its `x` and `y`: it handed over the zoom, the offset was dropped without a
- * diagnostic, and the story drew pinned at the origin it did not ask for. The
- * union is the one shape from the caller to `StoryCanvas`, so there is no
- * lossy field left to forget.
+ * would leave a caller holding a full {@link StoryCanvasViewport} nowhere to
+ * put its `x` and `y`: the offset would be dropped without a diagnostic, and
+ * the story would draw pinned at an origin it did not ask for. The union is the
+ * one shape from the caller to `StoryCanvas`, so there is no lossy field to
+ * forget.
  */
 function RealReactFlow({
   nodes,
@@ -334,8 +334,7 @@ export function ZoomSliderSpecimen() {
  * ResourceNode projection; stories supply only identity, title and placement.
  *
  * `drawn` and `activeGraphId` default to the inventory's own Space and its Long
- * Graph, which is what every story here drew when there was only one Space to
- * draw. A story that names another Map — the Command Dock's, which switches
+ * Graph, which is what most stories here draw. A story that names another Map — the Command Dock's, which switches
  * between two of them — gets the same derivation over its own Space rather than
  * a second canvas beside this one, and switching the Active Graph re-projects
  * without laying the Space out again.

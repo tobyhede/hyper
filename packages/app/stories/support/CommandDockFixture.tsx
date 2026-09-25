@@ -34,7 +34,7 @@ const UNWELL = {
   'save-failed': 'failed',
   'save-failed-elsewhere': 'failed',
   'save-rejected': 'rejected',
-  // A distinct state from `save-rejected` (`v1-release/17`): the backend
+  // A distinct state from `save-rejected`: the backend
   // refused the aggregate rather than declining the request outright, and the
   // Dock draws the same dialog from a structured refusal instead of a code.
   'save-refused': 'refused',
@@ -296,9 +296,9 @@ const dockGrip = (root: ParentNode): HTMLElement | null => {
  * `Middle` (`ALONG_LABEL.vertical.center`), so picking the last one selects the
  * left edge only because `left` happens to sit last in `DOCK_EDGES` — and a
  * reorder of that tuple would silently dock this story to the *right*, which
- * the e2e could not see while it asserted orientation alone. Walking forward
- * from the `Left edge` group label names the edge itself, so the worst a
- * rename can now do is stall, which shows up as a Dock still at the top.
+ * an e2e asserting orientation alone cannot see. Walking forward from the
+ * `Left edge` group label names the edge itself, so the worst a rename can do
+ * is stall, which shows up as a Dock still at the top.
  */
 const leftEdgeMiddle = (): HTMLElement | null => {
   const items = [...document.querySelectorAll('[role="menuitemradio"], [role="group"] > *')];

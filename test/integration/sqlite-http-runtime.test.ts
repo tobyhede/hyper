@@ -27,7 +27,7 @@ describe('SQLite HTTP runtime', () => {
     close = undefined;
   });
 
-  // Composition is where a setup problem is reported (ticket 15): a host with no
+  // Composition is where a setup problem is reported: a host with no
   // file behind it would start, then answer every request with a driver error.
   it.each([
     ['unset', undefined],
@@ -288,7 +288,7 @@ describe('SQLite HTTP runtime', () => {
     });
   });
 
-  // Ticket 27: a real, non-mocked case of the "not JSON" flavour, driven
+  // A real, non-mocked case of the "not JSON" flavour, driven
   // through composition rather than a stubbed repository. Both of the host's
   // `classifyStoredFailure` calls (`src/http/space-host.ts`'s `readAggregate`
   // re-reads once rather than rethrowing; the root's catch classifies) are

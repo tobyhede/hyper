@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest';
  * a `split('\n')` at each of the surfaces that draw, list or search a Resource. The
  * compiler cannot help — every one of those call sites has a `string` in hand
  * and every one of them would compile — so the containment is read off the
- * source, in the idiom `codemirror-encapsulation.test.ts` already established
- * here for an encapsulation a type cannot express.
+ * source, in the idiom `codemirror-encapsulation.test.ts` uses for an
+ * encapsulation a type cannot express.
  *
  * Two rules, and they are the same rule twice: **only the Resource front reads a
  * Title's later lines.** Everywhere else shows the name, which is `titleName`,
@@ -33,11 +33,9 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
  * Two files, and nothing wider. The Resource front draws the ladder and is the only
  * surface that does (ADR 0083); `@project/core`'s own module is where the rule
  * lives and is what every other reader goes through. The render adapter mounts
- * that front on the canvas and once held a whole-tree permission for it, which
- * it never spent — it hands `CanvasResource` a Title and reads no line of one — so
- * the permission went rather than standing as a region-wide hole with a reason
- * attached to it. Every entry here is asserted below to still be reading a
- * Title's lines, which is what a tree could not be held to file by file.
+ * that front on the canvas but needs no permission: it hands `CanvasResource` a
+ * Title and reads no line of one. Every entry here is asserted below to still
+ * be reading a Title's lines, which is what a tree could not be held to file by file.
  */
 const LADDER_READERS: readonly string[] = [
   'packages/core/src/title.ts',

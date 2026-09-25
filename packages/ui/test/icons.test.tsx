@@ -306,7 +306,7 @@ describe('the public icon facade', () => {
 
     // The glyph carries the distinction, so the accessible name has to as well —
     // otherwise the two draw differently and announce identically, which is
-    // worse than the single Reference Resource glyph this replaced.
+    // worse than one shared glyph.
     const ofMarkdown = screen.getByRole('img', { name: 'Reference to a Markdown Resource' });
     const ofSpace = screen.getByRole('img', { name: 'Reference to a Space Resource' });
     expect(ofMarkdown).toHaveAttribute('data-resource-kind', 'reference');

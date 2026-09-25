@@ -66,9 +66,9 @@ describe('the presenting camera', () => {
   });
 
   /**
-   * The move this seam used to make was two commands with the second chained on
-   * the first's Promise, so an interruption inside the first left the camera at
-   * the overview zoom. One command cannot strand, and the next arrival must be
+   * The move is one command. Two commands with the second chained on the
+   * first's Promise would strand the camera at the overview zoom whenever the
+   * first was interrupted. One command cannot strand, and the next arrival must be
    * issued whatever became of the last — which the never-settling stub is what
    * proves.
    */

@@ -119,7 +119,7 @@ describe('openDatabaseSelection', () => {
     const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space');
     const repository = new MemorySpaceRepository([remaining, selected], SPACE_ID);
     // Not a lifecycle assertion — the Space is made to vanish after construction,
-    // which since ADR 0078 is `replaceAggregate` and no longer a mode on one door.
+    // through `replaceAggregate`.
     const replaced = await repository.replaceAggregate(
       { metaSpaceId: SPACE_ID, spaces: [remaining.snapshot] },
       SPACE_ID,
@@ -279,10 +279,10 @@ describe('retryMetaSpaceEstablishment', () => {
     ]);
   });
 
-  // The retry used to stop after twelve attempts. A container that starts before
-  // PostgreSQL accepts connections, over a database that takes longer than that
-  // to arrive, then served 503 at the root forever: the root address no longer
-  // establishes anything, so nothing else was ever going to.
+  // The retry has no attempt bound. A container that starts before PostgreSQL
+  // accepts connections, over a database that takes a long time to arrive, would
+  // otherwise serve 503 at the root forever: the root address establishes
+  // nothing, so start-up is the only thing that will.
   it('keeps trying long past the bound it used to have', async () => {
     const repository = new ScriptedRepository(Array.from({ length: 40 }, unreachable));
     const waits: number[] = [];
@@ -337,12 +337,11 @@ describe('retryMetaSpaceEstablishment', () => {
     expect(reported).toEqual([expect.any(AggregateInvariantError)]);
   });
 
-  // Ticket 31, Part B. Only an unreachable database is worth waiting out. A
-  // failure neither named arm describes used to reset the count and continue,
-  // so a defect no retry cures was read once a minute, forever, at the 60s
-  // ceiling. It now counts toward giving up exactly as an invariant failure
-  // does: two running, so a one-off is not a verdict and a defect — which
-  // fails the same way every time — is.
+  // Only an unreachable database is worth waiting out. A failure neither named
+  // arm describes counts toward giving up exactly as an invariant failure does:
+  // two running, so a one-off is not a verdict and a defect — which fails the
+  // same way every time — is. Resetting the count instead would read a defect
+  // no retry cures once a minute, forever.
   it('stops at a failure it cannot classify once a second attempt confirms it', async () => {
     const repository = new ScriptedRepository(Array.from({ length: 10 }, unclassified));
     const waits: number[] = [];
@@ -411,9 +410,9 @@ describe('retryMetaSpaceEstablishment', () => {
   });
 
   // Default Content is code, not stored state, so no read and no wait can make
-  // it valid. Without its own type it was reported as "not an invariant
-  // failure", which reset the consecutive count and, now that the loop has no
-  // attempt bound, would have retried it forever.
+  // it valid. It needs its own type: reported as "not an invariant failure", it
+  // would reset the consecutive count and, with no attempt bound on the loop, be
+  // retried forever.
   it('stops at once when Default Content is not a valid aggregate', async () => {
     class RefusingRepository extends MemorySpaceRepository {
       override initializeAggregate(): Promise<InitializeAggregateResult> {
@@ -454,11 +453,11 @@ describe('retryMetaSpaceEstablishment', () => {
 });
 
 /*
- * Ticket 38 (and ticket 36), through a real repository over the PostgreSQL
- * driver: what start-up does with a server that refuses this client depends on
- * what the refusal carries. A wrong password is unclassified, confirms itself
- * on the second attempt, and stops the retry; too many connections is an
- * outage, which never confirms anything and is waited out.
+ * Through a real repository over the PostgreSQL driver: what start-up does with
+ * a server that refuses this client depends on what the refusal carries. A
+ * wrong password is unclassified, confirms itself on the second attempt, and
+ * stops the retry; too many connections is an outage, which never confirms
+ * anything and is waited out.
  */
 describe('retryMetaSpaceEstablishment over a PostgreSQL server that refuses this client', () => {
   const refusedBy = async (sqlState: string, message: string) => {

@@ -134,11 +134,11 @@ describe('loadSpace', () => {
   });
 
   it('rejects a version 2 document by its version, not by every key that moved', () => {
-    // The disposable pre-release shape carried a space-level `graphs` array and
-    // maps with none of their own. Read against version 1 it fails twice over
-    // — once per map missing the graphs it now owns — and none of those
-    // issues says the resource worth saying. Hyper is unreleased, so the answer is
-    // rejection naming the version, never a migration (ADR 0040).
+    // The version 2 shape carries a space-level `graphs` array and maps with
+    // none of their own. Read against version 1 it fails twice over — once per
+    // map missing the graphs it owns — and none of those issues says the
+    // thing worth saying. Hyper is unreleased, so the answer is rejection
+    // naming the version, never a migration (ADR 0040).
     const result = loadSpace(
       {
         version: 2,
@@ -168,7 +168,7 @@ describe('loadSpace', () => {
   it('rejects a version 1 space that still carries a Space-level graphs array', () => {
     // Read before parsing, beside the version check: `spaceFileSchema` is
     // strict, so an undeclared key is already refused rather than stripped.
-    // This check survives that to *name* the one that matters — a Space-level
+    // This check runs ahead of that to *name* the one that matters — a Space-level
     // `graphs` carried the whole topology (ADR 0040), and a generic
     // unrecognized-key refusal leaves a reader to work out why that one
     // mattered. Declaring the key in the schema instead would put it in the

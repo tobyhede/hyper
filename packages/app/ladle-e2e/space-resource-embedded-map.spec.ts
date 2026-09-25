@@ -83,8 +83,7 @@ test(
 /**
  * An embedded Edge is drawn and nothing else: a press on it reaches whatever lies
  * beneath. That holds because it is minted not selectable and the canvas has no
- * Edge click handler, so React Flow marks its group `inactive`
- * (`.scratch/embedded-open-space-thing/issues/04`).
+ * Edge click handler, so React Flow marks its group `inactive`.
  */
 test('an embedded Edge takes no pointer events, even on its own curve', async ({ page }) => {
   await open(page);
@@ -127,12 +126,12 @@ test(
 
 /**
  * The two choices an Open Space Resource publishes, drawn as the Dock draws the same
- * two (`.scratch/command-dock/issues/12`).
+ * two.
  *
  * Both halves matter and only one is about appearance. The treatment is compared
  * against the Dock **on screen in the same page**, property by property, so a
  * change to either that the other did not follow fails here rather than drawing
- * two panels that merely looked alike when this was written. The other half is
+ * two panels that merely look alike. The other half is
  * that the controls are not the Dock's *operations*: pressing this Resource's Map
  * list must not move the canvas the Resource is standing on.
  */
@@ -258,10 +257,9 @@ test(
       .getByRole('textbox', { name: 'Markdown source of Intake' })
       .press('ControlOrMeta+Enter');
     await expect(embedded).toContainText('Edited in the embedded Map');
-    // Crossing into the target Space to read the same edit there. The vertical
-    // tab strip that used to do this went with the Space Sidebar (ADR 0082), so
-    // the move is the Command Dock's Open Spaces menu — and the assertion is on
-    // the Space the Dock is now naming rather than on a panel beside it.
+    // Crossing into the target Space to read the same edit there, through the
+    // Command Dock's Open Spaces menu (ADR 0082) — and the assertion is on the
+    // Space the Dock is now naming.
     await page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).click({ delay: 120 });
     await page.getByRole('menuitemradio', { name: /^Architecture/ }).click();
     // `:visible`, because every open Space stays mounted and only one is shown
@@ -276,7 +274,7 @@ test(
 );
 
 /**
- * Ticket 04 / spec.md: handles author the Graph the Space Resource is showing
+ * Handles author the Graph the Space Resource is showing
  * and do not complete a cross-Space Edge on the containing canvas (ADR 0040).
  * Overview already has Intake→Storage; the reverse is a new Edge (cycles are
  * legal). The containing Graph also has Start here→Elsewhere, so the host
@@ -546,8 +544,7 @@ test(
 /**
  * An Open Space Resource's Graph list marks each row with the line the canvas
  * HUD's key draws, in the colour the target draws that Graph's Edges in — read
- * off the embedded Edge on screen — and its Map list carries no mark
- * (`.scratch/graph-colour/issues/02`).
+ * off the embedded Edge on screen — and its Map list carries no mark.
  */
 test(
   "an Open Space Resource's Graph rows draw the Graph's colour line",

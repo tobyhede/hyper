@@ -66,11 +66,10 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // first state and leaves an initialized repository exactly as it is (ADR
     // 0078), so on a developer's database that already holds a Meta Space it
     // would answer `already-initialized` and write nothing — and the drag below
-    // would then be looking for a Resource that was never stored. The old
-    // `importSpaces` hid that by falling through to an insert; there is no such
-    // door now, so the empty repository this test needs has to be arranged
-    // rather than assumed. Safe for the same reason the cleanup below is:
-    // `workers: 1` and one test, so nothing else holds this `DATABASE_URL`.
+    // would then be looking for a Resource that was never stored. So the empty
+    // repository this test needs has to be arranged rather than assumed. Safe
+    // for the same reason the cleanup below is: `workers: 1` and one test, so
+    // nothing else holds this `DATABASE_URL`.
     await clearHyperContent();
 
     // The Map is part of the fixture, and has to be. A mapless Space is
@@ -85,7 +84,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     //
     // This Space is Meta, and says so rather than being inferred to be. A
     // one-Space aggregate has nowhere else for the root to be, but naming it is
-    // what the lifecycle takes (ADR 0078) — array position no longer decides.
+    // what the lifecycle takes (ADR 0078) — array position decides nothing.
     const fixture = restartProofFixture({ spaceId, resourceId, mapId, graphId, title });
     const initialized = await repository.initializeAggregate({
       metaSpaceId: spaceId,
@@ -144,11 +143,8 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
       // integration suite asserts on purpose, in *prevents direct deletion of
       // the Meta Space while repository state names it*.
       //
-      // There is no longer a second branch to fall into. The old cleanup could
-      // pass on a developer's database and fail in CI because `importSpaces`
-      // established Meta only when the repository was empty and otherwise
-      // inserted beside whatever was there; the reset now runs before the
-      // fixture as well as after it, so this Space is Meta on every machine.
+      // The reset runs before the fixture as well as after it, so this Space
+      // is Meta on every machine and there is no second branch to fall into.
       //
       // `clearHyperContent` drops the repository-state row first, which is what
       // releases the key, and it is the same reset the integration suite runs.

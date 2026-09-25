@@ -54,10 +54,9 @@ const groupedMenuRows = (groups: readonly (readonly string[])[]): readonly strin
 /**
  * Assert a menu's rows read as the given groups, in order, with exactly one
  * separator between each pair of groups — the one grouping grammar every
- * entity, Map, Graph and Space menu in this product now shares
- * (`.scratch/dock-menu-reorganisation/`). Does not require `role="group"`:
- * `EntityActionsMenu` deliberately does not render one. The Playwright
- * counterpart of this assertion is `expectMenuGroups` in
+ * entity, Map, Graph and Space menu in this product shares. Does not require
+ * `role="group"`: `EntityActionsMenu` deliberately does not render one. The
+ * Playwright counterpart of this assertion is `expectMenuGroups` in
  * `packages/app/e2e/graph.ts`.
  */
 export function expectMenuGroups(menu: HTMLElement, groups: readonly (readonly string[])[]): void {

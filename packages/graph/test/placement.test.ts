@@ -100,7 +100,7 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     // Open Size is what conversion drops on the floor, and there is no way back
     // to it — which is why only a Map with nothing Open may be converted.
     expect([...converted.values()].every((at) => !at.open)).toBe(true);
-    // B's coordinate survives untouched, because A being Open never moved it at
+    // B's coordinate is untouched, because A being Open does not move it at
     // render time: the Edit that opened A did (ADR 0084).
     expect(converted.get(RESOURCE_B)).toEqual({ x: 300, y: 0, open: false });
   });
@@ -117,9 +117,9 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 
 describe('Placement.next', () => {
   it('authors what the canvas reports, whatever else is Open', () => {
-    // Nothing is inverted any more: displacement was applied by the Edit that
-    // opened A, so B's reported coordinate is already B's authored one and the
-    // report round-trips as itself (ADR 0084).
+    // Nothing is inverted: displacement was applied by the Edit that opened A,
+    // so B's reported coordinate is already B's authored one and the report
+    // round-trips as itself (ADR 0084).
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 360, height: 196 } }],
       [RESOURCE_B, { x: 300, y: 200, open: false }],
@@ -357,7 +357,7 @@ describe('Placement.displace', () => {
     // A Resource below the subject and inside its column moves down; one to its
     // right moves right; one clear on both moves right and not down. A Resource
     // beside the subject whose top is lower than the subject's is beside it, not
-    // below it — the half-plane rule ADR 0084 stated moved it down as well.
+    // below it, so it moves on one axis only (ADR 0093).
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 100, y: 100, open: false }],
       [RESOURCE_B, { x: 100, y: 500, open: false }],
@@ -537,8 +537,8 @@ describe('Placement.reclaim', () => {
     // The moved-*subject* face of ADR 0084's memorylessness, and the mirror of
     // the moved-neighbour one the ADR states: a reclaim reads the Map as it
     // stands, so a subject dragged past its own displaced neighbours finds
-    // nobody beyond it and gives nothing back. Deliberate — recording where a
-    // particular Open happened is the per-Resource history ADR 0084 rejected.
+    // nobody beyond it and gives nothing back. Deliberate: do not record where a
+    // particular Open happened, which is the per-Resource history ADR 0084 forbids.
     const openSize = { width: 560, height: 420 };
     const opened = Placement.fromEntries([
       [RESOURCE_A, { x: 5000, y: 5000, open: true, openSize }],
@@ -669,8 +669,8 @@ describe('Placement properties', () => {
     // unreachable in the product because Open always applies a growth floored at
     // zero and Close always applies the negation of a growth already applied, so
     // every Resource Close must reclaim from is still clear of the subject when it
-    // runs. The fix is to state the bound, not to clamp the operation or make it
-    // remember which Resources a particular Open pushed.
+    // runs. State the bound; do not clamp the operation or make it remember
+    // which Resources a particular Open pushed.
     fc.assert(
       fc.property(
         idsArb,
@@ -740,7 +740,7 @@ describe('Placement properties', () => {
   });
 
   it('never widens an authored placement, whatever a renderer reports', async () => {
-    // The rule two commits were spent restoring: rendered geometry is a report,
+    // The rule: rendered geometry is a report,
     // and only a completed gesture may add a Resource to the authored map.
     await fc.assert(
       fc.asyncProperty(idsArb, fc.array(coordArb, { minLength: 60 }), async (ids, coords) => {
@@ -795,9 +795,8 @@ describe('Placement properties', () => {
 
 describe('Placement.next over an Open Resource', () => {
   it('authors a drop on top of an Open Resource exactly where it was released', () => {
-    // The clamp band is gone with the derivation that created it (ADR 0084).
-    // There is no longer a range of canvas coordinates no authored point can
-    // name, so a Resource dropped over an Open one lands on the drop point.
+    // Every canvas coordinate is an authored one (ADR 0084), so a Resource
+    // dropped over an Open one lands on the drop point.
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
       [RESOURCE_B, { x: 1000, y: 1000, open: false }],

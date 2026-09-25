@@ -198,9 +198,9 @@ it('traverses an Edge from the changing working Space without installing a copy'
 /**
  * A self-connection is the first gesture authoring ships, and the Graph it mints
  * is fully cyclic: every Resource it holds is arrived at, so no Resource is an entry.
- * Presenting one used to do nothing at all — `graphStartResource` answered nothing,
- * `present()` returned before any state change, and the enabled control that
- * called it swallowed the click.
+ * Presenting one must still start somewhere: if `graphStartResource` answered
+ * nothing, `present()` would return before any state change and the enabled
+ * control that called it would swallow the click.
  */
 it('presents a fully cyclic Graph, which has no entry Resource', () => {
   const resource = uuid('00000000-0000-4000-8000-000000000002');
@@ -304,10 +304,9 @@ it('reads the last Resource when Traversal history returns to one it has already
 });
 
 /*
- * Traversal history belongs to presenting, and leaving presenting has none to clear. This
- * used to be four hand-written `traversalHistory: []` resets — one per path back to the
- * overview — any of which could have been forgotten without anything noticing
- * until a stale Resource was read from history after presentation had ended.
+ * Traversal history belongs to presenting, and leaving presenting has none to clear,
+ * whichever path leads back to the overview — so no path can forget a reset and leave
+ * a stale Resource to be read from history after presentation has ended.
  */
 it('leaves no Traversal history behind when presenting ends', () => {
   const space = fixture();
@@ -418,9 +417,9 @@ it('refuses to activate a Graph the current Space does not hold', () => {
  * under ADR 0040 a Map and the Graph it opens on are one answer the Edit
  * produced.
  *
- * What the test is for is unchanged, and is the resource `selectMap` does not
- * do: adopting the Map an Edit created continues the traversal rather than
- * ending it, down to the same Traversal history array.
+ * What the test is for is what `selectMap` does not do: adopting the Map an
+ * Edit created continues the traversal rather than ending it, down to the same
+ * Traversal history array.
  */
 it('continues the current Traversal history when an Edit keeps the selected Map', () => {
   const space = fixture();
@@ -454,10 +453,10 @@ it('takes the adopted Map’s own Active Graph over the one that was emphasised'
 });
 
 /**
- * The refusal that ADR 0040 restored. A Map draws only the Graphs it owns, so
- * an Edit handing over a Map and a Graph that Map does not own has named a
- * pair Navigation may not hold — the Active Graph would ride into the next Edit
- * as that Map's `activeGraph`, which intake rejects outright.
+ * A Map draws only the Graphs it owns, so an Edit handing over a Map and a
+ * Graph that Map does not own has named a pair Navigation may not hold — the
+ * Active Graph would ride into the next Edit as that Map's `activeGraph`, which
+ * intake rejects outright.
  *
  * Constructible against a real Space rather than a hand-built Map:
  * `GRAPH_ONE` exists and is drawn by the Flow view, and `MAP` simply does not
@@ -477,10 +476,10 @@ it('refuses to adopt a Map that does not draw the Graph handed with it', () => {
 });
 
 /**
- * The same refusal from the other side, and the second one ticket 01 left
- * unreachable. Activating is never an Edit (ADR 0028), so it cannot mint the
- * Graph it is handed — nor move it into the selected Map. `GraphSelector` is
- * fed the visible Graphs, so this is a caller's mistake rather than an author's.
+ * The same refusal from the other side. Activating is never an Edit (ADR 0028),
+ * so it cannot mint the Graph it is handed — nor move it into the selected Map.
+ * `GraphSelector` is fed the visible Graphs, so this is a caller's mistake
+ * rather than an author's.
  */
 it('refuses to activate a Graph the selected Map does not own', () => {
   const space = fixture();
@@ -671,10 +670,9 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
  * The addressable position, after every operation that writes one.
  *
  * One assertion shape for all of them, because the point of the address is that
- * it is *one* fact: before it, `App` reconstructed the position four separate
- * ways, each comparing the single field its own call site happened to supply
- * (ADR 0081). Nothing here touches a browser API — Navigation does not know what
- * a URL is, and this is where that stays true.
+ * it is *one* fact, not a position each call site reconstructs from the single
+ * field it happens to supply (ADR 0081). Nothing here touches a browser API —
+ * Navigation does not know what a URL is, and this is where that stays true.
  */
 describe('the address Navigation answers', () => {
   const addressOf = (navigation: Navigation) => navigationAddress(navigation.getState());

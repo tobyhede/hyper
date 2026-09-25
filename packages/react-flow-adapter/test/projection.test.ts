@@ -28,7 +28,7 @@ function load(
 /**
  * A version 1 space document over the given graphs.
  *
- * A graph is an owned value of the map that holds it now (ADR 0040), and
+ * A graph is an owned value of the map that holds it (ADR 0040), and
  * every edge endpoint must be a resource of *that* map, so the one map below
  * takes membership of every resource the graphs touch. The positions are arbitrary
  * — nothing in this file reads them — and what they express here is membership,
@@ -37,8 +37,7 @@ function load(
  * Returned as `SpaceFile` rather than as `unknown`, although `loadSpace` takes
  * `unknown` and would accept either. The literal is the whole point: typed, the
  * next change to the aggregate fails here at `tsc`; untyped, it checks against
- * nothing and fails at runtime instead — which is exactly how these fixtures
- * came to be a version behind.
+ * nothing and fails at runtime instead.
  */
 function spaceFile(
   graphs: readonly { id: string; title: string; edges: readonly { from: string; to: string }[] }[],
@@ -304,11 +303,9 @@ describe('projectGraphEdges', () => {
     // reach, and its end trim, and no geometry
     // (ADR 0086). Both fixture Graphs join the same two Resources, Alt in the other
     // direction: with nothing active the first keeps the centre and Alt takes
-    // the lane below it. Nothing is active, so both connect. It carried an
-    // optional routed polyline until then, for waypoints a routing strategy
-    // might have placed; nothing ever placed one, and a Map has nowhere to
-    // store one, so the bezier the Edge draws between the two anchors it
-    // attaches to is the only Edge geometry there has ever been.
+    // the lane below it. Nothing is active, so both connect. A Map has nowhere
+    // to store waypoints, so the bezier the Edge draws between the two anchors
+    // it attaches to is the only Edge geometry.
     expect(edges.find((e) => e.id === MAIN_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000004'),
       laneOffset: 0,

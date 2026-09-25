@@ -5,7 +5,7 @@ import type { ResourceFile } from '../src/index';
 /**
  * Resource files as an author writes them: frontmatter, then body, one file per resource
  * (ADR 0020). Tests build these rather than resource objects, because that is what
- * `loadSpace` now takes.
+ * `loadSpace` takes.
  *
  * The frontmatter goes through `stringify` rather than a template string, so a
  * generated title carrying a YAML indicator (`,`, `:`, `-`) is quoted rather

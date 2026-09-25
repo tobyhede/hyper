@@ -8,8 +8,8 @@ import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
  *
  * Two properties are being held here and neither is visible to a renderer test.
  *
- * The first is a **regression**: a Title with no break in it is the Title Hyper
- * has always drawn, and ADR 0083 says so in as many words. Its four numbers —
+ * The first is a **regression** guard: a Title with no break in it keeps the
+ * single-line typography, as ADR 0083 says in as many words. Its four numbers —
  * 18px, weight 600, leading 1.12, tracking -0.02em — are asserted as numbers
  * rather than left to a reviewer's eye, because a ladder built on top of them
  * is exactly the change that could move them without anything failing.
@@ -36,11 +36,11 @@ const railStylesheet = readFileSync(
 );
 
 /**
- * The Resource's own structural scale (ticket 06) is declared centrally in
+ * The Resource's own structural scale is declared centrally in
  * `tailwind.css`, beside its colour tokens, rather than on `.canvas-resource`
  * itself — the same place `--canvas-resource-ink-color` and its neighbours are.
  * The ladder's ceiling test below needs the border's numeric width, which
- * lives there now rather than inline in `canvas-resource.css`'s own `border`
+ * lives there rather than inline in `canvas-resource.css`'s own `border`
  * declaration.
  */
 const themeStylesheet = readFileSync(
@@ -100,9 +100,8 @@ const titleInput = (): string =>
 
 describe('a single-line Title', () => {
   /**
-   * The regression. These are the four values the heading carried before the
-   * ladder existed, and a Title of one line is only ever the `title` role, so
-   * they are still the whole of what draws it.
+   * The regression guard. A Title of one line is only ever the `title` role,
+   * so these four values are the whole of what draws it.
    */
   it('is still drawn at 18px, weight 600, leading 1.12 and tracking -0.02em', () => {
     expect(token('--canvas-resource-title-size', 'px')).toBe(18);
@@ -126,7 +125,7 @@ describe('a single-line Title', () => {
 
   /**
    * And it wraps at the `title` role for as many visual lines as it needs, to
-   * the same three-line clamp the heading used to carry. The break the box
+   * a three-line clamp. The break the box
    * chooses is not a rung.
    */
   it('still clamps to three visual lines at the title role', () => {
@@ -207,7 +206,7 @@ describe('the ladder ceiling', () => {
    * room would otherwise show up as a Title quietly overrunning its Resource.
    */
   it('fits inside the body of a Closed Resource', () => {
-    // The Resource's own border width is `--canvas-resource-border-width` (ticket 06),
+    // The Resource's own border width is `--canvas-resource-border-width`,
     // declared in `tailwind.css` beside the Resource's colour tokens rather than
     // stated inline in this stylesheet's own `border` shorthand.
     const border = themeToken('--canvas-resource-border-width', 'px');

@@ -108,8 +108,7 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
     // the room an Open Resource holds, so the Resources that were never opened land
     // in the same place whether or not the deleted Resource was ever Open —
     // `deleteFromSpace`'s own use of `Placement.reclaim` is what makes this
-    // hold, and it is exactly the call the registry's old `removeSpaceResource`
-    // skipped.
+    // hold.
     fc.assert(
       fc.property(
         idsArb,
@@ -406,9 +405,8 @@ describe('SnapshotEdit.createInMap properties', () => {
  * Open, Close and Resize (ADR 0084, ADR 0093, ADR 0066), over one Map of five
  * Resources.
  *
- * Moved here from Authoring's own `displacement.property.test.ts` when the
- * rules did: the transform `Placement.displace` is already held to its round
- * trip by `placement.test.ts`, and what these hold is the whole of what an Open,
+ * The transform `Placement.displace` is held to its round trip by
+ * `placement.test.ts`; what these hold is the whole of what an Open,
  * a Close and a Resize choose to apply — which growth each reads off which
  * entry, in which order, and what they write back into the Map. The transform
  * can be an exact involution and the Edits still drift, if an Open reads the
@@ -679,10 +677,9 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     // ADR 0084: Open and Close each read the Map as it is and remember nothing
     // about who was pushed, so a Resource dragged beyond the Open Resource
     // *while it is open* moves back with everything else clear of it. And it
-    // gives back the width **alone** (ADR 0093): under the half-plane rule ADR
-    // 0084 stated, a witness dropped one unit lower than the Open Resource's top
-    // was pulled up by the whole height growth on Close — room the Open never
-    // took from it.
+    // gives back the width **alone** (ADR 0093): a witness dropped one unit
+    // lower than the Open Resource's top is beside it, not below it, so Close
+    // does not pull it up by a height growth the Open never took from it.
     fc.assert(
       fc.property(
         entriesArb,

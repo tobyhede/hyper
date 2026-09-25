@@ -415,9 +415,8 @@ describe('re-exporting over an earlier export', () => {
    * Everything else is the author's — notes, assets — and re-export has to carry
    * it across rather than tidy it away.
    *
-   * A `README.md` inside a Space directory is **not** one of those, and the
-   * comments here and on `writeSpaceDirectory` used to offer it as the example of
-   * what survives. It does not and must not: root `*.md` is what the reader scans
+   * A `README.md` inside a Space directory is **not** one of those, and does not
+   * survive as one and must not: root `*.md` is what the reader scans
    * for Resource files, so a README left there imports as a Resource or refuses the
    * import for carrying no frontmatter. Asserted alongside, so the boundary is
    * the tested one rather than the plausible one.

@@ -34,7 +34,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       data: Parameters<typeof actual.writeFile>[1],
       options?: Parameters<typeof actual.writeFile>[2],
     ) =>
-      // A Space's file now sits under its own id inside the staged aggregate, so
+      // A Space's file sits under its own id inside the staged aggregate, so
       // the aggregate file at the replacement root is already written by the time this
       // fires — which is the point: the failure lands part-way through staging,
       // where the destination has not been touched yet.

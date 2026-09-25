@@ -72,9 +72,9 @@ describe('the global Presenting keys', () => {
 
   /**
    * A focused button activates itself on Space, and this listener sees the press
-   * first. Handling it advanced the traversal *and* let the control fire, so one
-   * press ran two commands; preventing the default instead stopped the control
-   * firing at all. Deferring is the whole rule, and it is a rule about
+   * first. Handling it would advance the traversal *and* let the control fire, so
+   * one press would run two commands; preventing the default instead would stop
+   * the control firing at all. Deferring is the whole rule, and it is a rule about
    * interactive controls rather than about one button.
    */
   it('defers Space to the interactive control that already activates on it', () => {
@@ -93,11 +93,11 @@ describe('the global Presenting keys', () => {
   /**
    * A modal surface owns every key pressed inside it.
    *
-   * Below the Sidebar's breakpoint the command surface is a Sheet drawn over the
-   * canvas and can be reopened mid-traversal. Its focus trap means every press
-   * then starts inside it, and a window listener that went on traversing would
-   * run a command behind a surface the presenter is looking at — one Escape
-   * both dismissing the sheet and leaving presentation.
+   * A modal surface drawn over the canvas can be opened mid-traversal. Its focus
+   * trap means every press then starts inside it, and a window listener that
+   * went on traversing would run a command behind a surface the presenter is
+   * looking at — one Escape both dismissing the surface and leaving
+   * presentation.
    */
   it('leaves every key to a modal surface open over the canvas', () => {
     const traversal = commands();

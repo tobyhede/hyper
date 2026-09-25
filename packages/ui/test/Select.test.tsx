@@ -43,11 +43,10 @@ describe('SelectContent placement', () => {
    * The canvas key marker belongs to the caller, not to this wrapper.
    *
    * React Flow subscribes its delete key on `document`, so a portalled popup
-   * needs `nokey` exactly where it is drawn over a canvas — which the Open
-   * Space Resource's selectors and the Space Resource creation pane both do, and which
-   * a Select used anywhere else does not. Marking it here would put the marker
-   * on every consumer to serve the ones that need it, so the wrapper stays
-   * unmarked and the two call sites say so themselves.
+   * needs `nokey` exactly where it is drawn over a canvas, which a Select used
+   * anywhere else does not need. Marking it here would put the marker on every
+   * consumer to serve the ones that need it, so the wrapper stays unmarked and
+   * a call site over a canvas says so itself.
    */
   it('leaves the canvas key marker to the surface that draws it', () => {
     openList();

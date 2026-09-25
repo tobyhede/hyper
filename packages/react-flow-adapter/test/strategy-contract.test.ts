@@ -14,9 +14,9 @@ import { uuid } from './uuid';
 /**
  * The `LayoutStrategy` contract, asserted against every implementation.
  *
- * `gridStrategy` and `positionedStrategy` each had thorough tests, in separate
- * files, sharing no assertions. So each was verified to do what *it* does, and
- * nothing checked they agree on the resource they have in common — which is the
+ * `gridStrategy` and `positionedStrategy` each have their own tests, in
+ * separate files, sharing no assertions: those verify that each does what *it*
+ * does, and this checks they agree on what they have in common — which is the
  * whole reason the seam exists. docs/agents/rendering.md says `gridStrategy` is
  * kept "partly to keep the seam honest"; this is what makes that true.
  *

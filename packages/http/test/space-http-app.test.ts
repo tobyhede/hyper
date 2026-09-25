@@ -270,11 +270,9 @@ describe('commit wire policy', () => {
     // unconsumed and cost every honest overshoot its connection. The upper bound
     // is what the cap check consumed before the drain began, plus the allowance,
     // plus slack for the stream's own read-ahead — so a drain reading twice what
-    // it is allowed fails here, where the 16 MiB literal this once asserted was
-    // two whole allowances of slack and would not have. The slack is eight
-    // chunks against the one actually observed: how far a `ReadableStream` reads
-    // ahead is a runtime detail, and a Node that read two chunks ahead should
-    // not turn this red without a behaviour change.
+    // it is allowed fails here. The slack is eight chunks: how far a
+    // `ReadableStream` reads ahead is a runtime detail, and a Node that read two
+    // chunks ahead should not turn this red without a behaviour change.
     expect(pulled).toBeGreaterThan(MAX_DRAINED_BODY_BYTES);
     expect(pulled).toBeLessThanOrEqual(MAX_DRAINED_BODY_BYTES + MAX_COMMIT_BODY_BYTES + chunk * 8);
   });
@@ -449,7 +447,7 @@ describe('Space HTTP reads', () => {
     expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', failure);
   });
 
-  // Ticket 27: one `AggregateInvariantError` is not proof of broken stored
+  // One `AggregateInvariantError` is not proof of broken stored
   // state, on PostgreSQL — `loadAggregate` runs at READ COMMITTED in two
   // statements, so a rival host's commit landing between them can make a
   // healthy store look like "Spaces without Meta" for an instant
@@ -479,7 +477,7 @@ describe('Space HTTP reads', () => {
 
   // Broken stored state and an unreachable database are told apart by type
   // (`isAggregateInvariant`, which walks the cause chain), the way
-  // `src/http/space-host.ts` already does for `GET /` — an invariant failure
+  // `src/http/space-host.ts` does for `GET /` — an invariant failure
   // that survives the re-read above is a permanent defect no retry cures
   // (500), everything else is temporary (503). The second case is carried
   // only on `cause`, because the driver does not always rethrow what a
@@ -508,7 +506,7 @@ describe('Space HTTP reads', () => {
   // Without it every aggregate failure costs two full reads against a database
   // that is already not answering.
   //
-  // Ticket 31: the unreachable arm is named (`PersistenceUnavailableError`)
+  // The unreachable arm is named (`PersistenceUnavailableError`)
   // rather than being whatever is not an invariant, so a failure that is
   // neither — a code defect, a driver failure nobody anticipated — is the third
   // case, and answers 500 `internal-error` rather than inheriting 503 by
@@ -543,7 +541,7 @@ describe('Space HTTP reads', () => {
     expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', error);
   });
 
-  // Ticket 38. The collection and single-Space reads answer by the same three
+  // The collection and single-Space reads answer by the same three
   // arms every other stored-seam route does: an outage is 503, and a failure
   // nothing has named is 500 rather than a 503 telling a client to wait out a
   // wrong password.
@@ -737,7 +735,7 @@ describe('Space HTTP aggregate commit', () => {
     expect(logError).toHaveBeenCalledWith('Failed to commit spaces', failure);
   });
 
-  // Ticket 31's third case at the commit route: a failure that is neither
+  // The third case at the commit route: a failure that is neither
   // broken stored state nor an unreachable database is not answered 503 by
   // default. It is logged, and answers 500 `internal-error`.
   it('answers a commit failure that is neither named arm as 500 internal-error', async () => {
@@ -753,10 +751,10 @@ describe('Space HTTP aggregate commit', () => {
 
   // `SqlSpaceRepository#commit` (`src/persistence/sql-space-repository.ts`)
   // wraps a stored revision it cannot read back as broken stored state,
-  // exactly as its aggregate read's own decode step already does — so an
-  // `AggregateInvariantError` can now reach this route, not only
+  // exactly as its aggregate read's own decode step does — so an
+  // `AggregateInvariantError` can reach this route, not only
   // `GET /api/aggregate`. Told apart from an unreachable database by type
-  // (`isAggregateInvariant`), the same rule that route already applies: a
+  // (`isAggregateInvariant`), the same rule that route applies: a
   // defect no retry cures answers 500 `internal-error` rather than 503
   // `persistence-unavailable` — an operator-facing distinction, not yet a
   // client one (`http-backend.test.ts` pins both problem codes to the same

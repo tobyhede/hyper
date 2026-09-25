@@ -35,8 +35,8 @@ describe('usePlacementRendering', () => {
   });
 
   it('re-runs layout for a new strategyGraph while the placement keeps its identity', async () => {
-    // What Edit completion relies on since it stopped forcing a new placement
-    // identity to provoke a re-layout: a completed Edit replaces the working
+    // What Edit completion relies on, with no new placement identity to
+    // provoke a re-layout: a completed Edit replaces the working
     // snapshot, and the `LayoutStrategyGraph` derived from it re-fires this
     // effect on its own. Nothing here touches the placement — the same object
     // is handed back on every render, so only the strategyGraph half can

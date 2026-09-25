@@ -18,22 +18,21 @@ import {
 } from '../support/structural-scan';
 
 /**
- * Arm 3 of ticket 08's structural scan (`test/support/structural-scan.ts`
- * reads the source and states what every arm shares): ticket 10's own
- * criterion, held as a standing check rather than a fact that happened to
- * become true: no shadow, anywhere, states its colour as black — in CSS, in a
- * `shadow-[…]` class or as Tailwind's `shadow-black` colour utility —
- * including inside a token's own definition, which arm 2 alone cannot see (a
- * value fully wrapped in `var(...)` passes arm 2 even when the token it names
- * is the offender). The CSS half, `findBlackShadowCssViolations`, lives in the
- * support module because arm 2's fixtures prove that blind spot with it.
+ * Arm 3 of the structural scan (`test/support/structural-scan.ts` reads the
+ * source and states what every arm shares): no shadow, anywhere, states its
+ * colour as black — in CSS, in a `shadow-[…]` class or as Tailwind's
+ * `shadow-black` colour utility — including inside a token's own definition,
+ * which arm 2 alone cannot see (a value fully wrapped in `var(...)` passes arm
+ * 2 even when the token it names is the offender). The CSS half,
+ * `findBlackShadowCssViolations`, lives in the support module because arm 2's
+ * fixtures prove that blind spot with it.
  */
 
 /**
  * Tailwind's named shadow-colour utility in black, opacity modifier and
  * variant prefix included. `inset-shadow` and `text-shadow` have the same
  * utility and are held to the same rule as `shadow`; `drop-shadow-black` is
- * the glyph outline ticket 10 scopes out, and a bare `shadow-black` behind
+ * a glyph outline and out of scope, and a bare `shadow-black` behind
  * any other word (`drop-`, `blah-`) is not this utility at all.
  */
 const BLACK_SHADOW_COLOR_CLASS =
@@ -41,7 +40,7 @@ const BLACK_SHADOW_COLOR_CLASS =
 
 /**
  * `shadow-[…]` and `shadow-black…` only — `drop-shadow-[…]` is a glyph's
- * contrast outline, not an elevation (ticket 10).
+ * contrast outline, not an elevation.
  */
 const findBlackShadowClassViolations = (
   file: string,
@@ -63,7 +62,7 @@ const findBlackShadowClassViolations = (
  * them — every one in `rgb(0 0 0 / …)`, so a named step is black unless the
  * theme restates it, which a scan of the literals written in source cannot
  * see. `inset-shadow`, `text-shadow` and `drop-shadow` are not elevations, and
- * are held to the same rule by decision (ticket 10).
+ * are held to the same rule by decision.
  */
 const SHADOW_STEPS_BY_FAMILY: ReadonlyMap<string, readonly string[]> = new Map([
   ['shadow', ['2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl']],

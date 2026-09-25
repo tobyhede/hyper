@@ -27,12 +27,10 @@ import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 /**
  * A Resource's own commands belong to the Resource (ADR 0073, ADR 0082).
  *
- * The addresses and the deletion were reachable only through the Space's
- * command surface, which named the *selected* Resource in its footer. Both are now
- * on the Resource's own rail, and these tests are what keeps them there once that
- * surface is replaced: the menu is asserted through the canvas rather than
- * through any chrome, and the deletion is asserted to be the very Edit the
- * footer ran rather than a second one that resembles it.
+ * The addresses and the deletion are on the Resource's own rail, and these
+ * tests are what keeps them there: the menu is asserted through the canvas
+ * rather than through any chrome, and the deletion is asserted to be the Space's
+ * one deletion Edit rather than a second one that resembles it.
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -309,7 +307,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   /**
    * Remove from Map is the named command for the Edit Delete/Backspace already
    * runs. It must not ask first: that question is Delete from Space's, because only
-   * a Space deletion cascades (v1-release/03).
+   * a Space deletion cascades.
    */
   it('removes the Resource from this Map and leaves it in the Space, without asking', async () => {
     const session = mount();
@@ -327,9 +325,9 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Remove from Map reports on its own channel. It used to borrow Delete from
-   * Space's, so a refused removal read "Resource not deleted" about a Resource
-   * nobody was deleting.
+   * Remove from Map reports on its own channel rather than Delete from
+   * Space's, so a refused removal never reads "Resource not deleted" about a
+   * Resource nobody is deleting.
    */
   it('shows a refused removal as "Resource not removed" and dismisses it', async () => {
     const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
@@ -508,9 +506,9 @@ describe('a Resource’s commands on the canvas rail', () => {
    * Placed at a fixed offset from the source, so the Reference Resource lands where the
    * author is looking.
    *
-   * A free-position search was rejected: that is a placement algorithm, and ADR
-   * 0086 put automatic arrangement behind an Edit and out of the render path
-   * deliberately. The overlap is authored and the author drags it off.
+   * Do not search for a free position: that is a placement algorithm, and ADR
+   * 0086 keeps automatic arrangement behind an Edit and out of the render
+   * path. The overlap is authored and the author drags it off.
    */
   it('places the Reference Resource at a fixed offset from the Resource it was made from', async () => {
     const session = mount();
@@ -629,7 +627,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * Copy link to Target copies the Target's own Resource address — not a
    * within-Map one, and not this Reference Resource's own address, which is
    * what the two rows before it already offer. The Target is often absent from
-   * this Map entirely (`.scratch/reference-thing/issues/02`).
+   * this Map entirely.
    */
   it('offers a Reference Resource a Copy link to Target, copying the Target’s own address', async () => {
     const written: string[] = [];
@@ -699,8 +697,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * The Space Resource menu's own grouping grammar
-   * (`.scratch/dock-menu-reorganisation/issues/04`): Create Reference on its own,
+   * The Space Resource menu's own grouping grammar: Create Reference on its own,
    * then Open in New Tab (Enter is absent here — this isolated single-Space
    * mount carries no `OpenSpacesContext`, so `spaces === null` withholds it;
    * `enter-space-resource.test.tsx` holds the full order with Enter present),
@@ -805,14 +802,12 @@ describe('a Resource’s commands on the canvas rail', () => {
    * The rail's Delete runs on the press otherwise, and a Resource's deletion cannot
    * be taken back: V1 has no undo, and a Space Resource owns its target's lifetime
    * together with every other reference to it, so the same press can reach work
-   * in Spaces that are not on screen (ADR 0074). The Sidebar's footer carried
-   * this `AlertDialog` and the Sidebar has gone; the dialog moved to the App
-   * root rather than into the menu, because the menu closes on the press and
-   * would take the question with it.
+   * in Spaces that are not on screen (ADR 0074). The `AlertDialog` is mounted
+   * at the App root rather than in the menu, because the menu closes on the
+   * press and would take the question with it.
    *
-   * The claim this replaced compared two surfaces running one Edit. There is one
-   * surface now — a Resource's commands are the Resource's (ADR 0073) — so what is left
-   * to pin is that the one route asks, and that answering it runs the deletion.
+   * A Resource's commands are the Resource's (ADR 0073), so there is one route:
+   * what is pinned is that it asks, and that answering it runs the deletion.
    */
   it('asks before deleting, and deletes when the question is answered', async () => {
     const session = mount(
@@ -850,9 +845,9 @@ describe('a Resource’s commands on the canvas rail', () => {
    *
    * `EntityActionsMenu` holds a reporting item's menu open and swaps its label
    * to the word the outcome names — machinery built for a command that *runs*
-   * on the press. This one only raises a question, so `done` on the press said
-   * "Resource deleted" beside a dialog still asking whether to, and announced it to
-   * a reader who then pressed Cancel. The deletion's own outcome is the canvas's
+   * on the press. This one only raises a question, so `done` on the press would
+   * say "Resource deleted" beside a dialog still asking whether to, and announce
+   * it to a reader who might then press Cancel. The deletion's own outcome is the canvas's
    * to report, and its refusal the confirmation's.
    */
   it('does not report a deletion while the question is still asking', async () => {
@@ -872,8 +867,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    *
    * A Resource's Title is one or more Title Lines and the front draws the ladder;
    * a dialog title is a sentence, and a line break arriving in one draws as a
-   * broken-looking label rather than as an error. This is the claim the
-   * retired Sidebar's own footer used to hold.
+   * broken-looking label rather than as an error.
    */
   it('names the Resource in the question by its name and not by its whole Title', async () => {
     const session = mount();

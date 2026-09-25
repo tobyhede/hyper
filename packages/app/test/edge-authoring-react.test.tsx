@@ -743,8 +743,8 @@ describe("the app's canvas delete key", () => {
    * and only the Edge half of this canvas has a focus-to-selection bridge. So a
    * Tab to another Resource leaves the selection where it was, while the node's own
    * assistive description promises Delete removes *it*. The open command one
-   * branch above already resolves its Resource from the event target; this one now
-   * agrees, and falls back to the selection when the key came from the pane.
+   * branch above resolves its Resource from the event target; this one agrees,
+   * and falls back to the selection when the key came from the pane.
    */
   it.each(DELETE_KEYS)(
     'removes the focused Resource rather than the selected one on %s',
@@ -839,12 +839,6 @@ describe("the app's canvas delete key", () => {
       // the canvas guard reads rather than a list of its own. `RESOURCES_TRIGGER` is
       // the Command Dock's own Resources trigger, exported for whoever supplies that
       // surface, so the class under test here is the class the Dock ships.
-      //
-      // It carried two cases beside it once, over `AddResourceControl` and a
-      // `SpaceSidebar` mounted the same way. ADR 0082 retired the Sidebar,
-      // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
-      // replaced both marks itself the same way — so one production trigger
-      // proves one guard.
       const { adapter, session } = await mountCanvas(
         <Toolbar>
           <ToolbarButton {...RESOURCES_TRIGGER}>Resources</ToolbarButton>
@@ -885,8 +879,8 @@ describe("the app's canvas delete key", () => {
   /**
    * The real control this canvas mounts, not a stand-in for it.
    *
-   * A fabricated `input[type=range]` proved only that the guard's `input` entry
-   * works, which was true before the zoom controls existed. What has to hold is
+   * A fabricated `input[type=range]` would prove only that the guard's `input`
+   * entry works, which holds without any zoom control. What has to hold is
    * that the shipped `ZoomSlider` — a Base UI thumb inside a React Flow `Panel`,
    * both of which this test renders for real — is excluded, and the entry that
    * excludes it is the `.nokey` its Panel already carries for React Flow's own
@@ -988,9 +982,7 @@ describe('a pane covering the graph', () => {
    * time so an Edge drawn from the presented Resource is a move available without
    * leaving the presentation (ADR 0027). `editing.spec.ts` authors a self-Edge
    * mid-presentation and asserts exactly that. Withdrawing the handles here
-   * would take the feature with them — which is what happened the first time
-   * `ResourceNode` was made to honour the flag, because the flag had been carrying
-   * `!presenting` unread for as long as nothing forwarded it.
+   * would take the feature with them.
    */
   it('keeps the handles connectable while presenting, where the Edge is a move', async () => {
     await mountCanvas(null, { presenting: true });

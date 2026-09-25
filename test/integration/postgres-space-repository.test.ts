@@ -24,14 +24,10 @@ import { expectPersisted } from '../support/persistence-contract';
  */
 // Deliberately unseeded: a repository has to reach a committable state from an
 // empty store on its own, and every case here begins by establishing the
-// contract's Meta Space through `initializeAggregate`. Seeding it by hand hid
-// that the SQL repository could not.
+// contract's Meta Space through `initializeAggregate`.
 //
-// Ticket 24: `SqlSpaceRepository` now owns `commit` too, so the whole
-// contract -- lifecycle and commit alike -- runs directly against it; the
-// ticket 22/23 tracer and lifecycle-only wiring this block used to carry
-// beside it are gone, superseded by this one call covering everything they
-// each covered separately.
+// The whole contract -- lifecycle and commit alike -- runs directly against
+// `SqlSpaceRepository`.
 spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
   await clearHyperContent();
   // Clients minted by `reopenRepository` below, closed with the harness.
@@ -52,18 +48,18 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
     /*
      * A fresh host means a fresh client: `createPostgresDatabase()` returns a
      * new connection pool, so the repository handed back reads through
-     * PostgreSQL sessions the seeding repository never used. This used to wrap
-     * the one live client twice, which reopened nothing: both repositories then
-     * read through the same connection, and the two contract cases that take
-     * this path are about what survives into a host that does not.
+     * PostgreSQL sessions the seeding repository never used. Do not wrap the
+     * one live client twice, which reopens nothing: both repositories would
+     * then read through the same connection, and the two contract cases that
+     * take this path are about what survives into a host that does not.
      *
      * Unlike `test/support/sqlite-harness.ts`, the original client is not
      * closed first. It is the module-level handle this whole file shares —
      * `clearHyperContent` and every raw-column write below go through it, and
      * `afterAll` closes it — so closing it here would take the rest of the file
-     * down with it. That is also why the SQLite harness has to close: ticket 18
-     * found a second live writer against one SQLite file unsupported, while
-     * PostgreSQL serves both pools at once.
+     * down with it. That is also why the SQLite harness has to close: a second
+     * live writer against one SQLite file is unsupported, while PostgreSQL
+     * serves both pools at once.
      */
     reopenRepository: () => {
       const database = createPostgresDatabase();
@@ -210,11 +206,11 @@ const concurrentSnapshot: SpaceSnapshot = {
  * `snapshot` with the Space Resource that makes `otherSnapshot` part of the same
  * aggregate.
  *
- * A two-Space seed is not two Spaces side by side any more. Complete aggregate
+ * A two-Space seed is not two Spaces side by side. Complete aggregate
  * intake refuses an ordinary Space nothing references
  * (`ordinary-space-unreferenced`), and both lifecycle doors ask it before they
- * write — so the pair that used to arrive through two insert-mode imports has
- * to arrive as one aggregate with Meta reaching the other Space (ADR 0078).
+ * write — so the pair has to arrive as one aggregate with Meta reaching the
+ * other Space (ADR 0078).
  *
  * It selects `otherSnapshot`'s own Map and Graph, which a Space Resource names
  * from the moment it exists (ADR 0079).
@@ -236,15 +232,6 @@ const linkedSnapshot: SpaceSnapshot = {
   ],
 };
 
-// Ticket 24 note: this file used to carry a separate `describe('SqlSpaceRepository
-// (PostgreSQL) -- Meta-lock retry race', ...)` block here, added by ticket 23 to
-// prove the race directly on `SqlSpaceRepository` while `commit` still lived on
-// the now-deleted `PostgresSpaceRepository`. The block below runs on
-// `SqlSpaceRepository` too now, and already carries both halves of that race --
-// "conflicts a replacement authorized against an identity a concurrent
-// replacement retired" and "judges a complete-aggregate commit against an
-// identity a concurrent replacement retired" -- so the separate block was
-// deleted as a literal duplicate rather than kept beside it.
 describe('SqlSpaceRepository (PostgreSQL)', () => {
   const repository = new SqlSpaceRepository(postgresSqlStore(db));
   const createdSpaceIds = new Set<UUID>();
@@ -257,8 +244,8 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
    * Establish the aggregate a case starts from, and fail loudly if it did not.
    *
    * Every seed goes through `initializeAggregate`, which is one of the two
-   * lifecycle doors left (ADR 0078) and the only one that establishes first
-   * state. It names Meta outright, so a fixture no longer says which Space is
+   * lifecycle doors (ADR 0078) and the only one that establishes first
+   * state. It names Meta outright, so a fixture never says which Space is
    * the root by putting it first.
    */
   const seed = async (metaSpaceId: UUID, spaces: readonly SpaceSnapshot[]): Promise<void> => {
@@ -296,7 +283,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   // corrupt document classified as a reachability problem is answered `try again
   // later` forever and retried until the budget is spent.
   //
-  // Only PostgreSQL can hold this state. `MemorySpaceRepository` stores
+  // Only a SQL database can hold this state. `MemorySpaceRepository` stores
   // snapshots that were already parsed on the way in, so it has no way to
   // present a document that fails intake on the way out.
   it('refuses a write of text that is not JSON into spaces.document', async () => {
@@ -470,25 +457,16 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   });
 
   /*
-   * The regression this used to pin, before ticket 23: a CI run failed
-   * asserting that the *second* of two concurrent replacements is the one
-   * whose state survives, and the fix at the time was to stop asserting which
-   * one survives -- both proposals read the Meta identity they are authorized
-   * against before either write lands, so (that version reasoned) both
-   * replace, and the survivor is whichever PostgreSQL grants the Meta row
-   * lock to last.
-   *
-   * That reasoning missed a second race living inside the same window: the
+   * Both proposals read the Meta identity they are authorized against before
+   * either write lands, and the Meta row lock decides which writes first. The
    * *loser* of the row-lock queue does not simply wait its turn and then
    * write against the row it originally read. The winner's whole
    * `replaceAggregate` -- including `truncateHyperContent`'s delete of the very
    * row the loser is blocked on -- runs and commits before the loser's blocked
-   * self-update ever unblocks, so the loser meets exactly ticket 23's race
-   * (`lockMetaIdentity`'s self-update finds the row gone) and, correctly
-   * fixed, conflicts against the identity the winner just established rather
-   * than silently overwriting it. `expectPersisted(...).toMatchObject([{kind:
-   * 'replaced'}, {kind: 'replaced'}])` no longer holds -- exactly one of the
-   * two replaces, the other conflicts, and this is now where that is pinned.
+   * self-update ever unblocks, so the loser's `lockMetaIdentity` self-update
+   * finds the row gone and conflicts against the identity the winner just
+   * established rather than silently overwriting it. Exactly one of the two
+   * replaces and the other conflicts, and this is where that is pinned.
    *
    * The blocking transaction is what the shared contract cannot have. It makes
    * the two genuinely overlap: issued back to back they might simply run one
@@ -528,7 +506,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
     // (`SPACE_ID`) by the time it released -- but only one of them can then be
     // the one PostgreSQL grants the row lock to first, and that one's own
     // replacement retires `SPACE_ID` out from under the other, which is
-    // ticket 23's race. Which one wins is not asserted, for the same reason
+    // the lock-retry race below. Which one wins is not asserted, for the same reason
     // the sibling "leaves one whole proposal" test below does not assert it.
     expect(results.filter((result) => result.kind === 'replaced')).toHaveLength(1);
     expect(results.filter((result) => result.kind === 'conflict')).toHaveLength(1);
@@ -546,13 +524,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   });
 
   /*
-   * Ticket 23: `lockMetaIdentity`'s self-update finds the singleton row gone
+   * `lockMetaIdentity`'s self-update finds the singleton row gone
    * when a concurrent replacement has deleted and rewritten it between this
-   * read and that self-update. `4ec1d1e7` ("Preserve replacement
-   * authorization across lock retry") made the retry's caller receive the
-   * identity read *before* the replacement rather than the one the retry
-   * itself just found -- and nothing failed if that were reversed. This pins
-   * which is correct: a manually held row lock stands in for a replacement
+   * read and that self-update. The retry's caller receives the identity read
+   * *before* the replacement rather than the one the retry itself just found,
+   * and this pins that: a manually held row lock stands in for a replacement
    * mid-flight, so `replaceAggregate`'s own read is forced to land before the
    * held lock's release and its self-update is forced to block on it, then
    * the held transaction retires the identity `replaceAggregate` read and
@@ -732,15 +708,14 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
   });
 
   /*
-   * M13 (second review pass of the one-SQL-repository branch): `Space.relock`
-   * (`src/persistence/sql-store.ts`) writes a placeholder `{}` document to
+   * `Space.relock` (`src/persistence/sql-store.ts`) writes a placeholder `{}` document to
    * take a row's write lock during `replaceAggregate`'s per-row re-lock loop,
    * rather than round-tripping the row's real one. `#replaceUnserialised`'s
    * own doc comment says that is safe because every relocked row is either
    * truncated in the same transaction (`#replaceAllSpaces` -> `#truncate
    * HyperContent`, which deletes every currently stored row, relocked or not)
-   * or the whole transaction rolls back on a `StaleSpaceRevisionError` -- but
-   * nothing had held the rollback half. `SPACE_ID` sorts before `OTHER_
+   * or the whole transaction rolls back on a `StaleSpaceRevisionError`, and
+   * this holds the rollback half. `SPACE_ID` sorts before `OTHER_
    * SPACE_ID`, so `loadAllForReplacement`'s ascending order relocks `SPACE_ID`
    * first; this forces the second row, `OTHER_SPACE_ID`, to conflict only
    * after `SPACE_ID`'s own placeholder write has already landed inside the

@@ -28,8 +28,8 @@ export interface GraphHudFixtureProps {
  * canvas publishes, whose membership is `mapResources(space, map)` — so a
  * Map that places two of the Space's five Resources puts two marks on the
  * minimap, and the key beside it and the map under it mean the same "open
- * Map". The fixture used to map `space.resources` itself, which drew all five
- * either way and left the two halves disagreeing.
+ * Map". Do not map `space.resources` here: that draws all five either way and
+ * leaves the two halves disagreeing.
  *
  * The projection's nodes are production `ResourceFlowNode`s, so the canvas is
  * given the adapter's own `nodeTypes`/`edgeTypes`: without them React Flow

@@ -187,7 +187,7 @@ export async function exerciseSpaceResourceFooter(page: Page, placement: Locator
   await page.mouse.down();
   await page.mouse.move(outer.x + 60 * zoom, multiple.y + 30 * zoom, { steps: 16 });
   await page.mouse.up();
-  // The visible Map reaches the actual footer; it no longer ends 100px up.
+  // The visible Map reaches the actual footer.
   // React Flow may pan near the viewport edge during this drag.
   const settledOuter = await boxOf(parent, 'Space Resource after dragging');
   const settledFooter = await boxOf(footer, 'footer after dragging');

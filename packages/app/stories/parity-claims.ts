@@ -226,13 +226,9 @@ export const parityClaims: readonly ParityClaim[] = [
       "A Reference Resource front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
-    // **The former coloured-rail claim, changed rather than dropped.**
-    // It read "a selected Resource's rail carries the Active Graph's own colour",
-    // which was true and is now deliberately false: the rail is neutral and the
-    // commands on it are the Command Dock's own surface
-    // (`.scratch/command-dock/issues/12`). The claim keeps the palette sweep,
-    // because what has to hold at every colour is the *opposite* of what it used
-    // to be — and adds the half that says where the colour went.
+    // The claim sweeps the palette because what has to hold at every colour is
+    // that the rail stays neutral, the Command Dock's own surface, while the
+    // colour stays on the handles and Edges.
     id: 'canvas-resource-toolbar-is-neutral-and-graph-colour-stays-on-connections',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Colours',
@@ -268,9 +264,9 @@ export const parityClaims: readonly ParityClaim[] = [
       'Two Space Resources referencing one Space each draw the Map they store rather than the target\u2019s own opening Map, so their embeddings differ in membership while converging on one Space.',
     // Both Space Resources can be authored in a browser, but only against a target
     // that owns two Maps \u2014 and a second Map is Add Map, which acts
-    // on the Space the author is *in*. Entering that Space is the rail command
-    // `space-cards/11` owns. The remaining gap is a target that already owns
-    // two Maps, not the absence of Enter \u2014 the e2e fixture does not author
+    // on the Space the author is *in*, reached through the rail's Enter command.
+    // The gap is a target that already owns
+    // two Maps \u2014 the e2e fixture does not author
     // that second Map through the browser \u2014 so the claim takes the
     // documented exemption meanwhile.
     applicationEvidence:
@@ -298,16 +294,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'An Open Reference Resource keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
   },
   /*
-   * **`persistence-indicator-shows-save-lifecycle` is retired with its story,
-   * for the reason the Dock's own claims are the shape they are.** It said
-   * persistence reports saving, briefly acknowledges success and returns to
-   * rest, and `components/persistence-indicator.stories.tsx` drove exactly that
-   * through a real `SpaceSession`. The Command Dock mounts `PersistenceControl`
-   * only for a conflict and a rejection — ticket `01` settled that there is no
+   * **No claim covers a saving lifecycle.** The Command Dock mounts
+   * `PersistenceControl` only for a conflict and a rejection — there is no
    * resting cue, because a commit settles faster than a dot can be read — so
-   * the saving half of that lifecycle is unreachable in the application, and a
-   * stable story for a state production cannot reach is not parity evidence
-   * (ADR 0052).
+   * saving is unreachable in the application, and a stable story for a state
+   * production cannot reach is not parity evidence (ADR 0052).
    *
    * `PersistenceIndicator` itself keeps a production path and needs no
    * inventory entry: an acknowledged rejection draws it, which is the Dock's
@@ -315,33 +306,15 @@ export const parityClaims: readonly ParityClaim[] = [
    * `PersistenceControl`.
    */
   /*
-   * The Command Dock (ADR 0082).
+   * The Command Dock (ADR 0082). Each claim below states one obligation in the
+   * Dock's own words.
    *
-   * **Thirteen claims stood here and none of them was carried across.** They
-   * named `space/space.stories.tsx` and `space/messaging.stories.tsx`, both of
-   * which are gone with `SpaceSidebar`, and four of them named the Sidebar in
-   * the claim sentence itself. Carrying one would have asserted that the
-   * behaviour did not change; the audit in
-   * `.scratch/command-dock/issues/07-promote-the-dock-and-retire-the-space-sidebar.md`
-   * is what found that five of the thirteen were false about the Dock. Each
-   * claim below states one obligation in the Dock's own words, so a reader
-   * comparing them to the old set reads two surfaces rather than one renamed.
-   *
-   * **Two obligations left rather than moved.** A Resource's Copy link to Resource
-   * in Map, Copy link to Resource and Delete from Space belong to the Resource
-   * rail (ADR 0073) and not to this surface — the Dock's organising rule is
-   * that a Resource's own commands are absent — so
-   * `space-sidebar-copies-resource-destinations` and
-   * `space-sidebar-entity-actions-menu` have no successor here. The menu's own
-   * successor is `canvas-resource-actions-menu`, claimed against the rail's
+   * A Resource's Copy link to Resource in Map, Copy link to Resource and Delete
+   * from Space belong to the Resource rail (ADR 0073) and not to this surface —
+   * the Dock's organising rule is that a Resource's own commands are absent.
+   * The menu is claimed as `canvas-resource-actions-menu`, against the rail's
    * stable `Components/Resource` story; the copied destinations keep their
    * browser evidence in `space-routing.spec.ts` untagged.
-   *
-   * **And one was retired rather than restated.** `space-sidebar-shows-pending-
-   * persistence` claimed a pending commit is exposed as saving. Ticket `01`
-   * settled that the Dock carries no resting cue at all — a commit settles
-   * faster than a dot can be read — so `PersistenceIndicator` is never called
-   * from here and there is nothing left to claim.
    */
   {
     id: 'command-dock-marks-one-current-map',

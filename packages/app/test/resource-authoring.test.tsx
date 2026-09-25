@@ -334,8 +334,8 @@ describe('authoring a Resource title on the graph', () => {
    * The Graph cluster's own lifecycle commands read the same withdrawal.
    *
    * New Graph, Delete Graph and Recolour are entity Edits exactly as New Map
-   * and Delete Map are, and they went out un-gated: the rows pressed
-   * cleanly, `authoring.complete` answered `refused`, and the answer was
+   * and Delete Map are. Un-gated, the rows would press cleanly,
+   * `authoring.complete` would answer `refused`, and the answer would be
    * discarded with nothing drawn anywhere. This asserts the gate; the refusal
    * the notice draws is the other half.
    */
@@ -440,18 +440,16 @@ describe('authoring a Resource title on the graph', () => {
 
 /**
  * The gap between `present()`'s refusal and the control that calls it, at the one
- * place it now opens.
+ * place it opens.
  *
- * Dropping a Graph's minimum Edge count made an empty Graph legal, and ADR 0040
- * made it *ordinary*: creating a Map mints its one
- * Active Graph holds nothing, so this is the state the author is in immediately
- * after their first edit on the Flow view. `graphStartResource` has no answer for
- * such a Graph, so `present()` returns having changed nothing — and an enabled
- * control would read `Present` and swallow the click, which is verbatim the
- * defect a fully cyclic Graph produced before its guard was split out.
+ * An empty Graph is legal, and ADR 0040 makes it *ordinary*: creating a Map
+ * mints its one Active Graph holding nothing, so this is the state the author is
+ * in immediately after their first edit on the Flow view. `graphStartResource`
+ * has no answer for such a Graph, so `present()` returns having changed nothing
+ * — and an enabled control would read `Present` and swallow the click.
  *
  * Neither half proves this on its own: the refusal is in Navigation and the
- * enablement is in `GraphSelector`, and what went wrong was that they disagreed.
+ * enablement is in `GraphSelector`, and the two must agree.
  */
 describe('presenting from a Map', () => {
   it('offers Present on a Map whose Active Graph holds an Edge', async () => {
@@ -612,8 +610,7 @@ describe('authoring an opened Resource', () => {
    * the author settles it first.
    *
    * This is the one control outside the canvas that needs to know an edit is
-   * running, and since ADR 0089 retired the creation panes there is no modal
-   * surface left that could need it too.
+   * running.
    */
   it('cannot start presenting over a live content edit', async () => {
     const session = mount();
@@ -676,11 +673,10 @@ describe('authoring an opened Resource', () => {
     await settled(session);
 
     // **All three, because one `chromeTitleEdit` answers for the whole bar.**
-    // `renamed-space` put the Space behind that guard beside the Map and the
-    // Graph, and the claim the branch makes is that the three go together. Read
-    // on the Map alone, a regression leaving the Space's name live while a
-    // Resource title editor owned the caret passed every suite — which is the one
-    // collision the guard exists to prevent.
+    // The Space sits behind that guard beside the Map and the Graph, and the
+    // three go together. Read on the Map alone, a regression leaving the
+    // Space's name live while a Resource title editor owned the caret would
+    // pass — which is the one collision the guard exists to prevent.
     for (const identity of CHROME_IDENTITIES) {
       expect([identity, unavailable(identityRenameItem(identity))]).toEqual([identity, false]);
     }
@@ -712,21 +708,14 @@ describe('authoring an opened Resource', () => {
   });
 
   /**
-   * The pane keeps its draft in `useState`, seeded once from the Resource it was
-   * mounted on. Opening a second Resource without closing the first therefore had
-   * the same React element in the same position — so the state survived while
-   * `resource.id` changed underneath it, and the fields were now A's text wearing
-   * B's identity. `Done` then wrote A's title and body over B.
+   * A draft is seeded once from the Resource its editor was mounted on, so an
+   * event reaching another Resource's node while A is being edited must not
+   * leave A's text wearing B's identity — Save would then write A's title and
+   * body over B.
    *
-   * The pane traps focus, but the invariant still has to survive an event from
-   * a node behind it — including a synthetic or stale event delivered after the
-   * pane opened.
-   *
-   * The node is found by its test id rather than by its heading, because the
-   * pane hides the graph behind it from the accessibility tree (`hideOthers`,
-   * ADR 0047) and a role query answers only what is in that tree. Dispatching
-   * onto the element is still the point: this is a keypress reaching a node the
-   * author cannot see.
+   * The invariant has to survive an event from any node — including a
+   * synthetic or stale event delivered after the editor opened — so the
+   * keypress is dispatched onto B's node element directly.
    */
   it('never carries one Resource’s draft onto another', async () => {
     const session = mount();
@@ -735,7 +724,7 @@ describe('authoring an opened Resource', () => {
 
     fireEvent.keyDown(screen.getByTestId(`rf__node-${OTHER_RESOURCE_ID}`), { key: 'Enter' });
 
-    // Whatever the pane shows, it must not be A's draft under B's id.
+    // Whatever the editor shows, it must not be A's draft under B's id.
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Markdown source of A' })).toHaveTextContent(
       'A rewritten',
@@ -771,12 +760,11 @@ describe('authoring an opened Resource', () => {
 /*
  * Opening a Space Resource is deliberately not covered here.
  *
- * It used to be, as the one kind Opening refused — and that refusal is gone:
  * Opening is one Map-owned Edit that asks no question about the Resource's kind
  * (ADR 0064), and a Space Resource has something to draw Open, being the Map
  * it selects of the Space it references (ADR 0068). The behaviour needs a
  * *second* stored Space to be about anything, and this file's fixture is one
- * Space over a backend that holds only it, so the test moved whole to
+ * Space over a backend that holds only it, so the test lives in
  * `space-resource-selection.test.tsx` rather than being weakened to fit here.
  */
 describe('the Resource affordance on the graph', () => {
@@ -805,9 +793,8 @@ describe('the Resource affordance on the graph', () => {
     fireEvent.click(resource);
     fireEvent.doubleClick(resource);
 
-    // The authored Open state itself, and the control an Open Resource offers. The
-    // Resource the gesture lands on is the evidence: a pane that is no longer built
-    // cannot be absent from the document for a reason this test is about.
+    // The authored Open state itself, and the control an Open Resource offers:
+    // the Resource the gesture lands on is the evidence.
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-expanded', 'false');
     expect(screen.queryByRole('button', { name: 'Close Resource A' })).not.toBeInTheDocument();
     await settled(session);

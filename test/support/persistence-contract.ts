@@ -23,12 +23,9 @@ type PersistenceContract<T> = T extends
  * `toMatchObject`, bound to the type of the value it is asserting about.
  *
  * **The matcher's own typing is why this exists.** `expect(x).toMatchObject(y)`
- * types `y` loosely enough that a key the received type no longer has is not an
- * error: ticket `13` removed `initialization` from `LoadedSpace` end to end,
- * `pnpm verify` passed with the compiler looking straight at the stale field,
- * and CI's `postgres` job was the first check to say so half an hour later. The
- * suite is inside the root program — `tsc` read the file — so another command to
- * remember would not have closed it. Binding the expectation to the received
+ * types `y` loosely enough that a key the received type does not have is not an
+ * error, so a stale field in an expectation typechecks and fails only when the
+ * suite runs against a database. Binding the expectation to the received
  * type does, because the received type is then what decides which keys the
  * expected object may name.
  *

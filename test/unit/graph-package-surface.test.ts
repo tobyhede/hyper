@@ -24,11 +24,10 @@ import * as graphPackage from '@project/graph';
  * the module each belongs to and not how a consumer reaches it.
  *
  * `lookup` offers exactly one function. Identity resolution is reached through
- * `space.lookup`, which the Space carries, so the shallow `get*` pairs that used
- * to be listed here have no callers left to name — and `buildSpaceLookup` is
- * intake's, called by `space` and by nothing outside the package. Its
- * contextual types come with the module, which is why `ResolvedMap`,
- * `OwnedGraph` and `SpaceLookup` are listed below.
+ * `space.lookup`, which the Space carries, so no shallow `get*` accessor has a
+ * caller to name — and `buildSpaceLookup` is intake's, called by `space` and by
+ * nothing outside the package. Its contextual types come with the module, which
+ * is why `ResolvedMap`, `OwnedGraph` and `SpaceLookup` are listed below.
  *
  * Adding a name here is the deliberate act this guard exists to require. It is
  * not a restatement of the index: these are the names, the index is where they

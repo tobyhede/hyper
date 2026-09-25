@@ -417,8 +417,8 @@ describe('canonical export', () => {
    *
    * Which makes the identities inside the refusal the whole of its value — the
    * operator has to find the Space or Resource the serializer mangled. Rendering
-   * `error.kind` alone reduced that to one word, which is exactly the loss
-   * `src/cli/aggregate-refusal.ts` was added in the same change to prevent.
+   * `error.kind` alone would reduce that to one word, which is the loss
+   * `src/cli/aggregate-refusal.ts` prevents.
    *
    * `loadAggregate` is stubbed because a valid repository cannot reach here; the
    * refusal has to come from the staged bytes disagreeing with Meta rooting.

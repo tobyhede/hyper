@@ -24,25 +24,19 @@ import {
  * codec throws prose, not Zod" forbids. Pin the shape, not Zod's wording, which
  * is version-dependent.
  *
- * **The door moved and the guard outlived it.** This reached that prose through
- * `PostgresSpaceRepository.importSpaces`, because the compatibility facade was
- * the only door parsing input the importer had not yet identified. ADR 0078
- * retired it, and `describeSchemaFailure` moved to `src/aggregate-directory/identify-space.ts`
- * with the minting it sits beside — so the door is `identifySpace` now, and it
- * raises `SpaceIdentityError` carrying the same summary. The debt the guard
- * exists for did not move with it: two functions still format that summary —
- * `describeSchemaFailure` here and `decodeSnapshot` in
- * `packages/persistence/src/http-protocol.ts` — because sharing one would export
- * a string formatter from a browser-safe package for a single server-side
- * caller. The duplication is the deliberate half; the drift is not, and nothing
- * but this stops the CLI and the wire describing one failure two ways.
+ * The CLI's door is `identifySpace` (`src/aggregate-directory/identify-space.ts`),
+ * which raises `SpaceIdentityError` carrying the summary `describeSchemaFailure`
+ * writes. Two functions format that summary — `describeSchemaFailure` and
+ * `decodeSnapshot` in `packages/persistence/src/http-protocol.ts` — because
+ * sharing one would export a string formatter from a browser-safe package for a
+ * single server-side caller. The duplication is the deliberate half; the drift
+ * is not, and nothing but this stops the CLI and the wire describing one
+ * failure two ways.
  *
- * One part did get easier. The old door parsed with `importSpaceSchema` and the
- * wire with `spaceSnapshotSchema`, so every fixture had to be built to fail
- * identically under both; `identifySpace` parses the identified snapshot with
- * `spaceSnapshotSchema`, the very schema the wire uses, so what is left under
- * test is the two summarisers. That the two *schemas* still agree about the
- * sentences they write is held below, where both are scanned.
+ * `identifySpace` parses the identified snapshot with `spaceSnapshotSchema`,
+ * the very schema the wire uses, so what is under test is the two
+ * summarisers. That the two *schemas* still agree about the sentences they
+ * write is held below, where both are scanned.
  */
 describe('import decoding', () => {
   const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');

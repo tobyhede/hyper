@@ -7,11 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * to carry one flake policy between them, so that a reader never has to ask
  * which config a failure came from before knowing what a green run proves.
  *
- * They drifted once already: the Ladle config was written with `retries: 0`,
- * which left `failOnFlakyTests` nothing to act on and made Issue 08's criterion
- * ("CI fails when any Playwright test is flaky even if a diagnostic retry
- * passes") unexercisable rather than met. Nothing but review caught it. This
- * holds the two together.
+ * A config with `retries: 0` leaves `failOnFlakyTests` nothing to act on, so
+ * "CI fails when any Playwright test is flaky even if a diagnostic retry
+ * passes" becomes unexercisable rather than met. This holds the two together.
  *
  * Both configs read `process.env['CI']` at module scope, so each case sets the
  * environment and re-imports rather than trusting a cached module.
@@ -55,7 +53,7 @@ describe('the two Playwright configs share one flake policy', () => {
     // Asserted as a literal rather than only as equality: two configs that
     // agreed on `retries: 0` would satisfy the comparison above while leaving
     // the criterion with no diagnostic retry to exercise, which is the exact
-    // state this test exists to prevent returning to.
+    // state this test exists to prevent.
     expect(application?.policy).toEqual({
       forbidOnly: true,
       failOnFlakyTests: true,

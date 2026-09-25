@@ -14,7 +14,7 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
 
 /*
  * Memory and the one SQL repository (ADR 0095) run the same commit decision,
- * `decideCommit` in `@project/persistence`, so this no longer proves two sets
+ * `decideCommit` in `@project/persistence`, so this does not prove two sets
  * of rules agree. It proves storage agrees: that what each reads, in what
  * order, and what each writes and answers around that one decision come out
  * the same over generated aggregates -- run against both databases
@@ -26,7 +26,7 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  * against PostgreSQL and `test/integration/sqlite-aggregate-commit-differential.test.ts`
  * calls it against SQLite (named for `vitest.sqlite.config.ts`'s `sqlite-*`
  * inclusion, the way `sqlite-space-repository.test.ts` and
- * `sqlite-hyper-cli.test.ts` already are), so a change to the property itself
+ * `sqlite-hyper-cli.test.ts` are), so a change to the property itself
  * cannot drift between the two databases it runs against.
  */
 
@@ -447,16 +447,12 @@ export const assertDifferential = (target: {
       const memory = new MemorySpaceBackend(fixture.metaSpaceId, initial);
 
       await target.clear();
-      // Both sides are told which Space is Meta, by the same value. The memory
-      // backend always was — it takes `metaSpaceId` in its constructor — while
-      // the SQL repository used to be seeded through `importSpaces(…, 'insert')`,
-      // which read Meta off the first element of the array. So the two agreed
-      // only while `fixture.snapshots[0]` stayed the Meta Space, and reordering
-      // the generator's output would have made the differential compare two
-      // differently-rooted aggregates and blame the repository. ADR 0078
-      // retired that inference along with the mode parameter;
-      // `initializeAggregate` names Meta outright, and the coupling is gone
-      // rather than merely unexercised.
+      // Both sides are told which Space is Meta, by the same value: the memory
+      // backend takes `metaSpaceId` in its constructor, and `initializeAggregate`
+      // names Meta outright. Neither reads Meta off `fixture.snapshots[0]`
+      // (ADR 0078), so reordering the generator's output cannot make the
+      // differential compare two differently-rooted aggregates and blame the
+      // repository.
       const initialized = await target.repository.initializeAggregate({
         metaSpaceId: fixture.metaSpaceId,
         spaces: fixture.snapshots,

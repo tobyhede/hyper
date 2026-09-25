@@ -231,11 +231,10 @@ describe('Vite Hono host', () => {
 
       const response = await fetch(`${host.url}/`, { method, redirect: 'manual' });
 
-      // The whole of ticket 21. Both methods the root serves are safe, and a
-      // safe method must not create durable authored state — this used to mint
-      // four identities and write two rows for whichever request arrived first,
-      // `curl -I` included. Establishment is start-up's now, so the answer says
-      // to come back rather than seeding a Meta Space to redirect to.
+      // Both methods the root serves are safe, and a safe method must not
+      // create durable authored state — `curl -I` included. Establishment is
+      // start-up's, so the answer says to come back rather than seeding a Meta
+      // Space to redirect to.
       expect(response.status).toBe(503);
       expect(response.headers.get('location')).toBeNull();
       await expect(spaceRepository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
@@ -269,9 +268,9 @@ describe('Vite Hono host', () => {
   // also what a healthy repository shows for an instant: `loadAggregate` reads
   // the Meta identity and the Spaces in two statements under READ COMMITTED, so
   // a rival host committing between them reports Spaces without Meta. The retry
-  // loop already required two consecutive ones for exactly this reason; the wire
-  // path drew a permanent 500 from the first, so a browser landing in that
-  // window was told the database was broken when a reload would have worked.
+  // loop requires two consecutive ones for exactly this reason, and so does the
+  // wire path: a permanent 500 from the first would tell a browser landing in
+  // that window the database was broken when a reload would have worked.
   it('reads again before calling one invariant failure a verdict', async () => {
     class RacingRepository extends MemorySpaceRepository {
       reads = 0;
@@ -374,7 +373,7 @@ describe('Vite Hono host', () => {
       title: 'Persistence unavailable',
       detail: 'Try the request again later.',
     },
-    // Ticket 31's third case: a failure that is neither named arm — a code
+    // A failure that is neither named arm — a code
     // defect, or a driver failure nobody anticipated — is not an unreachable
     // database by default. 503 would tell the browser to wait out something
     // nothing says will pass.
@@ -540,7 +539,7 @@ describe('Vite Hono host', () => {
   /**
    * A product URL is a web address and carries real HTTP semantics (ADR 0069),
    * so a method the contract does not serve is answered rather than handed to
-   * the SPA fallback — which was returning the whole application shell with a
+   * the SPA fallback, which would return the whole application shell with a
    * 200 for the very URL GET answers 400.
    *
    * The same shape as `unservedContractPath` gives the API tree: the identity
@@ -697,7 +696,7 @@ describe('Vite Hono host', () => {
   // read to its end and the connection survives its own 413, as above; past the
   // allowance the drain stops, the body is left unconsumed and the socket cannot
   // be reused — a client that never stops sending loses its connection rather
-  // than costing us the drain. Only the reuse half was pinned before.
+  // than costing us the drain.
   it('drops the connection when a body outruns the drain allowance', async () => {
     const { host, connections } = await startHost(createSpaceHttpApp(repository()));
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
@@ -724,10 +723,9 @@ describe('Vite Hono host', () => {
       // Waited for rather than assumed. A keep-alive agent holding one socket
       // will re-dispatch onto a connection the host has decided to drop but not
       // yet closed, and the follow-up then fails for a reason that is not the
-      // policy under test — the CI-only flake this test would otherwise carry.
-      // The allowance the client overruns is 8 MiB, so the write and its reset
-      // are a real amount of work; vi.waitFor's 1s default is the flake this
-      // wait exists to remove, and the ceiling only ever delays a real failure.
+      // policy under test. The allowance the client overruns is 8 MiB, so the
+      // write and its reset are a real amount of work; vi.waitFor's 1s default
+      // is too short for it, and the ceiling only ever delays a real failure.
       const doomed = connections[0];
       await vi.waitFor(() => expect(doomed?.destroyed).toBe(true), { timeout: 5000 });
 
@@ -746,8 +744,7 @@ describe('Vite Hono host', () => {
     const resource = '/api/spaces/00000000-0000-4000-8000-000000000001';
     const rejectedRequests = [
       {
-        // Body-carrying, as it was before the aggregate endpoint replaced the
-        // Space resource. It does not drain — no route matches, so `notFound`
+        // Body-carrying. It does not drain — no route matches, so `notFound`
         // answers it before `requireBoundedCommitBody` is reached — and at two
         // bytes there is nothing to drain anyway. What it holds is the graph:
         // the not-found answer must leave the connection as reusable as the
@@ -899,7 +896,7 @@ describe('Database HTTP runtime', () => {
 
       expect(typeof application.resolveProductRequest).toBe('function');
       // The reason is not swallowed, only kept out of the way of composition.
-      // It is named for what it is (ticket 31), with the driver's own error on
+      // It is named for what it is, with the driver's own error on
       // `cause`, where the operator's log prints it.
       expect(reported).toBeInstanceOf(PersistenceUnavailableError);
       const cause = reported instanceof Error ? reported.cause : undefined;

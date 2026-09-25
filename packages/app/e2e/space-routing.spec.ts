@@ -19,7 +19,7 @@ const RESOURCE_E_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 /**
  * Copy one address out of the menu that offers it.
  *
- * **Two menus now, and which one an entity uses is the design.** A Resource's own
+ * **Two menus, and which one an entity uses is the design.** A Resource's own
  * commands are on its rail (ADR 0073) — the Command Dock's organising rule is
  * that they are not on the Space's command surface at all — while a Map's and
  * a Graph's are behind their own cluster's disclosure. Both are `DropdownMenu`s
@@ -80,9 +80,8 @@ test('a direct canonical URL opens its exact existing Space', async ({ page }) =
  * altogether, so it proves nothing about the address being read; the second
  * authored Map is the only one whose appearance can only have come from the
  * path. The assertions are the header naming the one selected Map and the
- * canvas drawing that Map's Resources rather than the default's — the Sidebar
- * lists every Map title at all times, so matching a title as plain page text
- * would be true whatever is selected.
+ * canvas drawing that Map's Resources rather than the default's, because a Map
+ * title matched as plain page text says nothing about which Map is selected.
  */
 test('a direct Map URL restores the named authored Map', async ({ page }) => {
   const response = await page.goto(
@@ -294,13 +293,10 @@ test('history restores a canonical Resource through the default Map, not the con
 /**
  * A Resource's two addresses, from the Resource's own rail.
  *
- * **Untagged, and that is a decision rather than an omission.** The claim this
- * carried — `space-sidebar-copies-resource-destinations` — was retired with the
- * surface it named: a Resource's links are the rail's now, and the rail's story
- * sheet is still under `stories/review`, so there is no stable story for a
- * parity claim to name. The behaviour is proved here and in
- * `resource-rail-actions.test.tsx` meanwhile, and `parity-claims.ts` records that
- * the claim returns when the rail's sheet is promoted.
+ * **Untagged, and that is a decision rather than an omission.** A Resource's
+ * links are the rail's, and the rail's story sheet is under `stories/review`,
+ * so there is no stable story for a parity claim to name. The behaviour is
+ * proved here and in `resource-rail-actions.test.tsx`.
  */
 test('copy commands distinguish canonical Resource identity from its current Map', async ({
   page,
@@ -331,14 +327,11 @@ test('copy commands distinguish canonical Resource identity from its current Map
 /**
  * What the Map cluster's disclosure holds, and what it deliberately does not.
  *
- * **The claim this test carried is gone with its mechanism.**
- * `space-sidebar-entity-actions-menu` said one menu was "reached two ways from a
- * Sidebar row — its trailing icon and a right click". The Dock has clusters
- * rather than rows and no `onContextMenu` anywhere, so there is no second route
- * to restate; what survives is that a Map's commands are all in one place,
- * including Rename, and that the name itself is the disclosure that opens it.
+ * A Map's commands are all in one place, including Rename, and the name itself
+ * is the disclosure that opens it. The Dock has no `onContextMenu`, so there is
+ * no second route to it.
  *
- * **The order is one grouping grammar** (`.scratch/dock-menu-reorganisation/issues/01`):
+ * **The order is one grouping grammar:**
  * the Map list, New Map on its own, Rename beside Copy link to
  * Map, then Delete — one separator between each group.
  */
@@ -358,8 +351,7 @@ test('the Map cluster holds every Map command including Rename', async ({ page }
 });
 
 /**
- * The Space menu's own grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
+ * The Space menu's own grouping grammar: Rename beside Copy link to
  * Space, then Exit Space — one separator between the two groups. The address
  * copied is the Space's own, not the drawing Map's
  * (`link-actions.spec.ts` holds why no second address is offered here).
@@ -428,11 +420,9 @@ test('activating a Graph pushes a contextual destination restored by Back and Fo
 });
 
 /**
- * The Graph menu's one grouping grammar and its one address
- * (`.scratch/dock-menu-reorganisation/issues/01`,
- * `.scratch/graph-colour/issues/03`): the Graph list, New Graph, Colour…
- * beside Rename and Copy link to Graph, then Delete — one separator
- * between each group, and no permanent address offered any more.
+ * The Graph menu's one grouping grammar and its one address: the Graph list,
+ * New Graph, Colour… beside Rename and Copy link to Graph, then Delete — one
+ * separator between each group, and no permanent address offered.
  */
 test(
   'the Graph menu copies its within-Map address and offers no permanent one',
@@ -548,9 +538,9 @@ test('entering, advancing and retreating each append presentation history', asyn
  * A self-Edge is where a Traversal history move and an address move come apart:
  * advancing appends the same Resource, so the history grows and the position does
  * not. Under ADR 0081 the browser is told about the position, so entering the
- * presentation earns an entry and the move over the self-Edge earns none. This
- * asserted the opposite until that decision — a second entry at the same URL,
- * which made Back a no-op the reader had to press twice.
+ * presentation earns an entry and the move over the self-Edge earns none. A
+ * second entry at the same URL would make Back a no-op the reader had to press
+ * twice.
  */
 test('a self-Edge presentation move takes no browser entry', async ({ page }) => {
   const seeded = await seedPositionedMap(page, 'Self Edge', () => ({

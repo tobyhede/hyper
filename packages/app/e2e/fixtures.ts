@@ -11,8 +11,7 @@ import { createE2eViteServer } from './vite-server';
  * a fresh `nodeTypes`/`edgeTypes` object every render (#002), an unsized
  * container (#004), `<Handle>` outside a custom node (#010). It logs them and
  * carries on rendering something subtly wrong, so without this they cost
- * nothing to introduce and nothing catches them. See
- * `.scratch/react-flow-guidance/issues/01-fail-e2e-on-react-flow-warnings.md`.
+ * nothing to introduce and nothing catches them.
  *
  * The gate is deliberately narrow: only React Flow's own messages and uncaught
  * page errors. Failing on arbitrary console output would drag in Vite HMR and
@@ -54,10 +53,9 @@ export const test = base.extend<E2eFixtures>({
     }
   },
   // `contextOptions` is Playwright's own resolved bundle of everything `use`
-  // declares — viewport, device, locale — and this fixture dropped all of it by
-  // building a context from `baseURL` alone. Nothing noticed while every project
-  // wanted Playwright's default 1280x720, and a `test.use({ viewport })` asking
-  // for a phone was silently served a desktop.
+  // declares — viewport, device, locale. A context built from `baseURL` alone
+  // drops all of it, and a `test.use({ viewport })` asking for a phone is
+  // silently served a desktop.
   page: async ({ browser, contextOptions, e2eServer }, run) => {
     const baseURL = e2eServer.resolvedUrls?.local[0];
     if (baseURL === undefined) throw new Error('Vite did not publish a loopback URL');

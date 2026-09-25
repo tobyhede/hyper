@@ -4,13 +4,11 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 /**
- * The source reading the structural scale's checks share. Tickets 01 to 07
- * (`.scratch/structural-tokens/issues/`) gave the chrome one named scale for
- * radius, border width, font weight and type size, and ticket 06 gave the
+ * The source reading the structural scale's checks share. The chrome has one
+ * named scale for radius, border width, font weight and type size, and the
  * Resource its own, deliberately separate, scale for radius, border width,
- * font weight and shadow. Nothing stopped a new arbitrary value or a new bare
- * literal from joining either scale unnoticed — ticket 08's contract step
- * reads both source trees and fails a build that reintroduces one. It does so
+ * font weight and shadow. These checks read both source trees and fail a build
+ * that adds a new arbitrary value or bare literal to either scale. They do so
  * in four arms, one test file each:
  *
  * 1. `test/unit/structural-arbitrary-classes.test.ts`
@@ -22,14 +20,11 @@ import ts from 'typescript';
  *
  * Written in the idiom `command-surface-sharing.test.ts`,
  * `codemirror-encapsulation.test.ts` and `graph-package-surface.test.ts`
- * already established here for a claim a rendering test cannot make: read the
+ * share for a claim a rendering test cannot make: read the
  * tracked source, not a snapshot of what it currently draws.
  *
- * **Comments do not count.** Ticket 10 found three of its four named surfaces
- * were already fixed and only read as violations because a grep matched the
- * word inside a comment describing what the value used to be
- * (`Popover.tsx`/`Select.tsx` still narrate the arbitrary `shadow-[…]` their
- * `shadow-lg` replaced). `.ts`/`.tsx` source is parsed and every comment
+ * **Comments do not count.** A comment may name a value the code does not
+ * use, so `.ts`/`.tsx` source is parsed and every comment
  * node's range is blanked to whitespace before any pattern runs over it;
  * `.css` source has its `/* … *\/` comments blanked the same way. Blanking
  * rather than deleting keeps every reported line number true to the original
@@ -52,7 +47,7 @@ const trackedFiles = (): readonly string[] =>
     });
 
 /**
- * The two source trees ticket 08 names: `.tsx`/`.ts` class strings and
+ * The two source trees: `.tsx`/`.ts` class strings and
  * hand-rolled `.css` under `packages/*\/src` — the same root
  * `command-surface-sharing.test.ts` and `codemirror-encapsulation.test.ts`
  * read, and the one `docs/agents/ui.md` names as where product appearance is
@@ -151,20 +146,20 @@ export const describeViolation = (violation: Violation): string =>
   `${violation.file}:${violation.line}: ${violation.text.trim()}`;
 
 /**
- * The five structural utility prefixes ticket 01 named (radius, border width,
+ * The five structural utility prefixes (radius, border width,
  * type size, shadow and its offset — shadow and offset are one composite
  * value, so one prefix covers both) plus `font`, held apart from `drop-shadow`
- * because a drop-shadow on a glyph is a contrast outline, not an elevation
- * (ticket 10), and arm 3 reads the two differently.
+ * because a drop-shadow on a glyph is a contrast outline, not an elevation,
+ * and arm 3 reads the two differently.
  *
  * **Each prefix admits its own variants and no more.** `rounded` takes a side
  * or a corner (`rounded-t-[…]`, `rounded-ss-[…]`), `border` takes a side or an
  * axis (`border-t-[…]`, `border-x-[…]`, `border-s-[…]`) — Tailwind spells the
  * logical ones `s`/`e`, never `border-inline-start` — and `font`, `text`,
- * `shadow` and `drop-shadow` take none. A `(?:-[a-z]+)*` tail admitted any
- * unrelated utility that merely begins the same way: `border-spacing-[4px]`
- * read as a border width and failed the build as one, which the fixtures in
- * `structural-arbitrary-classes.test.ts` hold.
+ * `shadow` and `drop-shadow` take none. A `(?:-[a-z]+)*` tail would admit any
+ * unrelated utility that merely begins the same way — `border-spacing-[4px]`
+ * would read as a border width and fail the build as one — which the fixtures
+ * in `structural-arbitrary-classes.test.ts` hold.
  *
  * **A Tailwind state selector is not a structural value.** `data-[…]`,
  * `has-[…]`, `group-data-[…]`, `aria-[…]` and `supports-[…]` all carry a

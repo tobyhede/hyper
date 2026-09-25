@@ -26,13 +26,13 @@ const sourcesUnder = (directory: string): readonly string[] =>
 /**
  * Whether a name reads as a keyboard event rather than some other record.
  *
- * The scan used to require the literal `event`, which made the ratchet a check
- * on one spelling instead of on the binding: `e.key === 'Delete'` added an
- * unlisted key and left this test green. Any identifier may carry `.key`,
- * because a `.key` compared against a string literal is a key binding whatever
- * the parameter is called. `.code` is narrower on purpose — `refusal.code` and
- * its kin are domain identities (ADR 0057), not keystrokes — so it is read only
- * off a name that already reads as an event.
+ * Requiring the literal `event` would make the ratchet a check on one spelling
+ * instead of on the binding: `e.key === 'Delete'` would add an unlisted key and
+ * leave this test green. Any identifier may carry `.key`, because a `.key`
+ * compared against a string literal is a key binding whatever the parameter is
+ * called. `.code` is narrower on purpose — `refusal.code` and its kin are
+ * domain identities (ADR 0057), not keystrokes — so it is read only off a name
+ * that already reads as an event.
  */
 const readsAsEvent = (name: string): boolean => /^e([a-z]*)$/i.test(name) || /event/i.test(name);
 

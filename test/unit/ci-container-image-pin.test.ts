@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /*
- * The Playwright image pin lives in more than one job now — `e2e` and `ladle`
+ * The Playwright image pin lives in more than one job — `e2e` and `ladle`
  * both declare it — and nothing in the workflow makes the copies agree. The
  * `.node-version` guard cannot: it compares the Node major, and that is
  * identical across Playwright image versions. So a bump that moves one pin and

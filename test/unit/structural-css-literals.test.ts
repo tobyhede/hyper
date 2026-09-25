@@ -11,14 +11,13 @@ import {
 } from '../support/structural-scan';
 
 /**
- * Arm 2 of ticket 08's structural scan (`test/support/structural-scan.ts`
- * reads the source and states what every arm shares): a bare structural
+ * Arm 2 of the structural scan (`test/support/structural-scan.ts` reads the
+ * source and states what every arm shares): a bare structural
  * literal — radius, border width and shadow, plus `font-weight` and a weight
  * inside the `font` shorthand — written directly in a hand-rolled `.css` file
  * instead of read off a `var(...)`. Only `.css` files are read: a structural
  * value in a TSX style object — inline, or CodeMirror's theme in
- * `MarkdownSourceEditor.tsx` — is out of this arm's scope by decision (ticket
- * 08's Resolution).
+ * `MarkdownSourceEditor.tsx` — is out of this arm's scope by decision.
  *
  * **Token definition sites are exempted by shape, not by path.** A theme
  * value is *named* in a custom property declaration (`--radius-chrome-md:
@@ -29,9 +28,8 @@ import {
  * — never a `--custom-property` name, so naming a value already satisfies the
  * check regardless of which file does the naming.
  * `packages/app/src/tailwind.css` (the live theme) and the two inert
- * `tailwind-experiment-*.css` blocks ticket 09 left in the tree as evidence
- * both state every one of their structural values this way — nothing in
- * either file writes `border-radius:`, `border:`, `box-shadow:` or
+ * `tailwind-experiment-*.css` blocks both state every one of their structural
+ * values this way — nothing in either file writes `border-radius:`, `border:`, `box-shadow:` or
  * `font-weight:` as an applied property, only as the name half of a `--`
  * declaration — so both are scanned like every other file rather than carved
  * out, and a fixture test below and a real-tree test in "token definition

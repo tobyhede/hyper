@@ -27,56 +27,29 @@ import { selectResource } from './resource-selection';
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
  * Space is accepted is discarded with the Space it named.
  *
- * Three surfaces own a draft the author can actually reach today — the graph's
- * inline title field, the opened-Resource pane, and React Flow's drag — and no one
- * mechanism discards all three. Nothing held them to any of it before this file,
- * so all three held by construction and by reading.
+ * Three surfaces own a draft the author can reach — the graph's inline title
+ * field, the opened-Resource pane, and React Flow's drag — and no one mechanism
+ * discards all three. The Dock's chrome rename is a fourth, outside the canvas:
+ * `IdentityName` ends a rename on the replacement epoch, and the case stages a
+ * draft the rename refuses so the assertion does not turn on where jsdom put
+ * focus.
  *
- * **Two of the three cases are characterization: they pin outcomes that already
- * held.** The third is not. The Map rename below was written as
- * characterization too and was never entitled to be: the chrome editor is the
- * Dock name control's own state, no mechanism here reached it, and the case
- * passed only on the runs where the conflict's modal stole the caret and blur
- * committed the draft before the accept. `IdentityName` now ends a rename on the
- * replacement epoch, and the case stages a draft the rename refuses so the
- * assertion no longer turns on where jsdom put focus.
- * `.scratch/interaction-draft-invalidation/issues/02-…` carries the argument. So
- * that nobody has to take the coverage on trust, each case was mutation-checked
- * against three deliberate breakages, and what follows is what was measured
- * rather than what was reasoned:
- *
- * - **K** — delete `key={replacementEpoch}` from `App.tsx`.
- * - **R** — stop the render adapter's epoch subscriber clearing
- *   `projection`/`dragOrigins`/`selection` (`render-adapter.ts`).
- * - **N** — make `navigation.openFresh` retain the previous Space's navigation.
- *
- * | case | K | R | K+R | N |
- * |---|---|---|---|---|
- * | opened-Resource pane | passes | passes | passes | **fails** |
- * | in-flight drag | passes | **fails** | **fails** | passes |
- *
- * **What the modal does to a draft is the hazard this file kept walking into.**
+ * **What the modal does to a draft is the hazard this file stages around.**
  * The only trigger the app has for accepting a stored Space is the conflict
  * banner's `Accept remote`, which lives in a modal `AlertDialog`. Raising the
  * conflict traps focus into that dialog, the field blurs, and blur is
  * `InlineTitleEditor`'s own commit — so a draft the rename would *accept* is
  * committed before the replacement lands and there is nothing left to discard.
  * That is the app's real behaviour through its real trigger, not a harness
- * artifact; whether an arriving conflict should commit an in-progress rename is
- * a product question, and it is recorded in the ticket rather than frozen here.
- * A draft the rename **refuses** is held open and editable by contract, which is
- * why the chrome case below stages one: it is the draft that survives the trap
+ * artifact, and whether an arriving conflict should commit an in-progress
+ * rename is a product question this file does not freeze. A draft the rename
+ * **refuses** is held open and editable by contract, which is why the chrome
+ * case below stages one: it is the draft that survives the trap
  * either way, so what the assertion reads is the replacement and nothing else.
  *
- * `K` is defended by nothing, here or anywhere: the canvas key and the
- * projection reset are each sufficient for the drafts inside the canvas subtree,
- * and only the drag distinguishes them — which `R` alone already kills. The
- * chrome rename is outside that subtree and outside `K`'s reach entirely.
- *
  * What is deliberately **not** asserted: that the discard is silent, and where
- * focus lands afterwards. Both are open product questions recorded in that
- * ticket's Comments, and a test that pinned either would freeze an answer nobody
- * has given.
+ * focus lands afterwards. Both are open product questions, and a test that
+ * pinned either would freeze an answer nobody has given.
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -394,12 +367,11 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * completing it afterwards writes against whatever Map now resolves.
    *
    * **The draft is one the rename refuses, and that is what makes this test say
-   * anything.** It was a typed name before, and the assertion passed or failed
-   * on where the conflict's modal put the caret: `AlertDialog` traps focus, the
-   * field blurs, and blur is `InlineTitleEditor`'s own commit — so on the runs
-   * where the trap reached the field the draft was *committed* before the accept
-   * and the replacement had nothing left to discard. The editor survived on
-   * every other run, which is the defect this now pins. A blank name is the one
+   * anything.** With a typed name the assertion would turn on where the
+   * conflict's modal put the caret: `AlertDialog` traps focus, the field blurs,
+   * and blur is `InlineTitleEditor`'s own commit — so whenever the trap reached
+   * the field the draft would be *committed* before the accept and the
+   * replacement would have nothing left to discard. A blank name is the one
    * refusal every renameable entity has (`IdentityName`), and a refused draft is
    * held open and editable by contract — so the editor is still standing when
    * the accept lands whether the trap reached it or not, and the assertion is
@@ -419,8 +391,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
 
     await raiseConflict(session);
     // The staged pre-condition, asserted rather than assumed: without an open
-    // editor here the discard below is vacuous, which is exactly how this case
-    // passed while the editor was surviving.
+    // editor here the discard below is vacuous.
     expect(screen.getByRole('textbox', { name: 'Map name', hidden: true })).toHaveValue('   ');
     acceptRemote();
 
@@ -434,8 +405,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
   });
 
   /**
-   * The Space's own name, which `renamed-space` made a draft this rule has to
-   * reach — and which reaches it for a *different* reason than the Map above.
+   * The Space's own name, a draft this rule has to reach — and which reaches it for a *different* reason than the Map above.
    *
    * The Dock's one rename slot ends a draft on two facts: the replacement epoch,
    * and the subject the rename was begun against changing under it
@@ -509,13 +479,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * reach.
    *
    * The drag is left in flight on purpose and released by the `afterEach` above
-   * rather than here, because releasing it is not part of what this pins. What a
-   * late release *would* do was measured separately and is inert: no settled
-   * change is emitted after the replacement, so no `settled-resource-movement`
-   * completion is derived and `working` does not move. That is React Flow's
-   * doing, not ours — `render-adapter.ts:249` falls back to `beforeById` when
-   * `dragOrigins` is empty, so nothing here refuses a stale settled change. The
-   * ticket's section 5 has the bisection and treats it as an open question.
+   * rather than here, because releasing it is not part of what this pins.
    */
   it('drops an in-flight drag and redraws the Resource where the accepted Space places it', async () => {
     const session = await mountedSpaceApp();

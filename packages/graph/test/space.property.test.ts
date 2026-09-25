@@ -4,7 +4,7 @@ import { loadSpace, loadSpaceSnapshot } from '../src/index';
 import { resourceFile } from './resource-files';
 
 /**
- * Resources come from files now (ADR 0020), so the set a space ends up with is
+ * Resources come from files (ADR 0020), so the set a space ends up with is
  * decided by which files were handed in — never by the space file, and never by
  * the order they arrived. Distinct ids, arbitrary titles, arbitrary order in.
  */

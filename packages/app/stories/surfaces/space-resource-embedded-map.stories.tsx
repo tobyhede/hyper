@@ -245,8 +245,7 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
  *
  * The second Resource selects `Detail` although the target opens on `Overview`,
  * which is what says the stored selection wins over the target's own
- * `defaultMap` (ADR 0079). Under the fallback this replaced, the same
- * document would have drawn `Overview` twice.
+ * `defaultMap` (ADR 0079).
  */
 const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: PAIR_HOME_ID,

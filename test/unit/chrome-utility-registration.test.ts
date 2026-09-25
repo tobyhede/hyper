@@ -9,12 +9,11 @@ import {
 } from '../support/structural-scan';
 
 /**
- * Arm 4 of ticket 08's structural scan (`test/support/structural-scan.ts`
- * reads the source and states what every arm shares): ticket 02's
- * `tailwind-merge` finding. Every class-generating `*-chrome-*` utility the
- * theme emits, from any `@theme` block or `@utility`, is registered beside
- * `cn()`, and every registration names a utility the theme actually emits —
- * the two lists ticket 08 was written to hold together.
+ * Arm 4 of the structural scan (`test/support/structural-scan.ts` reads the
+ * source and states what every arm shares): every class-generating
+ * `*-chrome-*` utility the theme emits, from any `@theme` block or `@utility`,
+ * is registered beside `cn()` so `tailwind-merge` can merge it, and every
+ * registration names a utility the theme actually emits.
  */
 
 /**
@@ -23,13 +22,13 @@ import {
  * class `tailwind-merge` does not group by name, so it fails the merge
  * unregistered: `tailwind-merge` reads an unknown `shadow-*` word as a shadow
  * colour, so a hypothetical `shadow-chrome-probe` does not evict `shadow-lg`
- * (the "keeps a built-in step beside an unregistered chrome word" fixture
- * below holds that). `color` is merged without registration, because
- * `tailwind-merge` groups every colour utility by an accept-anything validator
- * (the "merges a colour utility without registration" fixture). `border-width`
- * is absent because ticket 01 records Tailwind v4 ships no themable
- * border-width namespace, which is why `border-chrome-accent` is a `@utility`
- * rather than a theme key. An absent namespace is reported, not skipped.
+ * (the "keeps a built-in step beside an unregistered chrome word" fixture below
+ * holds that). `color` is merged without registration, because `tailwind-merge`
+ * groups every colour utility by an accept-anything validator (the "merges a
+ * colour utility without registration" fixture). `border-width` is absent
+ * because Tailwind v4 ships no themable border-width namespace, which is why
+ * `border-chrome-accent` is a `@utility` rather than a theme key. An absent
+ * namespace is reported, not skipped.
  */
 type ThemeNamespace =
   | { readonly kind: 'utility'; readonly prefix: string }

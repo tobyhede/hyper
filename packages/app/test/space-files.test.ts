@@ -15,7 +15,7 @@ const NOTES_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
 /**
  * The Spaces on disk, loaded exactly as authored.
  *
- * A space is now a directory, not a file (ADR 0020): the space file holds
+ * A space is a directory, not a file (ADR 0020): the space file holds
  * structure, and every resource is a markdown file beside it or under `resources/`. So
  * this reads both locations the same way the app does, and is the regression
  * test that the resource files are still authored correctly — a missing fence or an

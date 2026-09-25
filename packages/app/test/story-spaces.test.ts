@@ -25,8 +25,8 @@ import {
  * `space.defaultMap` — so the story fixture must not answer that question
  * itself, and these Spaces have to *declare* what the Ladle specs then assert.
  *
- * That is what this file pins. `issue-14-space-sidebar.spec.ts` proves the
- * rendered story presses Collection 1; this proves the story is entitled to,
+ * That is what this file pins. The Ladle specs prove the rendered story
+ * presses Collection 1; this proves the story is entitled to,
  * because the Space says so through the same call production makes. Delete the
  * `defaultMap` and this fails here rather than in a browser.
  */
@@ -74,7 +74,7 @@ describe('the story Spaces', () => {
    * The retryable story hands the fixture a Space that changes: it opens on
    * `authoredSnapshot` and submits `editedSnapshot`. The fixture seeds `selected`
    * once and never reconciles it, so an Edit withdrawing the opened Map would
-   * leave the sidebar with no Map to press — a blank story rather than a
+   * leave the Dock with no Map to press — a blank story rather than a
    * degraded one. The Edit appends, and this is what says so, at `verify` rather
    * than in a browser — including that it appends *something*, since an
    * `editedSnapshot` that stopped differing from what the session loaded would
@@ -170,8 +170,8 @@ describe('the story Spaces', () => {
   /**
    * The one state no tracked fixture has, and the reason these Spaces exist.
    *
-   * The E2E fixture's Graphs are deliberately all lines and the sidebar's Space
-   * is four more of them, so nothing already in the tree gives the presenting
+   * The E2E fixture's Graphs are deliberately all lines and `authoredSpace`
+   * holds four more of them, so nothing already in the tree gives the presenting
    * chrome a Resource with a real choice at it. This is the assertion that the fork
    * story is a fork — and that the line beside it is still the degenerate one
    * rather than a second kind (ADR 0024).
@@ -190,10 +190,9 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The Graph colours the sidebar draws are derived, not transcribed. The four
-   * Graphs carry no colour of their own, so each takes a palette slot by its
-   * position in the flatten across Maps (ADR 0045) — which is what let the
-   * fixture's four hex literals go.
+   * The Graph colours `authoredSpace` draws are derived, not transcribed. The
+   * four Graphs carry no colour of their own, so each takes a palette slot by
+   * its position in the flatten across Maps (ADR 0045).
    */
   it('carries no Graph colour of its own, leaving the palette to answer', () => {
     expect(authoredSpace.graphs.map((graph) => graph.title)).toEqual([
@@ -262,8 +261,8 @@ describe('the story Spaces', () => {
 
   /**
    * The Command Dock's Graphs carry no colour either, for `authoredSpace`'s
-   * reason: the prototype this fixture replaced wrote three hex literals out by
-   * hand, which is a fixture free to disagree with the palette the canvas draws.
+   * reason: hex literals written out by hand are a fixture free to disagree with
+   * the palette the canvas draws.
    */
   it('leaves the palette to colour the Command Dock Graphs', () => {
     expect(commandDockSpace.graphs.filter((graph) => graph.color !== undefined)).toEqual([]);
@@ -271,10 +270,10 @@ describe('the story Spaces', () => {
   /**
    * **A Space, its Maps and its Graphs are four kinds of entity with one
    * spelling for identity, so a fixture that reuses a value hides the mistake
-   * a real reader would make.** Meta's own Id was written as a literal and its
-   * Catalogue Map as `metaId(0)`, which is the same UUID — so the product
-   * URL ADR 0069 builds for it read `/spaces/<X>/maps/<X>`, and any assertion
-   * that a Map is not its Space passed here without meaning anything.
+   * a real reader would make.** A Space and its Map spelled as the same UUID
+   * would make the product URL ADR 0069 builds read `/spaces/<X>/maps/<X>`, and
+   * any assertion that a Map is not its Space would pass without meaning
+   * anything.
    */
   it('gives the Meta Space an identity none of its own Maps or Graphs shares', () => {
     const { maps } = metaSnapshot.document;

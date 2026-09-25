@@ -25,10 +25,9 @@ import { unavailable } from './command-dock';
  * What the Command Dock owes an author, held over the application the catalogue mounts.
  *
  * Three of ADR 0082's obligations and one of ADR 0073's are assertable without
- * a browser, and each of them is a claim the prototype failed before this file
- * existed: a Resource could only be placed by dragging it, the Open Spaces menu's
- * accessible name did not contain the word on its face, and the bar was four
- * toolbars where the ADR draws one.
+ * a browser: a Resource can be placed without dragging it, the Open Spaces
+ * menu's accessible name contains the word on its face, and the bar is one
+ * toolbar.
  *
  * The story is mounted whole rather than through a harness of its own. It is
  * the resource under review — `Default` composes the real Space, the production
@@ -127,9 +126,9 @@ const accessibleName = (control: HTMLElement): string =>
 
 describe('placing a Resource into a Map without a pointer (ADR 0082)', () => {
   /**
-   * The rows were `<div draggable>` — no role, no tab stop, no activation — so
-   * an HTML5 drag was the only way to add a Resource to the Map. ADR 0082 says a
-   * drag may be *a* way and never the only one.
+   * Each row has a role, a tab stop and an activation, so an HTML5 drag is not
+   * the only way to add a Resource to the Map. ADR 0082 says a drag may be *a*
+   * way and never the only one.
    */
   it('offers each Resource in the list as a focusable button', async () => {
     await renderDock(<Default />);
@@ -178,9 +177,8 @@ describe('placing a Resource into a Map without a pointer (ADR 0082)', () => {
 
 describe("every control's accessible name contains its visible label (WCAG 2.5.3)", () => {
   /**
-   * The Open Spaces menu is the control this rule was written down for: it showed
-   * `Spaces` under `aria-label="Switch Space. N open."`, so speech input could
-   * not reach the word on its face. It is one token now, spent in both places.
+   * The Open Spaces menu's visible word and its accessible name are one token,
+   * spent in both places, so speech input can reach the word on its face.
    */
   it('names the root Open Spaces menu with the word it shows', async () => {
     await renderDock(<Default />);
@@ -250,7 +248,7 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
       'Resources',
       'Create a Resource',
     ]);
-    // No toolbar inside the toolbar: the clusters are groups now.
+    // No toolbar inside the toolbar: the clusters are groups.
     expect(within(dock()).queryAllByRole('toolbar')).toHaveLength(0);
   });
 
@@ -260,9 +258,8 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * The glyph fills the button, so it is what the pointer is over — a `title`
    * on the glyph is the tooltip the author actually sees, and the button's own
    * never shows. `Markdown Resource` where the button says `Create Markdown Resource`
-   * names the noun in a slot that performs a verb, which is the one reading the
-   * issue's own cost list says a silent visual reading could already take for a
-   * filter.
+   * names the noun in a slot that performs a verb, which a silent visual reading
+   * could take for a filter.
    */
   it('gives each Create control one tooltip, and it is the command', async () => {
     await renderDock(<Default />);
@@ -277,9 +274,8 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
   });
 
   /**
-   * The breadcrumb's two controls are the ones that could not be toolbar items
-   * while each cluster owned its own root, so they were plain Buttons and each
-   * took a tab stop. They are items now, which is what makes the bar one.
+   * The breadcrumb's two controls are toolbar items rather than plain Buttons
+   * each taking a tab stop, which is what makes the bar one.
    */
   it('keeps the way back inside the same roving order', async () => {
     await renderDock(<Default />);
@@ -309,7 +305,7 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
  * The press the grip answers: the primary button of the primary pointer.
  *
  * Written out rather than left to the event's own defaults because the grip
- * now reads all three fields, and a gesture that does not say which pointer
+ * reads all three fields, and a gesture that does not say which pointer
  * pressed it is a gesture no reader of this file can check against the guard.
  */
 const PRIMARY = { pointerId: 1, button: 0, isPrimary: true } as const;
@@ -323,9 +319,8 @@ const frame = (): HTMLElement => {
 
 describe('the grip discloses the twelve slots (ADR 0082)', () => {
   /**
-   * The grip is no longer a `Menu.Trigger`: Base UI opens one on `mousedown`,
-   * which is the first pixel of the drag, and the deferral that stood here was
-   * built on a guard that does not exist. It is a plain toolbar button with one
+   * The grip is not a `Menu.Trigger`: Base UI opens one on `mousedown`, which
+   * is the first pixel of the drag. It is a plain toolbar button with one
    * `onClick`, and the menu positions against it through `anchor`.
    */
   it('opens the slot menu from one activation', async () => {
@@ -442,10 +437,10 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
    * **One pointer owns the gesture it began.**
    *
    * A drag held by a captured pointer still sees every other pointer's moves —
-   * a second finger, a pen beside a touch — and each of them was read as the
-   * held gesture's own, so the dock jumped to whichever pointer moved last and
-   * a stray release docked it there. The initiating pointer is retained and
-   * every other one is ignored for the life of the press.
+   * a second finger, a pen beside a touch. Read as the held gesture's own, they
+   * would jump the dock to whichever pointer moved last and let a stray release
+   * dock it there, so the initiating pointer is retained and every other one is
+   * ignored for the life of the press.
    */
   it('ignores a second pointer while a gesture is in flight', async () => {
     await renderDock(<Default />);
@@ -472,9 +467,8 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
  * clause that decides where: "a report you have to go and find is not a
  * report". The row inside the Open Spaces menu says *which* — that stays, and
  * it is the whole of the detail — but a mark only reachable by disclosing the
- * menu tells a reader who has no reason to open it nothing at all. The Sidebar
- * badged the strip permanently; this is that obligation on the surface that
- * replaced it.
+ * menu tells a reader who has no reason to open it nothing at all, so the
+ * trigger carries the mark.
  */
 describe('an unwell Space the reader is not in', () => {
   it('marks the Spaces trigger before anything is disclosed', async () => {
@@ -496,14 +490,14 @@ describe('an unwell Space the reader is not in', () => {
   });
 
   /**
-   * **The shape where the report had nowhere to go**, and the one the stories
-   * cannot stage: the catalogue's session is five Spaces deep so the Open Spaces
-   * menu is drawn whatever the persistence says.
+   * **The shape where the Open Spaces menu is the only place to report**, and
+   * the one the stories cannot stage: the catalogue's session is five Spaces
+   * deep so the Open Spaces menu is drawn whatever the persistence says.
    *
    * Two Spaces open and the reader in the child. The bar names the Opener, and
-   * the Opener control draws a name and never a state. The Open Spaces menu was
-   * once withheld here as redundant, which left an Opener whose commit had
-   * failed reported nowhere; it is always drawn now, so its trigger reports it.
+   * the Opener control draws a name and never a state. The Open Spaces menu is
+   * drawn here too, not withheld as redundant: without it an Opener whose
+   * commit failed would be reported nowhere, so its trigger reports it.
    *
    * Assembled here rather than added to the stable sheet: it is the same
    * production `CommandDock` over the same fixture, with the one input the
@@ -604,12 +598,8 @@ function TwoSpacesWithAnUnwellOpener() {
 /**
  * **The last Map and the last Graph cannot be deleted, and the rule is not this file's.**
  *
- * The prototype's version of this test had to argue that the fixture's
- * `deleteDisabled`/`editsDisabled` flags were not the floor — that each row read
- * `<flag> || <collection>.length <= 1`, so a story passing `false` was saying
- * *no additional reason to withhold* rather than *no floor*. There is no fixture
- * flag to mistake now: the catalogue mounts production Authoring and the rule is
- * wherever Authoring keeps it.
+ * There is no fixture flag to mistake for the floor: the catalogue mounts
+ * production Authoring and the rule is wherever Authoring keeps it.
  *
  * Still written as a test rather than as a comment, because the next reader will
  * have the same doubt and a comment would only assert the answer.
@@ -661,7 +651,7 @@ describe('the last Map and Graph', () => {
 
 /**
  * **A Graph row carries the Graph's colour as a line, and the identity keeps
- * the glyph** (`.scratch/graph-colour/issues/02`). The rows of the Graph list
+ * the glyph**. The rows of the Graph list
  * draw the line the canvas HUD's key draws, so a Graph looks the same in the
  * list as beside its Edges; the cluster's own identity and Colour… keep the
  * coloured Graph glyph, where it says which kind of entity the colour is.

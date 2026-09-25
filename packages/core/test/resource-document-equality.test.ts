@@ -66,9 +66,9 @@ describe('a stored markdown document is the resource less its id', () => {
   /**
    * What sharing those instances buys, said in values rather than references.
    *
-   * The table is the edges of the rules the pane depends on and nothing else:
+   * The table is the edges of the Title and body rules and nothing else:
    * a Resource's Title normalizes and must keep one non-empty line, which is what
-   * `min(1)` means since ADR 0083, so a title of spaces is refused where a
+   * `min(1)` means, so a title of spaces is refused where a
    * title with one is kept and trimmed; a body is required and may be empty.
    * Every combination is asserted both ways,
    * because a divergence in either direction is a document that round-trips
@@ -118,11 +118,6 @@ describe('a stored markdown document is the resource less its id', () => {
      * literal rather than as the product of the three lengths, because the
      * product moves with whatever it is measuring and would notice only the
      * empty case.
-     *
-     * It is also the one number written down twice. The issue that resolved
-     * this file quotes it, and quoted a shorter enumeration beside it for as
-     * long as nothing tied the two together; change the table and this says
-     * which number the prose now owes.
      */
     expect(examined).toBe(45);
   });

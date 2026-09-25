@@ -170,8 +170,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
           [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
           [HOME_NEXT_RESOURCE_ID]: { x: 310, y: 20, open: false },
         },
-        // An Edge, so this Space can be presented: presenting is one of the
-        // operations that closes the creation pane, and a Graph with no Edge
+        // An Edge, so this Space can be presented: a Graph with no Edge
         // declines to start (ADR 0032).
         graphs: [
           {
@@ -393,10 +392,8 @@ async function openResourcesList(): Promise<HTMLElement> {
 /**
  * Reference a Space that already exists — the Resources list's add-Space row.
  *
- * The other half of what the retired creation pane did, and the half ADR 0089
- * keeps as a gesture of its own: making a Space and pointing at one that exists
- * are different acts, and this one lists real Spaces with search where the pane
- * offered a sentinel row beside them.
+ * A gesture of its own (ADR 0089): making a Space and pointing at one that
+ * exists are different acts, and this one lists real Spaces with search.
  */
 async function addExistingSpace(title: string): Promise<void> {
   await readyToAuthor();
@@ -455,8 +452,7 @@ describe('Create Space Resource', () => {
    *
    * `Space N` is numbered over the containing Space's own Resource titles, which is
    * the only source that can be read synchronously; the Space and the Resource get
-   * the same string, so they agree at creation exactly as the retired pane's
-   * typed title made them (ADR 0089). The target's first Resource is the neutral
+   * the same string, so they agree at creation (ADR 0089). The target's first Resource is the neutral
    * `Resource 1` every new Space begins with, because content titled after the
    * Space it lives in only reads as deliberate until the first rename makes the
    * pair disagree (ADR 0068).
@@ -718,10 +714,9 @@ describe('Create Space Resource', () => {
 /**
  * Referencing a Space that already exists, which is a different act.
  *
- * ADR 0089 splits the retired pane's two halves: Create Space Resource always makes
- * a Space, and pointing at one that exists is the Resources list's add-Space row —
- * a list of real Spaces with search, where the pane offered a sentinel row
- * beside them. Everything the lifecycle's `link` arm answers is proved here,
+ * ADR 0089 keeps the two acts apart: Create Space Resource always makes a
+ * Space, and pointing at one that exists is the Resources list's add-Space
+ * row — a list of real Spaces with search. Everything the lifecycle's `link` arm answers is proved here,
  * through that row.
  */
 describe('referencing an existing Space', () => {
@@ -899,11 +894,11 @@ describe('referencing an existing Space', () => {
   /**
    * Two references to one Space are two selections, and neither is the other's.
    *
-   * This is the behaviour that requiring the pair buys over deriving it. While
-   * a Space Resource with nothing stored read its Map through the target's own
-   * `defaultMap`, two Resources on one Space could only ever show the same
-   * Map — so one Resource showing `Collection 1` beside another showing
-   * `Collection 2` was not expressible at all.
+   * This is the behaviour that requiring the pair buys over deriving it. A
+   * Space Resource reading its Map through the target's own `defaultMap` would
+   * make two Resources on one Space always show the same Map, so one Resource
+   * showing `Collection 1` beside another showing `Collection 2` would not be
+   * expressible at all.
    *
    * The selection is changed through the on-canvas selector, which is the only
    * surface that changes one: neither creation gesture offers a choice, because
@@ -965,7 +960,7 @@ describe('referencing an existing Space', () => {
     const storedSpaceResources = (stored?.snapshot.resources ?? []).flatMap((resource) =>
       resource.document.kind === 'space' ? [{ id: resource.id, document: resource.document }] : [],
     );
-    // The backend answers Resources in ascending id order (ticket 30), which need
+    // The backend answers Resources in ascending id order, which need
     // not match Space Authoring's own authored order, so the two sides are
     // matched by id rather than by position before comparing what landed. The
     // ids stay in the comparison: dropping them would pass just as happily on a

@@ -90,8 +90,7 @@ describe('the unwell Spaces the Open Spaces trigger reports', () => {
   /**
    * The closed Meta row carries no `persistence` to be unwell about, and it
    * cannot be the Space being read either — so it is excluded by construction
-   * rather than by a check either function has to make
-   * (`.scratch/command-dock/issues/28`, decision 3).
+   * rather than by a check either function has to make.
    */
   it('does not count a closed Meta row', () => {
     const current = newUuid();

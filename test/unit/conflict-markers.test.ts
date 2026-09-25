@@ -6,10 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * A resolved conflict that keeps one of its markers is a syntax error in code
- * and a silent corruption in prose, and nothing in `pnpm verify` was reading for
+ * and a silent corruption in prose, and nothing else in `pnpm verify` reads for
  * one: `.prettierignore` excludes every Markdown file, so `format:check` never
- * opens one at all, and `.scratch/` is ignored by ESLint as well. That is how a
- * labelled opener reached a tracked issue record and survived a green verify.
+ * opens one at all, and `.scratch/` is ignored by ESLint as well.
  *
  * `git diff --check` does report a marker, but only on a line inside a diff
  * hunk. Once the marker is committed it is context rather than change, so the
@@ -35,10 +34,9 @@ const CLOSER = '>'.repeat(7);
 /**
  * Git's own marker shape. The opener and closer carry the branch or commit that
  * produced them (`… HEAD`), so **neither is anchored at the end** — an
- * end-anchored seven-character pattern matches no real conflict marker at all,
- * which is the specific mistake this replaces. The divider is written bare and
- * is matched bare, which also keeps a seven-character Setext heading underline
- * from reading as a conflict.
+ * end-anchored seven-character pattern matches no real conflict marker at all.
+ * The divider is written bare and is matched bare, which also keeps a
+ * seven-character Setext heading underline from reading as a conflict.
  *
  * Exactly seven characters, then end of line or whitespace: an eighth is not a
  * marker.

@@ -25,13 +25,12 @@ const space = (id: UUID, resourceId: UUID, title: string): SpaceSnapshot => ({
 });
 
 /**
- * What is left here is what the shared contract cannot say: this double's own
- * behaviour under a `commit`. Everything this file used to pin about batched
- * import — conflicting identities, a Resource a stored Space owns, clearing before
- * a truncating batch — moved to `repository-contract.ts` against
- * `initializeAggregate` and `replaceAggregate` when ADR 0078 retired
- * `importSpaces`, because those rules are the seam's and both adapters owe them,
- * not the double's alone.
+ * What is here is what the shared contract cannot say: this double's own
+ * behaviour under a `commit`. The lifecycle rules — conflicting identities, a
+ * Resource a stored Space owns, clearing before a truncating replacement — are
+ * pinned in `repository-contract.ts` against `initializeAggregate` and
+ * `replaceAggregate`, because those rules are the seam's and both adapters owe
+ * them, not the double's alone.
  */
 describe('MemorySpaceRepository', () => {
   it('rejects a commit that claims a Resource owned by another Space', async () => {

@@ -15,12 +15,8 @@ import { recordingHistory } from './browser-history';
 /**
  * The rules that decide a browser history entry, proved without a DOM.
  *
- * Every one of these was reachable only through a full jsdom mount and a spy on
- * `window.history.pushState` before `browser-location.ts` existed — the shape
- * ADR 0081 removed one level in, arriving again as "a rule with no owner,
- * proved by the only instrument that can reach where it happens to live". What
- * makes them reachable here is that the browser is a five-member interface and
- * the recording adapter is a real implementation of it.
+ * What makes them reachable without a DOM is that the browser is a five-member
+ * interface and the recording adapter is a real implementation of it.
  *
  * What is deliberately *not* here is anything about a real browser honouring
  * these writes. `packages/app/e2e/space-routing.spec.ts` proves that, which a
@@ -138,8 +134,7 @@ describe('the browser location', () => {
 
   /**
    * StrictMode invokes a mounting effect twice, and the redundant publication
-   * that used to reach the sync effect reaches this module as an ordinary second
-   * notification. Both are the same rule: a position already decided about is
+   * reaches this module as an ordinary second notification. Both are the same rule: a position already decided about is
    * decided about no further, which is what `syncedPosition` is for and why it
    * is private.
    */
@@ -266,7 +261,6 @@ describe('the browser location', () => {
    * Entering the presentation moves the address and earns its entry; advancing
    * across a self-Edge and retreating back out of it both grow and shrink the
    * Traversal history without moving the address, so neither takes another one.
-   * Both used to push a duplicate entry (ADR 0081).
    */
   it('takes one entry for a presentation a self-Edge never moves', () => {
     const app = compose(selfEdge);

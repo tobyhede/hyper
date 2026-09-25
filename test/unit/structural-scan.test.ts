@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LIVE_THEME, scannedCssFiles, scannedTsFiles } from '../support/structural-scan';
 
 /**
- * What `test/support/structural-scan.ts` owes every arm of ticket 08's
+ * What `test/support/structural-scan.ts` owes every arm of the
  * structural scan before any arm's own rule runs: that the tracked-file
  * listing reaches both source trees at all, so an arm reporting nothing is
  * reporting on something. Its comment masking is held by the fixtures of the

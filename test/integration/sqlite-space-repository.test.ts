@@ -20,11 +20,8 @@ import { recreatingBeforeRowLock, spaceRepositoryContract } from '../support/rep
 import { recordResourceWrites } from '../support/record-resource-writes';
 import { openSqliteRepository } from '../support/sqlite-harness';
 
-// Ticket 24: `SqlSpaceRepository` now owns `commit` too, so the whole
-// contract -- lifecycle and commit alike -- runs directly against it; the
-// ticket 22/23 tracer and lifecycle-only wiring this block used to carry
-// beside it are gone, superseded by this one call covering everything they
-// each covered separately.
+// The whole contract -- lifecycle and commit alike -- runs directly against
+// `SqlSpaceRepository`.
 spaceRepositoryContract('SqlSpaceRepository (SQLite)', async () => {
   const harness = await openSqliteRepository();
   const recreation = recreatingBeforeRowLock(sqliteSqlStore(harness.database));
@@ -233,11 +230,6 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expect(repositoryA.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
   });
 
-  // Moved to `repository-contract.ts` (ticket 22): "stores and commits a
-  // revision above Number.MAX_SAFE_INTEGER as canonical decimal text" proves
-  // this same round trip on both databases now that PostgreSQL's `revision`
-  // is TEXT too.
-
   it('serialises overlapping in-process commits at different Spaces well under the busy timeout', async () => {
     const { repository } = await opened();
     const child = targetSpace(OTHER_SPACE_ID, 'Child', [OTHER_RESOURCE_ID]);
@@ -414,11 +406,10 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       connection.close();
     }
 
-    // Ticket 27: two raw-text statements on the transaction connection are what
+    // Two raw-text statements on the transaction connection are what
     // let the adapter's own per-row decode step catch this and wrap it as
     // `AggregateInvariantError` — rather than the ORM's root-level json codec
-    // throwing first, before any intake of ours runs. See
-    // `.scratch/database-persistence/issues/27`.
+    // throwing first, before any intake of ours runs.
     await expectReadAndInitializeRefuse(repository);
     await expect(repository.replaceAggregate(proposal, OTHER_SPACE_ID)).resolves.toMatchObject({
       kind: 'replaced',
@@ -474,7 +465,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     });
   });
 
-  // Tickets 31 and 38: an unreachable database is named, not inferred from a
+  // An unreachable database is named, not inferred from a
   // failure being something else, and not from where it failed. A client
   // closed underneath the repository raises the pinned runtime's plain
   // closed-client `Error` from every operation, transactional or not, and the
@@ -551,7 +542,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   };
 
   /**
-   * PostgreSQL's recognition of an unavailable failure (ticket 38), read off a
+   * PostgreSQL's recognition of an unavailable failure, read off a
    * store whose runtime is never connected.
    */
   const unconnectedPostgres = postgres<PostgresContract>({
@@ -578,7 +569,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
       sqlState,
     });
 
-  // Ticket 31, amended. A deadlock victim is contention, not a defect: the
+  // A deadlock victim is contention, not a defect: the
   // database chose this transaction to abort so the other could proceed, and
   // the same request is expected to succeed on a later attempt.
   it('names a statement PostgreSQL aborted for contention unavailable', async () => {
@@ -666,7 +657,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
     await expect(racing.loadAggregate()).rejects.toBeInstanceOf(PersistenceUnavailableError);
   });
 
-  // Ticket 38. The store is asked only about a failure nothing has named. An
+  // The store is asked only about a failure nothing has named. An
   // already unavailable failure leaves as it is rather than wrapped again, and
   // broken stored state keeps its name even when an outage is on its chain too.
   it('does not wrap a failure that already carries a name', async () => {
@@ -717,7 +708,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
    */
   const closedClient = () => new Error('SQLite client is closed');
 
-  // Ticket 38. A commit that loses its revision race rolls back and reads the
+  // A commit that loses its revision race rolls back and reads the
   // Space it lost to afresh, outside the transaction and inside the one
   // `serialise` call it already holds. An outage there is the database not
   // answering like any other, so the commit is unavailable rather than a
@@ -841,8 +832,8 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
   });
 
   /*
-   * Ticket 18 keeps what ticket 14 measured: rollback journal in `delete` mode
-   * and `synchronous=FULL`. Journal mode is a property of the file once written,
+   * The file is written with a rollback journal in `delete` mode and
+   * `synchronous=FULL`. Journal mode is a property of the file once written,
    * so it is read after the repository has written. `synchronous` is
    * per-connection, and the driver sets only `foreign_keys` and `busy_timeout`
    * when it opens one (`@prisma-next/driver-sqlite`'s `openConnection`), so a
