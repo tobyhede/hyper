@@ -19,4 +19,4 @@ Leave `aria-expanded` and React Flow's `expandParent` alone. Those are the platf
 
 - [x] `grep -rniE 'expanded|expansion' packages src test` finds only `aria-expanded`, `expandParent` and quotations of the avoid-list.
 - [x] Consider adding an arm to `test/unit/current-domain-vocabulary.test.ts` so the word cannot drift back.
-- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. Grep `test/e2e/` for `data-expanded` too, because the database proofs are not in `e2e`.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. Grep `test/e2e/` for `data-expanded` too, because the database proofs are not in `e2e`. Locally `pnpm e2e` failed one Edge-count assertion, which passed when rerun alone. The full `e2e` pass is PR #303's CI: all three shards, plus `postgres`, `sqlite` and `ladle`, succeeded.
