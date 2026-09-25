@@ -31,10 +31,8 @@ import { viewportFromFraming, type SpaceResourceFraming } from '../space-resourc
  *   `withResolvers()` built.
  *
  * So **no required behaviour is chained on one of these Promises** — not with
- * `.then`, not with `await`. There is nothing left here that would want to:
- * dropping the two-phase move (ADR 0044) removed the only follow-up work this
- * seam ever had, and it was the `.then` carrying it that stranded the camera at
- * the overview zoom. `fitView` additionally *reuses* one resolver across calls,
+ * `.then`, not with `await`: a superseded move would strand the follow-up.
+ * `fitView` additionally *reuses* one resolver across calls,
  * so a second call before the first settles cannot be told apart from it.
  *
  * Rejection is a separate matter and is deliberately left unhandled. Nothing in
@@ -53,11 +51,9 @@ import { viewportFromFraming, type SpaceResourceFraming } from '../space-resourc
  * Returns the camera from presenting to the whole-graph overview (ADR 0027).
  *
  * Only the *return* — the initial fit belongs to React Flow's own `fitView`
- * prop, which runs before first paint at the identity transform. This effect
- * used to fire on mount as well, which put a second, animated fit *after* that
- * one, so every load began at the viewport origin and flew the whole graph in.
- * The mount case looked like it needed handling because the effect is the only
- * fit written down here; the prop is the other one, and it already ran.
+ * prop, which runs before first paint at the identity transform. Do not also
+ * fit on mount: a second, animated fit after the prop's would start every load
+ * at the viewport origin and fly the whole graph in.
  *
  * `previouslyPresenting` is what separates the two: an effect keyed on
  * `presenting` cannot otherwise tell "arrived at false" from "was always
@@ -82,15 +78,10 @@ export function OverviewCamera({ presenting }: { presenting: boolean }) {
  *
  * There is no second surface: presenting is this canvas, drawn close enough that
  * one resource fills the screen. One `fitView` over that one resource is the whole
- * mechanism (ADR 0044).
- *
- * It used to be two moves — pan at the wider scale, then close in — copied from
- * impress.js, where a combined move really does whip because impress animates
- * with CSS transitions. React Flow animates through d3-zoom, whose default
- * interpolator is `interpolateZoom`, the Van Wijk smooth zoom-out-pan-zoom-in
- * path; it solves the same problem in one call, and watching the two side by
- * side on the fixture found no difference to choose between. **Don't reinstate
- * the two-phase move** — ADR 0027 recommends it and ADR 0044 is why it is gone.
+ * mechanism. **Don't split it into a pan then a close-in** (ADR 0044): React
+ * Flow animates through d3-zoom, whose default interpolator is
+ * `interpolateZoom`, the Van Wijk smooth zoom-out-pan-zoom-in path, which
+ * solves the same problem in one call.
  *
  * The viewport size is a dependency rather than an argument to the fit: `fitView`
  * reads the container itself, but the effect must re-run when it changes, or a

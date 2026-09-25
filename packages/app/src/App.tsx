@@ -190,13 +190,9 @@ export const createApp = (
 
     return (
       <AppShell
-        // The shell yields nothing at its end edge, and there is no prop left
-        // that could ask it to. The Resources list is a Popover anchored to its
-        // trigger and floats over the canvas, so it yields no width — which is
-        // the occlusion the surface comparison held against the drawer it replaced
-        // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`), and
-        // why `22-retire-the-registry-drawer-and-the-yielded-strip.md` deleted
-        // `AppShell`'s `insetEnd` rather than leaving it unset here.
+        // The shell yields nothing at its end edge. The Resources list is a
+        // Popover anchored to its trigger and floats over the canvas, so it
+        // takes no width from it.
         notice={
           <>
             {clipboardFailure === null ? null : (

@@ -33,8 +33,7 @@ const isRegularFile = async (path: string): Promise<boolean> => {
  *
  * Its absence is a **discovery** failure rather than a parsing one, and the
  * message names the file: the likeliest way to arrive here is by pointing the
- * command at a single Space directory, which is no longer what public import
- * takes, and "there is no hyper.json here" is the sentence that says so.
+ * command at a single Space directory, which is not what public import takes, and "there is no hyper.json here" is the sentence that says so.
  */
 const readAggregateFile = async (directory: string): Promise<UUID> => {
   const path = join(directory, AGGREGATE_FILE_NAME);

@@ -12,16 +12,15 @@ export const CANONICAL_DECIMAL = /^(0|[1-9]\d{0,18})$/;
 /**
  * The ceiling every stored Revision is bound to: 2^63−1 (`CONTEXT.md`'s
  * Revision entry). Both databases store a Revision as canonical non-negative
- * decimal TEXT (ADR 0095) — this is the codec's own rule now, not either
- * column's native type; it happens to equal PostgreSQL `bigint`'s range
- * because that is where the ceiling was first enforced, but nothing here
- * reads it as "the PostgreSQL range" any more.
+ * decimal TEXT, so this is the codec's own rule and not either column's
+ * native type. It equals PostgreSQL `bigint`'s range, but nothing here reads
+ * it as "the PostgreSQL range".
  */
 export const REVISION_CEILING = 9_223_372_036_854_775_807n;
 
 /**
  * The codec's own error identity, distinct from a bare `RangeError` so a
- * caller reading broken stored state (ADR 0095) can catch exactly this and
+ * caller reading broken stored state can catch exactly this and
  * nothing else — an unrelated `RangeError` elsewhere in a read path must not
  * be misread as a canonical-revision failure. The one SQL repository's
  * aggregate read (`src/persistence/sql-space-repository.ts`'s
@@ -33,7 +32,7 @@ export class RevisionCodecError extends RangeError {}
 /**
  * Decode a stored Revision column's text into the domain `bigint`.
  *
- * Read and written by the one SQL repository (ADR 0095) so the
+ * Read and written by the one SQL repository so the
  * canonical-decimal format and the ceiling are checked identically on read,
  * whichever database the row came from. Throws `RevisionCodecError` — never
  * widened, never silently clamped — because a value a live database actually

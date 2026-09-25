@@ -9,7 +9,7 @@ import { repeatedGraphEdges } from './graph-edges';
  *
  * There is no `graphs` here, and that is the whole of ADR 0040 in one shape: a
  * graph is reached through the map that owns it, so a check written over a
- * space-level collection could not ask the question that now matters — whether
+ * space-level collection could not ask the question that matters — whether
  * an edge endpoint is a resource of *that* map.
  */
 export interface Referenceable {
@@ -22,13 +22,12 @@ export interface Referenceable {
 /**
  * Why a Space failed its reference check.
  *
- * The membership kinds name **ownership**, which is the era the aggregate is in
- * (ADR 0040): a Map's position keys are its Resource membership, and every Edge
- * of an owned Graph is closed over exactly that set. Where the superseded
- * vocabulary had one kind for "does not resolve", there are now two — the Resource
- * or Graph does not exist at all, or it exists and belongs somewhere else. They
- * are different mistakes and lead an author to different places, which is the
- * whole reason for the split.
+ * The membership kinds name **ownership** (ADR 0040): a Map's position keys are
+ * its Resource membership, and every Edge of an owned Graph is closed over
+ * exactly that set. A reference that fails has two kinds rather than one "does
+ * not resolve" — the Resource or Graph does not exist at all, or it exists and
+ * belongs somewhere else. They are different mistakes and lead an author to
+ * different places, which is the whole reason for the split.
  */
 export type SpaceReferenceErrorKind =
   | 'duplicate-resource-id'
@@ -119,9 +118,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   // A graph id is unique across the **space**, although one map owns it
   // (ADR 0045). The flatten a space-subject view draws keys colour and
   // activation on the id alone, and the lookup intake builds would drop one of a
-  // pair in silence while both stayed in the collection. ADR 0045's third
-  // ground, the `<graphId>::out`/`::in` handle ids, went with ADR 0087 — an Edge
-  // names no handle now — and the two that remain carry the rule on their own.
+  // pair in silence while both stayed in the collection.
   //
   // Every occurrence is collected before anything is reported, because the fault
   // is the *id*, not its second appearance: an id used four times is one resource

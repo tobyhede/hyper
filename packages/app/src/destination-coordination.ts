@@ -25,11 +25,9 @@ export function destinationRestoration(
 /**
  * What the browser should do about the position the application is at.
  *
- * Three outcomes, and the third is the new one (ADR 0081): before this, every
- * path either pushed or replaced, because each of the five sites that decided
- * knew only that the field it had passed differed. Comparing the position
- * against the location makes "the browser is already showing this" sayable, and
- * that is what lets `popstate` move Navigation without the move pushing an entry
+ * Three outcomes. Comparing the position against the location makes "the
+ * browser is already showing this" sayable as `none`, and that is what lets
+ * `popstate` move Navigation without the move pushing an entry
  * over the one the browser just navigated to.
  */
 export type DestinationSync =
@@ -62,12 +60,11 @@ export interface DestinationSyncInput {
  * the location addresses within it.
  *
  * It **extends** the address rather than restating its three fields, and the
- * Resource arrives inside it rather than beside it. Both were separate once and
- * both carry the same risk: a caller could hand `destinationSync` an address
- * already carrying a Resource and a second Resource argument that disagreed with it,
- * and structural typing had nothing to say — the spread that built the position
- * silently preferred the loose one while the `synced` comparison had seen the
- * other. One value cannot disagree with itself.
+ * Resource arrives inside it rather than beside it. Do not pass the Resource
+ * as a separate argument: a caller could then hand `destinationSync` an
+ * address already carrying a Resource and a second one that disagreed with it,
+ * and structural typing would have nothing to say. One value cannot disagree
+ * with itself.
  *
  * The addressed Resource is `app`'s and not Navigation's (ADR 0081): it is read
  * from a URL and never written back, so it belongs to the position the browser

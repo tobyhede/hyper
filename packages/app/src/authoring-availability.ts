@@ -28,11 +28,10 @@
 /**
  * The nine facts every answer below is derived from.
  *
- * `creatingResource` — a creation pane is open — went with the panes themselves:
- * every Resource creation now completes its Edit on activation (ADR 0089), so
- * there is no modal surface for the rest of the product to stand out of the way
- * of. `creatingSpaceResource` is the one async creation that remains: its
- * coordinated Edit lands one await after the press, and the Space Resource peer is
+ * Every Resource creation completes its Edit on activation, so there is no
+ * modal creation surface for the rest of the product to stand out of the way
+ * of. `creatingSpaceResource` is the one async creation: its coordinated Edit
+ * lands one await after the press, and the Space Resource peer is
  * withdrawn for that window rather than swallowing a second press silently.
  */
 export interface AuthoringInProgress {
@@ -74,7 +73,7 @@ export interface AuthoringInProgress {
    * Some embedded Map on this canvas is running a Resource edit of its own.
    *
    * A Space Resource draws another Space's Map inside this one, and a Resource edit
-   * begun in there is a second authoring surface exactly as a creation pane is
+   * begun in there is a second authoring surface exactly as a Markdown body edit is
    * — held apart from `editingResourceBody` and `editingResourceTitle` because those
    * name an edit of *this* Space's own Resources, and this one is an edit of a
    * different Space that happens to be drawn within a Resource of this one.
@@ -166,10 +165,6 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * An Open Resource is deliberately neither: Opening is an ordinary Map Edit on
    * the canvas (ADR 0064), so it takes nothing away.
-   *
-   * It reached the canvas as a prop named `titleEditingEnabled` — named for the
-   * first control it took away and read by all of them — and that name is gone
-   * with the prop rather than renamed.
    */
   const soleAuthoringSurface = spaceOnCanvas && !editingChromeTitle;
 
@@ -202,11 +197,11 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * Rename begins the very chrome title edit `chromeTitleEdit` governs — the
    * effect that discards a draft begun against that condition runs on the same
    * render — so this reads that answer itself rather than a second spelling of
-   * it that can fall behind. It once was one, and what the copy dropped was
-   * `editable`: while placement is pending, Rename opened an editor the effect
-   * closed immediately and Delete Map ran a real Edit against a Space with
-   * nothing drawn. Delete Map goes with Rename rather than standing alone in
-   * a menu whose other item cannot run.
+   * it that can fall behind. A copy that drops `editable` lets Rename open an
+   * editor the effect closes immediately while placement is pending, and lets
+   * Delete Map run a real Edit against a Space with nothing drawn. Delete Map
+   * goes with Rename rather than standing alone in a menu whose other item
+   * cannot run.
    *
    * `editingChromeTitle` is the term `chromeTitleEdit` does not carry: it is
    * what stops a second Rename beginning over a live one.
@@ -237,9 +232,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * Presenting draws the active Resource's content *instead of* the Resource, so a live
    * editor cannot survive it and the draft would go without one of ADR 0064's
    * four exits being spent. It does not read `presenting` itself — the surface
-   * draws Stop rather than Present once a traversal is running — and it does
-   * not read the two modal surfaces, which need nothing here: a creation pane
-   * owns its own modality, and the editor is still there when it closes.
+   * draws Stop rather than Present once a traversal is running.
    */
   const present = !editingResourceBody && !editingChromeTitle;
 
@@ -248,8 +241,8 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * is what makes the toolbar control agree with the `C` shortcut answering the
    * same operation on the canvas: Add Resource ends by putting a caret in the
    * created Resource's title editor, and title editing is withdrawn while a content
-   * edit owns the keyboard (ADR 0064) — so a live toolbar created a Resource and
-   * then swallowed the naming it exists to begin.
+   * edit owns the keyboard (ADR 0064) — so a live toolbar would create a
+   * Resource and then swallow the naming it exists to begin.
    *
    * It omits `editingResourceTitle` deliberately: Add Resource *begins* a title edit
    * rather than outliving one. Add Map below takes the same condition and
@@ -290,37 +283,21 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * running.
    *
    * Each of those withdraws an embedding for the reason it withdraws the canvas
-   * drawing it: a pane covers the embedding along with everything else on the
-   * graph, a presentation replaces what is drawn, a chrome rename is the one
-   * authoring surface, and a canvas that is not the one being authored cannot
-   * have an authored embedding within it. `EmbeddedMapAuthoring` hands this
-   * down as its own `spaceOnCanvas`, which is the same question one level down.
+   * drawing it: a presentation replaces what is drawn, a chrome rename is the
+   * one authoring surface, and a canvas that is not the one being authored
+   * cannot have an authored embedding within it. `EmbeddedMapAuthoring` hands
+   * this down as its own `spaceOnCanvas`, which is the same question one level
+   * down.
    *
    * The one term it does **not** take is the one it is about,
    * `editingEmbeddedMap`. An embedded edit is a second authoring surface for
    * the canvas *around* it, and withdrawing every embedding for it would end
    * the very edit that reported it — a title caret is dropped the moment its
    * canvas loses `authorOnCanvas`, so the edit would cancel itself on the
-   * render it began. Which single embedding holds the edit stays the canvas's
-   * own question: it spends this answer as it is, or withdraws every embedding
-   * but the one that is editing.
-   *
-   * Every reason below withdraws an embedding for the reason it withdraws the
-   * canvas drawing it: a pane covers the embedding along with everything else
-   * on the graph, a presentation replaces what is drawn, a chrome rename is the
-   * one authoring surface, and a canvas that is not the one being authored
-   * cannot have an authored embedding within it. The `EmbeddedMapAuthoring`
-   * that reads this hands it down as its own `spaceOnCanvas`, which is the same
-   * question one level down.
-   *
-   * The one term it drops is the one it is about. An embedded edit is a second
-   * authoring surface for the canvas *around* it, and withdrawing every
-   * embedding for it would end the very edit that reported it — a title caret
-   * is dropped the moment its canvas loses `authorOnCanvas`, so the edit would
-   * cancel itself on the render it began. So the canvas is withdrawn and the
-   * embeddings are not, and which single embedding holds the edit is the
-   * canvas's own question: it takes this answer and reinstates nothing, or
-   * withdraws every embedding but the one that is editing.
+   * render it began. So the canvas is withdrawn and the embeddings are not, and
+   * which single embedding holds the edit is the canvas's own question: it
+   * spends this answer as it is, or withdraws every embedding but the one that
+   * is editing.
    */
   const authorInEmbeddedMap = editable && soleAuthoringSurface && !presenting;
 
@@ -329,9 +306,9 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * whole Edge lifecycle.
    *
    * The toolbar's Add Resource is withdrawn on the first two terms above and so is
-   * every control drawn on a Resource. **Edge authoring was the one capability reading a
-   * shorter rule**, and the gap was not cosmetic: a pane covering the canvas
-   * must withdraw its keyboard commands as well as its spatial gestures.
+   * every control drawn on a Resource. Edge authoring reads the same rule: a
+   * canvas that is not the one being authored must withdraw its keyboard
+   * commands as well as its spatial gestures.
    *
    * `editingEmbeddedMap` is the fourth term, and it is deliberately **not**
    * in `soleAuthoringSurface`. It withdraws exactly what an embedded edit must
@@ -341,8 +318,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    * completed Edit rather than an editor, it cannot reach into the embedding,
    * and none of ADR 0064's four exits is spent by it. Moving the term into
    * `soleAuthoringSurface` would take that connection away, which is a decision
-   * about the product rather than the collapse that moved this term off the
-   * canvas.
+   * about the product rather than a simplification.
    */
   const authorOnCanvas = authorInEmbeddedMap && !editingEmbeddedMap;
 
@@ -359,19 +335,16 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
    *
    * Another live authoring surface is different, and so is a canvas with no
    * Resources on it yet — one is already taking the Edit, the other has nowhere to
-   * write. React Flow's own
-   * `nodesConnectable` read `editable && !presenting` for as long as it was
-   * inert, and the first attempt to forward it to the authoring handles broke
-   * that presented-Resource connection. An expression nothing reads is not a
-   * decision that was made.
+   * write. Do not add `!presenting` here: it takes away that presented-Resource
+   * connection.
    */
   const connectOnCanvas = editable && soleAuthoringSurface;
 
   /**
    * **Deliberately not `authorOnCanvas`**: a live content editor survives a
-   * modal pane opening over the canvas.
+   * modal dialog opening over the canvas.
    *
-   * The pane owns its own modality, and the editor is still there when it
+   * The dialog owns its own modality, and the editor is still there when it
    * closes — so a Resource mid-edit is covered rather than settled, and none of
    * ADR 0064's four exits is spent behind the reader's back. What it cannot
    * survive is presenting, which draws the active Resource's content *instead of*

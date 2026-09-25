@@ -23,8 +23,7 @@ export interface ResourceRailProps {
  * is selected and at a constant screen size (ADR 0102). Where no adapter floats
  * the toolbar, it is drawn here, before the glyph.
  *
- * **It carries no colour of its own** (`.scratch/command-dock/issues/12`). The
- * toolbar is the neutral command surface the Command Dock wears, so a Resource's
+ * **It carries no colour of its own.** The toolbar is the neutral command surface the Command Dock wears, so a Resource's
  * commands and the Space's commands read as one language. The Graph's colour
  * stays where it identifies a Graph — the Resource's handles and the Edges each
  * Graph draws.

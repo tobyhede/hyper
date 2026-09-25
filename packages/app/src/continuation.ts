@@ -11,12 +11,8 @@ import type { SpaceAuthoring } from './space-authoring';
  * Where an Edit continues, as one module.
  *
  * `CONTEXT.md` states the rule in several places — **an Edit continues at the
- * entity it produced** — and before this it had six implementations in five
- * mechanisms: a boolean ref, a projection poll, a component inside
- * `ReactFlowProvider`, an attribute query, a DOM closure held on React state,
- * and Edge Authoring's published one-shot. Each carried a paragraph about a
- * timing hazard of its own, and all six were the same hazard: **the
- * continuation runs before the surface it targets exists.**
+ * entity it produced** — and every gesture that follows it meets the same
+ * hazard: **the continuation runs before the surface it targets exists.**
  *
  * A gesture says *continue here, and do this when you arrive*; an adapter that
  * can reach the target spends it exactly once, on a render where it resolves.
@@ -27,8 +23,7 @@ import type { SpaceAuthoring } from './space-authoring';
  * author should be *now*, so an unspent one is stale the moment a second
  * gesture finishes: {@link Continuation.request} replaces it silently. Firing
  * *twice* is the bug class this exists to close, and {@link Continuation.take}
- * is what closes it — `createdResourceId` was set from two places and cleared from
- * none.
+ * is what closes it.
  */
 
 /** What a continuation names. */
@@ -51,25 +46,16 @@ export type ContinuationTarget =
  * unmounts and re-registers leaves the module holding a stale element. The
  * adapter resolves each of these against `data-continuation-control`.
  *
- * **One address, and it is a destination rather than a return.** This was the
- * two creation panes' return addresses, `'create-reference'` and
- * `'create-space-resource'` — where the caret went when a pane was cancelled. ADR
- * 0089 retired both panes, so there is nothing left to come back *from*: every
- * Resource creation completes its Edit on activation and continues at the Resource it
- * made, which is a canvas target. What replaced them is the one chrome
- * continuation the Dock still owes: Add Map creates an empty Map and
- * selects it, and what an author does with a brand-new Map is say what it
- * is for, so the caret lands in its name (`.scratch/command-dock/issues/13`).
+ * **One address, and it is a destination rather than a return.** Every
+ * Resource creation completes its Edit on activation and continues at the
+ * Resource it made, which is a canvas target. The one chrome continuation the
+ * Dock owes is Add Map's: it creates an empty Map and selects it, and what an
+ * author does with a brand-new Map is say what it is for, so the caret lands
+ * in its name.
  *
- * **There was a third kind here, `sidebar-row`, and it is gone with the surface
- * it named.** It existed because a Map or Graph rename was one draft shared
- * between a Sidebar row and the canvas header, begun from either and returning
- * the caret to whichever began it — so the return address had to survive the
- * row swapping its own branch mid-rename, and could only be an attribute query.
- * The Command Dock draws each name once and its editor replaces that one
- * control, so the editor returns focus to itself and there is no second surface
- * to address (`components/CommandDockParts.tsx`). Renaming it would have been a name
- * for a resource that no longer exists.
+ * A rename needs no address here: the Command Dock draws each name once and
+ * its editor replaces that one control, so the editor returns focus to itself
+ * (`components/CommandDockParts.tsx`).
  */
 export type ContinuationControl = 'map-name';
 
@@ -123,8 +109,8 @@ const NONE: ContinuationState = { pending: null };
 /**
  * Whether an unresolvable target is still on its way, or gone for good.
  *
- * The **wait policy**, and it lives here rather than in a comment beside one
- * adapter's early return, which is where it was.
+ * The **wait policy**, and it lives here rather than beside one adapter's
+ * early return.
  *
  * A canvas subject stays owed. A continuation is published synchronously with
  * the Edit that produced it, and the projection carrying that Edit's result
@@ -136,8 +122,7 @@ const NONE: ContinuationState = { pending: null };
  *
  * **Every resource target waits**, not only `reveal` and `rename`. Add to Map
  * is a `focus` whose target arrives a projection later exactly as a creation
- * does — it is why the mechanism this replaces polled the live projection —
- * and keying the wait on `then` would drop it. The two resource targets that name
+ * does, and keying the wait on `then` would drop it. The two resource targets that name
  * something already drawn (a cancelled Edge draft's anchor, a deleted Edge's
  * source) resolve on the first render either way, so waiting costs them
  * nothing; a resource that never arrives stays owed until the next request

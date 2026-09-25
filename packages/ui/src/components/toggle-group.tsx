@@ -60,8 +60,7 @@ function ToggleGroup<Value extends string>({
  * (`rounded-chrome-md`, `text-chrome-sm`), not a restated `rounded-[6px]` or
  * `text-[13px]`. This file is a hand-written wrapper rather than the
  * registry's own `toggle-group.tsx`, but a future regeneration of the
- * underlying primitive is still the moment those raw values would come back
- * (`.scratch/structural-tokens/issues/04-registry-derived-components-consume-the-tokens.md`).
+ * underlying primitive is still the moment those raw values would come back.
  */
 function ToggleGroupItem<Value extends string>({
   className,

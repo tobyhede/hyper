@@ -34,11 +34,10 @@ export type ReplaceAggregateResult =
  * `initializeAggregate` establishes first state and leaves an initialized
  * repository exactly as it is; `replaceAggregate` destroys and rewrites, and
  * takes the Meta identity it expects to be replacing so a stale caller is told
- * rather than obeyed. The order-sensitive `importSpaces(input, 'insert' |
- * 'truncate')` that used to sit beside them is gone: it inferred Meta from
- * array position, and a destructive choice hidden in a mode parameter is
- * exactly what the two named operations exist to prevent. Seeds, fixtures and
- * tests go through these same two.
+ * rather than obeyed. Do not add a mode parameter or infer Meta from array
+ * position: a destructive choice hidden in an argument is exactly what the two
+ * named operations exist to prevent. Seeds, fixtures and tests go through
+ * these same two.
  */
 export interface SpaceRepository extends StoredSpaceRepository {
   initializeAggregate(input: AggregateInput): Promise<InitializeAggregateResult>;

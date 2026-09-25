@@ -98,9 +98,9 @@ const DOCK_SLOTS = {
  * **Two structures for one table, and each does a job the other cannot.** The
  * record above is checked against `DockSlot` and so proves the table total; the
  * `Map` below takes an arbitrary `string` and so needs no assertion to answer
- * for one. Indexing the record directly would have wanted `value as DockSlot`,
- * which is the narrowing ADR 0062 stopped admitting — and it would have been a
- * lie besides, since the whole point of the parameter is that the value may name
+ * for one. Indexing the record directly would want `value as DockSlot`, which
+ * is a narrowing ADR 0062 does not admit — and it would be a lie besides, since
+ * the whole point of the parameter is that the value may name
  * no slot at all.
  */
 const SLOT_BY_VALUE: ReadonlyMap<string, DockPosition> = new Map(Object.entries(DOCK_SLOTS));
@@ -110,24 +110,21 @@ export const dockSlot = (value: string): DockPosition | null => SLOT_BY_VALUE.ge
 /**
  * The axis an edge puts the Dock on: left and right stack, top and bottom run.
  *
- * **Named, because the surface asks for it in three shapes.** It was spelled
- * inline as `'horizontal' | 'vertical'` at the two places that needed to say it
- * and nowhere as a type, so `ALONG_LABEL`'s key and this function's return had
- * no relation a compiler could check.
+ * **Named, because the surface asks for it in three shapes.** Spelled inline
+ * instead, `ALONG_LABEL`'s key and `orientationOf`'s return would have no
+ * relation a compiler could check.
  */
 export type DockOrientation = 'horizontal' | 'vertical';
 
 /**
  * **A record, because a ternary answers for an edge it has never met.**
  *
- * `edge === 'left' || edge === 'right' ? 'vertical' : 'horizontal'` was the last
- * edge-keyed resource in the Dock that took a default. Deriving `DockEdge` from its
- * tuple turned a fifth edge into compile errors at `EDGE_INSET`, `MENU_SIDE`,
- * `EDGE_LABEL`, `slotLabel` and `alongStyle` — every one a total record — while
- * this quietly called it horizontal, which is the one answer that then decides
- * how the Dock draws, which way its menus open and how its stops are named. The
- * loudest four failures and the one silent wrong answer were the same change
- * away from each other.
+ * Do not write it as `edge === 'left' || edge === 'right' ? 'vertical' :
+ * 'horizontal'`. A fifth edge is a compile error at `EDGE_INSET`, `MENU_SIDE`,
+ * `EDGE_LABEL`, `slotLabel` and `alongStyle` — every one a total record — and
+ * the ternary would quietly call it horizontal, which is the one answer that
+ * then decides how the Dock draws, which way its menus open and how its stops
+ * are named.
  */
 const ORIENTATION = {
   top: 'horizontal',
@@ -161,18 +158,17 @@ export interface DockBox {
  * The edge a release lands on: measured from the Dock's **own edges** rather
  * than from its centre.
  *
- * Centre distance made the top-left corner unreachable as a vertical Dock, and
- * the bug was that the Dock's width voted. A horizontal Dock is ~600px wide, so
- * its centre sits ~300px from the left edge however far left it is dragged,
- * while its centre can be 40px from the top — so `top` won every time and there
- * was no gesture that turned a top Dock into a left one near that corner. The
- * same asymmetry ran the other way for a vertical Dock near the top edge.
+ * Do not measure from the centre: the Dock's width would vote. A horizontal
+ * Dock ~600px wide has its centre ~300px from the left edge however far left
+ * it is dragged, while its centre can be 40px from the top — so `top` would
+ * win every time and no gesture would turn a top Dock into a left one near
+ * that corner. The same asymmetry runs the other way for a vertical Dock near
+ * the top edge.
  *
- * The gap to an edge does not know how big the resource measuring it is, so both
+ * The gap to an edge does not know how big the Dock measuring it is, so both
  * corners are reachable from either direction and the orientation follows the
- * direction the reader dragged from — which is what the two-ways-into-a-corner
- * claim always said and did not deliver. `dock-geometry.test.ts` is what holds
- * it to that, with a Dock wide enough for the old rule to fail on.
+ * direction the reader dragged from. `dock-geometry.test.ts` holds it to that,
+ * with a Dock wide enough for a centre rule to fail on.
  */
 export const nearestEdge = (bounds: DockBox, box: DockBox): DockEdge => {
   const candidates = [
@@ -192,16 +188,11 @@ export const nearestEdge = (bounds: DockBox, box: DockBox): DockEdge => {
  * **A stop is a place the Dock ends up, not a point on the edge**, and that is
  * the whole of the arithmetic. `start` puts a 600px-wide Dock's centre 300px
  * in, because the Dock has to fit; measuring that centre against the raw end of
- * the edge asks it to be somewhere it can never be. So the Dock's own width
- * voted, exactly as it did in `nearestEdge` before gaps replaced centres: a
- * Dock shoved hard into the left of a 1200px viewport has its centre at 304,
- * nearer the middle stop at 600 than the start stop at 0, and it snapped back
- * to the centre it had just been dragged out of. `start` and `end` were
- * effectively unreachable for any Dock wider than a third of the container.
- *
- * The comment that stood here claimed this measured "where each stop would
- * actually put the dock". It did not; now it does, and
- * `dock-geometry.test.ts` is what keeps it honest.
+ * the edge asks it to be somewhere it can never be, and lets the Dock's own
+ * width vote: a Dock shoved hard into the left of a 1200px viewport has its
+ * centre at 304, nearer the middle stop at 600 than a start stop at 0, and it
+ * would snap back to the centre it had just been dragged out of.
+ * `dock-geometry.test.ts` holds it to where each stop actually puts the Dock.
  *
  * **The inset is deliberately not part of it.** A stop's real position is
  * `inset + half` rather than `half`, but the three stops are hundreds of pixels

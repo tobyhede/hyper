@@ -48,8 +48,8 @@ type Persistence = SpaceSessionState['persistence'];
 /**
  * A permanent rejection and an aggregate refusal draw the same dialog.
  *
- * They are distinct `SpaceSessionState['persistence']` kinds (`v1-release/17`
- * criterion 2) with distinct recoveries in the session. This dialog offers
+ * They are distinct `SpaceSessionState['persistence']` kinds with distinct
+ * recoveries in the session. This dialog offers
  * Retry for neither; a rejection or refusal `canRetry` admits is drawn by
  * `PersistenceNotice` instead. Nothing on this surface needs to tell the two
  * apart: both are "the server declined this, continue editing to correct it,"
@@ -70,11 +70,11 @@ const rejectionDescription = ({ failure }: Rejection): string =>
 /**
  * Production persistence feedback and recovery at the application boundary.
  *
- * A retryable failure is deliberately absent here: it reports as a red dot
- * through the indicator and explains itself in `PersistenceNotice`, which the
- * shell pins under the toolbar. Swapping the indicator for a Retry button — as
- * this did — moved every control beside it and left the reason in a `title`
- * attribute that touch never shows.
+ * A retryable failure is deliberately absent here: it draws only the indicator
+ * and explains itself in `PersistenceNotice`, which the mounting surface
+ * places. Do not swap the indicator for a Retry button: that moves every
+ * control beside it and leaves the reason in a `title` attribute that touch
+ * never shows.
  */
 export function PersistenceControl({
   active = true,
@@ -138,8 +138,8 @@ export interface PersistenceNoticeProps {
 }
 
 /**
- * The standing explanation behind the toolbar's red dot, for every persistence
- * state that is neither fine nor final: the ones `canRetry` admits.
+ * The standing explanation for every persistence state that is neither fine nor
+ * final: the ones `canRetry` admits.
  *
  * It is not a dialog on purpose. A retryable failure or a blocked recovery
  * leaves the local work intact and the canvas fully usable — the author can
@@ -235,8 +235,9 @@ interface RefusedRecovery {
  * stored revision to key on, so two of them are equal by value, and the
  * coordinated path installs its states without notifying (`session.ts`) — the
  * render that would otherwise unmount this control between them is not
- * guaranteed to happen. Keyed on a revision, both were `'coordinated'` and the
- * first refusal stayed on screen over the second conflict.
+ * guaranteed to happen. Do not key on a revision: both would be
+ * `'coordinated'` and the first refusal would stay on screen over the second
+ * conflict.
  */
 function ConflictControl({
   conflict,
@@ -314,15 +315,14 @@ function ConflictControl({
  * That makes a fresh failure per publication load-bearing rather than
  * incidental, so it is pinned where it is produced rather than assumed here:
  * `http-backend.test.ts`'s 'mints a distinct failure for each rejected commit'.
- * A sequence number would have to be minted by the session and carried on
- * `SpaceSessionState`, which is a persistence contract widened to hold one
- * component's bookkeeping.
+ * Do not add a sequence number instead: it would have to be minted by the
+ * session and carried on `SpaceSessionState`, widening a persistence contract
+ * to hold one component's bookkeeping.
  *
- * This is not a remount, deliberately. The control used to rely on being
- * unmounted between rejections by the `pending` state in between, and the
- * coordinated path does not guarantee one: `prepareCoordinatedCommit` installs
- * `pending` without notifying (`session.ts`), so the render that resets local
- * state may never happen.
+ * Do not rely on a remount between rejections: the coordinated path does not
+ * guarantee a rendered `pending` state in between — `prepareCoordinatedCommit`
+ * installs `pending` without notifying (`session.ts`), so the render that
+ * resets local state may never happen.
  *
  * The acknowledgement itself is `PersistenceControl`'s, one level up, because
  * that is the component Open Spaces leaves mounted — see the note

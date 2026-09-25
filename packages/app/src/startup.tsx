@@ -14,12 +14,9 @@ export interface OpenedApplicationStartup {
   /**
    * The session the opened Space belongs to.
    *
-   * **Required, and not optional.** It was optional while a second startup
-   * shape existed — one opened Space and no session, mounted through
-   * `mountSpaceApp`. Every host sets it now (`space.ts`, the catalogue's
-   * `storyOpening`, `startup.test.tsx`), so the arm that read its absence was
-   * reachable from nothing and is gone with it. Optional here would be an
-   * invitation to a branch that no longer exists.
+   * **Required.** Every host sets it (`space.ts`, the catalogue's
+   * `storyOpening`, `startup.test.tsx`), and no startup result carries an
+   * opened Space without its session.
    */
   spaces: OpenSpaces;
   opening?: DestinationOpening | undefined;

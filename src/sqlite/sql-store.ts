@@ -37,8 +37,7 @@ interface SqlUniqueViolationFields {
  * exactly that `<table>.<column>` text, e.g. `spaces.id` or
  * `repository_state.singleton_id`. That reaches PostgreSQL's table precision
  * despite arriving through a different field, so this checks `constraint`
- * rather than the ever-`undefined` `table` — ticket 23's Answer records the
- * investigation against a real duplicate-key error on both tables.
+ * rather than the ever-`undefined` `table`.
  */
 const isUniqueViolation = (error: unknown, table: string): boolean => {
   if (typeof error !== 'object' || error === null) return false;
@@ -58,7 +57,7 @@ const isUniqueViolation = (error: unknown, table: string): boolean => {
  * query, a transaction or a `connect` on a client whose `close()` has run: a
  * plain `Error`, built in its `getRuntime`, `connect` and `transaction` with
  * nothing structured on it. A compatibility check against that one runtime,
- * and the only failure either store recognises by message (ticket 38): a
+ * and the only failure either store recognises by message: a
  * closed client is the database not answering, and no field says so. Nothing
  * else observed after a close is read as unavailable. Exactly `Error` and exactly
  * this text, so neither a subclass nor another message is read as it —

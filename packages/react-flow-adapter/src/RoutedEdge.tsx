@@ -20,15 +20,10 @@ import { laneBezier } from './edge-lanes';
 /**
  * React Flow custom edge that draws a bezier between the two handles.
  *
- * It kept a second branch until ADR 0086: a polyline along the waypoints a
- * routing strategy had placed, for a back-edge (target left of source, e.g. two
- * graphs disagreeing on the order of resources they share) whose bezier leaves
- * rightward and hooks back on itself. That branch never executed in the
- * application — no strategy in the tree ever emitted a routed section, and a
- * Map has nowhere to store one — so the bezier is, and always was, the only
- * edge geometry the product draws. The name stays because the edge is still the
- * one drawn along a Graph; where it attaches is settled by ADR 0087 and answered
- * below by `useEdgeAttachment`, from where the two Resources are at that moment.
+ * The bezier is the only edge geometry the product draws: a strategy answers no
+ * waypoints and a Map has nowhere to store one (ADR 0086). Where it attaches is
+ * settled by ADR 0087 and answered below by `useEdgeAttachment`, from where the
+ * two Resources are at that moment.
  */
 export type RoutedEdgeData = {
   graphId: GraphId;

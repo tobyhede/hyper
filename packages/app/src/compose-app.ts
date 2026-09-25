@@ -43,9 +43,8 @@ export interface ComposeCoreDependencies {
    * There is deliberately no second `Space` argument. Open Spaces parses the
    * stored snapshot and the session then `structuredClone`s
    * it, so the Space a caller holds at open and the session's `working` are
-   * equal values with different identities; taking both is how production came
-   * to resolve its opening Map against one and everything after it against
-   * the other.
+   * equal values with different identities; taking both would resolve the
+   * opening Map against one and everything after it against the other.
    */
   readonly spaceSession: SpaceSession;
   /** Which Map the Space opens in; the Space's own default when absent. */

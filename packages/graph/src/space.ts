@@ -24,7 +24,7 @@ declare const SPACE_INTAKE: unique symbol;
  * **The brand is what makes that a guarantee rather than a convention.** It is
  * a private unique symbol, so nothing outside this module can write an object
  * literal that typechecks as a Space — a value that only looks like one has not
- * been through the reference check, and the type now says so. It is
+ * been through the reference check, and the type says so. It is
  * compiler-only: no such property exists at runtime, and nothing may start
  * reading one.
  *
@@ -115,7 +115,7 @@ function unsupportedDocumentVersion(document: unknown): UnsupportedVersionError 
  *
  * Read before parsing, beside {@link unsupportedDocumentVersion}, because
  * `spaceFileSchema` is strict, so an undeclared key is already refused rather
- * than stripped. This survives it to *name* the one that matters. A space-level
+ * than stripped. This runs ahead of it to *name* the one that matters. A space-level
  * `graphs` carried the whole topology (ADR 0040), and a reader told only that
  * some key is undeclared has to work out which and why; a version 1 document
  * carrying both shapes at once is the case worth a sentence of its own.
@@ -151,22 +151,21 @@ function retiredSpaceGraphs(document: unknown): SpaceError | null {
  * these documents misleads: a cascade of moved keys in one case, a refusal that
  * names the key without saying it is retired in the other. Any door that parses
  * ahead of intake needs *all* of them, and a door that reaches for them
- * individually gets the ones its author knew about. `readSingleSpace` asked the
- * version check alone and imported a Space with its whole `graphs` array
- * dropped, looking complete (ticket `10`); ticket `08` is where it came to ask
- * the version check at all. One function is what makes the next check added
- * here reach the importer without anyone remembering to carry it there.
+ * individually gets the ones its author knew about — a door that asked only the
+ * version check would import a Space with its whole `graphs` array dropped,
+ * looking complete. One function is what makes the next check added here reach
+ * the importer without anyone remembering to carry it there.
  *
- * **This docblock is where that argument is written out** — the index clause,
- * the importer and both tickets point here rather than restating it.
+ * **This docblock is where that argument is written out** — the index clause
+ * and the importer point here rather than restating it.
  *
  * Three doors ask it: the two intakes below, and `readSingleSpace`, which parses
  * against import schemas that run ahead of intake (ADR 0030). The snapshot
  * decoders do not — they parse `spaceSnapshotSchema` first, so they refuse a
  * version 2 snapshot by cascade rather than by name. Deliberate, not an
  * oversight: there are no version 2 documents, and a directory is the only one a
- * human writes by hand. Issue `09` is the wontfix that says so. If it ever
- * matters, ask this earlier there; never decide a version somewhere new.
+ * human writes by hand. If it ever matters, ask this earlier there; never
+ * decide a version somewhere new.
  */
 export function documentRefusal(document: unknown): SpaceError | null {
   return unsupportedDocumentVersion(document) ?? retiredSpaceGraphs(document);
@@ -183,7 +182,7 @@ export type LoadSpaceSnapshotResult =
  * Takes the space file *and* the resource files, because a resource exists by virtue of
  * its file existing (ADR 0020) — the space file holds structure and nothing
  * else. This is one more argument, not one more capability: it does no I/O and
- * stays synchronous. Reading the bytes belongs to the caller, as it always did.
+ * stays synchronous. Reading the bytes belongs to the caller.
  */
 export function loadSpace(input: unknown, resourceFiles: readonly ResourceFile[]): LoadSpaceResult {
   const refusal = documentRefusal(input);

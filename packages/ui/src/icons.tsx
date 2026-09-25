@@ -35,24 +35,24 @@ type CanvasControlIconProps = ComponentProps<typeof Minus>;
 /**
  * An authored Map: the Resources a Space placed, and the Graphs over them.
  *
- * Placements on a plane. This was `PanelsTopLeft` — a header, a sidebar and a
- * content well, which is a *web page chrome* and describes nothing the product
- * does. A Map is authored placement (ADR 0014 — placement is authored, not
+ * Placements on a plane, not a page-chrome glyph such as `PanelsTopLeft` — a
+ * header, a sidebar and a content well describe nothing the product does. A
+ * Map is authored placement (ADR 0014 — placement is authored, not
  * computed), so the glyph is the placements.
  *
  * `size` exists for the same reason `SpaceIcon` and `GraphIcon` carry one: a
  * surface that draws two identity glyphs in one column has to draw them at one
  * size, and the canvas HUD draws this one beside a 13px Space cube. The default
- * is the 16 every other call site was already getting.
+ * is 16.
  */
 export const MapIcon = ({ size = 16 }: { size?: number | undefined }) => <LayoutGrid size={size} />;
 
 /**
  * A directed Graph, including its branches and joins.
  *
- * A path from a start pin to an end pin. This was `Network` — one node above
- * two, joined by a bracket — which draws a *hierarchy*, and a Graph is a
- * curated traversal over Resources a Map has already placed. Present is what a
+ * A path from a start pin to an end pin, not a glyph such as `Network` — one
+ * node above two, joined by a bracket — which draws a *hierarchy*, where a
+ * Graph is a curated traversal over Resources a Map has already placed. Present is what a
  * Graph is for, and a path is the resource you present.
  *
  * Drawn heavier than Lucide's default 2. This is the only glyph in the set
@@ -202,9 +202,9 @@ const CubeGlyph = ({ size }: { size: number }) => {
 };
 
 /**
- * Opener/Meta uses the OPEN infinity-cube artwork selected in the design review.
- * This product mark is the approved custom exception to the Lucide vocabulary;
- * icons.test.tsx holds its geometry to the supplied 16px SVG.
+ * Opener/Meta uses the OPEN infinity-cube artwork. This product mark is the one
+ * custom exception to the Lucide vocabulary; icons.test.tsx holds its geometry
+ * to the supplied 16px SVG.
  */
 export const ParentIcon = ({ size = 16 }: { size?: number | undefined }) => (
   <svg
@@ -238,9 +238,9 @@ export const SpaceResourceIcon = SpaceIcon;
  * one of these two.
  *
  * **Subtracted from the domain union rather than restated as its own.** Written
- * out as `'markdown' | 'space'` it was a second list agreeing with `Resource['kind']`
- * only by hand, so a kind added to the domain left every record keyed by this
- * type exhaustive and wrong. Derived, the addition lands here, and
+ * out as `'markdown' | 'space'` it would be a second list agreeing with
+ * `Resource['kind']` only by hand, so a kind added to the domain would leave
+ * every record keyed by this type exhaustive and wrong. Derived, the addition lands here, and
  * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
  */
 export type ResourceBaseKind = Exclude<Resource['kind'], 'reference'>;
@@ -333,28 +333,19 @@ export const AlertIcon = () => <CircleAlert />;
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
 
 /**
- * Open an entity's actions menu, on a **Resource rail**.
+ * A link glyph for an entity's actions menu.
  *
- * A link glyph rather than the conventional kebab, and that argument is the
- * rail's alone: every other control there names its command (`EditIcon`,
- * `OpenResourceIcon`, `CloseResourceIcon`), so a generic "more" glyph beside them would
- * be the one control saying nothing about what it does.
- *
- * It is no longer the glyph the menu wears everywhere. The menu grew a rename
- * and a delete beside its addresses, so a Sidebar row — which has no cluster of
- * self-naming commands to sit in — draws `EntityActionsIcon` instead. Whether
- * the rail follows is a rail decision, taken when `ResourceNode` first supplies the
- * actions; until then this stays exactly what it draws today.
+ * Exported and drawn by no surface: the Resource rail, like every other entity
+ * menu, draws {@link EntityActionsIcon}.
  */
 export const LinkActionsIcon = (props: ResourceActionIconProps) => <Link size={14} {...props} />;
 
 /**
  * Open an entity's actions menu, where the menu does not primarily serve one action.
  *
- * The conventional "more" glyph, and conventional is the whole argument: a
- * Space title or a Sidebar row carries no other command to be generic beside,
- * and the menu behind it holds a rename, two addresses and a delete. A glyph
- * naming any one of those would name the wrong one.
+ * The conventional "more" glyph, and conventional is the whole argument: the
+ * menu behind it holds a rename, addresses and a delete, and a glyph naming
+ * any one of those would name the wrong one.
  */
 export const EntityActionsIcon = (props: ResourceActionIconProps) => (
   <Ellipsis size={14} {...props} />

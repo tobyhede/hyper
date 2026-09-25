@@ -1,12 +1,9 @@
 /**
  * How a surface names an open Space that is not well.
  *
- * A module of its own since `.scratch/command-dock/issues/08`, which deleted
- * the vertical tab strip these words used to sit beside. They outlived it
- * because the Command Dock's Open Spaces menu reports the same three states
- * over the same open set, and `packages/app/src/dock-model.ts` is what spends
- * them. Leaving them in the deleted component's file would have made the one
- * live export a reason to keep a dead surface.
+ * A module of its own because no one surface owns the words: the Command
+ * Dock's Open Spaces menu reports these three states over the open set, and
+ * `packages/app/src/dock-model.ts` is what spends them.
  *
  * The words are exported and the record is not. What a surface needs is the
  * *answer* for a state rather than the table, and a table handed out is a table

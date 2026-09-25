@@ -28,8 +28,8 @@ export type CommandToolbarProps = ComponentProps<typeof Toolbar> & {
  *
  * It positions nothing and sizes nothing. Where the surface sits, how large it
  * may grow, whether it scrolls and when it is revealed belong to the surface
- * that mounts one — `command-dock.css` still owns the twelve slots, and
- * `canvas-resource.css` still owns the reveal.
+ * that mounts one — `command-dock.css` owns the twelve slots, and
+ * `ResourceNode` floats a Resource's strip in React Flow's `NodeToolbar`.
  */
 export const CommandToolbar = forwardRef<HTMLDivElement, CommandToolbarProps>(
   function CommandToolbar({ className, orientation = 'horizontal', ...props }, ref) {

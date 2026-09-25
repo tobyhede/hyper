@@ -18,19 +18,17 @@ export const uuidSchema = z.string().uuid().brand<'UUID'>();
 const idSchema = uuidSchema;
 
 /**
- * Mint a durable identity. The one place a UUID is generated (issue `11`).
+ * Mint a durable identity. The one place a UUID is generated.
  *
  * **Mint, not allocate.** Nothing reserves an id from a registry, and in
  * particular PostgreSQL does not hand them out: a space's id comes from its
  * column default, and every other id — resource, graph, map — is generated here,
- * in whichever process is doing the work. Calling it allocation is what made the
- * importer read as though the database had to be consulted for a random value.
+ * in whichever process is doing the work.
  *
  * The `crypto` global rather than `node:crypto`, so `core` and the packages
  * above it stay browser-safe. Browsers expose `randomUUID` only in a secure
- * context (HTTPS or localhost); that has always been true of this codebase's
- * generation sites, and centralizing them means a fallback, if one is ever
- * needed, has exactly one home. Don't add one speculatively.
+ * context (HTTPS or localhost). Generation lives here so a fallback, if one is
+ * ever needed, has exactly one home. Don't add one speculatively.
  */
 export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 
@@ -39,10 +37,9 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  *
  * This is the boundary the rule sits at, so a stored Title, an imported one and
  * one an author just typed all get the same answer, and no surface normalizes
- * again on the way to a screen. `min(1)` used to count characters; what it
- * means now is **at least one non-empty line**, which is why a Title of nothing
- * but whitespace no longer passes: it carries no name, and the name is what
- * every list, search and accessible label shows.
+ * again on the way to a screen. The rule is **at least one non-empty line**, so
+ * a Title of nothing but whitespace fails: it carries no name, and the name is
+ * what every list, search and accessible label shows.
  *
  * Resources only. Space, Map and Graph titles keep their plain single-line
  * field: they are labels in lists with no front to draw a ladder on, and giving
@@ -98,10 +95,10 @@ export const referenceResourceFrontmatterSchema = z.object({
  * by aggregate intake rather than here — this file knows the shape and
  * `@project/graph` knows the Spaces.
  *
- * What used to fill the gap was a fallback to the target's `defaultMap`,
- * which made one Resource's selection follow another Space's opening choice.
- * Requiring the field is what stops that: two Space Resources on one target differ
- * by what they store and by nothing else.
+ * Do not fall back to the target's `defaultMap` when the field is missing: one
+ * Resource's selection would then follow another Space's opening choice.
+ * Requiring the field keeps two Space Resources on one target differing by what
+ * they store and by nothing else.
  *
  * Framing is the Map-coordinate centre and scale saved for this particular
  * window onto the target. It is absent until the view has been framed, in which
@@ -239,13 +236,11 @@ export const graphSchema = z.object({
   // Optional CSS color for this graph's edges; falls back to a palette by order.
   color: z.string().min(1).optional(),
   /**
-   * Possibly none. A graph *is* its edges, but it is no longer minted by
-   * drawing one: creating a map creates its initial empty active graph in
-   * the same edit (ADR 0040), and Add Map produces exactly that — one fresh
-   * graph holding no edges (ADR 0079). Deleting a graph's last edge leaves the
-   * same shape, and graph management may not delete the graph itself to avoid
-   * it. The superseded rule read ADR 0033's connect gesture as the only way a
-   * graph came into being, which ADR 0040 replaced.
+   * Possibly none. A graph *is* its edges, but it is not minted by drawing
+   * one: creating a map creates its initial empty active graph in the same
+   * edit, and Add Map produces exactly that — one fresh graph holding no
+   * edges. Deleting a graph's last edge leaves the same shape, and graph
+   * management may not delete the graph itself to avoid it.
    *
    * A resource may appear as the `from` of several edges (a fork) and the `to` of
    * several (a merge); nothing here constrains that.
@@ -290,11 +285,8 @@ export const resourcePlacementSchema = z.discriminatedUnion('open', [
  * id is unique across the *space* (ADR 0045), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
  *
- * **Strict**, as the space file itself is. Under the version 2 shape this
- * key held a filter — an array of graph ids naming the graphs the map drew.
- * Reading one of those as an owned collection would be a type error, but a
- * *stripped* one would read a file that said "draw only these" as a map with
- * no graphs at all. Rejecting says so instead.
+ * **Strict**, as the space file itself is: a stripped key is a question
+ * answered silently, and rejecting says so instead.
  */
 export const positionedMapSchema = z
   .object({
@@ -344,10 +336,8 @@ export const mapSchema = z.preprocess(
 /**
  * The **first-public** space document version.
  *
- * Version 2 was the disposable pre-release shape, which carried a space-level
- * `graphs` array beside maps that owned none. Hyper is unreleased, so it has
- * no compatibility claim on this one and is rejected rather than migrated (ADR
- * 0040). A named constant rather than a literal inlined in one schema, because
+ * Any other version is rejected rather than migrated: Hyper is unreleased and
+ * makes no compatibility claim on a pre-release shape (ADR 0040). A named constant rather than a literal inlined in one schema, because
  * `documentRefusal` in `@project/graph` reads the declared version
  * *before* the schema parses — at domain intake and at the file importer both —
  * to say so in one error instead of one per key that moved. The literal below
@@ -368,12 +358,11 @@ export const SPACE_FILE_VERSION = 1;
  * resource files alongside this.
  *
  * **Strict**, for the reason `positionedMapSchema` is. A stripped key is a
- * question answered silently: a top-level `resources` or `edges` array (ADR 0020,
- * ADR 0007) half-describes a space nothing loads from, and a file still
- * spelling the opening selection the way ADR 0079 renamed it reaches
- * `workingSpace`, which adopts `maps[0]` and commits it — the Map its
- * author named replaced by one they did not, and then persisted. Rejecting
- * says so instead.
+ * question answered silently: a top-level `resources` or `edges` array
+ * half-describes a space nothing loads from, and a file spelling the opening
+ * selection under any key but `defaultMap` would reach `workingSpace`, which
+ * adopts `maps[0]` and commits it — the Map its author named replaced by one
+ * they did not, and then persisted. Rejecting the key says so instead.
  *
  * This is a policy and not a compatibility path, which is what lets it answer
  * a renamed key at all: it declines every key it does not declare, so it never

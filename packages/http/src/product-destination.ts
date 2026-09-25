@@ -227,9 +227,8 @@ export const resolveProductDestination = async (
  * Declared here because the seam has two sides and neither can typecheck the
  * other: the Node host composes the answer (`src/http/space-host.ts`) and the
  * Vite plugin writes it onto a `ServerResponse`, importing this by relative
- * path because a Vite config externalizes bare specifiers. Both sides used to
- * declare their own copy, and the copies had already drifted — one naming the
- * statuses it produces, the other any `number` at all.
+ * path because a Vite config externalizes bare specifiers. Do not declare a
+ * copy on either side: two copies drift apart.
  *
  * A closed set of statuses rather than `number`, because the set is the
  * contract ADR 0069 states for a direct request: a temporary redirect to the

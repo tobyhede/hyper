@@ -27,9 +27,7 @@ body {
 
 /* The app owns exactly one viewport and never scrolls the page, so the shell is
    pinned to the viewport height and its overflow belongs to the canvas inside
-   it. A column, because the header that used to sit above the canvas has gone
-   with the Sidebar whose trigger it carried (ADR 0082) — there is one child
-   now, and it takes the height. */
+   it. A column with one child, which takes the height. */
 .shell {
   display: flex;
   flex-direction: column;
@@ -39,18 +37,11 @@ body {
 
 /* Everything left of the viewport once the shell has it, and the containing
    block everything positioned inside the main area resolves against — the
-   notice below, and the Command Dock over the canvas.
-
-   `position: relative` sat on a `.shell__area` child of this element until
-   ticket 22, and only because `AppShell` set `padding-inline-end` here for the
-   strip a drawer overlaid: an absolutely positioned box resolves against its
-   containing block's *padding* box, so the notice would have ignored that
-   padding and sat under the drawer, and the child was the box the strip had
-   already been taken out of. Nothing yields a strip now, so this element's
-   padding box and its content box are the same box and the child had no job
-   left. The child's `height: 100%` went with it — `flex: 1` is what gives this
+   notice below, and the Command Dock over the canvas. `flex: 1` gives this
    element its height, and the canvas inside resolves its own `100%` against
-   that exactly as the child did. */
+   it. An absolutely positioned box resolves against its containing block's
+   *padding* box, so do not give this element inline padding without moving
+   the containing block to a child: the notice would ignore that padding. */
 .shell__main {
   position: relative;
   flex: 1;
@@ -62,12 +53,11 @@ body {
  * the width is capped so the graph stays visible beside it, and pointer events
  * are the notice's own — nothing invisible is laid over the canvas.
  *
- * It sat at `5` while the Space's command surface was a gutter beside the
- * canvas and could not overlap it. The Command Dock floats *over* the canvas at
- * `20` (`components/command-dock.css`) and moves between twelve slots, so at
- * every top slot the two occupy the same corner — and `.shell__main` is
+ * The Command Dock floats *over* the canvas at `20`
+ * (`components/command-dock.css`) and moves between twelve slots, so at every
+ * top slot the two occupy the same corner — and `.shell__main` is
  * `position: relative` with no `z-index`, so it opens no stacking context to
- * separate them and the higher value simply won. (A flex item opens one at a
+ * separate them and the higher value wins. (A flex item opens one at a
  * `z-index` other than `auto` even while static, so the absent `z-index` there
  * is the load-bearing half rather than the `position`.) A report drawn behind
  * the furniture it reports for is not a report, so this sits above the Dock's
@@ -88,9 +78,8 @@ body {
      a dialog, where it is part of the surface rather than over one. Here it is
      chrome laid on the canvas, and on sand paper an unlifted panel reads as a
      hole cut in the Space rather than a report about it. `--shadow-chrome-elevated`
-     is the same wash `.canvas-refusal` and the shared command surface spend —
-     this used to hand-copy it as a hardcoded `rgb(31 41 51 / N%)` rather than
-     reading the token (ticket 01), which is what this now does instead. */
+     is the same wash `.canvas-refusal` and the shared command surface spend,
+     read from the token rather than restated. */
   box-shadow: var(--shadow-chrome-elevated);
   border-radius: var(--radius-md);
 }
@@ -352,11 +341,10 @@ body {
    where the reveal is decided keeps it out of a specificity race the two rules
    would otherwise run against each other. */
 
-/* A Resource is drawn in the Resource's vocabulary, never the chrome's. `--card`,
-   `--border` and `--radius-chrome-xl` stood here and made an opened Resource take
-   chrome paper, a chrome hairline and a chrome corner, so a block that changed
-   only the chrome changed a Resource as well. `.canvas-resource` has always read the
-   tokens below; this rule and the two after it had not. */
+/* A Resource is drawn in the Resource's vocabulary, never the chrome's. Do not
+   read `--card`, `--border` or `--radius-chrome-*` here: an opened Resource would
+   take chrome paper, a chrome hairline and a chrome corner, so a block that
+   changed only the chrome would change a Resource as well. */
 .resource {
   background: var(--canvas-resource-face-rest);
   border: var(--canvas-resource-border-width) solid var(--canvas-resource-ink-color);
@@ -373,9 +361,9 @@ body {
    presented Resource" fact, which is adapter/app state and has no reason to be
    known inside the design-system package. */
 .rf-resource-node--active :is(.resource, .canvas-resource) {
-  /* The border stays the Resource's ink and is not restated: `--accent` was set
-     here, which on a cream face draws a border a shade off the paper and so
-     removed the Resource's edge for as long as it was the presented one. */
+  /* The border stays the Resource's ink and is not restated: `--accent` on a
+     cream face draws a border a shade off the paper and so removes the
+     Resource's edge for as long as it is the presented one. */
   outline: 2px solid var(--canvas-resource-ink-color);
 }
 
@@ -423,8 +411,8 @@ body {
    appearance, and they sit here rather than after the traversal block below on
    purpose. `.resource--full .resource__title` and `.rf-resource-node__content .resource__title`
    have the same specificity, so whichever is written second wins — and with
-   these last, a presented Resource's title took a fixed 1.3rem and stopped scaling
-   with the frame, which is exactly what the comment below forbids. */
+   these last, a presented Resource's title would take a fixed 1.3rem and stop
+   scaling with the frame, which is exactly what the comment below forbids. */
 .resource--full {
   background: transparent;
   border: none;

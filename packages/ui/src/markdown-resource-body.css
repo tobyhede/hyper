@@ -29,8 +29,7 @@
   --markdown-resource-gutter-width: 29px;
 
   /* This surface's own structural values, named once rather than restated at
-     each rule below. Not the Resource's central `--canvas-resource-*` scale
-     (ticket 06): a rendered heading's boldness and a blockquote's accent bar
+     each rule below. Not the Resource's central `--canvas-resource-*` scale: a rendered heading's boldness and a blockquote's accent bar
      are this content's own facts, not part of the Resource's own frame. */
   --markdown-resource-heading-weight: 700;
   --markdown-resource-blockquote-border-width: 3px;
@@ -139,9 +138,7 @@
      chrome's. Both are drawn on cream, and `--canvas-resource-muted-color` is the
      one role held to AA against both Resource faces
      (`test/unit/canvas-resource-contrast.test.ts`); the chrome's
-     `--muted-foreground` is measured against paper and has no claim here. The
-     rule already read this token and the numbers beside it did not, which is
-     how the gutter came to be a chrome grey on a Resource. */
+     `--muted-foreground` is measured against paper and has no claim here. */
   --markdown-source-gutter-color: var(--canvas-resource-muted-color, currentcolor);
   --markdown-source-gutter-padding: 0 6px 0 4px;
   --markdown-source-gutter-rule-color: color-mix(
@@ -167,8 +164,7 @@
    Drawn the way every application that names an inline shortcut draws one: the
    key as a **cap** — filled, bordered, its own small box — and the word beside
    it in plain muted text. A cap is recognised as an object without being read;
-   glyphs set into running text at low contrast have to be parsed, and that is
-   what made the earlier line illegible. `Kbd`'s default variant is that cap and
+   glyphs set into running text at low contrast have to be parsed. `Kbd`'s default variant is that cap and
    the design system already ships it; the only rule added here is the Resource's
    own palette, because `bg-muted` is the application's paper and this sits on
    the Resource's.

@@ -1,8 +1,8 @@
 import { StatusBusy } from '@project/ui';
 
 /**
- * What `Application` draws while startup resolution is outstanding, in place of
- * the blank page it used to leave there.
+ * What `Application` draws while startup resolution is outstanding, rather than
+ * a blank page.
  *
  * The logo is the served asset rather than the `ParentIcon` glyph, and it is
  * decorative: the message is the accessible text. `index.html` draws the same

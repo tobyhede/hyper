@@ -112,7 +112,7 @@ export class HttpSpaceBackend implements SpaceBackend {
           }),
         async (response, signal): Promise<CommitResult> => {
           try {
-            // The one table the route encodes through (ADR 0098). A decoder
+            // The one table the route encodes through. A decoder
             // rather than a decoded outcome: a status it does not know carries
             // Problem Details, and the body below must still be readable as that.
             const decodeOutcome = commitOutcomeDecoder(response.status);

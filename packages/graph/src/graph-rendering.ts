@@ -10,14 +10,10 @@ import type { Space } from './space';
  * **overview** — the view that draws every Graph at once (ADR 0021) — not to
  * the domain.
  *
- * It named the two ports each Edge attached to until ADR 0087. A Resource carried
- * an invisible `<graphId>::in` on its left and `<graphId>::out` on its right,
- * one pair per Graph, because elkjs needed ports to route through; ADR 0045
- * justified the *ids* separately, on React Flow's rule that same-kind handles be
- * distinguishable. Four anchors named for their sides satisfy that just as well,
- * and an Edge now attaches to whichever of them faces its neighbour — chosen
- * while it is drawn, from where the two Resources are at that moment, which is not
- * something this derivation could answer.
+ * It names no anchor for an Edge. An Edge attaches to whichever of a Resource's
+ * four side anchors faces its neighbour, chosen while it is drawn from where the
+ * two Resources are at that moment, which is not something this derivation can
+ * answer.
  */
 
 /**
@@ -46,8 +42,7 @@ export interface GraphRenderEdge {
  * the defect. A test that
  * stands a projected Edge up by hand mints its id here rather than spelling the
  * separator out, so changing the format moves those fixtures with it instead of
- * leaving them green against a shape nothing mints any more. That is the
- * failure this very format was introduced to end, one layer up.
+ * leaving them green against a shape nothing mints any more.
  */
 export const graphRenderEdgeId = (graphId: GraphId, edge: GraphEdge): string =>
   `${graphId}::${edge.from}::${edge.to}`;

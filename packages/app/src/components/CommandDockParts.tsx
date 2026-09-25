@@ -36,18 +36,16 @@ export function Divider({ orientation }: { readonly orientation: 'horizontal' | 
 /**
  * The name an identity trigger carries.
  *
- * Always drawn, in every orientation. A narrow dock that collapsed these to
- * icons was compared here and lost: the dock stacks on a side edge, so a row
- * is `[name] [v]` and there is room for the words — and the disclosure hangs
- * off that row, so a row that has shrunk to a glyph has nothing to hang from.
+ * Always drawn, in every orientation. Do not collapse these to icons: the
+ * dock stacks on a side edge, so a row is `[name] [v]` and there is room for
+ * the words — and the disclosure hangs off that row, so a row that has shrunk
+ * to a glyph has nothing to hang from.
  *
- * **Every name here is ink, the Graph's included.** Carrying the Graph's
- * colour on the name as well as the glyph was tried and reverted: the palette
- * is pastel because it is drawn as a stroke on sand, and the same values set
- * as text on white chrome are too light to read as a name — and a name is the
- * resource on this surface that most has to. The glyph beside it carries the
- * colour instead, where a shape rather than a legibility budget is what has to
- * survive.
+ * **Every name here is ink, the Graph's included.** Do not carry the Graph's
+ * colour on the name: the palette is pastel because it is drawn as a stroke on
+ * sand, and the same values set as text on white chrome are too light to read
+ * as a name. The glyph beside it carries the colour instead, where a shape
+ * rather than a legibility budget is what has to survive.
  */
 function IdentityLabel({ children }: { readonly children: ReactNode }) {
   return <CommandName>{children}</CommandName>;
@@ -59,10 +57,7 @@ function IdentityLabel({ children }: { readonly children: ReactNode }) {
  * The name and the chevron are the named `ChoiceMenuTrigger` an Open Space
  * Resource already uses. Pressing either opens this identity's list. Rename is a
  * row in that list; choosing it closes the menu and continues in
- * `InlineTitleEditor` — the same header editor these identities already used,
- * so Enter, Escape, blur and a refused draft stay as they were. The Edit
- * itself does not change; only how it is begun does
- * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+ * `InlineTitleEditor`, which owns Enter, Escape, blur and a refused draft.
  *
  * Switching stays reachable while a chrome title edit is withdrawn. Only the
  * Rename row becomes unavailable — the trigger is how the list is reached.
@@ -103,13 +98,11 @@ export function IdentitySurface({
    * **Whether this name is the one being renamed is the bar's answer, not this
    * component's.**
    *
-   * It was `useState(false)` here, once per identity, and the three of them
-   * reported into one boolean the App reads as "a chrome rename is running".
-   * Two editors could stand at once — a blank draft is refused and
-   * `InlineTitleEditor` holds a refused draft open, so pressing a second name
-   * left the first one live — and the first cleanup to run then told the App no
-   * rename was live at all, handing Create Resource, Present and the canvas's own
-   * title editing back underneath an editor still on screen.
+   * Do not hold it per identity. `InlineTitleEditor` holds a refused draft
+   * open, so two editors could stand at once, and the first cleanup to run
+   * would tell the App no rename was live at all, handing Create Resource,
+   * Present and the canvas's own title editing back underneath an editor still
+   * on screen.
    *
    * One slot under the whole bar makes that unrepresentable rather than
    * guarded: at most one name can be the renaming one, so the flag has one

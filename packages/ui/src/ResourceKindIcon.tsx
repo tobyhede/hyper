@@ -7,7 +7,7 @@ import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
  * Persistent, not a hover affordance: a Resource's kind is a fact about it, and a
  * Reference Resource that only announces itself under the pointer is one an author has to
  * hunt for. It is the same glyph wherever a Resource appears — on its Front, and in
- * the Target picker's results — so recognising one teaches the other.
+ * the Resources list — so recognising one teaches the other.
  *
  * Adding a Resource kind is a compile-time obligation here: both records are keyed
  * by the domain union, so a new kind fails to build until it has a glyph and a
@@ -56,15 +56,14 @@ export interface ResourceKindIconProps {
    *
    * For the one case the default is wrong: a control that **already names the
    * command it performs**, where the glyph repeats a fact the button has
-   * stated. The Command Dock's three Create controls are that — each is
-   * labelled `Create <kind>`, so an `img` announcing `<kind>` beside it is a
+   * stated. The Command Dock's Create controls and the Create Reference command
+   * are that — each is labelled `Create <kind>`, so an `img` announcing `<kind>` beside it is a
    * second node saying half of what the button just said, and a `title` of
    * `<kind>` is worse: the glyph fills the button, so that tooltip is the one
    * the pointer gets and `Create Reference` hovers as `Reference Resource`.
    *
    * It is deliberately not the default. Everywhere else the glyph carries the
-   * kind *on its own* — on a Resource's own Front, in the Target picker's results,
-   * on a list row — and there the name is the whole point of the element.
+   * kind *on its own* — on a Resource's own Front, on a list row — and there the name is the whole point of the element.
    */
   readonly decorative?: boolean | undefined;
 }
@@ -77,10 +76,9 @@ export interface ResourceKindIconProps {
  * badge on it, because it needs a second input, which kind it is a Reference Resource of,
  * that the others do not have. Everything else is {@link BASE_GLYPHS}, keyed by
  * the domain union with `reference` subtracted, and **that lookup is what makes
- * adding a kind a compile-time obligation**. Picking between the two with
- * `kind === 'space' ? … : …` read as the same composition and was not: it gave
- * every future kind the Markdown silhouette by default, silently, while this
- * file's own doc still promised a build failure.
+ * adding a kind a compile-time obligation**. Do not pick between the two with
+ * `kind === 'space' ? … : …`: that gives every future kind the Markdown
+ * silhouette by default, silently, instead of a build failure.
  */
 function KindGlyph({ kind, referenceOf, size }: ResourceKindIconProps) {
   // `size` is forwarded even when absent: every one of these declares its own

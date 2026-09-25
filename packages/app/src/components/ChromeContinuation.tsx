@@ -13,17 +13,8 @@ import {
  * needs nothing but the DOM. It owns the `control` kind.
  *
  * A control is found by `data-continuation-control` rather than held as a ref,
- * in **one** place rather than at each call site. The attribute matters for a
- * second reason as well: an open pane marks the root `inert`, and an addressing
- * query is how a covered control is reached at all. The query is scoped to the
+ * in **one** place rather than at each call site. The query is scoped to the
  * Space that raised it — see {@link ChromeContinuation}'s `within`.
- *
- * It used to own a `sidebar-row` kind beside this one, resolved by walking a
- * row's addressing attribute up to its `<li>` — the Sidebar drew a row's title
- * as a button and its live rename as a `div`, so the element the attribute found
- * could be the unfocusable one. The Command Dock's editor replaces the one
- * control it was opened from and hands focus back itself, so neither the kind
- * nor the walk survived the surface.
  */
 const elementOf = (
   root: ParentNode,

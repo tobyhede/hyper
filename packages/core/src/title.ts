@@ -1,8 +1,8 @@
 /**
  * Reading a Resource's Title (ADR 0083).
  *
- * A Title is one or more **Title Lines**, stored as it always was — one string
- * on the Resource document — with the newlines inside it load-bearing. The first
+ * A Title is one or more **Title Lines**, stored as one string on the Resource
+ * document, with the newlines inside it load-bearing. The first
  * line is the Resource's **name**; the lines after it qualify it on the Resource front.
  *
  * The structure therefore lives in a `string` and nothing in the type says so,

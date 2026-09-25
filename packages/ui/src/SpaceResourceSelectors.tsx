@@ -28,7 +28,7 @@ export interface CanvasSpaceResourceGraphChoice extends CanvasSpaceResourceChoic
  * Rename, New Map and Delete are each one field: the press, or `null` where the
  * command is unavailable. The application answers each from one Map authoring
  * capability, so the row's unavailable treatment and what it invokes cannot
- * disagree (`.scratch/command-outcomes/issues/09`).
+ * disagree.
  *
  * **What the rail says, and what it does not.** A refused rename answers the
  * sentence that holds the draft open, which is the editor's own treatment. A
@@ -136,8 +136,8 @@ export interface CanvasSpaceResourceSelection {
    * The selections are read but cannot be changed right now.
    *
    * Distinct from an absent selection, which means the target Space has not
-   * been read yet: a canvas that has withdrawn authoring — a creation pane is
-   * up, or the Space is presenting — still knows perfectly well which Map
+   * been read yet: a canvas that has withdrawn authoring — the Space is
+   * presenting, say — still knows perfectly well which Map
    * and Graph this Resource selects, and a Resource that said otherwise would be
    * reporting a wait that had already ended.
    */

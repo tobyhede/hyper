@@ -41,7 +41,7 @@ export interface SpaceSessionState {
     | { kind: 'failed'; failure: RetryableFailure; blocked?: SaveBlock }
     | { kind: 'rejected'; failure: PermanentFailure; blocked?: SaveBlock }
     /**
-     * A refused aggregate is not a permanent failure (ADR 0057, `v1-release/17`).
+     * A refused aggregate is not a permanent failure.
      *
      * The two share one recovery: neither offers Retry unless a recovery
      * attempt was blocked or the rejection was for size ({@link canRetry}),

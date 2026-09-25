@@ -101,10 +101,9 @@ const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoad
  * behind this composition's back — a host handed a deterministic minter would
  * then be random on load.
  *
- * The root address mints nothing. It used to establish the Meta Space when the
- * repository had none, which made two safe methods create durable authored
- * state; establishment is start-up's alone now, and start-up retries it
- * (`src/http/database-http-runtime.ts`).
+ * The root address mints nothing: establishing the Meta Space there would make
+ * two safe methods create durable authored state. Establishment is start-up's
+ * alone, and start-up retries it (`src/http/database-http-runtime.ts`).
  */
 export const createSpaceHost = (
   repository: SpaceRepository,
@@ -121,9 +120,7 @@ export const createSpaceHost = (
       if (!reads) return methodNotAllowed(accept);
       // Opening the application without another destination opens the Meta
       // Space, and reading is the whole of it. `GET` and `HEAD` are both safe
-      // methods, so neither may create durable authored state — this used to
-      // establish the Meta Space here, minting four identities and writing two
-      // rows for a request that promised to change nothing.
+      // methods, so neither may create durable authored state.
       let loaded: AggregateLoadResult;
       try {
         loaded = await readAggregate(repository);
@@ -140,8 +137,7 @@ export const createSpaceHost = (
         // carries and no retry cures, so it is a 500. An unreachable database
         // is temporary, and 503 says so. A failure that is neither — a code
         // defect, or a driver failure nobody anticipated — is a 500 under its
-        // own detail rather than a 503 by default: nothing says it will pass
-        // (ticket 31).
+        // own detail rather than a 503 by default: nothing says it will pass.
         //
         // `GET /api/aggregate` (`packages/http/src/index.ts`) does the same
         // resource on the same rule, independently, because `@project/http` cannot
@@ -166,14 +162,14 @@ export const createSpaceHost = (
         // one of these that claims something true: 404 says the root is missing
         // when it is not, 500 says a defect where there is none, and 302 needs
         // a Space id that does not exist. So this case and an unreachable
-        // database share a status, and the detail is what separates them —
-        // ticket 21 asked for one status each, and there is no second status in
-        // `ProductResponse` that is true of this state.
+        // database share a status, and the detail is what separates them:
+        // there is no second status in `ProductResponse` that is true of this
+        // state.
         //
         // A host reaches here only by failing to establish at start-up. While
         // the database is unreachable start-up retries without an attempt
         // bound, so the wait is literal and ends without anything the client
-        // does. A failure no wait cures stops the retry instead (ticket 31),
+        // does. A failure no wait cures stops the retry instead,
         // and start-up reports that it gave up and asks for a restart
         // (`src/http/database-http-runtime.ts`) — the operator's signal, since
         // this answer cannot carry it without serving a reason to the client.
@@ -203,8 +199,8 @@ export const createSpaceHost = (
 
     // These are web addresses and a direct request carries real HTTP semantics
     // (ADR 0069), so a method the contract does not serve is answered here
-    // rather than left to the SPA fallback — which handed back the application
-    // shell with a 200 for the very URL GET answers 400.
+    // rather than left to the SPA fallback, which would hand back the
+    // application shell with a 200 for the very URL GET answers 400.
     //
     // Identity first and method second, the shape `unservedContractPath`
     // already gives the API tree: an address that cannot be read is the same

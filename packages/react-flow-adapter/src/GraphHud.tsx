@@ -28,10 +28,9 @@ const PANEL_INSET = 15;
 /**
  * The canvas HUD: a Graph key attached above React Flow's minimap.
  *
- * **The key is kept deliberately**, although ADR 0053's Sidebar Graphs group
+ * **The key is kept deliberately**, although the Command Dock's Graph choice
  * says the same three facts. It is the on-canvas colour reference beside the
- * Edges being read, and it is what still names the Active Graph when the Sidebar
- * is collapsed or off-canvas below the mobile breakpoint. What the two must
+ * Edges being read. What the two must
  * never do is disagree, which is why both resolve a Graph's colour through the
  * one shared `graphColor` seam rather than each deriving its own — and why each
  * key row draws `GraphColorLine`, the same mark the Graph choice lists draw
@@ -39,8 +38,8 @@ const PANEL_INSET = 15;
  *
  * It lives in the adapter because the MiniMap is a React Flow component, and it
  * owns its own semantic presentation rather than delegating the markup: the key
- * had one production caller, so a separate published component was a seam with
- * nothing on the other side of it.
+ * has one production caller, so a separate published component would be a seam
+ * with nothing on the other side of it.
  *
  * **The key panel takes no pointer and the map takes every one it is given.**
  * A `.react-flow__panel` carries no `pointer-events` rule of React Flow's own,

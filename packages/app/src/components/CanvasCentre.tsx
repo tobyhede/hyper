@@ -9,12 +9,10 @@ export type VisibleCentre = () => MapPosition;
 /**
  * Reports where the middle of the visible canvas currently is.
  *
- * Add Resource and Add Reference Resource place at the centre of what the author is looking at,
- * and neither is invoked from inside the flow: one is a toolbar control and the
- * other a pane over the graph. So the answer has to be *readable* from outside,
- * and it has to be read at the moment of the gesture rather than at any earlier
- * render — an author who panned after opening the Reference Resource picker is looking
- * somewhere else by the time they choose a Target.
+ * A Resource created from the Command Dock lands at the centre of what the
+ * author is looking at, and the Dock is not inside the flow. So the answer has
+ * to be *readable* from outside, and it has to be read at the moment of the
+ * gesture rather than at any earlier render — an author may have panned since.
  *
  * Hence a getter handed upwards rather than a value: this component subscribes
  * to nothing and re-renders never. `useStoreApi` reads React Flow's store on
@@ -22,21 +20,18 @@ export type VisibleCentre = () => MapPosition;
  * already are — the same store the cameras read, rather than a second
  * measurement of the same DOM that could disagree with it.
  *
- * **`screenToFlowPosition` was the documented alternative and was weighed.** It
- * is the right call wherever a client point exists — `SpaceCanvas` uses it for
- * exactly that — and its arithmetic is the same `(point - pan) / zoom` written
- * below. The centre of the viewport is not such a point, though: reaching it
- * means measuring the pane with `getBoundingClientRect` and handing back the
- * middle, which is the second measurement this deliberately avoids, and the two
- * genuinely disagree — the store's `width`/`height` come from `offsetWidth` and
- * `offsetHeight` with React Flow's own `500` fallback, while the rect is live
- * and transform-affected. Converting a point we would have to derive from the
- * store anyway buys a documented name and costs the agreement.
+ * **Do not derive the centre through `screenToFlowPosition`.** It is the right
+ * call wherever a client point exists — `SpaceCanvas` uses it for exactly that
+ * — but the centre of the viewport is not such a point: reaching it means
+ * measuring the pane with `getBoundingClientRect`, and that measurement
+ * disagrees with the store — the store's `width`/`height` come from
+ * `offsetWidth` and `offsetHeight` with React Flow's own `500` fallback, while
+ * the rect is live and transform-affected.
  *
  * It is a component only because a hook needs somewhere to live inside
  * `ReactFlowProvider`. It draws nothing.
  *
- * **Not a camera.** It issues no command and moves nothing (ADR 0043): creating
+ * **Not a camera.** It issues no command and moves nothing: creating
  * a Resource leaves the viewport exactly where it was, which is what makes the
  * centre the right place to put one.
  */
@@ -56,10 +51,10 @@ export function CanvasCentre({ report }: { report: (centre: VisibleCentre | null
       };
     });
     // Withdrawn on the way out, because the reader outlives the reporter. This
-    // component is inside the canvas's `resources` branch — it needs React Flow's store —
-    // and both controls that read the centre are outside it: the toolbar's Add
-    // Resource, and the Reference Resource creation pane. A placement failure or a Space replaced
-    // under the canvas unmounts this and leaves them holding a getter closed over
+    // component is inside the canvas's `resources` branch — it needs React Flow's
+    // store — and the creation gestures that read the centre are outside it. A
+    // placement failure or a Space replaced under the canvas unmounts this and
+    // would leave them holding a getter closed over
     // an unmounted provider's store, which is not a viewport and must not answer
     // as one. `App` falls back to the origin, exactly as it does before the first
     // report.

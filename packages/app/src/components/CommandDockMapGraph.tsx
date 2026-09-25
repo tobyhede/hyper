@@ -132,22 +132,21 @@ export function GraphControls({
 }) {
   /**
    * **Present leads along a row and trails down a column**, and this is the one
-   * resource in the Dock the edge reorders.
+   * control in the Dock the edge reorders.
    *
    * Along a row it leads: it acts on the named entity the cluster is showing, so
    * it sits at the edge the eye enters from, ahead of the name it acts on.
    *
    * Down a column it cannot, because a column pays for it differently. A
    * leading verb needs a track of its own on *every* row — three of the four
-   * rows have no verb, and the 28px sits empty on each — and Resources' Create
-   * trails, so a leading Present makes the grid four tracks wide: 84px of a
-   * 208px column spent on gutters. Trailing, both verbs share one track and the
-   * column is three.
+   * rows have no verb, and the track sits empty on each — and Resources' Create
+   * trails, so a leading Present would make the grid a track wider. Trailing,
+   * both verbs share one track.
    *
    * It is a **reorder of the JSX and not a second placement rule**, so what the
    * eye reads and what the Tab key visits stay the same order. Placing the
-   * button visually while leaving it first in the DOM would have bought the
-   * same picture with a focus order that contradicts it.
+   * button visually while leaving it first in the DOM would give the same
+   * picture with a focus order that contradicts it.
    */
   const present = (
     <ToolbarButton
@@ -162,12 +161,9 @@ export function GraphControls({
       {/* Filled rather than outlined, which is the transport convention and not
           a decoration: at 12px an outlined triangle is mostly the paper behind
           it, so the one control on this cluster that starts something reads as
-          the lightest mark on it. `filled` is the icon's own prop — this used
-          to be a rule in `command-dock.css` reaching through the button into
-          the `svg` to beat Lucide's `fill="none"` attribute, which is a surface
-          overriding a glyph's drawing rather than asking it for one. The
-          Sidebar's Present is unfilled still, and stays that way until the
-          surface it belongs to is decided. */}
+          the lightest mark on it. `filled` is the icon's own prop, so the
+          surface asks the glyph for a fill rather than overriding Lucide's
+          `fill="none"` from `command-dock.css`. */}
       <PresentIcon color={graph.activeColor} filled />
     </ToolbarButton>
   );
@@ -176,9 +172,8 @@ export function GraphControls({
     <ToolbarGroup aria-label="Graph" className="command-dock__cluster">
       {vertical ? null : present}
       {/* The one identity that carries colour, and it carries it on the glyph
-          alone — the stroke the Edges of this Graph are drawn in. A neutral
-          swatch stood here and said only "a colour applies"; a Graph glyph
-          says which *kind* of entity the colour belongs to, and it is
+          alone — the stroke the Edges of this Graph are drawn in. A Graph
+          glyph says which *kind* of entity the colour belongs to, and it is
           `@project/ui`'s own `GraphIcon` rather than a mark this module
           invents. */}
       <IdentitySurface

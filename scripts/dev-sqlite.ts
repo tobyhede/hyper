@@ -11,8 +11,7 @@ import { DEFAULT_SQLITE_PATH } from '../src/sqlite/db';
  * Only the default's parent is made; a `SQLITE_PATH` naming anywhere else is
  * the operator's to prepare. A path the one policy refuses is an operator
  * mistake rather than a defect, so it is reported as one line and nothing is
- * started — as the shell `dev:sqlite` this replaced reported the absolute-path
- * rule (`test/unit/sqlite-dev-script.test.ts`).
+ * started (`test/unit/sqlite-dev-script.test.ts`).
  */
 const developmentPath = (): string => {
   mkdirSync(dirname(DEFAULT_SQLITE_PATH), { recursive: true });

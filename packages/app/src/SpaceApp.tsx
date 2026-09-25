@@ -13,9 +13,9 @@ export type SpaceAppRenderer = (app: ReactElement) => void;
  * Mount one application for the lifetime of the opened Space.
  *
  * Open Spaces validates the snapshot and composes the collaborators once, so
- * `createApp` no longer performs domain intake. What it still does before there
- * is a tree is apply the addressed opening against the session's working Space,
- * and that throws on a Space that has since stopped loading — with no boundary
+ * `createApp` performs no domain intake. What it does before there is a tree
+ * is apply the addressed opening against the session's working Space, and
+ * that throws on a Space that has since stopped loading — with no boundary
  * mounted yet to catch it. Both paths report the same sentence, for the same
  * reason: an uncaught throw leaves a blank page, which says nothing. This guard
  * is a backstop for a broken invariant, not a second composition path.

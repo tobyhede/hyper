@@ -107,10 +107,9 @@ const problem = (
  * `persistence-unavailable`. A failure that is neither — a code defect, or a
  * driver failure nobody anticipated — is 500 `internal-error` too, under its
  * own detail: 503 would tell the client to wait out something this code has
- * no evidence will pass (ticket 31). Every route that reads or writes the
- * stored seam answers by it — the collection and single-Space reads included,
- * which answered 503 for any failure until ticket 38, so a wrong password
- * told a client to wait. `src/http/space-host.ts` answers `GET /` by the same
+ * no evidence will pass, such as a wrong password. Every route that reads or
+ * writes the stored seam answers by it — the collection and single-Space reads
+ * included. `src/http/space-host.ts` answers `GET /` by the same
  * three arms; it cannot share this helper across the package boundary.
  */
 const storedFailureProblem = (context: Context, error: unknown) => {
@@ -158,14 +157,9 @@ const drainRejectedBody = async (
  * client loses the connection. Both are pinned by tests — the size cases in this
  * package, the connection reuse in `vite-hono-host.test.ts`.
  *
- * Draining on overflow is also what the superseded raw Node handler did: it
- * cleared its buffer and called `request.resume()` for exactly this reason.
- *
- * A declared-length pre-check sat here once and was dropped. It was never
- * required for the bound — counting catches an honest over-declaration too, only
- * later — and trusting the header meant a client could be answered 413 for a
- * body it had not sent. Measuring is the answer a lying header deserves. Do not
- * reintroduce it without first deciding what a dishonest length should mean.
+ * Do not add a declared-length pre-check. The bound does not need one —
+ * counting catches an honest over-declaration too, only later — and trusting
+ * the header would answer 413 for a body a client had not sent.
  *
  * The cost is the fast path: every legitimate commit is buffered and re-read.
  */
@@ -336,9 +330,9 @@ const unservedContractPath = (context: Context): Response | undefined => {
  * `c.json()` sets a bare `application/json`, so naming the charset is a rewrite
  * of what Hono produced rather than a default applied to what we omitted. Both
  * of the middleware's exits reach it: a response that fell through the route
- * tree, and the HEAD guard's early return. Only the first went through it
- * before, so `/api/spaces/not-a-uuid` answered GET and HEAD with the same 400
- * under two different media types.
+ * tree, and the HEAD guard's early return. Skipping either would answer GET and
+ * HEAD for `/api/spaces/not-a-uuid` with the same 400 under two different
+ * media types.
  */
 const normalizeJsonMedia = (response: Response): Response => {
   if (response.headers.get('Content-Type') === 'application/json') {
@@ -396,7 +390,7 @@ export const createSpaceHttpApp = (
         try {
           const result = await repository.commit(commit);
           // Every status comes from the one table the browser transport decodes
-          // through (ADR 0098), and each body is paired with its status at its
+          // through, and each body is paired with its status at its
           // own `context.json` call, because that is what the typed client
           // infers the per-status response bodies from —
           // `space-http-app-types.test.ts` holds that.

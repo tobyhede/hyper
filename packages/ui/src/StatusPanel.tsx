@@ -89,8 +89,8 @@ export interface StatusBusyProps {
    *
    * Decorative by contract: the label is the accessible text, so a mark carries
    * an empty `alt` and contributes nothing to what the region announces. Given
-   * none, the panel draws exactly the labelled row it always did — the column
-   * gap has one child to separate.
+   * none, the panel draws the labelled row alone — the column gap has one
+   * child to separate.
    */
   readonly mark?: ReactNode;
 }

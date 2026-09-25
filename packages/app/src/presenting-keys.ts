@@ -17,18 +17,12 @@ const MODAL = '[role="dialog"],[role="alertdialog"]';
 /**
  * Whether a modal surface owns this press.
  *
- * Deference is not only about a control that activates itself. **The rule was
- * written for a surface that has gone** — below the Space Sidebar's breakpoint
- * the whole command surface was a Base UI Sheet over the canvas, reopenable
- * during a traversal, and its focus trap meant every press then originated
- * inside it. The Command Dock has no Sheet and hides itself while presenting
- * (ADR 0082), so that particular surface is not what this defers to any more.
- * The rule stays because the *shape* is not the Sheet's: a creation pane, the
- * persistence conflict dialog and the Resource deletion confirmation are all modal
- * and all reachable, and a window listener that went on traversing would run
- * a Traversal command behind a surface the presenter is looking at: one Escape
- * both dismissing the dialog and leaving presentation, Arrow keys moving a Graph
- * nobody can see.
+ * Deference is not only about a control that activates itself. The persistence
+ * conflict dialog and the Resource deletion confirmation are modal and
+ * reachable while presenting, and a window listener that went on traversing
+ * would run a Traversal command behind a surface the presenter is looking at:
+ * one Escape both dismissing the dialog and leaving presentation, Arrow keys
+ * moving a Graph nobody can see.
  *
  * The same rule as the one below, spent on a whole surface rather than one
  * control: whatever the press belongs to keeps it.
@@ -59,10 +53,10 @@ const INTERACTIVE = [
  *
  * A `button` — the chrome's moves, Back and Overview, and every control on the
  * Dock — activates on Space and Enter by itself, and a `keydown` listener on
- * `window` sees that press first. Calling `preventDefault` there is what stopped
- * the activation ever happening; not calling it, but still advancing, ran two
- * commands for one press. Either way the presenter got something they did not
- * ask for from a control they were looking at.
+ * `window` sees that press first. Calling `preventDefault` there stops the
+ * activation; not calling it, but still advancing, runs two commands for one
+ * press. Either way the presenter gets something they did not ask for from a
+ * control they were looking at.
  *
  * So the rule is deference, and it is a rule about **interactive controls**
  * rather than about one button: whatever has focus and activates itself keeps
@@ -80,7 +74,7 @@ function activatesFocusedControl(event: KeyboardEvent): boolean {
 }
 
 /**
- * The global Traversal commands, bound while a traversal is on (ADR 0027).
+ * The global Traversal commands, bound while a traversal is on.
  *
  * Right commits the selected Edge, Left traverses back, Up and Down move the
  * selection among a fork's outgoing Edges without moving the camera — the move a

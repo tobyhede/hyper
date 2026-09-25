@@ -14,9 +14,9 @@ export interface PresentingChromeProps {
    * The chrome takes the delta rather than an index because it is the one that
    * knows where the selection currently sits in the list it drew: it renders
    * `moves` in order and marks one of them, so the arithmetic is a read of its
-   * own output. App used to do it — `selectBranch(index - moves.findIndex(...))`
-   * — which made the composition re-derive the list's shape to answer a question
-   * about a control it does not draw.
+   * own output. Do not compute it in `App`: the composition would then
+   * re-derive the list's shape to answer a question about a control it does
+   * not draw.
    */
   onSelectBranch: (delta: number) => void;
   onAdvance: () => void;
@@ -113,11 +113,9 @@ export function PresentingChrome({
    * the tree.
    *
    * It **begins owed**, because entering presentation strands focus in the same
-   * way. The Sidebar's Present button is the one DOM node that relabels to
-   * Overview, so React keeps focus on it and the presenter is left holding the
-   * control that *leaves* — and Space, which advances, defers to whatever has
-   * focus and would drop straight back to the overview. Claiming focus here is
-   * what makes the first Space advance.
+   * way: the Dock's commands, Present among them, are hidden while presenting
+   * (`command-dock.css`), and Space, which advances, defers to whatever has
+   * focus. Claiming focus here is what makes the first Space advance.
    *
    * It is deliberately **not** set for a traversal performed with the global
    * arrow keys: focus is wherever the presenter left it, and moving it into the
@@ -146,7 +144,7 @@ export function PresentingChrome({
   // Keyed on which move is selected, and deliberately **not** on `moves`: `App`
   // calls `navigation.moves()` during render, so that array is a fresh identity
   // every time and the effect would run on every render of the application. A
-  // presenter who had scrolled a wide fork's row sideways to read a distant
+  // presenter who has scrolled a wide fork's row sideways to read a distant
   // choice would have it snapped back by any unrelated publish. The Resource's id
   // rather than the index, so advancing to a new choice set scrolls too.
   useEffect(() => {
@@ -157,11 +155,7 @@ export function PresentingChrome({
     <div
       data-testid="presenting-chrome"
       // Its own container, so the responsive rule below reads the width the
-      // chrome actually has rather than the viewport's. It was tuned when the
-      // Space Sidebar took 16rem of that width above its breakpoint and none
-      // below; ADR 0082 gives the chrome the whole width at every size, so the
-      // container query now stacks only where the *viewport* is genuinely narrow
-      // — which is what `@container` was chosen to express either way.
+      // chrome actually has rather than the viewport's.
       // React Flow's live Space-key pan activation subscription reaches this
       // chrome outside the canvas, so `.nokey` excludes all of its controls.
       className="nokey @container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"
@@ -193,8 +187,8 @@ export function PresentingChrome({
                 The selection, as text, because nothing else in this region is.
                 Up and Down rewrite an `aria-label` and a variant class, and
                 neither is a text change — so with `aria-atomic="false"` the
-                region had nothing to read and a screen-reader presenter arrowed
-                across a fork in silence. Focus deliberately does not move for
+                region would have nothing to read and a screen-reader presenter
+                would arrow across a fork in silence. Focus deliberately does not move for
                 those keys, so this is the only surface left that can say what
                 changed. It carries the same wording as the control it names.
               */}

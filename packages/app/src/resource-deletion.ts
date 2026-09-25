@@ -14,7 +14,7 @@ import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
  * The menu arms a question and the dialog answers it, but neither surface owns
  * the interaction's lifetime. This module does: arming, cancellation, busy
  * state and kind-specific execution stay together, and the Edit owners stay
- * where they are (ADR 0035, ADR 0074, ADR 0076).
+ * where they are.
  *
  * **What a deletion leaves behind is not this module's.** It runs each deletion
  * through command outcomes' `resource-delete` channel, which owns the notice,

@@ -57,7 +57,7 @@ import type { DockSpace } from './command-dock-chrome';
 import { Divider, IdentitySurface, SetTrigger } from './CommandDockParts';
 
 /**
- * **The one set of branded ids the Dock still binds by hand.**
+ * **The one set of branded ids the Dock binds by hand.**
  *
  * `DropdownMenuRadioGroup` is generic over its value and `DropdownMenuRadioItem`
  * is generic over its own, and the type does not travel from the group to its
@@ -77,12 +77,9 @@ import { Divider, IdentitySurface, SetTrigger } from './CommandDockParts';
  * `tools/typing-fixtures/must-fail/mismatched-menu-item.tsx` is the standing
  * evidence that the rule bites.
  *
- * **The Map and Graph sets no longer need a name here, and that is the
- * better answer rather than a looser one.** Both are `ChoiceMenu` now, which
+ * **The Map and Graph sets need no name here.** Both are `ChoiceMenu`, which
  * renders the group *and* its items from one type parameter — so the two halves
  * cannot be named differently because no call site writes the second one.
- * Naming a type twice and trusting the author is what a shared composition
- * removes; `ChoiceMenu<MapId>` is the whole of it.
  *
  * **Two of the Dock's remaining radio groups are deliberately absent** and
  * neither wants adding: a Graph's colour is a plain `string` on both sides
@@ -96,24 +93,20 @@ const SpaceItem = DropdownMenuRadioItem<UUID>;
 /**
  * The Space's chevron: an ordinary menu, the same one Map and Graph carry.
  *
- * **It used to disclose a list of Spaces and that list is gone.** A Space is a
- * Space Resource, so the Spaces in this Space are Resources in it, and the surface that
- * offers Resources already offers them. Two disclosures over overlapping sets was
- * the duplication, and the one that had to go is the one whose set was a
- * subset.
+ * **It does not disclose a list of Spaces.** A Space is a Space Resource, so the
+ * Spaces in this Space are Resources in it, and the surface that offers
+ * Resources already offers them.
  *
  * **The same grouping grammar as `MapMenuActions` and `GraphMenuActions`
- * minus the part that names a set** (`.scratch/dock-menu-reorganisation/issues/02`):
+ * minus the part that names a set:**
  * Rename beside Copy link to Space, then Exit Space — one separator between
  * the two groups. The list of Spaces this control does *not* draw is the
  * **open** set, and that belongs to the Open Spaces menu beside the Opener
  * control, where the question is which Space you are looking at rather than what
  * you can do to it.
  *
- * **Exit is the one command the Open Spaces menu made necessary.** While pressing an
- * ancestor was Exit, leaving and closing were the same gesture and neither
- * needed a name; now that moving closes nothing, the open set only grows unless
- * something takes from it. It sits in its own trailing group, separated by a
+ * **Exit is what takes a Space out of the open set.** Moving between Spaces
+ * closes nothing, so the open set only grows unless something takes from it. It sits in its own trailing group, separated by a
  * rule — the same position Delete holds on the Map and Graph menus — and
  * it is disabled on the meta Space, which cannot be exited.
  *
@@ -163,13 +156,12 @@ function SpaceMenu({
               discards a session's place in it, not the Space, and
               re-entering costs one press on a Resource. Meta cannot be exited,
               so there the row is present and unavailable rather than gone —
-              and that is the *only* case, which `exitDisabled` is named for
-              and `space.opener` was not.
+              and that is the *only* case, which `exitDisabled` is named for.
 
               **Exit, because the glossary says Exit.** `CONTEXT.md` gives the
               word to the one action that closes an entered Space, and
-              `openSpaces.exit` is spelled that way too; this drew "Close Space"
-              and so named a fourth resource beside Open, Close and Exit. */}
+              `openSpaces.exit` is spelled that way too; "Close Space" would
+              collide with a Resource's Open and Close. */}
           <DropdownMenuItem
             className="gap-2"
             disabled={space.exitDisabled}
@@ -259,18 +251,16 @@ function ExitReport({ space }: { readonly space: DockSpace }) {
  * `[Opener] [⌄]` — where you came from, and every other Space you have open.
  *
  * **The bar names one step, and the Open Spaces menu holds the rest.** Depth costs
- * width and the Dock is furniture at the edge of a canvas, so drawing the whole
- * path was always going to lose: at four crossings it was a row of collapsed
- * glyphs saying "two Spaces, and you will have to hover to learn which". One
+ * width and the Dock is furniture at the edge of a canvas, so do not draw the
+ * whole path: a few crossings deep it becomes a row of collapsed glyphs. One
  * named step — the Space you came from, the one a reader actually reaches for —
  * costs a word, and everything else moves behind the Open Spaces menu's `⌄`.
  *
  * **The Open Spaces menu is not the path.** It lists the *open* Spaces as the tree they
  * are, so a Space opened from Meta and left behind is in it beside the branch
- * you are standing on, indented under the Space it was entered from. That is
- * the gap a trail could not close: a trail can only offer what is above you, so
- * a Space open but not an ancestor had nowhere to be, and leaving one meant
- * losing it. Selecting a row moves to it and closes nothing, so the list a
+ * you are standing on, indented under the Space it was entered from — a trail
+ * could only offer what is above you. Selecting a row moves to it and closes
+ * nothing, so the list a
  * reader learns stays the list they come back to — the shape of the menu does
  * not change under them when they use it.
  *
@@ -296,7 +286,7 @@ function OpenerAndOpenSpaces({
    * puts the announcement before the disclosure: "a standing failure announces
    * itself rather than waiting to be opened — a report you have to go and find
    * is not a report". A mark that exists only under the chevron is exactly that
-   * report, and the vertical strip this replaced badged the set permanently.
+   * report.
    *
    * The Space the reader is *in* is excluded, because it reports for itself:
    * its own persistence control and standing notice are on this same bar, with
@@ -325,15 +315,14 @@ function OpenerAndOpenSpaces({
     // CONTEXT.md retires for it (`dock-commands.test.tsx` holds the name).
     <Breadcrumb aria-label="Open Spaces">
       {/* The Dock has one type scale and the trail is in it. `BreadcrumbList`
-          defaults to `text-sm`, which is a page's scale: the crumb inside it
-          drew its own 13px and took its line height from the list, so the
-          Open Spaces menu came out a pixel shorter than every other named control.
-          `compact` is the 13px the rest of the surface is at. */}
+          defaults to `text-sm`, which is a page's scale, and the crumb takes
+          its line height from the list; `compact` is the size the rest of the
+          surface is at. */}
       <BreadcrumbList size="compact" className="command-dock__trail-list">
         {opener === null ? null : (
           <BreadcrumbItem className="command-dock__crumb">
             <BreadcrumbLink
-              // A `ToolbarButton`, because the Dock is one `Toolbar` now: a
+              // A `ToolbarButton`, because the Dock is one `Toolbar`: a
               // plain `Button` in here is a control the roving tabindex does not
               // know about, so it takes a tab stop of its own and the bar stops
               // being one. `BreadcrumbLink` renders whatever it is given —
@@ -344,9 +333,9 @@ function OpenerAndOpenSpaces({
                   // **The Opener's ink is a shared variant and not a rule here.**
                   // The Opener recedes below the bar's own tone so the two rows
                   // read as a place and the volume it sits inside, and that is
-                  // a Button's ink: declared over this class, it made an
-                  // application stylesheet a second owner of the shared
-                  // recipe's appearance, and won only by being loaded later.
+                  // a Button's ink. Do not declare it over this class: that
+                  // makes an application stylesheet a second owner of the
+                  // shared recipe's appearance, winning only by load order.
                   variant="receded"
                   size="compact"
                   className="command-dock__crumb nokey"
@@ -386,11 +375,8 @@ function OpenerAndOpenSpaces({
               aria-label={openSpacesName(openCount(space.listing), unwell)}
               title="Switch Space"
               // A `ToolbarButton` like every other control in the bar. It sits
-              // in a breadcrumb rather than in a cluster, which used to mean a
-              // plain `Button` — Base UI's toolbar button throws outside a
-              // `Toolbar.Root`, and each cluster was its own root. The Dock is
-              // one root now, so this is inside it and takes no tab stop of
-              // its own.
+              // in a breadcrumb rather than in a cluster, but the Dock's one
+              // `Toolbar.Root` encloses it, so it takes no tab stop of its own.
               render={
                 <ToolbarButton variant="ghost" size={opener === null ? SET_TRIGGER.size : 'icon'} />
               }
@@ -400,7 +386,7 @@ function OpenerAndOpenSpaces({
                     two cannot space themselves differently. Below the root the
                     Opener's name stands beside the chevron and the pair reads
                     as a place and a way out of it; at the top there is no
-                    Opener, and a bare chevron left the region opening with a
+                    Opener, and a bare chevron would open the region with a
                     mark that names nothing.
 
                     The OPEN mark: the Spaces set starts at Meta, while the
@@ -413,9 +399,8 @@ function OpenerAndOpenSpaces({
               {/* The same dot the unwell row carries, on the control that
                     discloses it — one treatment for one meaning, so the mark on
                     the bar and the mark in the list read as one mark. It
-                    is `aria-hidden` because the count above already says it;
-                    two announcements of one state is the `title`-beside-`sr-only`
-                    duplication the row below was fixed for. */}
+                    is `aria-hidden` because the count above already says it,
+                    and one state is announced once. */}
               {unwell === 0 ? null : (
                 <span className="command-dock__unwell" data-unwell aria-hidden="true" />
               )}
@@ -451,7 +436,7 @@ function OpenerAndOpenSpaces({
                       {/* The indent is **drawn**: a hairline per level, so
                           `Traversal` and `Platform` are visibly siblings and
                           the row you are on is three rules deep without anyone
-                          counting pixels (`.scratch/command-dock/issues/01-...`).
+                          counting pixels.
                           After the guides, each row carries its Space's mark —
                           OPEN for Meta, the cube for every other Space, as the
                           Space cluster draws it. */}
@@ -468,14 +453,11 @@ function OpenerAndOpenSpaces({
                         <ResourceKindIcon kind="space" decorative />
                       )}
                       {row.title}
-                      {/* **The regression `OpenSpaces` did not have.** The
-                          vertical tab strip this Open Spaces menu replaced —
-                          deleted since, by
-                          `.scratch/command-dock/issues/08` — drew a badge
-                          per open Space for `conflicted`, `failed` and
-                          `rejected`; a list that says nothing makes a Space
-                          whose commit conflicted while the reader was elsewhere
-                          look exactly like one that is fine.
+                      {/* **An unwell open Space is marked.** A list that says
+                          nothing about `conflicted`, `failed` and `rejected`
+                          makes a Space whose commit conflicted while the
+                          reader was elsewhere look exactly like one that is
+                          fine.
 
                           A dot and not a word: the row's job is to be picked,
                           and the sentence explaining a failure belongs to the
@@ -485,10 +467,10 @@ function OpenerAndOpenSpaces({
                           rather than in colour alone. */}
                       {report === null ? null : (
                         <span className="command-dock__unwell" data-state={row.persistence.kind}>
-                          {/* The `sr-only` span is the whole announcement. A
-                              native `title` beside it said the same sentence a
-                              second time — announced twice by a screen reader,
-                              and reachable by neither keyboard nor touch. If
+                          {/* The `sr-only` span is the whole announcement. Do
+                              not add a native `title` beside it: that says the
+                              sentence a second time to a screen reader, and is
+                              reachable by neither keyboard nor touch. If
                               this mark ever earns a pointer affordance it is
                               `Tooltip`'s, which `@project/ui` exports; a bare
                               `title` is a second, unstyled tooltip layer. */}
@@ -533,13 +515,11 @@ function OpenerAndOpenSpaces({
  * never an editor: a Space is renamed from inside it, and two equally weighted
  * editable names would say you are in both.
  *
- * **Three elements this removed rather than added.** There is no Exit button on
- * the bar — Exit is in the Space menu — no
- * separate list of open Spaces beside a trail of ancestors, and no tooltip
- * carrying depth — the Open Spaces menu's indent carries it. The Sidebar's tab strip
- * (`OpenSpaces`, deleted by `.scratch/command-dock/issues/08`) is not carried
- * over as a strip, but this is what it modelled: the *set* of open Spaces. What
- * it could not model is the crossing, and the Opener control is that.
+ * **Three elements it does not draw.** There is no Exit button on the bar —
+ * Exit is in the Space menu — no separate list of open Spaces beside a trail
+ * of ancestors, and no tooltip carrying depth — the Open Spaces menu's indent
+ * carries it. The Open Spaces menu is the *set* of open Spaces; the Opener
+ * control is the crossing.
  *
  * **What depth costs is width, and the two parts are how it is paid.** Only one
  * step is ever a word, so a fourth crossing costs nothing at all on the bar; and

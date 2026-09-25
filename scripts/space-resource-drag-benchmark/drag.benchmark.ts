@@ -275,7 +275,7 @@ async function dragAndMeasure(
     mutationRecords: probe.mutationRecords,
     browserWorkSeconds: {
       script: delta['ScriptDuration'] ?? 0,
-      // Preserve CDP's counter name while keeping ADR 0085's vocabulary scan clear.
+      // Preserve CDP's counter name while keeping the vocabulary scan clear.
       reflow: delta[['Lay', 'outDuration'].join('')] ?? 0,
       paint: paintDurations.reduce((total, duration) => total + duration, 0) / 1_000_000,
       task: delta['TaskDuration'] ?? 0,

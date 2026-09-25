@@ -3,10 +3,7 @@
    Reached by an attribute rather than a class because Base UI portals the popup out
    of whatever surface opened it, so no ancestor selector can find it.
 
-   It is deliberately unscoped, which is what it already was: the same treatment
-   reaches every consumer. The design-system
-   inventory used to record this as part of the Resource editor's debt, which was true
-   about where the colours came from and wrong about what they style.
+   It is deliberately unscoped: the same treatment reaches every consumer.
 
    Most of the palette is stated through the primitive's own shadcn variables, which
    is the theming seam `components/combobox.tsx` reads — that is why the values sit
@@ -28,7 +25,7 @@
   --csc-refused-foreground: #887f70;
   /* This popup's own border weight and item weight: a private singleton and a
      private step, neither part of the Resource's central `--canvas-resource-*`
-     scale (ticket 06) — 3px is this popup's own pick, not the Resource's 4px, and
+     scale — 3px is this popup's own pick, not the Resource's 4px, and
      forcing the two together would be an unrecorded reconciliation. The
      corners below *are* the Resource's own `--canvas-resource-radius`, reused
      rather than restated: the popup deliberately echoes the Resource's flush
@@ -66,10 +63,9 @@
 
 /* A refused choice stays legible rather than dimmed: the Combobox's own disabled
    opacity is overridden, not its semantics. Its reason is drawn in
-   `--muted-foreground`, which on this cream face is under AA — the same defect
-   `tailwind.css` records for the canvas Resource and fixed there with a token of its own.
-   Recorded, not fixed here: changing what the popup looks like is a design decision
-   rather than part of moving this stylesheet. */
+   `--muted-foreground`, which on this cream face is under AA. The canvas Resource
+   answers the same contrast problem with a token of its own (`tailwind.css`);
+   this popup does not, and changing what it looks like is a design decision. */
 [data-resource-search-combobox] [data-slot='combobox-item'][data-disabled] {
   color: var(--csc-refused-foreground);
   background: var(--popover);

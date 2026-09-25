@@ -107,15 +107,14 @@ export interface EdgeAuthoringInput {
   readonly placedResources: readonly Resource[];
   readonly newResourceTitle: string;
   /**
-   * Edge authoring is withdrawn before a placement resolves, while a modal pane
-   * covers the graph, while a chrome title edit is running, and while
-   * presenting — the four terms `authorOnCanvas` carries, and the canvas passes
-   * one value to it and to the Resource controls alike. The pane was missing here,
-   * which left the pointer gesture live behind it; see
-   * `authoring-availability.ts`'s `authorOnCanvas`.
+   * Edge authoring is withdrawn before a placement resolves, while this canvas
+   * is not the one being authored, while a chrome title edit or an embedded
+   * edit is running, and while presenting — the terms `authorOnCanvas`
+   * carries, and the canvas passes one value to it and to the Resource
+   * controls alike; see `authoring-availability.ts`'s `authorOnCanvas`.
    *
-   * The chrome rename is its own term rather than a second pane: it is inline
-   * and not modal at all — no backdrop, no focus trap, the canvas fully
+   * The chrome rename withdraws it although it is inline and not modal at all —
+   * no backdrop, no focus trap, the canvas fully
    * reachable behind it — and it withdraws this lifecycle because a second
    * authoring surface must not start over a live one.
    *
@@ -180,8 +179,8 @@ export function useEdgeAuthoring({
   const connecting = useRef(false);
   const [modifierHeld, setModifierHeld] = useState(false);
   // Where the pointer is, not the point it is at: React bails out of an
-  // unchanged state write, so a pointer moving across empty canvas no longer
-  // re-renders the flow per frame.
+  // unchanged state write, so a pointer moving across empty canvas does not
+  // re-render the flow per frame.
   const [pointerOver, setPointerOver] = useState<ElementDropTarget>('off-canvas');
 
   // The latest projection and module, read by stable callbacks. React Flow warns
@@ -295,12 +294,11 @@ export function useEdgeAuthoring({
         }
       }
       // The Resource a completed connection reached is published as a continuation
-      // rather than selected here. **The frame this used to defer by is gone
-      // with it**: it existed because selecting during the release would be
-      // undone by the selection changes the release itself produces, and the
-      // spend no longer happens inside `onConnectEnd` at all — the gesture
-      // posts, and `CanvasContinuation` spends on a later render, after React
-      // has committed the release.
+      // rather than selected here: selecting during the release would be undone
+      // by the selection changes the release itself produces. The spend does
+      // not happen inside `onConnectEnd` at all — the gesture posts, and
+      // `CanvasContinuation` spends on a later render, after React has
+      // committed the release.
       latest.current.authoring.endPointerDrag();
       setModifierHeld(false);
       setPointerOver('off-canvas');

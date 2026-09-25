@@ -36,12 +36,9 @@ interface NavigationBase {
  * Navigation is either overviewing the whole Space or presenting one Graph;
  * Traversal history and its selected branch belong to the second state alone.
  *
- * They used to sit beside `mode` on one flat state, which admitted an overview
- * carrying Traversal history and a `branchIndex` naming a branch of nothing. Nothing in the
- * type held the correspondence, so every operation maintained it by hand: four
- * separate `traversalHistory: []` with `branchIndex: 0` resets, and a `mode` check in front
- * of every read of either. Splitting on `mode` makes those states
- * unrepresentable, so the resets have nothing to clear and the reads narrow.
+ * Splitting on `mode` makes an overview carrying Traversal history, or a
+ * `branchIndex` naming a branch of nothing, unrepresentable, so no operation
+ * resets them by hand and every read narrows.
  */
 export type NavigationState =
   | (NavigationBase & { readonly mode: 'overview' })
@@ -190,7 +187,7 @@ export const openingGraphId = (resolved: ResolvedMap): GraphId => resolved.activ
  * cannot reach; element 0 is a fixed tuple element and keeps its type, so the
  * Traversal history's guaranteed first Resource supplies it. Both reads are indexes and neither
  * copies: this runs on every render through `activeResourceId` and `moves`, and
- * destructuring a tail to reach the end allocated a copy of the whole
+ * destructuring a tail to reach the end would allocate a copy of the whole
  * accumulated history each time.
  */
 function currentResource(traversalHistory: TraversalHistory): ResourceId {
@@ -201,7 +198,7 @@ function currentResource(traversalHistory: TraversalHistory): ResourceId {
  * The fields both modes carry, taken off whichever state is current.
  *
  * Named rather than spread, because spreading a presenting state into an
- * overview one carries Traversal history across at runtime — the very resource the type is
+ * overview one carries Traversal history across at runtime — the very thing the type is
  * here to stop, arriving through the back door as an untyped property.
  */
 function baseOf(state: NavigationState): NavigationBase {
@@ -256,9 +253,9 @@ export function createNavigation(
     },
     // Published whole, not merged over what is there: a replacement Space is
     // opened rather than navigated to, so nothing of the previous one survives
-    // it. Merging was equivalent only while `openedState` named every field —
-    // once it stopped naming `traversalHistory` it stopped clearing Traversal history, and
-    // history from a Space that was gone rode across under a `mode` saying there was none.
+    // it. Do not merge: `openedState` does not name `traversalHistory`, so a
+    // merge would carry Traversal history from a Space that is gone across under
+    // a `mode` saying there is none.
     openFresh: (selection) => {
       observable.publish(openedState(selection, resolveMap(currentSpace(), selection)));
     },
@@ -278,7 +275,7 @@ export function createNavigation(
     // `updatePositionedMap` as the Map's `activeGraph`, which intake
     // rejects outright.
     //
-    // **Re-resolving instead of refusing was the wrong repair.** Falling back to
+    // **Do not re-resolve instead of refusing.** Falling back to
     // the adopted Map's own Active Graph moves the emphasis without being
     // asked, and this call is the one that must not interrupt a traversal: the
     // history being presented belongs to the Graph that was active, so silently
@@ -350,10 +347,9 @@ export function createNavigation(
     // rather than at the gesture that caused it. This is the authoritative copy
     // of that reasoning; the tests point at it rather than restating it.
     //
-    // **The two refusals are separate again.** They were the same check while
-    // every canvas drew every Graph in the Space; under ADR 0040 a Map
-    // draws only the Graphs it *owns*, so a Graph that plainly exists — because
-    // a second Map owns it — is one this Map does not show. "Does not
+    // **The two refusals are separate.** Under ADR 0040 a Map draws only the
+    // Graphs it *owns*, so a Graph that plainly exists — because a second Map
+    // owns it — is one this Map does not show. "Does not
     // exist" and "does not show" are different mistakes by the caller and each
     // says which.
     //
@@ -366,8 +362,7 @@ export function createNavigation(
     // caller's mistake rather than an author's, and returning would answer one
     // by moving no emphasis and saying nothing, leaving the stale Active Graph
     // to be written by every Edit after it. Throwing names the wrong call at
-    // the call that made it, which is the whole point of moving this refusal
-    // off the commit. Nothing is half-applied either way: both checks sit above
+    // the call that made it, which a refusal at the commit cannot. Nothing is half-applied either way: both checks sit above
     // `publish`, so Navigation is left exactly as `selectMap` leaves it.
     //
     // **A minted Graph passes by ordering, not by an exemption.** Edit
@@ -393,17 +388,15 @@ export function createNavigation(
     // Two refusals, and **both are reachable**. Each is a state with no Resource to
     // begin at, and `GraphSelector` disables its control on exactly the union of
     // them, so the two agree — which is what stops either from being a click the
-    // control accepts and silently drops. They used to be one guard, and a fully
-    // cyclic Graph fell through the gap between them: the control read `Present`,
-    // stayed enabled, and swallowed the click.
+    // control accepts and silently drops: a fully cyclic Graph, say, drawing an
+    // enabled `Present` that swallows the click.
     //
     // **No active Graph** is the state a Space with no Maps is in, since a
     // Map is what owns Graphs (ADR 0040).
     //
-    // The **edge-less Graph** below was once the shape `graphSchema` forbade,
-    // and its guard was type ceremony. It is now ordinary: creating a Map
-    // creates its initial Active Graph *empty* in the same Edit (ADR 0040), and
-    // every new Map sits here until the author draws an Edge.
+    // The **edge-less Graph** below is ordinary: creating a Map creates its
+    // initial Active Graph *empty* in the same Edit, and every new Map sits
+    // here until the author draws an Edge.
     // `graphStartResource` has no answer for such a Graph. Presenting has something
     // real to decline.
     //
@@ -427,18 +420,16 @@ export function createNavigation(
       observable.publish({ ...baseOf(observable.getState()), mode: 'overview' }),
     // The guard is the no-outgoing-Edge case — no active Graph, or a Resource the
     // Graph leaves by nothing — and not an out-of-range `branchIndex`. Overview
-    // no longer reaches it and is no longer one of the cases it answers: the
-    // Traversal history and the index are presenting's alone, so the mode is settled by the
+    // does not reach it: the Traversal history and the index are presenting's alone, so the mode is settled by the
     // narrowing a line below rather than by falling through to an empty Edge set.
     // **Don't clamp the index to the Edge count here.** Every write keeps it in
     // range for the Resource it was written against: `selectBranch` takes it modulo
     // the count, `retreat` uses a `findIndex` result, and every other write is
-    // 0. Reaching a stale index needs the Edge set to shrink during a live traversal,
-    // which nothing does — an Edit only ever adds Edges, changing Graph or Resource
-    // rewrites the index, structural deletion is not built (ADR 0033), and
-    // accepting the stored Space opens fresh navigation, which resets Traversal history
-    // and the index with it. Clamping would also be
-    // the wrong repair rather than a safe one: `moves()` marks the selection by
+    // 0. A stale index needs the Edge set to shrink during a live traversal, and
+    // nothing does: presenting withdraws the Edge lifecycle (`authorOnCanvas`),
+    // so the one Edit it admits, a pointer connection, only adds Edges. Changing
+    // Graph or Resource rewrites the index, and accepting the stored Space opens
+    // fresh navigation, which resets Traversal history and the index with it. Clamping would be the wrong repair rather than a safe one: `moves()` marks the selection by
     // `index === branchIndex`, so a stale index shows *no* move selected, and
     // advancing to "the last valid Edge" would silently move down one the presenter was
     // never shown. It cannot replace this guard either, since an empty Edge set
@@ -461,8 +452,8 @@ export function createNavigation(
       // Dropping the last Resource cannot empty Traversal history, and this is where that
       // stops being a fact about the length check above and becomes one about
       // the value: the first Resource is carried over as itself, so what comes back
-      // is non-empty Traversal history rather than an array that happens not to be. The
-      // rest-destructuring `currentResource` dropped stays here deliberately:
+      // is non-empty Traversal history rather than an array that happens not to be.
+      // Rest-destructuring stays here deliberately:
       // `slice` makes this O(n) in the history length, but it runs once per
       // user gesture rather than on every render, and the copy is what carries
       // the non-emptiness into the type instead of asserting it away.

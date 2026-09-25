@@ -18,8 +18,8 @@ export interface NewResourcePreviewProps {
  *
  * The endpoint comes from `useConnection`, which converts it to flow coordinates
  * before handing it over — so this needs no `screenToFlowPosition` and no
- * viewport subscription to stay put under pan and zoom. Tracking the point in
- * component state instead re-rendered the whole flow on every pointer frame.
+ * viewport subscription to stay put under pan and zoom. Do not track the point
+ * in component state: that re-renders the whole flow on every pointer frame.
  *
  * Both eligibility and position come from `newResourceDrop`, which the release asks
  * as well: the ghost cannot appear where a release would refuse, and cannot land

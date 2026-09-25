@@ -2,15 +2,14 @@
 
    Geometry only, and deliberately no colour at all.
 
-   **The band used to carry the Active Graph's colour and no longer does**
-   (`.scratch/command-dock/issues/12`). What a selected Resource shows is a command
-   strip, and a strip of commands is chrome — so it is drawn as the product draws
-   chrome everywhere else: the neutral `.command-surface` the Command Dock
-   wears, mounted here by `ResourceRailActions`. A coloured band behind it would have
-   been a second surface treatment on one Resource and a second answer to what the
-   Graph's colour means. The colour has not left the canvas: the Resource's handles
-   and the Edges of each Graph still carry it, which is where a colour that says
-   *which Graph* belongs.
+   **Do not colour the band with the Active Graph's colour.** What a selected
+   Resource shows is a command strip, and a strip of commands is chrome — so it
+   is drawn as the product draws chrome everywhere else: the neutral
+   `.command-surface` the Command Dock wears, mounted by `ResourceRailActions`. A
+   coloured band behind it would be a second surface treatment on one Resource
+   and a second answer to what the Graph's colour means. The Resource's handles
+   and the Edges of each Graph carry the colour, which is where a colour that
+   says *which Graph* belongs.
 
    So the rail is a row, a height and nothing else. The height is what reserves
    the strip's room inside a Resource whose size is authored — it is read by

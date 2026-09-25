@@ -93,7 +93,7 @@ export interface CanvasResourceAuthoringInput {
    *
    * Two answers are read here, and they are deliberately different: every
    * control drawn on a Resource is `authorOnCanvas`, while a *live* content editor
-   * is `editResourceBody`, which a modal pane does not withdraw.
+   * is `editResourceBody`, which a modal dialog does not withdraw.
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
@@ -244,13 +244,12 @@ export function useCanvasResourceAuthoring({
         .getState()
         .working.resources.find((resource) => resource.id === resourceId.data);
       if (stored === undefined) return 'retained';
-      // Every Resource kind Opens, and there is deliberately no kind guard left
+      // Every Resource kind Opens, and there is deliberately no kind guard
       // here. Opening is one Map-owned operation (ADR 0064) and each kind
       // differs only in what its front then draws: Markdown of its own, an
       // immutable Target's read-only (ADR 0070), or the Map a Space Resource
-      // selects (ADR 0068). The guard this replaced admitted two kinds and
-      // silently retained the third, which is a decision about *content* being
-      // made by the code that authors placement.
+      // selects (ADR 0068). Do not guard on kind: that is a decision about
+      // *content* made by the code that authors placement.
       const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },

@@ -14,9 +14,8 @@ import { loadSpaceSnapshot, type Space } from '@project/graph';
  * Domain intake parses and reindexes the whole Space, and the runtime reads it
  * on paths that run per render — `navigation.moves()` is called during every
  * App render, including the per-pointer-frame renders a drag produces. Caching
- * on the snapshot's identity restores what the store used to give for free by
- * holding an installed `Space`, and is sound because a session publishes a
- * fresh `working` clone on a new state object rather than mutating one.
+ * on the snapshot's identity is sound because a session publishes a fresh
+ * `working` clone on a new state object rather than mutating one.
  *
  * The snapshot is an argument rather than something the reader fetches, so each
  * caller says which one it means: the render path reads the snapshot React is

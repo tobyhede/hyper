@@ -15,9 +15,9 @@ import type { AggregateInput } from '../persistence/space-repository';
  * second Space-creation path.
  *
  * `newSpace` is *called* rather than transcribed: writing the same two titles
- * out again made a second definition of the starting state, so renaming the
- * seed Resource moved every other provisioning path and left a freshly initialized
- * repository behind. All this adds is the on-disk-to-stored translation, which
+ * out again would make a second definition of the starting state, so renaming
+ * the seed Resource would move every other provisioning path and leave a
+ * freshly initialized repository behind. All this adds is the on-disk-to-stored translation, which
  * is a shape difference and not a content decision.
  *
  * It mints ordinary authored state: nothing here is protected, repaired or

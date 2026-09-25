@@ -328,8 +328,7 @@ export const decodeCommitRequest = (value: unknown): DecodedCommitRequest => {
   if (first === undefined) throw new Error('commit changes must be non-empty');
   // Shape only. Whether the change set names one Space twice, or disagrees with
   // its own snapshot about which Space it is, is what a commit *means*, and that
-  // is `commitRequestRefusal`'s, decided once for every implementation (ADR
-  // 0095, ADR 0098).
+  // is `commitRequestRefusal`'s, decided once for every implementation.
   return { changes: [first, ...rest] };
 };
 
@@ -687,7 +686,7 @@ export const decodeCommitRefusal = (value: unknown): AggregateRefused => {
 
 /**
  * The status each commit outcome crosses HTTP as, and the codec that reads it
- * back, written once for both ends of the seam (ADR 0098).
+ * back, written once for both ends of the seam.
  *
  * `satisfies Record<CommitOutcome['kind'], …>` is what makes it exhaustive: an
  * outcome added to the domain without a status here fails to compile, rather

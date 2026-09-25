@@ -29,7 +29,7 @@ export interface ResourceRailCommands {
 }
 
 /**
- * What a Resource's own rail offers (ADR 0073), in the order it draws it.
+ * What a Resource's own rail offers, in the order it draws it.
  *
  * The addresses are `spaceEntityActions`' answer and nothing else — the same
  * menu the Space's surface builds for the same entity, so a Resource's links

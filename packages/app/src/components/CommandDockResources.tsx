@@ -18,27 +18,20 @@ import { SetTrigger } from './CommandDockParts';
 import { ResourcesPopover } from './ResourcesPopover';
 
 /**
- * Create Resource, as three peer commands in the Resources cluster.
+ * Create Resource, as peer commands in the Resources cluster, one per kind.
  *
- * **The kinds were always peers; they are no longer disclosed.** The design this
- * replaces put them behind a `+` and recorded why they are peers rather than a
- * split button with a hidden default — the kind is chosen at creation, so none
- * of the three is the default. That reasoning is kept whole here. What is
- * dropped is the disclosure around them, which cost a press on *every*
- * creation, including the one kind that then needed no second decision:
- * `markdown` completed its Edit on activation, while `reference` and `space` opened
- * a pane because a Target and a target Space were still owed. So the menu
- * charged the cheapest command for a choice it never makes. ADR 0089 has since
- * made every kind complete on activation and taken `reference` out of this cluster
- * altogether, which makes the argument stronger rather than weaker.
+ * **The kinds are peers, and they are not disclosed.** They are not a split
+ * button with a hidden default: the kind is chosen at creation, so no kind is
+ * the default. Nor are they behind a menu: every kind completes its Edit on
+ * activation, so a disclosure would cost a press on every creation for a
+ * choice it never makes.
  *
- * The other half of that recorded design is untouched and still load-bearing:
  * Create stays *outside* the Resources surface. That list is a long scrolling one
  * an author drags out of, so a New pinned above it is a second region and a New
  * inside it scrolls away.
  *
  * **A glyph is asked to mean a verb here, which it is not asked to do anywhere
- * else in the product.** The same three silhouettes mark rows in the Resources
+ * else in the product.** The same silhouettes mark rows in the Resources
  * list and Resources on the canvas, where they say *what a Resource is*. Each control
  * carries `Create <kind>` as its accessible name and its tooltip, so the
  * keyboard and the pointer are unambiguous; what is accepted is that a silent
@@ -60,10 +53,10 @@ function CreatePeers({
     /* **A nested group, and it is what lets the vertical dock pack.** Base UI's
        toolbar group is a plain `role="group"` div with no positional logic, so
        it nests inside the cluster without taking the roving tabindex off the
-       one `Toolbar` root — and it gives `command-dock.css` one element to place
-       instead of two. Left as loose siblings the vertical column's grid
-       auto-places them onto a row each and the Resources cluster grows past the
-       44px Map and 44px Graph beside it. */
+       one `Toolbar` root — and it gives `command-dock.css` one element to place.
+       Left as loose siblings the vertical column's grid would auto-place them
+       onto a row each and the Resources cluster would grow past the Map and
+       Graph clusters beside it. */
     <ToolbarGroup aria-label="Create a Resource" className="command-dock__create">
       {RESOURCE_KINDS.map((kind) => (
         <ToolbarButton
@@ -124,8 +117,8 @@ function ResourcesList({
   const triggerId = useId();
 
   // Withdrawing the list *closes* it rather than leaving it open behind a
-  // disabled trigger. Presenting and creating a Reference Resource both pass through here,
-  // and a list that reopened itself on the way back would take focus with it,
+  // disabled trigger. Presenting passes through here, and a list that reopened
+  // itself on the way back would take focus with it,
   // landing the reader in the Resources rather than on the canvas they returned to.
   useEffect(() => {
     if (list.disabled && open) setOpenId(null);
@@ -173,22 +166,19 @@ export function ResourcesControl({
   readonly side?: MenuSide;
 }) {
   /**
-   * The cluster, as one of the Dock's named `role="group"`s.
-   *
-   * It was a `Toolbar` of its own, as each of the four clusters was — which
-   * made the Dock four toolbars and so four tab stops, where ADR 0073 draws
-   * one toolbar with named groups inside it. The root moved to {@link Dock};
-   * what is left here is the name, which is what assistive technology
-   * announces once on the way past rather than on every item.
+   * The cluster, as one of the Dock's named `role="group"`s. The one toolbar
+   * root is {@link Dock}'s; the group carries the name, which is what
+   * assistive technology announces once on the way past rather than on every
+   * item.
    */
   return (
     <ToolbarGroup aria-label="Resources" className="command-dock__cluster command-dock__resources">
       {/* **The list carries no commands, and that is the shape rather than a
           gap in it.** Resources names no one entity — a Resource's own commands are the
           Resource rail's (ADR 0073) and this Dock deliberately carries none — and
-          its set commands, the three Creates, are the peers beside this trigger.
-          Repeating Create inside the list as well would be the second path to
-          one command that the Sidebar's own actions menu was built to remove.
+          its set commands, the Creates, are the peers beside this trigger. Do
+          not repeat Create inside the list: that is a second path to one
+          command.
 
           It offers Space Resources like any other Resource and does nothing special
           with them: entering one is the canvas Resource's gesture (ADR 0068), not a
@@ -199,13 +189,12 @@ export function ResourcesControl({
           Graph* — so it sits at the edge the eye enters from, ahead of the name
           it acts on. Create acts on the **set**: Resources names no one entity, which
           is why it has no name to edit, and a command about the set reads after
-          the disclosure that lists it. `[▢ Resources ⌄][▢][▣][▢↗]` is "the Resources,
+          the disclosure that lists it. `[▢ Resources ⌄][▢][▢↗]` is "the Resources,
           and make one"; leading would be verbs with no subject in front of them.
 
           **The vertical dock packs this cluster rather than granting it tracks.**
-          Three trailing commands would need three verb tracks, empty on the three
-          rows that have one verb or none — 84px of a 208px column spent on
-          gutters. Instead the Resources trigger gives up the `1fr` name track it
+          A verb track per trailing command would sit empty on the rows that
+          have one verb or none. Instead the Resources trigger gives up the `1fr` name track it
           never needed: Space, Map and Graph name entities the author renamed,
           so their names take the slack and truncate, while "Resources" is a fixed
           word. See `command-dock.css`. */}

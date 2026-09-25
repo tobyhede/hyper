@@ -306,7 +306,6 @@ const MAX_MARKS = 3;
  * boundary. Decorative: the row's accessible description carries the same
  * facts in words (`describeMembership`), and the tooltip names them for a
  * pointer.
- * `.scratch/resource-context/issues/01-mark-where-else-a-resource-is-placed.md` holds the comparison that chose it.
  *
  * At most `MAX_MARKS` capsules are drawn and a `+N` count stands for the
  * rest, and likewise at most `MAX_MARKS` dots inside each capsule, so the title
@@ -482,12 +481,10 @@ function ConnectRow({
 /**
  * The dotted grip a row is dragged by.
  *
- * Three answers to "how does a Resource offer itself to be dragged" were compared in
- * the prototype — this strip-with-a-grip, the production Resource at row scale two
- * to a line, and a strip that raised into paper on hover. The grip won: a Resource
- * at row scale was mostly empty paper with a title too small to read at 117x66,
- * and an affordance that only arrives on hover arrives after the reader has
- * decided the list is not draggable.
+ * A grip rather than the production Resource at row scale, which is mostly
+ * empty paper with a title too small to read, and rather than an affordance
+ * that arrives on hover, which arrives after the reader has decided the list is
+ * not draggable.
  */
 function RowGrip() {
   return <span className="resources-popover__row-grip" aria-hidden="true" />;
@@ -532,30 +529,14 @@ const NOTHING_REFUSED: StandingRefusal = { opening: 0, said: null };
  * the `connect` purpose the placed ones an Edge may end at. What follows is
  * about the Dock's purpose unless it says otherwise.
  *
- * **The list is a Popover, and that is decided.**
- *
- * Three surfaces were compared — a Drawer from the screen edge, a Popover
- * anchored to its trigger, and a second dock of its own — over a Space with
- * twenty-nine unplaced Resources, which is the scale that separates them. The
- * Popover won on the two criteria in the comparison: it is anchored to the
- * control that opened it the way the menus beside it are, so the Dock reads as
- * one surface rather than a bar that sometimes summons a panel; and a drag out
- * of it survives its own dismissal, so adding several Resources costs one
- * disclosure rather than one each.
- *
- * What the other two cost is why they went. The Drawer occludes the edge of the
- * canvas you are dropping onto, and it is a screen-level surface answering a
- * control-level question. The panel is furniture: it has to be positioned, it
- * stays until closed, and choosing it means choosing that once per list — two
- * docked docks plus two panels was more than the canvas could carry.
- *
- * That comparison was made in the Command Dock prototype, recorded above the
- * prototype's own list, and then deleted along with the code it was attached to
- * when the Dock was promoted — which is how the drawer came to ship against it.
- * It is written here, above the surface that won, and in
- * `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. A decision
- * written inside the code it justifies dies with that code; losing this one now
- * takes two deliberate deletions.
+ * **The list is a Popover.** It is anchored to the control that opened it the
+ * way the menus beside it are, so the Dock reads as one surface rather than a
+ * bar that sometimes summons a panel; and a drag out of it survives its own
+ * dismissal, so adding several Resources costs one disclosure rather than one
+ * each. Do not make it a Drawer from the screen edge: that occludes the edge
+ * of the canvas you are dropping onto, and is a screen-level surface
+ * answering a control-level question. Do not make it a docked panel: that is
+ * furniture that has to be positioned and stays until closed.
  *
  * **It is deliberately non-modal and it does not close on an outside press.**
  * Dragging a Resource onto the canvas is the whole point of the surface, and a
@@ -589,25 +570,21 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
   /**
    * Where the caret goes when a keyboard Add takes its own row away.
    *
-   * **A deviation, recorded rather than assumed.** Base UI's popover has no
-   * roving list, so when the activated row unmounts — which is what a completed
-   * Add does, the Resource having joined the Map — it answers the focused
-   * element disappearing by taking focus to the popup container: an inert box
-   * the reader then has to Tab out of to reach anything.
+   * **A deviation.** Base UI's popover has no roving list, so when the
+   * activated row unmounts — which is what a completed Add does, the Resource
+   * having joined the Map — it answers the focused element disappearing by
+   * taking focus to the popup container: an inert box the reader then has to
+   * Tab out of to reach anything.
    *
-   * Considered: `ResourceSearchCombobox`, whose listbox owns exactly this and is
-   * the wrong shape — its rows are a *choice* that ends the interaction, and
-   * these rows are a command the reader spends repeatedly. Base UI's `Menu`,
-   * which has the roving focus but takes the arrow keys and typeahead the
-   * filter field needs and dismisses on activating an item — the two reasons
-   * this surface is a Popover and not a Menu in the first place.
+   * A listbox is the wrong shape — its rows are a *choice* that ends the
+   * interaction, and these rows are a command the reader spends repeatedly —
+   * and Base UI's `Menu` takes the arrow keys and typeahead the filter field
+   * needs and dismisses on activating an item.
    *
    * So one line rather than a second component: the caret lands back in the
-   * filter, which is where a reader adding several Resources is going next. That is
-   * what the surface comparison bought — "adding several Resources costs one
-   * disclosure rather than one each" — and it is the whole of the custom
-   * behaviour here. `ResourcesPopover.test.tsx` and `resources-popover.spec.ts` both
-   * hold it.
+   * filter, which is where a reader adding several Resources is going next, and
+   * it is the whole of the custom behaviour here. `ResourcesPopover.test.tsx`
+   * and `resources-popover.spec.ts` both hold it.
    */
   const filterField = useRef<HTMLInputElement>(null);
   /**
@@ -858,7 +835,8 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
               is what a reader reaches for, and it is the control that needs no
               prior decision; the toggles say what the list is *made of*, which
               is a setting you adjust once and leave. Putting the row of glyphs
-              first made the reader answer a question they had not asked yet. */}
+              first would make the reader answer a question they had not asked
+              yet. */}
             <InputGroup>
               <InputGroupAddon align="inline-start">
                 <SearchIcon />
@@ -871,18 +849,15 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                 onChange={(event) => setQuery(event.target.value)}
               />
             </InputGroup>
-            {/* **A glyph and a count, in a control that looks like one.** Ten
-              arrangements were drawn at this width and the comparison is in
-              `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. Two
-              faults settled it. The first row shipped had no border and no
-              ground, so four marks sat on the popover's paper looking like
-              decoration — a control that can be pressed says so *before* it is
-              pressed, which is what the box here buys and what leaves the fill
-              free to mean only "on". The second is that a filter with no counts
-              answers the wrong question: a reader wants to know whether the
-              resource they are after is in here at all, and every labelled variant
-              that could tell them cost a second line above the list this
-              surface exists to show.
+            {/* **A glyph and a count, in a control that looks like one.** A
+              control that can be pressed says so *before* it is pressed, which
+              is what the box here buys and what leaves the fill free to mean
+              only "on"; without border and ground the marks read as
+              decoration. And a filter with no counts answers the wrong
+              question: a reader wants to know whether the Resource they are
+              after is in here at all, and a labelled variant that could tell
+              them costs a second line above the list this surface exists to
+              show.
 
               Everything on, and pressing one **off** takes it out of the list.
               A filter that starts narrowed hides Resources nobody has been told

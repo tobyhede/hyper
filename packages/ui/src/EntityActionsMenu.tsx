@@ -30,9 +30,9 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  *
  * Every command answers one of the two, and a command that cannot fail answers
  * `done` — there is no "said nothing" arm on purpose. A command that reported
- * nothing had its outcome invented for it, which is the whole defect this
- * exists to close: the label swapped to "Copied" on the press rather than on
- * the copy, so a clipboard write the browser refused still read as done.
+ * nothing would have its outcome invented for it: the label would swap to
+ * "Copied" on the press rather than on the copy, so a clipboard write the
+ * browser refused would still read as done.
  *
  * A promise is admitted because that refusal arrives *after* the press —
  * writing the clipboard is asynchronous — so an item that reported at the call
@@ -57,15 +57,12 @@ export type EntityActionOutcome = 'done' | 'failed';
  * answers. `failed` is what it becomes instead when the command answers that it
  * did not, "Not copied".
  *
- * The menu is where a failure has to be legible, not only in whatever standing
- * notice the application also renders. It was built for a surface that could
- * *cover* that notice — below the Space Sidebar's breakpoint the whole command
- * surface was a Sheet over the shell, so a report pinned in the corner was
- * behind it and a reader on a phone never saw it. ADR 0082 retired that Sheet
- * and the Command Dock covers nothing, so the Dock's own menus pass no words
- * and report through the standing notice instead. What keeps this is the Resource
- * rail: it is a menu on the canvas, over the Resources, and a reader whose eyes are
- * on the Resource they pressed is not looking at the shell's corner.
+ * The menu is where a failure has to be legible when the reader is not looking
+ * at the standing notice the application renders. The Command Dock covers
+ * nothing, so its own menus pass no words and report through that notice. The
+ * Resource rail passes them: it is a menu on the canvas, over the Resources, and
+ * a reader whose eyes are on the Resource they pressed is not looking at the
+ * shell's corner.
  */
 export type EntityActionReport = Readonly<Record<EntityActionOutcome, string>>;
 
@@ -153,13 +150,11 @@ export type EntityActionGroup = readonly EntityAction[];
 /**
  * How wide either menu draws, so the two are the same menu in both senses.
  *
- * `w-80` rather than the `w-72` this started at: the leading icon column and
- * its gap take a little over 20px off the text, and at `w-72` the longest
- * destination sentence a Resource or Graph produces — "Always opens <title> on its
- * own, wherever it is placed" — went from two lines to three. The extra 32px
- * buys that line back and still leaves the popup inside the canvas it opens
- * over, which is the width that mattered when the menu opened against a
- * sixteen-rem gutter and is no narrower now that the gutter has gone.
+ * `w-80`: the leading icon column and its gap take a little over 20px off the
+ * text, and the longest destination sentence a Resource or Graph produces —
+ * "Always opens <title> on its own, wherever it is placed" — needs this width
+ * to stay on two lines, while the popup still fits inside the canvas it opens
+ * over.
  */
 const MENU_WIDTH = 'w-80';
 
@@ -199,11 +194,10 @@ function useConfirmation() {
    * Which press the one `report` and the one timer currently belong to.
    *
    * A reporting item is held open (`closeOnClick` is false), so a second
-   * command can be pressed while the first is still in flight — and both used
-   * to overwrite the pair unconditionally on arrival, so the slow one landed
-   * last and won. A copy the author had given up on took the confirmation off
-   * the row they had just pressed, cleared its timer, and announced itself a
-   * second time.
+   * command can be pressed while the first is still in flight. If both
+   * overwrote the pair on arrival, the slow one would land last and win: a copy
+   * the author had given up on would take the confirmation off the row they had
+   * just pressed, clear its timer, and announce itself a second time.
    *
    * The counter makes the **last press** win rather than the last answer: a
    * settlement whose press has been overtaken has nothing to say about a
@@ -218,8 +212,8 @@ function useConfirmation() {
       // one. The line above clears the timer that is pending *now*; a command
       // still in flight would otherwise land behind this cleanup, set state on
       // a component that has gone, and arm a fresh 1600ms timeout with no
-      // surviving path to clear it. The Sidebar going mid-clipboard-write is an
-      // ordinary Space switch, or the mobile Sheet closing.
+      // surviving path to clear it. A menu unmounting mid-clipboard-write is
+      // ordinary — a Space switch, say.
       press.current += 1;
     },
     [],
@@ -245,11 +239,10 @@ function useConfirmation() {
      * The call sits *inside* the async body rather than in front of it, which
      * is what makes the two ways a command can go wrong one way here. An
      * `async` body still runs synchronously to its first `await`, so `onSelect`
-     * is called on this click exactly as before — but a command that throws
-     * before it ever returns a promise now rejects instead of throwing out of a
-     * React event handler, which no error boundary catches. The Sidebar's
-     * Delete Map is that command: it runs an Edit, and `complete` throws
-     * outright for a Space that has stopped loading.
+     * is called on this click — but a command that throws before it ever
+     * returns a promise rejects instead of throwing out of a React event
+     * handler, which no error boundary catches. A command that runs an Edit
+     * is one: `complete` throws outright for a Space that has stopped loading.
      */
     void (async () => {
       try {
@@ -259,11 +252,10 @@ function useConfirmation() {
          * A command that threw is a command that failed, and is reported as
          * one — but a throw is a broken contract rather than an answered
          * outcome, and an item naming no words has nothing to show for it
-         * either way. So it is recorded here as well, because the alternative
-         * is what this replaced: the promise was never consumed on the
-         * wordless path, so a refused Delete Map became an unhandled
-         * rejection and the author pressed it to no effect and no message
-         * anywhere.
+         * either way. So it is recorded here as well: otherwise the promise
+         * goes unconsumed on the wordless path, and a refused command becomes
+         * an unhandled rejection the author presses to no effect and no
+         * message anywhere.
          */
         console.error('An entity action failed', failure);
         confirm('failed');
@@ -377,8 +369,7 @@ export interface EntityActionsTriggerProps {
   /** Names the control for assistive technology — "Golden path actions". */
   readonly label: string;
   /**
-   * The control the menu hangs off. A Resource rail passes its `ResourceRailAction` —
-   * the Space Sidebar's rows passed their `SidebarMenuAction` before ADR 0082 —
+   * The control the menu hangs off. A Resource rail passes its `ResourceRailAction`,
    * so the trigger takes the treatment of the cluster it sits in rather than
    * importing a second one.
    */

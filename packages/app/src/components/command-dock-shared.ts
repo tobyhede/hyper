@@ -20,8 +20,8 @@ import { createContext, useContext, useId, type MutableRefObject, type ReactNode
  * learns the answer at one cluster is owed it at the next.
  *
  * Centred on the trigger rather than aligned to its start. Every trigger here
- * is an icon-width chevron, so a start-aligned surface hangs off one edge of a
- * 28px button and reads as belonging to whatever sits beside it.
+ * is an icon-width chevron, so a start-aligned surface hangs off one edge of
+ * the button and reads as belonging to whatever sits beside it.
  */
 export const DISCLOSURE_ALIGN = 'center' as const;
 export const DISCLOSURE_SIDE_OFFSET = 6;
@@ -99,12 +99,11 @@ export const DockDisclosureContext = createContext<DockDisclosure>({
  *
  * **One slot, exactly as the disclosure above is one open id.** Renaming and
  * disclosing are the same rule twice: at most one at a time, and whichever
- * control begins next clears whatever was open. Each identity used to keep its
- * own `editing` boolean and report into the application's single
- * `editingChromeTitle`, which meant two editors could stand at once and the
- * first of them to close told the application that neither was — handing back
- * the commands the other was still withdrawing. A slot cannot say that: the
- * fact is the bar's, so it is held once and read by every name.
+ * control begins next clears whatever was open. Do not keep an `editing`
+ * boolean per identity: two editors could then stand at once, and the first of
+ * them to close would tell the application that neither was — handing back the
+ * commands the other was still withdrawing. The fact is the bar's, so it is
+ * held once and read by every name.
  *
  * A context for the same reason the disclosure is one: threading it through
  * `SpacesControl`, `MapControls` and `GraphControls` to reach a leaf is the
@@ -131,9 +130,8 @@ export const DockRenamingContext = createContext<DockRenaming>({
  * Toolbar because ADR 0073 makes a command cluster the component a Resource rail is
  * built from. Nesting them puts `role="menubar"` inside `role="toolbar"` and two
  * focus managers over the same buttons: the menu opens, the toolbar takes focus
- * back, and it closes again within a frame. It fails silently, with nothing in
- * the console, which from the outside is a menu that flashes on click and never
- * opens.
+ * back, and it closes again within a frame — silently, a menu that flashes on
+ * click and never opens.
  *
  * So the exclusivity a menubar would have supplied is supplied by controlled
  * open state, which both `Menu.Root` and `Popover.Root` accept. That is not a
@@ -143,8 +141,7 @@ export const DockRenamingContext = createContext<DockRenaming>({
  * **The id is also the trigger's.** A controlled Base UI root — `Menu.Root` as
  * much as `Popover.Root` — has to be told which element it belongs to: without
  * `triggerId` on the root and the same `id` on the trigger, `open` opens
- * nothing at all and does it silently, which is the second way this surface has
- * now produced a menu that flashes and never appears.
+ * nothing at all and does it silently.
  *
  * The id is `useId` rather than a caller-chosen string, so two disclosures
  * cannot collide by both calling themselves "resources" and adding a control needs

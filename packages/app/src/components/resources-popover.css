@@ -1,22 +1,20 @@
 /* The Resources Popover's own stylesheet, beside the component that draws it.
  *
- * **Not in `command-dock.css`, and the Ladle suite is why.** These rules first
- * landed there, because the Dock is what mounts the list — but `ResourcesPopover`
- * itself imported no stylesheet, so a story that mounts the component on its
- * own drew it unstyled, and the `resources-popover-*` claims about the row grip,
- * the filter box and the scrolling bound were all being proved against a bare
- * `<ul>`. A stylesheet beside its component is the repository's own convention
+ * **Not in `command-dock.css`, and the Ladle suite is why.** The Dock mounts the
+ * list, but a story mounts the component on its own, and the
+ * `resources-popover-*` claims about the row grip, the filter box and the
+ * scrolling bound would otherwise be proved against an unstyled `<ul>`. A
+ * stylesheet beside its component is the repository's own convention
  * (`canvas-resource.css`, `resource-search-combobox.css`, `markdown-source-editor.css`)
  * and it is the only arrangement under which mounting the component is enough.
  */
 
-/* The Resources Popover's list, restored with the surface it belongs to
-   (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`). */
+/* The Resources Popover's list. */
 .resources-popover__list {
   display: flex;
   /* Bounded by the room the popover actually has rather than by a constant.
      Base UI publishes `--available-height` on the positioner, and a fixed
-     300px on a short viewport puts the last rows under the edge of the screen
+     height on a short viewport puts the last rows under the edge of the screen
      with no way to reach them — which is the failure mode a screen-edge drawer
      does not have and an anchored surface does. The floor keeps a usably tall
      list on the shortest screen; the cap keeps a tall screen from drawing a
@@ -27,12 +25,10 @@
      for the alert above the rows — so below about 268px of room the floor is
      what decides, and a 140px list is then taller than the room it sits in:
      `overflow-y` scrolls the rows the list owns and nothing scrolls the popup
-     back off the screen edge. The last line is the *hard* reserve: 6rem is what
-     the chrome above the rows actually measures (a 92px popup top and filter
-     row at this width), so the list never claims room the popup has to spend on
-     the controls that reach it. Measured rather than guessed — with the floor
-     alone the popup's bottom stands at 232px whatever the viewport, so it
-     clipped below about 232px tall, and 4rem was still short of clearing it.
+     back off the screen edge. The last line is the *hard* reserve: 6rem covers
+     the chrome above the rows — the popup's top and the filter row — so the
+     list never claims room the popup has to spend on the controls that reach
+     it.
 
      Not `clamp(0px, …)`: that is this rule with the floor deleted, and a list
      that collapses to no rows is the worse of the two failures. The 2.5rem
@@ -97,7 +93,7 @@
 }
 
 /* The affordance is drawn and never moves. The grip is the dock's own dotted
-   field at row scale, so the resource you drag a Resource by and the resource you drag
+   field at row scale, so the mark you drag a Resource by and the mark you drag
    the dock by are one mark. */
 .resources-popover__row-grip {
   width: 10px;
@@ -109,9 +105,9 @@
   opacity: 0.4;
 }
 
-/* The hover is a *pointer report*, not a selection. It used to swap in
-   `--secondary` when that was beige, which painted a warm block the eye read
-   as a chosen row rather than the one the pointer happens to be over. */
+/* The hover is a *pointer report*, not a selection: it must not paint a block
+   the eye reads as a chosen row rather than the one the pointer happens to be
+   over. */
 /* An unavailable Connect row stays focusable so its reason can be reached;
    it takes the focus ring, never the hover fill. */
 .resources-popover__row:not([aria-disabled='true']):hover,
@@ -122,13 +118,10 @@
 
 /* --------------------------------------------- the Resources list's filter */
 
-/* **The box is what makes it read as a control.** The row first shipped as four
-   bare glyph toggles and read as decoration: no border, no ground, four marks
-   on the popover's paper. A control that can be pressed says so before it is
-   pressed, which leaves the fill free to mean only "on" rather than carrying
-   the affordance as well as the state. The comparison that settled this, and
-   the nine other arrangements it was drawn against, are in
-   `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. */
+/* **The box is what makes it read as a control.** Bare glyph toggles, with no
+   border and no ground, read as decoration on the popover's paper. A control
+   that can be pressed says so before it is pressed, which leaves the fill free
+   to mean only "on" rather than carrying the affordance as well as the state. */
 .resources-popover__filter {
   display: flex;
   gap: 4px;
@@ -140,7 +133,7 @@
   border-color: var(--border);
   background: var(--card);
   /* A hairline in the theme's ink, as every other hairline is, rather than
-     black (`.scratch/structural-tokens/issues/10-...`). */
+     black. */
   box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent);
 }
 

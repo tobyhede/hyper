@@ -7,9 +7,8 @@ import type { EdgeSubject } from '../render-adapter';
  * The Edge commands one shared context supplies, rather than each Edge's `data`.
  *
  * Callbacks in `data` would be rebuilt for every Edge on every projection, and
- * React Flow compares `data` to decide whether an Edge re-renders — so a canvas
- * of twenty Edges would re-render all of them whenever any command's identity
- * moved. One context, read by whichever Edge is drawing its own chrome.
+ * React Flow compares `data` to decide whether an Edge re-renders — so every
+ * Edge on the canvas would re-render whenever any command's identity moved. One context, read by whichever Edge is drawing its own chrome.
  */
 export interface EdgeAuthoringCommands {
   /** The Graph whose Edges draw Titles: the Active Graph, and only it. */

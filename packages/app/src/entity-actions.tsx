@@ -13,9 +13,8 @@ import {
  * What each entity in a Space offers, built once.
  *
  * It exists as its own module rather than as a closure inside `App.tsx` for one
- * reason: a story that draws this menu has to draw *this* menu. The commands
- * were prototyped as a story-local list, and a story-local list is a second
- * menu that agrees with production only for as long as somebody keeps it in
+ * reason: a story that draws this menu has to draw *this* menu. A story-local
+ * list is a second menu that agrees with production only for as long as somebody keeps it in
  * step — a menu on screen in the catalogue that the application does not have
  * is worse evidence than none.
  *
@@ -35,12 +34,13 @@ import {
  * The two addresses, spelled once.
  *
  * Exported so a consumer spells each from here instead of from a second
- * literal that happens to agree: the Dock's clusters draw their own menus and cannot render an `EntityActionGroup[]`
- * whole, so they reach into this list by id — and they did it with bare
- * literals at four call sites. `runEntityCommand` looks an id up and spends
- * `?.onSelect()` on the miss, so a rename here left the copy commands silently
- * inert with `tsc` and lint both green. One spelling on both sides, and
- * {@link EntityCommandId} is what stops a fifth being invented.
+ * literal that happens to agree: the Dock's clusters draw their own menus and
+ * cannot render an `EntityActionGroup[]`
+ * whole, so they reach into this list by id. Do not spell one as a bare
+ * literal: `runEntityCommand` looks an id up and spends `?.onSelect()` on the
+ * miss, so a renamed id leaves the copy commands silently inert with `tsc` and
+ * lint both green. One spelling on both sides, and {@link EntityCommandId} is
+ * what stops another being invented.
  */
 export const COPY_LINK_ACTION_ID = 'copy-link';
 export const COPY_RESOURCE_LINK_ACTION_ID = 'copy-resource-link';
@@ -66,7 +66,7 @@ export type SpaceEntity =
 
 /**
  * What an inline rename names — the three entities the Command Dock names, all
- * of which now have one.
+ * of which have one.
  *
  * **The Space arm carries no id, and that asymmetry is the domain's.** A
  * Map and a Graph are named *inside* a Space, so an Edit on one has to say
@@ -90,8 +90,8 @@ export interface SpaceEntityActionsOptions {
    *
    * The answer is what the menu item reports, which is why this is not a plain
    * `void`: a browser that refuses clipboard access refuses it a microtask
-   * after the press, so an item that reported on the press said "Copied" over a
-   * link nobody could paste. A caller that cannot fail — a fixture recording
+   * after the press, so an item that reported on the press would say "Copied"
+   * over a link nobody could paste. A caller that cannot fail — a fixture recording
    * the destination — answers `true`.
    */
   readonly onCopy: (destination: ProductDestination) => boolean | Promise<boolean>;
@@ -122,9 +122,8 @@ export interface SpaceEntityActionsOptions {
  * it does not — and a second, more durable form is offered only where it
  * differs and only under its own name (a Resource's "Copy link to Resource").
  * Neither label says "canonical", "contextual" or "permanent"; those words
- * stay in the code and out of the product. A Graph's own durable address is no
- * longer offered from any menu at all
- * (`.scratch/dock-menu-reorganisation/issues/01`).
+ * stay in the code and out of the product. A Graph's own durable address is
+ * offered from no menu at all.
  *
  * The `space` branch below is the one place this rule is not followed, and it
  * says why there.
@@ -149,10 +148,10 @@ const NOT_SENT = 'Not sent';
  * What a copy command's own label says when the clipboard refused it.
  *
  * The application also pins "Link not copied" under the header, and that notice
- * is not enough on its own: below the Sidebar's breakpoint the menu is inside a
- * Sheet drawn over the area the notice renders in, so the item the reader just
- * pressed is the only place they can be told. Same two words as the notice's
- * title, minus the subject the item already names.
+ * is not enough on its own: the Resource rail is a menu on the canvas, and a
+ * reader whose eyes are on the Resource they pressed is not looking at the
+ * notice, so the item they just pressed is the only place they can be told. Same
+ * two words as the notice's title, minus the subject the item already names.
  */
 const NOT_COPIED = 'Not copied';
 
@@ -200,11 +199,9 @@ export function spaceEntityActions({
 
   return (entity) => {
     if (entity.kind === 'space') {
-      // No Rename, and no longer because there is no such Edit — `renamed-space`
-      // exists now. The Dock renames a Space the way it renames a Map and a
+      // No Rename. The Dock renames a Space the way it renames a Map and a
       // Graph: by a click on the name it already draws, right beside this menu.
-      // A row here would open that same editor from a second place, which is the
-      // duplication the whole arrangement keeps removing — and the same reason
+      // A row here would open that same editor from a second place — the same reason
       // the Map and Graph branches below get their Rename row only from a
       // caller that has one, while the application passes `onRename: null`.
       //
@@ -232,8 +229,7 @@ export function spaceEntityActions({
 
     if (entity.kind === 'graph') {
       // A Map **owns** its Graphs (ADR 0040), so a Graph row always has a
-      // within-Map address, which is the only address this menu offers
-      // (`.scratch/dock-menu-reorganisation/issues/01`).
+      // within-Map address, which is the only address this menu offers.
       const { graph, map } = entity;
       return [
         renameAction({ kind: 'graph', id: graph.id }, graph.title),

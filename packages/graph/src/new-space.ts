@@ -90,10 +90,9 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
  * The default new Space: `Resource 1` in `New space`.
  *
  * It takes `newId` for the same reason {@link initializeSpace} does (ADR 0016)
- * — the four identities it mints are the caller's to control — and because
- * closing over the ambient generator is what made `defaultContentAggregate`
- * transcribe this function rather than call it. It calls it now, so the
- * starting state has one definition rather than two that agree by inspection.
+ * — the four identities it mints are the caller's to control — which is also
+ * what lets `defaultContentAggregate` call it, so the starting state has one
+ * definition.
  */
 export function newSpace(newId: () => UUID): NewSpace {
   return initializeSpace({ title: NEW_SPACE_TITLE, newId });

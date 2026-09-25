@@ -20,7 +20,7 @@ import { CopyIcon, DeleteIcon, GraphIcon, PlusIcon } from './icons';
  * New Map and Delete are each one field — the press, or `null` where the
  * command is unavailable — so the row's unavailable treatment and what it
  * invokes cannot disagree: both surfaces hand over what Map authoring's
- * capability answered (`.scratch/command-outcomes/issues/09`).
+ * capability answered.
  */
 export interface MapMenuActionsProps {
   readonly title: string;
@@ -36,7 +36,7 @@ export interface MapMenuActionsProps {
  * One grouping grammar, below the selection list `ChoiceMenu` draws: New
  * Map on its own; Rename beside Copy link to Map, the two commands
  * that act on the name already showing; then Delete — one separator between
- * each group (`.scratch/dock-menu-reorganisation/issues/01`).
+ * each group.
  */
 export function MapMenuActions({
   title,
@@ -100,10 +100,9 @@ export interface GraphMenuActionsProps {
  *
  * The same grouping grammar as {@link MapMenuActions} — make one, this one,
  * remove this one — with Colour… heading the group of commands on the Graph
- * you are on, the one command a Graph carries that a Map does not
- * (`.scratch/graph-colour/issues/03`). Copy link to Graph copies the
- * within-Map address; this menu offers no separate permanent address for the
- * Graph itself (`.scratch/dock-menu-reorganisation/issues/01`).
+ * you are on, the one command a Graph carries that a Map does not. Copy link
+ * to Graph copies the within-Map address; this menu offers no separate
+ * permanent address for the Graph itself.
  */
 export function GraphMenuActions({
   title,

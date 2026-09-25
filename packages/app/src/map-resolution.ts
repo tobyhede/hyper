@@ -17,7 +17,7 @@ export class MapNotFoundError extends Error {
 }
 
 /**
- * The durable opening selection (ADR 0079). Working-space intake guarantees a
+ * The durable opening selection. Working-space intake guarantees a
  * stored Space has one, so a Space without one is a bug rather than a state to
  * present, and this throws.
  *
