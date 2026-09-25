@@ -610,7 +610,7 @@ export function SpaceCanvas({
       if (event.key === 'Enter' || event.key === ' ') {
         if (bodyEditing) return;
         // The same exclusion the `C` branch below makes, and load-bearing
-        // rather than defensive: an Expanded Resource draws its editor *inside* the
+        // rather than defensive: an Open Resource draws its editor *inside* the
         // node, so a Space typed into it would otherwise be cancelled here
         // before the document ever received the character.
         if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;

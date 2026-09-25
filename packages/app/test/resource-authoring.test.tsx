@@ -795,7 +795,7 @@ describe('the Resource affordance on the graph', () => {
 
     // The authored Open state itself, and the control an Open Resource offers:
     // the Resource the gesture lands on is the evidence.
-    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-expanded', 'false');
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-open', 'false');
     expect(screen.queryByRole('button', { name: 'Close Resource A' })).not.toBeInTheDocument();
     await settled(session);
   });

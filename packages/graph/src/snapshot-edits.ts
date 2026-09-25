@@ -48,7 +48,7 @@ export type SnapshotEditRefusal =
   /** A Reference Resource created with a Target that is itself a Reference Resource. */
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
   /** A Resize of a Resource that is not Open: there is no Open Size to change. */
-  | { readonly code: 'resource-not-expanded' }
+  | { readonly code: 'resource-not-open' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -388,7 +388,7 @@ function close(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): Snapshot
  * the proposal's. Which near misses count as that size is the application's
  * magnetic range (ADR 0066), decided before this is reached; only the exact
  * size arrives here as a Close. `unchanged` at the size it already has, and
- * `resource-not-expanded` for a Resource that is not Open, which has no Open
+ * `resource-not-open` for a Resource that is not Open, which has no Open
  * Size to change.
  */
 function resize(
@@ -401,7 +401,7 @@ function resize(
   if ('code' in placed) return refused(placed);
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  if (!at.open) return refused({ code: 'resource-not-expanded' });
+  if (!at.open) return refused({ code: 'resource-not-open' });
   if (
     size.width === COLLAPSED_RESOURCE_SIZE.width &&
     size.height === COLLAPSED_RESOURCE_SIZE.height

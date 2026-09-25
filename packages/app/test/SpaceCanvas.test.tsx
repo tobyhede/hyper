@@ -453,12 +453,12 @@ describe('the Resource affordance', () => {
   });
 });
 
-describe('withdrawing canvas authoring from an Expanded Resource', () => {
+describe('withdrawing canvas authoring from an Open Resource', () => {
   it('withdraws body editing and resize through the same complete gate', async () => {
-    const expanded = resourceNode('A', RESOURCE_ID, true);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
-    const { view, setTitleEditing } = await mountGraph([expanded]);
+    const opened = resourceNode('A', RESOURCE_ID, true);
+    opened.data.open = true;
+    opened.data.body = '# A';
+    const { view, setTitleEditing } = await mountGraph([opened]);
 
     expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -472,10 +472,10 @@ describe('withdrawing canvas authoring from an Expanded Resource', () => {
   it.each(['Enter', ' '])(
     'does not Open a Resource with %s while its body is being edited',
     async (key) => {
-      const expanded = resourceNode('A', RESOURCE_ID, true);
-      expanded.data.expanded = true;
-      expanded.data.body = '# A';
-      const { openResource } = await mountGraph([expanded]);
+      const opened = resourceNode('A', RESOURCE_ID, true);
+      opened.data.open = true;
+      opened.data.body = '# A';
+      const { openResource } = await mountGraph([opened]);
       fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
 
       const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
@@ -585,7 +585,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('offers a resize operation to an Open Resource whatever its kind', async () => {
     const reference = resourceNode('Reference Resource', RESOURCE_ID, false);
     reference.data.kind = 'reference';
-    reference.data.expanded = true;
+    reference.data.open = true;
     const { view } = await mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -605,9 +605,9 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    * never a separate click first.
    */
   it('routes one resize lifecycle from the control to the canvas capability', async () => {
-    const expanded = resourceNode('A', RESOURCE_ID, false);
-    expanded.data.expanded = true;
-    expanded.data.body = '# A';
+    const opened = resourceNode('A', RESOURCE_ID, false);
+    opened.data.open = true;
+    opened.data.body = '# A';
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -615,7 +615,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    await mountGraph([expanded], onSelectResource, resourceResize);
+    await mountGraph([opened], onSelectResource, resourceResize);
 
     pressResizeControl();
 
@@ -641,15 +641,15 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    * neighbours, handles and Edges together.
    */
   it('proposes no node change to React Flow while it resizes', async () => {
-    const expanded = resourceNode('A', RESOURCE_ID, false);
-    expanded.data.expanded = true;
+    const opened = resourceNode('A', RESOURCE_ID, false);
+    opened.data.open = true;
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    const { nodesChanged } = await mountGraph([expanded], () => undefined, resourceResize);
+    const { nodesChanged } = await mountGraph([opened], () => undefined, resourceResize);
     nodesChanged.mockClear();
 
     pressResizeControl();
@@ -662,15 +662,15 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   });
 
   it('routes loss of an active resize to cancellation', async () => {
-    const expanded = resourceNode('A', RESOURCE_ID, false);
-    expanded.data.expanded = true;
+    const opened = resourceNode('A', RESOURCE_ID, false);
+    opened.data.open = true;
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    await mountGraph([expanded], () => undefined, resourceResize);
+    await mountGraph([opened], () => undefined, resourceResize);
     pressResizeControl();
 
     fireEvent.blur(window);
@@ -696,21 +696,21 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    * between the first frame and the second.
    */
   it('keeps a touch gesture alive across the projection its own frames publish', async () => {
-    const expanded = resourceNode('A', RESOURCE_ID, false);
-    expanded.data.expanded = true;
+    const opened = resourceNode('A', RESOURCE_ID, false);
+    opened.data.open = true;
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    const { setNodes } = await mountGraph([expanded], () => undefined, resourceResize);
+    const { setNodes } = await mountGraph([opened], () => undefined, resourceResize);
 
     touchResizeControl('touchstart');
     expect(resourceResize.beginResize).toHaveBeenCalledWith(RESOURCE_ID);
 
     const republished = resourceNode('A', RESOURCE_ID, false);
-    republished.data.expanded = true;
+    republished.data.open = true;
     setNodes([republished]);
 
     touchResizeControl('touchmove', 80, 60);
@@ -864,7 +864,7 @@ describe("React Flow's document key subscriptions", () => {
 
 /**
  * Opening is a command of the *canvas*, and a Resource contains the text control
- * its content is edited in. The `C` shortcut asks this question too, and a Space typed into an Expanded Resource's editor is a
+ * its content is edited in. The `C` shortcut asks this question too, and a Space typed into an Open Resource's editor is a
  * character rather than a request to open the Resource it is inside.
  *
  * Modelled with a plain `contenteditable` rather than the real editor because

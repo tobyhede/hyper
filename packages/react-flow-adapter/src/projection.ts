@@ -92,7 +92,7 @@ export type ResourceNodeData = {
    *
    * An Open Reference Resource draws its immutable Target's content through the same front.
    */
-  expanded?: boolean;
+  open?: boolean;
   /** Present only when activating the Open body may place a caret. */
   onBeginBodyEditing?: () => void;
   /**
@@ -109,13 +109,13 @@ export type ResourceNodeData = {
    * the editor mounted. A composition that gave `onEnd` the abandon meaning
    * would undo every accepted save.
    *
-   * Independent of `titleEditor` on purpose. Expansion is what the Map
+   * Independent of `titleEditor` on purpose. Open is what the Map
    * authored and the caret is a gesture the author just made, so a Resource can be
-   * Expanded while its *title* is being renamed (ADR 0064).
+   * Open while its *title* is being renamed (ADR 0064).
    */
   bodyEditor?: CanvasResourceBodyEditor;
   /**
-   * Resizing this Expanded Resource, absent on one that may not be resized.
+   * Resizing this Open Resource, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
    * the two editors above carry their own completions: the collapsed size is
@@ -203,10 +203,10 @@ export type ResourceNodeData = {
    *  target's body. Absent otherwise — content is not embedded in every node
    *  (ADR 0006), which is the constraint that made this per-resource.
    *
-   *  **An Expanded Resource carries one too.** ADR 0064 narrows ADR 0006 rather
-   *  than lifting it — an Expanded Resource carries its source because the author
+   *  **An Open Resource carries one too.** ADR 0064 narrows ADR 0006 rather
+   *  than lifting it — an Open Resource carries its source because the author
    *  asked for that one, not because every Resource does. `openResourceIds` is what
-   *  tells this projection which Resources the Map Expanded, and `body` is
+   *  tells this projection which Resources the Map Opened, and `body` is
    *  resolved for them in the same pass: `ResourceNode` reads `data.body ?? ''`, so
    *  a Resource resolved into one set and not the other would draw an empty
    *  document over a working editor rather than fail. */
@@ -257,7 +257,7 @@ export interface ProjectResourceNodesOptions {
   strategyGraph?: LayoutStrategyGraph;
   /** Restrict the projection to these resource ids (e.g. one graph's resources). */
   resourceIds?: readonly ResourceId[];
-  /** Map-authored Expanded Resources whose Markdown body is drawn in place. */
+  /** Map-authored Open Resources whose Markdown body is drawn in place. */
   openResourceIds?: ReadonlySet<ResourceId>;
 }
 
@@ -370,7 +370,7 @@ export function projectResourceNodes(
     if (content?.kind === 'space') node.data.spaceContent = content;
     if (body !== undefined) node.data.body = body;
     if (open) {
-      node.data.expanded = true;
+      node.data.open = true;
       node.zIndex = 10;
     }
     return node;

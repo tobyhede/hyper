@@ -54,18 +54,16 @@ Guards above are omitted below.
 | `created-reference` | `reference-target-not-found` → `reference-target-must-own-content` → completed |
 | `opened-resource` | `resource-not-in-map` → (already Open ⇒ `unchanged`) → completed |
 | `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
-| `resized-resource` | `resource-not-in-map` → `resource-not-expanded` → (same size ⇒ `unchanged`) → completed |
+| `resized-resource` | `resource-not-in-map` → `resource-not-open` → (same size ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
 
-`resource-not-expanded` is the code `resized-resource` raises for a Resource that is
-**Closed**. The prose in this file speaks `CONTEXT.md`'s Open/Closed vocabulary;
-every code string is quoted exactly as `AuthoringRefusal['code']` declares it,
-retired wording included. A refusal code is a stable identity across the seam
-(ADR 0057), so renaming this one is a change to the domain surface rather than a
-wording fix — do not correct it here, and do not let the mismatch tempt a rename
-that has not been decided.
+`resource-not-open` is the code `resized-resource` raises for a Resource that is
+**Closed**. Every code string here is quoted exactly as `AuthoringRefusal['code']`
+declares it. A refusal code is a stable identity across the seam (ADR 0057), so
+renaming one is a change to the domain surface rather than a wording fix, made in
+source and quoted here afterwards.
 
 ### Connections
 

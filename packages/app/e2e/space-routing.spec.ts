@@ -182,12 +182,12 @@ test('canonical and contextual Resource links reveal a Closed Resource without a
   expect((await page.goto(canonical))?.status()).toBe(200);
   const canonicalResource = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
   await expect(canonicalResource).toBeFocused();
-  await expect(canonicalResource.getByTestId('resource')).toHaveAttribute('data-expanded', 'false');
+  await expect(canonicalResource.getByTestId('resource')).toHaveAttribute('data-open', 'false');
 
   expect((await page.goto(contextual))?.status()).toBe(200);
   const resourceA = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
   await expect(resourceA).toBeFocused();
-  await expect(resourceA.getByTestId('resource')).toHaveAttribute('data-expanded', 'false');
+  await expect(resourceA.getByTestId('resource')).toHaveAttribute('data-open', 'false');
   await page.reload();
   await expect(resourceA).toBeFocused();
   await page.goBack();

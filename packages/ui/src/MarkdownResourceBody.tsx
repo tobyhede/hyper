@@ -58,11 +58,11 @@ export interface MarkdownResourceBodyProps {
 }
 
 /**
- * The Markdown kind's Expanded front: rendered Markdown, on the Resource (ADR 0064).
+ * The Markdown kind's Open front: rendered Markdown, on the Resource (ADR 0064).
  *
  * **The same rendering as presentation mode.** At rest this reuses
  * `RenderedMarkdown`, the parser and sanitiser beneath `ResourceContent`; an
- * Expanded Resource therefore cannot interpret the same Markdown differently from
+ * Open Resource therefore cannot interpret the same Markdown differently from
  * the Resource reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasResource` already owns.
  *
@@ -136,7 +136,7 @@ export function MarkdownResourceBody({
   /**
    * Whether an edit has begun and the caret has not been placed yet.
    *
-   * The editor may still be arriving behind `lazy` on the first Expansion of a
+   * The editor may still be arriving behind `lazy` on the first Opening of a
    * Space, so the request outlives the render that made it: the effect below
    * takes it when the handle is already there, and {@link receiveEditor} takes
    * it when the handle arrives afterwards. Waiting for the editor to become

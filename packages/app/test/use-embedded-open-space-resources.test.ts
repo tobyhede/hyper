@@ -34,7 +34,7 @@ const spaceResource = (resourceId: typeof HOST, map: typeof MAP): ResourceFlowNo
     title: 'Elsewhere',
     readOnly: false,
     kind: 'space',
-    expanded: true,
+    open: true,
     spaceContent: {
       id: resourceId,
       title: 'Elsewhere',

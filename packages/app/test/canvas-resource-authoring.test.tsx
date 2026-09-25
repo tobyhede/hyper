@@ -90,22 +90,22 @@ const snapshotWithoutResource = spaceSnapshotSchema.parse({
 });
 
 const node = (
-  expanded: boolean,
+  open: boolean,
   resourceId = RESOURCE_ID,
   kind: 'markdown' | 'reference' | 'space' = 'markdown',
 ): ResourceFlowNode => ({
   id: resourceId,
   type: 'resource',
   position: { x: 0, y: 0 },
-  width: expanded ? 640 : RESOURCE_SIZE.width,
-  height: expanded ? 480 : RESOURCE_SIZE.height,
+  width: open ? 640 : RESOURCE_SIZE.width,
+  height: open ? 480 : RESOURCE_SIZE.height,
   data: {
     resourceId,
     title: 'A',
     readOnly: false,
     kind,
     body: 'A source',
-    expanded,
+    open,
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -115,7 +115,7 @@ const node = (
 });
 
 interface HookProps {
-  readonly expanded: boolean;
+  readonly open: boolean;
   readonly enabled: boolean;
   readonly presenting: boolean;
   readonly nameOnCreation: string | null;
@@ -130,16 +130,16 @@ const mountAuthoring = (
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { authoring, adapter } = composeApp({ spaceSession });
   const initialProps: HookProps = {
-    expanded: false,
+    open: false,
     enabled: true,
     presenting: false,
     nameOnCreation: null,
     resourceId: RESOURCE_ID,
   };
   const hook = renderHook(
-    ({ expanded, enabled, presenting, nameOnCreation, resourceId }: HookProps) =>
+    ({ open, enabled, presenting, nameOnCreation, resourceId }: HookProps) =>
       useCanvasResourceAuthoring({
-        nodes: [node(expanded, resourceId, projectedKind)],
+        nodes: [node(open, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
         // what `enabled: false` means here — it is the fact that takes canvas
@@ -193,7 +193,7 @@ describe('canvas Resource authoring', () => {
     expect(result.current.nodes[0]?.data.bodyEditor).toBeUndefined();
 
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -205,7 +205,7 @@ describe('canvas Resource authoring', () => {
   it('authors Open for a Reference Resource through the same Resource operation', () => {
     const { result, rerender, spaceSession } = mountAuthoring(undefined, 'reference');
     rerender({
-      expanded: false,
+      open: false,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -218,7 +218,7 @@ describe('canvas Resource authoring', () => {
     );
 
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -249,7 +249,7 @@ describe('canvas Resource authoring', () => {
     const { result, rerender, spaceSession } = mountAuthoring();
 
     rerender({
-      expanded: false,
+      open: false,
       enabled: true,
       presenting: true,
       nameOnCreation: null,
@@ -268,7 +268,7 @@ describe('canvas Resource authoring', () => {
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeDefined();
 
     rerender({
-      expanded: false,
+      open: false,
       enabled: false,
       presenting: false,
       nameOnCreation: null,
@@ -277,7 +277,7 @@ describe('canvas Resource authoring', () => {
     expect(onlyNode(result.current.nodes).data.titleEditor).toBeUndefined();
 
     rerender({
-      expanded: false,
+      open: false,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -293,7 +293,7 @@ describe('canvas Resource authoring', () => {
   it('keeps a live body editor when a modal withdraws canvas controls', () => {
     const { result, rerender } = mountAuthoring();
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -302,7 +302,7 @@ describe('canvas Resource authoring', () => {
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
 
     rerender({
-      expanded: true,
+      open: true,
       enabled: false,
       presenting: false,
       nameOnCreation: null,
@@ -317,7 +317,7 @@ describe('canvas Resource authoring', () => {
   it('withholds competing Resource edits while a body caret is live', () => {
     const { result, rerender } = mountAuthoring();
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -333,7 +333,7 @@ describe('canvas Resource authoring', () => {
   it('temporarily hides a body editor while presenting without discarding its caret', () => {
     const { result, rerender } = mountAuthoring();
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -343,7 +343,7 @@ describe('canvas Resource authoring', () => {
     expect(onlyNode(result.current.nodes).data.bodyEditor).toBeDefined();
 
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: true,
       nameOnCreation: null,
@@ -352,7 +352,7 @@ describe('canvas Resource authoring', () => {
     expect(onlyNode(result.current.nodes).data.bodyEditor).toBeUndefined();
 
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -380,7 +380,7 @@ describe('canvas Resource authoring', () => {
       authoring.complete({ kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
     });
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -414,7 +414,7 @@ describe('canvas Resource authoring', () => {
     (kind) => {
       const { result, rerender } = mountAuthoring(undefined, kind);
       rerender({
-        expanded: true,
+        open: true,
         enabled: true,
         presenting: false,
         nameOnCreation: null,
@@ -432,7 +432,7 @@ describe('canvas Resource authoring', () => {
     (kind) => {
       const { result, rerender } = mountAuthoring(undefined, kind);
       rerender({
-        expanded: true,
+        open: true,
         enabled: true,
         presenting: false,
         nameOnCreation: null,
@@ -465,7 +465,7 @@ describe('canvas Resource authoring', () => {
     const bodyEditingChanged = vi.fn();
     const { result, rerender } = mountAuthoring(bodyEditingChanged);
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -475,14 +475,14 @@ describe('canvas Resource authoring', () => {
     expect(bodyEditingChanged).toHaveBeenLastCalledWith(true);
 
     rerender({
-      expanded: false,
+      open: false,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
       resourceId: RESOURCE_ID,
     });
     rerender({
-      expanded: true,
+      open: true,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
@@ -496,7 +496,7 @@ describe('canvas Resource authoring', () => {
   it('opens title editing only when a newly created Resource identity changes', () => {
     const { result, rerender } = mountAuthoring();
     rerender({
-      expanded: false,
+      open: false,
       enabled: true,
       presenting: false,
       nameOnCreation: RESOURCE_ID,
@@ -506,7 +506,7 @@ describe('canvas Resource authoring', () => {
 
     act(() => onlyNode(result.current.nodes).data.titleEditor?.onCancel());
     rerender({
-      expanded: false,
+      open: false,
       enabled: true,
       presenting: false,
       nameOnCreation: RESOURCE_ID,
@@ -529,18 +529,18 @@ describe('canvas Resource authoring Space rail', () => {
     ],
   };
 
-  const spaceNode = (expanded: boolean, readOnly = false): ResourceFlowNode => ({
-    ...node(expanded, SPACE_RESOURCE_ID, 'space'),
-    data: { ...node(expanded, SPACE_RESOURCE_ID, 'space').data, readOnly },
+  const spaceNode = (open: boolean, readOnly = false): ResourceFlowNode => ({
+    ...node(open, SPACE_RESOURCE_ID, 'space'),
+    data: { ...node(open, SPACE_RESOURCE_ID, 'space').data, readOnly },
   });
 
-  const mountRail = (expanded: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
+  const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, adapter } = composeApp({ spaceSession });
     return renderHook(() =>
       useCanvasResourceAuthoring({
-        nodes: [spaceNode(expanded, readOnly)],
+        nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
           presenting: false,

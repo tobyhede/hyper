@@ -311,7 +311,7 @@ export function embeddedMap({
       selectable: enabled,
       focusable: enabled,
       deletable: false,
-      zIndex: (parent.zIndex ?? 10) + (node.data.expanded === true ? 2 : 1),
+      zIndex: (parent.zIndex ?? 10) + (node.data.open === true ? 2 : 1),
     };
     if (!enabled) next.className = 'nopan nowheel nodrag';
     const clipBounds = bounds ?? {

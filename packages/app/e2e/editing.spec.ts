@@ -218,7 +218,7 @@ test(
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
     await resource.getByRole('button', { name: 'Edit Title A' }).click();
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
     const title = page.getByRole('textbox', { name: 'Resource title' });
     await title.fill('Renamed A');
     await title.press('Enter');
@@ -242,7 +242,7 @@ test(
     await keyboardTitle.fill('');
     await nodeByTitle(page, 'B').first().click();
     await expect(keyboardTitle).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
     await quiescent(page);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
     await keyboardTitle.focus();
@@ -282,7 +282,7 @@ test("a short Title control's hit-area hugs its text, not the whole Resource bod
   };
   await page.mouse.click(blankSpace.x, blankSpace.y);
   await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
-  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
 });
 
 test('a click selects a Resource, and no pointer gesture on its body opens it', async ({
@@ -296,12 +296,12 @@ test('a click selects a Resource, and no pointer gesture on its body opens it', 
 
   await resource.click();
   await expect(resource).toHaveClass(/selected/);
-  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
 
   // Off the Title, which has its own control. React Flow zooms on a double click
   // by default and its filter exempts only `.nopan`, which a Resource is not.
   await resource.dblclick({ position: { x: 24, y: 12 } });
-  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
   expect(await viewportTransform(page)).toEqual(transform);
 });
 
@@ -510,7 +510,7 @@ test('the opened Resource draws Markdown and its editor on the same paper surfac
   );
 });
 
-test('opened Markdown editing persists source while expansion displaces and restores Resources', async ({
+test('opened Markdown editing persists source while Opening displaces and restores Resources', async ({
   page,
 }) => {
   await page.goto('/');
@@ -522,12 +522,12 @@ test('opened Markdown editing persists source while expansion displaces and rest
   const openedId = await resource.getAttribute('data-id');
 
   await openResource(resource, 'A');
-  const expanded = await allPositions(page);
-  expect(expanded[openedId ?? '']).toEqual(before[openedId ?? '']);
+  const opened = await allPositions(page);
+  expect(opened[openedId ?? '']).toEqual(before[openedId ?? '']);
   expect(
     Object.entries(before).some(
       ([id, position]) =>
-        id !== openedId && JSON.stringify(expanded[id]) !== JSON.stringify(position),
+        id !== openedId && JSON.stringify(opened[id]) !== JSON.stringify(position),
     ),
   ).toBe(true);
   await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
@@ -536,7 +536,7 @@ test('opened Markdown editing persists source while expansion displaces and rest
 
   await expect(page.getByRole('textbox', { name: 'Markdown source of A' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
-  expect(await allPositions(page)).toEqual(expanded);
+  expect(await allPositions(page)).toEqual(opened);
 
   await (await controls(resource)).getByRole('button', { name: 'Close Resource A' }).click();
   expect(await allPositions(page)).toEqual(before);
@@ -1559,16 +1559,13 @@ test(
     );
 
     await expect.poll(async () => size(resource)).toEqual({ width: 260, height: 146 });
-    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute(
-      'data-expanded',
-      'true',
-    );
+    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'true');
     await expect(persistence).toHaveAttribute('data-revision', beforeCloseRevision ?? '');
 
     await page.mouse.up();
 
     await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'false',
     );
     await expect(resource.locator('.react-flow__resize-control')).toHaveCount(0);
@@ -2471,7 +2468,7 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     'opacity',
     '1',
   );
-  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
@@ -2746,7 +2743,7 @@ test('clicking a Resource authoring handle neither opens the Resource nor draws 
   const handleBox = (await authoringHandle(resource, 'source', 'right').boundingBox())!;
   await page.mouse.click(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
 
-  await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+  await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
   await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '0');
 });

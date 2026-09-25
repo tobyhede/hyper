@@ -459,7 +459,7 @@ describe('space file maps', () => {
     });
   });
 
-  it('requires an Expanded Resource to be at least the Closed Resource size', () => {
+  it('requires an Open Resource to be at least the Closed Resource size', () => {
     const positions = (width: number, height: number) => ({
       '00000000-0000-4000-8000-000000000002': {
         x: 0,

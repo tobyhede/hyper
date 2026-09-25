@@ -290,7 +290,7 @@
 
 /* The title footer takes only its content. CanvasResource reports its measured
    height so embedded nodes and Edges clip at the same boundary. */
-.canvas-resource[data-content-kind='space'][data-expanded='true'] .canvas-resource__body {
+.canvas-resource[data-content-kind='space'][data-open='true'] .canvas-resource__body {
   height: auto;
   flex: none;
   margin-top: auto;
@@ -316,7 +316,7 @@
   border-bottom: var(--canvas-resource-content-divider-width) solid var(--canvas-resource-ink);
   /* The Resource's ink, not the ambient `--foreground`. A Resource's face is its own
      paper and a body drawn in the surrounding theme's text colour is the one
-     part of an Expanded Resource that would not look like the Resource. */
+     part of an Open Resource that would not look like the Resource. */
   color: var(--canvas-resource-title);
   opacity: 1;
   transition-property: opacity;
@@ -438,7 +438,7 @@
 .canvas-resource__content {
   padding-top: 12px;
 }
-.canvas-resource[data-expanded='false'] > .canvas-resource__body {
+.canvas-resource[data-open='false'] > .canvas-resource__body {
   padding-top: 30px;
 }
 
@@ -447,7 +447,7 @@
 .canvas-resource:has(> .canvas-resource__rail .canvas-resource__actions) .canvas-resource__content {
   padding-top: calc(54px + var(--shadow-chrome-elevated-offset, 0px));
 }
-.canvas-resource[data-expanded='false']:has(> .canvas-resource__rail .canvas-resource__actions)
+.canvas-resource[data-open='false']:has(> .canvas-resource__rail .canvas-resource__actions)
   > .canvas-resource__body {
   padding-top: 46px;
 }

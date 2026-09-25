@@ -79,7 +79,7 @@ const chain = (name: string): readonly string[] =>
     .split(' && ')
     .flatMap((step) => {
       const nested = /^pnpm ([\w:-]+)$/.exec(step)?.[1];
-      // Only a step naming another *chain* is expanded. `pnpm lint` names a
+      // Only a step naming another *chain* is flattened. `pnpm lint` names a
       // single command and stays the step it is, which is what the callers
       // below assert on.
       if (nested === undefined || nested === name) return [step];

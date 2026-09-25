@@ -109,7 +109,7 @@ export const AbandonEditIcon = (props: ResourceActionIconProps) => (
  * Enter the Space a Space Resource references.
  *
  * Lucide `log-in`: an arrow going *into* a container, deliberately unlike
- * Open's `maximize-2`. Entering the Space and expanding the Resource in place
+ * Open's `maximize-2`. Entering the Space and opening the Resource in place
  * are two destinations and must not share a symbol.
  */
 export const EnterSpaceIcon = (props: ResourceActionIconProps) => <LogIn size={14} {...props} />;

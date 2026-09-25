@@ -135,7 +135,7 @@ test(
           contentInert: boolean;
           contentPresence: string | undefined;
           contentTransitionRunning: boolean;
-          expanded: string | undefined;
+          open: string | undefined;
           titleBottomInsets: number[];
         }>((resolve) => {
           const titleBottomInsets: number[] = [];
@@ -145,7 +145,7 @@ test(
                 contentInert: boolean;
                 contentPresence: string | undefined;
                 contentTransitionRunning: boolean;
-                expanded: string | undefined;
+                open: string | undefined;
               }
             | undefined;
           const sample = (now: number) => {
@@ -164,7 +164,7 @@ test(
                 contentInert: content.hasAttribute('inert'),
                 contentPresence: content.dataset['presence'],
                 contentTransitionRunning: opacityTransition?.playState === 'running',
-                expanded: element.dataset['expanded'],
+                open: element.dataset['open'],
               };
             }
             if (now - startedAt < duration) requestAnimationFrame(sample);
@@ -177,7 +177,7 @@ test(
     expect(closingSnapshot.contentInert).toBe(true);
     expect(closingSnapshot.contentPresence).toBe('leaving');
     expect(closingSnapshot.contentTransitionRunning).toBe(true);
-    expect(closingSnapshot.expanded).toBe('false');
+    expect(closingSnapshot.open).toBe('false');
     for (const inset of closingSnapshot.titleBottomInsets) {
       expect(inset).toBeGreaterThan(0);
       expect(inset).toBeLessThanOrEqual(Math.max(openBottomInset, closedBottomInset) + 1);
@@ -193,7 +193,7 @@ test(
 
     const leavingContent = resource.locator('.canvas-resource__content');
     await expect(leavingContent).toHaveCount(0);
-    await expect(resource).toHaveAttribute('data-expanded', 'false');
+    await expect(resource).toHaveAttribute('data-open', 'false');
     await selectResource(node);
     await expect(toolbar.getByRole('button', { name: 'Open Resource Strategies' })).toBeVisible();
     const longResource = page.getByRole('region', { name: 'Long Markdown Resource' });
@@ -371,7 +371,7 @@ test(
         })),
       )
       .toEqual({ width: 260, height: 146 });
-    await expect(node.locator('.rf-resource-node__inner')).toHaveAttribute('data-expanded', 'true');
+    await expect(node.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'true');
     await page.mouse.up();
   },
 );

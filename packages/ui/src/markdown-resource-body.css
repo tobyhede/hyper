@@ -1,4 +1,4 @@
-/* The Markdown kind's Expanded front, beside the component that draws it.
+/* The Markdown kind's Open front, beside the component that draws it.
 
    Custom composite record (shadcn-first-ui):
    - Existing Hyper component considered: CanvasResource, Button, RenderedMarkdown
@@ -17,7 +17,7 @@
      actions draw them. This surface keeps only a transparent pointer target;
      the rail remains its sole visible control.
    - Tests proving the deviation: MarkdownResourceBody.test.tsx and
-     packages/app/ladle-e2e/resource-expand.spec.ts.
+     packages/app/ladle-e2e/resource-open.spec.ts.
 
    Geometry and the editor's two published contracts only. Everything about how
    the source *looks* — type, gutter, line numbers, wrapping, highlighting — is

@@ -237,7 +237,7 @@ function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boole
   const [size, setSize] = useState({ width: 480, height: 360 });
   return (
     <CanvasResourceNodeSpecimen
-      expanded
+      open
       selected={selected}
       nodeSize={size}
       onResize={(proposal) => setSize(snapResourceSizeToClose(proposal))}
@@ -389,7 +389,7 @@ export const OpenAndClose: Story = () => {
       <section aria-label="Interactive Resource" className="flex flex-col gap-2">
         <p className="text-xs text-muted-foreground">{open ? 'Open' : 'Closed'}</p>
         <CanvasResourceNodeSpecimen
-          expanded={open}
+          open={open}
           onOpenChange={changeOpen}
           body={openMarkdown}
           nodeSize={open ? openFrame : closedFrame}
@@ -401,7 +401,7 @@ export const OpenAndClose: Story = () => {
           {longOpen ? 'Open' : 'Closed'} · long Markdown
         </p>
         <CanvasResourceNodeSpecimen
-          expanded={longOpen}
+          open={longOpen}
           onOpenChange={changeLongOpen}
           title="Long Markdown"
           body={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
@@ -424,7 +424,7 @@ export const OpenReference: Story = () => {
     <div className="p-8">
       <CanvasResourceNodeSpecimen
         resourceId={resourceIds.openingReference}
-        expanded={open}
+        open={open}
         onOpenChange={changeOpen}
         body={'## Strategies\n\nNo strategy is privileged.'}
         nodeSize={open ? openFrame : closedFrame}

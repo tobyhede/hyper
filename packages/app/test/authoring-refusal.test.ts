@@ -31,7 +31,7 @@ const EVERY_REFUSAL = {
   },
   'resource-already-in-map': { code: 'resource-already-in-map' },
   'resource-not-in-map': { code: 'resource-not-in-map' },
-  'resource-not-expanded': { code: 'resource-not-expanded' },
+  'resource-not-open': { code: 'resource-not-open' },
   'resource-has-references': { code: 'resource-has-references', referenceTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
   'map-must-keep-graph': { code: 'map-must-keep-graph' },

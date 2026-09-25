@@ -506,8 +506,8 @@ export function CanvasResource(props: CanvasResourceProps) {
       // Exposes authored state for the Resource's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's
       // layout remains invariant; no wall-clock presentation state is allowed
-      // to become a second expansion fact and move the Title mid-close.
-      data-expanded={open}
+      // to become a second Open fact and move the Title mid-close.
+      data-open={open}
       // A running edit is not a hover, so `canvas-resource.css` draws the active
       // face off this as well as `:hover` — a Resource being written in reads as
       // active without the pointer on it.

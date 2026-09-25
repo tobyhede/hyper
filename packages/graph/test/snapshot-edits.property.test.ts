@@ -791,7 +791,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
 
         expect(SnapshotEdit.resize(snapshot, MAP_ID, subjectId, size)).toEqual({
           kind: 'refused',
-          refusal: { code: 'resource-not-expanded' },
+          refusal: { code: 'resource-not-open' },
         });
       }),
     );

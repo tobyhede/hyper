@@ -2878,3 +2878,107 @@ describe('the vocabulary the Reference Resource guard reads', () => {
     );
   });
 });
+
+/**
+ * `CONTEXT.md`'s Open entry avoids two words for the state a Map authors when it
+ * Opens a Resource. The domain, the schema and Space Authoring say Open; the
+ * render layer, the DOM attribute tests read and a refusal code said otherwise
+ * until they were brought into line, and nothing read for them to drift back.
+ *
+ * One case-insensitive stem arm rather than a family of shapes, because the two
+ * words have no sense this repository means other than the retired one: a field,
+ * a `data-` attribute, a kebab refusal code, a capitalised noun in prose and a
+ * compound local all contain the stem, and no domain word does. The senses that
+ * are not ours are masked by spelling, each asserted below to still be written
+ * somewhere:
+ *
+ *  - the platform's disclosure attribute, which a Menu trigger states and
+ *    `Button`'s variant reads — the ticket that retired the words left it alone;
+ *  - the npm package minimatch depends on, named in the lockfile;
+ *  - the shell's sense, in the ESLint config's warning about glob braces.
+ *
+ * React Flow's `expandParent` is a different word and the arm never reads it.
+ * The words are composed from fragments, in this file's usual idiom, so the file
+ * holds none of them literally.
+ */
+const RETIRED_OPEN_STEM = ['ex', 'pan'].join('');
+const RETIRED_OPEN_STATE = new RegExp(`${RETIRED_OPEN_STEM}(?:ded|sion)`, 'i');
+const RETIRED_OPEN_ADJECTIVE = `${RETIRED_OPEN_STEM}ded`;
+const RETIRED_OPEN_NOUN = `${RETIRED_OPEN_STEM}sion`;
+
+const FOREIGN_OPEN_SPELLINGS: readonly string[] = [
+  `aria-${RETIRED_OPEN_ADJECTIVE}`,
+  `brace-${RETIRED_OPEN_NOUN}`,
+  `brace ${RETIRED_OPEN_NOUN}`,
+];
+
+const withoutForeignOpenSpellings = (source: string): string =>
+  FOREIGN_OPEN_SPELLINGS.reduce((text, spelling) => text.split(spelling).join('foreign'), source);
+
+describe('the Open state is named once (CONTEXT.md, Open)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file the rename actually touched', () => {
+    expect(scanned).toContain('packages/react-flow-adapter/src/projection.ts');
+    expect(scanned).toContain('packages/ui/src/canvas-resource.css');
+    expect(scanned).toContain('packages/graph/src/snapshot-edits.ts');
+    expect(scanned).toContain('packages/app/ladle-e2e/resource.spec.ts');
+    expect(scanned).toContain('test/e2e/postgres-persistence.spec.ts');
+  });
+
+  it('finds neither retired word anywhere it governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      return hits(withoutForeignOpenSpellings(source), RETIRED_OPEN_STATE).map(
+        (hit) => `${file}:${hit}`,
+      );
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no mask that has stopped earning itself', () => {
+    for (const spelling of FOREIGN_OPEN_SPELLINGS) {
+      const stillWritten = scanned.some((file) => readTracked(file)?.includes(spelling));
+      expect(stillWritten, `${spelling} is masked but no longer written anywhere`).toBe(true);
+    }
+  });
+
+  it('reports the retired words in every shape they were written in', () => {
+    const capitalised = `E${RETIRED_OPEN_ADJECTIVE.slice(1)}`;
+    const retired = [
+      `  ${RETIRED_OPEN_ADJECTIVE}?: boolean;`,
+      `if (node.data.${RETIRED_OPEN_ADJECTIVE} === true) return;`,
+      `<div data-${RETIRED_OPEN_ADJECTIVE}={open} />`,
+      `.canvas-resource[data-${RETIRED_OPEN_ADJECTIVE}='false'] > .canvas-resource__body {`,
+      `refused({ code: 'resource-not-${RETIRED_OPEN_ADJECTIVE}' })`,
+      `// An ${capitalised} Resource draws its content on the Resource.`,
+      `const ${RETIRED_OPEN_ADJECTIVE}Snapshot: SpaceSnapshot = {`,
+      `// E${RETIRED_OPEN_NOUN.slice(1)} is what the Map authored.`,
+      `test('persists source while ${RETIRED_OPEN_NOUN} displaces Resources', () => {});`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_OPEN_STATE.test(withoutForeignOpenSpellings(line)), line).toBe(true);
+    }
+  });
+
+  it("stays silent on the platform's, React Flow's and npm's words, and on the vocabulary that replaced them", () => {
+    const kept = [
+      `expect(trigger).toHaveAttribute('aria-${RETIRED_OPEN_ADJECTIVE}', 'true');`,
+      `aria-${RETIRED_OPEN_ADJECTIVE}:bg-secondary`,
+      `  brace-${RETIRED_OPEN_NOUN}@2.1.2:`,
+      `// \`{a,b}\` brace ${RETIRED_OPEN_NOUN} silently matches nothing.`,
+      `node.expandParent = true;`,
+      `if (node.data.open === true) return;`,
+      `.canvas-resource[data-open='false'] > .canvas-resource__body {`,
+      `refused({ code: 'resource-not-open' })`,
+      `// An Open Resource draws its content on the Resource.`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_OPEN_STATE.test(withoutForeignOpenSpellings(line)), line).toBe(false);
+    }
+  });
+});

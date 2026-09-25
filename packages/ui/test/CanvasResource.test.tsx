@@ -959,7 +959,7 @@ describe('CanvasResource open Markdown front', () => {
     );
 
     expect(screen.getByRole('article', { name: 'Strategies' })).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'false',
     );
   });
@@ -975,7 +975,7 @@ describe('CanvasResource open Markdown front', () => {
     );
 
     const resource = screen.getByRole('article', { name: 'Strategies' });
-    expect(resource).toHaveAttribute('data-expanded', 'true');
+    expect(resource).toHaveAttribute('data-open', 'true');
     expect(screen.getByText('the Resource’s own source')).toBeVisible();
   });
 
@@ -990,7 +990,7 @@ describe('CanvasResource open Markdown front', () => {
     );
 
     expect(screen.getByRole('article', { name: 'Strategy overview' })).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'false',
     );
   });
@@ -1008,7 +1008,7 @@ describe('CanvasResource open Markdown front', () => {
       />,
     );
 
-    // Expansion is what the Map authored and the caret is a gesture, so the
+    // Open is what the Map authored and the caret is a gesture, so the
     // two are independent rather than exclusive (ADR 0064).
     expect(screen.getByRole('textbox', { name: 'Resource title' })).toBeVisible();
     expect(screen.getByText('the Resource’s own source')).toBeVisible();

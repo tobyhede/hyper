@@ -39,7 +39,7 @@ for (const delay of [0, 120]) {
       await settled(page);
       const persistence = page.getByTestId('persistence-status');
       const revision = await persistence.getAttribute('data-revision');
-      const closed = await page.locator('.canvas-resource[data-expanded="false"]').count();
+      const closed = await page.locator('.canvas-resource[data-open="false"]').count();
       await dock(page)
         .getByRole('button', { name: /^Space: / })
         .click({ delay });
@@ -57,8 +57,8 @@ for (const delay of [0, 120]) {
       // Give an unintended asynchronous Edit time to publish before checking
       // the unchanged revision, as the editing suite does for negative gestures.
       await page.waitForTimeout(250);
-      await expect(page.locator('.canvas-resource[data-expanded="false"]')).toHaveCount(closed);
-      await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+      await expect(page.locator('.canvas-resource[data-open="false"]')).toHaveCount(closed);
+      await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
       await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
     });
   }
@@ -93,7 +93,7 @@ test('renaming a Space, Map or Graph from the Dock does not Open a selected Reso
     await expect(editor).toBeFocused();
     await editor.press('Enter');
     await expect(editor).toHaveCount(0);
-    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
   }
 
   for (const key of ['Enter', ' '] as const) {
@@ -101,12 +101,12 @@ test('renaming a Space, Map or Graph from the Dock does not Open a selected Reso
     await map.focus();
     await page.keyboard.press(key);
     await expect(page.getByRole('menu')).toBeVisible();
-    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
     await page.getByRole('menuitem', { name: 'Rename' }).click();
     const editor = page.getByRole('textbox', { name: 'Map name', exact: true });
     await expect(editor).toBeFocused();
     await editor.press('Escape');
-    await expect(page.locator('.canvas-resource[data-expanded="true"]')).toHaveCount(0);
+    await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
   }
 });
 

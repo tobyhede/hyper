@@ -400,7 +400,7 @@ export interface CanvasResourceNodeSpecimenProps {
    */
   readonly openOperationEnabled?: boolean;
   readonly nodeSize?: { readonly width: number; readonly height: number };
-  readonly expanded?: boolean;
+  readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
   readonly onResize?: (size: { readonly width: number; readonly height: number }) => void;
   readonly stageClassName?: string;
@@ -423,7 +423,7 @@ export function CanvasResourceNodeSpecimen({
   graphColor,
   openOperationEnabled = true,
   nodeSize,
-  expanded,
+  open,
   onOpenChange,
   onResize,
   stageClassName = '',
@@ -458,7 +458,7 @@ export function CanvasResourceNodeSpecimen({
     onBeginTitleEditing: () => undefined,
   };
   if (openOperationEnabled) data.onEditResource = onOpenChange ?? (() => 'completed');
-  if (expanded !== undefined) data.expanded = expanded;
+  if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (body !== undefined) data.body = body;
   // The editor is the state, so a specimen that asks to be renaming supplies
@@ -469,7 +469,7 @@ export function CanvasResourceNodeSpecimen({
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
   // Set exactly the way `SpaceCanvas` sets it: resize is Resource behaviour, not
   // kind behaviour, so its presence follows Open state alone.
-  if (expanded === true) {
+  if (open === true) {
     if (onResize !== undefined) {
       data.resize = {
         minWidth: RESOURCE_SIZE.width,
