@@ -69,6 +69,13 @@ export interface FeatureRoadmap {
    * skipped: a ticket the roll-up cannot see reads as work that does not exist.
    */
   readonly unstatused: readonly string[];
+  /**
+   * Every number two or more ticket files under `issues/` claim, as
+   * `16: 16-first.md, 16-second.md`. A ticket number is an address: tickets,
+   * AGENTS.md and agents cite one by number within its effort, and a blocker
+   * naming a claimed-twice number cannot be resolved to either file.
+   */
+  readonly duplicateNumbers: readonly string[];
 }
 
 export interface Roadmap {
@@ -104,6 +111,8 @@ const RELEASE_SPACE_PATTERN = /^space:[ \t]+(.+)$/iu;
 const HEADING_PATTERN = /^#[ \t]+(.+?)[ \t]*$/u;
 const NUMBERED_TITLE_PATTERN = /^\d{2}[ \t]*[—–-][ \t]*/u;
 const FILE_NUMBER_PATTERN = /^(\d{2})-/u;
+/** Any leading number, so a duplicate is found however many digits it has. */
+const CLAIMED_NUMBER_PATTERN = /^(\d+)-/u;
 const NO_BLOCKERS_PATTERN = /^(none|nothing|n\/a)\b/iu;
 /**
  * A blocker list is a wrapped paragraph, so the references after the first line
@@ -286,7 +295,24 @@ interface ScannedFeature {
   readonly issues: readonly ParsedIssue[];
   readonly documents: readonly ParsedIssue[];
   readonly unstatused: readonly string[];
+  readonly duplicateNumbers: readonly string[];
 }
+
+/**
+ * Read as a list rather than keyed by number: a lookup keyed by the number is
+ * exactly what cannot see a duplicate, because the second file replaces the first.
+ */
+const duplicateNumbersIn = (files: readonly string[]): readonly string[] => {
+  const byNumber = new Map<string, string[]>();
+  for (const file of files) {
+    const name = basename(file);
+    const claimed = CLAIMED_NUMBER_PATTERN.exec(name)?.[1];
+    if (claimed !== undefined) byNumber.set(claimed, [...(byNumber.get(claimed) ?? []), name]);
+  }
+  return [...byNumber]
+    .filter(([, names]) => names.length > 1)
+    .map(([number, names]) => `${number}: ${names.join(', ')}`);
+};
 
 const scanFeature = (root: string, slug: string): ScannedFeature => {
   const directory = join(root, slug);
@@ -303,7 +329,8 @@ const scanFeature = (root: string, slug: string): ScannedFeature => {
   const documents = markdownFilesIn(directory)
     .map((file) => parseFile(root, file))
     .filter((document): document is ParsedIssue => document !== null);
-  return { slug, issues, documents, unstatused };
+  const duplicateNumbers = duplicateNumbersIn(tickets.map((ticket) => ticket.file));
+  return { slug, issues, documents, unstatused, duplicateNumbers };
 };
 
 const blockerKey = (feature: string, number: string): string => `${feature}/${number}`;
@@ -348,6 +375,7 @@ export const buildRoadmap = (root: string): Roadmap => {
       issues,
       documents: feature.documents.map((document) => ({ ...document, unmetBlockers: [] })),
       unstatused: feature.unstatused,
+      duplicateNumbers: feature.duplicateNumbers,
     };
   });
 
@@ -587,6 +615,9 @@ export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = n
   const unstatused = roadmap.features.flatMap((feature) =>
     feature.unstatused.map((path) => `  ${path}`),
   );
+  const duplicated = roadmap.features.flatMap((feature) =>
+    feature.duplicateNumbers.map((claim) => `  ${feature.slug}/issues/${claim}`),
+  );
   const releaseIssues = release === null ? [] : issuesTagged(roadmap, release.tag);
   const releaseSettled = releaseIssues.filter(({ issue }) => isSettled(issue.state)).length;
   const openReleaseIssues = releaseIssues.filter(({ issue }) => !isSettled(issue.state));
@@ -633,6 +664,13 @@ export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = n
   }
   if (unstatused.length > 0) {
     lines.push('', `NO STATUS LINE — ${unstatused.length} (invisible to this scan)`, ...unstatused);
+  }
+  if (duplicated.length > 0) {
+    lines.push(
+      '',
+      `DUPLICATE TICKET NUMBERS — ${duplicated.length} (a citation of one is ambiguous)`,
+      ...duplicated,
+    );
   }
   lines.push('', `COMPLETE — ${complete.length}`, ...wrapSlugs(complete));
   lines.push(
@@ -1024,6 +1062,9 @@ export const renderRoadmapHtml = (
       ),
   );
   const unstatused = roadmap.features.flatMap((feature) => feature.unstatused);
+  const duplicated = roadmap.features.flatMap((feature) =>
+    feature.duplicateNumbers.map((claim) => `${feature.slug}/issues/${claim}`),
+  );
 
   return [
     '<!doctype html>',
@@ -1062,6 +1103,13 @@ export const renderRoadmapHtml = (
                 `<li><a class="path" href="${escapeHtml(path)}">${escapeHtml(path)}</a></li>`,
             )
             .join('')}</ul></details>`,
+    ),
+    htmlSection(
+      'Duplicate ticket numbers — a citation of one is ambiguous',
+      duplicated.length,
+      duplicated.length === 0
+        ? ''
+        : `<details open><ul>${duplicated.map((claim) => `<li>${escapeHtml(claim)}</li>`).join('')}</ul></details>`,
     ),
     htmlSection(
       'Deferred work inside settled issues',
