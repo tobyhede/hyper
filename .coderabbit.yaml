@@ -81,8 +81,11 @@ reviews:
         `docs/adr/`, `docs/superpowers/` and `.scratch/`. There is no router
         library: ADR 0069 removed it, so no file speaks a routing library's
         vocabulary and the old carve-out for one is gone.
-        `test/unit/current-domain-vocabulary.test.ts` scans every tracked file
-        for them, so reintroducing one fails the build rather than the review.
+        `test/unit/current-domain-vocabulary.test.ts` scans every tracked
+        source, test, script, configuration and Space-data file for them, so
+        reintroducing one there fails the build rather than the review. Prose
+        Markdown documents (README, CONTEXT.md, AGENTS.md, `docs/`, skills) are
+        not scanned, so a retired name in a document is a review finding.
         ADR 0085 is BUILT too, and the same test enforces it in thirteen shape
         arms each: a Resource is never called a Card and a Map is never called
         a Layout, in any compound, kebab-case refusal code, test id, CSS block
@@ -347,8 +350,9 @@ reviews:
           `Arrangement`, a shared `Draft`, a `cards` array in the space file,
           or an `edges` array beside Graphs.
           `test/unit/current-domain-vocabulary.test.ts` enforces all of those
-          but the last four over every tracked file, so those are build
-          failures rather than review findings; this check covers what is left.
+          but the last four over every tracked file except prose Markdown
+          documents, so those are build failures rather than review findings;
+          this check covers what is left, including every document.
           Two limits of that test are worth knowing. It reads shapes, so a
           retired word carrying an English suffix, or bare and lowercase in a
           sense the guard deliberately leaves writable, may reach review. And
