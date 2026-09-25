@@ -190,12 +190,13 @@ function SpaceMenu({
  *
  * **The arms are `ExitSpaceResult`'s and there are three.** `exited` draws
  * nothing — the Space is gone from the Open Spaces menu and the canvas has moved, which
- * is the whole of the report. `warning` is a question, because ADR 0068 makes
- * `rejected` the one bad state Exit permits: leaving loses the work, and when
- * the Space's own Retry could still save it the sentence says so, but refusing
- * would trap an entry whose work may never fit. Answering it
- * hands the same `RejectedExitConfirmation` token back to the exit, which is
- * production's own second call rather than a second command. `refused` is a
+ * is the whole of the report. `warning` is a question, because ADR 0068 lets
+ * Exit leave a `rejected` or `refused` Space that Retry cannot recover:
+ * leaving loses the work, and refusing would trap the entry. Answering the
+ * warning hands the same `RejectedExitConfirmation` token back to the exit,
+ * which is production's own second call rather than a second command. A
+ * rejection Retry can still save, such as one for size, never reaches the
+ * warning and is refused instead. `refused` is a
  * statement, and it names the recovery that already exists — Retry, or Resolve —
  * because ADR 0068 only makes a refusal worth making when it names an action.
  *
