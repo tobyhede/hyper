@@ -271,9 +271,11 @@ export interface ProjectResourceNodesOptions {
  * resolves an Edge that names no handle to the first bound of that kind.
  *
  * Declared rather than measured. `parseHandles` prefers what is on `node.handles`
- * to anything in the DOM, and nothing may force a remeasure: the forced path
- * rebuilds the bounds from `getHandleBounds`, which reads only the elements the
- * DOM draws. `ResourceNode` records the same rule from the other side.
+ * to anything in the DOM, so a Resource's anchors are known on the render that
+ * first places it. React Flow still re-reads them from the DOM with
+ * `getHandleBounds` whenever a node's element changes size, and finds the same
+ * four sides, which `ResourceNode` renders on every Resource; each projection
+ * then declares them again.
  */
 function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
   const radius = AUTHORING_HANDLE_DIAMETER / 2;
