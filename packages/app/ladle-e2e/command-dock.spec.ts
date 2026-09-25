@@ -802,8 +802,8 @@ test(
  *
  * Asserted as the obligation and not as a CSS value: the cluster is **one row**
  * (so it stands at its neighbours' height rather than three times it), and its
- * four glyphs sit on **one pitch** (so the trigger's chevron reads as the first
- * of four rather than as punctuation after the word). A verb track apiece
+ * three glyphs sit on **one pitch** (so the trigger's chevron reads as the first
+ * of three rather than as punctuation after the word). A verb track apiece
  * would stand empty on the other rows.
  */
 test(

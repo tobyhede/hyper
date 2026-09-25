@@ -397,8 +397,7 @@ test(
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
     await settled(page);
 
-    // An authored Map, so the Edge joins a Graph that already holds one out
-    // of A rather than the empty Graph a conversion would mint (ADR 0045).
+    // An authored Map whose Graph already holds an Edge out of A.
     await selectCanvas(page, 'Collection 1');
     await activateGraph(page, 'Short');
     await settled(page);

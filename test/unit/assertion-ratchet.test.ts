@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 const RULE = '@typescript-eslint/no-unsafe-type-assertion';
 
 /** These only ever go down. Lower these when the count drops; never raise them. */
-const CEILING = 78;
-const CEILING_FILES = 35;
+const CEILING = 47;
+const CEILING_FILES = 25;
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
