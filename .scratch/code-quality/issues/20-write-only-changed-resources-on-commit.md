@@ -20,7 +20,7 @@
 - **Stale revisions** still throw `StaleSpaceRevisionError` before any Resource is written.
 
 - [x] Only new or changed Resources are upserted; the ownership check still covers every new id
-- [ ] `test/support/repository-contract.ts` and both aggregate-commit differentials pass on SQLite, and on PostgreSQL in CI. SQLite passes locally; PostgreSQL is left to CI.
+- [x] `test/support/repository-contract.ts` and both aggregate-commit differentials pass on SQLite, and on PostgreSQL in CI. SQLite passed locally; PostgreSQL passed in CI's `postgres` job on PR #290 (run 36085894541).
 - [x] A test proves a changed Resource is persisted, and an unchanged one is not rewritten, by counting statements or reading `updated_at`
 - [x] The ticket 17 harness is re-run, and the before and after numbers are recorded here
 
