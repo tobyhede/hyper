@@ -1,10 +1,10 @@
 # 25: Run mutation testing in CI
 
-**Status:** needs-triage
+**Status:** needs-triage — deferred by Toby Hede (2026-09-25) and excluded from the active queue (`../DECISIONS-2026-09-25.md`). The decisions below stay open until it is picked up again.
 
 **Blocked by:** None; follows the Stryker decision in 13
 
-**What to build:** A CI job that runs the StrykerJS campaigns, so the mutation findings stop depending on someone remembering to run `pnpm mutate:*` by hand. Ticket 13 recorded the decision to keep Stryker and run it in CI (2026-09-25).
+**What to build:** A CI job that runs the StrykerJS campaigns, so the mutation findings stop depending on someone remembering to run `pnpm mutate:*` by hand. Ticket 13 recorded the decision to keep Stryker and run it in CI (2026-09-25); the CI half was then deferred.
 
 This reverses a standing rule. AGENTS.md, `docs/agents/build-tooling.md` and the comment at the top of `stryker.conf.mjs` all say mutation testing is "a deliberate local diagnostic, never a gate": it is not in `verify` or CI, `thresholds.break` is `null`, and the tickets that introduced it forbid a threshold (`.scratch/mutation-testing/`). The change therefore needs an ADR, and every one of those passages has to be updated in the same change.
 
