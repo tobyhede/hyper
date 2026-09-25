@@ -310,7 +310,7 @@ untouched as accurate history).
   Open/Close and Space Resource Open/Close specs the flag removal touches
   (`editing.spec.ts`, `overview.spec.ts`, `space-resource.spec.ts`).
 - `pnpm e2e:ladle` — green, **115 passed** (40.6s), including
-  `resource-expand.spec.ts`'s "Open Reference Resource story renders Target
+  `resource-open.spec.ts`'s "Open Reference Resource story renders Target
   Markdown read-only under the Reference Resource Title" — the Ladle proof
   that exercises the corrected `OpenReference` story and harness default.
 
