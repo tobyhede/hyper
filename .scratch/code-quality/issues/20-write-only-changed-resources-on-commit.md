@@ -2,7 +2,7 @@
 
 **Priority:** P2 — measured cost that grows with every Resource in the edited Space
 
-**Status:** ready-for-agent. Built, and passing on SQLite and memory locally. What is left is CI's `postgres` job on the current commit: its one pass (run 36085894541, at 09f9f5ac) predates the re-read of the Resource rows under the row lock, so it does not cover this code.
+**Status:** resolved
 
 **Blocked by:** None
 
@@ -20,7 +20,7 @@
 - **Stale revisions** still throw `StaleSpaceRevisionError` before any Resource is written.
 
 - [x] Only new or changed Resources are upserted; the ownership check still covers every new id
-- [ ] `test/support/repository-contract.ts` and both aggregate-commit differentials pass on SQLite, and on PostgreSQL in CI. SQLite passes locally on the current code. PostgreSQL passed in CI's `postgres` job on PR #290 (run 36085894541) at 09f9f5ac, before the re-read under the row lock; it has not run since.
+- [x] `test/support/repository-contract.ts` and both aggregate-commit differentials pass on SQLite, and on PostgreSQL in CI. CI run 36099949806 on PR #290 passed its `postgres` and `sqlite` jobs at 6193dd9e, which includes the re-read of the Resource rows under the row lock and the contract cases that recreate them before it.
 - [x] A test proves a changed Resource is persisted, and an unchanged one is not rewritten, by counting statements or reading `updated_at`
 - [x] The ticket 17 harness is re-run, and the before and after numbers are recorded here
 
