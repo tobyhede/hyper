@@ -18,6 +18,7 @@ import {
   type SpaceCommit,
   type SpaceSummary,
 } from '@project/persistence';
+import { isDeepStrictEqual } from 'node:util';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
 import type {
   AggregateInput,
@@ -150,6 +151,31 @@ const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot):
       previous.document.map === resource.document.map &&
       previous.document.graph === resource.document.graph
     );
+  });
+};
+
+type SnapshotResource = SpaceSnapshot['resources'][number];
+
+/**
+ * The Resources of `next` an update has to write: each one `stored` does not
+ * hold, and each one whose document differs from the stored document. The
+ * rest are already stored exactly as `next` has them, so rewriting them would
+ * change no row.
+ *
+ * `stored` is the Space's Resource rows as they stand, each document decoded
+ * from its column and not parsed, so a Resource left out here is one whose row
+ * already holds exactly the document `next` proposes. A document that compares
+ * unequal only in shape -- a property present as `undefined` on one side --
+ * is written, which costs a statement and changes nothing.
+ */
+const changedResources = (
+  stored: readonly { readonly id: string; readonly document: unknown }[],
+  next: SpaceSnapshot,
+): readonly SnapshotResource[] => {
+  const storedDocuments = new Map(stored.map((resource) => [resource.id, resource.document]));
+  return next.resources.filter((resource) => {
+    const previous = storedDocuments.get(resource.id);
+    return previous === undefined || !isDeepStrictEqual(previous, resource.document);
   });
 };
 
@@ -542,7 +568,18 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * The revision is re-established under the row lock rather than trusted
    * from an earlier read: the fast path deliberately holds no singleton lock,
    * so another commit -- fast or slow -- can move the row in between, and the
-   * conflict this then throws rolls the whole transaction back.
+   * conflict this then throws rolls the whole transaction back before any
+   * Resource is written.
+   *
+   * Only the Resources `changedResources` names are written, judged against
+   * the Space's Resource rows read again once the revision holds, under the
+   * row lock. Do not judge them against the read the commit decided on: a
+   * revision comparison cannot see a Space deleted and recreated at the same
+   * revision after that read, and a Resource skipped against the rows it
+   * replaced would leave the recreated row, or no row, where the snapshot
+   * names one. Every Resource the Space does not hold -- a new id, or one
+   * moving here from another Space -- is new to it, and goes through
+   * `#upsertResources`'s ownership check.
    */
   async #writeUpdate(
     tables: SqlTables<Order>,
@@ -561,7 +598,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       snapshot.id,
       encodeNextRevisionReclassified(snapshot.id, newRevision),
     );
-    await this.#upsertResources(tables, snapshot);
+    const locked = await tables.Space.loadWithResources(snapshot.id);
+    if (locked === null) throw new Error(`Space ${snapshot.id} disappeared under its row lock`);
+    const stored = locked.resources.map((resource) => ({
+      id: resource.id,
+      document: this.#store.readDocument(resource.document),
+    }));
+    await this.#upsertResources(tables, snapshot.id, changedResources(stored, snapshot));
     await tables.Resource.deleteExcept(
       snapshot.id,
       snapshot.resources.map((resource) => resource.id),
@@ -574,16 +617,20 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * An update's row already exists, so ownership is read back off the upsert
    * instead (`SqlTables.Resource.upsert`'s own doc comment).
    */
-  async #upsertResources(tables: SqlTables<Order>, snapshot: SpaceSnapshot): Promise<void> {
-    for (const resource of snapshot.resources) {
+  async #upsertResources(
+    tables: SqlTables<Order>,
+    spaceId: UUID,
+    resources: readonly SnapshotResource[],
+  ): Promise<void> {
+    for (const resource of resources) {
       const stored = await tables.Resource.upsert({
         id: resource.id,
-        spaceId: snapshot.id,
+        spaceId,
         document: resource.document,
       });
-      if (stored.spaceId !== snapshot.id) {
+      if (stored.spaceId !== spaceId) {
         throw new ResourceOwnershipError(
-          `Resource ${resource.id} belongs to space ${stored.spaceId}, not ${snapshot.id}`,
+          `Resource ${resource.id} belongs to space ${stored.spaceId}, not ${spaceId}`,
         );
       }
     }
