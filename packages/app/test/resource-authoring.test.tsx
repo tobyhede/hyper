@@ -444,12 +444,12 @@ describe('authoring a Resource title on the graph', () => {
  *
  * An empty Graph is legal, and ADR 0040 makes it *ordinary*: creating a Map
  * mints its one Active Graph holding nothing, so this is the state the author is
- * in immediately after their first edit on the Flow view. `graphStartResource`
+ * in immediately after Add Map. `graphStartResource`
  * has no answer for such a Graph, so `present()` returns having changed nothing
  * — and an enabled control would read `Present` and swallow the click.
  *
  * Neither half proves this on its own: the refusal is in Navigation and the
- * enablement is in `GraphSelector`, and the two must agree.
+ * enablement is `presentDisabled` in `dock-chrome.ts`, and the two must agree.
  */
 describe('presenting from a Map', () => {
   it('offers Present on a Map whose Active Graph holds an Edge', async () => {

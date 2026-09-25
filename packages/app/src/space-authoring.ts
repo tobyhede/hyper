@@ -1313,14 +1313,14 @@ export function createSpaceAuthoring({
       // selection from `navigation.getState()` at derivation time, and three
       // paths put that ahead of the id the author submitted: a completion that
       // arrived while another was completing derives off the queue rather than
-      // off the press; the Dock's `IdentityName` closes over the
+      // off the press; the Dock's rename closes over the
       // `canvas.selected.id` of its last committed render, so a selection that
       // moved this tick has not reached it yet; and an embedded Map Edit
       // resolves `embeddedMapId` rather than the selection at all, so a
       // rename aimed at the drawing Map names the wrong one by construction.
-      // The surface guards are real and are not this one — `IdentityName` ends
-      // a draft whose subject changed, `App` ends one the replacement epoch or
-      // lost availability invalidated (ADR 0042) — but both end it on the
+      // The surface guard is real and is not this one — `CommandDock` ends a
+      // draft whose subject changed or whose Space was replaced (ADR 0042) —
+      // but it ends it on the
       // *next* render, and this answers the submit already in flight. So a
       // rename naming a Map other than the one this Edit resolves is a
       // gesture aimed at something no longer drawing — an author's state, not a

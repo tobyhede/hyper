@@ -19,7 +19,7 @@ import { node, settled } from './render-adapter-fixtures';
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
 
-describe('Map delete draws the right geometry (ticket 02, item 1)', () => {
+describe('Map delete draws the right geometry', () => {
   const SPACE_ID = id('1');
   const DELETED_MAP_ID = id('2');
   const SURVIVING_MAP_ID = id('3');
@@ -101,7 +101,7 @@ describe('Map delete draws the right geometry (ticket 02, item 1)', () => {
   });
 });
 
-describe('Entering draws the entered Map’s geometry (ticket 02, item 2)', () => {
+describe('Entering draws the entered Map’s geometry', () => {
   const META_ID = id('10');
   const OTHER_ID = id('11');
   const DEFAULT_MAP_ID = id('12');
@@ -198,7 +198,7 @@ describe('Entering draws the entered Map’s geometry (ticket 02, item 2)', () =
   });
 });
 
-describe('An embedded Edit in an unselected Map leaves no stale member (ticket 02, item 3)', () => {
+describe('An embedded Edit in an unselected Map leaves no stale member', () => {
   const SPACE_ID = id('30');
   const TOP_MAP_ID = id('31');
   const OTHER_MAP_ID = id('32');
@@ -287,7 +287,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member (ticket 0
   });
 });
 
-describe('A queued drag holds its drop point (ticket 02, item 4 — guards the change)', () => {
+describe('A queued drag holds its drop point', () => {
   const SPACE_ID = id('40');
   const MAP_ID = id('41');
   const GRAPH_ID = id('42');

@@ -293,10 +293,10 @@ test('history restores a canonical Resource through the default Map, not the con
 /**
  * A Resource's two addresses, from the Resource's own rail.
  *
- * **Untagged, and that is a decision rather than an omission.** A Resource's
- * links are the rail's, and the rail's story sheet is under `stories/review`,
- * so there is no stable story for a parity claim to name. The behaviour is
- * proved here and in `resource-rail-actions.test.tsx`.
+ * **Untagged, and that is a decision rather than an omission.** No parity claim
+ * names a Resource's copy links. The behaviour is proved here, against the
+ * `RailActions` story in `ladle-e2e/link-actions.spec.ts`, and in
+ * `resource-rail-actions.test.tsx`.
  */
 test('copy commands distinguish canonical Resource identity from its current Map', async ({
   page,

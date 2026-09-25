@@ -28,9 +28,9 @@ import { selectResource } from './resource-selection';
  * Space is accepted is discarded with the Space it named.
  *
  * Three surfaces own a draft the author can reach — the graph's inline title
- * field, the opened-Resource pane, and React Flow's drag — and no one mechanism
- * discards all three. The Dock's chrome rename is a fourth, outside the canvas:
- * `IdentityName` ends a rename on the replacement epoch, and the case stages a
+ * field, an Open Resource's Markdown source editor, and React Flow's drag — and
+ * no one mechanism discards all three. The Dock's chrome rename is a fourth,
+ * outside the canvas: `CommandDock` ends a rename on the replacement epoch, and the case stages a
  * draft the rename refuses so the assertion does not turn on where jsdom put
  * focus.
  *
@@ -372,7 +372,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
    * and blur is `InlineTitleEditor`'s own commit — so whenever the trap reached
    * the field the draft would be *committed* before the accept and the
    * replacement would have nothing left to discard. A blank name is the one
-   * refusal every renameable entity has (`IdentityName`), and a refused draft is
+   * refusal every renameable entity has, and a refused draft is
    * held open and editable by contract — so the editor is still standing when
    * the accept lands whether the trap reached it or not, and the assertion is
    * about the replacement rather than about jsdom's focus.

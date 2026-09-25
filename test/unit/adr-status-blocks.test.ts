@@ -532,7 +532,7 @@ describe('the status block that guard reads', () => {
 
   it('reports the two-stage retirement the one-superseder convention rules out', () => {
     // One superseder per ADR: 0022 names 0026 and stops there, so a reader
-    // follows the chain rather than finding 0040 named twice.
+    // follows the chain. 0040 naming 0022 as well is the fault reported.
     const adrs = synthetic({
       '0022': ['Status: superseded', 'Superseded by: 0026'],
       '0026': ['Status: superseded', 'Supersedes: 0022', 'Superseded by: 0040'],

@@ -1329,10 +1329,10 @@ describe('a Map is named once (ADR 0085)', () => {
  *
  * **This block is why the name is Resource and not Object.** A scan for
  * `Object[A-Z]`, `[A-Za-z]Object`, `object[A-Z]` and `OBJECTS?` matches
- * hundreds of foreign sites (`RefObject`, `toMatchObject`, oxlint's
- * `ObjectExpression`), and a domain word whose guard needs hundreds of
- * exceptions has no guard. The same scan for Resource matches none, so the name
- * holds only while this file holds it.
+ * foreign spellings throughout the tree (`RefObject`, `toMatchObject`, oxlint's
+ * `ObjectExpression`), and a domain word whose guard needs an exception for
+ * each has no guard. ADR 0085 chose Resource over Object on that
+ * ground.
  *
  * **The English words need no exemption.** `cardinality`, `discard` and
  * `wildcard` are all invisible to every arm below, and not by luck: each arm

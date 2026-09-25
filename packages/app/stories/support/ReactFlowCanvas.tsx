@@ -334,10 +334,9 @@ export function ZoomSliderSpecimen() {
  * ResourceNode projection; stories supply only identity, title and placement.
  *
  * `drawn` and `activeGraphId` default to the inventory's own Space and its Long
- * Graph, which is what most stories here draw. A story that names another Map — the Command Dock's, which switches
- * between two of them — gets the same derivation over its own Space rather than
- * a second canvas beside this one, and switching the Active Graph re-projects
- * without laying the Space out again.
+ * Graph. A story that names another Map gets the same derivation over its own
+ * Space rather than a second canvas beside this one, and switching the Active
+ * Graph re-projects without laying the Space out again.
  *
  * The camera is {@link StoryCanvasViewport} rather than an optional `zoom`,
  * because a default and "fit this Map to the frame" are both spelled

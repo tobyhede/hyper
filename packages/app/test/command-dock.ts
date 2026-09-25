@@ -196,19 +196,6 @@ export const openSpaceRow = (title: RegExp | string): HTMLElement =>
   screen.getByRole('menuitemradio', { name: title });
 
 /**
- * Present, reached from under a modal creation pane.
- *
- * A pane hides the rest of the tree from assistive technology, so a role query
- * cannot see the bar behind it — and a reader cannot press it either. The claim
- * a test spends this on is not that the control is reachable; it is what the
- * application does *when* a presentation begins, which is also reachable by
- * Back onto a presenting Resource's URL with the pane still up. Naming the exception
- * here keeps it one exception rather than a habit.
- */
-export const presentControlBehindAModal = (graphTitle: string): HTMLElement =>
-  screen.getByRole('button', { name: `Present ${graphTitle}`, hidden: true });
-
-/**
  * Delete, on the Map the cluster is showing.
  *
  * Two rules meet on this one row and neither implies the other: the last Map

@@ -29,8 +29,8 @@ import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
  *
  * The addresses and the deletion are on the Resource's own rail, and these
  * tests are what keeps them there: the menu is asserted through the canvas
- * rather than through any chrome, and the deletion is asserted to be the Space's
- * one deletion Edit rather than a second one that resembles it.
+ * rather than through any chrome, and the deletion by what the session holds
+ * afterwards.
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');

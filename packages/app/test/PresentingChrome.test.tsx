@@ -246,10 +246,11 @@ describe('PresentingChrome', () => {
   /**
    * Presentation begins with focus on the control that carries it forward.
    *
-   * Entry is a press of a control outside this chrome, such as the Dock's
-   * Present, and `usePresentingKeys` leaves Space to whatever control has focus.
-   * Left on that control, Space would activate it rather than traverse. The
-   * chrome claims focus as it mounts, which is what makes Space advance.
+   * Entry is from outside this chrome — the Dock's Present, which hides while
+   * presenting, or an address — so nothing in the chrome holds focus when it
+   * mounts. `usePresentingKeys` leaves Space to whatever control has focus, so
+   * the chrome claims focus as it mounts: Space then presses the move that
+   * advances.
    */
   it('takes focus onto its primary control when presentation begins', () => {
     render(chrome({ moves: movesTo(['B', 'C'], 0) }));

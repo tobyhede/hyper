@@ -82,7 +82,7 @@ export async function expectRestartProofExport(
  * Open a Space already stored at `spaceId`, and wait for the Dock to name it.
  *
  * **The Space's name is a label, not a heading** (ADR 0082). The Command Dock
- * draws it through the same `IdentityName` the Map and Graph use, so the slot
+ * draws it through the same `IdentitySurface` the Map and Graph use, so the slot
  * is addressed the way every other spec addresses it, and the visible filter
  * is the open-Spaces rule: every open Space stays mounted, and only the one on
  * the canvas is showing. It is matched with `toContainText`, the matcher

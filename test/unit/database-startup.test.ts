@@ -283,7 +283,7 @@ describe('retryMetaSpaceEstablishment', () => {
   // accepts connections, over a database that takes a long time to arrive, would
   // otherwise serve 503 at the root forever: the root address establishes
   // nothing, so start-up is the only thing that will.
-  it('keeps trying long past the bound it used to have', async () => {
+  it('keeps trying through forty unreachable attempts', async () => {
     const repository = new ScriptedRepository(Array.from({ length: 40 }, unreachable));
     const waits: number[] = [];
 
