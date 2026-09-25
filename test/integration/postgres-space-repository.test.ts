@@ -7,7 +7,7 @@ import { createPostgresDatabase, type PostgresDatabase } from '../../src/prisma/
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { recordResourceWrites } from '../support/record-resource-writes';
-import { spaceRepositoryContract } from '../support/repository-contract';
+import { recreatingBeforeRowLock, spaceRepositoryContract } from '../support/repository-contract';
 import { expectPersisted } from '../support/persistence-contract';
 
 /**
@@ -36,10 +36,12 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
   await clearHyperContent();
   // Clients minted by `reopenRepository` below, closed with the harness.
   const reopenedDatabases: PostgresDatabase[] = [];
-  const recording = recordResourceWrites(postgresSqlStore(db));
+  const recreation = recreatingBeforeRowLock(postgresSqlStore(db));
+  const recording = recordResourceWrites(recreation.store);
   return {
     repository: new SqlSpaceRepository(recording.store),
     takeResourceWrites: recording.takeResourceWrites,
+    recreateBeforeRowLock: recreation.recreateBeforeRowLock,
     close: async () => {
       for (const database of reopenedDatabases) {
         await database.close();

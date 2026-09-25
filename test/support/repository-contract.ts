@@ -7,6 +7,7 @@ import {
 } from '@project/persistence';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SqlStore } from '../../src/persistence/sql-store';
 
 /**
  * The behaviour every `SpaceRepository` owes its callers, run against each
@@ -245,7 +246,57 @@ export interface RepositoryHarness {
    * replaces a Space's snapshot whole).
    */
   takeResourceWrites?: () => readonly string[];
+  /**
+   * Replace the Space's Resource rows with `snapshot`'s inside the next
+   * commit, after its read and before its row lock
+   * (`recreatingBeforeRowLock`). `undefined` on a harness with no rows and no
+   * row lock (the memory double).
+   */
+  recreateBeforeRowLock?: (snapshot: SpaceSnapshot) => void;
 }
+
+/**
+ * A database's own `SqlStore`, unchanged except that the next
+ * `Space.writeDocumentUnderLock` first replaces the named Space's Resource
+ * rows with the ones `recreateBeforeRowLock` was given, in the same
+ * transaction. That is the state the row lock finds when a replacement
+ * recreated the Space at the revision the commit expects after the commit
+ * read it, which PostgreSQL's READ COMMITTED lets an unlocked read predate.
+ */
+export const recreatingBeforeRowLock = <Handle, Order>(store: SqlStore<Handle, Order>) => {
+  let pending: SpaceSnapshot | undefined;
+  const recreating: SqlStore<Handle, Order> = {
+    ...store,
+    tables: (handle) => {
+      const tables = store.tables(handle);
+      return {
+        ...tables,
+        Space: {
+          ...tables.Space,
+          writeDocumentUnderLock: async (id, document) => {
+            const recreated = pending;
+            pending = undefined;
+            if (recreated?.id === id) {
+              await tables.Resource.deleteExcept(id, []);
+              for (const entry of recreated.resources) {
+                await tables.Resource.create({
+                  id: entry.id,
+                  spaceId: id,
+                  document: entry.document,
+                });
+              }
+            }
+            return tables.Space.writeDocumentUnderLock(id, document);
+          },
+        },
+      };
+    },
+  };
+  const recreateBeforeRowLock = (snapshot: SpaceSnapshot): void => {
+    pending = snapshot;
+  };
+  return { store: recreating, recreateBeforeRowLock };
+};
 
 const commitUpdate = (repository: SpaceRepository, snapshot: SpaceSnapshot, revision: bigint) =>
   repository.commit({
@@ -376,6 +427,25 @@ export const spaceRepositoryContract = (
         return;
       }
       await body(harness.repository, harness.takeResourceWrites);
+    } finally {
+      await harness.close();
+    }
+  };
+
+  const withRecreationHarness = async (
+    context: SkippableTestContext,
+    body: (
+      repository: SpaceRepository,
+      recreateBeforeRowLock: (snapshot: SpaceSnapshot) => void,
+    ) => Promise<void>,
+  ) => {
+    const harness = await createHarness();
+    try {
+      if (harness.recreateBeforeRowLock === undefined) {
+        context.skip();
+        return;
+      }
+      await body(harness.repository, harness.recreateBeforeRowLock);
     } finally {
       await harness.close();
     }
@@ -1697,7 +1767,7 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * Ticket 20. A commit writes the Resources it adds and the Resources whose
+   * A commit writes the Resources it adds and the Resources whose
    * document it changes, and leaves every other Resource row as it stands, on
    * either commit path. A rename of one Resource is the fast path; adding a
    * Resource and placing it on the Map moves the snapshot boundary, so the
@@ -1861,4 +1931,40 @@ export const spaceRepositoryContract = (
       expect(takeResourceWrites()).toEqual([RESOURCE_ID]);
     });
   });
+
+  /*
+   * The row lock can find a Space whose Resource rows are no longer the ones
+   * the commit read: a replacement that recreated the Space at the revision
+   * the commit expects leaves the revision comparison nothing to see. The
+   * commit then stores its whole snapshot, every Resource included, rather
+   * than its document over the recreated Resources. The recreated rows here
+   * change one Resource the commit leaves as it read it and drop the other,
+   * which the commit's Map still places.
+   */
+  const beforeRecreation = graphedSpace(SPACE_ID, 'Graphed', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+  const recreated = { ...beforeRecreation, resources: [resource(RESOURCE_ID, 'Recreated')] };
+  const commitsOverRecreation: readonly (readonly [string, SpaceSnapshot])[] = [
+    ['topology-preserving', retitled(beforeRecreation, 'Committed')],
+    [
+      'complete-aggregate',
+      {
+        ...beforeRecreation,
+        resources: [...beforeRecreation.resources, resource(OTHER_RESOURCE_ID, 'Added')],
+      },
+    ],
+  ];
+
+  for (const [path, next] of commitsOverRecreation) {
+    it(`${name} stores a ${path} commit's whole snapshot over Resource rows recreated before its row lock`, async (context) => {
+      await withRecreationHarness(context, async (repository, recreateBeforeRowLock) => {
+        await seed(repository, beforeRecreation);
+
+        recreateBeforeRowLock(recreated);
+        await expect(commitUpdate(repository, next, 0n)).resolves.toMatchObject({
+          kind: 'committed',
+        });
+        await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(next, 1n, null));
+      });
+    });
+  }
 };

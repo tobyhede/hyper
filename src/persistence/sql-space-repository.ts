@@ -162,14 +162,14 @@ type SnapshotResource = SpaceSnapshot['resources'][number];
  * rest are already stored exactly as `next` has them, so rewriting them would
  * change no row.
  *
- * `stored` is what the commit read of the Space before writing, parsed by the
- * same intake every reader parses a stored Resource through, so a Resource
- * left out here reads back exactly as `next` proposes it. A document that
- * compares unequal only in shape -- a property present as `undefined` on one
- * side -- is written, which costs a statement and changes nothing.
+ * `stored` is the Space's Resource rows as they stand, each document decoded
+ * from its column and not parsed, so a Resource left out here is one whose row
+ * already holds exactly the document `next` proposes. A document that compares
+ * unequal only in shape -- a property present as `undefined` on one side --
+ * is written, which costs a statement and changes nothing.
  */
 const changedResources = (
-  stored: readonly SnapshotResource[],
+  stored: readonly { readonly id: string; readonly document: unknown }[],
   next: SpaceSnapshot,
 ): readonly SnapshotResource[] => {
   const storedDocuments = new Map(stored.map((resource) => [resource.id, resource.document]));
@@ -485,10 +485,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       const topologyPreserving = await this.#commitTopologyPreservingUpdate(tables, request);
       if (topologyPreserving !== undefined) return topologyPreserving;
       const metaSpaceId = await this.#lockMetaIdentity(handle, tables);
-      const storedSpaces = await this.#loadEverySpace(tables);
-      const decision = decideCommit(request, metaSpaceId, storedSpaces);
+      const decision = decideCommit(request, metaSpaceId, await this.#loadEverySpace(tables));
       if (decision.kind === 'answer') return decision.result;
-      const storedById = new Map(storedSpaces.map((stored) => [stored.snapshot.id, stored]));
 
       for (const change of request.changes) {
         if (change.kind === 'delete') {
@@ -498,11 +496,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         } else if (change.kind === 'create') {
           await this.#createStoredSpace(tables, change.snapshot);
         } else {
-          // `decideCommit` has matched this update's revision against the
-          // stored Space, so it is in `storedById`.
           await this.#writeUpdate(
             tables,
-            storedById.get(change.spaceId)?.snapshot.resources ?? [],
             change.snapshot,
             change.expectedRevision,
             committedRevision(change),
@@ -537,8 +532,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   ): Promise<RepositoryCommitResult | undefined> {
     const change = topologyPreservingCandidate(request);
     if (change === undefined) return undefined;
-    const current = await this.#loadStoredSpaceRowForCommit(tables, change.spaceId);
-    const decision = decideTopologyPreservingUpdate(change, current);
+    const decision = decideTopologyPreservingUpdate(
+      change,
+      await this.#loadStoredSpaceRowForCommit(tables, change.spaceId),
+    );
     if (decision.kind === 'aggregate-path') return undefined;
     if (decision.kind === 'answer') return decision.result;
     if ((await tables.RepositoryState.read()) === null) return undefined;
@@ -548,7 +545,6 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     // written nothing.
     await this.#writeUpdate(
       tables,
-      current?.snapshot.resources ?? [],
       change.snapshot,
       change.expectedRevision,
       committedRevision(change),
@@ -575,23 +571,18 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * conflict this then throws rolls the whole transaction back before any
    * Resource is written.
    *
-   * Only the Resources `changedResources` names are written. `storedResources`
-   * is the Space's Resources as this commit read them, before this lock. The
-   * revision still being `expectedRevision` under the lock says no update has
-   * written this Space since that read, because each update advances it, so
-   * the Space's own Resource rows are still as read. That comparison cannot
-   * see a Space deleted and recreated at the same revision in between. The
-   * complete-aggregate path read under the store's aggregate lock, which every
-   * replacement, creation and deletion also takes, so that cannot happen
-   * there; the fast path read without it, and rests on this comparison for
-   * its Resources as it already does for its document (ticket 20's Answer).
-   * Every Resource the Space did not hold -- a new id, or one moving here from
-   * another Space -- is new to it, and goes through `#upsertResources`'s
-   * ownership check.
+   * Only the Resources `changedResources` names are written, judged against
+   * the Space's Resource rows read again once the revision holds, under the
+   * row lock. Do not judge them against the read the commit decided on: a
+   * revision comparison cannot see a Space deleted and recreated at the same
+   * revision after that read, and a Resource skipped against the rows it
+   * replaced would leave the recreated row, or no row, where the snapshot
+   * names one. Every Resource the Space does not hold -- a new id, or one
+   * moving here from another Space -- is new to it, and goes through
+   * `#upsertResources`'s ownership check.
    */
   async #writeUpdate(
     tables: SqlTables<Order>,
-    storedResources: readonly SnapshotResource[],
     snapshot: SpaceSnapshot,
     expectedRevision: bigint,
     newRevision: bigint,
@@ -607,7 +598,13 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       snapshot.id,
       encodeNextRevisionReclassified(snapshot.id, newRevision),
     );
-    await this.#upsertResources(tables, snapshot.id, changedResources(storedResources, snapshot));
+    const locked = await tables.Space.loadWithResources(snapshot.id);
+    if (locked === null) throw new Error(`Space ${snapshot.id} disappeared under its row lock`);
+    const stored = locked.resources.map((resource) => ({
+      id: resource.id,
+      document: this.#store.readDocument(resource.document),
+    }));
+    await this.#upsertResources(tables, snapshot.id, changedResources(stored, snapshot));
     await tables.Resource.deleteExcept(
       snapshot.id,
       snapshot.resources.map((resource) => resource.id),
