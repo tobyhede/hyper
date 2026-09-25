@@ -140,9 +140,7 @@ describe('PersistenceControl', () => {
   /**
    * The three recoveries a conflict can offer, each with its own sentence.
    *
-   * Written before the copy moved out of the component, so the move is proved
-   * to change nothing the author reads. Which recovery a conflict is remains
-   * derived from the two snapshots it carries: a newer stored Space reloads, a
+   * Which recovery a conflict is remains derived from the two snapshots it carries: a newer stored Space reloads, a
    * participant the conflict never named reverts to its baseline, and a Space
    * with neither has nothing stored to accept.
    */
@@ -191,7 +189,7 @@ describe('PersistenceControl', () => {
    */
   it('draws a second rejection of the same code after the first was dismissed', () => {
     // Equal by value on purpose: a key derived from what the failure *says*
-    // cannot tell these two apart, and they are exactly the pair the fix is for.
+    // cannot tell these two apart, and they are exactly the pair the control must separate.
     const rejection = () =>
       ({
         kind: 'rejected',
@@ -220,7 +218,7 @@ describe('PersistenceControl', () => {
   });
 
   /**
-   * `v1-release/17` criterion 2: a permanent rejection (`kind: 'rejected'`)
+   * A permanent rejection (`kind: 'rejected'`)
    * and an aggregate refusal (`kind: 'refused'`) are distinct
    * `SpaceSessionState['persistence']` kinds. `PersistenceControl`'s own
    * `Rejection` type spans both, and this exercises the acknowledge/dismiss

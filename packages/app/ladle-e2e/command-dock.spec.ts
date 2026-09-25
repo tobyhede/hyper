@@ -6,12 +6,8 @@ import { commandDockSnapshot } from '../stories/support/spaces';
 /**
  * The Command Dock's behaviour half (ADR 0082, ADR 0052).
  *
- * **This file replaced `issue-14-space-sidebar.spec.ts` rather than being
- * added beside it.** Twelve of the thirteen `@parity:` tags in the Space
- * Sidebar's suite named claims that are gone: four of them named the Sidebar in
- * the claim sentence, and five stated behaviour the Dock does not have or has
- * decided against. Each test below presses one Dock obligation instead, and the
- * claims it proves are in `stories/parity-claims.ts` under their own names.
+ * Each test below presses one Dock obligation, and the claims it proves are in
+ * `stories/parity-claims.ts` under their own names.
  *
  * Every story is `iframed`, so each test drives the preview directly at
  * `?story=<id>&mode=preview` — `space--command-dock--<export-kebab>`.
@@ -32,7 +28,7 @@ const surface = (page: Page) => page.getByRole('toolbar', { name: 'Command Dock'
  * mouseup in one tick, and Base UI's dismissal never gets a turn between them —
  * a trigger whose ref was dropped then opens and closes on its own press, which
  * this suite cannot see without it. The reason is written out at
- * `link-actions.spec.ts`, where the regression it caught happened.
+ * `link-actions.spec.ts`.
  */
 const disclose = async (page: Page, name: string) => {
   // `exact`, because an accessible name matches as a substring by default and
@@ -45,9 +41,8 @@ const disclose = async (page: Page, name: string) => {
 };
 
 /**
- * ADR 0053's one surviving clause, kept verbatim by ADR 0082: the canvas takes
- * one exclusive choice over authored Maps, with no second control and no
- * empty value.
+ * The canvas takes one exclusive choice over authored Maps, with no second
+ * control and no empty value (ADR 0082).
  *
  * The list is a `DropdownMenuRadioGroup` rather than a column of pressed rows,
  * so what carries the choice is `aria-checked` on one item — and the cluster
@@ -89,8 +84,7 @@ test(
  * New Map is in the Map menu, beside the list it adds to, and it adds an
  * *empty* one (ADR 0079, ADR 0080).
  *
- * The Sidebar had room for a permanent Add Map button; the Dock finds room by
- * disclosure. What did not change is that the command creates and selects a
+ * The Dock finds room for the command by disclosure. It creates and selects a
  * Map with no Resources placed in it through production Space Authoring.
  */
 test(
@@ -105,8 +99,7 @@ test(
     const menu = await disclose(page, 'Map: Collection 1');
     await menu.getByRole('menuitem', { name: 'New Map' }).click();
 
-    // The command opens nothing and continues in the new Map's name
-    // (`.scratch/command-dock/issues/13`), so the Dock is drawing that name's
+    // The command opens nothing and continues in the new Map's name, so the Dock is drawing that name's
     // editor rather than the name — and the caret is the outcome worth holding.
     // Escape cancels an untouched draft, which leaves the title the Edit stored.
     //
@@ -133,8 +126,7 @@ test(
 );
 
 /**
- * The Map menu's one grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/01`): the Map list, New
+ * The Map menu's one grouping grammar: the Map list, New
  * Map on its own, Rename beside Copy link to Map, then Delete — one
  * separator between each group.
  */
@@ -225,9 +217,8 @@ test(
 );
 
 /**
- * The Graph menu's one grouping grammar and its one address
- * (`.scratch/dock-menu-reorganisation/issues/01`,
- * `.scratch/graph-colour/issues/03`): the Graph list, New Graph, Colour…
+ * The Graph menu's one grouping grammar and its one address: the Graph list,
+ * New Graph, Colour…
  * beside Rename and Copy link to Graph, then Delete — one separator
  * between each group. The application writes the real within-Map product
  * URL to the clipboard, and offers no permanent address of the Graph's own.
@@ -261,10 +252,9 @@ test(
 );
 
 /**
- * The Space menu's own grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/02`): Rename beside Copy link to
- * Space, then Exit Space — one separator between the two groups. Reorganisation
- * only: the Space's own address is unchanged, and Exit still stays trailing and
+ * The Space menu's own grouping grammar: Rename beside Copy link to
+ * Space, then Exit Space — one separator between the two groups. The copied
+ * address is the Space's own, and Exit stays trailing and
  * disabled on Meta (`command-dock-edits-identity-names`,
  * `space-resource.spec.ts`'s Exit coverage).
  */
@@ -295,8 +285,7 @@ test('Copy link to Space copies the Space’s own durable address', async ({ pag
 });
 
 /**
- * The Resource rail's own grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/03`), reached through the real
+ * The Resource rail's own grouping grammar, reached through the real
  * production host: Create Reference on its own, Connect to Resource on its own,
  * both copy links beside each other, then Remove from Map and Delete from Space
  * sharing the trailing destructive group — one separator between each. The
@@ -341,12 +330,11 @@ test('a Reference Resource’s actions menu keeps Create Reference leading, draw
 });
 
 /**
- * A Space Resource's own grouping grammar
- * (`.scratch/dock-menu-reorganisation/issues/04`), reached through the real
+ * A Space Resource's own grouping grammar, reached through the real
  * production host: Create Reference; Connect to Resource; Enter and Open in New
  * Tab; the three copy links; then Remove from Map and Delete from Space sharing
  * the trailing destructive group — one separator between each. Rename is
- * absent — the Title still edits on the Resource front, unchanged by this grouping.
+ * absent — the Title edits on the Resource front.
  */
 test('a Space Resource’s actions menu groups Create Reference, Connect, Enter, links, then Remove and Delete', async ({
   page,
@@ -367,8 +355,7 @@ test('a Space Resource’s actions menu groups Create Reference, Connect, Enter,
  * The name is the rename control, and there is no second surface to return the
  * caret to.
  *
- * The Sidebar shared one draft between an active row and a canvas header, which
- * is where `continuation.ts`'s `sidebar-row` target came from. The Dock draws
+ * The Dock draws
  * each name once, so the editor replaces the control it began from and hands
  * focus back to itself.
  */
@@ -378,7 +365,7 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
 
-    // **The Space first, because it is the identity that was a label.** It is one
+    // **The Space first.** It is one
     // Edit on this Space's own session, writing `document.title` and nothing
     // else: the four other Spaces this story has open are untouched, and the
     // Space Resource in the Opener that points here keeps its own Title (ADR 0083).
@@ -568,11 +555,9 @@ test(
     expect(frame).not.toBeNull();
     expect(popup).not.toBeNull();
     // **Away from the edge it is against, and measured as two facts.** The
-    // comment here used to claim the menu's left edge clears the dock's right
-    // edge, and the assertion beneath it compared against the dock's *left*
-    // edge — so it passed for a menu drawn straight over the bar, and the claim
-    // it described is not even true: Base UI aligns the popup to the trigger
-    // inside the bar, so it starts a little inside the dock's outer edge.
+    // menu's left edge does not clear the dock's right edge: Base UI aligns the
+    // popup to the trigger inside the bar, so it starts a little inside the
+    // dock's outer edge.
     //
     // What "opens into the canvas" actually means is that it never runs off the
     // edge the dock is against, and that it extends past the dock rather than
@@ -689,9 +674,8 @@ test(
 /**
  * Presenting removes the furniture rather than emptying it.
  *
- * The Sidebar withdrew authoring command by command, and its claim described
- * which items left a Map row's menu. There is no menu left to withdraw
- * anything from: the audience is left with the canvas and `PresentingChrome`.
+ * There is no menu left to withdraw anything from: the audience is left with
+ * the canvas and `PresentingChrome`.
  */
 test(
   'presenting removes the whole command surface',
@@ -710,9 +694,7 @@ test(
 /**
  * The responsive story, which is this surface's own (ADR 0082).
  *
- * What it owes is **not** the Sheet's contract. A Sheet had to be dismissed
- * before a command's result could be seen, because it covered the canvas and
- * trapped focus; this surface never took the canvas away, so there is nothing to
+ * This surface never takes the canvas away, so there is nothing to
  * dismiss and no dismissal to get right. What it owes is to fit — every cluster
  * keeps its name, its disclosure and its place in the roving order, reached by
  * scrolling the strip along the axis it already runs on.
@@ -753,14 +735,13 @@ test(
 );
 
 /**
- * Create Resource, as three peers rather than a disclosure.
+ * Create Resource, as peers rather than a disclosure.
  *
  * **The obligation is the press count.** The kind is chosen at creation, so
- * none of the three is a default and none is disclosed behind another — which
- * means one activation reaches any kind, and the cheapest one (`markdown`,
- * which completes its Edit on activation) is not charged for a choice it never
- * makes. A menu here read as one command and was three; three controls read as
- * three and are.
+ * no kind is a default and none is disclosed behind another — which means one
+ * activation reaches any kind, and each completes its Edit on activation
+ * without being charged for a choice it never makes. A menu would read as one
+ * command and be several; one control per kind reads as what it is.
  *
  * Each is named for the kind it makes rather than for the set. The glyphs are
  * the same silhouettes the Resources list and the canvas use for *what a Resource
@@ -816,14 +797,14 @@ test(
  * that can give up the `1fr` track the others need: Space, Map and Graph
  * name entities the author renamed, and that track is what lets their names
  * take the slack and truncate instead of resizing the column. "Resources" is a
- * fixed word, so the track held about 69px of nothing — and the three Create
- * commands are what it is spent on instead.
+ * fixed word, so that track would hold nothing — and the Create commands are
+ * what the row is spent on instead.
  *
  * Asserted as the obligation and not as a CSS value: the cluster is **one row**
  * (so it stands at its neighbours' height rather than three times it), and its
  * four glyphs sit on **one pitch** (so the trigger's chevron reads as the first
- * of four rather than as punctuation after the word). The alternative — three
- * verb tracks — would have stood empty on the other three rows.
+ * of four rather than as punctuation after the word). A verb track apiece
+ * would stand empty on the other rows.
  */
 test(
   'a side-edge dock packs Resources onto one row at its neighbours’ height',
@@ -914,7 +895,7 @@ test(
     await expect(failure).toBeHidden();
 
     // And there is no resting saving cue anywhere in the surface, in this story
-    // or any other — the decision ticket `01` took.
+    // or any other.
     await expect(page.getByRole('button', { name: 'Saving changes' })).toHaveCount(0);
   },
 );
@@ -1053,13 +1034,10 @@ test(
 /**
  * A Space that went wrong while the reader was somewhere else.
  *
- * The regression `OpenSpaces` did not have: the vertical tab strip this menu
- * replaced badged every open Space, and a list that says nothing makes a Space
- * whose commit failed look exactly like one that is fine. The row says *which*
- * and nothing else — the recovery belongs to that Space's own Dock, one press
- * away — and it says it in words rather than colour alone, through
- * `openSpaceStatusLabel`. The strip is deleted
- * (`.scratch/command-dock/issues/08`) and those words outlived it in
+ * A list that says nothing makes a Space whose commit failed look exactly like
+ * one that is fine. The row says *which* and nothing else — the recovery
+ * belongs to that Space's own Dock, one press away — and it says it in words
+ * rather than colour alone, through `openSpaceStatusLabel` in
  * `packages/ui/src/open-space-status.ts`, which `unwellReport`
  * (`packages/app/src/dock-model.ts`) is what calls — this menu draws what that
  * answers.
@@ -1123,9 +1101,7 @@ test('Command Dock stories are isolated from the Ladle catalogue', async ({ page
 /**
  * One treatment across the three names, and all three disclose.
  *
- * The Space used to be the exception here — a `<span>` wearing the Button box,
- * because there was no `renamed-space` Edit and a greyed name would have
- * advertised a command nobody could run. There is one now, so the three are one
+ * The three are one
  * composition: the typography is shared *and* so is the disclosure, and Rename
  * is a command in each list.
  */
@@ -1191,8 +1167,7 @@ test(
     await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(map).toBeFocused();
-    // And the Space's, because the caret coming back is the half of this claim
-    // that the identity which used to be a label had no way to owe.
+    // And the Space's: the caret comes back to its name too.
     await space.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
@@ -1211,7 +1186,7 @@ test(
 
 /**
  * A Graph row is marked with the line the canvas HUD's key draws, in that
- * Graph's colour, and with no Graph glyph (`.scratch/graph-colour/issues/02`).
+ * Graph's colour, and with no Graph glyph.
  * The list and the key are compared on screen in the same page — colour and
  * box — so the two cannot drift apart without this failing. The Graph identity
  * and Colour… keep the coloured glyph; the Map list is unmarked.

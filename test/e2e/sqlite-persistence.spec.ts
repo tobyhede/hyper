@@ -64,8 +64,8 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
 
   try {
     // Seeded through a connection of its own, closed before either host opens
-    // the same file: ticket 18 found a second live writer against one SQLite
-    // file unsupported, so this proof never holds more than one connection to
+    // the same file: a second live writer against one SQLite file is
+    // unsupported, so this proof never holds more than one connection to
     // it open at a time rather than trusting two to coexist.
     const seedDatabase = createSqliteDatabase(path);
     try {
@@ -75,8 +75,7 @@ test('a SQLite-backed edit survives a fresh Vite host', async ({ browser }) => {
       // answers `already-initialized`, writes nothing, and sends the drag below
       // looking for a Resource that was never stored. The outer `finally` handles
       // this run failing; this handles a run that never reached its `finally` at
-      // all — a killed process, a CI timeout — and a file left dirty before the
-      // outer cleanup existed.
+      // all — a killed process, a CI timeout.
       await clearSqliteContent(seedDatabase);
       const seedRepository = new SqlSpaceRepository(sqliteSqlStore(seedDatabase));
       // The Map is part of the fixture, and has to be — see the matching

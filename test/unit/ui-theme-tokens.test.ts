@@ -42,7 +42,7 @@ describe('CSS custom properties referenced by ui and react-flow-adapter', () => 
   });
 
   it('never colors text with the muted background token', () => {
-    // `--muted` resolves to `--secondary` (a background); text wanting the old
+    // `--muted` resolves to `--secondary` (a background); text wanting a
     // muted grey must use `--muted-foreground`, the token this theme pairs it with.
     const misusedAsText = files.flatMap((file) => {
       const text = readFileSync(file, 'utf8');

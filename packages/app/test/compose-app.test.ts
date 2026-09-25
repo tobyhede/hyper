@@ -6,11 +6,9 @@ import { composeApp, composeCore } from '../src/compose-app';
 import { createConnectionCompletion } from '../src/connection-completion';
 
 /**
- * What an opened Space is composed of, asserted at the composition rather than
- * at the twenty call sites that used to write it out.
+ * What an opened Space is composed of, asserted at the composition.
  *
- * The property under test is the one every hand-written `currentSpace` closure
- * got wrong: production reads the working snapshot through **one**
+ * The property under test: production reads the working snapshot through **one**
  * `createWorkingSpaceReader`, so two reads with nothing committed between them
  * answer the same `Space` — which is what the render memos hang on. A closure
  * that re-parses answers a fresh object every time, and a test written over one

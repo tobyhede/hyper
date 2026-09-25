@@ -373,8 +373,8 @@ describe('render adapter', () => {
    * anything it renders, so `changeNodes` is reached before that projection
    * lands. Under the additive union that cannot erase the subject — a
    * `dimensions` change is not a `select` change and `selectChanges` drops it —
-   * and this pins that too, since the model this replaced *did* erase it by
-   * re-deriving the selection from the live node array.
+   * and this pins that too: re-deriving the selection from the live node array
+   * would erase it.
    */
   it('keeps a selection seeded for a Resource the projection has not drawn yet', () => {
     const store = adapter();
@@ -632,9 +632,9 @@ describe('render adapter', () => {
     // The draft layers the proposed Open Size over the authored Placement and
     // nothing more. B keeps its authored coordinate through the whole gesture
     // although A grows past it, because a Resource's neighbours do not move until
-    // the Edit lands (ADR 0084) — there is no derived layer left to preview.
-    // This is what stops the render adapter reacquiring a `move` draft: a
-    // dragged Resource displaces nobody either.
+    // the Edit lands (ADR 0084) — there is no derived layer to preview.
+    // This is why the render adapter holds no `move` draft: a dragged Resource
+    // displaces nobody either.
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       [RESOURCE_B, { x: 300, y: 200, open: false }],

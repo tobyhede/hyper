@@ -12,9 +12,8 @@ import { openTestSpace } from './opened-space';
  * The kinds it forwards are the whole of what its surfaces produce, so any
  * other kind arriving is a wiring defect rather than a domain rule the author
  * has run into. `AuthoringResult` says a broken invariant "throws, or is
- * reported through the non-throwing reporter", and the refusal that used to
- * stand here broke that twice over — it dressed a defect as the author's
- * mistake, and it did so with a sentence about Edge endpoints.
+ * reported through the non-throwing reporter", so it is reported rather than
+ * refused: a refusal would dress a defect as the author's mistake.
  */
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');

@@ -33,10 +33,8 @@ const seededSpace = (
  * through the lifecycle door every other caller uses (ADR 0078).
  *
  * The Meta identity is **named** here rather than inferred: the one Space this
- * reads is the aggregate's root, and `initializeAggregate` is told so. The
- * retired `importSpaces` took Meta from array position instead, which is the
- * inference ADR 0078 refuses — a helper that keeps taking it would be seeding
- * fixtures through a door the product no longer has.
+ * reads is the aggregate's root, and `initializeAggregate` is told so. Taking
+ * Meta from array position is the inference ADR 0078 refuses.
  *
  * `newUuid` rather than an injected generator because nothing here asserts on an
  * identity: the ids the directory leaves out are filled in so the snapshot can

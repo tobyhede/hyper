@@ -142,10 +142,9 @@ const mountAuthoring = (
         nodes: [node(expanded, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
-        // what `enabled: false` means here now that ADR 0089 has retired the
-        // creation panes — it is the surviving fact that takes canvas authoring
-        // away, and it is deliberately not the fact that ends a live content
-        // edit.
+        // what `enabled: false` means here — it is the fact that takes canvas
+        // authoring away, and it is deliberately not the fact that ends a live
+        // content edit.
         availability: authoringAvailability({
           editable: true,
           presenting,
@@ -238,9 +237,7 @@ describe('canvas Resource authoring', () => {
   });
 
   /**
-   * `openResource` refuses on `authorOnCanvas`, so presenting withdraws it — and
-   * that term is the one the guard gained when it stopped reading the modal
-   * pane alone.
+   * `openResource` refuses on `authorOnCanvas`, so presenting withdraws it.
    *
    * Unreachable through today's two call sites, both of which are already
    * behind the same answer, which is exactly why it is pinned here: the

@@ -14,9 +14,8 @@ it('accepts the one SQL repository and the E2E repository without adapters', () 
   expectTypeOf<E2eMemorySpaceRepository>().toExtend<StoredSpaceRepository>();
 });
 
-// The server seam adds to the HTTP one rather than restating it. The two were
-// separate declarations, mutually assignable only by coincidence of shape; this
-// fails the moment `SpaceRepository` stops being a superset of what the HTTP
+// The server seam adds to the HTTP one rather than restating it. This fails
+// the moment `SpaceRepository` stops being a superset of what the HTTP
 // application consumes, and it fails at the declaration rather than at a call site.
 it('declares the server repository as a strict superset of the HTTP seam', () => {
   expectTypeOf<SpaceRepository>().toExtend<StoredSpaceRepository>();

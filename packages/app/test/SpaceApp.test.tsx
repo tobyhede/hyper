@@ -135,11 +135,11 @@ afterAll(() => vi.unstubAllGlobals());
 /**
  * **Exit is withheld from the meta Space, and from nothing else.**
  *
- * The row read "is there a Space I was opened *from*", which is a different
- * question and answers `null` for every Space reached by its own URL —
- * `open`, `openResolvedPath` and the startup path all record no opener. So a
- * pasted link opened a Space whose Exit was greyed out although
- * `openSpaces.exit` would have exited it. The rule the surface means is the one
+ * "Is there a Space I was opened *from*" is a different question, and it
+ * answers `null` for every Space reached by its own URL — `open`,
+ * `openResolvedPath` and the startup path all record no opener. Asking it would
+ * grey out Exit on a Space a pasted link opened, although `openSpaces.exit`
+ * would exit it. The rule the surface means is the one
  * `open-spaces.ts` enforces: the meta Space is permanent and every other open
  * Space can be left.
  */
@@ -217,17 +217,6 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
 
   expect(initial.app.navigation.getState().mode).toBe('presenting');
 });
-
-/**
- * The Sidebar's `Ctrl/Cmd-B` had a claim here and it has gone with the key.
- *
- * It proved that a `window` listener reaching every mounted shell only toggled
- * the Space on the canvas. The Command Dock has no global key at all — it is
- * furniture over the canvas rather than a gutter to collapse, so there is
- * nothing to toggle and nothing for a hidden Space to answer wrongly (ADR 0082).
- * The sibling claim above, that Escape reaches only the showing Space, is the
- * one that outlived the surface, and it still stands.
- */
 
 describe('Space app conflict recovery', () => {
   it('replaces the visible runtime and editor placement when remote state is accepted', async () => {
@@ -442,9 +431,9 @@ describe('Space app conflict recovery', () => {
   /**
    * Refusing is not a failure of the Space app: the local work is intact and the
    * conflict is still the session's state, so the page that owns both has to
-   * stay. Reporting through the failure panel unmounted the whole tree, which
-   * left the author reading why their unsaved work could not be replaced on a
-   * screen that no longer showed it — and no control to do anything else.
+   * stay. Reporting through the failure panel would unmount the whole tree,
+   * leaving the author reading why their unsaved work could not be replaced on
+   * a screen that no longer showed it — and no control to do anything else.
    */
   it('keeps the conflicted Space on screen when it refuses the remote snapshot', async () => {
     await refusedRemote();
@@ -557,12 +546,9 @@ describe('Space app failure reporting', () => {
    * asked.
    *
    * The **standing alert** is the report both surfaces share: it is pinned in
-   * the shell, over a canvas nothing now covers, so it is visible at every
-   * width. That is what changed with the Sidebar — a Sheet used to be drawn over
-   * the area the alert renders in, which is the whole reason a copy command had
-   * to report a second time in its own label.
+   * the shell, over a canvas nothing covers, so it is visible at every width.
    *
-   * The **item's own label** survives on the Resource rail, and only there: that
+   * The **item's own label** is drawn on the Resource rail, and only there: that
    * menu is on the canvas, over the Resource, so a reader following it is not
    * looking at the shell's corner. The Dock's Graph menu is chrome beside the
    * alert and needs no second voice — see `CommandDockMapGraph.tsx`.
@@ -716,8 +702,8 @@ describe('Space app failure reporting', () => {
   });
 
   /**
-   * Composition happens in Open Spaces now, so `createApp` no longer performs
-   * domain intake. What it still does before there is a tree is read the
+   * Composition happens in Open Spaces, so `createApp` performs no domain
+   * intake. What it does before there is a tree is read the
    * session's working Space to open an addressed Graph, and that throws on a
    * snapshot that has since stopped loading. What is pinned is that
    * `mountSpaceApp` reports it rather than throwing at its caller and leaving a
@@ -837,9 +823,8 @@ describe('Space app Resources list', () => {
       (app) => render(app),
     );
 
-    // Opened by the press, because nothing opens it for the reader any more:
-    // first-load initialization authors the Map and announces nothing
-    // (`.scratch/command-dock/issues/13`).
+    // Opened by the press, because nothing opens it for the reader: first-load
+    // initialization authors the Map and announces nothing.
     fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
     expect(screen.getByRole('dialog', { name: 'Resources' })).toHaveTextContent(
       'This Space has no Resources.',
@@ -855,11 +840,9 @@ describe('Space app Resources list', () => {
   /**
    * **Add Map opens nothing, and the author continues in the name.**
    *
-   * The Resources list used to be disclosed here, on the argument that an empty
-   * Map needs filling. What an author does with a brand-new Map is say
-   * what it is for — `Map 1` is a placeholder nobody wants — and a list that
-   * appears in response to a creation is furniture arriving unasked
-   * (`.scratch/command-dock/issues/13`).
+   * What an author does with a brand-new Map is say what it is for — `Map 1`
+   * is a placeholder nobody wants — and a list that appears in response to a
+   * creation is furniture arriving unasked.
    */
   it('adds an empty selected Map, opens no list, and puts the caret in its name', async () => {
     const base = snapshot('Space', 'Resource', 10, 20);
@@ -898,10 +881,9 @@ describe('Space app Resources list', () => {
   /**
    * **The name discloses; Rename is a command in the list.**
    *
-   * Clicking a name used to open the editor. Switching is the frequent act
-   * and renaming the rare one, so the word and the chevron are now one
-   * disclosure and Rename sits with the other commands on each identity
-   * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+   * Switching is the frequent act and renaming the rare one, so the word and
+   * the chevron are one disclosure and Rename sits with the other commands on
+   * each identity.
    */
   it('opens each identity list from the name and begins rename from the menu', async () => {
     const base = snapshot('Space', 'Resource', 10, 20);
@@ -1038,12 +1020,12 @@ describe('Space app Resources list', () => {
    * **Where the caret goes when a chrome rename ends.**
    *
    * The editor *replaces* the name it was opened from rather than expanding
-   * inside it, so ending the rename unmounts the element holding the caret. The
-   * Sidebar answered this with a continuation resolving `layout-header`; the
-   * Dock deleted that kind on the grounds that the editor "hands focus back
-   * itself", and nothing did — the caret fell to `document.body` and the next
-   * Tab restarted from the top of the document. `InlineTitleEditor` calls
-   * `onReturnFocus` from its own Enter and Escape handlers for exactly this.
+   * inside it, so ending the rename unmounts the element holding the caret.
+   * Unless something returns it, the caret falls to `document.body` and the
+   * next Tab restarts from the top of the document. `InlineTitleEditor` calls
+   * `onReturnFocus` from its own Enter and Escape handlers for exactly this;
+   * no continuation target such as `layout-header` returns it on the editor's
+   * behalf.
    */
   it('returns the caret to the name it was opened from when a Map rename ends', async () => {
     const base = snapshot('Space', 'Resource', 10, 20);
@@ -1273,14 +1255,13 @@ describe('Space app Resources list', () => {
    *
    * A live chrome rename withdraws Create Resource, Present, Delete Resource and the
    * canvas's own title editing, because each of those re-derives the canvas or
-   * takes the caret from under the editor. Three identities drawing three
-   * editors over one boolean is what let that come apart: with a blank Map
-   * draft still refusing, a Graph rename begun and then abandoned with Escape
-   * reported the *bar* as idle and handed the commands back underneath an
-   * editor that was still on screen.
+   * takes the caret from under the editor. The case that can pull the two
+   * apart: with a blank Map draft still refusing, a Graph rename begun and then
+   * abandoned with Escape must not report the *bar* as idle and hand the
+   * commands back underneath an editor that is still on screen.
    *
-   * The claim is the coupling rather than either half of it, because the fix is
-   * free to end the first rename or to keep it — what it may not do is disagree
+   * The claim is the coupling rather than either half of it: the bar is free
+   * to end the first rename or to keep it — what it may not do is disagree
    * with itself. Create Resource is the one asserted: it reads `addResource`, which
    * carries `editingChromeTitle` and nothing else about this Space, while
    * Present here is withheld anyway for a Graph with no Edges to traverse.
@@ -1345,9 +1326,8 @@ describe('Space app Resources list', () => {
   /**
    * **The last Map cannot be deleted, and the Dock says so before the press.**
    *
-   * ADR 0079 keeps a Space on at least one Map. The Sidebar let the command
-   * run and printed the refusal afterwards; the Dock draws it present and
-   * unavailable instead — a control that disappears teaches nothing about why,
+   * ADR 0079 keeps a Space on at least one Map. The Dock draws the command
+   * present and unavailable — a control that disappears teaches nothing about why,
    * and one that refuses every time teaches it a press too late. So what is
    * pinned here is the availability, and then the ordinary lifecycle once a
    * second Map exists: rename in place, delete, and the selection landing
@@ -1393,23 +1373,6 @@ describe('Space app Resources list', () => {
     expect(session.getState().working.resources).toEqual(base.resources);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Map');
   });
-
-  /**
-   * **A Map refusal was pinned here and its one route has gone.**
-   *
-   * The claim was that a Delete Map refusal does not outlive its own Map:
-   * the refusal is drawn in the shell's standing notice, which every Map
-   * shows, so one left standing explained a Map the reader had already left.
-   * The only way to produce it was Delete on the last Map, and the Command
-   * Dock withholds that command before the press (ADR 0079) — which the test
-   * above now pins instead.
-   *
-   * What is left is a race: a Delete whose Map is gone by the time the press
-   * lands refuses `map-not-found`. That is real, the alert and the clearing
-   * effect are both still there for it, and it is not reachable from a mount —
-   * so this is a note rather than a test, and the effect is one an integration
-   * run would have to catch.
-   */
 
   it('keeps the Resources list closed after the reader closes it, even once the Space gains another Resource', async () => {
     const base = snapshot('Space', 'Resource', 10, 20);

@@ -25,7 +25,7 @@ const markdown = (id: UUID, title = id): StoredResource => ({
  * A Space Resource always carries a selection, so this helper always takes one
  * (ADR 0079). What the aggregate then decides is whether the pair *resolves* in
  * the target — an id naming nothing there is a dangling reference to something
- * deleted, which is what every refusal below is now about.
+ * deleted, which is what every refusal below is about.
  */
 const spaceResource = (
   id: UUID,
@@ -256,8 +256,8 @@ describe('loadSpaceAggregate', () => {
     type MapMissing = Extract<SpaceAggregateError, { readonly kind: 'space-resource-map-missing' }>;
     // The only producer reads the Resource's own `map`, which every Space
     // Resource carries (ADR 0079), so the refusal always names the Map it
-    // looked for. There is no longer a fallback to the target's own opening
-    // selection, and so no arm in which the refusal has nothing to name.
+    // looked for. Nothing falls back to the target's own opening selection,
+    // so there is no arm in which the refusal has nothing to name.
     expectTypeOf<MapMissing['mapId']>().toEqualTypeOf<UUID>();
   });
 

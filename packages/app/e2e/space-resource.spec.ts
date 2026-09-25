@@ -43,9 +43,8 @@ import {
 /**
  * Move to an open Space from the Command Dock's Open Spaces menu.
  *
- * The vertical tab strip this replaces is gone with the Space Sidebar (ADR
- * 0082): the open set is disclosed from the bar as the tree the crossings make,
- * and a row is a way *to* a Space rather than a tab beside it. `delay` is the
+ * The open set is disclosed from the bar as the tree the crossings make (ADR
+ * 0082), and a row is a way *to* a Space rather than a tab beside it. `delay` is the
  * press a menu trigger needs — a zero-delay click puts mousedown and mouseup in
  * one tick and Base UI's dismissal never gets a turn between them.
  */
@@ -83,10 +82,10 @@ const exitSpace = async (page: Page): Promise<void> => {
 /**
  * Create a Space Resource and give it a name — one press, then the inline editor.
  *
- * ADR 0089 retired the pane that collected a Title before the Edit ran: the
- * press mints the Space and the Resource that names it from one `Space N` and
- * continues in the Resource's own Title editor, so naming it anything else is an
- * ordinary rename afterwards. **Which means the Space keeps `Space N`** — a
+ * The press mints the Space and the Resource that names it from one `Space N`
+ * and continues in the Resource's own Title editor (ADR 0089), so naming it
+ * anything else is an ordinary rename afterwards. **Which means the Space keeps
+ * `Space N`** — a
  * Resource's Title and the title of the Space it references agree only at creation
  * (`CONTEXT.md`), and a rename here is what makes that divergence visible.
  */
@@ -102,7 +101,7 @@ const createSpaceResourceNamed = async (page: Page, title: string): Promise<void
 /**
  * Reference a Space that already exists, from the Resources list's add-Space row.
  *
- * The other half of what the pane did, and a different act (ADR 0089): this one
+ * A different act from creating one (ADR 0089): this one
  * points at a Space rather than making one, so the Resource it authors is named
  * after the Space it found.
  */
@@ -116,12 +115,12 @@ const addExistingSpace = async (page: Page, title: string): Promise<void> => {
 };
 
 /**
- * The whole creation gesture, which is now one press (ADR 0089).
+ * The whole creation gesture, which is one press (ADR 0089).
  *
  * **Optimistic, and this is where that is visible.** The Resource is placed and its
  * Title editor takes the caret while the two-snapshot lifecycle is still
  * committing, so the editor is asserted before `settled` rather than after it —
- * exactly as Create Markdown Resource behaves, which is the point of the change.
+ * exactly as Create Markdown Resource behaves.
  * The `Space N` the editor is seeded with is the one string handed to both the
  * Space and the Resource, so the two agree at creation.
  */
@@ -333,8 +332,7 @@ test('a second Space Resource may reference the Space the first one created', as
   await expect(nodeByTitle(page, 'Space 1')).toHaveCount(1);
   // Three Edits, not two: the creation completes on activation and the Title is
   // typed into the Resource afterwards (ADR 0089), so `createSpaceResourceNamed` spends
-  // a creation *and* a rename where the retired pane collected the Title first
-  // and spent one. The third is this Resource, authored against the Space that
+  // a creation *and* a rename. The third is this Resource, authored against the Space that
   // creation made.
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3');
 
@@ -406,8 +404,8 @@ test(
     // stored pair reached the canvas rather than only the two controls.
     await expect(page.locator('.react-flow__node[data-id^="embedded:"]')).toHaveCount(1);
 
-    // **The Dock's surface and controls, and not the Dock's operations**
-    // (`.scratch/command-dock/issues/12`). The panel the two choices sit on is
+    // **The Dock's surface and controls, and not the Dock's operations.**
+    // The panel the two choices sit on is
     // compared against the Dock that is on screen beside it, property by property,
     // so a change to one that the other did not follow fails here; and the Resource
     // drawing its own stored context left the canvas the Resource stands on where
@@ -473,7 +471,7 @@ test(
 
     // The Graph list marks its one row with the target Graph's colour line —
     // the created Space's first Graph takes the palette's first slot — and
-    // the Map list beside it carries no mark (`.scratch/graph-colour/issues/02`).
+    // the Map list beside it carries no mark.
     await (await resourceControls(page, resource)).getByTestId('space-resource-graph').click();
     const graphRow = page.getByRole('menuitemradio', { name: 'Graph 1' });
     await expect(graphRow.locator('[data-slot="graph-color-line"]')).toHaveCSS(
@@ -753,7 +751,7 @@ test(
 );
 
 /**
- * Ticket 04 / spec.md: handles author the Graph the Space Resource is showing
+ * Handles author the Graph the Space Resource is showing
  * and do not complete a cross-Space Edge on the containing canvas (ADR 0040).
  */
 test('a connect between two embedded Resources authors the shown Graph, not the host Graph', async ({
@@ -965,9 +963,9 @@ test(
 );
 
 /**
- * Enter is the Space Resource's kind command (ADR 0073). The existing test above
+ * Enter is the Space Resource's kind command (ADR 0073). The test above
  * reaches the target through the Open Spaces menu after embed; this one is the
- * rail press ticket 11 owns.
+ * rail press.
  */
 test(
   'Enter on a Space Resource shows the target and names the Space it was entered from',

@@ -18,9 +18,7 @@ export interface SpaceDirectory {
  *
  * Public import takes nothing else, so every import test starts from this shape
  * rather than a bare Space directory — which is why it lives here rather than in
- * one of them. It was copied byte-for-byte between two unit suites, with variants
- * in two more, so a change to the format had four places to reach and a missed
- * one writes a directory the reader no longer accepts.
+ * one of them: a change to the format has one place to reach.
  *
  * `root` is the caller's. Each suite owns its own temporary directory naming and
  * cleanup, and this takes no view on either.

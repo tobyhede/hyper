@@ -26,7 +26,7 @@ export async function exerciseSpaceResourceContextMenus(
     await trigger.focus();
     await trigger.press('Enter');
   };
-  // One grouping grammar (`.scratch/dock-menu-reorganisation/issues/01`): the
+  // One grouping grammar: the
   // Map list, New Map on its own, Rename beside Copy link to
   // Map, then Delete — one separator between each group.
   await openMenu('map');
@@ -56,7 +56,7 @@ export async function exerciseSpaceResourceContextMenus(
   expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
 
   // Same grammar, with Colour… heading the commands on this Graph —
-  // and no permanent address offered any more.
+  // and no permanent address offered.
   await openMenu('graph');
   const graphMenu = page.getByRole('menu');
   await expect(graphMenu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
@@ -152,8 +152,7 @@ export async function exerciseSpaceResourceEntityMenu(
     await trigger.focus();
     await trigger.press('Enter');
   };
-  // The Title still edits on the Resource front, not from the menu
-  // (`.scratch/dock-menu-reorganisation/issues/04`): the menu carries no Rename
+  // The Title edits on the Resource front, not from the menu: the menu carries no Rename
   // row, so the rename that seeds the rest of this test presses the front's own
   // control instead.
   const title = page.getByRole('textbox', { name: 'Resource title', exact: true });

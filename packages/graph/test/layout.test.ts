@@ -72,7 +72,7 @@ describe('buildLayoutStrategyGraph', () => {
     expect(b).toMatchObject({ width: 100, height: 50 });
     // Nothing is positioned yet — that is the map's job. And a Resource carries
     // its rect and nothing else: the contract answers positions only (ADR 0086),
-    // so the per-Graph anchors it used to carry are the render layer's alone.
+    // so per-Graph anchors are the render layer's alone.
     expect(Object.keys(b).sort()).toEqual(['height', 'id', 'width']);
     expect(b.x).toBeUndefined();
   });

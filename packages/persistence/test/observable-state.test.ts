@@ -45,7 +45,7 @@ describe('createObservableState', () => {
     expect(() => observable.publish(1)).not.toThrow();
     expect(seen).toEqual([1]);
     // Identity, not shape: `toEqual` compares an Error by name and message, so
-    // this passed for a publisher that reported an Error it had manufactured
+    // it would pass for a publisher that reported an Error it had manufactured
     // itself. What each failure carries is the point of forwarding it.
     await vi.waitFor(() => expect(reported).toHaveLength(2));
     expect(reported[0]).toBe(thrown);

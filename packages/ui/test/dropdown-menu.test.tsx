@@ -62,19 +62,17 @@ describe('DropdownMenu', () => {
    * A destructive item is ink at rest, red where the reader is, and its glyph
    * follows the row.
    *
-   * Two registry defaults are gone and this is what holds them gone. The drop
-   * painted `color` on the child `svg`, which a surface restating the row's
-   * colour could not reach past — a declared colour is not overridden by an
-   * ancestor's, however specific — so a consumer that wanted Delete to be ink
-   * had to restate the glyph too and reach for `!important`. And the drop
-   * painted the row itself `text-destructive` at rest, so a menu with a Delete
-   * in it read as a warning about the menu rather than about the one command
-   * that removes something.
+   * This departs from two registry defaults, and the test holds both. Painting
+   * `color` on the child `svg` would put the glyph beyond a surface restating
+   * the row's colour — a declared colour is not overridden by an ancestor's,
+   * however specific — so a consumer that wanted Delete to be ink would have to
+   * restate the glyph too and reach for `!important`. And painting the row
+   * itself `text-destructive` at rest makes a menu with a Delete in it read as
+   * a warning about the menu rather than about the one command that removes
+   * something.
    *
-   * Both were consumer overrides in the Command Dock's stylesheet until they
-   * were settled here (`.scratch/command-dock/issues/03`, `/07`). The test is
-   * what stops the second one coming back with the next registry sync: `focus:`
-   * may name `text-destructive`, and the resting class list may not.
+   * The test is what stops the second coming back with the next registry sync:
+   * `focus:` may name `text-destructive`, and the resting class list may not.
    */
   it('paints a destructive item only where the reader is, and lets its glyph follow', () => {
     render(
@@ -131,9 +129,9 @@ describe('DropdownMenu', () => {
   /**
    * The items are held to the same type as the group that reads them.
    *
-   * The group's generic was a promise nothing kept: `RadioItem`'s own `value`
-   * stayed Base UI's `any`, so a mistyped item still rendered and its value
-   * still came back out typed as the group's `Value`. An item binds the type
+   * The group's generic alone is a promise nothing keeps: `RadioItem`'s own
+   * `value` is Base UI's `any`, so a mistyped item still renders and its value
+   * still comes back out typed as the group's `Value`. An item binds the type
    * once — `DropdownMenuRadioItem<Value>`, or an instantiation expression
    * where a surface writes several — and a value the group could not produce
    * is then a compile error at the item that would produce it.
@@ -207,8 +205,8 @@ describe('DropdownMenu', () => {
   });
 
   /**
-   * A union survives the round trip, which is what `String()` destroyed: the
-   * value came back as a bare `string` and had to be parsed again into one of
+   * A union survives the round trip, which `String()` would destroy: the value
+   * would come back as a bare `string` and have to be parsed again into one of
    * the resources the menu had itself just rendered.
    */
   it('preserves a union value type through the group', () => {

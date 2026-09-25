@@ -157,8 +157,7 @@ describe('UI catalogue', () => {
     );
   });
 
-  // The other half of "exactly once", and the half a Playwright reporter used
-  // to own before `ci-wall-clock/02` retired it: two tests tagging one claim is
+  // The other half of "exactly once": two tests tagging one claim is
   // evidence no reader can be pointed at. Both suites are checked, and each
   // failure has to name the suite it is about.
   it.each([
@@ -315,8 +314,8 @@ describe('production component coverage', () => {
 
   it('resolves a subpath import against the package the importing file belongs to', () => {
     const root = fixture();
-    // `packages/ui` declares its own `#components/*`, and `sidebar.tsx` uses it
-    // to reach `sheet.tsx`. Resolving every `#` specifier under `packages/app`
+    // `packages/ui` declares its own `#components/*`, and its components use it
+    // to reach one another. Resolving every `#` specifier under `packages/app`
     // loses those, and the modules they reach look uncatalogued.
     write(
       root,
@@ -465,13 +464,10 @@ describe('production component coverage', () => {
 
   it('resolves a re-export reference by the name consumers import, not the local one', () => {
     const root = fixture();
-    // `packages/ui/src/index.ts` really did this, re-exporting the shadcn
-    // registry's content component under a second name because a domain
-    // component held the first one. Reading `propertyName` on an export
-    // specifier takes the local name, so importing either matched the referenced
-    // line too and catalogued a module the story never rendered. ADR 0085
-    // resolved that collision and the barrel references nothing today — which is
-    // why this fixture is synthetic rather than a quotation.
+    // A barrel can re-export a component under a second name. Reading
+    // `propertyName` on an export specifier takes the local name, so importing
+    // either would match the referenced line too and catalogue a module the
+    // story never rendered.
     write(
       root,
       'packages/ui/src/index.ts',

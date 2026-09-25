@@ -33,11 +33,10 @@ const canvasTransform = (page: Page): Promise<string> =>
 /**
  * React Flow keeps every MiniMap mark finite and clipped at several canvas zooms.
  *
- * Ticket 01's original failure left the nodes and mask in the DOM, but wrote
- * `NaN` into their coordinate system. Checking every node against the SVG's
- * visible box holds both halves of "drawn to scale": none can become the old
- * full-size canvas rect, and none can escape the map while remaining smaller
- * than it.
+ * A MiniMap can leave its nodes and mask in the DOM while writing `NaN` into
+ * their coordinate system. Checking every node against the SVG's visible box
+ * holds both halves of "drawn to scale": none can become a full-size canvas
+ * rect, and none can escape the map while remaining smaller than it.
  *
  * **The zoom the wheel asks for is asserted, not assumed.** The MiniMap's SVG
  * has d3-zoom called on it whether or not it is `zoomable`, and d3-zoom's wheel
@@ -103,8 +102,9 @@ const expectMinimapDrawnToScale = async (page: Page): Promise<void> => {
  * stay listed and stay coloured. The expectations are read off the Space the
  * story opens rather than written as a second literal list here — `Retained`
  * opens on `Collection 1`, which owns three of the Space's four Graphs, and a
- * literal `['Long', 'Mid', 'Short', 'Echo']` would be evidence of the flatten
- * ticket 02 removed rather than of the rule that replaced it. That the
+ * literal `['Long', 'Mid', 'Short', 'Echo']` would be evidence of a key
+ * flattened across every Map rather than of the rule that each Map lists its
+ * own Graphs. That the
  * emphasis *moves* with an activation, and that the Command Dock agrees when
  * it does, is the paired application evidence's claim — activation is the
  * Dock's command and a story-only button for it would prove nothing here.
@@ -136,7 +136,7 @@ test(
     );
 
     // The key and MiniMap are sibling Panels meeting at one edge. This catches
-    // both the old nested MiniMap and two bottom-right Panels overlapping.
+    // both a MiniMap nested in the key and two bottom-right Panels overlapping.
     const keyPanel = page
       .locator('.react-flow__panel')
       .filter({ has: page.getByTestId('canvas-identity') });
@@ -239,7 +239,7 @@ test(
       Object.keys(map.positions).length,
     );
 
-    // Ticket 01 requires the scale proof at every catalogue Map. This
+    // The scale proof holds at every catalogue Map. This
     // sparse second Map has a different authored extent, so it catches a
     // map that happens to be valid only for Collection 1's five-node spine.
     await expectMinimapDrawnToScale(page);

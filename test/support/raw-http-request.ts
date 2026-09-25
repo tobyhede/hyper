@@ -15,10 +15,9 @@ export interface RawResponse {
  * `agent` is optional because only the connection-reuse tests care which socket
  * carries the request; passing one pins several requests to the same one.
  *
- * `method` is required and deliberately has no default. It carried `'PUT'` long
- * after the contract retired that method, and survived because every caller
- * passes one — an unreachable default cannot go visibly stale. Requiring it
- * makes the next contract change a compile error rather than dead prose.
+ * `method` is required and deliberately has no default. A default every caller
+ * overrides is unreachable, so it cannot go visibly stale; requiring the
+ * method makes a contract change a compile error rather than dead prose.
  */
 export const send = (
   baseUrl: string,

@@ -285,10 +285,10 @@ describe('an embedded production projection', () => {
   });
 
   it('constrains a gesture proposal to the drawn region, not the containing box', () => {
-    // These expectations used to clamp into `[0, width] x [0, height]`, which is
-    // the containing Resource's own box rather than what it draws: the bands
-    // `SPACE_RESOURCE_EMBED_INSET` reserves are its rail, border and footer, and a
-    // proposal accepted inside them is clipped rather than drawn (below).
+    // Not `[0, width] x [0, height]`, which is the containing Resource's own box
+    // rather than what it draws: the bands `SPACE_RESOURCE_EMBED_INSET` reserves
+    // are its rail, border and footer, and a proposal accepted inside them is
+    // clipped rather than drawn (below).
     const drawn = view({ width: 700, height: 500 });
     expect(constrainEmbeddedPosition({ x: 600, y: 120 }, drawn)).toEqual({ x: 600, y: 120 });
     expect(constrainEmbeddedPosition({ x: 900, y: 640 }, drawn)).toEqual({ x: 660, y: 372 });

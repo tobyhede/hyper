@@ -81,10 +81,9 @@ const FRONTS = [
 /**
  * The whole of a Resource front, at rest, for every front the component draws.
  *
- * This story exists because no other one showed a front entire: `States`,
- * `Kinds`, `Hover`, `Colours`, `Open and close`, `Open Reference Resource` and `Resize
- * control` are each a slice, and two undecided elements lived on the front for
- * months because the slice that drew them was not the slice anyone reviewed.
+ * No other story shows a front entire: `States`, `Kinds`, `Hover`, `Colours`,
+ * `Open and close`, `Open Reference Resource` and `Resize control` are each a
+ * slice, and an element drawn only in a slice nobody reviews goes unreviewed.
  *
  * What every specimen below draws, and all it draws: the Resource's border —
  * dotted for a Reference Resource, solid for every other front — and the
@@ -155,8 +154,8 @@ export const Kinds: Story = () => (
 );
 
 /**
- * **The rail no longer carries the Graph's colour, and this is where that is
- * shown** (`.scratch/command-dock/issues/12`).
+ * **The rail does not carry the Graph's colour, and this is where that is
+ * shown.**
  *
  * Each specimen is the real `ResourceNode` at one palette colour, drawn selected so
  * both halves of the answer are on screen at rest: the Resource's commands sit on

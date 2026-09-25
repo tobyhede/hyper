@@ -136,7 +136,7 @@ describe('canvasProjection', () => {
 
   /*
    * Two Space Resources on one target, selecting one Map at different Graphs
-   * (ADR 0026, `layout-only-v1/04` criterion 5).
+   * (ADR 0026).
    *
    * Which Edges an embedding draws is the Map's business, and which one it
    * emphasises is the Resource's, so a pair that differs only by stored Graph has
@@ -192,8 +192,8 @@ describe('canvasProjection', () => {
 
     // Graphs and Edges are derived separately and must agree on the same set —
     // the Graphs this Map owns (ADR 0040), which here is both. A Resource's
-    // anchors used to be a third derivation of it; they are Graph-independent
-    // since ADR 0087, so every Resource the Map draws carries the same four.
+    // anchors are Graph-independent, so every Resource the Map draws carries
+    // the same four.
     expect(visibleGraphs.map((graph) => graph.id)).toEqual([DRAWN_GRAPH, OTHER_GRAPH]);
     expect(edges.map((edge) => edge.data?.['graphId']).sort()).toEqual(
       [DRAWN_GRAPH, OTHER_GRAPH].sort(),

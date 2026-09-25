@@ -22,9 +22,8 @@ import {
  *
  * ADR 0052 makes the stable stories production-parity evidence, so a fixture
  * that *transcribes* what production derives is the one role they must not take:
- * the sidebar's Graph colours used to be hex literals copied out of
- * `GRAPH_PALETTE` under a comment promising they matched, which is parity held
- * by a comment. These go through the same intake production does — a story
+ * Graph colours written as hex literals copied out of `GRAPH_PALETTE` would be
+ * parity held by a comment. These go through the same intake production does — a story
  * cannot draw a Space the app would refuse — and everything derived is derived
  * here too.
  *
@@ -32,9 +31,9 @@ import {
  * story down with a message instead of rendering something subtly wrong.
  *
  * Each also **declares where it opens**, so `defaultMap` answers that for a
- * story exactly as it does for the app. The fixture used to decide it — "the
- * first Map, else Flow" — which is the state translation ADR 0052's negative
- * names. `story-spaces.test.ts` holds the declaration and what the Ladle specs
+ * story exactly as it does for the app. A fixture that decided it by a rule of
+ * its own would be the state translation ADR 0052's negative names.
+ * `story-spaces.test.ts` holds the declaration and what the Ladle specs
  * press to the same answer.
  */
 
@@ -109,16 +108,12 @@ const COLLECTION_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
  *
  * **No Graph carries a colour.** A Graph without one takes a palette slot by
  * order through `graphColorsByGraphId`, and the flatten across Maps in declared
- * order (ADR 0045) puts Long, Mid, Short and Echo in the first four slots — the
- * same blue, amber, green and pink the fixture used to write out by hand.
+ * order (ADR 0045) puts Long, Mid, Short and Echo in the first four slots.
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
  *
- * **It names `defaultMap`**, which the tracked e2e fixture deliberately does
- * not: that one exists to prove a Space declaring Maps still arrives in Flow,
- * and this one exists to draw a sidebar with a Map pressed. Declaring it is
- * how the story gets that from `defaultMap` instead of from a rule the
- * harness keeps.
+ * **It names `defaultMap`**, so the Map a story opens on comes from
+ * `defaultMap` instead of from a rule the harness keeps.
  *
  * Exported alongside the {@link authoredSpace} it loads into, because a story
  * that opens a real `SpaceSession` needs the stored shape and not the validated
@@ -239,7 +234,7 @@ export const widelyPlacedSpace: Space = loaded(loadSpaceSnapshot(widelyPlacedSna
  * {@link authoredSnapshot} one Edit later: a third Map, `Collection 3`.
  *
  * What a story submits has to differ from what it loaded, or a failed save and
- * a successful one draw the same list and nothing proves the sidebar read the
+ * a successful one draw the same list and nothing proves the story read the
  * session at all. The Map only has to be legal — a title, positions naming
  * Resources this Space already holds, and one owned Graph whose Edge endpoints are
  * members of it (ADR 0040) — so it is built from the same spine helpers the two
@@ -298,25 +293,23 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.resou
  * Where a story's converted Graph takes its identity.
  *
  * Here rather than in the fixture, because the only state that decides whether
- * a minted id is safe is the block of ids declared above it, and the two were
- * in different files: the fixture counted from one and handed out the very ids
- * `RESOURCE_A` and `RESOURCE_B` already carry. `convertSubject` would not have refused
- * either — a conversion's freshness is checked against the Space's *Graphs*
+ * a minted id is safe is the block of ids declared above it. A counter that
+ * handed out ids `RESOURCE_A` and `RESOURCE_B` already carry would not be
+ * refused — a conversion's freshness is checked against the Space's *Graphs*
  * (ADR 0045), and a Resource's id is not one — so a story that converted a View
- * would have minted a Graph wearing a Resource's identity, in silence.
+ * would mint a Graph wearing a Resource's identity, in silence.
  *
  * No story converts one today. The counter is the fixture's answer to ADR
- * 0016's composition seam, and nothing presses it; the collision is one Ladle
- * spec away rather than on screen now. Co-locating it is what stops that being
- * one constraint to remember: an id declared above and the counter below it are read
- * together, and `story-spaces.test.ts` holds them apart.
+ * 0016's composition seam. Co-locating it is what stops that being one
+ * constraint to remember: an id declared above and the counter below it are
+ * read together, and `story-spaces.test.ts` holds them apart.
  *
  * The base is a **reserved block** rather than one past the highest id, so a
  * story that declares another Resource or Map does not have to move it — the
  * literals above occupy `0x02`..`0x40`, and this leaves the whole space between
- * them and here. Hexadecimal throughout, which is what the ids are: the
- * decimal counter this replaced rendered `12` as `…0000012` while `RESOURCE_E` is
- * `…000000c`, so the two spellings did not even sort against each other.
+ * them and here. Hexadecimal throughout, which is what the ids are: a decimal
+ * counter would render `12` as `…0000012` while `RESOURCE_E` is `…000000c`, so
+ * the two spellings would not even sort against each other.
  */
 export const MINTED_GRAPH_ID_BASE = 0x1000;
 
@@ -641,8 +634,8 @@ const dockPositions = (count: number): Record<string, ResourcePlacement> =>
 /**
  * The Space the Command Dock prototype draws.
  *
- * Purpose-built, and deliberately not {@link authoredSpace}: that one exists to
- * draw a sidebar and every Resource in it is placed, so a Resources surface opened over
+ * Purpose-built, and deliberately not {@link authoredSpace}: every Resource in
+ * that one is placed, so a Resources surface opened over
  * it would have nothing to offer. The Dock needs three values at once that no
  * existing fixture has together — **two Maps** to switch between, **three
  * Graphs over one Map** so emphasis is a visible answer rather than a
@@ -650,9 +643,8 @@ const dockPositions = (count: number): Record<string, ResourcePlacement> =>
  * is what its list surfaces are being compared on.
  *
  * **No Graph carries a colour**, exactly as `authoredSnapshot` does not: a Graph
- * without one takes a palette slot by order through `graphColorsByGraphId`. The
- * prototype this replaced wrote `#4c8dff`, `#d08a3a` and `#2f9e8f` out by hand,
- * which is a fixture free to disagree with the palette the canvas draws.
+ * without one takes a palette slot by order through `graphColorsByGraphId`, so
+ * the fixture cannot disagree with the palette the canvas draws.
  *
  * It **declares where it opens**, so `defaultMap` answers that for the Dock
  * exactly as it does for the app.
@@ -704,10 +696,10 @@ const chainId = (offset: number): UUID =>
 /**
  * A Space whose Resources are all Space Resources: one link in a chain of crossings.
  *
- * **Depth is what these exist for.** Meta held every other fixture directly, so
- * the deepest trail a reader could walk was two — Meta and the Space they
- * entered — and a trail two deep cannot show what a Dock does with a trail that
- * outgrows it. Two links between Meta and the Dock's own Space make the walk
+ * **Depth is what these exist for.** With Meta holding every other fixture
+ * directly, the deepest trail a reader could walk would be two — Meta and the
+ * Space they entered — and a trail two deep cannot show what a Dock does with a
+ * trail that outgrows it. Two links between Meta and the Dock's own Space make the walk
  * `Meta ▸ Platform ▸ Design system ▸ Rendering`, which is the shape the
  * collapsed form is judged on.
  *
@@ -800,9 +792,9 @@ const META_TARGETS = [
  * Meta's own identity, and the Map and Graph it owns — three values from the
  * reserved block rather than one shared between kinds.
  *
- * The Space used to spell its Id as the literal `metaId(0)` resolves to, so the
- * Space *was* its Catalogue Map as far as any Id comparison could tell, and
- * `/spaces/:spaceId/maps/:mapId` drew the same 22 characters twice.
+ * A Map sharing the Space's Id would *be* the Space as far as any Id
+ * comparison could tell, and `/spaces/:spaceId/maps/:mapId` would draw the same
+ * 22 characters twice.
  */
 const META_SPACE_ID = metaId(0);
 const META_MAP = metaId(1);

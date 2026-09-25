@@ -53,7 +53,7 @@ describe('isAggregateInvariant', () => {
   });
 });
 
-// Ticket 31. The two named failures a stored-seam reader tells apart, and the
+// The two named failures a stored-seam reader tells apart, and the
 // third it meets that neither describes. Neither named arm is the other's
 // else-branch: a failure that is neither broken stored state nor an
 // unreachable database is classified as neither, and each reader decides its

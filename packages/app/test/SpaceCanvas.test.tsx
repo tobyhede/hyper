@@ -171,9 +171,8 @@ async function mountGraph(
         placementReady={editable}
         // The facts a mounted canvas is given, turned into answers by the one
         // module that owns them: `titleEditing` is the chrome rename `App`
-        // reports — the surviving fact that withdraws canvas authoring, the
-        // creation panes having gone with ADR 0089 — and `editable` is a
-        // resolved placement.
+        // reports — the fact that withdraws canvas authoring — and `editable`
+        // is a resolved placement.
         availability={authoringAvailability({
           editable,
           presenting: false,
@@ -282,9 +281,8 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 /**
- * Leaving a refused title used to open the Resource underneath, because the click
- * that blurred the field was also the click that selected the Resource — so the
- * graph carried a ref that ate exactly one click to stop it. The field now
+ * Leaving a refused title must not open the Resource underneath, although the
+ * click that blurs the field is also a click on the Resource. The field
  * contains its own events, while the Resource body keeps selection (ADR 0065).
  */
 describe('a title Edit the graph refused', () => {
@@ -311,7 +309,7 @@ describe('a title Edit the graph refused', () => {
 /**
  * No pointer gesture on a Resource's body opens it (ADR 0036). A Resource centres its
  * title, so a body gesture and the title's rename want the same pixels; opening
- * moved to the Resource's own control and the keyboard instead.
+ * belongs to the Resource's own control and the keyboard.
  */
 describe('opening a Resource', () => {
   it.each([
@@ -346,10 +344,7 @@ describe('opening a Resource', () => {
 /**
  * `F2` renames the *selected* Resource, so it must not fire while a control has
  * focus — the author is then working on that control, and the selection may
- * belong to another Resource entirely. The graph used to answer the key twice: a
- * React Flow `onKeyDown` branch that ran first and asked nothing about the
- * target, and a window listener that declined for a focused control and never
- * got the chance.
+ * belong to another Resource entirely.
  *
  * A Resource's commands float in React Flow's `NodeToolbar`, drawn while that
  * Resource is the one selected (`ResourceNode`'s `toolbarVisible`), so the
@@ -377,10 +372,11 @@ describe('F2 while a control has focus', () => {
  * The Resource affordance is a real button in the tab order, revealed by
  * `:focus-visible`, so a keyboard author reaches it without a pointer. Its
  * activation keys are the same two the graph reads as "open this Resource", and the
- * graph's handler sits on the ancestor that sees them first — it opened the Resource
- * for reading and called `preventDefault`, which in a browser also cancels the
- * activation the button never got. The button was unusable by the input it is
- * there for, and its whole point is to open something the plain open does not.
+ * graph's handler sits on the ancestor that sees them first. A handler that
+ * opened the Resource for reading and called `preventDefault` would, in a
+ * browser, also cancel the button's activation, leaving the button unusable by
+ * the input it is there for — and its whole point is to open something the
+ * plain open does not.
  *
  * Base UI's composite handles Space on keydown, while Enter retains native
  * click activation. jsdom supplies the former but not the latter.
@@ -582,8 +578,8 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
 /**
  * Resize is Resource behaviour rather than kind behaviour (ADR 0066): a Resource owns
  * the surrounding rect and the resize interaction, while a kind owns only what
- * fills an Open front. Reference Resource has no Open front yet, but that is content
- * ownership and must not read back as a second resize gate.
+ * fills an Open front. That is content ownership and must not read back as a
+ * second resize gate.
  */
 describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('offers a resize operation to an Open Resource whatever its kind', async () => {
@@ -822,7 +818,7 @@ describe('the C shortcut', () => {
    * nothing — so the real control is absent from the accessibility tree here
    * while being an ordinary visible slider in a browser. What is asserted is
    * the mechanism that excludes it: the `.nokey` its Panel already carries for
-   * React Flow's own subscriptions, which the canvas guard now reads too.
+   * React Flow's own subscriptions, which the canvas guard reads too.
    */
   it('is a keypress on the zoom slider rather than a command', async () => {
     const { addResource } = await mountGraph();
@@ -867,9 +863,8 @@ describe("React Flow's document key subscriptions", () => {
 });
 
 /**
- * Opening is a command of the *canvas*, and a Resource now contains the text control
- * its content is edited in. The `C` shortcut already asks this question; the
- * open key did not, and a Space typed into an Expanded Resource's editor is a
+ * Opening is a command of the *canvas*, and a Resource contains the text control
+ * its content is edited in. The `C` shortcut asks this question too, and a Space typed into an Expanded Resource's editor is a
  * character rather than a request to open the Resource it is inside.
  *
  * Modelled with a plain `contenteditable` rather than the real editor because

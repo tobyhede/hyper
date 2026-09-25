@@ -4,10 +4,7 @@ import { expect, test, type Page } from './fixtures';
 /**
  * One treatment across the three names, and all three disclose.
  *
- * The Space used to be the exception — a `<span>` wearing the Button box, because
- * there was no `renamed-space` Edit and a greyed name would have advertised a
- * command nobody could run. There is one now, so what this holds is that the
- * three identities are one composition: shared typography *and* a shared
+ * The three identities are one composition: shared typography *and* a shared
  * disclosure, with Rename in each list and the caret coming back to the name.
  */
 test(
@@ -61,8 +58,7 @@ test(
     await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(map).toBeFocused();
-    // The Space's own, because the identity that used to be a label had no way
-    // to owe the caret at all.
+    // The Space's own name owes the caret back too.
     await space.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: 'Rename' }).click();

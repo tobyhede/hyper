@@ -21,8 +21,7 @@ describe('no-conditional-empty-object-spread', () => {
 
   // The JSX half of the rule. A spread attribute is a `JSXSpreadAttribute`,
   // not a `SpreadElement` inside an `ObjectExpression`, so the object-literal
-  // visitor never sees it — this is the case that reached props unflagged
-  // until the rule grew its second visitor.
+  // visitor never sees it, and the rule needs a second visitor for props.
   it('flags the same idiom spread into JSX props', () => {
     const diagnostics = lint(
       [

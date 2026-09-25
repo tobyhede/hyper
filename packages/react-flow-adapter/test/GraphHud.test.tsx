@@ -79,7 +79,7 @@ describe('GraphHud', () => {
   });
 
   /**
-   * The minimap pans and zooms the canvas, as it did before it was unnested.
+   * The minimap pans and zooms the canvas.
    *
    * These are not decoration. `XYMinimap` calls d3-zoom on the MiniMap's own
    * SVG unconditionally — `selection.call(zoomAndPanHandler, {})` in
@@ -163,10 +163,10 @@ describe('GraphHud', () => {
   /**
    * Both identity glyphs are drawn at one size, in one box.
    *
-   * `MapIcon` had no size and drew at 16 inside the same 14px box the
-   * 13px Space cube sits in, so the two rows had different glyph heights and
-   * different optical centres. Lucide sets no `preserveAspectRatio`, so SVG's
-   * default letterboxed the glyph rather than distorting it — which is why this
+   * Without a declared size `MapIcon` draws at 16 inside the same 14px box the
+   * 13px Space cube sits in, so the two rows would have different glyph heights
+   * and different optical centres. Lucide sets no `preserveAspectRatio`, so
+   * SVG's default letterboxes the glyph rather than distorting it — which is why this
    * reads the declared size rather than a rendered box jsdom does not lay out.
    */
   it('draws both identity glyphs at the same size', () => {
@@ -189,14 +189,12 @@ describe('GraphHud', () => {
   });
 
   /**
-   * The key's own two claims, now that the HUD owns the markup rather than
-   * delegating it: the stripe is the *resolved* colour, and the Active Graph is
-   * the one that is not dimmed.
+   * The key's own two claims: the stripe is the *resolved* colour, and the
+   * Active Graph is the one that is not dimmed.
    *
    * The projection's answer outranks the Graph's own `color`, which is what
-   * `graphColor` decides and what the Sidebar reads through the same seam — so
-   * a stripe here disagreeing with a Sidebar glyph would mean the seam had been
-   * bypassed.
+   * `graphColor` decides — so a stripe here disagreeing with that answer would
+   * mean the seam had been bypassed.
    */
   it('resolves each stripe through the shared Graph colour seam and dims the rest', () => {
     const activeGraphId = uuid('00000000-0000-4000-8000-000000000010');

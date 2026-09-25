@@ -36,15 +36,12 @@ const settledNetwork = async (page: Page): Promise<void> => {
 };
 
 /**
- * **Untagged, and the claim it carried is retired.**
+ * **Untagged: it proves ordering and durability, not a save lifecycle.**
  *
- * `persistence-indicator-shows-save-lifecycle` said persistence reports saving,
- * briefly acknowledges success and returns to rest. The Command Dock draws no
- * resting cue at all — ticket `01` settled that a commit settles faster than a
+ * The Command Dock draws no resting cue at all — a commit settles faster than a
  * dot can be read — so `PersistenceControl` is mounted only for the two states
- * that need a decision, and the saving half of that lifecycle is unreachable in
- * the application. What is left true is the ordering and the durability, which
- * is what this test actually proves.
+ * that need a decision, and a saving indicator is unreachable in the
+ * application. What this test proves is the ordering and the durability.
  */
 test('rapid edits commit in order and the latest position survives reload', async ({ page }) => {
   let releaseFirst = (): void => undefined;

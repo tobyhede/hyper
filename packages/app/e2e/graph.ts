@@ -15,16 +15,15 @@ import { expect, type Locator, type Page } from '@playwright/test';
  */
 
 /* -------------------------------------------------------------------------- */
-/* The fixture's resourceinalities                                                 */
+/* The fixture's counts                                                       */
 /* -------------------------------------------------------------------------- */
 
 /**
  * How many Resources and Edges the fixture Meta Space actually declares, read from
  * the authored files at load.
  *
- * Four assertions used to spell these out as literals — `40` target handles,
- * `14`/`13`/`13` edges — so a change to the fixture silently broke tests that
- * are not about the fixture. Reading the files keeps them synchronised without
+ * Spelled out as literals, these counts would break tests that are not about
+ * the fixture whenever the fixture changes. Reading the files keeps them synchronised without
  * weakening anything: the fixture is the independent source of truth the page is
  * being checked against, and no count here is ever derived from the page under
  * test.
@@ -145,13 +144,12 @@ export async function openResource(node: Locator, title: string): Promise<void> 
 /**
  * Select a placed Resource, so its toolbar is drawn (ADR 0102), and open its actions menu.
  *
- * Shared because three suites drove the identical gesture before this was
- * pulled out — `editing.spec` and `mobile-dock.spec` through the real page
- * harness, `ladle-e2e/command-dock.spec` through the Ladle story host — all
- * reaching for the Command Dock's organising rule that a Resource's own commands
- * live on its rail rather than on the Dock (ADR 0073). `.last()` is what the
- * Ladle copy already used and costs nothing when only one menu is open, which
- * is every case these three exercise.
+ * Shared by three suites — `editing.spec` and `mobile-dock.spec` through the
+ * real page harness, `ladle-e2e/command-dock.spec` through the Ladle story
+ * host — all reaching for the Command Dock's organising rule that a Resource's
+ * own commands live on its rail rather than on the Dock (ADR 0073). `.last()`
+ * costs nothing when only one menu is open, which is every case these three
+ * exercise.
  */
 export async function resourceActions(page: Page, title: string): Promise<Locator> {
   const resource = nodeByTitle(page, title).first();
@@ -169,15 +167,12 @@ export async function resourceActions(page: Page, title: string): Promise<Locato
 /**
  * The Space's command surface (ADR 0082).
  *
- * **Every helper below opens a menu where it used to press a button**, and that
- * is the whole of what the Command Dock changed for this suite. The Sidebar was
- * a sixteen-rem column with room for a permanent row per Map, a permanent row
- * per Graph and a permanent Add Map; the Dock is a strip over the canvas that
- * finds room by disclosure. So the *claims* the specs make are unchanged and the
- * reach is not, which is exactly why the reach lives here — one module rather
- * than the thirty call sites that would otherwise each settle on their own way
- * of pressing it. `packages/app/test/command-dock.ts` is this module's opposite
- * number in the unit suite, for the same reason.
+ * **Every helper below reaches its command by opening a menu**, because the
+ * Dock is a strip over the canvas that finds room by disclosure. The reach
+ * lives here — one module rather than the thirty call sites that would
+ * otherwise each settle on their own way of pressing it.
+ * `packages/app/test/command-dock.ts` is this module's opposite number in the
+ * unit suite, for the same reason.
  */
 export function dock(page: Page): Locator {
   return page.getByRole('toolbar', { name: 'Command Dock' });
@@ -189,7 +184,7 @@ export function dock(page: Page): Locator {
  * `delay` is not decoration. A default Playwright click puts mousedown and
  * mouseup in one tick and Base UI's dismissal never gets a turn between them, so
  * a menu can open and close inside one press without this suite seeing it
- * (`ladle-e2e/link-actions.spec.ts` records the regression that found it).
+ * (`ladle-e2e/link-actions.spec.ts` holds that case).
  *
  */
 async function disclose(page: Page, name: string | RegExp): Promise<Locator> {
@@ -227,8 +222,7 @@ export function spaceName(page: Page): Locator {
 /**
  * Begin a Dock identity rename from its list.
  *
- * The name discloses; Rename is the command that opens the editor
- * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+ * The name discloses; Rename is the command that opens the editor.
  * `delay` is the same Base UI dismissal turn {@link disclose} waits for.
  */
 export async function beginRename(page: Page, identity: Locator): Promise<void> {
@@ -245,7 +239,7 @@ export function selectedCanvas(page: Page): Locator {
  * Draw one authored Map, by title.
  *
  * One exclusive choice over authored Maps, with no second control and no
- * empty value — ADR 0053's one durable clause, which ADR 0082 keeps verbatim.
+ * empty value (ADR 0082).
  * The fixture Meta Space declares Collection 1 and Collection 2
  * (`fixture/<meta>/space.json`), so a test can open one without authoring it
  * first, which is the only way to drag a Resource in a Map that already owns
@@ -266,7 +260,7 @@ export async function selectCanvas(page: Page, title: string): Promise<void> {
  * Create and select an empty Map owning one empty Graph (ADR 0079, ADR 0080).
  *
  * **It leaves the caret in the new Map's name**, which is where the command
- * continues (`.scratch/command-dock/issues/13`) — so the Dock is drawing an
+ * continues — so the Dock is drawing an
  * editor and not a name when this returns, and `selectedCanvas` matches nothing.
  * Callers that want to read the Dock back settle the editor with
  * {@link settleNewMapName} first.
@@ -493,9 +487,9 @@ const NUDGE = 2;
  * `whileDragging`, which runs between the two moves — the same shape
  * `connectHandles` uses above, and for the same kind of reason. What a drag does
  * to the rest of the canvas mid-flight is invisible from either resting frame:
- * the defect ADR 0084 removes moved a neighbour as the dragged Resource crossed its
- * origin and moved it back before release, so a test that reads only the before
- * and after sees a gesture that did nothing. The callback runs after the first
+ * a neighbour moved as the dragged Resource crosses its origin and moved back
+ * before release (which ADR 0084 forbids) looks, to a test that reads only the
+ * before and after, like a gesture that did nothing. The callback runs after the first
  * move, which lands on exactly the halfway point of the delta — a crossing a
  * caller wants observed belongs strictly before that halfway mark.
  */
@@ -525,7 +519,7 @@ export async function dragBy(
   // Spending the nudge on its own move makes that loss a known constant instead
   // of a proportion, and **every coordinate below is then measured from the
   // nudge rather than from the press**, so the Resource travels exactly `dx`/`dy`
-  // flow units. Leaving the nudge uncompensated would have left an error of
+  // flow units. Leaving the nudge uncompensated would leave an error of
   // `NUDGE / zoom` — small at the fixture's zoom, and growing as a Map gets
   // wider or a viewport narrower, which is precisely the shape of assertion
   // that passes until the day it does not.
@@ -577,10 +571,9 @@ export async function connectHandles(
   const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
   // The opening nudge goes *towards* the target rather than always rightwards.
   // React Flow auto-pans while a connection is dragged within 40px of the
-  // container edge, and the Space Sidebar took 256px of that container
-  // (ADR 0053): parking the pointer 36px from the right edge made the canvas
-  // pan for as long as the drag lasted, and Playwright waits forever for a box
-  // that never stops moving. Aiming at the target is also the truer gesture.
+  // container edge: a pointer parked that close to an edge pans the canvas for
+  // as long as the drag lasts, and Playwright waits forever for a box that
+  // never stops moving. Aiming at the target is also the truer gesture.
   const nudge = to !== null && to.x + to.width / 2 < start.x ? -30 : 30;
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
@@ -680,8 +673,7 @@ export async function resourceControls(page: Page, resource: Locator): Promise<L
 /**
  * Assert a menu's rows read as the given groups, in order, with exactly one
  * separator between each pair of groups — the one grouping grammar every
- * entity, Map, Graph and Space menu in this product now shares
- * (`.scratch/dock-menu-reorganisation/`).
+ * entity, Map, Graph and Space menu in this product shares.
  *
  * Reads the ordered `menuitem` / `menuitemradio` / `separator` rows rather
  * than `role="group"`, because that is the one shape every menu here

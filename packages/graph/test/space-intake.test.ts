@@ -15,11 +15,8 @@ import { referenceFile, resourceFile, uuid } from './resource-files';
  * loader alone would say nothing about the snapshot every commit goes through,
  * and the pair of them is exactly where a divergence would hide.
  *
- * The old `validate.test.ts` handed hand-built broken maps straight to
- * `validateReferences`. That module is internal, its input shape is not a value
- * any caller holds, and half of what it accepted was a shape the schema rejects
- * — so those cases are here instead, stated over documents a loader could
- * actually be given.
+ * Every case is stated over a document a loader could actually be given, never
+ * over the internal reference check's input shape, which no caller holds.
  */
 
 const SPACE = uuid('00000000-0000-4000-8000-000000000001');
@@ -261,9 +258,7 @@ describe.each([
 
     it('loads a map whose only graph holds no edges', () => {
       // Creating a Map creates its initial empty Active Graph in the same Edit
-      // (ADR 0040), and converting a View returns exactly that (ADR 0045), so
-      // this is the first result a conversion writes. Closure over an empty edge
-      // set is vacuous, not exempt.
+      // (ADR 0040). Closure over an empty edge set is vacuous, not exempt.
       const space = loaded(
         load({
           resources: [markdown(A, 'A')],
@@ -649,10 +644,9 @@ describe.each([
     });
 
     it('refuses a defaultMap naming no declared Map', () => {
-      // The kind names the field the document actually has (ADR 0055). A kind
-      // and the message beside it that name two different fields is the split
-      // the rename exists to close, and a consumer matching on the kind is the
-      // one that reads the retired name.
+      // The kind names the field the document actually has (ADR 0055): a kind
+      // and the message beside it naming two different fields would send a
+      // consumer matching on the kind to a field the document does not have.
       const errors = refused(load(simple(ABSENT)));
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'unresolved-default-map', ref: ABSENT }),

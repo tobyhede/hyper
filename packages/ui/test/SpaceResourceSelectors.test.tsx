@@ -257,7 +257,7 @@ describe('SpaceResourceSelectors', () => {
 
   /**
    * This Resource's Map and Graph menus match the Dock's own grouping
-   * grammar (`.scratch/dock-menu-reorganisation/issues/01`): the direct
+   * grammar: the direct
    * children of the popup alternate group/separator, one separator between
    * each group, and the items inside read in the documented order.
    */

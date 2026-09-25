@@ -22,16 +22,15 @@ import { resourceFile } from './resource-files';
  * asserts the relationship, so a change to one side only would pass every test
  * and render a Graph with no Edges.
  *
- * Since ADR 0087 an Edge names no handle and attaches to one of four anchors
+ * An Edge names no handle and attaches to one of four anchors
  * chosen while it is drawn, so what has to hold is that **every** Resource an Edge
  * reaches carries those anchors — not that some named handle happens to exist.
  * React Flow resolves an unnamed handle to the first of the node's bounds of
  * that kind, so a Resource missing either kind is an Edge that silently vanishes.
  *
  * Properties rather than examples because the failure mode is multi-graph: the
- * generated Spaces overlap on Resources, which is the shape that once put several
- * same-side handles on one node. See
- * `.scratch/react-flow-guidance/issues/02-projection-handle-invariants.md`.
+ * generated Spaces overlap on Resources, which is the shape that can put several
+ * same-side handles on one node.
  */
 
 /** Ids from a shared pool, so generated graphs overlap on resources — the case that
@@ -192,8 +191,7 @@ describe('projection handle invariants', () => {
 
         // React Flow cannot tell two same-kind handles apart otherwise, and picks
         // whichever it finds first. Four anchors named for their sides satisfy
-        // that by construction — which is the ground ADR 0045 gave the per-Graph
-        // ids, and the reason four anchors could take their place.
+        // that by construction.
         for (const node of nodes) {
           const seen = (node.handles ?? []).map((handle) => `${handle.type}-${handle.position}`);
           expect(new Set(seen).size, `${node.id} handles`).toBe(seen.length);

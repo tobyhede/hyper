@@ -4,11 +4,10 @@ import { uuidSchema } from '@project/core';
 import { ResourceSearchCombobox, type ResourceChoice } from '../src/index';
 
 /**
- * The one production picker, tested at the component rather than through the
- * surfaces that compose it — Edge `From`/`To`, new Reference Resource Target and opened
- * Reference Resource Target. Every behaviour here is the picker's own contract with all of
- * them, so a regression belongs to this file rather than to
- * whichever surface happened to notice.
+ * The picker, tested at the component rather than through any surface that
+ * composes it. Every behaviour here is the picker's own contract, so a
+ * regression belongs to this file rather than to whichever surface happened to
+ * notice.
  *
  * Base UI's popup positions itself by measuring, and jsdom ships no
  * `ResizeObserver` — it is reached before the list can open at all.
@@ -30,7 +29,7 @@ beforeAll(() => {
   );
 });
 
-/** Real `ResourceId`s, because that is what a choice's id now is. */
+/** Real `ResourceId`s, because that is what a choice's id is. */
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 const RESOURCE_C = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');

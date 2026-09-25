@@ -69,11 +69,9 @@ const appFetch =
 
 /**
  * The application is composed over a real `SpaceRepository`, which is what it is
- * given in every runtime. It used to be handed `MemorySpaceBackend` wrapped in a
- * repository-shaped adapter that mapped each browser-side result back to a
- * stored one and threw on the arms it could not represent — so the HTTP path was
- * exercised over the less faithful of the two doubles, through a mapping no
- * production code performs (ADR 0096).
+ * given in every runtime, rather than a browser-side backend adapted to the
+ * repository's shape: that would exercise the HTTP path through a mapping no
+ * production code performs.
  *
  * The contract names the Meta identity it seeds under, which is what lets
  * `MemorySpaceRepository`'s overloads be satisfied honestly rather than by

@@ -261,8 +261,8 @@ describe('loadWorkingSpace', () => {
    * `current: undefined` on an entry that names this Space is the repository
    * saying the Space is gone — deleted between the read and the initialization
    * Edit. That is the same answer as never having been there, and the loader
-   * already spells it `undefined`; throwing turned an ordinary not-found into a
-   * server error.
+   * already spells it `undefined`; throwing would turn an ordinary not-found
+   * into a server error.
    */
   it('answers undefined when the conflict reports the Space deleted', async () => {
     const store = {

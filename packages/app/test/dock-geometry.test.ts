@@ -19,16 +19,15 @@ const horizontal = (left: number, top: number): DockBox => ({
  * Which edge a release lands on.
  *
  * **The claim under test is that a corner is reachable from either direction.**
- * It was once false, and the way it was false is the reason this function
- * measures gaps rather than centres: a horizontal Dock is ~600px wide, so its
- * centre sits ~300px from the left edge however far left it is dragged, while
- * that same centre can be 40px from the top. Centre distance therefore let the
- * Dock's own width vote, `top` won every time near the top-left, and no gesture
- * turned a top Dock into a left one there.
+ * That is why this function measures gaps rather than centres: a horizontal
+ * Dock is ~600px wide, so its centre sits ~300px from the left edge however far
+ * left it is dragged, while that same centre can be 40px from the top. Centre
+ * distance would let the Dock's own width vote, `top` would win every time near
+ * the top-left, and no gesture would turn a top Dock into a left one there.
  *
  * So the test drags a *wide* Dock into the top-left and asks for `left`. A
  * narrow one would pass under either rule and prove nothing — the width is the
- * whole mechanism, and a fixture that removes it removes the bug.
+ * whole mechanism.
  */
 describe('the edge a release lands on', () => {
   it('is reachable at a corner from either direction, whatever the Dock is wide', () => {
@@ -46,22 +45,23 @@ describe('the edge a release lands on', () => {
 /**
  * Which of the three stops along an edge a release lands on.
  *
- * **The same bug as the corner, one axis down.** A stop is a place the Dock
+ * **The same rule as the corner, one axis down.** A stop is a place the Dock
  * ends up, not a point on the edge: `start` puts a 600px-wide Dock's centre
  * 300px in, because the Dock has to fit. Measuring the Dock's centre against
- * the raw ends of the edge therefore asks it to be somewhere it can never be,
- * and the width votes again — a Dock shoved hard into the left of a 1200px
+ * the raw ends of the edge would ask it to be somewhere it can never be, and
+ * the width would vote again — a Dock shoved hard into the left of a 1200px
  * viewport has its centre at 304, which is nearer the middle stop at 600 than
- * the start stop at 0, so it snaps back to the centre it was dragged out of.
+ * the start stop at 0, so it would snap back to the centre it was dragged out
+ * of.
  *
- * The fixture is wide for the reason it was wide for `nearestEdge`: the width
+ * The fixture is wide for the reason it is wide for `nearestEdge`: the width
  * is the mechanism, and a narrow Dock reaches `start` under either rule.
  */
 describe('the stop along an edge a release lands on', () => {
   it('is the stop the Dock was dragged to, at every one of the three', () => {
     // Hard against the left. Centre at 304; the start stop is at 300 and the
-    // middle at 600. Under the old rule the middle won and the Dock snapped
-    // back out of the corner it had been dragged into.
+    // middle at 600. Measured against the raw ends, the middle would win and
+    // the Dock would snap back out of the corner it had been dragged into.
     expect(nearestAlong(VIEWPORT, horizontal(4, 60), 'top')).toBe('start');
 
     // Centred: 300 of slack either side, so its centre is the container's.

@@ -169,11 +169,10 @@ function RefusedAdd() {
  *
  * Mounted closed, behind its own trigger and over a stand-in for the canvas it
  * feeds — the smallest boundary that owns the list's opening, its dismissal and
- * the fact that the surface behind it stays live. That last one is the
- * comparison's own claim restored: the list is anchored to its trigger and does
- * not close on an outside press, so dropping a Resource onto the canvas neither
- * dismisses it nor is dismissed by it
- * (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+ * the fact that the surface behind it stays live. That last one is the claim:
+ * the list is anchored to its trigger and does not close on an outside press,
+ * so dropping a Resource onto the canvas neither dismisses it nor is dismissed
+ * by it.
  */
 export const AvailableResources: Story = () => {
   return <ResourcesPopoverFixture />;

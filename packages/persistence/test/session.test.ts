@@ -807,8 +807,8 @@ describe('openSpaceSession', () => {
    * across both operations and every other persistence state, so it is stated
    * once and quantified rather than written out eight times — and quantifying
    * over *sequences* says the refusal is repeatable, not merely true of a first
-   * call. `pending` and `rejected` are covered here for free; no mutant pointed
-   * at either, and the same guard governs them.
+   * call. `pending` and `rejected` are covered here too, because the same
+   * guard governs them.
    *
    * What it asserts is deliberately not "did not throw". A guard replaced by a
    * silent early return that also wiped the session would pass that and fail
@@ -1027,7 +1027,7 @@ describe('openSpaceSession', () => {
   });
 
   /*
-   * The twin of the case above, so the fix does not over-correct: an Edit
+   * The twin of the case above, so the rule does not over-correct: an Edit
    * submitted *after* `prepareCoordinatedCommit` has run is genuinely newer
    * than the coordinated snapshot, not superseded by it, and must still reach
    * the backend once the coordination settles and the barrier lifts.

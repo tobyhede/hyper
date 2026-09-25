@@ -25,17 +25,10 @@ import {
 /**
  * The app's chrome at phone width (ADR 0082).
  *
- * **This file replaced `mobile-sidebar.spec.ts`, and what it owes is a
- * different resource.** The Sidebar below its breakpoint was a modal Sheet drawn
- * over the canvas: it trapped focus and marked everything behind it inert, so
- * every command whose result was on the canvas had to dismiss it first, and
- * that dismissal contract was most of what the old file proved. All of it came
- * free from the registry `Sidebar` primitive, and ADR 0082 states the cost of
- * losing it plainly — *"The responsive story is now ours."*
- *
- * The Dock's answer is one constraint rather than a second arrangement. It never
- * takes the canvas away: it is furniture over it, it takes no layout space, and
- * at 390px it still covers a strip rather than a screen. So there is nothing to
+ * The Dock's answer to a narrow screen is one constraint rather than a second
+ * arrangement. It never takes the canvas away: it is furniture over it, it
+ * takes no layout space, and at 390px it still covers a strip rather than a
+ * screen. So there is nothing to
  * dismiss and no dismissal to get right — what it owes is to **fit**, with every
  * cluster keeping its name, its disclosure and its place in the roving order.
  * Nothing is withdrawn at a breakpoint, which is what would make the phone a
@@ -75,7 +68,7 @@ test(
 
     // And every disclosure still discloses. The Map menu is opened, a choice
     // is made, and the result is on the canvas with nothing dismissed in
-    // between — which is the sentence the Sheet's contract used to be about.
+    // between.
     await selectCanvas(page, 'Collection 2');
     await expect(dock(page)).toBeVisible();
     await expect(page.getByTestId('active-graph')).toContainText('Echo');
@@ -89,10 +82,9 @@ test(
 /**
  * A command whose result opens an editor on the canvas.
  *
- * This is the case the Sheet could not serve at all: the editor took focus as it
- * mounted and the Sheet's trap took it straight back, so Add Resource had to dismiss
- * before it could run. Here the strip is beside the result rather than over it,
- * and the caret lands where the author is looking.
+ * The editor takes focus as it mounts, so nothing over the canvas may trap
+ * focus. The strip is beside the result rather than over it, and the caret
+ * lands where the author is looking.
  */
 test('Create Resource from the strip names the new Resource on the canvas', async ({ page }) => {
   await page.goto('/');
@@ -142,9 +134,7 @@ test('New Map selects an empty authored Map, and Delete returns to the one befor
 
   // New Map continues in the new Map's name at this width exactly as it
   // does at any other — the caret, not a disclosure, is what the command leaves
-  // behind (`.scratch/command-dock/issues/13`). The Resources list it used to
-  // reveal was the control this test then had to dismiss to reach the next
-  // command; there is nothing overlaying the strip now.
+  // behind, so there is nothing overlaying the strip to dismiss.
   await settleNewMapName(page, 'Map 1');
   await expect(selectedCanvas(page)).toContainText('Map 1');
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
@@ -211,7 +201,7 @@ test('recolouring the active Graph from the Graph menu persists at phone width',
  */
 
 /**
- * Delete Resource's confirmation at phone width (v1-release/03). Assertions
+ * Delete Resource's confirmation at phone width. Assertions
  * follow `editing.spec.ts` — `Delete Resource confirms before removing the Resource
  * from the whole Space` — so Confirm is `deleted-resource`, not canvas membership.
  */
@@ -296,7 +286,7 @@ test('Delete on a Dock control leaves the selected Resource on the canvas', asyn
 /**
  * Presenting removes the strip entirely and hands the keyboard to the canvas.
  *
- * The Sheet had to be dismissed before a presentation could be driven; the strip
+ * Nothing has to be dismissed before a presentation can be driven: the strip
  * is simply gone, and what is left is `PresentingChrome` and the canvas the
  * arrows reach.
  */
@@ -417,7 +407,7 @@ test('a persistence failure stays inside the viewport beside a side-edge Dock', 
  * enough for it. Height does not work that way. A vertical column whose clusters
  * are taller than the room the frame is capped to keeps its content height, and
  * a scroll property on a box with no viewport to scroll inside does nothing at
- * all: the column simply hung out of the bottom of the screen, with the last
+ * all: the column would hang out of the bottom of the screen, with the last
  * cluster past the edge of a shell that is `overflow: hidden` and so cannot be
  * scrolled to.
  *
@@ -457,9 +447,9 @@ test.describe('a short viewport', () => {
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(220);
 
-    // The strip is the scroll viewport for its own content, which is the half
-    // that was missing: the cap was on the frame around it, so the column below
-    // measured the same height scrolled as unscrolled.
+    // The strip is the scroll viewport for its own content: a cap on the frame
+    // around it alone would leave the column measuring the same height
+    // scrolled as unscrolled.
     const scroll = await surface.evaluate((element) => ({
       client: element.clientHeight,
       content: element.scrollHeight,
@@ -468,11 +458,9 @@ test.describe('a short viewport', () => {
 
     // And the far cluster is reachable, which is what the scrolling is for.
     //
-    // **Pressing it now completes an Edit rather than opening a menu.** Create
-    // Resource was one `+` disclosing three kinds, so the cheapest proof that the
-    // far cluster could be *pressed* was that its menu appeared. The kinds are
-    // peers now and Create Markdown Resource completes on activation, so the proof
-    // is the Resource it makes — and the assertion is the one
+    // **Pressing it completes an Edit rather than opening a menu.** Create
+    // Markdown Resource completes on activation, so the proof that the far
+    // cluster could be *pressed* is the Resource it makes — and the assertion is the one
     // `Create Resource from the strip names the new Resource on the canvas` already
     // uses, rather than a second way of saying a Resource arrived.
     const create = createResourceControl(page);

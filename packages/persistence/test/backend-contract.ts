@@ -125,7 +125,7 @@ export const spaceBackendContract = (
     const harness = await createHarness({ spaces: [contractLoaded], metaSpaceId: SPACE_ID });
     try {
       // Shape-valid and domain-invalid: a graph reaches intake only through the
-      // map that owns it now (ADR 0040), and its edge endpoints must be resources
+      // map that owns it (ADR 0040), and its edge endpoints must be resources
       // of *that* map, so the dangling end is one the positions omit.
       const invalid = structuredClone(contractLoaded.snapshot);
       invalid.document.maps = [

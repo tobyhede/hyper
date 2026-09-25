@@ -43,12 +43,12 @@ const withGraphs = (graphs: unknown[]) => ({
 
 describe('space file schema', () => {
   it('nests a Graph under the Map that owns it, with no Space-level collection', () => {
-    // ADR 0040: a Graph is an owned value of one Map. The Space-level array
-    // is gone, and a file carrying one is rejected rather than half-read — by
-    // `loadSpace`, not here. This schema is a plain object, so it *strips* a key
-    // it does not declare, and declaring the retired one would put it in the
-    // inferred document type the HTTP contract is checked against. The rejection
-    // is a pre-parse check beside the version answer; `space.test.ts` covers it.
+    // A Graph is an owned value of one Map, so a parsed file has no Space-level
+    // array. A file carrying one is rejected rather than half-read — by
+    // `loadSpace`, not here: declaring the key in this schema would put it in
+    // the inferred document type the HTTP contract is checked against. The
+    // rejection is a pre-parse check beside the version answer; `space.test.ts`
+    // covers it.
     const file = spaceFileSchema.parse({
       version: 1,
       id: '00000000-0000-4000-8000-000000000001',
@@ -101,13 +101,13 @@ describe('space file schema', () => {
   });
 
   it('rejects an undeclared key rather than opening on a Map its author did not name', () => {
-    // What answers the opening selection ADR 0079 renamed. Stripped, a file
-    // still carrying the old spelling reaches `workingSpace`, which adopts
+    // Stripped rather than refused, a file naming its opening Map under a key
+    // the schema does not declare reaches `workingSpace`, which adopts
     // `maps[0]` and commits it — the author's stated Map silently
     // replaced and then written back.
     //
     // The key below is arbitrary on purpose. Rejection is by policy and not by
-    // name, so neither the schema nor this test spells the retired one; a test
+    // name, so neither the schema nor this test spells a particular key; a test
     // that did would be the codebase carrying knowledge of a shape that cannot
     // reach it, which is what ADR 0056 forbids.
     const result = spaceFileSchema.safeParse({
@@ -172,9 +172,9 @@ describe('space file schema', () => {
   });
 
   it('rejects a top-level edges array, which graphs replaced', () => {
-    // ADR 0007 deleted the structural layer beside graphs; a graph's own `edges`
-    // (ADR 0032) are a different concept that happens to share the word. An older
-    // file carrying the old array is refused rather than read past.
+    // A top-level `edges` array is not part of the document; a graph's own
+    // `edges` are a different concept that happens to share the word. A file
+    // carrying one is refused rather than read past.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       edges: [
@@ -189,8 +189,8 @@ describe('space file schema', () => {
   });
 
   it('accepts a space file with no maps — a new space has no structure yet', () => {
-    // ADR 0015. It renders; it cannot be presented. A Map owns at least one
-    // Graph (ADR 0040), so having no Maps is what having no Graphs now is.
+    // It renders; it cannot be presented (ADR 0015). A Map owns at least one
+    // Graph, so having no Maps is what having no Graphs is.
     const { maps: _maps, ...withoutMaps } = validSpaceFile;
     expect(spaceFileSchema.safeParse(withoutMaps).success).toBe(true);
     expect(spaceFileSchema.safeParse({ ...validSpaceFile, maps: [] }).success).toBe(true);
@@ -212,10 +212,8 @@ describe('space file schema', () => {
 
   it('accepts a graph with no edges — a Map mints its initial Graph empty', () => {
     // Creating a Map creates its initial empty Active Graph in the same Edit
-    // (ADR 0040), and the Flow view converts by returning exactly that (ADR
-    // 0045), so an edge-less Graph is a state the product produces on the first
-    // Resource the author moves. Deleting the last Edge of a Graph leaves the same
-    // shape. The superseded rule read a Graph as minted *by* drawing an Edge.
+    // (ADR 0040), so an edge-less Graph is a state the product produces.
+    // Deleting the last Edge of a Graph leaves the same shape.
     const result = spaceFileSchema.safeParse(
       withGraphs([{ id: '00000000-0000-4000-8000-000000000004', title: 'Main', edges: [] }]),
     );
@@ -551,9 +549,9 @@ describe('space file maps', () => {
   });
 
   it('rejects a map whose graphs are ids rather than owned values', () => {
-    // The version 2 filter, which named the graphs a map drew. It shares a
-    // key with the collection a map now owns, so the shape check is what
-    // tells them apart — a file saying "draw only these" is not one owning them.
+    // A list of Graph ids shares a key with the collection a map owns, so the
+    // shape check is what tells them apart — a file saying "draw only these"
+    // is not one owning them.
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
       maps: [{ ...working, graphs: ['00000000-0000-4000-8000-000000000011'] }],

@@ -362,7 +362,7 @@ test(
 
     // A quarter of `--canvas-resource-muted-color`, as Chrome serialises the
     // `color-mix` in `markdown-resource-body.css` — the Resource's own muted ink,
-    // washed. It was `--accent`, the chrome's highlighted-row fill, which on the
+    // washed. Not `--accent`, the chrome's highlighted-row fill, which on the
     // light theme is a near-white and would leave a selection nobody could see
     // on cream.
     expect(
@@ -410,7 +410,7 @@ test(
  * The two cases Done and Escape do not cover.
  *
  * Cancel is a *discard*, and every other Cancel in this suite is clicked on a pane
- * whose source was never touched — so nothing failed if Cancel committed. And the
+ * whose source was never touched — so none of them fails if Cancel commits. And the
  * pane's commit shortcut is a key CodeMirror also binds (`insertBlankLine`): withheld
  * from its keymap, it must reach the form having changed nothing. Pressed with the
  * real platform modifier, which is the half a jsdom test cannot prove.
@@ -474,7 +474,7 @@ test('the Markdown editor code loads only when a Markdown Resource opens', async
  * `.resource--full` rules they override have equal specificity, so only source
  * order separates them — the same cascade trap `presenting.spec.ts` pins for
  * `.resource--full`. With the treatment colocated in its own stylesheet, that order
- * is now a fact about the module graph rather than about one file's line
+ * is a fact about the module graph rather than about one file's line
  * numbers, and a reordered import would silently return the editor to the
  * generic dark pane with every other assertion still green.
  */
@@ -725,18 +725,18 @@ function at(
 }
 
 /**
- * The first of ADR 0084's two reported defects: an Open Resource's size deciding
- * where its neighbours are drawn.
+ * An Open Resource's size does not decide where its neighbours are drawn
+ * (ADR 0084): dragging it across a neighbour moves nothing but itself.
  *
  * The neighbour is before the subject on both axes, so opening the subject
  * displaces nothing and what follows is about the drag alone. The rule is
  * per-axis, so the geometry only has to cross one: the Resources are a hundred and
  * twenty apart on `x` and far enough apart on `y` never to overlap, and a short
  * drag leftwards carries the subject across the neighbour's `x` and nothing
- * else. That is the discontinuity ADR 0084 measured — the derived rule answered
- * the crossing by moving the neighbour a whole growth-step sideways, and moved
- * it back on the return. `whileDragging` is what makes the mid-gesture frame visible at
- * all, and the delta is chosen so the halfway move is already past the crossing.
+ * else. A neighbour moved at that crossing and moved back on the return would
+ * be invisible in both resting frames. `whileDragging` is what makes the
+ * mid-gesture frame visible at all, and the delta is chosen so the halfway move
+ * is already past the crossing.
  */
 test('dragging an Open Resource across a neighbour moves nothing but the dragged Resource', async ({
   page,
@@ -768,8 +768,7 @@ test('dragging an Open Resource across a neighbour moves nothing but the dragged
     );
   };
 
-  // 280 puts the halfway move at x = -20, already past the neighbour's origin,
-  // which is where the derived rule used to fire.
+  // 280 puts the halfway move at x = -20, already past the neighbour's origin.
   await dragBy(page, subject, -280, 0, neighbourStill);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
@@ -793,13 +792,11 @@ test('dragging an Open Resource across a neighbour moves nothing but the dragged
 });
 
 /**
- * The second reported defect: a drop the old inverse could not answer for.
+ * A drop inside an Open Resource's growth band settles exactly where the author
+ * released it, because a canvas coordinate is an authored one (ADR 0084).
  *
- * `Placement.authoredPoint` inverted a derivation that is not onto — no authored
- * coordinate drew inside an Open Resource's growth — so a drop that landed in that
- * band was answered with the near side, and the Resource settled on the Open Resource's
- * origin instead of where the author released it. The band was one growth-step
- * wide beginning at that origin, so this drops half a step into it on both axes.
+ * The band is one growth-step wide beginning at the Open Resource's origin, so
+ * this drops half a step into it on both axes.
  */
 test('a closed Resource released inside an Open Resource lands at the drop point', async ({
   page,
@@ -832,8 +829,7 @@ test('a closed Resource released inside an Open Resource lands at the drop point
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
 
   // Drawn inside the Open Resource, which is the premise the flow-space assertions
-  // below rest on — and the resource the clamp made unreachable, since a Resource it
-  // answered for came to rest on the Open Resource's own top-left corner.
+  // below rest on.
   const moverBox = await boxOf(mover, 'the dropped Resource');
   expect(moverBox.x).toBeGreaterThan(openBox.x);
   expect(moverBox.y).toBeGreaterThan(openBox.y);
@@ -857,8 +853,7 @@ test('a closed Resource released inside an Open Resource lands at the drop point
  * subject on both axes moves by the width growth alone — its one room axis is
  * `x` (ADR 0093) — and the Resource behind it on both axes does not move at all. From then on those are authored positions like any
  * other: dragging the Open Resource past the neighbour is not a second Open, and the
- * room stays where the Open Edit put it. Under the derived rule the neighbour
- * came back to its authored point the moment the subject was dragged beyond it.
+ * room stays where the Open Edit put it.
  */
 test('opening a Resource displaces its neighbours once, and dragging it never displaces them again', async ({
   page,
@@ -932,8 +927,7 @@ test(
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
     // One list over the authored Maps with exactly one checked item, and the
-    // cluster outside it naming the same one (ADR 0053's surviving clause, kept
-    // verbatim by ADR 0082; ADR 0079).
+    // cluster outside it naming the same one (ADR 0082, ADR 0079).
     const choices = await mapChoices(page);
     await expect(choices).toHaveCount(3);
     await expect(choices.and(page.locator('[aria-checked="true"]'))).toHaveCount(1);
@@ -966,15 +960,13 @@ test(
     const persistence = page.getByTestId('persistence-status');
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
-    // In the Map menu, beside the list it adds to — the Sidebar had room for
-    // a permanent control and the Dock finds room by disclosure (ADR 0082).
-    // What the command does is unchanged: an *empty* Map, created and
-    // selected in one Edit (ADR 0079, ADR 0080).
+    // In the Map menu, beside the list it adds to: the Dock finds room by
+    // disclosure (ADR 0082). The command creates and selects an *empty* Map
+    // in one Edit (ADR 0079, ADR 0080).
     await newMap(page);
 
-    // The command opens nothing and continues in the new Map's name
-    // (`.scratch/command-dock/issues/13`). It used to reveal the Resources list
-    // instead, which is why there is no dialog to dismiss here any more.
+    // The command opens nothing and continues in the new Map's name, so there
+    // is no dialog to dismiss here.
     await settleNewMapName(page, 'Map 1');
     await expect(selectedCanvas(page)).toContainText('Map 1');
     await expect(persistence).toHaveAttribute('data-revision', '1');
@@ -1437,9 +1429,8 @@ test.describe('resizing by touch', () => {
    * d3-drag sets `touch-action: none` on the control, which takes away the
    * browser's usual reason to seize a touch gesture — but the platform can
    * still take one (a call arriving, a system gesture, the page backgrounded),
-   * and a probe written before this test confirmed CDP `touchCancel` raises a
-   * real `pointercancel` on `window` in this Chromium. What that probe also
-   * showed is that `pointercancel` is the *whole* of what reaches `window`
+   * and CDP `touchCancel` raises a real `pointercancel` on `window` in this
+   * Chromium. `pointercancel` is the *whole* of what reaches `window`
    * here: `touchstart`, `touchmove`, `touchend` and `touchcancel` never arrive,
    * because d3-drag calls `stopImmediatePropagation` on each and leaves the
    * compatibility `pointer*` pair alone. The observed sequence for a cancelled
@@ -1681,13 +1672,11 @@ test('opening animates the Resource wrapper and displaced neighbours from one du
 /**
  * **It opens nothing, and the author continues in the name.**
  *
- * This test used to be named for the Resources View it revealed. New Map no
- * longer discloses anything — the Edit creates and selects an empty Map and
- * the caret lands in its name (`.scratch/command-dock/issues/13`) — so what is
- * left to hold is that the canvas really is empty, that the Space's existing
- * Resources are still there to be placed on it, and that the empty Map is
- * durable. The Resources are read from the list the author opens themselves, which
- * is the half the old disclosure was standing in for.
+ * New Map discloses nothing — the Edit creates and selects an empty Map and
+ * the caret lands in its name — so what this holds is that the canvas really
+ * is empty, that the Space's existing Resources are still there to be placed on
+ * it, and that the empty Map is durable. The Resources are read from the list
+ * the author opens themselves.
  */
 test('New Map creates an empty Map, continues in its name, and persists', async ({ page }) => {
   await page.goto('/');
@@ -1700,7 +1689,7 @@ test('New Map creates an empty Map, continues in its name, and persists', async 
   await expect(selectedCanvas(page)).toContainText('Map 1');
 
   // The Space kept its Resources; only this Map is empty. Opened by hand,
-  // because that is now the only way the list opens.
+  // because New Map opens nothing.
   await page.getByRole('button', { name: 'Resources' }).click();
   await expect(page.getByRole('button', { name: 'Add A to Map' })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -1870,8 +1859,7 @@ test(
 
     // The count answers the search rather than the Space, which is the whole of
     // why it is worth drawing — a number that disagreed with the rows under it
-    // would be a second claim about the same set
-    // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+    // would be a second claim about the same set.
     await page.getByRole('textbox', { name: 'Search resources' }).fill('zzzz');
     await expect(rows).toHaveCount(0);
     await expect(markdown).toHaveAccessibleName('Markdown Resources, 0');
@@ -1920,8 +1908,7 @@ test(
     await expect(page.getByRole('textbox', { name: 'Search resources' })).toBeVisible();
     // **The application half proves containment; the Ladle half proves the
     // scrolling.** This Space's selected Map leaves five Resources unplaced, and
-    // five rows do not overflow any sane bound — the drawer this replaced
-    // scrolled here only because its rows were whole 146px Resource fronts. What is
+    // five rows do not overflow any sane bound. What is
     // provable against the real Space is the invariant that actually bites on a
     // short screen: an anchored popover is bounded by the room it has and stays
     // inside the viewport, where a fixed height would put the last rows under
@@ -1958,9 +1945,8 @@ test(
 
     // Selecting a Resource on the canvas is the ordinary press this list has to
     // live through: it is how a Resource is dropped, and a surface that closed on
-    // it could only ever add one Resource per opening. That is the comparison's own
-    // reason for anchoring the list rather than drawing it from the screen edge
-    // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+    // it could only ever add one Resource per opening. That is why the list is
+    // anchored rather than drawn from the screen edge.
     await nodeByTitle(page, 'A').click();
     await expect(nodeByTitle(page, 'A')).toHaveClass(/selected/);
     await expect(list).toBeVisible();
@@ -1986,10 +1972,8 @@ test('the open Resources list takes no width from the canvas it feeds', async ({
   const list = page.getByRole('dialog', { name: 'Resources' });
   await expect(list).toBeVisible();
 
-  // **The obligation ADR 0082 binds, and the one the drawer this replaced could
-  // not keep.** A drawer from the screen edge occludes the edge you are
-  // dropping onto, so the shell had to yield its width and the canvas got
-  // narrower every time the reader opened it. An anchored popover floats: the
+  // **The obligation ADR 0082 binds.** The list must neither occlude the edge
+  // being dropped onto nor narrow the canvas. An anchored popover floats: the
   // canvas is the same box open or closed, and the Graph key and the pannable
   // overview stay where they were.
   const after = await boxOf(canvas, 'the canvas');
@@ -2041,10 +2025,8 @@ test(
     await source.press('Enter');
 
     // The Resource is placed, and the reader has not been taken anywhere: an anchored
-    // list is a surface you spend repeatedly, which is what the surface
-    // comparison bought and what a screen-edge drawer, taken away by the Resource it
-    // placed, could not offer
-    // (`.scratch/command-dock/issues/10-decide-the-cards-surface.md`).
+    // list is a surface you spend repeatedly, and it must not be taken away by the
+    // Resource it placed.
     await expect(nodeByTitle(page, 'E')).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add E to Map' })).toHaveCount(0);
@@ -2062,11 +2044,10 @@ test(
 );
 
 /**
- * Deleting a Resource is the Resource rail's now (ADR 0073), so its withdrawal is read
+ * Deleting a Resource is the Resource rail's (ADR 0073), so its withdrawal is read
  * there.
  *
- * The Sidebar drew a standing `Delete Resource <title>` button for the selected
- * Resource, and these tests read its presence. The Command Dock has no Resource
+ * The Command Dock has no Resource
  * commands at all — that is its organising rule — so the command lives in the
  * Resource's own actions menu, and "withdrawn" means the row is absent from that
  * menu rather than a button absent from the chrome.
@@ -2200,13 +2181,13 @@ test(
     // **Withdrawn by the surface being hidden, not by the toggle greying out.**
     // Presenting hides the Dock's commands (ADR 0082) — it does not remove the
     // Dock, which stays mounted at `data-presenting='true'` so the persistence
-    // report keeps its slot (`command-dock.css:86-91`). `visibility: hidden`
+    // report keeps its slot (`command-dock.css`). `visibility: hidden`
     // takes the toolbar out of the accessibility tree, so `toggle` is scoped
     // inside a locator matching nothing and its `toHaveCount(0)` would be
     // satisfied by a Dock that had never rendered at all. The trigger is
     // therefore addressed through the frame, which is still there, and the
     // list it controls is closed rather than left hidden behind a still-true
-    // `open` — the half of the claim that outlived the Sidebar.
+    // `open`.
     const surface = page.locator('.command-dock__surface');
     await expect(surface).toBeAttached();
     await expect(surface).toBeHidden();
@@ -2667,10 +2648,6 @@ test('drawing an Edge into an explicitly created Map then refuses its duplicate'
  * only the anchors actually rendered, which drops the not-yet-incident ones — and
  * the *next* connection then fails to resolve its source handle. One connection
  * cannot see it; the damage is done to the gesture after.
- *
- * Verified both ways against the fixture: with a forced remeasure in `ResourceNode`
- * this fails with six React Flow #008 warnings on the second connection, and
- * without one it passes.
  */
 test('a second connection drawn in the same session resolves its handles', async ({ page }) => {
   await page.goto('/');
@@ -2705,9 +2682,8 @@ test('a second connection drawn in the same session resolves its handles', async
   // The Resource the connection reached is the selected one, which is what the
   // chain above is named for and what the continuation `endPointerDrag`
   // requests is owed. Asserted rather than assumed, and *after* the barrier:
-  // the deferral that used to hold this selection past React Flow's own
-  // release handling is gone, so a selection installed and then undone by the
-  // release is exactly the failure this has to catch — which it cannot do
+  // a selection installed and then undone by React Flow's own release handling
+  // is exactly the failure this has to catch — which it cannot do
   // while React Flow is still settling the gesture that would undo it.
   await expect(e).toHaveClass(/selected/);
 
@@ -2820,7 +2796,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
     const drawn = await page.locator('.react-flow__edge').count();
     // Every Edge this Resource is an endpoint of, counted before the Edit, so the
     // assertion below is an exact remainder rather than "fewer than before" —
-    // which passed while a single incident Edge went and the rest stayed.
+    // which a single incident Edge going, with the rest staying, would satisfy.
     const incident = await page.getByLabel(/^Edge (from A to|from .* to A) /).count();
     expect(incident).toBeGreaterThan(0);
 
@@ -3465,7 +3441,7 @@ test(
  * ADR 0070 forbids a Reference Resource of a Reference Resource, and a Reference Resource is otherwise a regular
  * Resource — so the menu stays consistent with every other Resource's, and the greyed
  * row is where the product says that referencing terminates. Create Reference
- * still leads the group it always does.
+ * leads its group as on every other Resource.
  */
 test('Create Reference is drawn unavailable on a Reference Resource, still leading its menu', async ({
   page,
@@ -3497,7 +3473,7 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
 /**
  * Copy link to Target copies the Target's own canonical Resource address, not a
  * within-Map one — the Target is frequently absent from the Map the
- * Reference Resource itself lives on (`.scratch/reference-thing/issues/02`).
+ * Reference Resource itself lives on.
  */
 const FIXTURE_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const RESOURCE_B_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');

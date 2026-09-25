@@ -16,11 +16,10 @@ import { composeApp } from '../src/compose-app';
 import { mintingIds } from './minting';
 
 /**
- * The semantic operations Space Authoring gained for the complete Resource and
- * Graph authoring experience, asserted through the interface that owns them.
+ * The semantic operations Space Authoring offers for Resource and Graph
+ * authoring, asserted through the interface that owns them.
  *
- * Every case here is a row of the handoff's domain transition matrix: what one
- * completed Edit writes, what creating a Map does to it, and the
+ * Every case here is a domain transition: what one completed Edit writes, what creating a Map does to it, and the
  * invariant or no-op that row names. Deliberately separate from
  * `space-authoring.test.ts`, which owns the lifecycle around a completion —
  * ordering, the install gate, persistence and replacement — rather than the
@@ -191,9 +190,9 @@ describe('Add Resource', () => {
   });
 
   it('steps off an anchor another Resource already occupies rather than stacking exactly', () => {
-    // Two creations, so two ids. The old global mock answered both with one
-    // constant and the duplicate went unnoticed; naming them is what makes the
-    // second creation a real one.
+    // Two creations, so two ids: a constant would answer both identically and
+    // hide a duplicate, and naming them is what makes the second creation a
+    // real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
     authoring.complete({ kind: 'created-resource', anchor: CENTRE });
@@ -230,7 +229,7 @@ describe('Add Resource', () => {
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
-    // way in any more (ADR 0084). The Resource lands where it was dropped.
+    // way in (ADR 0084). The Resource lands where it was dropped.
     expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual({
       x: 500,
       y: 400,

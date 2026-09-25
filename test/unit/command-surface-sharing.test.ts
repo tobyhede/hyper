@@ -128,10 +128,9 @@ describe('a toolbar drawn on the canvas', () => {
 
 describe('the Resource rail', () => {
   /**
-   * **The band is neutral, and that is the requested change** (issue 12). It
-   * carried the Active Graph's colour; what a Resource reveals is a command strip,
-   * and a strip of commands is chrome, so it is drawn as chrome is everywhere
-   * else. The colour has not left the canvas — the authoring handles are
+   * **The band is neutral.** What a Resource reveals is a command strip, and a
+   * strip of commands is chrome, so it is drawn as chrome is everywhere else.
+   * The Active Graph's colour stays on the canvas — the authoring handles are
    * painted `activeGraphColor` by `ResourceNode` and each Graph's Edges are drawn in
    * its own — which is where a colour that says *which Graph* belongs.
    */

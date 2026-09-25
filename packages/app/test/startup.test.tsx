@@ -79,9 +79,8 @@ it('opens once under StrictMode and mounts without interpreting the browser path
     });
     expect(openings).toBe(1);
 
-    // The Space's name, on the bar. It was an `h1` in the Sidebar's header; the
-    // Command Dock draws it as one of four names in a strip, so it is a name
-    // rather than a document heading.
+    // The Space's name, on the bar. The Command Dock draws it as one of four
+    // names in a strip, so it is a name rather than a document heading.
     expect(within(container).getByTestId('space-title')).toHaveTextContent('Stored space');
     await waitFor(() => expect(container.querySelector('.react-flow')).toBeInTheDocument());
   } finally {

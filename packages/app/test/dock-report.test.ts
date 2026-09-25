@@ -11,17 +11,10 @@ import {
 /**
  * What the Command Dock's Open Spaces menu says about an open Space that is not well.
  *
- * The Dock's Open Spaces menu replaced `OpenSpaces`, the vertical tab strip that
- * badged each open Space for `conflicted`, `failed` and `rejected`, and
- * `.scratch/command-dock/issues/08` deleted that strip. One surface reports the
- * state now, so the transitional risk this test was written against — two
- * surfaces reporting one state in *different words* — is gone with the second
- * surface.
- *
- * The test stays, and still runs against the shared label rather than against a
- * literal. `openSpaceStatusLabel` is where the wording is decided, and holding
- * the menu to it is what keeps a literal from being typed here the next time
- * someone edits a row.
+ * The test runs against the shared label rather than against a literal.
+ * `openSpaceStatusLabel` is where the wording is decided, and holding the menu
+ * to it is what keeps a literal from being typed here the next time someone
+ * edits a row.
  */
 describe('the Command Dock reports an unwell Space', () => {
   it('in the words `openSpaceStatusLabel` decides', () => {
@@ -32,7 +25,7 @@ describe('the Command Dock reports an unwell Space', () => {
       openSpaceStatusLabel('rejected'),
     );
     // A refused aggregate is a distinct persistence state from a permanent
-    // rejection (`v1-release/17`), reported with the same word: both mean the
+    // rejection, reported with the same word: both mean the
     // server declined this Space's last commit and only a further Edit
     // recovers it.
     expect(unwellReport({ kind: 'refused', failure: refused })).toBe(
@@ -68,8 +61,7 @@ const refused = {
  * What an exit that did not happen owes the reader.
  *
  * ADR 0082 binds the surface to name *which* open Space is unwell, so a
- * refusal that draws nothing — which is what the prototype did, having invented
- * a Close that could not refuse — is not an option. There are three arms and
+ * refusal that draws nothing is not an option. There are three arms and
  * four sentences, because `persistence-recovery-required` names two different
  * recoveries and a reader told "resolve the conflict" when the fix is Retry has
  * been sent to the wrong control.

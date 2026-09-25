@@ -18,10 +18,10 @@ const pointerCaptureDescriptor = (name: PointerCaptureMethod) =>
  * outlives the file that made it.
  *
  * `vi.unstubAllGlobals` undoes `vi.stubGlobal` and knows nothing at all about a
- * direct prototype assignment, so the three below used to survive this suite —
- * harmless only because `vitest.config.ts` leaves `isolate` at its default
- * `true`, and a permanently `false` `hasPointerCapture` the moment that changes
- * or these stubs move into a shared setup file.
+ * direct prototype assignment, so without this the three below would survive
+ * this suite — harmless only while `vitest.config.ts` leaves `isolate` at its
+ * default `true`, and a permanently `false` `hasPointerCapture` the moment that
+ * changes or these stubs move into a shared setup file.
  *
  * jsdom defines none of the three, so restoring means taking them back off. The
  * descriptor is captured rather than that absence assumed, so this keeps
@@ -94,7 +94,7 @@ const permanentCopyCommand = (onSelect: EntityAction['onSelect']): EntityAction 
   onSelect,
 });
 
-/** A command the Sidebar's Delete Map is shaped like: it reports no words. */
+/** A command shaped like a Delete Map: it reports no words. */
 const deleteMapCommand = (onSelect: EntityAction['onSelect']): EntityAction => ({
   id: 'delete-map',
   label: 'Delete Map',
@@ -157,10 +157,10 @@ describe('the entity actions menu', () => {
   /**
    * A confirmation is a report about the command, not about the press.
    *
-   * `onSelect` was called and the label swapped to "Copied" in the same
-   * breath, so a clipboard write the browser refused still read as done — the
-   * application's own copy is fire-and-forget past a `then`, so the refusal
-   * arrived after the menu had already claimed success.
+   * Swapping the label to "Copied" as `onSelect` is called would let a
+   * clipboard write the browser refused still read as done — the application's
+   * own copy is fire-and-forget past a `then`, so the refusal arrives after the
+   * press.
    */
   it('withholds the confirmation from a command that answers that it failed', async () => {
     await openMenuAnd(copyCommand(() => Promise.resolve('failed')));
@@ -170,10 +170,8 @@ describe('the entity actions menu', () => {
   });
 
   /**
-   * And the failure is reported *in the menu*, which is the only place a
-   * reader on a phone can be shown it: below the Sidebar's breakpoint the whole
-   * surface is a Sheet drawn over the canvas, and the application's standing
-   * "Link not copied" alert renders in the shell area behind it.
+   * And the failure is reported *in the menu*, where the reader who pressed the
+   * command is looking.
    */
   it('announces the failure it reports', async () => {
     await openMenuAnd(copyCommand(() => Promise.resolve('failed')));
@@ -198,10 +196,10 @@ describe('the entity actions menu', () => {
   /**
    * A command that throws has failed, and is reported as one.
    *
-   * The call used to sit in front of the promise chain rather than inside it,
-   * so a command that threw before it ever returned a promise threw out of a
-   * React event handler — which no error boundary catches — and the item was
-   * left sitting under its unchanged label.
+   * The call sits inside the promise chain rather than in front of it: a
+   * command that threw before it ever returned a promise would otherwise throw
+   * out of a React event handler — which no error boundary catches — and leave
+   * the item sitting under its unchanged label.
    */
   it('reports the failure of a command that throws instead of answering', async () => {
     const recorded = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -228,12 +226,11 @@ describe('the entity actions menu', () => {
   /**
    * The failure of a command that names no words still has to go somewhere.
    *
-   * This is the Sidebar's Delete Map: it reports no words, wraps its command
-   * in an `async` function to dismiss the mobile Sheet on the outcome, and runs
-   * an Edit whose `complete` throws outright for a Space that has stopped
-   * loading. The rejection used to be discarded unread — the menu had already
-   * closed, the Sheet stayed open, no alert was armed, and the author pressed
-   * Delete Map to no effect and no message anywhere.
+   * A Delete Map reports no words, wraps its command in an `async` function,
+   * and runs an Edit whose `complete` throws outright for a Space that has
+   * stopped loading. The menu has already closed by then, so a rejection
+   * discarded unread would leave the author pressing Delete Map to no effect
+   * and no message anywhere.
    */
   it('does not drop the failure of a command that reports no words', async () => {
     const recorded = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -254,9 +251,9 @@ describe('the entity actions menu', () => {
    *
    * One `report` and one timer serve the whole menu, and a reporting item keeps
    * its menu open (`closeOnClick` is false), so two commands really can be in
-   * flight at once. Each settlement used to overwrite both unconditionally, so
-   * a slow copy landing after a fast one moved the confirmation onto the row
-   * the author had not just pressed and announced it a second time.
+   * flight at once. A settlement that overwrote both unconditionally would let
+   * a slow copy landing after a fast one move the confirmation onto the row
+   * the author had not just pressed and announce it a second time.
    */
   it('leaves the confirmation on the command that was pressed last', async () => {
     const slow = deferredOutcome();
@@ -278,11 +275,11 @@ describe('the entity actions menu', () => {
   /**
    * Unmounting is the last press.
    *
-   * The cleanup clears the timer that is pending when the menu goes, but a
-   * command settling afterwards used to set state on a gone component and arm a
-   * fresh 1600ms timeout behind the cleanup that had already run — a timer with
-   * no surviving path to clear it. The Sidebar unmounting mid-clipboard-write is
-   * an ordinary Space switch, or the mobile Sheet closing.
+   * The cleanup clears the timer that is pending when the menu goes, and a
+   * command settling afterwards must not set state on a gone component or arm a
+   * fresh timeout behind the cleanup that has already run — a timer with no
+   * surviving path to clear it. A menu unmounting mid-clipboard-write is an
+   * ordinary Space switch.
    */
   it('arms no timer for a command that answers after its menu has gone', async () => {
     const slow = deferredOutcome();

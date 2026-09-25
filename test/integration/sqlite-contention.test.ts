@@ -21,8 +21,8 @@ import {
 } from '../support/sqlite-second-process';
 
 /*
- * Ticket 18. One Hyper process owns a SQLite file. Inside it, overlapping
- * repository operations are serialised (ticket 16), so they answer in domain
+ * One Hyper process owns a SQLite file. Inside it, overlapping
+ * repository operations are serialised, so they answer in domain
  * terms and never wait on SQLite. A second process on the same live file is
  * unsupported, and what it causes is an operational failure — thrown, never a
  * revision conflict — that leaves the file as it was.
@@ -214,7 +214,7 @@ describe('SQLite contention', () => {
       held = await holdLockInSecondProcess(harness.path, 'exclusive');
 
       // This runtime has made no statement before the lock, so enabling the
-      // first-use marker check would cache this failed read (ticket 37).
+      // first-use marker check would cache this failed read.
       const { settled } = await timed(() => repository.listSpaces());
       expect(settled.status).toBe('rejected');
       expect(settled.status === 'rejected' && isBusyOrLocked(settled.reason)).toBe(true);
@@ -282,8 +282,8 @@ describe('SQLite contention', () => {
      * needs a Meta update that links it, or ADR 0079's
      * `ordinary-space-unreferenced` refuses it. So two overlapping change
      * sets that each create the *same* new Space id also each carry a Meta
-     * update at the Meta revision they both last saw. Serialisation (ticket
-     * 16) means the loser's read happens after the winner has already
+     * update at the Meta revision they both last saw. Serialisation
+     * means the loser's read happens after the winner has already
      * written, so by the time `decideAggregateCommit` loops over the loser's
      * changes, both are stale: Meta's revision moved, and the create's
      * target Space id now already exists. The loop collects every stale
@@ -365,8 +365,7 @@ describe('SQLite contention', () => {
 
   describe('with a second process on the live file', () => {
     /*
-     * Measured, not carried over from ticket 14's in-process numbers. Which
-     * wait a lock produces is SQLite's: a reader in another process lets this
+     * Which wait a lock produces is SQLite's: a reader in another process lets this
      * one write, then holds its COMMIT until the busy timeout runs out; a
      * writer before its commit refuses this one's write at once; a writer
      * committing refuses every statement after the full timeout.

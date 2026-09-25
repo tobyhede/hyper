@@ -246,11 +246,10 @@ describe('PresentingChrome', () => {
   /**
    * Presentation begins with focus on the control that carries it forward.
    *
-   * Entry is a mouse click on the Sidebar's Present button, and that button is
-   * the same DOM node that relabels to Overview — so React keeps focus on it and
-   * the presenter is left focused on the control that *leaves*. Space, which
-   * advances, would then defer to it and drop straight back to the overview. The
-   * chrome claims focus as it mounts, which is what makes Space advance.
+   * Entry is a click on a control outside this chrome, and left there, focus
+   * stays on a control that does not advance. Space, which advances, would then
+   * defer to that control rather than traverse. The chrome claims focus as it
+   * mounts, which is what makes Space advance.
    */
   it('takes focus onto its primary control when presentation begins', () => {
     render(chrome({ moves: movesTo(['B', 'C'], 0) }));

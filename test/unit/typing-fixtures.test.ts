@@ -97,7 +97,7 @@ const noteRejection = (path: string, rule: string): void => {
 
 /**
  * Read at the boundary rather than asserted into shape. The `as` idiom other
- * tests use for trusted JSON is exactly what `no-unsafe-type-assertion` now
+ * tests use for trusted JSON is exactly what `no-unsafe-type-assertion`
  * bans, and a test proving the ratchet bites cannot be the one that evades it.
  */
 const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>

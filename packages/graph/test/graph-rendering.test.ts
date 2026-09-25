@@ -130,10 +130,9 @@ describe('buildGraphRenderEdges', () => {
   const edges = buildGraphRenderEdges(space);
 
   /**
-   * **The invariant the id format now leans on, asserted rather than assumed.**
+   * **The invariant the id format leans on, asserted rather than assumed.**
    *
-   * The position-keyed id it replaced was collision-proof by construction; this
-   * one is unique only because a Graph cannot hold the same pair twice (ADR
+   * The id is unique only because a Graph cannot hold the same pair twice (ADR
    * 0032). What holds that up is intake's `duplicate-graph-edge` and Space
    * Authoring's `edge-already-exists`, neither of which lives here — so relaxing
    * either would mint the same id twice with nothing in this package noticing.
@@ -275,11 +274,11 @@ describe('buildGraphRenderEdges', () => {
    *
    * A Graph cannot hold the same pair twice (ADR 0032), so the Graph and the two
    * endpoints identify the Edge — which is exactly the triple the render layer
-   * compares an Edge selection by (`sameEdgeSubject`). Keyed on the Edge's
-   * position instead, every id after a removed or replaced Edge slid down one,
-   * and the surviving Edges silently inherited ids that had named their
-   * neighbours: the element React Flow had already drawn for the departed Edge
-   * answered a query for whichever Edge took its slot.
+   * compares an Edge selection by (`sameEdgeSubject`). Do not key it on the
+   * Edge's position: every id after a removed or replaced Edge would slide down
+   * one, and the surviving Edges would silently inherit ids that had named their
+   * neighbours, so the element React Flow had already drawn for the departed
+   * Edge would answer a query for whichever Edge took its slot.
    */
   it('leaves a surviving edge’s id unchanged when an earlier edge is removed', () => {
     const before = buildGraphRenderEdges(space).map((edge) => edge.id);

@@ -12,11 +12,7 @@ import { describe, expect, it } from 'vitest';
  */
 const RULE = '@typescript-eslint/no-unsafe-type-assertion';
 
-/**
- * These only ever go down. ADR 0062 recorded 79 across 36 files; merging `main`
- * mid-review took it to 78 across 35, because that branch deleted more assertion
- * sites than the one it added. Lower these when the count drops; never raise them.
- */
+/** These only ever go down. Lower these when the count drops; never raise them. */
 const CEILING = 78;
 const CEILING_FILES = 35;
 
@@ -27,7 +23,7 @@ const read = (path: string): string => readFileSync(join(repositoryRoot, path), 
 /**
  * The baseline is read at a boundary rather than asserted into shape. The `as`
  * idiom other tests use for repository-owned JSON is precisely what this rule
- * now bans, so this file cannot use it without suppressing the rule it guards.
+ * bans, so this file cannot use it without suppressing the rule it guards.
  */
 const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -97,8 +93,8 @@ type Severity = 'unconfigured' | 'off' | 'warn' | 'error';
  * The severity ESLint will actually apply to a file, not the severity the config
  * text mentions somewhere. A grep for `'rule': 'error'` stays green while a
  * later file-scoped override turns the rule off for `**\/test/**` — which is the
- * grandfathering ADR 0062 explicitly rejected, and which would silently remove
- * most of the ratchet, since 23 of the 36 baseline entries are test or e2e files.
+ * grandfathering ADR 0062 rejects, and which would silently remove most of the
+ * ratchet, since most baseline entries are test or e2e files.
  */
 const severityFor = async (file: string): Promise<Severity> => {
   const { ESLint } = await import('eslint');
@@ -133,7 +129,7 @@ describe('the rule', () => {
   });
 
   it('has not been traded against the comment rule, which does a different job', () => {
-    // One demands a reason, the other caps the count. ADR 0062 kept both.
+    // One demands a reason, the other caps the count. ADR 0062 keeps both.
     const oxlint = read('.oxlintrc.json');
     expect(oxlint).toContain('require-safety-comment-for-type-assertion');
     expect(oxlint).not.toContain('"anti-slop/require-safety-comment-for-type-assertion": "off"');

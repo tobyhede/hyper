@@ -918,10 +918,8 @@ describe('Space session registry', () => {
     ]);
   });
 
-  // Ticket 01 (`.scratch/snapshot-edits/issues/01-registry-edits-through-snapshot-edit.md`):
-  // the registry's own copy of the membership rules diverged from Space
-  // Authoring's. These three are the failing tests that prove it, written
-  // before `SnapshotEdit` existed.
+  // The registry applies the same membership rules Space Authoring does,
+  // through `SnapshotEdit`, and these three hold it to them.
   describe('Space Resource membership through SnapshotEdit', () => {
     it("reclaims an Open Space Resource's room from every Resource it displaced, on delete", async () => {
       const OPEN_SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
@@ -1583,9 +1581,8 @@ describe('Space session registry', () => {
       });
     });
 
-    // Ticket 05 (`.scratch/snapshot-edits/issues/05-creation-decides-after-its-last-wait.md`):
-    // create and link checked their containing Map once, before the
-    // coordination's own aggregate read, and never again.
+    // Create and link decide on their containing Map after the coordination's
+    // own aggregate read, not only before it.
     it('refuses to create a Space Resource when its containing Map is deleted while the creation was reading persistence', async () => {
       const CONTAINING_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000080');
       const CONTAINING_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000081');

@@ -12,9 +12,8 @@ describe('Input', () => {
   });
 
   /**
-   * The field a command surface carries — a Sidebar row's title editor, a
-   * list's filter. It was open-coded identically in two places before it was a
-   * size, which is what a third copy would have made a third chance to
+   * The field a command surface carries — a title editor, a list's filter. It
+   * is a size rather than open-coded at each surface, so the copies cannot
    * disagree.
    */
   it('draws the compact field a command surface carries', () => {

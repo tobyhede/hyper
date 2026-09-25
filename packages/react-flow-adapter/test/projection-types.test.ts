@@ -6,9 +6,10 @@ import type { ResourceNodeData, ResourceTitleEditor } from '../src/projection';
  * not a boolean beside two independently optional callbacks.
  *
  * Split, the editing state could be asked for with either operation missing,
- * and `ResourceNode` had to invent total functions to satisfy `CanvasResourceProps` —
- * an absent completion answered `null`, which `CanvasResource` reads as *accepted*,
- * so the editor closed on a rename that never happened. Pairing them is what
+ * and `ResourceNode` would have to invent total functions to satisfy
+ * `CanvasResourceProps` — an absent completion answering `null`, which
+ * `CanvasResource` reads as *accepted*, would close the editor on a rename
+ * that never happened. Pairing them is what
  * makes that state unrepresentable rather than merely unreached.
  *
  * These assertions are a runtime no-op: `expectTypeOf` compiles to nothing and
@@ -30,8 +31,8 @@ it('cannot ask for a title editor without what ends it', () => {
 
 it('keeps no separate flag that could be raised over a missing operation', () => {
   expectTypeOf<'editingTitle'>().not.toExtend<keyof ResourceNodeData>();
-  // architecture-review/21 deleted these two: presence of `onEditResource`
-  // and `onBeginTitleEditing` is now the whole capability.
+  // Presence of `onEditResource` and `onBeginTitleEditing` is the whole
+  // capability, so no flag may stand beside them.
   expectTypeOf<'titleEditingEnabled'>().not.toExtend<keyof ResourceNodeData>();
   expectTypeOf<'resourceEditingEnabled'>().not.toExtend<keyof ResourceNodeData>();
 });

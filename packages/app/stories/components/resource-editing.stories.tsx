@@ -82,8 +82,8 @@ function TitleEditingResource({
 /**
  * A third specimen, and the one the heading nesting is proved on.
  *
- * The two above it are titled on one line, which is the Title Hyper has always
- * had and the shape the in-place geometry of this editor is a promise about.
+ * The two above it are titled on one line, which is the shape the in-place
+ * geometry of this editor is a promise about.
  * That shape cannot tell ADR 0083's two arrangements apart: `Edit Title <name>`
  * and the heading's own name are then the same string, so a control that had
  * swallowed the heading, and an implementation that drew the name and dropped

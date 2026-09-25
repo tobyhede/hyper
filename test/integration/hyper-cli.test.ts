@@ -108,7 +108,7 @@ describe('hyper CLI', () => {
    * A canonical aggregate directory: a versioned `hyper.json` naming Meta, plus
    * one `<space-uuid>/` child per Space.
    *
-   * A bare Space directory is no longer what the public command takes, so every
+   * A bare Space directory is not what the public command takes, so every
    * fixture here is built through this — a directory with no aggregate file is a
    * different failure, not a shorter fixture.
    */
@@ -260,7 +260,7 @@ describe('hyper CLI', () => {
 
     // There is no third outcome to fall into. Import either establishes first
     // state or, with `--dangerous-truncate`, replaces it; adding a Space beside
-    // stored content is not a mode any more (ADR 0078), so an initialized
+    // stored content is not a mode (ADR 0078), so an initialized
     // repository is told what it holds and what flag would replace it.
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
@@ -295,8 +295,7 @@ describe('hyper CLI', () => {
     await seedAggregate({ metaSpaceId: IMPORTED_SPACE_ID, spaces: [snapshot] });
     const destination = await temporaryDirectory('hyper-cli-export-');
 
-    // One argument, because export takes the whole aggregate. The Space-scoped
-    // `hyper export <space-uuid> <destination>` is retired: a Space on its own
+    // One argument, because export takes the whole aggregate. A Space on its own
     // is not something the format can round-trip, since a Space Resource pointing
     // out of it would name a target the directory does not hold.
     const result = await runHyperCommand(['export', destination]);

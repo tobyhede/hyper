@@ -15,9 +15,9 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
  * React Flow re-measures a resource's handles through `updateNodeInternals`, and
  * that path reads the viewport's zoom with `new window.DOMMatrixReadOnly(...)`
  * (`@xyflow/system`). jsdom ships no `DOMMatrixReadOnly`, so the call throws —
- * from inside a `requestAnimationFrame` callback, which is exactly why nothing
- * caught it: the error never reaches a test body, so Vitest prints every test as
- * passing and then exits 1 on the unhandled error.
+ * from inside a `requestAnimationFrame` callback, so the error never reaches a
+ * test body: Vitest prints every test as passing and then exits 1 on the
+ * unhandled error.
  *
  * `ResourceNode` does not call `updateNodeInternals`, because `projection.ts`
  * declares its handles. The stub is still required: React Flow's own

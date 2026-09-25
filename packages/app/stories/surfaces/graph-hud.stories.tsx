@@ -13,9 +13,8 @@ export default { title: 'Surfaces/Graph HUD' };
  * place — the fixture provides the Space, the Graphs, the colours and the
  * viewport, and the framework does the rest.
  *
- * The claim it carries is the one ADR 0053 left open when the Sidebar gained a
- * Graphs group: the key stays, and the two surfaces must not disagree about a
- * Graph's title, its colour, or which one is active.
+ * The claim it carries: the key must not disagree with the Command Dock's
+ * Graphs about a Graph's title, its colour, or which one is active.
  */
 export const Retained: Story = () => <GraphHudFixture />;
 Retained.meta = { iframed: true };

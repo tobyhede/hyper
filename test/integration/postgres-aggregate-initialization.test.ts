@@ -99,7 +99,7 @@ describe('PostgreSQL aggregate operations before initialization', () => {
     );
     try {
       // Scheduling evidence only: let the second real connection either finish
-      // (the old race) or wait for the first transaction's lock (the fix).
+      // (the race) or wait for the first transaction's lock (serialised).
       // No elapsed-time guess decides when the first transaction resumes.
       await expect
         .poll(async () => {

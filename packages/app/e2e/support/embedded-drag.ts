@@ -17,7 +17,7 @@ const centreOf = (box: { x: number; y: number; width: number; height: number }) 
  * A dragged Space Resource leans, and its embedded canvas leans with it about the
  * same centre — so an embedded Resource keeps its *distance* from the containing
  * Resource through a drag and not its x and y. Comparing raw offsets only holds
- * while nothing leans, which is what this helper used to assume.
+ * while nothing leans.
  */
 /**
  * The lean, read from the Resource that publishes it rather than imported.

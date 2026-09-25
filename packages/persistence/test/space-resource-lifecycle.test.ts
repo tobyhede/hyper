@@ -1785,12 +1785,9 @@ describe('Space Resource lifecycle', () => {
     expect(control.requests).toHaveLength(0);
   });
 
-  // Renamed twice, from "keeps a target referenced by an uncommitted
-  // sibling session" then "does not let an uncommitted sibling reference
-  // save a target from a cascading deletion": neither survives ADR 0099's
-  // one recovery rule. Target's stored inbound count is genuinely zero —
-  // Sibling's reference lives only in its own uncommitted, `failed`
-  // working Space, so it must not be read as a *stored* reference that
+  // Under ADR 0099's one recovery rule, Target's stored inbound count is
+  // genuinely zero — Sibling's reference lives only in its own uncommitted,
+  // `failed` working Space, so it must not be read as a *stored* reference that
   // would save Target from the cascade (that mismatch between what the
   // browser decides and what the repository would accept is exactly what
   // `decideCommit`'s `ordinary-space-unreferenced` check would catch) —
@@ -2303,8 +2300,6 @@ describe('Space Resource lifecycle', () => {
 
     // Storage already holds an ordinary Space nothing references — a baseline
     // `decideCommit` forgives (ADR 0095) — and this link never touches it.
-    // The old manual intake check had no such forgiveness and refused every
-    // Edit while that baseline stood.
     await expect(
       lifecycle.link({
         containingSpaceId: META_ID,
@@ -2989,7 +2984,7 @@ describe('Space Resource recovery after a replay that never installed', () => {
 
 describe('Space Resource recovery another coordination holds', () => {
   /**
-   * Ticket 23's sequence up to the replay: C0 creates TARGET in Meta and is
+   * The sequence up to the replay: C0 creates TARGET in Meta and is
    * rejected, so Meta and TARGET hold C0's recovery; C1 then creates CHILD in
    * the rejected TARGET, which ADR 0076 lets take part, and conflicts, so TARGET
    * and CHILD hold C1's. Meta's next Edit asks C0's recovery to replay, and

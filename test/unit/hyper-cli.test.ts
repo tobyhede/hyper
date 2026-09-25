@@ -393,12 +393,12 @@ describe('runHyper', () => {
    * its last export — the conservative direction, which invites an export that
    * was already done rather than hiding one that never happened.
    *
-   * Reporting it as `Export failed` with exit 1 inverted that: the one state
-   * this design chose to be safe became the one the operator is told to treat
-   * as a failure, and would plausibly answer by re-running or discarding the
-   * destination. The reasons were lost too — `describeError` reads only
-   * `message`, so an `AggregateError`'s `errors` never reached the terminal and
-   * the operator learned neither which Space nor why.
+   * Reporting it as `Export failed` with exit 1 would invert that: the one state
+   * this design chose to be safe would become the one the operator is told to
+   * treat as a failure, and would plausibly answer by re-running or discarding
+   * the destination. The reasons have to reach the terminal too — an
+   * `AggregateError`'s `errors`, not only its `message` — so the operator learns
+   * which Space and why.
    */
   it('reports a completed export whose projected revision could not be recorded', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
@@ -585,7 +585,7 @@ describe('runHyper', () => {
   });
 
   /*
-   * Export takes a destination and nothing else now that it is whole-aggregate,
+   * Export takes a destination and nothing else because it is whole-aggregate,
    * so the Space-scoped `hyper export <space-uuid> <destination>` is wrong arity
    * rather than a Space that cannot be found — which is why it belongs with the
    * other malformed command lines and exits 2.
@@ -597,10 +597,10 @@ describe('runHyper', () => {
     { args: ['--dangerous-truncate'] },
     { args: ['space', '--unknown'] },
     /*
-     * An option is never a destination. `export` reached `exportAggregate` on
-     * arity alone, so an operator mixing the two commands wrote a complete
-     * aggregate into a directory named `--dangerous-truncate` and was told
-     * nothing — the unknown-flag guard below only ever sees the import path.
+     * An option is never a destination. Accepted on arity alone, an operator
+     * mixing the two commands would write a complete aggregate into a directory
+     * named `--dangerous-truncate` and be told nothing — the unknown-flag guard
+     * below only ever sees the import path.
      */
     { args: ['export', '--dangerous-truncate'] },
     { args: ['export', '--unknown'] },
@@ -793,12 +793,11 @@ describe('runHyper', () => {
   /*
    * The fault is produced for real: a directory whose two maps own one graph
    * id, read off disk, identified, and put through domain intake by a real
-   * repository. That error is new to version 1 — a graph id is unique across the
-   * space although one map owns it (ADR 0045).
+   * repository. A graph id is unique across the space although one map owns it
+   * (ADR 0045).
    *
-   * This test is where the CLI's refusal reporting was found to be throwing
-   * identities away: a duplicate graph id is a whole-Space fault, so it arrives
-   * as one `invalid-space-snapshot`, and printing the kind alone left an author
+   * A duplicate graph id is a whole-Space fault, so it arrives as one
+   * `invalid-space-snapshot`, and printing the kind alone would leave an author
    * holding a directory and the word "invalid" — when the only part they can act
    * on is *which two* collided. `describeAggregateRefusal` renders the structured
    * error instead, which is why both colliding Map ids are nameable below.

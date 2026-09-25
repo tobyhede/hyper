@@ -14,8 +14,8 @@ import { parseResourceFile, serializeResourceFile } from '../src/index';
 /**
  * A Title as a stored Resource carries it: non-empty, and already normalized, so a
  * generated trailing space is not read as a writer/reader drift when intake
- * trims it (ADR 0083). A multi-line Title is the block-scalar question the
- * round trip of `.scratch/card-titles/issues/07` owns.
+ * trims it (ADR 0083). A multi-line Title is the block-scalar question
+ * `multiline-title-round-trip.property.test.ts` owns.
  */
 const line = fc
   .string({ minLength: 1, maxLength: 30 })

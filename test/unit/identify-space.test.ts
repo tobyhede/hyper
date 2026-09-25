@@ -92,11 +92,11 @@ describe('identifySpace', () => {
    * between them — which is exactly the rule `read-aggregate` states for a
    * directory name against its `space.json`.
    *
-   * It was enforced only in that one caller, so the invariant sat outside the
-   * function that depends on it: the third argument overrode `input.id` without
-   * a word, and a second caller that passed one and skipped the check would
-   * store a Space under an id its own document does not spell — with no refusal
-   * anywhere to say so.
+   * Enforced only in that one caller, the invariant would sit outside the
+   * function that depends on it: a third argument overriding `input.id` without
+   * a word, from a second caller that skipped the check, would store a Space
+   * under an id its own document does not spell — with no refusal anywhere to
+   * say so.
    */
   it('refuses a Space id that disagrees with the one the document declares', () => {
     const identify = (): SpaceSnapshot =>

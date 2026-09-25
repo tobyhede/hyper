@@ -5,10 +5,8 @@ import { describe, expect, it } from 'vitest';
 /**
  * ADR 0034 keeps `@project/http` on the portable Fetch interface, and the
  * `no-restricted-imports` zone in `eslint.config.js` is what enforces it. The
- * zone derives its list from `module.builtinModules`; nothing checked that the
- * derivation still covers what Node ships, and a hand-written list preceded it
- * for long enough to lose `wasi`, `trace_events` and every `_`-prefixed
- * internal without lint noticing.
+ * zone derives its list from `module.builtinModules`, and nothing else checks that
+ * the derivation still covers what Node ships.
  *
  * `module.builtinModules` is the authority on both sides, so this asks it too
  * rather than keeping a second list. What it pins is not the expression — it is

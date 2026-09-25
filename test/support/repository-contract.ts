@@ -166,7 +166,7 @@ const graphedSpace = (
  * A Space whose one map owns one graph with one edge out of the map.
  *
  * Under version 1 an edge endpoint must name a resource of the map that owns the
- * graph, so "dangling" is now a membership failure rather than a space-wide
+ * graph, so "dangling" is a membership failure rather than a space-wide
  * lookup miss — and a graph can only reach domain intake through a map, so
  * the failure cannot be built without one.
  */
@@ -530,13 +530,12 @@ export const spaceRepositoryContract = (
     });
   }
 
-  // Ticket 31. A stored document that fails its schema is broken stored state
-  // whichever commit path meets it: the complete-aggregate path always named
-  // it so (`#loadEverySpace`), and the single-Space fast path now does too,
-  // rather than letting the parse error escape unclassified and reach the
-  // commit route as whatever the route did by default. `loadSpace` keeps the
-  // narrower answer deliberately (ticket 27): one Space failing intake is
-  // that resource's answer to give, not evidence the aggregate cannot be read.
+  // A stored document that fails its schema is broken stored state whichever
+  // commit path meets it — the complete-aggregate path (`#loadEverySpace`) and
+  // the single-Space fast path alike — rather than a parse error escaping
+  // unclassified to the commit route. `loadSpace` keeps the narrower answer
+  // deliberately: one Space failing intake is that resource's answer to give,
+  // not evidence the aggregate cannot be read.
   it(`${name} names a broken stored document broken stored state on the single-Space fast path, and leaves loadSpace's answer narrower`, async (context) => {
     await withBrokenStateHarness(context, async (repository, arrange) => {
       await arrange('invalid-space-document', {
@@ -778,8 +777,8 @@ export const spaceRepositoryContract = (
        * Deliberately sequential. What two *overlapping* replacements do is
        * PostgreSQL's Meta row lock deciding which is granted it last, which is
        * transactional isolation a `Map` cannot have -- it is forced with a
-       * barrier and asserted in the integration suite, and stating it here made
-       * the contract read as though call order settled the winner.
+       * barrier and asserted in the integration suite, and stating it here would
+       * make the contract read as though call order settled the winner.
        */
       await expect(
         repository.replaceAggregate({ metaSpaceId: MISSING_SPACE_ID, spaces: [second] }, SPACE_ID),
@@ -818,12 +817,11 @@ export const spaceRepositoryContract = (
 
   /*
    * A Resource belongs to exactly one Space of the aggregate, and an aggregate
-   * that says otherwise is refused whole. There is no longer a second,
-   * insert-only reading in which a proposal collides with a Resource some
-   * *surviving stored* Space owns: both lifecycle doors take the aggregate
-   * entire, so what is stored after the call is what the call proposed, and
-   * ownership is settled inside that proposal alone (ADR 0078). The two
-   * distinct codes this pair of cases used to hold apart went with it.
+   * that says otherwise is refused whole. There is no insert-only reading in
+   * which a proposal collides with a Resource some *surviving stored* Space
+   * owns: both lifecycle doors take the aggregate entire, so what is stored
+   * after the call is what the call proposed, and ownership is settled inside
+   * that proposal alone (ADR 0078).
    */
   it(`${name} refuses an aggregate that repeats a Resource identity, storing none of it`, async () => {
     await withHarness(async (repository) => {
@@ -884,10 +882,9 @@ export const spaceRepositoryContract = (
     });
   });
 
-  // Ticket 27 proved this for SQLite, whose TEXT column always could hold a
-  // non-canonical revision; ADR 0095's TEXT columns make it reachable on
-  // PostgreSQL too, so it belongs here rather than in one database's own
-  // integration file.
+  // Both databases store a revision as TEXT (ADR 0095), so either can hold a
+  // non-canonical one, and the case belongs here rather than in one database's
+  // own integration file.
   it(`${name} raises an identifiable invariant failure for a stored Space whose revision is not canonical`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
@@ -1000,7 +997,7 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * On the SQL repository (`sql-space-repository.ts`, ticket 24), the shared
+   * On the SQL repository (`sql-space-repository.ts`), the shared
    * `#writeUpdate` helper runs an unconditional `deleteExcept` after every
    * update it writes, including on the fast path -- whose own
    * `preservesSnapshotBoundary` never lets the Resource set change before
@@ -1685,10 +1682,7 @@ export const spaceRepositoryContract = (
 
   // Revisions above `Number.MAX_SAFE_INTEGER` are ordinary once a database
   // stores them as text rather than a native integer (ADR 0095) — both
-  // databases hold and round-trip one identically now, so this is shared
-  // rather than PostgreSQL's own weaker "the expected revision isn't
-  // narrowed" case and SQLite's two ("speaks bigint at the repository
-  // boundary…", "commits and reloads revisions above…").
+  // databases hold and round-trip one identically, so this is shared.
   it(`${name} stores and commits a revision above Number.MAX_SAFE_INTEGER as canonical decimal text`, async (context) => {
     await withRawRevisionHarness(context, async (repository, writeRawRevision) => {
       const first = space(SPACE_ID, 'One', [RESOURCE_ID]);

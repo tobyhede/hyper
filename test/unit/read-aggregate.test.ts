@@ -79,7 +79,7 @@ describe('readAggregate', () => {
 
   /*
    * The likeliest way to arrive without one is by pointing the command at a
-   * single Space directory, which is no longer what public import takes. The
+   * single Space directory, which is not what public import takes. The
    * message names the file so the answer is the next document read.
    */
   it('refuses a directory with no aggregate file, naming it', async () => {
@@ -257,10 +257,11 @@ describe('readAggregate', () => {
    * which `space.json` the filesystem returned first.
    *
    * Reading the Spaces concurrently is deliberate — one unreadable Space must
-   * not hide the next one's problem — but minting inside that concurrency made
-   * the draw order an artifact of I/O completion: every call runs only as far as
-   * its first `await`, and `newId` is consumed after it. So the same directory
-   * handed the same generator twice could put `…0001` on either Space's Map.
+   * not hide the next one's problem — but minting inside that concurrency would
+   * make the draw order an artifact of I/O completion: every call runs only as
+   * far as its first `await`, and `newId` is consumed after it. So the same
+   * directory handed the same generator twice could put `…0001` on either
+   * Space's Map.
    *
    * `readAggregate` is asked twice over the same bytes with a fresh counter each
    * time: the two answers have to agree, which is what "from the bytes alone"

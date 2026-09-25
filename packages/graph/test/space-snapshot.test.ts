@@ -96,11 +96,10 @@ describe('loadSpaceSnapshot', () => {
   });
 
   /**
-   * The format the callers that deleted their own outer `safeParse` now report
-   * with. `parseSnapshot` in the PostgreSQL repository used to reach a client
-   * with `parsed.error.message` — Zod's entire serialized issue array as one
+   * The format a caller reports a snapshot refusal with. Never
+   * `parsed.error.message`: that is Zod's entire serialized issue array as one
    * string, a JSON document nested inside a field the client renders as a
-   * sentence — and reaches it with these instead, which is what `docs/agents/http.md` pins
+   * sentence. A located refusal is what `docs/agents/http.md` pins
    * under "A wire codec throws prose, not Zod".
    *
    * The *shape* is pinned, not the sentence: a located field path, then Zod's
@@ -153,8 +152,7 @@ describe('loadSpaceSnapshot', () => {
   it('rejects a stored document carrying a key the shape does not declare', () => {
     // `spaceFileObjectSchema` is strict and `.omit()` carries the mode, so the
     // stored door answers an undeclared key the way the file door does — which
-    // is what stops a stale producer committing one. The opening selection ADR
-    // 0079 renamed is the case that asked for it; the key here is arbitrary,
+    // is what stops a stale producer committing one. The key here is arbitrary,
     // because the refusal is by policy rather than by name (ADR 0056).
     const result = loadSpaceSnapshot({
       ...snapshot,

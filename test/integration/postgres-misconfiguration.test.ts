@@ -14,7 +14,7 @@ import {
 import { captureError } from '../support/capture-error';
 
 /*
- * Ticket 38, against a real PostgreSQL. `test/unit/postgres-unreachable.test.ts`
+ * Against a real PostgreSQL. `test/unit/postgres-unreachable.test.ts`
  * replays a FATAL handshake refusal from a stand-in server; this file asks the
  * server `test:integration:postgres` migrated to refuse this client for real —
  * a wrong password through its SCRAM login, and a database that does not exist
@@ -92,7 +92,7 @@ describe.each([
 });
 
 /*
- * Ticket 38 (and ticket 36): start-up over a real server that will not take
+ * Start-up over a real server that will not take
  * this password. The refusal is unclassified, so the second attempt confirms
  * it and the retry stops, rather than waiting forever for an outage to end.
  * Establishment fails at its first read, before it mints anything.

@@ -5,16 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * `AGENTS.md`'s split into `docs/agents/*.md` (see that commit) repointed 13
- * in-code comments that used to cite `AGENTS.md` by name, and the split's own
- * claim was that each now names "the file that now carries the fact". `tsc`
- * and ESLint both read a comment as inert text, so nothing already checks that
- * the fact actually landed where the comment says it did — and one didn't:
- * `space-snapshot.test.ts` cited `editing-and-persistence.md` for a bullet
- * that lives in `http.md`.
+ * In-code comments cite `docs/agents/*.md` for facts those files carry. `tsc`
+ * and ESLint both read a comment as inert text, so nothing else checks that
+ * the fact is where the comment says it is.
  *
- * Most of the 13 citations are bare file mentions with nothing to check
- * against. One shape is checkable: a comment that quotes the cited bullet's
+ * Most citations are bare file mentions with nothing to check against. One
+ * shape is checkable: a comment that quotes the cited bullet's
  * own lead-in verbatim (`` `docs/agents/X.md` pins under "..." ``). This reads
  * every such citation in the tree, in the idiom `conflict-markers.test.ts`
  * established here, and asserts the quoted fragment is actually present in

@@ -10,15 +10,10 @@ import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
 
 /**
- * Red-first coverage for `.scratch/snapshot-edits/issues/02-remove-authorings-placement-copy.md`,
- * "Red first". Each `describe` below is one of the ticket's four suspected
- * defects, named the way the ticket names it.
- *
- * None of these tests calls `authoredPlacement`, `reportRendered`,
- * `replacePlacement` or `initialPlacement` — the members the ticket deletes —
- * on purpose: every assertion reads the session's own written snapshot or the
- * render adapter's own drawn projection, so the tests stay meaningful once the
- * copy they are about is gone.
+ * Authored placement has one home, the session's snapshot. Every assertion
+ * here reads the session's own written snapshot or the render adapter's own
+ * drawn projection, never an intermediate copy of placement, so each test
+ * states what is written and what is drawn.
  */
 
 const id = (suffix: string) =>
@@ -33,9 +28,8 @@ describe('Map delete draws the right geometry (ticket 02, item 1)', () => {
   const SHARED_RESOURCE_ID = id('6');
 
   /**
-   * One Resource placed in both Maps, at two different points — the shape the
-   * ticket names: "a Resource in both the deleted Map and the newly selected
-   * one".
+   * One Resource placed in both Maps, at two different points: a Resource in
+   * both the deleted Map and the newly selected one.
    */
   const snapshot: SpaceSnapshot = {
     id: SPACE_ID,
@@ -247,29 +241,18 @@ describe('An embedded Edit in an unselected Map leaves no stale member (ticket 0
   };
 
   /**
-   * The ticket's suspected cause named `deleted-resource` specifically: "a
-   * `deleted-resource` cascade can leave a stale member that the next Edit writes
-   * into the snapshot, where intake refuses the reference." That exact shape
-   * could not be reproduced through any typed call: `SpaceAuthoring.completeInMap`'s
+   * An embedded Edit writes straight into the session's snapshot, exactly as a
+   * top-level one does, and every later read derives its placement fresh from
+   * that same snapshot, so there is no second store to go stale.
+   *
+   * What is pinned: an embedded Edit on a Map other than the one selected has
+   * to produce a snapshot intake accepts, and a later top-level Edit has to see
+   * it. It is exercised with `deleted-graph`, the closest reachable kind that
+   * changes an unselected Map's own content — `SpaceAuthoring.completeInMap`'s
    * parameter type (`EmbeddedResourceCompletion | EmbeddedContextCompletion`)
-   * excludes `deleted-resource`, and `resource-deletion.ts`, the only production
-   * caller of a `deleted-resource` completion, always calls the top-level
-   * `authoring.complete` rather than `completeInMap`.
-   *
-   * With Authoring's own placement copy gone, the suspected *mechanism* — a
-   * copy left stale because reconciliation was gated by `installing` — is gone
-   * with it: an embedded Edit now writes straight into the session's snapshot,
-   * exactly as a top-level one does, and every later read derives its
-   * placement fresh from that same snapshot. There is no second store left to
-   * go stale, for `deleted-resource` or any other kind.
-   *
-   * The test stays as a guard on the surrounding behaviour: an embedded Edit
-   * on a Map other than the one selected still has to produce a snapshot
-   * intake accepts, and a later top-level Edit still has to see it — exercised
-   * with `deleted-graph`, the closest reachable kind that changes an
-   * unselected Map's own content, called directly through
-   * `completeInMap` exactly as `space-authoring-operations.test.ts` does
-   * to reach this same primitive outside its production callers.
+   * excludes `deleted-resource` — called directly through `completeInMap`
+   * exactly as `space-authoring-operations.test.ts` does to reach this same
+   * primitive outside its production callers.
    */
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
@@ -337,10 +320,8 @@ describe('A queued drag holds its drop point (ticket 02, item 4 — guards the c
   };
 
   /**
-   * This test guards the change rather than a suspected defect, and must pass
-   * before and after (ticket 02, "Red first"): a `settled-resource-movement`
-   * that queues behind an in-flight commit must stay drawn at its drop point
-   * until it is derived and lands there.
+   * A `settled-resource-movement` that queues behind an in-flight commit must
+   * stay drawn at its drop point until it is derived and lands there.
    *
    * The nested `changeNodes` call below simulates a drag settling from inside
    * an `EditCompleted` notification of an unrelated, already-in-flight Edit —

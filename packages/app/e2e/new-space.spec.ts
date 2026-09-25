@@ -275,9 +275,8 @@ test('an Alt-drop released off the canvas creates no Resource', async ({ page })
   // Leaving the canvas fires no move the graph can see, so the preview's last
   // eligible point survives the departure. Where the release *landed* is the
   // only fact that may author a Resource.
-  // Chrome over the canvas rather than beside it: the header this used went with
-  // the Sidebar (ADR 0082), and the Command Dock is the surface a release lands
-  // on without the flow ever seeing it.
+  // Chrome over the canvas rather than beside it: the Command Dock is the
+  // surface a release lands on without the flow ever seeing it (ADR 0082).
   const offCanvas = (await page.getByTestId('command-dock').boundingBox())!;
   await page.mouse.move(offCanvas.x + offCanvas.width / 2, offCanvas.y + offCanvas.height / 2);
   // The frozen half, asserted rather than assumed: the preview is *still* on
@@ -338,8 +337,8 @@ test('the Graph the explicit Map owns can be self-connected and presented', asyn
   await expect(activeGraph(page)).toHaveText('Graph 1');
 
   // Every Resource a fully cyclic Graph holds is arrived at, so it has no entry
-  // Resource. The control is enabled because a Graph *is* active, and presenting
-  // used to return before changing anything — the click went nowhere.
+  // Resource. The control is enabled because a Graph *is* active, so presenting
+  // must still begin rather than return before changing anything.
   await presentControl(page).click();
 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();

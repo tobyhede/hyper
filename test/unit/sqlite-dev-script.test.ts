@@ -7,11 +7,10 @@ const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
 const missingParent = '/no-such-hyper-sqlite-parent/hyper.db';
 
 /*
- * The shell `dev:sqlite` this script replaced printed one line and exited 1 for
- * a `SQLITE_PATH` it would not accept. The resolution now happens in the
- * script, so the script owns that diagnostic; an unresolvable path must not
- * reach the migration or the Vite host either, which is what the empty stdout
- * holds.
+ * `dev:sqlite` prints one line and exits 1 for a `SQLITE_PATH` it will not
+ * accept. The resolution happens in the script, so the script owns that
+ * diagnostic; an unresolvable path must not reach the migration or the Vite
+ * host either, which is what the empty stdout holds.
  */
 describe('pnpm dev:sqlite', () => {
   it.each([

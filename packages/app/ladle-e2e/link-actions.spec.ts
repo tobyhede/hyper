@@ -7,22 +7,17 @@ const RESOURCE_COPY_LINK = /^Copy link to Resource(?! in Map)/;
  * The entity-actions menu, in a real browser, because jsdom cannot fail this.
  *
  * `fireEvent.click` fires `click` alone. A real press is a pointerdown, a
- * mousedown, a focus, a mouseup and then a click, and it was the second half
- * that broke this: a trigger that dropped the ref Base UI's `Menu.Trigger` gave
- * it had no element, so the dismissal could not attribute the press to a
- * trigger and closed the menu that press had just opened.
+ * mousedown, a focus, a mouseup and then a click, and the second half is where
+ * a trigger that drops the ref Base UI's `Menu.Trigger` gives it breaks: with
+ * no element, the dismissal cannot attribute the press to a trigger and closes
+ * the menu that press has just opened.
  *
- * **The Sidebar rows this was written against are gone (ADR 0082).** Three
- * tests here pressed `Space/Space`, and the claim one of them carried —
- * `space-sidebar-entity-actions-menu` — described a menu "reached two ways from
- * a Sidebar row". The Command Dock has clusters rather than rows and no
- * `onContextMenu` anywhere, so that behaviour did not move: it belongs to the
- * Resource rail (ADR 0073), which is what the last three tests in this file
- * press, on the stable `Components/Resource` rail story.
- * What is left of the Sidebar's half is the one choice the Dock still decides
- * about the Space's own menu — which address it offers, and that Rename is a
- * command in it — restated below in the Dock's own words and untagged, the claim
- * it stood for having been retired rather than renamed.
+ * A menu reached two ways — its trigger and a right click — is the Resource
+ * rail's (ADR 0073), which is what the last three tests in this file press, on
+ * the stable `Components/Resource` rail story. The Command Dock has no
+ * `onContextMenu`. For the Space's own menu, the test below holds the one
+ * choice the Dock decides — which address it offers, and that Rename is a
+ * command in it — untagged.
  */
 
 /**
@@ -38,8 +33,7 @@ const RESOURCE_COPY_LINK = /^Copy link to Resource(?! in Map)/;
  * rather than a claim that no second address is possible.
  *
  * Rename sits in this menu with Copy link to Space — the name discloses, and
- * the editor is begun from the list
- * (`.scratch/command-dock/issues/26-identity-clusters-disclose-from-the-name.md`).
+ * the editor is begun from the list.
  * `spaceEntityActions` is still handed `onRename: null` by the application
  * (`entity-actions.tsx`): that is the Resource rail's menu, not this cluster's.
  */
@@ -55,8 +49,8 @@ test('the Space cluster discloses from the name and offers one address plus Rena
   await expect(page.getByRole('button', { name: 'Map: Collection 1', exact: true })).toBeVisible();
 
   // `delay` is the whole reason this test is in a browser: a default Playwright
-  // click puts mousedown and mouseup in the same tick, and the dismissal that
-  // this regressed on never gets a turn between them.
+  // click puts mousedown and mouseup in the same tick, and the dismissal never
+  // gets a turn between them.
   await page.getByRole('button', { name: 'Space: Rendering', exact: true }).click({ delay: 120 });
 
   const menu = page.getByRole('menu');
@@ -74,12 +68,10 @@ test('the Space cluster discloses from the name and offers one address plus Rena
 /**
  * A copy confirms by swapping the item's own label, without the menu closing.
  *
- * **This is the Resource rail's and no longer the chrome's.** `EntityActionsMenu`
- * swaps a pressed item's words because the Sidebar's menus were drawn inside a
- * Sheet over the area a pinned notice renders in, and on a phone the reader
- * could not see the report any other way. The Command Dock has no Sheet and
- * covers nothing, so it reports through the application's standing notice
- * instead; the rail keeps the swap, being a menu on the canvas itself.
+ * **This is the Resource rail's, not the chrome's.** `EntityActionsMenu` swaps
+ * a pressed item's words in the rail, a menu on the canvas itself. The Command
+ * Dock covers nothing, so it reports through the application's standing notice
+ * instead.
  */
 test('a copy command confirms in the rail menu it was pressed in', async ({ page }) => {
   await page.goto('/?story=components--resource--rail-actions&mode=preview');

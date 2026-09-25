@@ -161,7 +161,7 @@ describe('spaceEntityActions', () => {
   /**
    * A Map owns its Graphs (ADR 0040), so a Graph row always has the
    * address within the Map drawing it. A Graph's own permanent address is
-   * no longer offered from any menu (`.scratch/dock-menu-reorganisation/issues/01`).
+   * not offered from any menu.
    */
   it('offers a Graph its within-Map address and no permanent one', () => {
     const entity: SpaceEntity = { kind: 'graph', graph: GRAPH, map: MAP };
@@ -299,10 +299,10 @@ describe('spaceEntityActions', () => {
   });
 
   /**
-   * A Reference Resource's own two addresses still name the Reference Resource itself.
+   * A Reference Resource's own two addresses name the Reference Resource itself.
    * Copy link to Target is a third row naming the Target's own Resource address —
    * never a within-Map one, because the Target is often not on this
-   * Map at all (`.scratch/reference-thing/issues/02`).
+   * Map at all.
    */
   it('offers a Reference Resource a Copy link to Target alongside its own addresses', () => {
     const entity: SpaceEntity = {

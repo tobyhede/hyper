@@ -13,23 +13,21 @@ import { mintingIds } from './minting';
 /**
  * A Space whose working snapshot was replaced under it still names a Graph.
  *
- * Every other replacement of a Space's working snapshot re-opens that Space's
+ * Every replacement of a Space's working snapshot re-opens that Space's
  * Navigation with it — `acceptStoredSpace` does, and every Edit that changes a
  * Map's Graph set answers the next Active Graph before it installs. The
- * coordinated Space Resource lifecycle is the one that did not: its recovery
- * restores *every participant's* snapshot (`session-registry.ts`), and only the
- * Space the author answered the conflict on had a `SpaceAuthoring` to re-open.
+ * coordinated Space Resource lifecycle's recovery restores *every
+ * participant's* snapshot (`session-registry.ts`), not only the Space the
+ * author answered the conflict on, so every participant has to re-resolve.
  *
- * So a second open Space could be rolled back past a Graph it had locally, and
- * go on naming that Graph as active — a state nothing corrected, because no
- * replacement epoch advanced and nothing else re-resolved the pair.
- *
- * The consequences were not cosmetic. The Dock resolves its Active Graph from
- * the projection and falls back to the first visible Graph, so it named and
- * commanded one Graph while `SpaceCanvas` and Navigation named another: Present
- * was enabled and did nothing, the two Copy links answered different URLs, and
- * the next Edit rode the stale id into the Map's `activeGraph` for intake
- * to reject.
+ * A second open Space rolled back past a Graph it had locally must not go on
+ * naming that Graph as active: no replacement epoch advances, so nothing else
+ * re-resolves the pair. The Dock resolves its Active Graph from the projection
+ * and falls back to the first visible Graph, so a stale id would have it
+ * command one Graph while `SpaceCanvas` and Navigation named another: Present
+ * enabled and doing nothing, the two Copy links answering different URLs, and
+ * the next Edit riding the stale id into the Map's `activeGraph` for intake to
+ * reject.
  */
 
 const id = (value: string): UUID => uuidSchema.parse(value);
@@ -188,10 +186,10 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
 /**
  * The same recovery, taking the *selected Map* rather than its Active Graph.
  *
- * Worse than the Graph half rather than milder: the restored Space still loads,
- * so nothing refuses it — `resolveMap` throws `MapNotFoundError` for a
- * Space with nothing wrong with it, and the canvas is replaced by the failure
- * surface.
+ * Left unresolved, this is worse than the Graph half rather than milder: the
+ * restored Space still loads, so nothing refuses it — `resolveMap` would throw
+ * `MapNotFoundError` for a Space with nothing wrong with it, and the canvas
+ * would be replaced by the failure surface.
  */
 const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof composeApp>> => {
   const control = new MemorySpaceBackendTestControl();

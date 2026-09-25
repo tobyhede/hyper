@@ -3,20 +3,15 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * The open set, and the one tab stop the whole surface takes.
  *
- * **This file drove `Space/Multiple Spaces`, a vertical tab strip of mounted
- * Space Sidebars, and that story is gone with the surface it framed (ADR
- * 0082).** What it proved is not: a reader moves between open Spaces without
- * closing or resetting any of them, and reaching the whole set costs one tab
- * stop rather than one per Space. The Command Dock answers both differently —
- * the set is a disclosure from the bar rather than a strip beside it, and the
- * bar is one `Toolbar` with a roving tabindex — so the tests are restated
- * against it rather than deleted with the strip.
+ * A reader moves between open Spaces without closing or resetting any of them,
+ * and reaching the whole set costs one tab stop rather than one per Space. The
+ * Command Dock answers both (ADR 0082): the set is a disclosure from the bar,
+ * and the bar is one `Toolbar` with a roving tabindex.
  *
  * Untagged, both of them. The claims the Dock's Open Spaces menu owes are
  * `command-dock-marks-the-space-one-crossing-up` and
  * `command-dock-names-an-unwell-open-space`, and each already has its one test
- * in `command-dock.spec.ts`. These hold the two obligations the strip carried
- * that no claim names.
+ * in `command-dock.spec.ts`. These hold the two obligations no claim names.
  */
 
 const DEFAULT = '/?story=space--command-dock--default&mode=preview';
@@ -31,12 +26,11 @@ const openSpacesMenu = async (page: Page) => {
 };
 
 /**
- * Moving is not closing, which is the change ADR 0068 has to answer to.
+ * Moving is not closing (ADR 0068).
  *
- * Exit used to be both the move and the close, so leaving a Space took its
- * Map and Graph selections with it. Nothing closes here: the open set is a
- * tree a reader moves around, and every entry keeps where it was left — so
- * coming back to one arrives where you were rather than at its default.
+ * Nothing closes here: the open set is a tree a reader moves around, and every
+ * entry keeps where it was left — so coming back to one arrives where you were
+ * rather than at its default.
  */
 test('the Open Spaces menu moves between Spaces without closing or resetting one', async ({
   page,
@@ -77,9 +71,9 @@ test('the Open Spaces menu moves between Spaces without closing or resetting one
 /**
  * One tab stop for the whole surface (ADR 0073).
  *
- * Each cluster used to be a `Toolbar` of its own, which made the Dock four roots
- * and four tab stops; the ADR draws one root with named `role="group"`s inside
- * it, so the arrows cross a group boundary exactly as they cross any other gap.
+ * The Dock is one root with named `role="group"`s inside it, not a `Toolbar`
+ * per cluster, so the arrows cross a group boundary exactly as they cross any
+ * other gap.
  * A roving tabindex is what that means in the DOM, and it is the rule a
  * `Button` dropped into the bar instead of a `ToolbarButton` silently breaks —
  * it would take a tab stop of its own and the bar would stop being one.

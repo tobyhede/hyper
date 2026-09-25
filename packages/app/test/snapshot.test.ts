@@ -32,8 +32,8 @@ const snapshot = spaceSnapshotSchema.parse({
     ],
   },
   // Declared in Title order, because intake sorts and `snapshotFromSpace` is
-  // asserted to round-trip this array exactly. It used to read A-then-B: ADR
-  // 0085 renamed the first one's Title, and `Next` now sorts ahead of `Resource`.
+  // asserted to round-trip this array exactly, and `Next` sorts ahead of
+  // `Resource`.
   resources: [
     { id: RESOURCE_B, document: { title: 'Next', kind: 'markdown', body: 'More' } },
     { id: RESOURCE_A, document: { title: 'Resource', kind: 'markdown', body: 'Body' } },

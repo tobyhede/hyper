@@ -439,8 +439,7 @@ describe('the Map an Open Space Resource draws', () => {
   /**
    * A refused rail Map deletion is said once, by the containing canvas's
    * command outcomes: the rail reports no sentence of its own beside the
-   * notice, whose dismissal would otherwise leave a second copy behind
-   * (`.scratch/command-outcomes/issues/09`).
+   * notice, whose dismissal would otherwise leave a second copy behind.
    *
    * Refused through a spy on the target's Space Resource lifecycle, because
    * its refusals are races or recovery states no mount can stage.
@@ -506,7 +505,7 @@ describe('the Map an Open Space Resource draws', () => {
   });
 
   /**
-   * Ticket 04 captures wheel on the canvas root to author framing. ADR 0064
+   * The canvas root captures wheel to author framing. ADR 0064
    * forbids `nowheel` on an Open Resource, so the editing Space Resource must not
    * take that class — the capture listener is the wheel, not a hole in the
    * host viewport.
@@ -618,8 +617,8 @@ describe('the Map an Open Space Resource draws', () => {
   /**
    * Two host Space Resources, both Open, both in portal Edit. Wheel is debounced
    * 160 ms so a burst on one portal is one Edit; a burst that crosses two
-   * portals must still author each. The canvas-root listener that used a single
-   * pending slot dropped the first portal's framing when the second wheel
+   * portals must still author each. A canvas-root listener with a single
+   * pending slot would drop the first portal's framing when the second wheel
    * arrived inside the window.
    */
   it('authors framing on each Space Resource wheeled within the debounce window', async () => {
@@ -680,8 +679,8 @@ describe('the Map an Open Space Resource draws', () => {
   });
 
   /**
-   * Unmounting while a wheel is still pending used to clear the timer and leave
-   * the framing only in portalDraft. Cleanup must flush what has not landed.
+   * Unmounting while a wheel is still pending must not leave the framing only
+   * in portalDraft: cleanup flushes what has not landed.
    */
   it('persists a pending portal zoom when the canvas unmounts before the debounce', async () => {
     const value = home({
@@ -1471,11 +1470,10 @@ describe('the Map an Open Space Resource draws', () => {
   });
 
   /**
-   * The one state that draws no view now that the selection is required.
+   * The one state that draws no view.
    *
-   * A Space Resource selects a Map from the moment it exists (ADR 0079), so
-   * the Resource that used to stand here — one that had chosen nothing yet — is
-   * unreachable, and a pair resolving to nothing means the Map it names was
+   * A Space Resource selects a Map from the moment it exists (ADR 0079), so a
+   * pair resolving to nothing means the Map it names was
    * deleted out from under it. The Resource has neither failed nor is it waiting:
    * its target read, so both selectors are drawn over the Maps that do
    * exist, and the only missing entity is the one it points at.
@@ -1578,9 +1576,10 @@ describe('the Map an Open Space Resource draws', () => {
   /**
    * A failed read belongs to the embedding that asked for it.
    *
-   * One string for the whole canvas made both true at once: only one of two
-   * unreadable targets was ever announced, the sentence named neither Resource, and
-   * a third Resource opening successfully erased whichever one was on screen.
+   * One string for the whole canvas would break both: only one of two
+   * unreadable targets would ever be announced, the sentence would name neither
+   * Resource, and a third Resource opening successfully would erase whichever
+   * one was on screen.
    */
   it('names each target it could not read and keeps one failure clear of another', async () => {
     const backend = new MemorySpaceBackend(
@@ -1620,8 +1619,8 @@ describe('the Map an Open Space Resource draws', () => {
    *
    * The load effect re-runs whenever `embeddedRequests` changes identity, and
    * Open Spaces republishes its entries on every session change in every open
-   * Space — so a claim released on failure had an unreadable target read again
-   * on essentially every edit anywhere in the session, with no backoff.
+   * Space — so a claim released on failure would read an unreadable target
+   * again on essentially every edit anywhere in the session, with no backoff.
    */
   it('asks a target it could not read once, whatever else changes in the session', async () => {
     const backend = new MemorySpaceBackend(

@@ -178,11 +178,9 @@ describe('ResourcesPopover', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     const popup = await openList();
-    // Named by the surface rather than by a heading inside it. The drawer this
-    // replaced carried an `sr-only` title because a `Drawer` is a screen-level
-    // dialog a reader may navigate to by heading; an anchored popover is
-    // reached from the control that names it, and that control's word is the
-    // name — one region, one caption, said once.
+    // Named by the surface rather than by a heading inside it: an anchored
+    // popover is reached from the control that names it, and that control's
+    // word is the name — one region, one caption, said once.
     expect(popup).toHaveAccessibleName('Resources');
   });
 
@@ -208,9 +206,8 @@ describe('ResourcesPopover', () => {
     await openList();
 
     // No Close inside the surface, and that is the shape rather than a gap in
-    // it: a drawer is a screen-level panel that owes a way out of itself, while
-    // an anchored popover is dismissed from the control it hangs off — the same
-    // way every menu in the Dock beside it is.
+    // it: an anchored popover is dismissed from the control it hangs off — the
+    // same way every menu in the Dock beside it is.
     fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

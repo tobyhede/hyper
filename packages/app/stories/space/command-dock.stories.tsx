@@ -49,10 +49,7 @@ NewSpace.meta = { iframed: true };
 /**
  * Presenting, where the whole surface goes.
  *
- * The Sidebar withdrew authoring command by command — Rename and Delete left a
- * Map row's menu while its address stayed. The Dock does not have that
- * problem to solve: it is furniture over the paper, so presenting removes the
- * furniture. What the audience is left with is the canvas and
+ * The Dock is furniture over the paper, so presenting removes the furniture. What the audience is left with is the canvas and
  * `PresentingChrome`, which carries the way out.
  *
  * Real Navigation presents the Active Graph, so the chrome is the application's.
@@ -78,7 +75,7 @@ SaveRejected.meta = { iframed: true };
 
 /**
  * A refused aggregate: the backend declined the whole aggregate rather than
- * this Space's request (ADR 0057, `v1-release/17`), a distinct persistence
+ * this Space's request (ADR 0057), a distinct persistence
  * state that draws the same one-sentence dialog and, like a rejection, offers
  * no retry.
  */

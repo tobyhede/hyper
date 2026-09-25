@@ -14,9 +14,8 @@ import { uuid } from './uuid';
  * assertions read what ResourceNode told it. `updateNodeInternals` is the whole of
  * React Flow's remeasure contract — it has no rendered consequence to observe —
  * and the real `useUpdateNodeInternals` reaches for a store this component is
- * deliberately rendered without. It is still stubbed although `ResourceNode` no
- * longer calls it, so that re-introducing the call is caught here rather than
- * only in a browser.
+ * deliberately rendered without. `ResourceNode` must not call it, and it is
+ * stubbed so that a call is caught here rather than only in a browser.
  */
 /** The live connection React Flow reports, so a test can put a drag in flight. */
 interface MockConnectionState {
@@ -630,8 +629,8 @@ describe('ResourceNode title authoring', () => {
 });
 
 /**
- * Decided #3 (architecture-review/21): `readOnly` is the suppression a dormant
- * embedded Resource relies on, not the two deleted flags. `ResourceNode`
+ * `readOnly` is the suppression a dormant embedded Resource relies on, and no
+ * per-control flag stands beside it. `ResourceNode`
  * forwards `data.readOnly` to `CanvasResource`, which withholds Open/Close and
  * begin-title-edit regardless of whether the composition supplied the
  * operation — these cases supply it, so the assertion is genuinely about
@@ -823,12 +822,11 @@ describe('ResourceNode graph authoring', () => {
    *
    * The four authoring handles are the only ones that can begin a gesture — the
    * graph ports are `isConnectable={false}` outright, being invisible attachment
-   * points for overview Edges — so they are what the switch has to reach. Before
-   * this they ignored it, and the flow-level flag governed nothing but whether
-   * the connection *line* rendered. What stood in for it was presentation: CSS
-   * hides the handles while presenting, and a pane's backdrop covers them. A
-   * withdrawal that depends on something being drawn over it is not a withdrawal
-   * — it is the same hidden-control-live-gesture shape as the delete-key holes.
+   * points for overview Edges — so they are what the switch has to reach, or
+   * the flow-level flag governs nothing but whether the connection *line*
+   * renders. CSS hiding the handles while presenting is presentation, not a
+   * withdrawal: a withdrawal that depends on something being drawn over it
+   * leaves a hidden control with a live gesture.
    */
   it.each([
     ['no drag in flight', false, 'Connect from' as const, 'start' as const],
@@ -1136,9 +1134,8 @@ describe('ResourceNode Expanded Resource front', () => {
     };
     render(<ResourceNode {...props({ kind: 'reference', expanded: true, resize })} />);
 
-    // `projection.ts` never marks a Reference Resource Expanded in production (ADR 0064), but
-    // this Resource's own resize gate must not repeat that as a second opinion —
-    // ADR 0066 makes resize Resource behaviour, not kind behaviour.
+    // The resize gate reads Expanded and never the kind: ADR 0066 makes resize
+    // Resource behaviour, not kind behaviour.
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 

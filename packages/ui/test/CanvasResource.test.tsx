@@ -9,7 +9,7 @@ import {
 
 /**
  * Base UI's menus position themselves by measuring, and jsdom ships no pointer
- * capture. The stubs remain for entity-action menus this file still opens; the
+ * capture. The stubs are for the entity-action menus this file opens; the
  * `scrollIntoView` an item-aligned list calls is stubbed globally in
  * `vitest.setup.ts`.
  */
@@ -362,8 +362,8 @@ describe('CanvasResource Open and Close operation', () => {
       ),
     ).toEqual(['Save Resource A', 'Cancel editing Resource A', 'Close Resource A']);
     // Unavailable through `aria-disabled` rather than the native property, so
-    // the control keeps its place in the rail's arrow order (ADR 0073). Drawn
-    // and unreachable is the state this replaces.
+    // the control keeps its place in the rail's arrow order (ADR 0073) rather
+    // than being drawn and unreachable.
     const close = screen.getByRole('button', { name: 'Close Resource A' });
     expect(close).toHaveAttribute('aria-disabled', 'true');
     expect(close).not.toBeDisabled();
@@ -410,8 +410,7 @@ describe('CanvasResource Open and Close operation', () => {
     }
     // The key each performs is still stated, which is how a control that
     // performs a shortcut announces it (`docs/agents/ui.md`). These two are the
-    // repo's worked example of that convention, since `.scratch/command-dock/issues/08`
-    // deleted `AddResourceControl`, which used to be.
+    // repo's worked example of that convention.
     expect(buttons[0]).toHaveAttribute('aria-keyshortcuts', 'Meta+Enter Control+Enter');
     expect(buttons[1]).toHaveAttribute('aria-keyshortcuts', 'Escape');
   });

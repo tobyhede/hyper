@@ -30,10 +30,7 @@ import {
 // packages/app/README.md for why each case is there.
 //
 // This file is the **overview**: the space drawn whole, every graph at once.
-// Presenting is absent — the deck it used to be went with the step sequence (ADR
-// 0023, 0024) and returns as a traversal on this same canvas (ADR 0027), with
-// its own spec. The deck's tests are not adapted here; they asserted against a
-// surface that no longer exists.
+// Presenting is a traversal on this same canvas (ADR 0027), with its own spec.
 
 /** A graph node located by its exact resource title, so single-letter titles don't
  *  collide (a reference resource node names its target, so "A" appears on more than one). */
@@ -59,7 +56,7 @@ test('draws every Graph in the selected Map, each in its own color', async ({ pa
   // Six Resources — the five on the spine plus T, which joins no Graph — Long's four
   // Edges plus Mid's three plus Short's two, and eight anchors on every Resource.
   // T draws its eight like the rest: an anchor is a Resource's and not a Graph's
-  // since ADR 0087, so joining no Graph takes none of them away.
+  // (ADR 0087), so joining no Graph takes none of them away.
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
   await expect(page.locator('.rf-resource-node__authoring-handle')).toHaveCount(48);
@@ -109,12 +106,9 @@ test(
 );
 
 /**
- * **The requested treatment change, read off the running application**
- * (`.scratch/command-dock/issues/12`).
+ * **A selected Resource's rail is neutral, read off the running application.**
  *
- * This test used to assert the opposite — that a selected Resource's rail painted
- * the Active Graph's colour. Three cues replace it, and none of them is a
- * weaker version of the claim: the band paints nothing; the commands on it are
+ * Three cues hold it: the band paints nothing; the commands on it are
  * the *same* surface the Command Dock is drawn on, compared property by property
  * against the Dock actually on screen rather than against numbers copied out of
  * a stylesheet; and the Graph's colour is still on the Resource, on the handles an
@@ -131,7 +125,7 @@ test(
     const resource = nodeByTitle(page, 'A').first();
     const controls = await resourceControls(page, resource);
 
-    // No band, at the one state that used to carry the loudest one.
+    // No band, even with a Graph active and the Resource selected.
     await expect(resource.locator('.canvas-resource__rail')).toHaveCSS(
       'background-color',
       'rgba(0, 0, 0, 0)',
@@ -171,7 +165,7 @@ test(
  * nothing (ADR 0031), so the revision is unmoved throughout.
  *
  * This is also the application half of the Graph HUD's `SparseMap` story
- * (`packages/app/stories/surfaces/graph-hud.stories.tsx`, issue 06 ticket 02):
+ * (`packages/app/stories/surfaces/graph-hud.stories.tsx`):
  * the same claim, that the key is the selected Map's own Graphs and not
  * the Space's, over the tracked fixture rather than the catalogue's.
  */
@@ -262,9 +256,9 @@ test(
  *
  * The Command Dock's Graph cluster discloses every Graph the selected Map
  * owns, with its title, its colour and which one is active — which is what the
- * canvas HUD's key already said. Issue 06 keeps the key: it is the on-canvas
+ * canvas HUD's key says. The key stays: it is the on-canvas
  * colour reference beside the Edges being read, and it is the one of the two
- * that is on screen without a menu being opened for it. What the decision costs
+ * that is on screen without a menu being opened for it. What keeping both costs
  * is this test — the two must never disagree, which is why both resolve a colour
  * through the one shared `graphColor` seam rather than each deriving its own.
  */
@@ -313,7 +307,7 @@ test(
     await expect(checked).toHaveCount(1);
     await expect(checked).toHaveText('Mid');
 
-    // And with the menu dismissed, which is the whole reason the key was kept:
+    // And with the menu dismissed, which is the whole reason the key stays:
     // the Dock names the Active Graph and nothing else without being opened,
     // while the key stays on the canvas beside the Edges it explains.
     await page.keyboard.press('Escape');
@@ -325,7 +319,7 @@ test(
 
 /**
  * A Graph row in the Dock's list is the HUD key's row: the same line, the same
- * box, the same colour, and no Graph glyph (`.scratch/graph-colour/issues/02`).
+ * box, the same colour, and no Graph glyph.
  * The Graph identity and Colour… keep the coloured glyph, which says what kind
  * of entity the colour belongs to; the Map list, drawn by the same component,
  * carries no mark.
@@ -428,7 +422,7 @@ test('anchors stay measurable, so Edges attach where the Resource is', async ({ 
   // somewhere else — silently, with no warning to catch. The four anchors sit at
   // `opacity: 0` until the reveal shows them, which keeps the box; that reads as
   // an ordinary styling choice, and this is what stops a later CSS tidy-up from
-  // reaching for `display: none`. See react-flow-guidance/issues/03.
+  // reaching for `display: none`.
   const anchors = page.locator('.rf-resource-node__authoring-handle');
   await expect(anchors.first()).toBeAttached();
 

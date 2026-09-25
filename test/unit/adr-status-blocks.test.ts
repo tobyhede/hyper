@@ -4,34 +4,27 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * An ADR's status block is the only navigation `docs/adr/` has — there is no
- * index file to land on instead. A link that points one way is therefore a
- * dead end rather than an untidiness: a reader landing on the refined ADR has
- * no forward pointer to the decision that refined it, and nothing in
- * `pnpm verify` was reading for one. `.prettierignore` excludes every Markdown
- * file so `format:check` never opens an ADR, and a status block is prose to
- * `tsc` and ESLint alike.
+ * An ADR's status block is how a reader moves from one decision to the ones
+ * related to it. A link that points one way is therefore a dead end rather than
+ * an untidiness: a reader landing on the refined ADR has no forward pointer to
+ * the decision that refined it. `.prettierignore` excludes every Markdown file
+ * so `format:check` never opens an ADR, and a status block is prose to `tsc`
+ * and ESLint alike, so nothing else reads for one.
  *
  * This reads the blocks themselves, in the idiom `conflict-markers.test.ts`
- * established here for the same shape of problem: one scan over everything,
- * rather than a hand-kept list of the pairs someone remembered to check. It is
- * the scan `.scratch/layout-ownership-review/issues/05-two-refinement-links-point-only-one-way.md`
- * asked for a decision on, and this file is that decision.
+ * uses for the same shape of problem: one scan over everything, rather than a
+ * hand-kept list of the pairs someone remembered to check.
  *
  * Two further rules join the reciprocal ones, and both are about where a reader
  * looks rather than about a link. `Status:` takes one word, so a superseded ADR
  * names its superseder on a `Superseded by:` line and nowhere else — the inline
- * `Status: superseded by ADR NNNN` spelling that 0019 and 0029 carried is now a
- * fault. And a superseded ADR lives in `docs/adr/superseded/`, so the directory
- * listing itself is the live set. 54 accepted decisions are too many to read
- * before work; 18 retired ones mixed in among them made it worse.
+ * `Status: superseded by ADR NNNN` spelling is a fault. And a superseded ADR
+ * lives in `docs/adr/superseded/`, so the directory listing itself is the live
+ * set.
  *
- * Supersession is asserted reciprocal too, which it could not be until issue
- * `.scratch/layout-ownership-review/issues/04-adr-0040-claims-to-supersede-an-already-superseded-adr.md`
- * settled the convention: one superseder per ADR, with a two-stage retirement
- * read transitively rather than named at both stages. A guard written before
- * that would have decided the question by accident, which is why this half was
- * withheld rather than forgotten.
+ * Supersession is asserted reciprocal too, under the convention of one
+ * superseder per ADR, with a two-stage retirement read transitively rather than
+ * named at both stages.
  */
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -45,7 +38,7 @@ const refs = (value: string | undefined): readonly string[] => value?.match(/\d{
 
 interface StatusBlock {
   readonly fields: ReadonlyMap<string, string>;
-  /** `accepted`, `rejected` or `superseded`, with the inline spelling folded in. */
+  /** `accepted`, `rejected` or `superseded`: the first word of `Status:`. */
   readonly status: string;
   /** `Superseded by:`. The inline `Status:` spelling is a fault, not a source. */
   readonly supersededBy: readonly string[];
@@ -81,9 +74,8 @@ const parseStatusBlock = (text: string): Omit<StatusBlock, 'retired'> => {
   return {
     fields,
     status: declared.split(/\s+/)[0] ?? '',
-    // The `Superseded by:` line and nothing else. The inline spelling used to be
-    // folded in here, which made the parser tolerant of two ways to write one
-    // fact; `statusSpellingFaults` reports it instead.
+    // The `Superseded by:` line and nothing else. The inline spelling is a
+    // fault `statusSpellingFaults` reports, not a second way to write one fact.
     supersededBy: refs(fields.get('Superseded by')),
     declaredStatus: declared,
   };
@@ -139,10 +131,9 @@ const readAdrFiles = (): readonly (readonly [string, string])[] =>
 
 /**
  * A reference naming no ADR is reported rather than skipped. Resolving the
- * target first and *filtering* on it — which is what this did at first — makes
- * the guard silent about the one fault it cannot repair by symmetry: `Refines:
- * 0099` is a dead end for a reader, and an unreachable target is exactly the
- * shape a typo takes.
+ * target first and *filtering* on it would make the guard silent about the one
+ * fault it cannot repair by symmetry: `Refines: 0099` is a dead end for a
+ * reader, and an unreachable target is exactly the shape a typo takes.
  *
  * **A rejected ADR is outside the guard as a source**, decided before any of its
  * targets is resolved. Its claims never took effect, so it announces nothing on
@@ -194,9 +185,8 @@ const refinedByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
  * for the same reasons: a rejected ADR is exempt as a source, a fault as a
  * `Superseded by:` target, and silent as a `Supersedes:` target.
  *
- * One spelling answers: the `Superseded by:` line. 0019 and 0029 reciprocated
- * 0030 inline until `statusSpellingFaults` ruled that out, and both now write
- * the line like everything else.
+ * One spelling answers: the `Superseded by:` line. The inline spelling is
+ * `statusSpellingFaults`'s to report.
  */
 const supersedesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
   [...adrs].flatMap(([number, adr]) =>
@@ -216,15 +206,13 @@ const supersedesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
 
 /**
  * Reciprocity is not the whole convention, and on its own it does not enforce
- * it. Issue `04` adopted **one** superseder per ADR, and a two-stage retirement
- * written at both ends — 0022 naming 0026 and 0040, each naming 0022 back —
+ * it. The convention is **one** superseder per ADR, and a two-stage retirement
+ * written at both ends — one ADR naming two superseders, each naming it back —
  * satisfies every reciprocal check there is. Cardinality is the assertion that
- * makes the convention hold; without it the shape 0040 was carrying is legal
- * again as soon as someone answers the second link.
+ * makes the convention hold.
  *
- * Counted over *distinct* targets, because `supersededBy` folds the inline
- * spelling in beside the line: an ADR writing both names one superseder twice,
- * which is a redundant record rather than a second retirement.
+ * Counted over *distinct* targets: an ADR naming one superseder twice is a
+ * redundant record rather than a second retirement.
  */
 const supersededByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
   [...adrs].flatMap(([number, adr]) => {
@@ -252,11 +240,10 @@ const supersededByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
 /**
  * `Status:` takes one word.
  *
- * 0019 and 0029 wrote `Status: superseded by ADR 0030`, and the parser used to
- * fold that into the same answer as a `Superseded by:` line. Two spellings for
- * one fact cost more than they saved: every reader of the block — this guard,
- * the index generator, a person scanning the directory — had to know both, and
- * the second spelling put a link where nothing else looks for one.
+ * `Status: superseded by ADR NNNN` is a fault rather than a second spelling of
+ * a `Superseded by:` line. Two spellings for one fact would make every reader
+ * of the block — this guard, the index generator, a person scanning the
+ * directory — know both, and would put a link where nothing else looks for one.
  */
 const statusSpellingFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
   [...adrs].flatMap(([number, adr]) =>
@@ -268,8 +255,8 @@ const statusSpellingFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] 
 /**
  * A superseded ADR lives in `docs/adr/superseded/`, and nothing else does.
  *
- * The status block already said which decisions were retired, but only to a
- * reader who opened the file. The directory says it to a reader who lists the
+ * The status block says which decisions are retired, but only to a reader who
+ * opens the file. The directory says it to a reader who lists the
  * folder, which is what makes the live set countable.
  */
 const locationFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
@@ -286,7 +273,7 @@ const locationFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
  * The index lists every accepted decision, once.
  *
  * `docs/adr/README.md` exists so a reader can take in the live set without
- * opening 54 files. An index that silently falls behind is worse than none: it
+ * opening every file. An index that silently falls behind is worse than none: it
  * reads as complete, so a decision missing from it is a decision nobody knows
  * to look for. This holds the two directions — nothing accepted is absent, and
  * nothing listed has since been retired or was never an ADR.
@@ -456,7 +443,7 @@ describe('the status block that guard reads', () => {
   });
 
   it('reports a reference that names no ADR, at either end', () => {
-    // Filtering these out is what made the guard silent about a typo, and a
+    // Filtering these out would make the guard silent about a typo, and a
     // dead reference is the one fault symmetry cannot repair.
     const adrs = synthetic({
       '0001': ['Status: accepted', 'Refines: 0099'],
@@ -533,9 +520,8 @@ describe('the status block that guard reads', () => {
   });
 
   it('does not accept an inline Status as the answer to a Supersedes', () => {
-    // The shape 0019 and 0029 carried. It reciprocated 0030 to a parser that
-    // folded the spelling in, and to nothing else — so the link was invisible
-    // to every other reader of the block.
+    // The inline spelling reciprocates only to a parser that folds it in, so
+    // the link is invisible to every other reader of the block.
     const inline = synthetic({
       '0019': ['Status: superseded by ADR 0030'],
       '0030': ['Status: accepted', 'Supersedes: 0019'],
@@ -545,10 +531,8 @@ describe('the status block that guard reads', () => {
   });
 
   it('reports the two-stage retirement the one-superseder convention rules out', () => {
-    // ADR 0040 carried `Supersedes: 0022, 0026` until issue `04` settled on one
-    // superseder per ADR. 0022 names 0026 and stops there, so a reader follows
-    // the chain rather than finding 0040 named twice — and this is the guard
-    // that keeps the convention from drifting back.
+    // One superseder per ADR: 0022 names 0026 and stops there, so a reader
+    // follows the chain rather than finding 0040 named twice.
     const adrs = synthetic({
       '0022': ['Status: superseded', 'Superseded by: 0026'],
       '0026': ['Status: superseded', 'Supersedes: 0022', 'Superseded by: 0040'],
@@ -559,7 +543,7 @@ describe('the status block that guard reads', () => {
   });
 
   it('reports two superseders even when both directions answer', () => {
-    // The convention issue `04` adopted is one superseder per ADR, and
+    // The convention is one superseder per ADR, and
     // reciprocity alone does not enforce it: write the second link at both ends
     // and every `Supersedes` has its `Superseded by` and vice versa. Without a
     // cardinality check the guard would call this record well-formed, and the

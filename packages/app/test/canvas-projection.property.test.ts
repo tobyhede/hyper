@@ -102,7 +102,7 @@ describe('canvasProjection handle invariants', () => {
 
         const declared = new Map(nodes.map((node) => [node.id, node.handles ?? []]));
 
-        // An Edge names no handle since ADR 0087, so React Flow resolves each end
+        // An Edge names no handle (ADR 0087), so React Flow resolves each end
         // to the first declared bound of that kind — and answers null, drawing
         // nothing at all, for a Resource that declares none. What the two
         // derivations have to agree on is therefore which Resources are on the

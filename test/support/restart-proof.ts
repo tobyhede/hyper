@@ -81,16 +81,12 @@ export async function expectRestartProofExport(
 /**
  * Open a Space already stored at `spaceId`, and wait for the Dock to name it.
  *
- * **The Space's name is a label, not a heading** (ADR 0082). The Space
- * Sidebar drew it as an `h1`; the Command Dock draws it through the same
- * `IdentityName` the Map and Graph use, and a name with no rename Edit
- * behind it renders as a `span` rather than as a button or a heading —
- * renaming a Space is not built (`.scratch/command-dock/issues/09`). So the
- * slot is addressed the way every other spec addresses it, and the visible
- * filter is the open-Spaces rule: every open Space stays mounted, and only
- * the one on the canvas is showing.
- * `toContainText`, which is the matcher `space-resource.spec.ts` spends on this
- * same locator and the one actually proven green against the Dock. The title
+ * **The Space's name is a label, not a heading** (ADR 0082). The Command Dock
+ * draws it through the same `IdentityName` the Map and Graph use, so the slot
+ * is addressed the way every other spec addresses it, and the visible filter
+ * is the open-Spaces rule: every open Space stays mounted, and only the one on
+ * the canvas is showing. It is matched with `toContainText`, the matcher
+ * `space-resource.spec.ts` spends on this same locator. The title
  * carries the Space's own UUID, so containment is unambiguous here.
  */
 export async function openStoredSpace(

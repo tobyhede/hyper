@@ -34,8 +34,7 @@ describe('hasValidUniqueMediaTypeParameters', () => {
     expect(hasValidUniqueMediaTypeParameters(value)).toBe(true);
   });
 
-  // The quoted-pair branch. No existing test carried a backslash, so every line
-  // of the escape scanner was unexercised.
+  // The quoted-pair branch, which only a backslash reaches.
   it.each([
     ['an escaped DQUOTE', String.raw`application/json; foo="a\"b"`],
     ['an escaped backslash', String.raw`application/json; foo="a\\b"`],
