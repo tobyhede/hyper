@@ -286,9 +286,19 @@ export const applyEdit = (
         height: current.height + 20,
       }));
     case 'add-edge': {
-      const to = snapshot.resources[index + 2];
-      if (to === undefined) throw new Error(`Space ${snapshot.id} has no Resource ${index + 2}`);
       const { map, graph } = firstMap(snapshot);
+      // The first other Resource from `index + 2` on, wrapping round, that
+      // the subject has no Edge to yet, so repeated samples add a new Edge
+      // rather than a duplicate the Graph would refuse.
+      const to = [
+        ...snapshot.resources.slice(index + 2),
+        ...snapshot.resources.slice(0, index + 2),
+      ].find(
+        (candidate) =>
+          candidate.id !== subject.id &&
+          !graph.edges.some((edge) => edge.from === subject.id && edge.to === candidate.id),
+      );
+      if (to === undefined) throw new Error(`Resource ${subject.id} has no Edge left to add`);
       const nextMap = {
         ...map,
         graphs: map.graphs.map((candidate) =>

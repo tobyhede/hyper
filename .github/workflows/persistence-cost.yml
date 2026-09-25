@@ -68,7 +68,9 @@ jobs:
         env:
           PERSISTENCE_COST_TARGETS: postgres,sqlite,memory
           PERSISTENCE_COST_SAMPLES: '20'
+        # A pipe hides the harness's exit status unless `pipefail` is set.
         run: |
+          set -o pipefail
           mkdir -p "$REPORT_DIR"
           pnpm exec tsx scripts/persistence-cost/measure.ts | tee "$REPORT_DIR/measure.md"
 
@@ -76,7 +78,9 @@ jobs:
         env:
           PERSISTENCE_COST_DURATION_MS: '10000'
           PERSISTENCE_COST_ROUNDS: '3'
-        run: pnpm exec tsx scripts/persistence-cost/contention.ts | tee "$REPORT_DIR/contention.md"
+        run: |
+          set -o pipefail
+          pnpm exec tsx scripts/persistence-cost/contention.ts | tee "$REPORT_DIR/contention.md"
 
       - name: Summarise
         if: always()
