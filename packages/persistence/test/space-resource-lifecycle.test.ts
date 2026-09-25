@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { nextGraphColor } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
-import type { SpaceSessionState } from '../src/session';
+import { canRetry, type SpaceSessionState } from '../src/session';
 import { createSpaceSessionRegistry, type SpaceResourceRefusal } from '../src/session-registry';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -2846,8 +2846,13 @@ describe('Space Resource recovery after a replay that never installed', () => {
 
     expect(backend.loadAggregateCalls).toBe(2);
     expect(control.requests).toHaveLength(1);
-    expect(meta.getState().persistence.kind).toBe('failed');
-    expect(target.getState().persistence.kind).toBe('failed');
+    for (const session of [meta, target]) {
+      expect(session.getState().persistence).toMatchObject({
+        kind: 'failed',
+        failure: { code: 'network' },
+        blocked: { code: 'persistence-read-failed' },
+      });
+    }
     expect(registry.entry(TARGET_ID)).toMatchObject({ kind: 'session' });
 
     meta.submit({
@@ -2890,8 +2895,12 @@ describe('Space Resource recovery after a replay that never installed', () => {
 
     expect(backend.loadAggregateCalls).toBe(2);
     expect(control.requests).toHaveLength(1);
-    expect(meta.getState().persistence.kind).toBe('conflicted');
-    expect(target.getState().persistence.kind).toBe('conflicted');
+    for (const session of [meta, target]) {
+      expect(session.getState().persistence).toMatchObject({
+        kind: 'conflicted',
+        blocked: { code: 'persistence-read-failed' },
+      });
+    }
 
     control.queueResult({
       kind: 'committed',
@@ -2950,7 +2959,11 @@ describe('Space Resource recovery after a replay that never installed', () => {
 
     expect(backend.loadAggregateCalls).toBe(2);
     expect(control.requests).toHaveLength(1);
-    expect(target.getState().persistence.kind).toBe('failed');
+    // A throw is not a refusal, so the failure it recovers from still stands.
+    expect(target.getState().persistence).toEqual({
+      kind: 'failed',
+      failure: { kind: 'retryable-failure', code: 'network' },
+    });
 
     // The barrier is down: an ordinary Space opened now commits on its own.
     const reopened = registry.open({
@@ -2983,7 +2996,7 @@ describe('Space Resource recovery another coordination holds', () => {
    */
   const supersededSequence = async () => {
     const control = new MemorySpaceBackendTestControl();
-    const backend = new MemorySpaceBackend(
+    const backend = new ScriptedAggregateBackend(
       META_ID,
       [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
       control,
@@ -3049,9 +3062,12 @@ describe('Space Resource recovery another coordination holds', () => {
       ],
       deletedSpaceIds: [],
     });
-    meta.submit(meta.getState().working);
+    meta.submit({
+      ...meta.getState().working,
+      document: { ...meta.getState().working.document, title: 'Meta edited while blocked' },
+    });
     await registry.waitUntilRetirable(META_ID);
-    return { control, registry, meta, target, child, storedTarget };
+    return { control, backend, registry, meta, target, child, storedTarget };
   };
 
   it('does not replay a coordination over a participant another conflicted coordination holds', async () => {
@@ -3067,6 +3083,112 @@ describe('Space Resource recovery another coordination holds', () => {
     });
     expect(child.getState().persistence.kind).toBe('conflicted');
     expect(registry.session(CHILD_ID)).toBe(child);
+  });
+
+  it('names the Space whose recovery refused the replay, keeping the Edit it did not save', async () => {
+    const { meta } = await supersededSequence();
+
+    expect(meta.getState()).toMatchObject({
+      working: { document: { title: 'Meta edited while blocked' } },
+      persistence: {
+        kind: 'rejected',
+        blocked: {
+          code: 'persistence-recovery-required',
+          spaceId: TARGET_ID,
+          title: 'Target',
+          recovery: 'resolve-conflict',
+        },
+      },
+    });
+    expect(canRetry(meta.getState().persistence)).toBe(true);
+  });
+
+  it('does not replay when the blocking recovery resolves, and saves the latest Edits on Retry', async () => {
+    const { control, registry, meta, child } = await supersededSequence();
+
+    child.acceptRemote();
+    await registry.waitUntilRetirable(META_ID);
+
+    // Resolving C1 settles TARGET and nothing else: Meta waits for Retry.
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState().persistence).toMatchObject({ kind: 'rejected', blocked: {} });
+
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(control.requests).toHaveLength(3);
+    expect(control.requests[2]?.changes).toMatchObject([
+      {
+        kind: 'update',
+        spaceId: META_ID,
+        snapshot: { document: { title: 'Meta edited while blocked' } },
+      },
+      { spaceId: TARGET_ID },
+    ]);
+    expect(meta.getState()).toMatchObject({
+      working: { document: { title: 'Meta edited while blocked' } },
+      acknowledgedRevision: 4n,
+      persistence: { kind: 'settled' },
+    });
+  });
+
+  it('refuses a Retry again while the blocking recovery is unresolved', async () => {
+    const { control, backend, registry, meta, target, child } = await supersededSequence();
+    const refusedAt = backend.loadAggregateCalls;
+
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(backend.loadAggregateCalls).toBe(refusedAt + 1);
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState()).toMatchObject({
+      working: { document: { title: 'Meta edited while blocked' } },
+      persistence: {
+        kind: 'rejected',
+        blocked: { code: 'persistence-recovery-required', spaceId: TARGET_ID },
+      },
+    });
+    // C1 still owns TARGET and CHILD.
+    expect(target.getState().persistence.kind).toBe('conflicted');
+    expect(child.getState().persistence.kind).toBe('conflicted');
+  });
+
+  it('says a Retry whose replay read failed did not save, and keeps Retry available', async () => {
+    const { control, backend, registry, meta, child } = await supersededSequence();
+    child.acceptRemote();
+
+    backend.failNextLoad(new Error('aggregate read refused'));
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(control.requests).toHaveLength(2);
+    expect(meta.getState()).toMatchObject({
+      working: { document: { title: 'Meta edited while blocked' } },
+      persistence: { kind: 'rejected', blocked: { code: 'persistence-read-failed' } },
+    });
+    expect(canRetry(meta.getState().persistence)).toBe(true);
+
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(control.requests).toHaveLength(3);
+    expect(meta.getState().persistence).toEqual({ kind: 'settled' });
+  });
+
+  it('replays once for Retry pressed while a blocked replay is still reading', async () => {
+    const { control, backend, registry, meta, child } = await supersededSequence();
+    child.acceptRemote();
+    const releaseRead = backend.deferNextLoad();
+
+    meta.retry();
+    meta.retry();
+    releaseRead();
+    await registry.waitUntilRetirable(META_ID);
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+
+    expect(control.requests).toHaveLength(3);
+    expect(meta.getState().persistence.kind).toBe('settled');
   });
 
   it("resolves CHILD and TARGET together through CHILD's Accept stored", async () => {

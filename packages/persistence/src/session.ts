@@ -1,36 +1,60 @@
-import type { SpaceSnapshot } from '@project/core';
+import type { SpaceSnapshot, UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, SpaceBackend } from './backend';
 import { createObservableState, type ObserverErrorReporter } from './observable-state';
+import type { SpaceResourceRecovery } from './space-resource-planning';
 
 type RetryableFailure = Extract<CommitResult, { kind: 'retryable-failure' }>;
 type PermanentFailure = Extract<CommitResult, { kind: 'permanent-failure' }>;
 type AggregateRefusal = Extract<CommitResult, { kind: 'aggregate-refused' }>;
 
+/**
+ * Why the save that recovers a coordinated Edit never reached the backend.
+ *
+ * A recovery replays its Edit as a new coordination, and that coordination can
+ * refuse before it commits: another coordination's recovery holds a Space the
+ * replay needs, or the aggregate read it validates against failed. Nothing was
+ * sent, so the outcome the recovery answers to still stands and the working
+ * Space keeps every unsaved Edit; the block says why the latest attempt did not
+ * change that. `title` is the blocking Space's name when the refusal was made.
+ */
+export type SaveBlock =
+  | {
+      readonly code: 'persistence-recovery-required';
+      readonly spaceId: UUID;
+      readonly title: string;
+      readonly recovery: SpaceResourceRecovery;
+    }
+  | { readonly code: 'persistence-read-failed' };
+
 export interface SpaceSessionState {
   working: SpaceSnapshot;
   acknowledgedRevision: bigint;
   changedSinceExport: boolean;
+  /**
+   * `blocked`, on each state a coordinated recovery can answer to, is the
+   * latest recovery attempt's refusal (see {@link SaveBlock}); the next
+   * outcome installed replaces it.
+   */
   persistence:
     | { kind: 'settled' }
     | { kind: 'pending' }
-    | { kind: 'failed'; failure: RetryableFailure }
-    | { kind: 'rejected'; failure: PermanentFailure }
+    | { kind: 'failed'; failure: RetryableFailure; blocked?: SaveBlock }
+    | { kind: 'rejected'; failure: PermanentFailure; blocked?: SaveBlock }
     /**
      * A refused aggregate is not a permanent failure (ADR 0057, `v1-release/17`).
      *
-     * The two used to share `rejected`, and their recovery was already the same
-     * one this keeps: neither offers Retry — `retry()` below answers only
-     * `failed` — and both leave `submit` free to resubmit past them, because an
-     * authored correction is what a refusal or a rejection alike waits for. What
-     * a shared `kind` cost is the type-level distinction between "the server
-     * declined the request" and "the proposed aggregate is invalid," which a
-     * consumer reading `failure.kind` inside `rejected` had to make for itself.
-     * A `refused` state makes that distinction the discriminant, so a consumer
+     * The two share one recovery: neither offers Retry unless a recovery
+     * attempt was blocked ({@link canRetry}), and both leave `submit` free to
+     * resubmit past them, because an authored correction is what a refusal or a
+     * rejection alike waits for. A shared `kind` would cost the type-level
+     * distinction between "the server declined the request" and "the proposed
+     * aggregate is invalid". A `refused` state makes that distinction the discriminant, so a consumer
      * that means one and not the other says so at the type it switches on.
      */
-    | { kind: 'refused'; failure: AggregateRefusal }
+    | { kind: 'refused'; failure: AggregateRefusal; blocked?: SaveBlock }
     | {
         kind: 'conflicted';
+        blocked?: SaveBlock;
         /** The newer stored Space to reload, when the conflict named this one. */
         current: LoadedSpace | undefined;
         /**
@@ -54,6 +78,22 @@ export interface SpaceSessionState {
         baseline: SpaceSnapshot | undefined;
       };
 }
+
+type Persistence = SpaceSessionState['persistence'];
+
+/**
+ * Whether `retry()` acts on this state: an explicit attempt to save the latest
+ * working Space again, with no further Edit.
+ *
+ * A retryable failure always offers it. A rejection or refusal offers it only
+ * once a recovery attempt was blocked, because then nothing the server said is
+ * standing in the way, and the blocker can be resolved elsewhere without an
+ * Edit here. Otherwise a rejection or refusal waits for an authored correction.
+ */
+export const canRetry = (persistence: Persistence): boolean =>
+  persistence.kind === 'failed' ||
+  ((persistence.kind === 'rejected' || persistence.kind === 'refused') &&
+    persistence.blocked !== undefined);
 
 export interface SpaceSession {
   readonly getState: () => SpaceSessionState;
@@ -91,6 +131,8 @@ export interface ManagedSpaceSession {
   readonly failCoordinatedCommit: (
     result: Exclude<CommitResult, { kind: 'committed' } | { kind: 'conflict' }>,
   ) => void;
+  /** Record why this session's recovery attempt never reached the backend. */
+  readonly blockCoordinatedCommit: (block: SaveBlock) => void;
   readonly setCoordinatedRecovery: (recovery: CoordinatedRecovery | undefined) => void;
   /** Whether this session answers to `recovery` for its coordinated outcome. */
   readonly holdsCoordinatedRecovery: (recovery: CoordinatedRecovery) => boolean;
@@ -363,12 +405,13 @@ export const openManagedSpaceSession = (
     },
     retry: () => {
       const state = observable.getState();
-      if (state.persistence.kind === 'failed' && coordinatedRecovery !== undefined) {
+      if (!canRetry(state.persistence)) return;
+      if (coordinatedRecovery !== undefined) {
         coordinatedRecovery.retry();
         return;
       }
-      // `failed` implies nothing is in flight: see `inFlight`.
-      if (state.persistence.kind !== 'failed' || coordinating || persistencePaused) return;
+      // A retryable state implies nothing is in flight: see `inFlight`.
+      if (coordinating || persistencePaused) return;
       startCommit(state.working, state.acknowledgedRevision);
     },
     acceptRemote: () => {
@@ -540,6 +583,12 @@ export const openManagedSpaceSession = (
       publishIdle();
     },
     failCoordinatedCommit,
+    blockCoordinatedCommit: (blocked) => {
+      const state = observable.getState();
+      const { persistence } = state;
+      if (persistence.kind === 'settled' || persistence.kind === 'pending') return;
+      observable.install({ ...state, persistence: { ...persistence, blocked } });
+    },
     setCoordinatedRecovery: (recovery) => {
       coordinatedRecovery = recovery;
     },

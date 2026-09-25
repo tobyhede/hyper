@@ -146,6 +146,41 @@ describe('CoordinatedCommit', () => {
     expect(replays).toHaveLength(2);
   });
 
+  it('records a refused replay on the participants it recovers, and offers Retry again', () => {
+    const { commit, managed, replays } = setUp();
+    commit.enlist();
+    commit.prepare();
+    commit.publish();
+    commit.settle({ kind: 'permanent-failure', code: 'forbidden' });
+    const edited: SpaceSnapshot = {
+      ...renamed,
+      document: { ...renamed.document, title: 'Edited after rejection' },
+    };
+    managed.session.submit(edited);
+    expect(replays).toHaveLength(1);
+
+    const block = {
+      code: 'persistence-recovery-required',
+      spaceId: SPACE_ID,
+      title: 'Blocking',
+      recovery: 'resolve-conflict',
+    } as const;
+    commit.resumeRecovery(block);
+
+    expect(commit.phase).toBe('failed');
+    expect(managed.session.getState()).toMatchObject({
+      working: edited,
+      persistence: { kind: 'rejected', failure: { code: 'forbidden' }, blocked: block },
+    });
+    managed.session.retry();
+    expect(replays).toHaveLength(2);
+
+    commit.resumeRecovery({ code: 'persistence-read-failed' });
+    expect(managed.session.getState().persistence).toMatchObject({
+      blocked: { code: 'persistence-read-failed' },
+    });
+  });
+
   it('hands recovery over to the replay that prepares, which then ignores resuming', () => {
     const { commit, managed, replays, spaces } = setUp();
     commit.enlist();

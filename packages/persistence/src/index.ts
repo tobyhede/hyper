@@ -70,7 +70,7 @@ export { ascendingById, readInIdOrder } from './read-order';
 /* The stored side of the seam, declared once for both consumers: the Fetch
  * application in `@project/http` and the PostgreSQL adapter under `src/`. */
 export * from './repository';
-export { openSpaceSession } from './session';
-export type { SpaceSession, SpaceSessionOptions, SpaceSessionState } from './session';
+export { canRetry, openSpaceSession } from './session';
+export type { SaveBlock, SpaceSession, SpaceSessionOptions, SpaceSessionState } from './session';
 export * from './session-registry';
 export * from './working-space';
