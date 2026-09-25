@@ -4,6 +4,7 @@ import { nextGraphColor } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '../src/memory';
 import { canRetry, type SpaceSessionState } from '../src/session';
 import { createSpaceSessionRegistry, type SpaceResourceRefusal } from '../src/session-registry';
+import { commitRequestBytes, SizeLimitedBackend } from './size-limited-backend';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const META_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -3332,5 +3333,99 @@ describe('Space Resource recovery another coordination holds', () => {
       acknowledgedRevision: 5n,
       persistence: { kind: 'settled' },
     });
+  });
+});
+
+/*
+ * Code-quality ticket 22, for a coordinated save: the size limit is on the
+ * whole request, so a Meta that saves alone can be refused once a Space
+ * Resource creation carries the new Space beside it. Every participant keeps
+ * its Edits and offers Retry; a reduction anywhere in the request is what
+ * brings it under.
+ */
+describe('A coordinated save over the request size limit', () => {
+  const metaWithBody = (space: SpaceSnapshot, body: string): SpaceSnapshot => ({
+    ...space,
+    resources: space.resources.map((resource) =>
+      resource.id === META_RESOURCE_ID
+        ? { ...resource, document: { title: 'Meta', kind: 'markdown', body } }
+        : resource,
+    ),
+  });
+  const metaBody = (space: SpaceSnapshot): string | undefined => {
+    const document = space.resources.find(({ id }) => id === META_RESOURCE_ID)?.document;
+    return document?.kind === 'markdown' ? document.body : undefined;
+  };
+
+  it('refuses the total request, keeps every Edit, and saves once a reduction fits', async () => {
+    const large = metaWithBody(metaSnapshot, 'x'.repeat(4000));
+    const backend = new SizeLimitedBackend(META_ID, [
+      { snapshot: large, revision: 3n, exportedRevision: null },
+    ]);
+    // Meta alone, with a little room: the Space Resource creation's request,
+    // which also carries the new Space, is over it.
+    backend.limit =
+      commitRequestBytes({
+        changes: [{ kind: 'update', spaceId: META_ID, snapshot: large, expectedRevision: 3n }],
+      }) + 64;
+    const registry = createSpaceSessionRegistry(backend);
+    const meta = registry.open({ snapshot: large, revision: 3n, exportedRevision: null });
+
+    meta.submit({ ...large, document: { ...large.document, title: 'Meta alone' } });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+    expect(meta.getState().acknowledgedRevision).toBe(4n);
+
+    const lifecycle = registry.spaceResources(
+      idSource([TARGET_ID, TARGET_RESOURCE_ID, TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
+    );
+    await lifecycle.create({
+      containingSpaceId: META_ID,
+      mapId: META_MAP_ID,
+      title: 'Architecture',
+      position: { x: 240, y: 80 },
+    });
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('rejected'));
+    const target = registry.session(TARGET_ID);
+    const tooLarge = { kind: 'permanent-failure', code: 'payload-too-large' } as const;
+    expect(meta.getState().persistence).toEqual({ kind: 'rejected', failure: tooLarge });
+    expect(target?.getState().persistence).toEqual({ kind: 'rejected', failure: tooLarge });
+    expect(canRetry(meta.getState().persistence)).toBe(true);
+    expect(backend.requests[1]?.changes.map(({ kind }) => kind)).toEqual(['update', 'create']);
+    const spaceResourceKept = (): boolean =>
+      meta.getState().working.resources.some(({ id }) => id === SPACE_RESOURCE_ID);
+    expect(spaceResourceKept()).toBe(true);
+
+    // Retry as it stands is rejected again, from either participant, with the
+    // Edits kept and nothing stored.
+    meta.retry();
+    await registry.waitUntilRetirable(META_ID);
+    target?.retry();
+    await registry.waitUntilRetirable(META_ID);
+    expect(backend.requests).toHaveLength(4);
+    expect(meta.getState().persistence).toEqual({ kind: 'rejected', failure: tooLarge });
+    expect(target?.getState().persistence).toEqual({ kind: 'rejected', failure: tooLarge });
+    expect(spaceResourceKept()).toBe(true);
+
+    // A reduction still over the total is rejected the same way.
+    meta.submit(metaWithBody(meta.getState().working, 'x'.repeat(3980)));
+    await registry.waitUntilRetirable(META_ID);
+    expect(backend.requests).toHaveLength(5);
+    expect(meta.getState().persistence).toEqual({ kind: 'rejected', failure: tooLarge });
+    expect(metaBody(meta.getState().working)).toBe('x'.repeat(3980));
+    await expect(backend.loadSpace(TARGET_ID)).resolves.toBeUndefined();
+    await expect(backend.loadSpace(META_ID)).resolves.toMatchObject({ revision: 4n });
+
+    meta.submit(metaWithBody(meta.getState().working, 'x'.repeat(1000)));
+    await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('settled'));
+    expect(target?.getState().persistence.kind).toBe('settled');
+    expect(backend.requests[5]?.changes).toMatchObject([
+      { kind: 'update', spaceId: META_ID },
+      { kind: 'create', spaceId: TARGET_ID },
+    ]);
+    await expect(backend.loadSpace(TARGET_ID)).resolves.toMatchObject({ revision: 0n });
+    const stored = await backend.loadSpace(META_ID);
+    expect(stored?.revision).toBe(5n);
+    expect(stored === undefined ? undefined : metaBody(stored.snapshot)).toBe('x'.repeat(1000));
+    expect(stored?.snapshot.resources.some(({ id }) => id === SPACE_RESOURCE_ID)).toBe(true);
   });
 });

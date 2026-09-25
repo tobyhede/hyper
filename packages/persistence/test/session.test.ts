@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import type { LoadedSpace, SpaceBackend, SpaceSession, SpaceSessionState } from '../src/index';
 import { MemorySpaceBackend, openSpaceSession } from '../src/index';
-import { openManagedSpaceSession } from '../src/session';
+import { canRetry, openManagedSpaceSession } from '../src/session';
+import { commitRequestBytes, SizeLimitedBackend } from './size-limited-backend';
 import { MemorySpaceBackendTestControl } from '../src/memory';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -1134,5 +1135,114 @@ describe('openSpaceSession', () => {
       ({ persistence }) => persistence.kind === 'settled',
     );
     expect(control.requests).toHaveLength(2);
+  });
+});
+
+/*
+ * Code-quality ticket 22: a save over the request size limit keeps every Edit
+ * and offers Retry, which sends whatever the working Space holds then. A Retry
+ * or a reduction still over the limit is rejected again the same way; one
+ * under it saves.
+ */
+describe('a save over the request size limit', () => {
+  const withBody = (body: string): LoadedSpace['snapshot'] => ({
+    ...loaded.snapshot,
+    resources: loaded.snapshot.resources.map((resource) => ({
+      ...resource,
+      document: { title: 'A', kind: 'markdown', body },
+    })),
+  });
+  const bodyOf = (snapshot: LoadedSpace['snapshot']) => {
+    const document = snapshot.resources[0]?.document;
+    return document?.kind === 'markdown' ? document.body : undefined;
+  };
+  const sizeLimited = () => {
+    const backend = new SizeLimitedBackend(SPACE_ID, [loaded]);
+    // A body of up to 100 characters fits; one of 101 does not.
+    backend.limit = commitRequestBytes({
+      changes: [
+        {
+          kind: 'update',
+          spaceId: SPACE_ID,
+          snapshot: withBody('x'.repeat(100)),
+          expectedRevision: 3n,
+        },
+      ],
+    });
+    return backend;
+  };
+  const reaches = (session: SpaceSession, kind: SpaceSessionState['persistence']['kind']) =>
+    waitFor(session.getState, session.subscribe, ({ persistence }) => persistence.kind === kind);
+
+  it('keeps the Edits, offers Retry, and saves once a reduction fits', async () => {
+    const backend = sizeLimited();
+    const session = openSpaceSession(backend, loaded);
+
+    session.submit(withBody('x'.repeat(500)));
+    const rejected = await reaches(session, 'rejected');
+    expect(rejected.persistence).toEqual({
+      kind: 'rejected',
+      failure: { kind: 'permanent-failure', code: 'payload-too-large' },
+    });
+    expect(canRetry(rejected.persistence)).toBe(true);
+    expect(bodyOf(rejected.working)).toBe('x'.repeat(500));
+    expect(rejected.acknowledgedRevision).toBe(3n);
+
+    // Retry as it stands: still over, so rejected again, with the Edit kept.
+    session.retry();
+    expect(session.getState().persistence.kind).toBe('pending');
+    const retried = await reaches(session, 'rejected');
+    expect(backend.requests).toHaveLength(2);
+    expect(canRetry(retried.persistence)).toBe(true);
+    expect(bodyOf(retried.working)).toBe('x'.repeat(500));
+
+    // A reduction still over the limit is rejected the same way.
+    session.submit(withBody('x'.repeat(300)));
+    const stillOver = await reaches(session, 'rejected');
+    expect(backend.requests).toHaveLength(3);
+    expect(canRetry(stillOver.persistence)).toBe(true);
+    expect(bodyOf(stillOver.working)).toBe('x'.repeat(300));
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 3n,
+      snapshot: { resources: [{ document: { body: 'Original' } }] },
+    });
+
+    session.submit(withBody('x'.repeat(80)));
+    const settled = await reaches(session, 'settled');
+    expect(settled.acknowledgedRevision).toBe(4n);
+    await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      revision: 4n,
+      snapshot: { resources: [{ document: { body: 'x'.repeat(80) } }] },
+    });
+  });
+
+  it('sends the latest working Space on Retry, and saves when the server accepts it', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'permanent-failure', code: 'payload-too-large' });
+    const session = openSpaceSession(new MemorySpaceBackend(SPACE_ID, [loaded], control), loaded);
+
+    session.submit(changedTitle('Too large'));
+    await reaches(session, 'rejected');
+    session.retry();
+    const settled = await reaches(session, 'settled');
+
+    expect(settled.acknowledgedRevision).toBe(4n);
+    expect(control.attempts).toHaveLength(2);
+    expect(control.attempts[1]).toMatchObject({
+      expectedRevision: 3n,
+      snapshot: { document: { title: 'Too large' } },
+    });
+  });
+
+  it('offers no Retry for a rejection that is not about size', () => {
+    expect(
+      canRetry({ kind: 'rejected', failure: { kind: 'permanent-failure', code: 'forbidden' } }),
+    ).toBe(false);
+    expect(
+      canRetry({
+        kind: 'rejected',
+        failure: { kind: 'permanent-failure', code: 'payload-too-large' },
+      }),
+    ).toBe(true);
   });
 });

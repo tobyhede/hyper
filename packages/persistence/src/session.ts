@@ -44,12 +44,12 @@ export interface SpaceSessionState {
      * A refused aggregate is not a permanent failure (ADR 0057, `v1-release/17`).
      *
      * The two share one recovery: neither offers Retry unless a recovery
-     * attempt was blocked ({@link canRetry}), and both leave `submit` free to
-     * resubmit past them, because an authored correction is what a refusal or a
-     * rejection alike waits for. Their own `kind` is the distinction between
-     * "the server declined the request" and "the proposed aggregate is
-     * invalid", so a consumer that means one and not the other says so at the
-     * type it switches on.
+     * attempt was blocked or the rejection was for size ({@link canRetry}),
+     * and both leave `submit` free to resubmit past them, because an authored
+     * correction is what a refusal or a rejection alike waits for. Their own
+     * `kind` is the distinction between "the server declined the request" and
+     * "the proposed aggregate is invalid", so a consumer that means one and not
+     * the other says so at the type it switches on.
      */
     | { kind: 'refused'; failure: AggregateRefusal; blocked?: SaveBlock }
     | {
@@ -81,9 +81,22 @@ export interface SpaceSessionState {
 
 type Persistence = SpaceSessionState['persistence'];
 
+/**
+ * A rejection because the submitted request was over the server's size limit.
+ *
+ * The limit is on the whole request: every Space a coordinated save carries
+ * counts toward it together, so no single Space or Resource count is promised
+ * to fit. Reducing content is what answers it, and the next attempt carries
+ * whatever the working Spaces then hold.
+ */
+export type OversizedRejection = Extract<Persistence, { kind: 'rejected' }> & {
+  readonly failure: { readonly kind: 'permanent-failure'; readonly code: 'payload-too-large' };
+};
+
 /** A persistence state `retry()` acts on (see {@link canRetry}). */
 export type RetryablePersistence =
   | Extract<Persistence, { kind: 'failed' }>
+  | OversizedRejection
   | (Extract<Persistence, { kind: 'rejected' } | { kind: 'refused' }> & {
       readonly blocked: SaveBlock;
     });
@@ -92,13 +105,18 @@ export type RetryablePersistence =
  * Whether `retry()` acts on this state: an explicit attempt to save the latest
  * working Space again, with no further Edit.
  *
- * A retryable failure always offers it. A rejection or refusal offers it only
- * once a recovery attempt was blocked, because then nothing the server said is
- * standing in the way, and the blocker can be resolved elsewhere without an
- * Edit here. Otherwise a rejection or refusal waits for an authored correction.
+ * A retryable failure always offers it. So does a rejection for size, because
+ * the author answers it by reducing content, wherever that content is, and
+ * Retry sends what the working Spaces hold then; a Retry still over the limit is
+ * rejected again with the Edits kept. Any other rejection or refusal offers it
+ * only once a recovery attempt was blocked, because then nothing the server
+ * said is standing in the way, and the blocker can be resolved elsewhere
+ * without an Edit here. Otherwise a rejection or refusal waits for an authored
+ * correction.
  */
 export const canRetry = (persistence: Persistence): persistence is RetryablePersistence =>
   persistence.kind === 'failed' ||
+  (persistence.kind === 'rejected' && persistence.failure.code === 'payload-too-large') ||
   ((persistence.kind === 'rejected' || persistence.kind === 'refused') &&
     persistence.blocked !== undefined);
 
