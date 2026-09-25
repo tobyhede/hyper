@@ -91,6 +91,36 @@ describe('status lines', () => {
   });
 });
 
+describe('ticket numbers', () => {
+  it('reports both files when one effort claims a number twice', () => {
+    const root = scratch();
+    write(root, 'effort/issues/16-first.md', 'Status: resolved\n');
+    write(root, 'effort/issues/16-second.md', '# Handoff with no status\n');
+    write(root, 'effort/issues/17-only.md', 'Status: resolved\n');
+    write(root, 'other/issues/16-elsewhere.md', 'Status: resolved\n');
+
+    const roadmap = buildRoadmap(root);
+
+    expect(featureNamed(roadmap, 'effort').duplicateNumbers).toEqual([
+      '16: 16-first.md, 16-second.md',
+    ]);
+    expect(featureNamed(roadmap, 'other').duplicateNumbers).toEqual([]);
+    expect(renderRoadmap(roadmap)).toContain('DUPLICATE TICKET NUMBERS — 1');
+    expect(renderRoadmapHtml(roadmap)).toContain('effort/issues/16: 16-first.md, 16-second.md');
+  });
+
+  it('finds no number claimed twice within any effort of the tracked tracker', () => {
+    const roadmap = buildRoadmap(join(REPOSITORY_ROOT, '.scratch'));
+
+    // A tracker the scan quietly stopped reaching would report nothing forever.
+    expect(roadmap.features.filter((feature) => feature.issues.length > 0).length).toBeGreaterThan(
+      20,
+    );
+    expect(roadmap.features.map((feature) => feature.slug)).toContain('command-dock');
+    expect(roadmap.features.flatMap((feature) => feature.duplicateNumbers)).toEqual([]);
+  });
+});
+
 describe('issue tags', () => {
   it('reads optional comma-separated tags without changing issue membership', () => {
     const root = scratch();

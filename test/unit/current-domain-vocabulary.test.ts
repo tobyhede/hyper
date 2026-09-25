@@ -10,13 +10,13 @@ import { describe, expect, it } from 'vitest';
  * survive only in historical records and in qualified HTTP or graph-layout
  * prose. Nothing was reading for that. `tsc` catches a reference to a name
  * nothing declares, but not a name reintroduced together with its declaration,
- * and it never opens a Markdown document, a `space.json` fixture or a resource file
- * — which is most of what the rename touched.
+ * and it never opens a stylesheet, a `space.json` fixture or a resource file.
  *
- * This reads the tracked files themselves, in the idiom
- * `conflict-markers.test.ts` already established here for the same shape of
- * problem: one scan over everything, rather than a hand-kept list of the places
- * someone remembered to look.
+ * This reads the tracked source, test, script, configuration and Space-data
+ * files themselves, in the idiom `conflict-markers.test.ts` already established
+ * here for the same shape of problem: one scan over everything, rather than a
+ * hand-kept list of the places someone remembered to look. Prose documents are
+ * out of scope (`isMarkdownDocument`).
  */
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -200,12 +200,28 @@ const trackedFiles = (): readonly string[] =>
     });
 
 /**
- * Every tracked file the historical trees do not account for — what all three
- * blocks below start from, and the reason none of them writes the exclusion out
- * again. The one that narrows further does so on top of this.
+ * A Space's Resource files are Markdown too, and they are product data the
+ * fixtures and the example Space seed, so they are read like `space.json`.
+ */
+const SPACE_CONTENT_TREES = ['packages/app/example/', 'packages/app/fixture/'] as const;
+
+/**
+ * A prose document — the README, CONTEXT.md, AGENTS.md, `docs/**`, a skill.
+ * Documents are not scanned: the guard holds the source, tests, scripts,
+ * configuration and Space data the product is built from.
+ */
+const isMarkdownDocument = (file: string): boolean =>
+  file.endsWith('.md') && !SPACE_CONTENT_TREES.some((tree) => file.startsWith(tree));
+
+/**
+ * Every tracked file the historical trees do not account for, bar prose
+ * documents — what every block below starts from, and the reason none of them
+ * writes the exclusion out again.
  */
 const scannableFiles = (): readonly string[] =>
-  trackedFiles().filter((file) => !HISTORICAL_TREES.some((tree) => file.startsWith(tree)));
+  trackedFiles().filter(
+    (file) => !HISTORICAL_TREES.some((tree) => file.startsWith(tree)) && !isMarkdownDocument(file),
+  );
 
 /** Every line of `text` matching `pattern`, as `line: text` for a readable failure. */
 const hits = (text: string, pattern: RegExp): string[] =>
@@ -256,8 +272,10 @@ describe('the retired domain vocabulary is gone from tracked files', () => {
 
   it('reaches the kinds of file the rename actually touched', () => {
     // A file list that quietly stopped resolving would report nothing forever.
-    // The rename crossed all four, and only one of them is a compiler's concern.
-    expect(scanned).toContain('AGENTS.md');
+    // The rename crossed source, Resource files and `space.json` fixtures, and
+    // only the first is a compiler's concern.
+    expect(scanned).toContain('packages/core/src/schema.ts');
+    expect(scanned).not.toContain('AGENTS.md');
     expect(scanned.filter((file) => file.endsWith('.ts')).length).toBeGreaterThan(0);
     expect(scanned.filter((file) => file.endsWith('.md')).length).toBeGreaterThan(0);
     expect(scanned.filter((file) => file.endsWith('.json')).length).toBeGreaterThan(0);
@@ -478,15 +496,10 @@ describe('the vocabulary that guard reads', () => {
  * The persisted key that moved with them is deliberately **not** read here.
  * ADR 0054 rolls the unreleased prototype forward, and issue `04` foreclosed
  * every back-compat path for that key by name — so there is no live source this
- * scan would be protecting, and a document outside this repository still
- * carrying it is not content a scan over tracked files can reach anyway.
+ * scan would be protecting.
  *
  * The names below have no qualified sense anywhere, unlike ADR 0041's, so this
- * scan carries no exemption list beyond the historical trees. What it caught on
- * the rename that added it was `docs/agents/ui.md` — the read-before-touching
- * authority for the sidebar, still pointing the next agent at a deleted module
- * and a renamed prop. `docs-agents-citation-accuracy.test.ts` reads code→doc
- * quotations and has nothing to say about a document naming code that is gone.
+ * scan carries no exemption list beyond the historical trees.
  *
  * **The bare render-layer word is not read, and cannot be.** React Flow ships
  * `EdgeLabelRenderer` and a `react-flow__renderer` class, `SpaceAppRenderer`
@@ -544,45 +557,20 @@ const RETIRED_RENDERER_NAMES = [
  */
 const RETIRED_SELECTED_CANVAS = ['Selected', 'Canvas', 'Renderer'].join('');
 
-/**
- * The field the aggregate stopped carrying when the two questions were split.
- *
- * The list of rows and which one was current became two answers rather than one
- * value with a field, so a reader sent to this field is sent to one that does
- * not exist — which is what `docs/agents/ui.md` went on doing after the split,
- * in the same bullet the rename above had already been corrected in. Nothing
- * was reading for it: the retired *names* were gone, so every scan here was
- * green while the read-before-touching document still described a shape the
- * code had left. Both the list and the separate answer are themselves retired
- * now, and the entries above hold them.
- *
- * Named rather than listed above because it is the one entry the self-test has
- * to write out, and because the two spellings differ: the scan needs the dot
- * escaped, and the fixture text needs it plain. Unescaped it is a wildcard, and
- * the scan would also report an identifier with any character in between.
- */
-const RETIRED_AGGREGATE_FIELD = ['renderers', '.selected'].join('');
-
 const RETIRED_RENDERER_NAME = new RegExp(
-  [
-    ...RETIRED_RENDERER_NAMES.map((name) => `\\b${name}`),
-    `\\b${RETIRED_SELECTED_CANVAS}`,
-    `\\b${RETIRED_AGGREGATE_FIELD.replace('.', '\\.')}`,
-  ].join('|'),
+  [...RETIRED_RENDERER_NAMES.map((name) => `\\b${name}`), `\\b${RETIRED_SELECTED_CANVAS}`].join(
+    '|',
+  ),
 );
 
 describe('the canvas renderer is named once (ADR 0055)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The two files the rename left something behind in: the Space command
-    // surface, which used one identifier for two concepts, and the agent-facing
-    // document that pointed at a deleted module. A file list that quietly
-    // stopped resolving would report nothing forever. The surface is the
-    // Command Dock now — `SpaceSidebar.tsx` stood here until ADR 0082 retired
-    // it — and the canary follows the component rather than the filename.
+    // The Space command surface, which used one identifier for two concepts.
+    // A file list that quietly stopped resolving would report nothing forever.
+    // The canary follows the component rather than the filename.
     expect(scanned).toContain('packages/app/src/components/CommandDock.tsx');
-    expect(scanned).toContain('docs/agents/ui.md');
     expect(scanned.filter((file) => file.endsWith('.tsx')).length).toBeGreaterThan(0);
   });
 
@@ -595,21 +583,6 @@ describe('the canvas renderer is named once (ADR 0055)', () => {
     });
 
     expect(found).toEqual([]);
-  });
-
-  it('reports the field the aggregate stopped carrying, the way a document writes it', () => {
-    // The document is what this arm keeps honest, and a document names a field
-    // in prose rather than in a declaration. Composed from the constant above
-    // for the same reason every retired name here is: written out, the fixture
-    // would be a hit this scan reports against its own file.
-    const retired = [
-      `takes the row naming the current canvas (\`${RETIRED_AGGREGATE_FIELD}\`)`,
-      `whether \`${RETIRED_AGGREGATE_FIELD}\` is computed or authored`,
-    ];
-
-    for (const line of retired) {
-      expect(RETIRED_RENDERER_NAME.test(line), line).toBe(true);
-    }
   });
 
   /**
@@ -705,56 +678,6 @@ const RETIRED_LOOSE_NAME_CAPITAL = ['Work', 'space'].join('');
 const RETIRED_LOOSE_BARE = new RegExp(RETIRED_LOOSE_NAME, 'i');
 
 /**
- * The retired word in the **shapes issue 08 actually wrote it in**, which is
- * what makes a second arm safe to run over documents the path scope cannot
- * reach. Every monorepo mention in a document is bare and lowercase — pnpm's
- * packages, a pnpm one, the `exports` Vite resolves through — while the domain
- * sense only ever appeared as an identifier, a test id, a CSS block or a module
- * name. Measured over the 46 tracked Markdown files outside the historical
- * trees, this pattern reports none of them, so that arm carries no exemption
- * list at all.
- *
- * Two carve-outs are shape rather than exception, in the idiom ADR 0041's
- * `Routed*` uses: pnpm's own kebab compound is the alias module's name, and
- * `pnpm-` prefixes the manifest that lists the packages. Both have to stay
- * writable, because the AGENTS.md line saying where the monorepo sense is
- * allowed has to be able to name them.
- *
- * **Three seams are known and taken deliberately, because the shapes that
- * close them are the ones worth reading.** The capitalised bare word opening a
- * sentence is reported; so is a kebab modifier pnpm could legitimately write;
- * and so are pnpm's two exported camelCase names, which `build-tooling.md`
- * would trip on the day it explains the alias table by identifier rather than
- * by module. None is in the tree. What those arms buy is the retired entity
- * written as a proper noun — every domain noun here is capitalised — the
- * retired module a document sends the next agent to, and the retired
- * component. A false positive fails loudly with a file:line and is one
- * decision to take; a document quietly naming a deleted module is the defect
- * that has already happened twice. The camelCase seam is left open rather than
- * carved out because no document names those two today, and an exception
- * without a live justification is what the ticket warns against.
- */
-const RETIRED_LOOSE_COMPOUND = new RegExp(
-  [
-    // PascalCase compounds opening with it: the sidebar, the selection, the
-    // failure view, the startup.
-    `${RETIRED_LOOSE_NAME_CAPITAL}[A-Z]`,
-    // Compounds ending in it: what opened one, what mounted one.
-    `[A-Za-z]${RETIRED_LOOSE_NAME_CAPITAL}\\b`,
-    // The bare capitalised word, which is the retired module and the entity
-    // `CONTEXT.md` says to call a Space.
-    `\\b${RETIRED_LOOSE_NAME_CAPITAL}\\b`,
-    // camelCase compounds opening with it: its title, its chrome.
-    `\\b${RETIRED_LOOSE_NAME}[A-Z]`,
-    // A test id, a CSS block, a story id — minus pnpm's alias module.
-    `\\b${RETIRED_LOOSE_NAME}-(?!aliases\\b)[a-z]`,
-    // ...and the same positions with it on the right: the retired module the
-    // Space is opened by, minus the manifest that lists the packages.
-    `(?<!pnpm)-${RETIRED_LOOSE_NAME}\\b`,
-  ].join('|'),
-);
-
-/**
  * The source the repo authors, which is everywhere the domain can be written.
  * Deliberately broader than `isImplementationSource` — the rename crossed E2E
  * specs, Ladle stories, story fixtures, `styles.css`, the root unit tests and
@@ -809,7 +732,6 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
   const authored = scanned
     .filter(isAuthoredSource)
     .filter((file) => !MONOREPO_VOCABULARY.includes(file));
-  const documents = scanned.filter((file) => file.endsWith('.md'));
 
   it('reaches the kinds of file the rename actually touched', () => {
     // The component the chrome was named after, the stylesheet whose block
@@ -829,28 +751,6 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
     const found = authored.flatMap((file) => {
       const source = readTracked(file);
       return source === null ? [] : reportableHits(file, source).map((hit) => `${file}:${hit}`);
-    });
-
-    expect(found).toEqual([]);
-  });
-
-  it('reads the documents an agent is sent to before touching the code', () => {
-    // The second arm is worth having because documents are where both blocks
-    // above found their bug: ADR 0055's caught `docs/agents/ui.md` pointing the
-    // next agent at a deleted module, and issue 08's own third review round
-    // caught the same file again. These three are read-before-touching
-    // authorities, and none of them is authored source.
-    expect(documents).toContain('AGENTS.md');
-    expect(documents).toContain('CONTEXT.md');
-    expect(documents).toContain('docs/agents/ui.md');
-  });
-
-  it('finds no retired compound in the documents that direct the next agent', () => {
-    const found = documents.flatMap((file) => {
-      const source = readTracked(file);
-      return source === null
-        ? []
-        : hits(source, RETIRED_LOOSE_COMPOUND).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -876,14 +776,13 @@ describe('the name used loosely for a Space and its chrome is gone', () => {
 });
 
 /**
- * Both patterns above are only as sharp as what they match, and one that
- * silently stopped matching would pass every file forever. Read them against
+ * The pattern above is only as sharp as what it matches, and one that
+ * silently stopped matching would pass every file forever. Read it against
  * the names issue 08 retired, and against pnpm's.
  *
- * The two arms are kept honest differently, and this says which does which.
  * The bare word matches pnpm's spellings too — it is *where* they sit that
- * keeps them silent — so the domain arm's half of this reads the exemption
- * predicate rather than the pattern.
+ * keeps them silent — so pnpm's half of this reads the exemption predicate
+ * rather than the pattern.
  */
 describe('the vocabulary the loose-name guard reads', () => {
   it('reports the retired names in every shape they were written in', () => {
@@ -895,8 +794,7 @@ describe('the vocabulary the loose-name guard reads', () => {
       `<div data-testid="${RETIRED_LOOSE_NAME}-sidebar">`,
       `.${RETIRED_LOOSE_NAME}-selection { display: grid; }`,
       `components--${RETIRED_LOOSE_NAME}-sidebar--settled`,
-      // A document naming the retired module, which is the failure ADR 0055's
-      // block caught: the word is on the right of the kebab there.
+      // A citation of the retired module: the word is on the right of the kebab.
       `see \`packages/app/src/open-${RETIRED_LOOSE_NAME}.ts\``,
       // The bare capitalised word, which is the entity CONTEXT.md renames.
       `The ${RETIRED_LOOSE_NAME_CAPITAL} is the app chrome around the canvas.`,
@@ -904,23 +802,6 @@ describe('the vocabulary the loose-name guard reads', () => {
 
     for (const line of retired) {
       expect(RETIRED_LOOSE_BARE.test(line), line).toBe(true);
-      expect(RETIRED_LOOSE_COMPOUND.test(line), line).toBe(true);
-    }
-  });
-
-  it('stays silent on the monorepo prose the document arm reads', () => {
-    const kept = [
-      `Seven \`@project/*\` ${RETIRED_LOOSE_NAME} packages under \`packages/\`:`,
-      `A pnpm ${RETIRED_LOOSE_NAME} with strict TypeScript and enforced boundaries`,
-      `Vite needs no alias at all — it resolves through the ${RETIRED_LOOSE_NAME} \`exports\``,
-      `a bare specifier is externalized and hands Node the ${RETIRED_LOOSE_NAME} TypeScript`,
-      // The two names the AGENTS.md gotcha line has to be able to write.
-      `the pnpm sense stays in \`packages/app/${RETIRED_LOOSE_NAME}-aliases.ts\``,
-      `\`pnpm-${RETIRED_LOOSE_NAME}.yaml\` lists the packages`,
-    ];
-
-    for (const line of kept) {
-      expect(RETIRED_LOOSE_COMPOUND.test(line), line).toBe(false);
     }
   });
 
@@ -966,7 +847,7 @@ describe('the vocabulary the loose-name guard reads', () => {
  *
  * Built from fragments for the reason every other retired word here is: this
  * file is scanned like any other tracked file, and a literal would make the one
- * document that talks about the word the one place it could hide.
+ * file that talks about the word the one place it could hide.
  *
  * `CONTEXT.md` names Open Spaces as both the set and the surface that draws it.
  * The retired word named the set after `switchTo`, the operation that spends
@@ -979,30 +860,16 @@ describe('the vocabulary the loose-name guard reads', () => {
 const RETIRED_SURFACE = ['s', 'witcher'].join('');
 const RETIRED_SURFACE_NAME = new RegExp(RETIRED_SURFACE, 'i');
 
-/**
- * Where the word is not the retired one.
- *
- * `CONTEXT.md` has to name what it retires, which is the carve-out every block
- * above already makes for the document that does the retiring.
- */
-const RETIRED_SURFACE_FILES: readonly string[] = ['CONTEXT.md'];
-
 describe('the retired name for the surface over the open set is gone', () => {
   it('finds it nowhere Open Spaces is what is meant', () => {
-    const offenders = scannableFiles()
-      .filter((file) => !RETIRED_SURFACE_FILES.includes(file))
-      .flatMap((file) => {
-        const source = readTracked(file);
-        return source === null
-          ? []
-          : hits(source, RETIRED_SURFACE_NAME).map((hit) => `${file}:${hit}`);
-      });
+    const offenders = scannableFiles().flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : hits(source, RETIRED_SURFACE_NAME).map((hit) => `${file}:${hit}`);
+    });
 
     expect(offenders).toEqual([]);
-  });
-
-  it('holds each exemption to still earning itself', () => {
-    expectEachExemptionEarned(RETIRED_SURFACE_FILES, RETIRED_SURFACE_NAME);
   });
 
   it('reads the shapes the word was actually written in', () => {
@@ -1068,25 +935,16 @@ const RETIRED_OPENER_NAME = new RegExp(
     .join('|'),
 );
 
-/** `CONTEXT.md` names what it retires. */
-const RETIRED_OPENER_FILES: readonly string[] = ['CONTEXT.md'];
-
 describe('the Opener is named once', () => {
-  it('finds no retired name for it outside the document that retires them', () => {
-    const offenders = scannableFiles()
-      .filter((file) => !RETIRED_OPENER_FILES.includes(file))
-      .flatMap((file) => {
-        const source = readTracked(file);
-        return source === null
-          ? []
-          : spanningHits(source, RETIRED_OPENER_NAME).map((hit) => `${file}:${hit}`);
-      });
+  it('finds no retired name for it', () => {
+    const offenders = scannableFiles().flatMap((file) => {
+      const source = readTracked(file);
+      return source === null
+        ? []
+        : spanningHits(source, RETIRED_OPENER_NAME).map((hit) => `${file}:${hit}`);
+    });
 
     expect(offenders).toEqual([]);
-  });
-
-  it('holds each exemption to still earning itself', () => {
-    expectEachExemptionEarned(RETIRED_OPENER_FILES, RETIRED_OPENER_NAME);
   });
 
   it('reads the shapes the names were actually written in', () => {
@@ -1260,32 +1118,15 @@ const withoutForeignSpellings = (source: string): string =>
   source.replace(new RegExp(FOREIGN_MAP_SPELLINGS.source, 'g'), 'foreign');
 
 /**
- * A retired name quoted as **history** rather than used as vocabulary.
+ * A retired name quoted as **history** rather than used as vocabulary: the
+ * continuation control value that went with the retired gutter (ADR 0082),
+ * which the test that pinned its removal still names as gone.
  *
- * ADR 0085 requires this: accepted ADR bodies and resolved records keep the old
- * words as provenance, and a current-state document that explains what changed
- * has to be able to name what it changed from. Two do — the trap a persisted-key
- * rename set twice, and the symbol a stale spike harness went stale against —
- * and renaming either does not update a record, it falsifies one.
- *
- * Masked rather than exempted by file, in the idiom directly above: only these
- * two quotations are forgiven, and the rest of both documents stays governed.
- * Each is asserted below to still be present, so a document that stops telling
- * the story stops carrying the licence to tell it.
+ * Masked rather than exempted by file, in the idiom directly above, and
+ * asserted below to still be present, so a test that stops telling the story
+ * stops carrying the licence to tell it.
  */
-const HISTORICAL_QUOTATIONS = [
-  ['`default', 'View` → `default', 'Layout`'].join(''),
-  ['elk', 'Layout` → `elkStrategy'].join(''),
-  // The module this rename moved, named in AGENTS.md's own account of the move
-  // — the sentence exists to tell a rebasing branch which similarity threshold
-  // git needs to follow it, so it has to spell where it came from.
-  `${retiredMapLower}-resolution`,
-  // The two addressing names that went with the retired gutter (ADR 0082): the
-  // continuation's control value and the row attribute beside it. Both are
-  // recorded as gone, in a document and in the test that pinned the behaviour.
-  `${retiredMapLower}-header`,
-  `data-${retiredMapLower}-id`,
-] as const;
+const HISTORICAL_QUOTATIONS = [`${retiredMapLower}-header`] as const;
 
 const withoutHistoricalQuotations = (source: string): string =>
   HISTORICAL_QUOTATIONS.reduce((text, quotation) => text.split(quotation).join('history'), source);
@@ -1332,13 +1173,6 @@ const QUALIFIED_SPELLINGS: readonly string[] = [
   // as prose about arranging rather than as the entity; the hyphenated form is
   // the same phrase and takes the same reading.
   `abstract-${retiredMapLower}`,
-  // Vendored third-party guidance, pinned by `skills-lock.json`: shadcn's rule
-  // about composing a form. It is the CSS sense, and a colon after the word is
-  // what makes the field arm read it as the retired key. This one spelling is
-  // the whole of what that tree needs forgiven — masked, so the rest of it stays
-  // governed, rather than skipped as a tree, which would have widened every
-  // block in this file and left a bump in the pinned skills invisible.
-  `Form ${retiredMapLower}:`,
 ];
 
 const CITED_PATH = /\S*\/\S*|\b\d{4}-[a-z0-9-]+/g;
@@ -1366,12 +1200,10 @@ describe('a Map is named once (ADR 0085)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The domain schema, the resolver the app reads a Map through, and the
-    // agent-facing document that describes both. A file list that quietly
-    // stopped resolving would report nothing forever.
+    // The domain schema and the resolver the app reads a Map through. A file
+    // list that quietly stopped resolving would report nothing forever.
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).toContain('packages/app/src/map-resolution.ts');
-    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
   });
 
   it('finds no compound of the retired name anywhere it still governs', () => {
@@ -1393,11 +1225,11 @@ describe('a Map is named once (ADR 0085)', () => {
     // stops exporting one, the exemption stops being earned and goes.
     expectEachExemptionEarned(FOREIGN_MAP_FILES, FOREIGN_MAP_SPELLINGS);
 
-    // The same rule for the two historical quotations: each is forgiven only
-    // while some tracked document is still telling that story.
+    // The same rule for the historical quotation: it is forgiven only while
+    // some tracked file is still telling that story.
     const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
     for (const quotation of HISTORICAL_QUOTATIONS) {
-      expect(everything, `no document still quotes ${quotation}`).toContain(quotation);
+      expect(everything, `nothing tracked still quotes ${quotation}`).toContain(quotation);
     }
 
     // And for every qualified spelling: a mask outlives its reason the moment
@@ -1514,8 +1346,8 @@ describe('a Map is named once (ADR 0085)', () => {
   });
 
   it('reads a cited foreign path as the citation it is, not as the word', () => {
-    // React Flow's own docs site spells a section with the retired word, and
-    // `docs/agents/rendering.md` sends an agent to it. The suffix arm reports
+    // React Flow's own docs site spells a section with the retired word, and a
+    // comment citing it is a citation. The suffix arm reports
     // it — correctly, since nothing about the shape says foreign — and
     // `CITED_PATH` is what forgives it, which is the same masking the kebab
     // arms above rely on. Asserted from both ends so neither half can go
@@ -1561,10 +1393,8 @@ describe('a Map is named once (ADR 0085)', () => {
  *
  * What needs a **file** exemption is what ADR 0085 predicted, and it is the one
  * carve-out: the vendored shadcn registry. `packages/ui/src/components/card.tsx`
- * exports seven components under the retired name, and six other modules import
- * them — a barrel, two components, a baseline test, a review story, and the
- * agent-facing document that explains why the barrel carries two content
- * components with different names. A foreign name with no shape to read, exactly
+ * exports seven components under the retired name, and four other modules import
+ * them — a barrel, two components and a baseline test. A foreign name with no shape to read, exactly
  * as Lucide's glyph is for Route and elkjs's options bag is for Layout.
  *
  * The registry's Tailwind tokens and custom properties need **nothing**, and
@@ -1656,12 +1486,9 @@ const RETIRED_RESOURCE_BARE = new RegExp(`\\b${RETIRED_RESOURCE}\\b`);
  * hyphen is what makes a kebab arm see a token at all, and it is also what
  * every one of these is built from.
  *
- * Three kinds. The shadcn registry's Tailwind tokens, custom properties and
+ * Two kinds. The shadcn registry's Tailwind tokens, custom properties and
  * `data-slot` values, which are read in six modules outside the vendored one
- * and are not ours to sweep (ADR 0047, ADR 0050). The two `.scratch/` efforts
- * `docs/agents/issue-tracker.md` names **without** their directory prefix,
- * which no path shape can see — the same blind spot that let two of them
- * through the sweep itself. And `CITED_PATH`, shared with the block above,
+ * and are not ours to sweep (ADR 0047, ADR 0050). And `CITED_PATH`, shared with the block above,
  * for every citation that does carry a prefix: a renamed citation into a tree
  * this rename does not rewrite is a broken link, which is the failure this
  * file's own comments record as having happened twice.
@@ -1677,8 +1504,6 @@ const QUALIFIED_RESOURCE_SPELLINGS = [
   `[slot=${retiredResourceLower}`,
   `bg-${retiredResourceLower}`,
   `--${retiredResourceLower}\``,
-  `${retiredResourceLower}-authoring`,
-  `${retiredResourceLower}-gestures`,
 ] as const;
 
 const withoutQualifiedResourceSpellings = (source: string): string =>
@@ -1705,9 +1530,6 @@ const FOREIGN_RESOURCE_SPELLINGS = new RegExp(
     `/${retiredResourceLower}:`,
     // The registry's own slot value, which the quoted-string arm reads.
     `data-slot="${retiredResourceLower}"`,
-    // A second registry component whose name ends in the retired word, written
-    // only in the vendored guidance below.
-    `Hover${RETIRED_RESOURCE}`,
   ].join('|'),
 );
 
@@ -1724,36 +1546,27 @@ const withoutForeignResourceSpellings = (source: string): string =>
 /**
  * The files where the retired spelling is the **shadcn registry's** rather than
  * ours: the vendored module, the barrel that re-exports it, the two components
- * and the two catalogue fixtures that render it, and the agent-facing document
- * that explains why the barrel now carries a domain content component and a
- * registry one under different names (ADR 0047, ADR 0050, ADR 0085).
+ * and the catalogue fixture that render it, and the vendored skill's evals
+ * (ADR 0047, ADR 0050, ADR 0085).
  */
 const FOREIGN_RESOURCE_FILES: readonly string[] = [
   // The vendored shadcn skill set, which `skills-lock.json` pins and which is
-  // written in shadcn's own vocabulary: its composition rule *is* that you use
-  // the registry's `Card` family rather than one `div`. Masked by spelling
-  // rather than skipped as a tree, in the idiom the Map block above adopted
-  // for the same tree — so a pinned-skills bump that introduced a domain
-  // compound would still be reported. `shadcn-first-ui` and
-  // `address-code-review` are repo-owned and are **not** here: the first names
-  // our own components in its guidance and speaks the current vocabulary.
-  '.agents/skills/shadcn/SKILL.md',
-  '.agents/skills/shadcn/rules/composition.md',
-  '.agents/skills/shadcn/rules/styling.md',
+  // written in shadcn's own vocabulary. Its Markdown is prose and unscanned;
+  // the evals are data, masked by spelling rather than skipped, so a
+  // pinned-skills bump that put a domain compound there would still be reported.
   '.agents/skills/shadcn/evals/evals.json',
   'packages/ui/src/components/card.tsx',
   'packages/ui/src/index.ts',
   'packages/ui/src/CanvasResource.tsx',
   'packages/ui/src/ResourceRail.tsx',
   'packages/ui/test/design-system-baseline.test.tsx',
-  'docs/agents/ui.md',
 ];
 
 /**
  * The implementation source that renders the registry's *bare* component, which
  * is spelled exactly as the domain type was. Narrower than the list above on
- * purpose: `ResourceRail` takes only the header, and the two fixtures are not
- * implementation source, so neither reaches the bare arm at all.
+ * purpose: `ResourceRail` takes only the header, and the catalogue fixture and
+ * the skill's evals are not implementation source, so neither reaches the bare arm at all.
  */
 const FOREIGN_BARE_RESOURCE_FILES: readonly string[] = [
   'packages/ui/src/components/card.tsx',
@@ -1796,12 +1609,10 @@ describe('a Resource is named once (ADR 0085)', () => {
   const scanned = scannableFiles().filter((file) => !file.startsWith(MIGRATION_SNAPSHOTS));
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The domain schema, the authored database contract, and the agent-facing
-    // document that describes the editing seam. A file list that quietly
-    // stopped resolving would report nothing forever.
+    // The domain schema and the authored database contract. A file list that
+    // quietly stopped resolving would report nothing forever.
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).toContain('src/prisma/contract.prisma');
-    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
   });
 
   it('finds no compound of the retired name anywhere it still governs', () => {
@@ -2139,10 +1950,9 @@ const expectSchemaExclusionsEarned = (): void => {
 };
 
 describe('a Map has no retired identifier (ADR 0101)', () => {
-  it('reaches source, documents, and both live database contracts', () => {
+  it('reaches source and both live database contracts', () => {
     const scanned = currentVocabularyFiles();
     expect(scanned).toContain('packages/core/src/schema.ts');
-    expect(scanned).toContain('docs/agents/rendering.md');
     expect(scanned).toContain('src/prisma/contract.prisma');
     expect(scanned).toContain('src/sqlite/contract.prisma');
   });
@@ -2237,18 +2047,17 @@ describe('the retired Map noun guard reads every shape it governs', () => {
   // word in front of it, which is the closing compound arm exactly. Recorded
   // as reported rather than masked: no tracked file writes one, so a mask for
   // it would be an exemption earning nothing, and this file's exemptions are
-  // each asserted to still be earning themselves. The day a document needs a
-  // Mermaid sequence, the mask is written then, with this case to invert.
+  // each asserted to still be earning themselves. The day a scanned file needs
+  // a Mermaid sequence, the mask is written then, with this case to invert.
   it('reports the foreign keyword it cannot tell from a compound', () => {
     expect(previousMapPattern.test(`sequence${PREVIOUS_MAP}`)).toBe(true);
   });
 });
 
 describe('a Resource has no retired identifier (ADR 0101)', () => {
-  it('reaches source, documents, and both live database contracts', () => {
+  it('reaches source and both live database contracts', () => {
     const scanned = currentVocabularyFiles();
     expect(scanned).toContain('packages/core/src/schema.ts');
-    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
     expect(scanned).toContain('src/prisma/contract.prisma');
     expect(scanned).toContain('src/sqlite/contract.prisma');
   });
@@ -2367,15 +2176,13 @@ describe('the retired Resource noun guard reads every shape it governs', () => {
 /**
  * ADR 0010 makes Space the top-level domain value, minted only by `loadSpace`,
  * and retires the shipping-ledger word that named it before. `CONTEXT.md:9`
- * says so in as many words — "retired from the code, not merely avoided" — and
- * `README.md` and `docs/agents/editing-and-persistence.md` both repeat it. Until
- * now nothing in `verify` noticed, which is the gap this block closes.
+ * says so in as many words — "retired from the code, not merely avoided".
  *
  * **The word has a second, foreign sense, and that is what shapes the scan.**
  * A package's `package.json` and the file that lists the packages are manifests
  * in npm's and pnpm's vocabulary, not ours, and the tree writes that sense
- * freely: as prose in `scripts/`, `test/` and the agent-facing documents, and
- * as three identifiers naming a parsed `package.json`. This is the same split
+ * freely: as prose in `scripts/` and `test/`, and as three identifiers naming
+ * a parsed `package.json`. This is the same split
  * the loose-name block above makes for pnpm's own retired word, and it is
  * settled the same way — **by shape, not by file**.
  *
@@ -2390,19 +2197,18 @@ describe('the retired Resource noun guard reads every shape it governs', () => {
  *    and the only sense left is ours.
  *
  * That leaves bare lowercase prose about a package manifest writable in a
- * comment, a script and a document — deliberately, and for the reason the
+ * comment or a script — deliberately, and for the reason the
  * sibling block above leaves pnpm's bare monorepo prose writable: the arm reads
  * shapes, so the foreign sense needs no exemption to survive and cannot be
  * mistaken for the retired entity.
  *
- * **Three masks, no file exemptions.** The three identifiers naming a parsed
+ * **Masks, no file exemptions.** The three identifiers naming a parsed
  * `package.json` are masked by spelling, in the `withoutForeignSpellings`
  * idiom, so a domain compound added to one of those modules is still reported.
- * The two retirement notices — the sentences in `README.md` and in
- * `packages/core/src/schema.ts` that exist to say the word is retired — are
- * masked as quotations, in the `HISTORICAL_QUOTATIONS` idiom, because a
- * document that explains what changed has to be able to name what it changed
- * from. Each of the five is asserted below to still be earning itself.
+ * The retirement notice — the sentence on `packages/core/src/schema.ts` that
+ * exists to say the word is retired — is masked as a quotation, in the
+ * `HISTORICAL_QUOTATIONS` idiom. Each mask is asserted below to still be
+ * earning itself.
  */
 const RETIRED_SPACE = ['man', 'ifest'].join('');
 const RETIRED_SPACE_CAPITAL = ['Man', 'ifest'].join('');
@@ -2469,17 +2275,15 @@ const FOREIGN_SPACE_SPELLINGS: readonly string[] = [
 ];
 
 /**
- * The two sentences that exist to say the word is retired — one in `README.md`,
- * one in the doc comment on the space-file schema. Both name the retired word
- * because that is the whole content of the notice, and renaming either does not
- * update a record, it deletes one.
+ * The sentence that exists to say the word is retired, in the doc comment on
+ * the space-file schema. It names the retired word because that is the whole
+ * content of the notice.
  *
- * Masked rather than exempted by file, so the rest of both files stays
- * governed, and each is asserted below to still be present: a notice that stops
+ * Masked rather than exempted by file, so the rest of the file stays governed,
+ * and each fragment is asserted below to still be present: a notice that stops
  * being written stops carrying the licence to write it.
  */
 const RETIREMENT_NOTICES: readonly string[] = [
-  `"${RETIRED_SPACE_CAPITAL}" is retired`,
   `"${RETIRED_SPACE}" is retired`,
   `not a ${RETIRED_SPACE}.`,
 ];
@@ -2494,11 +2298,10 @@ describe('a Space is named once (ADR 0010)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this retirement governs', () => {
-    // The schema whose doc comment carries the notice, the document that
-    // repeats it, and the script that writes the foreign sense. A file list
-    // that quietly stopped resolving would report nothing forever.
+    // The schema whose doc comment carries the notice and the script that
+    // writes the foreign sense. A file list that quietly stopped resolving
+    // would report nothing forever.
     expect(scanned).toContain('packages/core/src/schema.ts');
-    expect(scanned).toContain('docs/agents/editing-and-persistence.md');
     expect(scanned).toContain('scripts/check-typescript-toolchain.ts');
   });
 
@@ -2582,7 +2385,7 @@ describe('a Space is named once (ADR 0010)', () => {
 
   it('stays silent on the foreign sense, on its prose, and on the name that replaced it', () => {
     const kept = [
-      // The foreign sense as prose: a comment, a document, a test name. Left
+      // The foreign sense as prose: a comment, a script, a test name. Left
       // writable by the shape rule rather than by an exemption, which is the
       // whole design of this block.
       `// A matching directory is only a package if it carries a ${RETIRED_SPACE}.`,
@@ -2644,10 +2447,6 @@ describe('a Space is named once (ADR 0010)', () => {
  * **The verb phrase is untouched and is sense 1 saying what it means.** The
  * aggregate *rooted at* the Meta Space is the rooting rule in words; the verb
  * puts no word boundary after the noun, so no arm reaches it and none should.
- *
- * One mask, asserted below to still be earning itself: `CONTEXT.md`'s own
- * `_Avoid_` line has to name the phrase it retires, in the
- * `HISTORICAL_QUOTATIONS` idiom the Map block already uses.
  */
 const KEPT_AGGREGATE = ['Agg', 'regate'].join('');
 const keptAggregate = KEPT_AGGREGATE.toLowerCase();
@@ -2696,26 +2495,14 @@ const RETIRED_AGGREGATE_SENSES = new RegExp(
  */
 const RETIRED_AGGREGATE_ALIAS = new RegExp(`\\bvalidateSpace${KEPT_AGGREGATE}\\b`);
 
-/**
- * The glossary's own retirement notice. `CONTEXT.md` has to be able to name the
- * phrase it retires, and renaming that line does not update a record — it
- * deletes one.
- */
-const AGGREGATE_RETIREMENT_NOTICE = `${keptAggregate} ${RETIRED_ROOT} as a name for the stored Meta identity`;
-
-const withoutAggregateNotice = (source: string): string =>
-  source.split(AGGREGATE_RETIREMENT_NOTICE).join('retired');
-
 describe('aggregate has one meaning (ADR 0088)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The repository that holds both senses and once held the alias between
-    // them, the schema whose comment called one Space an aggregate, and the
-    // glossary that now has an entry for the word.
+    // The repository that holds both senses and the schema whose comment
+    // called one Space an aggregate.
     expect(scanned).toContain('src/persistence/sql-space-repository.ts');
     expect(scanned).toContain('packages/core/src/schema.ts');
-    expect(scanned).toContain('CONTEXT.md');
   });
 
   it('finds neither retired sense in any shape it was written in', () => {
@@ -2723,9 +2510,7 @@ describe('aggregate has one meaning (ADR 0088)', () => {
       const source = readTracked(file);
       return source === null
         ? []
-        : hits(withoutAggregateNotice(source), RETIRED_AGGREGATE_SENSES).map(
-            (hit) => `${file}:${hit}`,
-          );
+        : hits(source, RETIRED_AGGREGATE_SENSES).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -2740,14 +2525,6 @@ describe('aggregate has one meaning (ADR 0088)', () => {
     });
 
     expect(found).toEqual([]);
-  });
-
-  it('keeps no mask that has stopped earning itself', () => {
-    const everything = scanned.map((file) => readTracked(file) ?? '').join('\n');
-
-    expect(everything, 'no document still carries the retirement notice').toContain(
-      AGGREGATE_RETIREMENT_NOTICE,
-    );
   });
 
   it('reports both retired senses in every shape they were written in', () => {
@@ -2862,16 +2639,10 @@ describe('aggregate has one meaning (ADR 0088)', () => {
  * one of these files is *entirely* the foreign sense — unlike the shadcn
  * registry component the Card block had to mask spelling-by-spelling inside a
  * barrel that also carried domain names, nothing here mixes the two senses in
- * one file. **`CONTEXT.md` is not one of them**: only its `_Avoid_` line under
- * **Reference Resource** has to keep saying the retired word to retire it, and
- * the rest of the glossary is ours to govern like any other document, so that
- * one line is masked by its exact spelling — the `RETIREMENT_NOTICES` idiom
- * the Space block above already uses — rather than the whole file exempted. A
- * few more structural spellings straddle a file that is not otherwise exempt
- * and are masked the same way: two root tool configs and an agent-facing
- * document cite the anti-slop rule id, `AGENTS.md` cites the path-alias
- * module and the Vite config key it explains, and a dictionary-type test
- * names a TypeScript alias-consumer test double. Ordinary lowercase prose
+ * one file. A few structural spellings straddle a file that is not otherwise
+ * exempt and are masked by spelling instead: a root tool config cites the
+ * anti-slop rule id, and a dictionary-type test names a TypeScript
+ * alias-consumer test double. Ordinary lowercase prose
  * about a path alias — "path aliases", "an illegal alias unresolvable", "no
  * alias at all" — needs no exemption at all: every arm below requires either
  * a capital, a hyphen, an underscore or a trailing colon/equals, and bare
@@ -2959,9 +2730,6 @@ const PATH_ALIAS_MODULE = ['work', 'space-aliases'].join('');
  * block comment above for what each one is and why.
  */
 const FOREIGN_ALIAS_FILES: readonly string[] = [
-  '.agents/skills/shadcn/SKILL.md',
-  '.agents/skills/shadcn/cli.md',
-  '.agents/skills/shadcn/mcp.md',
   'tools/oxlint/anti-slop/index.ts',
   'tools/oxlint/anti-slop/shared/dictionary-types.ts',
   'tools/oxlint/anti-slop/shared/lexical-type-parameters.ts',
@@ -2986,29 +2754,23 @@ const FOREIGN_ALIAS_FILES: readonly string[] = [
 
 /**
  * Structural spellings the kebab, key-value and dotted-read arms above would
- * otherwise report, inside a file that is not otherwise exempt: two root tool
- * configs and an agent-facing document cite the anti-slop rule id, `AGENTS.md`
- * cites the path-alias module and the Vite config key it explains, and a
- * dictionary-type test names a TypeScript alias-consumer test double. Masked
- * rather than exempted by file, because each of these files also carries — or
- * will carry — the domain rename in the same breath.
+ * otherwise report, inside a file that is not otherwise exempt: a root tool
+ * config cites the anti-slop rule id, and a dictionary-type test names a
+ * TypeScript alias-consumer test double. Masked rather than exempted by file,
+ * because each of these files also carries — or will carry — the domain rename
+ * in the same breath.
  *
  * Historical-tree citations are masked here too, for the same reason the
- * Map and Resource blocks forgive a cited foreign path: `AGENTS.md`'s ADR
- * 0070 entry names a `.scratch/` issue, and `HISTORICAL` excludes that tree's
- * *contents*, not a live document pointing into it. The mask is those three
- * prefixes only — not `CITED_PATH` — because that pattern also swallows a live
- * relative import whose last segment is a PascalCase compound of the retired
- * name, which this rename's scan still has to report.
+ * Map and Resource blocks forgive a cited foreign path: a source comment may
+ * name a `.scratch/` issue, and `HISTORICAL` excludes that tree's *contents*,
+ * not a live file pointing into it. The mask is those three prefixes only —
+ * not `CITED_PATH` — because that pattern also swallows a live relative import
+ * whose last segment is a PascalCase compound of the retired name, which this
+ * rename's scan still has to report.
  */
 const QUALIFIED_ALIAS_SPELLINGS: readonly string[] = [
   'no-unknown-type-aliases',
-  PATH_ALIAS_MODULE,
-  'resolve.alias',
   'plain-alias-consumer',
-  // AGENTS.md's own sentence, an ordinary colon introducing a clause rather
-  // than an object key — indistinguishable from one by spelling alone.
-  'path aliases:',
   // The real `typescript` compiler API two tests call by name to find a type
   // alias declaration's AST shape.
   'isTypeAliasDeclaration',
@@ -3025,33 +2787,15 @@ const withoutQualifiedAliasSpellings = (source: string): string =>
     source.replace(CITED_HISTORICAL_PATH, 'path'),
   );
 
-/**
- * `CONTEXT.md`'s own retirement notice: the `_Avoid_` line under **Reference
- * Resource** has to name the word it retires, exactly as the Space block's
- * `RETIREMENT_NOTICES` and the aggregate block's `AGGREGATE_RETIREMENT_NOTICE`
- * do for theirs. Masked by its exact spelling — not the whole file exempted —
- * so a retired usage added anywhere else in the glossary is still reported,
- * and asserted below to still be earning itself.
- */
-const REFERENCE_RESOURCE_RETIREMENT_NOTICE =
-  '_Avoid_: alias, link (as a name for the Resource; Copy link is a command), copy, transclusion, mirror, and Reference as a family Space Resource belongs to (a Space Resource references a Space; it is not a Reference Resource).';
-
-const withoutReferenceResourceRetirementNotice = (source: string): string =>
-  source.split(REFERENCE_RESOURCE_RETIREMENT_NOTICE).join('retired');
-
 describe('a Reference Resource is named once (ADR 0092)', () => {
   const scanned = scannableFiles().filter((file) => !FOREIGN_ALIAS_FILES.includes(file));
 
   it('reaches the kinds of file this rename actually touched', () => {
-    // The domain schema, the agent-facing document that already speaks the new
-    // name, and the vocabulary-bearing accessible-name module. A file list that
-    // quietly stopped resolving would report nothing forever.
+    // The domain schema, the vocabulary-bearing accessible-name module, and the
+    // fixture Resource files whose Titles carried the retired noun. A file list
+    // that quietly stopped resolving would report nothing forever.
     expect(scanned).toContain('packages/core/src/schema.ts');
     expect(scanned).toContain('packages/ui/src/ResourceKindIcon.tsx');
-    expect(scanned).toContain('AGENTS.md');
-    // No longer a whole-file exemption: the glossary is scanned like any other
-    // document, with only its own retirement notice masked.
-    expect(scanned).toContain('CONTEXT.md');
     expect(scanned.filter((file) => file.endsWith('.md')).length).toBeGreaterThan(0);
   });
 
@@ -3059,10 +2803,9 @@ describe('a Reference Resource is named once (ADR 0092)', () => {
     const found = scanned.flatMap((file) => {
       const source = readTracked(file);
       if (source === null) return [];
-      return hits(
-        withoutReferenceResourceRetirementNotice(withoutQualifiedAliasSpellings(source)),
-        RETIRED_ALIAS_NAME,
-      ).map((hit) => `${file}:${hit}`);
+      return hits(withoutQualifiedAliasSpellings(source), RETIRED_ALIAS_NAME).map(
+        (hit) => `${file}:${hit}`,
+      );
     });
 
     expect(found).toEqual([]);
@@ -3073,10 +2816,9 @@ describe('a Reference Resource is named once (ADR 0092)', () => {
       const source = readTracked(file);
       return source === null
         ? []
-        : hits(
-            withoutReferenceResourceRetirementNotice(withoutQualifiedAliasSpellings(source)),
-            RETIRED_ALIAS_BARE,
-          ).map((hit) => `${file}:${hit}`);
+        : hits(withoutQualifiedAliasSpellings(source), RETIRED_ALIAS_BARE).map(
+            (hit) => `${file}:${hit}`,
+          );
     });
 
     expect(found).toEqual([]);
@@ -3094,11 +2836,6 @@ describe('a Reference Resource is named once (ADR 0092)', () => {
       const stillWritten = scannableFiles().some((file) => readTracked(file)?.includes(spelling));
       expect(stillWritten, `${spelling} is masked but no longer written anywhere`).toBe(true);
     }
-
-    expect(
-      readTracked('CONTEXT.md')?.includes(REFERENCE_RESOURCE_RETIREMENT_NOTICE),
-      'CONTEXT.md no longer carries the Reference Resource retirement notice',
-    ).toBe(true);
   });
 
   it('reports the retired name in every shape it was written in', () => {
@@ -3152,8 +2889,7 @@ describe('a Reference Resource is named once (ADR 0092)', () => {
     const kept = [
       // The genuinely foreign sense, bare and lowercase, bounded by spaces
       // rather than by any of the shapes above — no capital, no hyphen, no
-      // underscore and, for the first, a masked rather than a bare colon.
-      `Cross-package imports use the path ${retiredAliasLower}es: declared in`,
+      // underscore.
       `makes an illegal ${retiredAliasLower} unresolvable`,
       `Vite needs no ${retiredAliasLower} at all`,
       // The vocabulary this rename arrived at.

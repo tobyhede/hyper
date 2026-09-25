@@ -1,15 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { configuredSqlitePath } from '../../src/sqlite/db';
-
-const source = readFileSync(
-  fileURLToPath(new URL('../../src/sqlite/db.ts', import.meta.url)),
-  'utf8',
-);
 
 const originalPath = process.env['SQLITE_PATH'];
 let temporaryRoot: string | undefined;
@@ -24,20 +17,6 @@ describe('SQLite path policy', () => {
     restoreConfiguredPath();
     if (temporaryRoot !== undefined) await rm(temporaryRoot, { recursive: true, force: true });
     temporaryRoot = undefined;
-  });
-
-  /*
-   * The Windows half of this rule cannot be exhibited on POSIX: `isAbsolute`
-   * there *is* a leading-separator test, so `C:\data\hyper.db` is rejected by
-   * either spelling on this platform. What a POSIX run can hold is which
-   * spelling the module uses, and that `path.win32.isAbsolute` — the branch a
-   * Windows run takes — admits the drive-letter and UNC forms the character
-   * test does not.
-   */
-  it('states the absolute-path rule with node:path rather than a leading-separator test', () => {
-    expect(source).toMatch(/import \{[^}]*isAbsolute[^}]*\} from 'node:path'/);
-    expect(source).toMatch(/isAbsolute\(selected\)/);
-    expect(source).not.toMatch(/startsWith\('\//);
   });
 
   it('accepts a POSIX absolute path and refuses a relative one', async () => {

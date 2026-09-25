@@ -23,8 +23,7 @@ import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
  * (`command-outcomes.ts`): a refused outcome carries the complete
  * {@link CommandNotice}, so that module holds it without reading an
  * `AuthoringRefusal`. So this module imports no continuation, no React and no
- * DOM (`map-authoring-commands.test.ts`, "imports no continuation, React or
- * DOM").
+ * DOM (an `eslint.config.js` zone holds it).
  */
 
 /**

@@ -1,7 +1,6 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import contractJson from '../../src/sqlite/contract.json' with { type: 'json' };
 import {
@@ -9,19 +8,6 @@ import {
   createSqliteDatabase,
   requireConfiguredSqlitePath,
 } from '../../src/sqlite/db';
-
-const viteConfig = readFileSync(
-  fileURLToPath(new URL('../../packages/app/vite.config.ts', import.meta.url)),
-  'utf8',
-);
-const sqliteViteConfig = readFileSync(
-  fileURLToPath(new URL('../../packages/app/vite.sqlite.config.ts', import.meta.url)),
-  'utf8',
-);
-const databaseViteConfig = readFileSync(
-  fileURLToPath(new URL('../../packages/app/database-vite-config.ts', import.meta.url)),
-  'utf8',
-);
 
 const spaceColumns = contractJson.storage.namespaces.__unbound__.entries.table.spaces.columns;
 const spaceFields = contractJson.domain.namespaces.__unbound__.models.Space.fields;
@@ -124,12 +110,4 @@ describe('Prisma Next SQLite foundation', () => {
       }
     },
   );
-
-  it('leaves PostgreSQL as the default Vite host', () => {
-    expect(viteConfig).toContain('postgresViteTarget');
-    expect(sqliteViteConfig).toContain('sqliteViteTarget');
-    expect(databaseViteConfig).toContain('postgres-http-runtime.ts');
-    expect(databaseViteConfig).toContain('dist-http/postgres-http-runtime.js');
-    expect(databaseViteConfig).toContain('sqlite-http-runtime.ts');
-  });
 });

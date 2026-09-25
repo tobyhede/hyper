@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import { coordinatedContextCreate } from '../src/coordinated-context-create';
@@ -94,14 +93,5 @@ describe('coordinated context create', () => {
     });
     expect(received).toEqual([{ id: MAP, active: GRAPH }]);
     expect(result).toBe('stored selection refused');
-  });
-});
-
-describe('coordinated context create module', () => {
-  it('does not import continuation targets', () => {
-    const source = readFileSync(new URL('../src/coordinated-context-create.ts', import.meta.url), {
-      encoding: 'utf8',
-    });
-    expect(source).not.toMatch(/from ['"]\.\/continuation['"]/);
   });
 });

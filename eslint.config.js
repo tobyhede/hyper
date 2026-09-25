@@ -76,6 +76,19 @@ const APP_UI_IMPLEMENTATION_PATTERN = {
   message: UI_IMPLEMENTATION_MESSAGE,
 };
 
+const CONTINUATION_IMPORT = {
+  name: './continuation',
+  message: 'Where an Edit continues is the surface’s decision, not this module’s.',
+};
+
+const MAP_AUTHORING_MESSAGE =
+  'Map authoring imports no continuation, React or DOM: where the caret goes is the surface’s.';
+
+const MAP_AUTHORING_REACT = ['react', 'react-dom'].map((name) => ({
+  name,
+  message: MAP_AUTHORING_MESSAGE,
+}));
+
 /**
  * Node builtins, barred from the portable Fetch module. `node:fs` and a bare
  * `fs` are the same import, and ESLint matches specifiers literally, so a
@@ -214,6 +227,9 @@ export default tseslint.config(
       sourceType: 'module',
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
+        // `react-jsx` never reads `React` for JSX, so a namespace import used only in
+        // types is reported by `consistent-type-imports`.
+        jsxPragma: null,
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
@@ -316,6 +332,72 @@ export default tseslint.config(
         {
           paths: UI_IMPLEMENTATION_DEPENDENCIES,
           patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
+        },
+      ],
+    },
+  },
+  // Single-module bans inside `app`. Each restates the `app` zone above, which
+  // it replaces for its file.
+  //
+  // Coordination modules answer an outcome and never place a caret: where an
+  // Edit continues is the surface's decision, spent through `./continuation`.
+  {
+    files: ['packages/app/src/coordinated-context-create.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, CONTINUATION_IMPORT],
+          patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
+        },
+      ],
+    },
+  },
+  // Map authoring is pure coordination over the Space's collaborators: no
+  // continuation, no React and no DOM.
+  {
+    files: ['packages/app/src/map-authoring-commands.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, CONTINUATION_IMPORT, ...MAP_AUTHORING_REACT],
+          patterns: [
+            ESCAPE_PATTERN,
+            APP_UI_IMPLEMENTATION_PATTERN,
+            { group: ['react/*', 'react-dom/*'], message: MAP_AUTHORING_MESSAGE },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          globals: [
+            { name: 'document', message: MAP_AUTHORING_MESSAGE },
+            { name: 'window', message: MAP_AUTHORING_MESSAGE },
+          ],
+          checkGlobalObject: true,
+        },
+      ],
+    },
+  },
+  // The embed lifecycle hook sits beneath the canvas components and is read by
+  // them, so it reaches nothing in `./components/`.
+  {
+    files: ['packages/app/src/use-embedded-open-space-resources.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: UI_IMPLEMENTATION_DEPENDENCIES,
+          patterns: [
+            ESCAPE_PATTERN,
+            APP_UI_IMPLEMENTATION_PATTERN,
+            {
+              regex: '^\\./components/',
+              message: 'The embed lifecycle hook does not depend on the canvas components.',
+            },
+          ],
         },
       ],
     },

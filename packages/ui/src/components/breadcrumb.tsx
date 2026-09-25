@@ -11,7 +11,7 @@ import { cn } from '#lib/utils';
  *
  * `@shadcn/breadcrumb` on `base-nova`. Taken as generated bar the imports — `cn`
  * from `#lib/utils`, and React's namespace as `import type`, which the registry
- * writes as a value import and `ui-component-type-imports` refuses in a file
+ * writes as a value import and `consistent-type-imports` refuses in a file
  * that only names its types — and bar `BreadcrumbList`'s `size`, which the
  * registry does not ship and which is documented on the variant below. It
  * carries no `radix-ui` dependency, being Base UI's `useRender` underneath
