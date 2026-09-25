@@ -293,7 +293,7 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
-  | { readonly code: 'resource-not-expanded' }
+  | { readonly code: 'resource-not-open' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */

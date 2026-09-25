@@ -208,7 +208,7 @@ describe('Add Resource', () => {
   });
 
   it('stores the canvas anchor as authored, whatever else is Open', () => {
-    const expandedSnapshot: SpaceSnapshot = {
+    const openedSnapshot: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
@@ -223,7 +223,7 @@ describe('Add Resource', () => {
         ],
       },
     };
-    const { authoring, session } = open(expandedSnapshot);
+    const { authoring, session } = open(openedSnapshot);
 
     authoring.complete({ kind: 'created-resource', anchor: { x: 500, y: 400 } });
 
@@ -302,7 +302,7 @@ describe('Edit Resource', () => {
   });
 });
 
-describe('Expanded Resource geometry', () => {
+describe('Open Resource geometry', () => {
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
@@ -366,7 +366,7 @@ describe('Expanded Resource geometry', () => {
     });
   });
 
-  it('refuses a stale resize completion for a Resource that is no longer Expanded', () => {
+  it('refuses a stale resize completion for a Resource that is no longer Open', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
@@ -376,7 +376,7 @@ describe('Expanded Resource geometry', () => {
         resourceId: RESOURCE_A,
         size: { width: 560, height: 420 },
       }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-expanded' } });
+    ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-open' } });
     expect(session.getState().working).toBe(before);
   });
 

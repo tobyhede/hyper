@@ -152,7 +152,7 @@ export function decorateSharedResourceNode(
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
   }
-  if (resourceBelongsToWorkingSpace && node.data.expanded === true && context.authorOnCanvas) {
+  if (resourceBelongsToWorkingSpace && node.data.open === true && context.authorOnCanvas) {
     // Ordinary Open proposals preserve the Space footer. The gesture itself
     // still reaches Closed Size so ADR 0066's magnet can Close it.
     const floor = node.data.kind === 'space' ? SPACE_RESOURCE_MIN_OPEN_SIZE : RESOURCE_SIZE;
@@ -249,7 +249,7 @@ export function decorateSpaceResourceNode(
   // draws it, disabled: an absent rail is how the Resource says the target has
   // not been read yet, so a canvas that had merely withdrawn authoring would
   // put every Open Space Resource back to reporting a wait that had already ended.
-  if (node.data.expanded === true && !node.data.readOnly && target !== undefined) {
+  if (node.data.open === true && !node.data.readOnly && target !== undefined) {
     const resourceId = node.data.resourceId;
     let railContext: SpaceResourceRailContext | undefined;
     if (
@@ -291,7 +291,7 @@ export function decorateSpaceResourceNode(
   const onPortalEditingChange = context.onPortalEditingChange;
   if (
     onPortalEditingChange !== undefined &&
-    node.data.expanded === true &&
+    node.data.open === true &&
     patch.spaceRail !== undefined
   ) {
     patch.portal = {

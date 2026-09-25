@@ -90,7 +90,7 @@ test(
         const resource = specimen(page, `${front.label} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-kind', front.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
-        await expect(resource).toHaveAttribute('data-expanded', 'false');
+        await expect(resource).toHaveAttribute('data-open', 'false');
         await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
         await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
         await expect(resource).toHaveCSS('border-style', front.border);

@@ -330,7 +330,7 @@ describe('MarkdownResourceBody', () => {
     expect(surface).toHaveClass('nodrag', 'nopan');
     expect(surface).not.toHaveClass('nokey');
     // `nowheel` is deliberately absent: the wheel belongs to the canvas
-    // everywhere, so no Expanded Resource is a hole to wheel-pan across (ADR 0064).
+    // everywhere, so no Open Resource is a hole to wheel-pan across (ADR 0064).
     expect(surface).not.toHaveClass('nowheel');
   });
 });

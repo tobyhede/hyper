@@ -125,7 +125,7 @@ export function ResourceNode({
     markdownOperations.onBeginEdit = data.onBeginBodyEditing;
   }
   const markdownFront: CanvasResourceFront =
-    data.expanded === true && data.bodyEditor !== undefined
+    data.open === true && data.bodyEditor !== undefined
       ? {
           kind: 'markdown',
           source: data.body ?? '',
@@ -133,7 +133,7 @@ export function ResourceNode({
           editor: data.bodyEditor,
           ...markdownOperations,
         }
-      : data.expanded === true
+      : data.open === true
         ? { kind: 'markdown', source: data.body ?? '', open: true, ...markdownOperations }
         : {
             kind: 'markdown',
@@ -147,7 +147,7 @@ export function ResourceNode({
       data.spaceContent !== undefined
         ? { kind: 'space' }
         : { kind: 'markdown', source: data.body ?? '' },
-    open: data.expanded === true,
+    open: data.open === true,
   };
   if (data.onEditResource !== undefined) {
     referenceFront.onOpenChange = data.onEditResource;
@@ -157,7 +157,7 @@ export function ResourceNode({
   // composition hands down the rail fragment plus Enter.
   const spaceFront: SpaceFront = {
     kind: 'space',
-    open: data.expanded === true,
+    open: data.open === true,
   };
   if (data.onEditResource !== undefined) {
     spaceFront.onOpenChange = data.onEditResource;
@@ -359,7 +359,7 @@ export function ResourceNode({
     resizeOperation.current?.onResize({ width: next.width, height: next.height });
     return false;
   }, []);
-  const expanded = data.expanded === true;
+  const open = data.open === true;
   const { zoom } = useViewport();
   const resizeScale = Math.max(1 / zoom, 1);
 
@@ -425,22 +425,22 @@ export function ResourceNode({
       // gesture, exactly as it reads `data-resizing` for the other one.
       data-dragging={dragging}
       // The wrapper React Flow sizes from `node.width`/`node.height` is this
-      // element's parent, so an Expanded Resource only reaches its own rect if this
+      // element's parent, so an Open Resource only reaches its own rect if this
       // one stops declaring the collapsed constant — which `styles.css` does
       // unconditionally rather than under this attribute, because keying
       // geometry on the flag is exactly the discontinuity that makes a close
       // snap. **No stylesheet reads this**, deliberately: it publishes authored
       // open state for tests and assistive technology, and geometry is never
       // allowed to depend on it.
-      data-expanded={expanded}
+      data-open={open}
       // Read by `styles.css`, which leans the Resource rather than this element.
       // The Resource is a sibling of the handles, not their ancestor.
       data-drag-tilted={data.dragTilted === true}
     >
       {/*
-        React Flow's own bottom-right resize control, revealed on an Expanded Resource
+        React Flow's own bottom-right resize control, revealed on an Open Resource
         by hover, Selection or focus rather than drawn only once selected. An
-        Expanded Resource is whatever box the author drew — there is no ratio on it,
+        Open Resource is whatever box the author drew — there is no ratio on it,
         because the closed Resource is what keeps the silhouette that predicts
         what an audience sees (ADR 0064).
 
@@ -451,7 +451,7 @@ export function ResourceNode({
         those handles would be invisible to that rule; anything before the Resource
         is harmless to it.
       */}
-      {!data.readOnly && expanded && resize !== undefined && (
+      {!data.readOnly && open && resize !== undefined && (
         <>
           <span
             className="rf-resource-node__resize-mark"

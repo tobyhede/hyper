@@ -108,7 +108,7 @@ export const handRolledStyles = [
   {
     block: 'rf-resource-node',
     reason:
-      "The adapter's node wrapper: resource sizing from `--resource-width`/`--resource-height` and the Expanded Resource's fill of the box the Map authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Resource's palette, and the one rule naming the actively presented Resource. React Flow measures against this box, so it cannot move into the component it wraps.",
+      "The adapter's node wrapper: resource sizing from `--resource-width`/`--resource-height` and the Open Resource's fill of the box the Map authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Resource's palette, and the one rule naming the actively presented Resource. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
     block: 'resource',

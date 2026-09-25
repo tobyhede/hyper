@@ -181,9 +181,7 @@ export function useCanvasResourceAuthoring({
     caret?.field === 'body' &&
     nodes.some(
       (node) =>
-        node.id === caret.resourceId &&
-        node.data.expanded === true &&
-        node.data.kind === 'markdown',
+        node.id === caret.resourceId && node.data.open === true && node.data.kind === 'markdown',
     );
 
   if (caret?.field === 'body') {
@@ -405,7 +403,7 @@ export function useCanvasResourceAuthoring({
     setCaret({
       resourceId: node.id,
       field: 'body',
-      openObserved: node.data.expanded === true,
+      openObserved: node.data.open === true,
     });
   }, []);
   const onContextEditingChange = useCallback((resourceId: ResourceId, editing: boolean) => {

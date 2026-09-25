@@ -22,7 +22,7 @@ interface RenderedMarkdownProps {
 /**
  * The one Markdown parser and sanitiser shared by every rendered Resource body.
  *
- * Kept separate from {@link ResourceContent} so an Expanded Resource can reuse the
+ * Kept separate from {@link ResourceContent} so an Open Resource can reuse the
  * presentation-mode rendering without also drawing presentation mode's title
  * and outer frame.
  */

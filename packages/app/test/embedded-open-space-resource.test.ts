@@ -63,7 +63,7 @@ const openSpaceResource = (
     readonly width?: number;
     readonly height?: number;
     readonly kind?: Resource['kind'];
-    readonly expanded?: boolean;
+    readonly open?: boolean;
   } = {},
 ): ResourceFlowNode => ({
   id: resourceId,
@@ -76,7 +76,7 @@ const openSpaceResource = (
     title: 'Elsewhere',
     readOnly: false,
     kind: geometry.kind ?? 'space',
-    expanded: geometry.expanded ?? true,
+    open: geometry.open ?? true,
     spaceContent: spaceContent(resourceId, target.spaceId, target.map),
     active: false,
     selectedForAuthoring: false,
@@ -279,7 +279,7 @@ describe('embedded open Space Resource discovery', () => {
         title: 'Note',
         readOnly: false,
         kind: 'markdown',
-        expanded: false,
+        open: false,
         active: false,
         selectedForAuthoring: false,
         showContent: false,
@@ -347,7 +347,7 @@ describe('embedded open Space Resource discovery', () => {
   });
 
   it('does not discover a closed Space Resource or one without space content', () => {
-    const closed = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { expanded: false });
+    const closed = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { open: false });
     const markdown: ResourceFlowNode = {
       id: CHILD_RESOURCE,
       type: 'resource',
@@ -357,7 +357,7 @@ describe('embedded open Space Resource discovery', () => {
         title: 'Note',
         readOnly: false,
         kind: 'markdown',
-        expanded: true,
+        open: true,
         active: false,
         selectedForAuthoring: false,
         showContent: false,

@@ -392,7 +392,7 @@ describe('an embedded production projection', () => {
     expect(drawn.nodes.find((node) => node.data.resourceId === REFERENCE)).toMatchObject({
       width: 560,
       height: 420,
-      data: { expanded: true, body: 'Target content', kind: 'reference' },
+      data: { open: true, body: 'Target content', kind: 'reference' },
     });
     // B sits at the target Map's authored 400 plus the embedding offset, and
     // the Open Reference Resource below it moves nothing: displacement is applied by the Edit

@@ -262,7 +262,7 @@ describe('projectResourceNodes', () => {
     expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
       title: 'Return',
       kind: 'reference',
-      expanded: true,
+      open: true,
       body: '## Authored once',
     });
   });

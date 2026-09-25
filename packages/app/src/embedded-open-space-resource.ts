@@ -187,7 +187,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   }));
   for (const item of queue) {
     const { parent, origin, containingDrawn, clip, path } = item;
-    if (parent.data.expanded !== true) continue;
+    if (parent.data.open !== true) continue;
     const document = parent.data.spaceContent;
     if (document === undefined) continue;
     const readOnly = item.readOnly || parent.data.kind === 'reference';

@@ -220,7 +220,7 @@ describe('canvasProjection', () => {
     expect(sibling.edges.map((edge) => edge.data?.['graphId'])).toEqual([OTHER_GRAPH]);
   });
 
-  it('carries each authored Expanded rect through strategy input and node projection', async () => {
+  it('carries each authored Open rect through strategy input and node projection', async () => {
     const map = {
       ...mapOwning(DRAWN),
       positions: {
@@ -239,6 +239,6 @@ describe('canvasProjection', () => {
       projection.strategyGraph,
     );
     const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === RESOURCE_A);
-    expect(node).toMatchObject({ width: 560, height: 420, data: { expanded: true } });
+    expect(node).toMatchObject({ width: 560, height: 420, data: { open: true } });
   });
 });

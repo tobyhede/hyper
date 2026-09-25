@@ -116,7 +116,7 @@ body {
   height: 100%;
 }
 
-/* An Expanded Resource is whatever rect the Map authored, so the node's own
+/* An Open Resource is whatever rect the Map authored, so the node's own
    subtree stops declaring the collapsed constant and fills the box React Flow
    sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
    default because a Resource is drawn before any layout resolves, and 100% of an

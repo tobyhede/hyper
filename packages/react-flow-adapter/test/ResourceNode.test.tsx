@@ -188,7 +188,7 @@ interface Overrides {
   titleEditor?: ResourceTitleEditor;
   onEditResource?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
-  expanded?: boolean;
+  open?: boolean;
   body?: string;
   onBeginBodyEditing?: () => void;
   bodyEditor?: ResourceNodeData['bodyEditor'];
@@ -207,7 +207,7 @@ function props({
   titleEditor,
   onEditResource,
   onBeginTitleEditing,
-  expanded,
+  open,
   body,
   onBeginBodyEditing,
   bodyEditor,
@@ -227,13 +227,13 @@ function props({
     readOnly,
   };
   if (onEditResource !== undefined)
-    data.onEditResource = (open) => {
-      onEditResource(open);
+    data.onEditResource = (next) => {
+      onEditResource(next);
       return 'completed';
     };
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
-  if (expanded !== undefined) data.expanded = expanded;
+  if (open !== undefined) data.open = open;
   if (body !== undefined) data.body = body;
   if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
   if (bodyEditor !== undefined) data.bodyEditor = bodyEditor;
@@ -356,7 +356,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
       <ResourceNode
         {...props({
           kind: 'space',
-          expanded: true,
+          open: true,
           body: 'must not render',
           onEditResource,
           onBeginBodyEditing,
@@ -424,7 +424,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
       <ResourceNode
         {...props({
           selected: true,
-          expanded: true,
+          open: true,
           body: 'Body',
           resize,
           onEditResource: vi.fn(),
@@ -439,7 +439,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
 
   it('returns focus to the Resource when an edit ends on a Resource no longer selected', async () => {
     const running = props({
-      expanded: true,
+      open: true,
       body: 'Body',
       onEditResource: vi.fn(),
       bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
@@ -453,7 +453,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     await screen.findByRole('button', { name: 'Save Resource A' });
 
     // Save or Cancel ends the edit, and with it the reason the toolbar was drawn.
-    rerender(inNode(props({ expanded: true, body: 'Body', onEditResource: vi.fn() })));
+    rerender(inNode(props({ open: true, body: 'Body', onEditResource: vi.fn() })));
 
     expect(toolbar()).toBeNull();
     expect(container.querySelector('.react-flow__node')).toHaveFocus();
@@ -463,7 +463,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     render(
       <ResourceNode
         {...props({
-          expanded: true,
+          open: true,
           body: 'Body',
           onEditResource: vi.fn(),
           bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
@@ -648,7 +648,7 @@ describe('ResourceNode readOnly suppresses controls despite a supplied operation
     const onEditResource = vi.fn();
     render(
       <ResourceNode
-        {...props({ selected: true, readOnly: true, expanded: true, body: 'x', onEditResource })}
+        {...props({ selected: true, readOnly: true, open: true, body: 'x', onEditResource })}
       />,
     );
 
@@ -877,7 +877,7 @@ describe('ResourceNode handle geometry', () => {
     // An Open Resource occupies a larger rect, so all four of its anchors move
     // (ADR 0064). The projection re-declares them on a freshly allocated node,
     // which is the whole of how a moved anchor reaches React Flow.
-    rerender(<ResourceNode {...props({ expanded: true })} />);
+    rerender(<ResourceNode {...props({ open: true })} />);
 
     expect(updateNodeInternals).not.toHaveBeenCalled();
   });
@@ -911,42 +911,42 @@ test('renders every authoring handle as a sibling following the Resource', () =>
   }
 });
 
-describe('ResourceNode Expanded Resource front', () => {
+describe('ResourceNode Open Resource front', () => {
   const SOURCE = '# Strategies\n\nNo strategy is privileged.';
 
-  it("draws the Resource's rendered Markdown on the Resource, and says the Resource is Expanded", () => {
-    const { container } = render(<ResourceNode {...props({ expanded: true, body: SOURCE })} />);
+  it("draws the Resource's rendered Markdown on the Resource, and says the Resource is Open", () => {
+    const { container } = render(<ResourceNode {...props({ open: true, body: SOURCE })} />);
 
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
     expect(screen.getByText('No strategy is privileged.')).toBeVisible();
     // Both are read off the same fact — the slot's presence — so a Resource cannot
-    // be sized as Expanded while drawing nothing, or the reverse.
-    expect(screen.getByTestId('resource')).toHaveAttribute('data-expanded', 'true');
+    // be sized as Open while drawing nothing, or the reverse.
+    expect(screen.getByTestId('resource')).toHaveAttribute('data-open', 'true');
     expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'true',
     );
   });
 
-  it('draws its title alone until the Map Expands it', () => {
+  it('draws its title alone until the Map Opens it', () => {
     const { container } = render(<ResourceNode {...props({ body: SOURCE })} />);
 
     expect(
       screen.queryByRole('button', { name: 'Edit Markdown source of A' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId('resource')).toHaveAttribute('data-expanded', 'false');
+    expect(screen.getByTestId('resource')).toHaveAttribute('data-open', 'false');
     expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'false',
     );
   });
 
-  it('does not mount a stale body editor until the Map Expands the Resource', () => {
+  it('does not mount a stale body editor until the Map Opens the Resource', () => {
     const { container } = render(
       <ResourceNode
         {...props({
-          expanded: false,
+          open: false,
           body: SOURCE,
           bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
         })}
@@ -954,9 +954,9 @@ describe('ResourceNode Expanded Resource front', () => {
     );
 
     expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('resource')).toHaveAttribute('data-expanded', 'false');
+    expect(screen.getByTestId('resource')).toHaveAttribute('data-open', 'false');
     expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-expanded',
+      'data-open',
       'false',
     );
   });
@@ -967,7 +967,7 @@ describe('ResourceNode Expanded Resource front', () => {
         {...props({
           kind: 'reference',
           title: 'Return',
-          expanded: true,
+          open: true,
           body: SOURCE,
           selected: true,
           onEditResource: vi.fn(),
@@ -980,14 +980,14 @@ describe('ResourceNode Expanded Resource front', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit Resource/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close Resource Return' })).toBeVisible();
-    expect(screen.getByTestId('resource')).toHaveAttribute('data-expanded', 'true');
+    expect(screen.getByTestId('resource')).toHaveAttribute('data-open', 'true');
   });
 
-  it('keeps Expanding and renaming independent, because one is authored and the other a gesture', () => {
+  it('keeps Opening and renaming independent, because one is authored and the other a gesture', () => {
     render(
       <ResourceNode
         {...props({
-          expanded: true,
+          open: true,
           body: SOURCE,
           titleEditor: { onComplete: () => null, onCancel: () => undefined },
         })}
@@ -1000,7 +1000,7 @@ describe('ResourceNode Expanded Resource front', () => {
     expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
   });
 
-  it('draws exactly one bottom-right resize control on an Expanded Resource given a resize operation', () => {
+  it('draws exactly one bottom-right resize control on an Open Resource given a resize operation', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
@@ -1009,7 +1009,7 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
 
     // One control, not React Flow's eight — a bottom-right-only control cannot
     // move the authored origin by construction, so there is nothing else to draw.
@@ -1030,7 +1030,7 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel,
     };
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1048,7 +1048,7 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1073,7 +1073,7 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
 
     // The press is the gesture: geometry is proposed only from a drag this Resource
     // started, so a move without it proves nothing about the live one.
@@ -1093,7 +1093,7 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.pointerUp(window);
@@ -1116,14 +1116,14 @@ describe('ResourceNode Expanded Resource front', () => {
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
   });
 
-  it('offers no resize control on an Expanded Resource the composition gave no resize operation', () => {
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE })} />);
+  it('offers no resize control on an Open Resource the composition gave no resize operation', () => {
+    render(<ResourceNode {...props({ open: true, body: SOURCE })} />);
     // The capability carries its own floor, so a Resource offered no operation is
     // offered no control either — there is no minimum for this package to guess.
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
   });
 
-  it('offers a resize control on an Expanded Reference Resource, because resize follows state rather than Resource kind', () => {
+  it('offers a resize control on an Open Reference Resource, because resize follows state rather than Resource kind', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
@@ -1132,9 +1132,9 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ kind: 'reference', expanded: true, resize })} />);
+    render(<ResourceNode {...props({ kind: 'reference', open: true, resize })} />);
 
-    // The resize gate reads Expanded and never the kind: ADR 0066 makes resize
+    // The resize gate reads Open and never the kind: ADR 0066 makes resize
     // Resource behaviour, not kind behaviour.
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
@@ -1148,7 +1148,7 @@ describe('ResourceNode Expanded Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ expanded: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
 
     // The control owns the hit target's upper layer. The inert mark is its
     // preceding sibling so the later Resource face can occlude their overlap.

@@ -77,7 +77,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is already in this Map.';
     case 'resource-not-in-map':
       return 'This Resource is not in this Map.';
-    case 'resource-not-expanded':
+    case 'resource-not-open':
       return 'Open this Resource before resizing it.';
     case 'resource-has-references':
       return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
