@@ -1,4 +1,5 @@
 import {
+  act,
   createEvent,
   fireEvent,
   render,
@@ -194,7 +195,11 @@ async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSessi
  * revision this session acknowledged, which the backend has moved past.
  */
 const raiseConflict = async (session: SpaceSession): Promise<void> => {
-  session.submit(session.getState().working);
+  // The submission publishes synchronously, so it is owned by its own `act`;
+  // the reply that conflicts is awaited outside it.
+  act(() => {
+    session.submit(session.getState().working);
+  });
   await waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
   await screen.findByTestId('persistence-accept-remote');
 };
@@ -375,6 +380,11 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
       MARKDOWN_DRAFT,
     );
     expect(session.getState().working).toEqual(LOCAL_OPEN);
+    // The retry saves the local Space, and the draft outlives that too.
+    await waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+    expect(screen.getByRole('textbox', { name: MARKDOWN_SOURCE, hidden: true })).toHaveTextContent(
+      MARKDOWN_DRAFT,
+    );
   });
 
   /**

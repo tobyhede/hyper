@@ -103,6 +103,10 @@ const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot =>
   },
 });
 
+/** Until the session has saved everything it was given. */
+const settled = (session: SpaceSession): Promise<void> =>
+  waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
 const runtime = (value: SpaceSnapshot) => {
   const loaded = loadSpaceSnapshot(value);
   if (!loaded.ok) throw new Error(loaded.errors.map((error) => error.message).join('\n'));
@@ -807,7 +811,7 @@ describe('Space app failure reporting', () => {
  * this evidence is the Ladle behaviour test, which runs in a real browser.
  */
 describe('Space app Resources list', () => {
-  it('opens an accessible empty list for a zero-Resource Space, and creates in it', () => {
+  it('opens an accessible empty list for a zero-Resource Space, and creates in it', async () => {
     const seeded = snapshot('Space', 'Resource', 10, 20);
     const empty: SpaceSnapshot = {
       ...seeded,
@@ -843,6 +847,9 @@ describe('Space app Resources list', () => {
     expect(unavailable(createResourceControl())).toBe(false);
     createResource('Markdown Resource');
     expect(session.getState().working.resources).toHaveLength(1);
+    // The canvas draws the created Resource, and the Edit is saved.
+    expect(await screen.findByLabelText('Resource Resource 1')).toBeInTheDocument();
+    await settled(session);
   });
 
   /**
@@ -991,7 +998,7 @@ describe('Space app Resources list', () => {
    * it withdraws is what gates Present, Create Resource and every entity Edit.
    */
   it('ends a live Map rename when the Map changes, without writing to the App during render', async () => {
-    const reported = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reported = vi.spyOn(console, 'error');
     const base = snapshot('Space', 'Resource', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceResources } = openTestSpace(
@@ -1020,8 +1027,11 @@ describe('Space app Resources list', () => {
 
     expect(screen.queryByRole('textbox', { name: 'Map name' })).toBeNull();
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Map');
+    // The Map it lands on is placed afresh, and nothing writes to the App
+    // across that either.
+    await waitUntilMapContinuationReady();
+    await settled(session);
     expect(reported.mock.calls.flat().join(' ')).not.toContain('Cannot update a component');
-    reported.mockRestore();
   });
 
   /**
@@ -1055,6 +1065,8 @@ describe('Space app Resources list', () => {
     const name = screen.getByTestId('selected-canvas');
     expect(name).toHaveTextContent('Workshop');
     expect(document.activeElement).toBe(name);
+    await settled(session);
+    expect(document.activeElement).toBe(name);
   });
 
   /**
@@ -1087,13 +1099,18 @@ describe('Space app Resources list', () => {
     // Somewhere else the reader has chosen — the canvas in the product, any
     // focusable element here, because what is pinned is that the Dock does not
     // take it back rather than which element holds it.
+    // Moving focus is what blurs the editor, so the move is the reader's
+    // operation and is owned as one.
     const elsewhere = document.createElement('button');
     document.body.append(elsewhere);
-    elsewhere.focus();
-    fireEvent.blur(editor);
+    act(() => {
+      elsewhere.focus();
+    });
 
     const name = await screen.findByTestId('selected-canvas');
     expect(name).toHaveTextContent('Workshop');
+    expect(document.activeElement).toBe(elsewhere);
+    await settled(session);
     expect(document.activeElement).toBe(elsewhere);
     elsewhere.remove();
   });
@@ -1449,6 +1466,12 @@ describe('Space app Resources list', () => {
     createResource('Markdown Resource');
     expect(session.getState().working.resources.length).toBe(before + 1);
 
+    // The creation continues in the new Resource's title once the canvas draws
+    // it, and the list stays closed across that and the save.
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Resource title' })).toHaveFocus(),
+    );
+    await settled(session);
     expect(
       screen.queryByRole('button', { name: 'Add Outside resource to Map' }),
     ).not.toBeInTheDocument();

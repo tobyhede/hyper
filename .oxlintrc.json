@@ -297,7 +297,8 @@
       // `nodeColor`, Node's `net.Server.address(): AddressInfo | string | null`
       // and `fs.writeFile`'s `PathLike` parameter, Vite's optional
       // `configureServer`/`configurePreviewServer` plugin hooks, an ESLint
-      // `unknown` config result shape-checked once) — none of these are
+      // `unknown` config result shape-checked once, the untyped arguments of a
+      // `console.error` call the unowned-update guard reads) — none of these are
       // unparsed *external* data the rule's "parse at the I/O boundary" message
       // has anywhere further to push to.
       "files": [
@@ -307,7 +308,8 @@
         "test/unit/vite-hono-host.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
         "test/unit/export-aggregate-recovery.test.ts",
-        "test/support/refusing-postgres-server.ts"
+        "test/support/refusing-postgres-server.ts",
+        "test/support/unowned-react-updates.ts"
       ],
       "rules": {
         "anti-slop/no-runtime-typeof": "off"

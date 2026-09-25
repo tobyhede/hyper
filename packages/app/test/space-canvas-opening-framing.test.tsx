@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -13,6 +13,7 @@ import { OpenSpacesContext } from '../src/open-spaces-context';
 import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
+import { mountSettled } from './settled-mount';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -127,7 +128,7 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe('opening framing on a mounted canvas', () => {
-  it('ignores the host seed while hidden and reads this canvas when it first becomes active', () => {
+  it('ignores the host seed while hidden and reads this canvas when it first becomes active', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
     const app = composeApp({ spaceSession });
@@ -196,7 +197,7 @@ describe('opening framing on a mounted canvas', () => {
       },
     };
 
-    render(
+    await mountSettled(
       <OpenSpacesContext.Provider value={spaces}>
         <Subscribed spaces={spaces}>
           <ReactFlowProvider>
@@ -279,7 +280,7 @@ describe('opening framing on a mounted canvas', () => {
     expect(asked).toEqual([TARGET_ID]);
   });
 
-  it('reads this canvas seed on the first paint when it is already the active Space', () => {
+  it('reads this canvas seed on the first paint when it is already the active Space', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
     const app = composeApp({ spaceSession });
@@ -332,7 +333,7 @@ describe('opening framing on a mounted canvas', () => {
       },
     };
 
-    render(
+    await mountSettled(
       <OpenSpacesContext.Provider value={spaces}>
         <ReactFlowProvider>
           <SpaceCanvas

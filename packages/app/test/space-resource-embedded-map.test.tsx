@@ -17,6 +17,7 @@ import { EMBEDDED_EDGE_TYPE, embeddedNodeId } from '../src/embedded-map';
 import { createOpenSpaces, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
+import { mountSettled } from './settled-mount';
 import { newUuid } from '@project/core';
 import {
   anyPresentControl,
@@ -220,7 +221,7 @@ async function mountOpenSpaces(
     history: recordingHistory(),
   });
   const initial = await spaces.open(HOME_ID);
-  render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+  await mountSettled(<OpenSpacesApplication spaces={spaces} initial={initial} />);
   return { session: initial.session, spaces };
 }
 
@@ -961,6 +962,7 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(embeddedNode(DRAWN_B).style.clipPath).not.toBe(previous));
     expect(spaces.entry(TARGET_ID)).toBeUndefined();
     expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
+    await waitFor(() => expect(initial.session.getState().persistence.kind).toBe('settled'));
   });
 
   /**

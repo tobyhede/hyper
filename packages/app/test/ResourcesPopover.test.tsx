@@ -221,11 +221,14 @@ describe('ResourcesPopover', () => {
     await openList();
 
     const behind = screen.getByRole('button', { name: 'The canvas behind it' });
-    act(() => {
+    // Asynchronous, because the popup answers focus leaving it on a microtask
+    // after the focus move; the list has to survive that answer too.
+    await act(async () => {
       fireEvent.pointerDown(behind);
       fireEvent.mouseDown(behind);
       fireEvent.click(behind);
       behind.focus();
+      await Promise.resolve();
     });
 
     expect(screen.getByRole('dialog', { name: 'Resources' })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUuid, spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
@@ -287,7 +287,9 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     await enterArchitecture();
 
     const opened = spaces.entry(TARGET_ID);
-    opened?.app.navigation.selectMap(OTHER_MAP_ID);
+    act(() => {
+      opened?.app.navigation.selectMap(OTHER_MAP_ID);
+    });
     expect(opened?.app.navigation.getState()).toMatchObject({
       selectedMapId: OTHER_MAP_ID,
       activeGraphId: OTHER_GRAPH_ID,
@@ -299,7 +301,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     });
     expect(opened?.session.getState().working.document.defaultMap).toBe(OTHER_MAP_ID);
 
-    await spaces.switchTo(HOME_ID);
+    await act(() => spaces.switchTo(HOME_ID));
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));
     await screen.findByRole('article', { name: 'Architecture' });
 
@@ -349,7 +351,9 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
   it('seeds from the Resource again after Exit, because Exit destroyed the entry', async () => {
     const spaces = await mount();
     await enterArchitecture();
-    spaces.entry(TARGET_ID)?.app.navigation.selectMap(OTHER_MAP_ID);
+    act(() => {
+      spaces.entry(TARGET_ID)?.app.navigation.selectMap(OTHER_MAP_ID);
+    });
 
     fireEvent.click(exitSpaceItem('Architecture'));
     await waitFor(() => expect(showingSpace()).toHaveTextContent('Home'));

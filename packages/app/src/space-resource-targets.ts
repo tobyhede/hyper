@@ -112,6 +112,16 @@ export const useSpaceResourceTargets = (
     [],
   );
 
+  /**
+   * No Space Resource references anything, so the answer is known on this
+   * render and nothing is read for it. The drop happens during render, and the
+   * effect installs nothing for an empty set, so a Space without Space
+   * Resources renders no second time on a microtask nobody awaits, and the last
+   * Space Resource's target goes on the render that removes it.
+   */
+  const referencesNothing = referencedSpaceIds(resources).length === 0;
+  if (referencesNothing && targets.size > 0) setTargets(NO_SPACE_RESOURCE_TARGETS);
+
   const previousEntries = useRef(entries);
   useEffect(() => {
     if (previousEntries.current.some((entry) => !entries.includes(entry))) requested.current = null;
@@ -122,6 +132,10 @@ export const useSpaceResourceTargets = (
     requested.current = key;
     generation.current += 1;
     const mine = generation.current;
+    // Nothing referenced is nothing to read: the render that ran this effect
+    // has already dropped any targets, and a read still in flight is
+    // invalidated by the generation bump above.
+    if (ids.length === 0) return;
     // Settled one target at a time rather than through one `Promise.all` that
     // rejects: each id is a read of a *different* Space, so one Space being
     // unreachable says nothing about the one the Resource beside it points at, and

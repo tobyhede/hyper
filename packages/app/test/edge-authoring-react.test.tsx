@@ -1,18 +1,10 @@
-import {
-  act,
-  fireEvent,
-  render,
-  renderHook,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { useLayoutEffect, type ReactNode } from 'react';
 import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
-import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
@@ -23,6 +15,7 @@ import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
+import { mountSettled } from './settled-mount';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -212,6 +205,10 @@ function compose({
   return { session, ...composed };
 }
 
+/** Until the session has saved everything it was given. */
+const settled = (session: SpaceSession): Promise<void> =>
+  waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
 const graphsOf = (working: SpaceSnapshot) =>
   (working.document.maps ?? []).flatMap((map) => map.graphs);
 
@@ -247,7 +244,7 @@ afterAll(() => vi.unstubAllGlobals());
  * what such a control does with a key press is a fact about this canvas even
  * though it is not part of it.
  */
-function mountCanvas(
+async function mountCanvas(
   beside: ReactNode = null,
   {
     covered = false,
@@ -271,7 +268,7 @@ function mountCanvas(
       {deleteWhenCoveredCommits ? <DeleteWhenCommitted armed={paneOpen} /> : null}
     </ReactFlowProvider>
   );
-  const view = render(canvas(covered));
+  const view = await mountSettled(canvas(covered));
   return {
     ...composed,
     view,
@@ -403,8 +400,8 @@ const canvasElement = (): HTMLElement => {
  * place inert stops between a keyboard author and the Edges they can act on.
  */
 describe('decorated Edges', () => {
-  it('makes only the Active Graph Edge focusable and names it for a screen reader', () => {
-    mountCanvas();
+  it('makes only the Active Graph Edge focusable and names it for a screen reader', async () => {
+    await mountCanvas();
 
     const active = edgeElement(EDGES[0]!.id);
     expect(active).toHaveAttribute('tabindex', '0');
@@ -413,8 +410,8 @@ describe('decorated Edges', () => {
     expect(edgeElement(EDGES[1]!.id)).not.toHaveAttribute('tabindex');
   });
 
-  it('installs a focused Edge as the canvas selection', () => {
-    const { adapter } = mountCanvas();
+  it('installs a focused Edge as the canvas selection', async () => {
+    const { adapter } = await mountCanvas();
 
     fireEvent.focus(edgeElement(EDGES[0]!.id));
 
@@ -425,8 +422,8 @@ describe('decorated Edges', () => {
     });
   });
 
-  it('does not select an Edge outside the Active Graph when it receives focus', () => {
-    const { adapter } = mountCanvas();
+  it('does not select an Edge outside the Active Graph when it receives focus', async () => {
+    const { adapter } = await mountCanvas();
 
     fireEvent.focus(edgeElement(EDGES[1]!.id));
 
@@ -438,8 +435,8 @@ const toolbarOf = (name: string): HTMLElement =>
   screen.getByRole('toolbar', { name: `Edge ${name}` });
 
 describe('the Edge toolbar', () => {
-  it('appears on the selected Edge alone, named for its endpoints while it has no Title', () => {
-    const { adapter } = mountCanvas();
+  it('appears on the selected Edge alone, named for its endpoints while it has no Title', async () => {
+    const { adapter } = await mountCanvas();
     expect(screen.queryByRole('toolbar', { name: 'Edge A → B' })).not.toBeInTheDocument();
 
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -448,8 +445,8 @@ describe('the Edge toolbar', () => {
     expect(screen.queryByRole('toolbar', { name: 'Edge B → C' })).not.toBeInTheDocument();
   });
 
-  it('offers Edit, the Title eye and Delete as one named group, the eye disabled with no Title', () => {
-    const { adapter } = mountCanvas();
+  it('offers Edit, the Title eye and Delete as one named group, the eye disabled with no Title', async () => {
+    const { adapter } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     const group = within(toolbarOf('A → B')).getByRole('group', { name: 'Edge commands' });
@@ -464,8 +461,8 @@ describe('the Edge toolbar', () => {
     );
   });
 
-  it('deletes the Edge from its Graph and leaves the Graph standing', () => {
-    const { adapter, session } = mountCanvas();
+  it('deletes the Edge from its Graph and leaves the Graph standing', async () => {
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Edge A → B' }));
@@ -477,7 +474,7 @@ describe('the Edge toolbar', () => {
   });
 
   it('writes the Title from Edit, completes on Enter, and returns focus to the Title', async () => {
-    const { adapter, session } = mountCanvas();
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
@@ -498,7 +495,7 @@ describe('the Edge toolbar', () => {
   });
 
   it('cancels on Escape, writing nothing, and returns focus to the Edge it had no Title for', async () => {
-    const { adapter, session, edgeAuthoring } = mountCanvas();
+    const { adapter, session, edgeAuthoring } = await mountCanvas();
     const before = session.getState().working;
     act(() => adapter.getState().selectEdge(SUBJECT));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
@@ -510,8 +507,8 @@ describe('the Edge toolbar', () => {
     await waitFor(() => expect(edgeElement(EDGES[0]!.id)).toHaveFocus());
   });
 
-  it('completes on blur without taking focus back to the Title', () => {
-    const { adapter, session } = mountCanvas();
+  it('completes on blur without taking focus back to the Title', async () => {
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
     const field = screen.getByRole('textbox', { name: 'Edge Title' });
@@ -531,9 +528,11 @@ describe('the Edge toolbar', () => {
    * blurred an emptied field would complete the clear, then hide a Title the
    * Edge no longer has.
    */
-  it('makes the eye unavailable while the Title is being written, keeping the caret', () => {
-    const { adapter, session, authoring } = mountCanvas();
-    authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+  it('makes the eye unavailable while the Title is being written, keeping the caret', async () => {
+    const { adapter, session, authoring } = await mountCanvas();
+    act(() => {
+      authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+    });
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Edge depends on' }));
@@ -551,10 +550,11 @@ describe('the Edge toolbar', () => {
       { ...EDGE, title: 'depends on' },
     ]);
     expect(screen.queryByRole('alert')).toBeNull();
+    await settled(session);
   });
 
-  it('begins writing from the revealed Title itself', () => {
-    const { adapter, edgeAuthoring } = mountCanvas();
+  it('begins writing from the revealed Title itself', async () => {
+    const { adapter, edgeAuthoring } = await mountCanvas();
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
 
@@ -564,8 +564,8 @@ describe('the Edge toolbar', () => {
     expect(screen.getByRole('textbox', { name: 'Edge Title' })).toHaveValue('depends on');
   });
 
-  it('draws a Title at rest, fitted to its Edge, with the whole Title in its tooltip', () => {
-    const { adapter } = mountCanvas();
+  it('draws a Title at rest, fitted to its Edge, with the whole Title in its tooltip', async () => {
+    const { adapter } = await mountCanvas();
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
 
     const title = screen.getByTitle('depends on');
@@ -575,8 +575,8 @@ describe('the Edge toolbar', () => {
     expect(title.style.maxWidth).toMatch(/px$/u);
   });
 
-  it("draws only the Active Graph's Titles", () => {
-    const { adapter } = mountCanvas();
+  it("draws only the Active Graph's Titles", async () => {
+    const { adapter } = await mountCanvas();
     act(() =>
       adapter
         .getState()
@@ -589,9 +589,11 @@ describe('the Edge toolbar', () => {
     expect(screen.queryByTitle('aside')).toBeNull();
   });
 
-  it('hides a Title at rest from the eye, and dims it while the Edge is revealed', () => {
-    const { adapter, session, authoring } = mountCanvas();
-    authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+  it('hides a Title at rest from the eye, and dims it while the Edge is revealed', async () => {
+    const { adapter, session, authoring } = await mountCanvas();
+    act(() => {
+      authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+    });
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
 
@@ -609,14 +611,15 @@ describe('the Edge toolbar', () => {
 
     act(() => adapter.getState().clearSelection());
     expect(screen.queryByTitle('depends on')).toBeNull();
+    await settled(session);
   });
 
   /**
    * Hiding a missing Title is unreachable from the disabled eye, so it is asked
    * of Edge Authoring directly, as a stale toolbar would.
    */
-  it('reports a refused command in one alert region under the toolbar, until the selection moves', () => {
-    const { adapter, edgeAuthoring } = mountCanvas();
+  it('reports a refused command in one alert region under the toolbar, until the selection moves', async () => {
+    const { adapter, edgeAuthoring } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     act(() => {
@@ -631,8 +634,8 @@ describe('the Edge toolbar', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('keeps a refused Title open with its reason in that same region', () => {
-    const { adapter, edgeAuthoring } = mountCanvas();
+  it('keeps a refused Title open with its reason in that same region', async () => {
+    const { adapter, edgeAuthoring } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
     const field = screen.getByRole('textbox', { name: 'Edge Title' });
@@ -647,8 +650,8 @@ describe('the Edge toolbar', () => {
     expect(field).toBeInTheDocument();
   });
 
-  it('moves focus from the Edge into its toolbar on Enter, and back on Escape', () => {
-    mountCanvas();
+  it('moves focus from the Edge into its toolbar on Enter, and back on Escape', async () => {
+    await mountCanvas();
     const edge = edgeElement(EDGES[0]!.id);
     act(() => edge.focus());
 
@@ -661,10 +664,10 @@ describe('the Edge toolbar', () => {
   });
 
   /** The delay lets the pointer cross from the line to the toolbar. */
-  it('reveals the toolbar on hover and releases it a moment after the pointer leaves', () => {
+  it('reveals the toolbar on hover and releases it a moment after the pointer leaves', async () => {
     vi.useFakeTimers();
     try {
-      mountCanvas();
+      await mountCanvas();
       const edge = edgeElement(EDGES[0]!.id);
 
       fireEvent.mouseEnter(edge);
@@ -698,8 +701,8 @@ describe('the Edge toolbar', () => {
 describe("the app's canvas delete key", () => {
   const DELETE_KEYS = ['Backspace', 'Delete'] as const;
 
-  it.each(DELETE_KEYS)('removes the selected Edge when %s is aimed at the canvas', (key) => {
-    const { adapter, session } = mountCanvas();
+  it.each(DELETE_KEYS)('removes the selected Edge when %s is aimed at the canvas', async (key) => {
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.keyDown(canvasElement(), { key });
@@ -709,8 +712,8 @@ describe("the app's canvas delete key", () => {
 
   it.each(DELETE_KEYS)(
     'removes the selected Resource from its Map when %s is aimed at the canvas',
-    (key) => {
-      const { adapter, session } = mountCanvas();
+    async (key) => {
+      const { adapter, session } = await mountCanvas();
       act(() => adapter.getState().selectResource(RESOURCE_A));
 
       fireEvent.keyDown(canvasElement(), { key });
@@ -723,8 +726,8 @@ describe("the app's canvas delete key", () => {
 
   it.each(DELETE_KEYS)(
     'leaves the selected Resource standing when %s is aimed outside the canvas',
-    (key) => {
-      const { adapter, session } = mountCanvas(<main tabIndex={-1}>Outside the canvas</main>);
+    async (key) => {
+      const { adapter, session } = await mountCanvas(<main tabIndex={-1}>Outside the canvas</main>);
       act(() => adapter.getState().selectResource(RESOURCE_A));
 
       fireEvent.keyDown(screen.getByText('Outside the canvas'), { key });
@@ -743,26 +746,29 @@ describe("the app's canvas delete key", () => {
    * branch above already resolves its Resource from the event target; this one now
    * agrees, and falls back to the selection when the key came from the pane.
    */
-  it.each(DELETE_KEYS)('removes the focused Resource rather than the selected one on %s', (key) => {
-    const { adapter, session } = mountCanvas();
-    act(() => adapter.getState().selectResource(RESOURCE_A));
-    const focused = document.querySelector(`.react-flow__node[data-id="${RESOURCE_B}"]`);
-    if (focused === null)
-      throw new Error('The Resource the key is aimed at must be on the canvas.');
+  it.each(DELETE_KEYS)(
+    'removes the focused Resource rather than the selected one on %s',
+    async (key) => {
+      const { adapter, session } = await mountCanvas();
+      act(() => adapter.getState().selectResource(RESOURCE_A));
+      const focused = document.querySelector(`.react-flow__node[data-id="${RESOURCE_B}"]`);
+      if (focused === null)
+        throw new Error('The Resource the key is aimed at must be on the canvas.');
 
-    fireEvent.keyDown(focused, { key, bubbles: true });
+      fireEvent.keyDown(focused, { key, bubbles: true });
 
-    const map = session.getState().working.document.maps?.[0];
-    expect(map?.positions[RESOURCE_B]).toBeUndefined();
-    expect(map?.positions[RESOURCE_A]).toBeDefined();
-  });
+      const map = session.getState().working.document.maps?.[0];
+      expect(map?.positions[RESOURCE_B]).toBeUndefined();
+      expect(map?.positions[RESOURCE_A]).toBeDefined();
+    },
+  );
 
   /**
    * The same two exclusions the `C` binding spells out, for the same reasons: a
    * command runs once per press, and a modifier makes the key somebody else's.
    */
-  it('ignores an auto-repeated Backspace so one press removes one Resource', () => {
-    const { adapter, session } = mountCanvas();
+  it('ignores an auto-repeated Backspace so one press removes one Resource', async () => {
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectResource(RESOURCE_A));
 
     fireEvent.keyDown(document.body, { key: 'Backspace', repeat: true });
@@ -784,8 +790,8 @@ describe("the app's canvas delete key", () => {
    */
   it.each(['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const)(
     'leaves a %s-modified Backspace to whatever else would have had it',
-    (modifier) => {
-      const { adapter, session } = mountCanvas();
+    async (modifier) => {
+      const { adapter, session } = await mountCanvas();
       act(() => adapter.getState().selectResource(RESOURCE_A));
 
       fireEvent.keyDown(document.body, { key: 'Backspace', [modifier]: true });
@@ -796,8 +802,8 @@ describe("the app's canvas delete key", () => {
 
   it.each(['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const)(
     'leaves the selected Edge standing under a %s-modified Delete',
-    (modifier) => {
-      const { adapter, session } = mountCanvas();
+    async (modifier) => {
+      const { adapter, session } = await mountCanvas();
       act(() => adapter.getState().selectEdge(SUBJECT));
 
       fireEvent.keyDown(document.body, { key: 'Delete', [modifier]: true });
@@ -806,8 +812,8 @@ describe("the app's canvas delete key", () => {
     },
   );
 
-  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its Title field', (key) => {
-    const { adapter, session } = mountCanvas();
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its Title field', async (key) => {
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Edge A → B' }));
 
@@ -816,8 +822,8 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its toolbar', (key) => {
-    const { adapter, session } = mountCanvas();
+  it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its toolbar', async (key) => {
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Edge A → B' }), { key });
@@ -827,7 +833,7 @@ describe("the app's canvas delete key", () => {
 
   it.each(DELETE_KEYS)(
     'leaves the Edge standing when %s reaches a Create Resource control',
-    (key) => {
+    async (key) => {
       // The real treatment, mounted where the real control is: outside the flow
       // entirely, in chrome that marks itself `.nokey` — which is the marker
       // the canvas guard reads rather than a list of its own. `RESOURCES_TRIGGER` is
@@ -839,7 +845,7 @@ describe("the app's canvas delete key", () => {
       // `.scratch/command-dock/issues/08` deleted the control, and the Dock that
       // replaced both marks itself the same way — so one production trigger
       // proves one guard.
-      const { adapter, session } = mountCanvas(
+      const { adapter, session } = await mountCanvas(
         <Toolbar>
           <ToolbarButton {...RESOURCES_TRIGGER}>Resources</ToolbarButton>
         </Toolbar>,
@@ -856,8 +862,10 @@ describe("the app's canvas delete key", () => {
     ['menu', 'menu'],
     ['listbox', 'listbox'],
     ['dialog', 'dialog'],
-  ] as const)('leaves the Edge standing when Delete reaches a %s', (_name, role) => {
-    const { adapter, session } = mountCanvas(<div role={role} tabIndex={0} aria-label={role} />);
+  ] as const)('leaves the Edge standing when Delete reaches a %s', async (_name, role) => {
+    const { adapter, session } = await mountCanvas(
+      <div role={role} tabIndex={0} aria-label={role} />,
+    );
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.keyDown(screen.getByRole(role), { key: 'Delete' });
@@ -865,8 +873,8 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it('leaves the Edge standing while presenting', () => {
-    const { adapter, session } = mountCanvas(null, { presenting: true });
+  it('leaves the Edge standing while presenting', async () => {
+    const { adapter, session } = await mountCanvas(null, { presenting: true });
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.keyDown(document.body, { key: 'Delete' });
@@ -885,7 +893,7 @@ describe("the app's canvas delete key", () => {
    * subscriptions.
    */
   it('leaves the Edge standing when Delete reaches the zoom slider', async () => {
-    const { adapter, session } = mountCanvas();
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     // Found by label rather than role: Base UI keeps a thumb `visibility:
@@ -899,7 +907,7 @@ describe("the app's canvas delete key", () => {
   });
 
   it('leaves the Edge standing when Delete reaches a zoom button', async () => {
-    const { adapter, session } = mountCanvas();
+    const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.keyDown(await screen.findByRole('button', { name: 'Zoom in' }), { key: 'Delete' });
@@ -907,8 +915,8 @@ describe("the app's canvas delete key", () => {
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
   });
 
-  it('observes a pane refusal from the commit that publishes it', () => {
-    const { adapter, session, setCovered } = mountCanvas(null, {
+  it('observes a pane refusal from the commit that publishes it', async () => {
+    const { adapter, session, setCovered } = await mountCanvas(null, {
       deleteWhenCoveredCommits: true,
     });
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -937,14 +945,14 @@ describe("the app's canvas delete key", () => {
  * aimed at the dialog must not delete the Edge selected behind it.
  */
 describe('a pane covering the graph', () => {
-  it('withdraws the Edge surface while the pane covers it', () => {
-    mountCanvas(null, { covered: true });
+  it('withdraws the Edge surface while the pane covers it', async () => {
+    await mountCanvas(null, { covered: true });
 
     expect(edgeElement(EDGES[0]!.id)).not.toHaveAttribute('tabindex');
   });
 
-  it('offers the Edge surface again once the pane closes', () => {
-    const { setCovered } = mountCanvas(null, { covered: true });
+  it('offers the Edge surface again once the pane closes', async () => {
+    const { setCovered } = await mountCanvas(null, { covered: true });
 
     setCovered(false);
 
@@ -962,8 +970,8 @@ describe('a pane covering the graph', () => {
    * own answer rather than our styling, so it says the gesture is off and not
    * merely invisible.
    */
-  it('leaves no handle a drag could start from', () => {
-    mountCanvas(null, { covered: true });
+  it('leaves no handle a drag could start from', async () => {
+    await mountCanvas(null, { covered: true });
 
     const handles = document.querySelectorAll('.rf-resource-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
@@ -984,8 +992,8 @@ describe('a pane covering the graph', () => {
    * `ResourceNode` was made to honour the flag, because the flag had been carrying
    * `!presenting` unread for as long as nothing forwarded it.
    */
-  it('keeps the handles connectable while presenting, where the Edge is a move', () => {
-    mountCanvas(null, { presenting: true });
+  it('keeps the handles connectable while presenting, where the Edge is a move', async () => {
+    await mountCanvas(null, { presenting: true });
 
     const handles = document.querySelectorAll('.rf-resource-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
@@ -994,10 +1002,10 @@ describe('a pane covering the graph', () => {
 
   it.each(['Backspace', 'Delete'] as const)(
     'leaves the selected Edge standing when %s reaches the pane',
-    (key) => {
+    async (key) => {
       // A pane action button, mounted where the pane is outside the flow. The
       // app-owned canvas command guard recognises its dialog ancestor.
-      const { adapter, session } = mountCanvas(<button type="button">Cancel</button>, {
+      const { adapter, session } = await mountCanvas(<button type="button">Cancel</button>, {
         covered: true,
       });
       act(() => adapter.getState().selectEdge(SUBJECT));
@@ -1026,10 +1034,10 @@ describe('spending a continuation on the canvas', () => {
   const drawnFlowEdge = flowEdge(GRAPH_ID, RESOURCE_A, RESOURCE_C);
   const focusDrawn = { target: { kind: 'edge', ...DRAWN }, select: false, then: 'focus' } as const;
 
-  it('focuses the Edge on the projection that draws it, not the one before', () => {
+  it('focuses the Edge on the projection that draws it, not the one before', async () => {
     // The real canvas, because resolving the continuation is a DOM lookup: the
     // element only exists once React Flow has drawn the Edge.
-    const { authoring, adapter, continuation } = mountCanvas();
+    const { authoring, adapter, continuation } = await mountCanvas();
     document.body.focus();
 
     act(() => {
@@ -1060,8 +1068,8 @@ describe('spending a continuation on the canvas', () => {
    * into the selection, so the element must be the new Edge's own, not one a
    * departed Edge left behind.
    */
-  it('leaves the Edge it focuses selected, not only focused', () => {
-    const { authoring, adapter, continuation } = mountCanvas();
+  it('leaves the Edge it focuses selected, not only focused', async () => {
+    const { authoring, adapter, continuation, session } = await mountCanvas();
     document.body.focus();
 
     act(() => {
@@ -1077,6 +1085,7 @@ describe('spending a continuation on the canvas', () => {
       document.querySelector(`.react-flow__edge[data-id="${drawnFlowEdge.id}"]`),
     );
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...DRAWN });
+    await settled(session);
   });
 
   /**
@@ -1099,8 +1108,8 @@ describe('spending a continuation on the canvas', () => {
    * none does, which is a caret left on `document.body` and, for `reveal`, a
    * camera that never arrives.
    */
-  it('focuses a Resource on the projection that draws it, not the one before', () => {
-    const { adapter, continuation } = mountCanvas();
+  it('focuses a Resource on the projection that draws it, not the one before', async () => {
+    const { adapter, continuation } = await mountCanvas();
     document.body.focus();
 
     act(() =>
@@ -1123,8 +1132,8 @@ describe('spending a continuation on the canvas', () => {
   });
 
   /** A Resource already on the canvas resolves on the render that receives it. */
-  it('focuses a Resource that is already drawn without waiting', () => {
-    const { edgeAuthoring, continuation } = mountCanvas();
+  it('focuses a Resource that is already drawn without waiting', async () => {
+    const { edgeAuthoring, continuation, session } = await mountCanvas();
     document.body.focus();
 
     act(() => {
@@ -1135,6 +1144,7 @@ describe('spending a continuation on the canvas', () => {
     expect(document.activeElement).toBe(
       document.querySelector(`.react-flow__node[data-id="${RESOURCE_A}"]`),
     );
+    await settled(session);
   });
 });
 
@@ -1144,8 +1154,8 @@ describe('spending a continuation on the canvas', () => {
  * most proposals during the drag, but "rare" is not "announced".
  */
 describe('announcing a refusal', () => {
-  it('shows the reason a finished pointer gesture ran into', () => {
-    const { edgeAuthoring } = mountCanvas();
+  it('shows the reason a finished pointer gesture ran into', async () => {
+    const { edgeAuthoring } = await mountCanvas();
     expect(screen.queryByTestId('edge-gesture-refusal')).not.toBeInTheDocument();
 
     // A→B already exists in Main, so this is the duplicate rule — reached

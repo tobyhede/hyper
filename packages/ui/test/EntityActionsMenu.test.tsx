@@ -131,8 +131,19 @@ const openMenu = (...groups: readonly EntityAction[][]) => {
   return rendered;
 };
 
-const press = async (name: RegExp) =>
-  fireEvent.click(await screen.findByRole('menuitem', { name }));
+/**
+ * Press a row and let the command it runs answer.
+ *
+ * The confirmation is set when the command's promise settles, which is after
+ * the click's own `act` has closed; the asynchronous `act` owns that answer.
+ */
+const press = async (name: RegExp) => {
+  const item = await screen.findByRole('menuitem', { name });
+  await act(async () => {
+    fireEvent.click(item);
+    await Promise.resolve();
+  });
+};
 
 const openMenuAnd = async (action: EntityAction) => {
   openMenu([action]);

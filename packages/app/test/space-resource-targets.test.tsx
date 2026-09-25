@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Resource, type UUID } from '@project/core';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
@@ -200,5 +200,45 @@ describe('reading the Spaces a canvas references', () => {
 
     await waitFor(() => expect(screen.getByTestId('titles')).toHaveTextContent('Roadmap'));
     expect(screen.getByTestId('titles')).not.toHaveTextContent('Architecture');
+  });
+
+  /**
+   * A canvas without Space Resources has nothing to read, and so nothing to
+   * wait for: its answer is installed on the render that learns it rather than
+   * after an empty batch settles on a later microtask no caller owns.
+   */
+  it('reads nothing and renders once for a canvas without Space Resources', async () => {
+    const read = vi.fn(() => Promise.resolve(target));
+    const none: readonly Resource[] = [];
+    const rendered = vi.fn();
+    function Counted() {
+      rendered();
+      const targets = useSpaceResourceTargets(none, read);
+      return (
+        <p data-testid="titles">{[...targets.values()].map(({ title }) => title).join(' ')}</p>
+      );
+    }
+
+    render(<Counted />);
+    // Every microtask the mount could have queued is given its chance to land.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(rendered).toHaveBeenCalledOnce();
+    expect(read).not.toHaveBeenCalled();
+    expect(screen.getByTestId('titles')).toBeEmptyDOMElement();
+  });
+
+  it('drops every target on the render that removes the last Space Resource', async () => {
+    const read = vi.fn(() => Promise.resolve(target));
+
+    const view = render(<Probe read={read} resources={resources()} />);
+    await waitFor(() => expect(screen.getByTestId('titles')).toHaveTextContent('Architecture'));
+
+    view.rerender(<Probe read={read} resources={[]} />);
+
+    expect(screen.getByTestId('titles')).toBeEmptyDOMElement();
+    expect(read).toHaveBeenCalledOnce();
   });
 });

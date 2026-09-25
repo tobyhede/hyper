@@ -845,8 +845,13 @@ describe('referencing an existing Space', () => {
       kind: 'permanent-failure',
       code: 'invalid-commit',
     });
+    // Found before the `act` rather than inside it: a query that waits turns the
+    // act environment off while it polls, so an update landing meanwhile inside
+    // the enclosing `act` is reported as act in an unconfigured environment.
+    const add = await screen.findByRole('button', { name: 'Add Other Space to Map' });
     await act(async () => {
-      fireEvent.click(await screen.findByRole('button', { name: 'Add Other Space to Map' }));
+      fireEvent.click(add);
+      await Promise.resolve();
     });
 
     expect(
