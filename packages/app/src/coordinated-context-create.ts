@@ -15,7 +15,7 @@ export interface CreatedContext {
  *
  * Settled → create → persist → hook. Call sites own selection writes and
  * rename continuation; this module does not import continuation targets
- * (`coordinated-context-create.test.ts` — "does not import continuation targets").
+ * (an `eslint.config.js` `no-restricted-imports` zone holds it).
  */
 export interface CoordinatedContextCreateRequest {
   readonly waitBefore?: () => Promise<boolean>;

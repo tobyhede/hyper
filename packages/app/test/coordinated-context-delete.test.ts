@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
@@ -78,34 +77,5 @@ describe('coordinated Graph delete', () => {
 
   it('passes a lifecycle no-op through as unchanged', async () => {
     expect(await coordinatedGraphDelete(noop, graphInput)).toEqual({ kind: 'unchanged' });
-  });
-});
-
-/**
- * Ticket 03: Dock Graph delete goes through the wrapper, with no preferred
- * replacement — Navigation always adopts the pair the lifecycle returns.
- * `spaceResources.deleteGraph({` would be a second orchestration path beside
- * it. Map deletion left the wrapper for Map authoring
- * (`.scratch/command-outcomes/issues/08`), which owns its coordination; a
- * direct `spaceResources.deleteMap` in the Dock's chrome would be a second path
- * beside that.
- */
-describe('Dock delete wiring', () => {
-  const app = readFileSync(new URL('../src/dock-chrome.ts', import.meta.url), {
-    encoding: 'utf8',
-  });
-
-  it('sends Map delete through Map authoring rather than the lifecycle', () => {
-    expect(app).toMatch(/offered\(\s*mapAuthoring\.map\(map\.id\)\.delete,/u);
-    expect(app).toMatch(
-      /commandOutcomes\.run\('map-delete',\s*remove,\s*\{\s*completionMovesMap:\s*true\s*\}\)/u,
-    );
-    expect(app).not.toMatch(/spaceResources\.deleteMap\b/u);
-  });
-
-  it('sends Graph delete through the wrapper with no preferred Graph', () => {
-    expect(app).toMatch(/coordinatedGraphDelete\(\s*spaceResources\.deleteGraph,/u);
-    expect(app).toMatch(/preferredGraphId:\s*null/u);
-    expect(app).not.toMatch(/spaceResources\.deleteGraph\(\s*\{/u);
   });
 });

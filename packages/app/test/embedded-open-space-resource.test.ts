@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Resource } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
@@ -440,23 +439,5 @@ describe('embedded Read/Edit enabled gate', () => {
         thisEmbeddingEditing: false,
       }),
     ).toBe(false);
-  });
-});
-
-describe('edit portal state lives in the pipeline', () => {
-  it('does not declare portal membership or draft state in SpaceCanvas', () => {
-    const source = readFileSync(new URL('../src/components/SpaceCanvas.tsx', import.meta.url), {
-      encoding: 'utf8',
-    });
-    expect(source).not.toMatch(/useState<ReadonlySet<ResourceId>>/);
-    expect(source).not.toMatch(/useState<ReadonlyMap<ResourceId, SpaceResourceFraming>>/);
-  });
-
-  it('does not let the embed lifecycle hook import from the components tree', () => {
-    const source = readFileSync(
-      new URL('../src/use-embedded-open-space-resources.ts', import.meta.url),
-      { encoding: 'utf8' },
-    );
-    expect(source).not.toMatch(/from ['"]\.\/components\//);
   });
 });

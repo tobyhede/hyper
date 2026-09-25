@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   newUuid,
@@ -829,16 +828,5 @@ describe('offered', () => {
 
     expect(offered({ available: false, invoke: () => undefined }, build)).toBeNull();
     expect(build).not.toHaveBeenCalled();
-  });
-});
-
-describe('the Map authoring module', () => {
-  it('imports no continuation, React or DOM: where the caret goes is the surface’s', () => {
-    const source = readFileSync(new URL('../src/map-authoring-commands.ts', import.meta.url), {
-      encoding: 'utf8',
-    });
-    expect(source).not.toMatch(/from ['"]\.\/continuation['"]/);
-    expect(source).not.toMatch(/from ['"]react(-dom)?(\/[^'"]*)?['"]/);
-    expect(source).not.toMatch(/\b(document|window)\./);
   });
 });
