@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** resolved — the abstention is load-bearing; the tests stay, with the failing browser tests named beside them (PR #PRNUM)
+**Status:** resolved — the abstention is load-bearing; the tests stay, with the failing browser tests named beside them (#304)
 
 **Priority:** P3
 
