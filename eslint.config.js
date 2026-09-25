@@ -227,6 +227,9 @@ export default tseslint.config(
       sourceType: 'module',
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
+        // `react-jsx` never reads `React` for JSX, so a namespace import used only in
+        // types is reported by `consistent-type-imports`.
+        jsxPragma: null,
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
