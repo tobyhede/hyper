@@ -9,7 +9,6 @@ import {
   Eye,
   EyeOff,
   LayoutGrid,
-  Link,
   LogIn,
   Maximize,
   Maximize2,
@@ -331,14 +330,6 @@ export const AlertIcon = () => <CircleAlert />;
 
 /** Close the surface that contains the control. */
 export const CloseIcon = () => <X size={14} strokeWidth={3} />;
-
-/**
- * A link glyph for an entity's actions menu.
- *
- * Exported and drawn by no surface: the Resource rail, like every other entity
- * menu, draws {@link EntityActionsIcon}.
- */
-export const LinkActionsIcon = (props: ResourceActionIconProps) => <Link size={14} {...props} />;
 
 /**
  * Open an entity's actions menu, where the menu does not primarily serve one action.

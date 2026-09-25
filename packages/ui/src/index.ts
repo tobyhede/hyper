@@ -128,7 +128,6 @@ export {
   FitViewIcon,
   GraphIcon,
   MapIcon,
-  LinkActionsIcon,
   MarkdownIcon,
   OpenIndependentlyIcon,
   OpenResourceIcon,
